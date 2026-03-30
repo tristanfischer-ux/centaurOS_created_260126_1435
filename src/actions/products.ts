@@ -86,7 +86,7 @@ function briefsTable(supabase: any) {
 export async function getProducts(): Promise<ActionResult<ProductSummary[]>> {
   return withAuth(async ({ supabase, foundryId }) => {
     const { data, error } = await productsTable(supabase)
-      .select('id, name, description, hero_image_url, lifecycle, unit_price_pence, target_monthly_units, cad_lab_project_id, unit_economics, created_at, updated_at')
+      .select('id, name, description, hero_image_url, lifecycle, unit_price_pence, target_monthly_units, cad_lab_project_id, unit_economics, market_assessment, fundability_score, created_at, updated_at')
       .eq('foundry_id', foundryId)
       .order('updated_at', { ascending: false })
 
@@ -128,6 +128,8 @@ export async function getProducts(): Promise<ActionResult<ProductSummary[]>> {
         cogs_per_unit: ue?.cogs_per_unit_pence ? ue.cogs_per_unit_pence / 100 : null,
         gross_margin_pct: ue?.gross_margin_pct ?? null,
         latest_convergence_status: iterationMap[row.id] ?? null,
+        has_market_assessment: row.market_assessment != null,
+        has_fundability_score: row.fundability_score != null,
         created_at: row.created_at,
         updated_at: row.updated_at,
       }
@@ -369,6 +371,36 @@ export async function promoteFromCadLab(cadLabProjectId: string): Promise<Action
 
     return { data: data as Product }
   })
+}
+
+/**
+ * Auto-promotes a completed CAD Lab project to a product (fire-and-forget).
+ *
+ * @description Called from saveCadLabResult/saveCadLabProjectRfq when a design
+ * reaches "generated" or "rfq_created" status. Idempotent — silently returns
+ * if a product already exists for this project. Wraps promoteFromCadLab with
+ * error absorption so the Forge save never fails because of Products.
+ */
+export async function autoPromoteIfComplete(
+  cadLabProjectId: string,
+): Promise<{ promoted: boolean; productId?: string }> {
+  try {
+    const result = await promoteFromCadLab(cadLabProjectId)
+    if ("error" in result) {
+      // Duplicate or invalid — not an error for auto-promote
+      if (result.error?.includes("already exists")) return { promoted: false }
+      console.warn("[Products] Auto-promote skipped:", result.error)
+      return { promoted: false }
+    }
+    console.info("[Products] Auto-promoted CAD project to product:", {
+      cadLabProjectId,
+      productId: result.data?.id,
+    })
+    return { promoted: true, productId: result.data?.id }
+  } catch (err) {
+    console.error("[Products] Auto-promote failed:", err)
+    return { promoted: false }
+  }
 }
 
 // ─── syncProductFinancials ───────────────────────────────────────────

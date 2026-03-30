@@ -1,9 +1,10 @@
 /**
  * @file product-list-view.tsx — Client component for the /products page.
  *
- * @description Renders the product grid with Priya's briefing hero, empty state
- * with 3 creation flow cards, and product cards with lifecycle badges and
- * unit economics summary.
+ * @description Renders the product portfolio with Priya's briefing hero,
+ * rich product cards (economics, status indicators, lifecycle), and
+ * three clear creation flows: market idea, promote from Forge, inline
+ * business plan upload.
  *
  * @related
  * - src/app/(platform)/products/page.tsx — Server component
@@ -20,7 +21,16 @@ import { useRouter } from 'next/navigation'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { createProduct, createIteration, generateMarketAssessment } from '@/actions/products'
+import {
+  createProduct,
+  createIteration,
+  generateMarketAssessment,
+  promoteFromCadLab,
+} from '@/actions/products'
+import { listCadLabProjects } from '@/actions/cad-lab-projects'
+import { analyzeBusinessPlan } from '@/actions/analyze'
+import { saveBusinessPlanAnalysis, buildSmartMerge } from '@/actions/business-plan'
+import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from '@/lib/business-plan-types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,11 +46,24 @@ import {
 } from '@/components/ui/dialog'
 import { typography } from '@/lib/design-system'
 import { toast } from 'sonner'
-import { Hammer, Lightbulb, FileText, Package, ArrowRight, Lock, Loader2 } from 'lucide-react'
+import {
+  Hammer,
+  Lightbulb,
+  FileText,
+  Package,
+  ArrowRight,
+  Loader2,
+  Upload,
+  Search,
+  Star,
+  Plus,
+  TrendingUp,
+} from 'lucide-react'
 import type { ProductSummary, ProductLifecycle, ConvergenceStatus } from '@/types/product'
 import { LIFECYCLE_LABELS } from '@/types/product'
+import type { CadLabProjectSummary } from '@/actions/cad-lab-projects'
 
-// ─── Convergence badge config ─────────────────────────────────────────
+// ─── Config ──────────────────────────────────────────────────────────
 
 const CONVERGENCE_BADGE: Record<string, { label: string; variant: 'success' | 'warning' | 'info' | 'destructive' }> = {
   improving: { label: 'Improving', variant: 'success' },
@@ -49,8 +72,6 @@ const CONVERGENCE_BADGE: Record<string, { label: string; variant: 'success' | 'w
   regressing: { label: 'Regressing', variant: 'destructive' },
   converged: { label: 'Converged', variant: 'info' },
 }
-
-// ─── Lifecycle badge variant mapping ─────────────────────────────────
 
 const LIFECYCLE_VARIANT: Record<ProductLifecycle, 'default' | 'secondary' | 'success' | 'warning' | 'info' | 'brand' | 'outline'> = {
   concept: 'outline',
@@ -62,14 +83,29 @@ const LIFECYCLE_VARIANT: Record<ProductLifecycle, 'default' | 'secondary' | 'suc
   deprecated: 'secondary',
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────
+const LIFECYCLE_ORDER: ProductLifecycle[] = [
+  'concept', 'researching', 'validated', 'prototyping', 'pre_production', 'in_market',
+]
+
+// ─── Helpers ─────────────────────────────────────────────────────────
 
 function formatPence(pence: number): string {
-  return `\u00A3${(pence / 100).toFixed(2)}`
+  return `£${(pence / 100).toFixed(2)}`
+}
+
+function formatCurrency(pence: number): string {
+  if (pence >= 100_000) return `£${(pence / 100_000).toFixed(1)}k`
+  return `£${(pence / 100).toFixed(0)}`
 }
 
 function formatMargin(pct: number): string {
   return `${pct.toFixed(1)}%`
+}
+
+function marginColor(pct: number): string {
+  if (pct >= 40) return 'text-success'
+  if (pct >= 20) return 'text-warning'
+  return 'text-destructive'
 }
 
 function countByLifecycle(products: ProductSummary[]): Record<string, number> {
@@ -80,16 +116,23 @@ function countByLifecycle(products: ProductSummary[]): Record<string, number> {
   return counts
 }
 
-// ─── Props ──────────────────────────────────────────────────────────
+// ─── Props ───────────────────────────────────────────────────────────
 
 interface ProductListViewProps {
   products: ProductSummary[]
 }
 
-// ─── Component ──────────────────────────────────────────────────────
+// ─── Main Component ──────────────────────────────────────────────────
 
 export function ProductListView({ products }: ProductListViewProps) {
-  // ── AI Briefing ──────────────────────────────────────────────────
+  const router = useRouter()
+
+  // ── State for creation flows ────────────────────────────────────
+  const [marketDialogOpen, setMarketDialogOpen] = React.useState(false)
+  const [forgePickerOpen, setForgePickerOpen] = React.useState(false)
+  const [showPlanUpload, setShowPlanUpload] = React.useState(false)
+
+  // ── AI Briefing ─────────────────────────────────────────────────
   const briefingContext = React.useMemo(() => {
     const counts = countByLifecycle(products)
     const parts = Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')
@@ -116,7 +159,7 @@ export function ProductListView({ products }: ProductListViewProps) {
           <h1 className={typography.h1}>Products</h1>
         </div>
         <p className={typography.pageSubtitle}>
-          Your hardware products — from concept to market
+          Where your designs, market research, and unit economics come together.
         </p>
       </div>
 
@@ -128,7 +171,7 @@ export function ProductListView({ products }: ProductListViewProps) {
         narrative={briefing.narrative}
         fallbackMessage={
           products.length === 0
-            ? "No products yet. Let's get your first product defined — start from a Forge design, a market idea, or your business plan."
+            ? "No products yet. Start with a market idea, promote a Forge design, or upload a business plan to extract products."
             : `You have ${products.length} product${products.length === 1 ? '' : 's'}. Let me review your portfolio.`
         }
         isLoading={briefing.isLoading}
@@ -139,19 +182,35 @@ export function ProductListView({ products }: ProductListViewProps) {
 
       {/* Empty state or product grid */}
       {products.length === 0 ? (
-        <EmptyProductState />
+        <EmptyProductState
+          onMarketIdea={() => setMarketDialogOpen(true)}
+          onForgePromote={() => setForgePickerOpen(true)}
+          onPlanUpload={() => setShowPlanUpload(true)}
+          showPlanUpload={showPlanUpload}
+          router={router}
+        />
       ) : (
         <div className="space-y-4">
-          {/* New Product button */}
-          <div className="flex justify-end">
-            <Link
-              href="/the-forge"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-international-orange bg-international-orange/10 rounded-md hover:bg-international-orange/20 transition-colors"
-            >
-              <Package className="h-4 w-4" />
+          {/* Creation actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={() => setMarketDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />
               New Product
-            </Link>
+            </Button>
+            <Button variant="outline" onClick={() => setForgePickerOpen(true)}>
+              <Hammer className="h-4 w-4 mr-1.5" />
+              Promote from Forge
+            </Button>
+            <Button variant="outline" onClick={() => setShowPlanUpload(!showPlanUpload)}>
+              <FileText className="h-4 w-4 mr-1.5" />
+              Extract from Plan
+            </Button>
           </div>
+
+          {/* Inline plan upload (toggled) */}
+          {showPlanUpload && (
+            <InlinePlanUpload router={router} />
+          )}
 
           {/* Product grid */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -161,21 +220,466 @@ export function ProductListView({ products }: ProductListViewProps) {
           </div>
         </div>
       )}
+
+      {/* Market Idea Dialog */}
+      <MarketIdeaDialog
+        open={marketDialogOpen}
+        onOpenChange={setMarketDialogOpen}
+        router={router}
+      />
+
+      {/* Forge Picker Dialog */}
+      <ForgePickerDialog
+        open={forgePickerOpen}
+        onOpenChange={setForgePickerOpen}
+        existingProjectIds={products.map((p) => p.cad_lab_project_id).filter(Boolean) as string[]}
+        router={router}
+      />
     </div>
   )
 }
 
-// ─── Empty State ────────────────────────────────────────────────────
+// ─── Empty State ─────────────────────────────────────────────────────
 
-function EmptyProductState() {
-  const router = useRouter()
-  const [marketDialogOpen, setMarketDialogOpen] = React.useState(false)
+function EmptyProductState({
+  onMarketIdea,
+  onForgePromote,
+  onPlanUpload,
+  showPlanUpload,
+  router,
+}: {
+  onMarketIdea: () => void
+  onForgePromote: () => void
+  onPlanUpload: () => void
+  showPlanUpload: boolean
+  router: ReturnType<typeof useRouter>
+}) {
+  return (
+    <div className="space-y-6">
+      {/* Explainer */}
+      <div className="text-center py-6">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-international-orange/10 mb-4">
+          <Package className="h-6 w-6 text-international-orange" />
+        </div>
+        <h3 className="text-lg font-display font-medium text-foreground mb-2">
+          No products yet
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+          Products bring together your Forge designs, market research, unit economics, and fundraising story. Completed Forge designs are auto-promoted here. You can also start from scratch.
+        </p>
+      </div>
+
+      {/* Three creation paths */}
+      <div className="space-y-4 max-w-3xl mx-auto">
+        {/* Primary: Market Idea (full width) */}
+        <Card
+          className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 cursor-pointer border-international-orange/30"
+          onClick={onMarketIdea}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter') onMarketIdea() }}
+        >
+          <CardContent className="py-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange/10 flex-shrink-0">
+                <Lightbulb className="h-5 w-5 text-international-orange" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">Start with an idea</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Describe your market and problem. We will create the product, run market assessment, and model economics.
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-international-orange flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Secondary: two side-by-side */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card
+            className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 cursor-pointer"
+            onClick={onForgePromote}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter') onForgePromote() }}
+          >
+            <CardContent className="py-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-international-orange/10 flex-shrink-0">
+                  <Hammer className="h-4 w-4 text-international-orange" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Promote from The Forge</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Pick a completed design. COGS and images are carried over automatically.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 cursor-pointer"
+            onClick={onPlanUpload}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter') onPlanUpload() }}
+          >
+            <CardContent className="py-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-international-orange/10 flex-shrink-0">
+                  <FileText className="h-4 w-4 text-international-orange" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Extract from a business plan</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Upload a PDF or DOCX. Products are extracted and created automatically.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Inline plan upload (expanded) */}
+        {showPlanUpload && (
+          <InlinePlanUpload router={router} />
+        )}
+      </div>
+
+      {/* What happens next */}
+      <div className="flex items-center justify-center gap-2 py-4 text-[10px] uppercase tracking-wider text-muted-foreground max-w-2xl mx-auto">
+        <span className="flex items-center gap-1"><Package className="h-3 w-3" /> Created</span>
+        <span>→</span>
+        <span className="flex items-center gap-1"><Search className="h-3 w-3" /> Market Research</span>
+        <span>→</span>
+        <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Unit Economics</span>
+        <span>→</span>
+        <span className="flex items-center gap-1"><Star className="h-3 w-3" /> Investor Ready</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Inline Business Plan Upload ─────────────────────────────────────
+
+function InlinePlanUpload({ router }: { router: ReturnType<typeof useRouter> }) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false)
+  const [extractedProducts, setExtractedProducts] = React.useState<Array<{
+    name: string
+    description: string
+    targetMarket?: string
+    revenueModel?: string
+    suggestedPrice?: number
+    selected: boolean
+  }>>([])
+  const [showReview, setShowReview] = React.useState(false)
+  const [isCreating, setIsCreating] = React.useState(false)
+
+  const handleFile = React.useCallback(async (file: File) => {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(ext as typeof ALLOWED_EXTENSIONS[number])) {
+      toast.error(`Unsupported file type "${ext}". Use PDF, DOCX, or TXT.`)
+      return
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Max 20 MB.`)
+      return
+    }
+
+    setIsAnalyzing(true)
+    toast.info('Analyzing your business plan...')
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const result = await analyzeBusinessPlan(formData)
+    if (result.error || !result.analysis) {
+      setIsAnalyzing(false)
+      toast.error(result.error ?? 'Analysis failed')
+      return
+    }
+
+    const { analysisId, error: saveError } = await saveBusinessPlanAnalysis(result.analysis, file.name)
+    if (saveError || !analysisId) {
+      setIsAnalyzing(false)
+      toast.error(saveError ?? 'Failed to save analysis')
+      return
+    }
+
+    const { mergeState, error: mergeError } = await buildSmartMerge(result.analysis, analysisId)
+    setIsAnalyzing(false)
+
+    if (mergeError || !mergeState) {
+      toast.error(mergeError ?? 'Failed to extract products')
+      return
+    }
+
+    // INTENT: Only show extracted products (not objectives/hiring/etc.)
+    const products = (mergeState.extractedProducts ?? []).map((p) => ({
+      ...p,
+      selected: true,
+    }))
+
+    if (products.length === 0) {
+      toast.info('No products found in the business plan.')
+      return
+    }
+
+    setExtractedProducts(products)
+    setShowReview(true)
+  }, [])
+
+  const handleCreate = React.useCallback(async () => {
+    const selected = extractedProducts.filter((p) => p.selected)
+    if (selected.length === 0) {
+      toast.error('Select at least one product to create')
+      return
+    }
+
+    setIsCreating(true)
+    let created = 0
+    for (const p of selected) {
+      const result = await createProduct({
+        name: p.name,
+        description: p.description,
+      })
+      if (result.data) {
+        created++
+        // Fire-and-forget market assessment
+        generateMarketAssessment(result.data.id).catch(() => {})
+      }
+    }
+
+    setIsCreating(false)
+    setShowReview(false)
+    setExtractedProducts([])
+    toast.success(`Created ${created} product${created !== 1 ? 's' : ''}`)
+    router.refresh()
+  }, [extractedProducts, router])
+
+  return (
+    <Card>
+      <CardContent className="py-4">
+        {!showReview ? (
+          <div className="space-y-3">
+            <div
+              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-6 px-4 cursor-pointer hover:border-international-orange/40 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const file = e.dataTransfer.files[0]
+                if (file) handleFile(file)
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') fileInputRef.current?.click() }}
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-6 w-6 text-international-orange animate-spin" />
+                  <p className="text-sm text-muted-foreground">Analyzing your business plan...</p>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Drop a business plan here, or <span className="text-international-orange font-medium">browse</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">PDF, DOCX, or TXT — max 20 MB</p>
+                </>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) { handleFile(file); e.target.value = '' }
+              }}
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground">
+              Found {extractedProducts.length} product{extractedProducts.length !== 1 ? 's' : ''} in your business plan
+            </p>
+            {extractedProducts.map((p, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-3 rounded-lg border border-border p-3"
+              >
+                <input
+                  type="checkbox"
+                  checked={p.selected}
+                  onChange={() => {
+                    setExtractedProducts((prev) =>
+                      prev.map((item, j) =>
+                        j === i ? { ...item, selected: !item.selected } : item,
+                      ),
+                    )
+                  }}
+                  className="mt-0.5 h-4 w-4 accent-international-orange"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">{p.name}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{p.description}</p>
+                  <div className="flex gap-2 mt-1">
+                    {p.targetMarket && (
+                      <Badge variant="secondary" size="sm">{p.targetMarket}</Badge>
+                    )}
+                    {p.suggestedPrice != null && (
+                      <Badge variant="outline" size="sm">~£{p.suggestedPrice}</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setShowReview(false); setExtractedProducts([]) }}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCreate}
+                disabled={isCreating || !extractedProducts.some((p) => p.selected)}
+              >
+                {isCreating ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Creating...</>
+                ) : (
+                  `Create ${extractedProducts.filter((p) => p.selected).length} Product${extractedProducts.filter((p) => p.selected).length !== 1 ? 's' : ''}`
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Forge Picker Dialog ─────────────────────────────────────────────
+
+function ForgePickerDialog({
+  open,
+  onOpenChange,
+  existingProjectIds,
+  router,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  existingProjectIds: string[]
+  router: ReturnType<typeof useRouter>
+}) {
+  const [projects, setProjects] = React.useState<CadLabProjectSummary[]>([])
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [promoting, setPromoting] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    setIsLoading(true)
+    listCadLabProjects().then((result) => {
+      setIsLoading(false)
+      if ('projects' in result) {
+        // Filter to completed designs not already linked to a product
+        const eligible = result.projects.filter(
+          (p) =>
+            (p.status === 'generated' || p.status === 'complete' || p.status === 'rfq_created') &&
+            !existingProjectIds.includes(p.id),
+        )
+        setProjects(eligible)
+      }
+    })
+  }, [open, existingProjectIds])
+
+  const handlePromote = React.useCallback(async (projectId: string) => {
+    setPromoting(projectId)
+    const result = await promoteFromCadLab(projectId)
+    setPromoting(null)
+    if ('error' in result) {
+      toast.error(result.error ?? 'Failed to promote')
+      return
+    }
+    toast.success('Design promoted to product')
+    onOpenChange(false)
+    if (result.data) router.push(`/products/${result.data.id}`)
+  }, [onOpenChange, router])
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Promote from The Forge</DialogTitle>
+          <DialogDescription>
+            Select a completed design to turn into a product. COGS and images carry over.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 max-h-80 overflow-y-auto py-2">
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!isLoading && projects.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No completed designs available. Designs are auto-promoted when they finish — check The Forge.
+            </p>
+          )}
+          {projects.map((project) => (
+            <div
+              key={project.id}
+              className="flex items-center justify-between rounded-lg border border-border p-3"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
+                <p className="text-xs text-muted-foreground">{project.subject || 'No description'}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={promoting === project.id}
+                onClick={() => handlePromote(project.id)}
+              >
+                {promoting === project.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Promote'
+                )}
+              </Button>
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Market Idea Dialog ──────────────────────────────────────────────
+
+function MarketIdeaDialog({
+  open,
+  onOpenChange,
+  router,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  router: ReturnType<typeof useRouter>
+}) {
   const [marketDescription, setMarketDescription] = React.useState('')
   const [problem, setProblem] = React.useState('')
   const [industry, setIndustry] = React.useState('')
   const [isCreating, setIsCreating] = React.useState(false)
 
-  const handleMarketIdeaSubmit = React.useCallback(async () => {
+  const handleSubmit = React.useCallback(async () => {
     if (!marketDescription.trim() || !problem.trim()) {
       toast.error('Please fill in target market and problem')
       return
@@ -188,16 +692,9 @@ function EmptyProductState() {
       const description = `${marketDescription.trim()}\n\nProblem: ${problem.trim()}`
 
       const result = await createProduct({ name: productName, description })
-      if (result.error) {
-        toast.error(result.error)
-        return
-      }
-      if (!result.data) {
-        toast.error('Failed to create product')
-        return
-      }
+      if (result.error) { toast.error(result.error); return }
+      if (!result.data) { toast.error('Failed to create product'); return }
 
-      // INTENT: Create first iteration with zero scores for the new market-first product
       await createIteration(
         result.data.id,
         { market: 0, financial: 0, fundability: 0, manufacturing: 0 },
@@ -206,189 +703,90 @@ function EmptyProductState() {
       )
 
       toast.success('Product created — running market assessment...')
-      setMarketDialogOpen(false)
-
-      // FLOW: Auto-trigger market assessment for market-first products
-      generateMarketAssessment(result.data.id).catch(() => {
-        // Non-critical — user can trigger manually from Market tab
-      })
-
+      onOpenChange(false)
+      generateMarketAssessment(result.data.id).catch(() => {})
       router.push(`/products/${result.data.id}`)
     } catch {
       toast.error('Failed to create product')
     } finally {
       setIsCreating(false)
     }
-  }, [marketDescription, problem, industry, router])
-
-  const flows = [
-    {
-      title: 'From The Forge',
-      description: 'Promote a completed design to a product',
-      icon: Hammer,
-      href: '/the-forge' as string | undefined,
-      enabled: true,
-      onClick: undefined as (() => void) | undefined,
-    },
-    {
-      title: 'From a Market Idea',
-      description: 'Start with your target market',
-      icon: Lightbulb,
-      href: undefined as string | undefined,
-      enabled: true,
-      onClick: (() => setMarketDialogOpen(true)) as (() => void) | undefined,
-    },
-    {
-      title: 'From Your Business Plan',
-      description: 'Upload a business plan on the Strategy page to extract products',
-      icon: FileText,
-      href: '/strategy' as string | undefined,
-      enabled: true,
-      badge: undefined as string | undefined,
-      onClick: undefined as (() => void) | undefined,
-    },
-  ]
+  }, [marketDescription, problem, industry, router, onOpenChange])
 
   return (
-    <div className="space-y-6">
-      <div className="text-center py-8">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-international-orange/10 mb-4">
-          <Package className="h-6 w-6 text-international-orange" />
-        </div>
-        <h3 className="text-lg font-display font-medium text-foreground mb-2">
-          No products yet
-        </h3>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Products bridge your designs, finances, and fundraising. Create your first product to start building your portfolio.
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
-        {flows.map((flow) => {
-          const content = (
-            <Card
-              key={flow.title}
-              className={
-                flow.enabled
-                  ? 'hover:-translate-y-0.5 active:scale-[0.99] duration-200 cursor-pointer'
-                  : 'opacity-60'
-              }
-            >
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center text-center space-y-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange/10">
-                    {flow.enabled ? (
-                      <flow.icon className="h-5 w-5 text-international-orange" />
-                    ) : (
-                      <Lock className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{flow.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{flow.description}</p>
-                  </div>
-                  {flow.badge && (
-                    <Badge variant="outline" size="sm">{flow.badge}</Badge>
-                  )}
-                  {flow.enabled && (
-                    <ArrowRight className="h-4 w-4 text-international-orange" />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )
-
-          if (flow.enabled && flow.href) {
-            return (
-              <Link key={flow.title} href={flow.href}>
-                {content}
-              </Link>
-            )
-          }
-
-          if (flow.enabled && flow.onClick) {
-            const handler = flow.onClick
-            return (
-              <div key={flow.title} onClick={handler} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handler() }}>
-                {content}
-              </div>
-            )
-          }
-
-          return <div key={flow.title}>{content}</div>
-        })}
-      </div>
-
-      {/* Market Idea Dialog */}
-      <Dialog open={marketDialogOpen} onOpenChange={setMarketDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create from a Market Idea</DialogTitle>
-            <DialogDescription>
-              Describe your market opportunity and we will help you build a product around it.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="market-description">
-                Describe your target market <span className="text-destructive">*</span>
-              </Label>
-              <textarea
-                id="market-description"
-                value={marketDescription}
-                onChange={(e) => setMarketDescription(e.target.value)}
-                className="w-full min-h-[80px] p-3 text-sm rounded-md border border-input bg-background text-foreground resize-y"
-                placeholder="e.g. Small UK manufacturers who need affordable quality inspection tools..."
-                aria-required="true"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="market-problem">
-                What problem does your product solve? <span className="text-destructive">*</span>
-              </Label>
-              <textarea
-                id="market-problem"
-                value={problem}
-                onChange={(e) => setProblem(e.target.value)}
-                className="w-full min-h-[80px] p-3 text-sm rounded-md border border-input bg-background text-foreground resize-y"
-                placeholder="e.g. Current solutions cost 10x more and require specialist training..."
-                aria-required="true"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="market-industry">What industry?</Label>
-              <Input
-                id="market-industry"
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-                placeholder="e.g. Manufacturing, Healthcare, Agriculture..."
-              />
-            </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Start with a Market Idea</DialogTitle>
+          <DialogDescription>
+            Describe your market opportunity. We will create the product, research the market, and start modelling economics.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="market-description">
+              Describe your target market <span className="text-destructive">*</span>
+            </Label>
+            <textarea
+              id="market-description"
+              value={marketDescription}
+              onChange={(e) => setMarketDescription(e.target.value)}
+              className="w-full min-h-[80px] p-3 text-sm rounded-md border border-input bg-background text-foreground resize-y"
+              placeholder="e.g. Small UK manufacturers who need affordable quality inspection tools..."
+              aria-required="true"
+            />
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setMarketDialogOpen(false)} disabled={isCreating}>
-              Cancel
-            </Button>
-            <Button onClick={handleMarketIdeaSubmit} disabled={isCreating || !marketDescription.trim() || !problem.trim()}>
-              {isCreating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Create Product'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          <div className="space-y-2">
+            <Label htmlFor="market-problem">
+              What problem does your product solve? <span className="text-destructive">*</span>
+            </Label>
+            <textarea
+              id="market-problem"
+              value={problem}
+              onChange={(e) => setProblem(e.target.value)}
+              className="w-full min-h-[80px] p-3 text-sm rounded-md border border-input bg-background text-foreground resize-y"
+              placeholder="e.g. Current solutions cost 10x more and require specialist training..."
+              aria-required="true"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="market-industry">What industry?</Label>
+            <Input
+              id="market-industry"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              placeholder="e.g. Manufacturing, Healthcare, Agriculture..."
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isCreating}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isCreating || !marketDescription.trim() || !problem.trim()}>
+            {isCreating ? (
+              <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Creating...</>
+            ) : (
+              'Create Product'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-// ─── Product Card ───────────────────────────────────────────────────
+// ─── Product Card ────────────────────────────────────────────────────
 
 function ProductCard({ product }: { product: ProductSummary }) {
+  const monthlyRevenue =
+    product.unit_price_pence != null && product.target_monthly_units != null
+      ? product.unit_price_pence * product.target_monthly_units
+      : null
+
+  const lifecycleProgress = LIFECYCLE_ORDER.indexOf(product.lifecycle)
+  const lifecycleMax = LIFECYCLE_ORDER.length - 1
+
   return (
     <Link href={`/products/${product.id}`}>
       <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 cursor-pointer h-full">
@@ -404,7 +802,7 @@ function ProductCard({ product }: { product: ProductSummary }) {
             />
           </div>
         ) : (
-          <div className="h-24 w-full rounded-t-lg bg-muted flex items-center justify-center">
+          <div className="h-20 w-full rounded-t-lg bg-muted flex items-center justify-center">
             <Package className="h-8 w-8 text-muted-foreground/30" />
           </div>
         )}
@@ -418,39 +816,66 @@ function ProductCard({ product }: { product: ProductSummary }) {
               {LIFECYCLE_LABELS[product.lifecycle]}
             </Badge>
           </div>
+
+          {/* Lifecycle progress bar */}
+          {product.lifecycle !== 'deprecated' && lifecycleProgress >= 0 && (
+            <div className="flex gap-0.5 mt-1.5">
+              {LIFECYCLE_ORDER.map((stage, i) => (
+                <div
+                  key={stage}
+                  className={`h-1 flex-1 rounded-full ${
+                    i <= lifecycleProgress
+                      ? 'bg-international-orange'
+                      : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </CardHeader>
 
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 space-y-2">
           {product.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+            <p className="text-xs text-muted-foreground line-clamp-2">
               {product.description}
             </p>
           )}
 
-          {/* Unit economics summary */}
-          {(product.cogs_per_unit != null || product.gross_margin_pct != null) && (
-            <div className="flex items-center gap-3 text-xs">
-              {product.cogs_per_unit != null && (
-                <span className="text-muted-foreground">
-                  COGS: <span className="text-foreground font-medium">{formatPence(product.cogs_per_unit * 100)}</span>
-                </span>
-              )}
-              {product.gross_margin_pct != null && (
-                <span className="text-muted-foreground">
-                  Margin: <span className="text-foreground font-medium">{formatMargin(product.gross_margin_pct)}</span>
-                </span>
-              )}
-            </div>
-          )}
+          {/* Economics row */}
+          <div className="flex items-center gap-3 text-xs flex-wrap">
+            {product.cogs_per_unit != null && (
+              <span className="text-muted-foreground">
+                COGS <span className="text-foreground font-medium">{formatPence(product.cogs_per_unit * 100)}</span>
+              </span>
+            )}
+            {product.gross_margin_pct != null && (
+              <span className="text-muted-foreground">
+                Margin <span className={`font-medium ${marginColor(product.gross_margin_pct)}`}>{formatMargin(product.gross_margin_pct)}</span>
+              </span>
+            )}
+            {monthlyRevenue != null && monthlyRevenue > 0 && (
+              <span className="text-muted-foreground">
+                Rev <span className="text-foreground font-medium">{formatCurrency(monthlyRevenue)}/mo</span>
+              </span>
+            )}
+          </div>
 
-          {/* Convergence badge */}
-          {product.latest_convergence_status && CONVERGENCE_BADGE[product.latest_convergence_status] && (
-            <div className="mt-2">
-              <Badge variant={CONVERGENCE_BADGE[product.latest_convergence_status].variant} size="sm">
+          {/* Status indicators + convergence */}
+          <div className="flex items-center gap-2">
+            {/* Status dots */}
+            <div className="flex items-center gap-1.5" title="Design linked / Market data / Fundability scored">
+              <Hammer className={`h-3 w-3 ${product.cad_lab_project_id ? 'text-international-orange' : 'text-muted-foreground/30'}`} />
+              <Search className={`h-3 w-3 ${product.has_market_assessment ? 'text-international-orange' : 'text-muted-foreground/30'}`} />
+              <Star className={`h-3 w-3 ${product.has_fundability_score ? 'text-international-orange' : 'text-muted-foreground/30'}`} />
+            </div>
+
+            {/* Convergence badge */}
+            {product.latest_convergence_status && CONVERGENCE_BADGE[product.latest_convergence_status] && (
+              <Badge variant={CONVERGENCE_BADGE[product.latest_convergence_status].variant} size="sm" className="ml-auto">
                 {CONVERGENCE_BADGE[product.latest_convergence_status].label}
               </Badge>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
     </Link>

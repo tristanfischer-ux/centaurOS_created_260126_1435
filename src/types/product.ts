@@ -73,6 +73,10 @@ export interface ProductSummary {
   gross_margin_pct: number | null
   /** Latest convergence status from most recent iteration (for list view badges) */
   latest_convergence_status: ConvergenceStatus | null
+  /** Whether AI market assessment has been generated */
+  has_market_assessment: boolean
+  /** Whether fundability score has been computed */
+  has_fundability_score: boolean
   created_at: string
   updated_at: string
 }

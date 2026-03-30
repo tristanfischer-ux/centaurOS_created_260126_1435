@@ -450,6 +450,16 @@ export async function saveCadLabResult(
       return { error: `Failed to save result: ${sanitizeErrorMessage(error)}` }
     }
 
+    // INTENT: Auto-promote completed designs to Products page (fire-and-forget).
+    // If promotion fails, the save still succeeds — Products is non-critical.
+    if (result.success) {
+      import("@/actions/products").then(({ autoPromoteIfComplete }) =>
+        autoPromoteIfComplete(projectId).catch((err) =>
+          console.error("[THE-FORGE] Auto-promote failed:", err),
+        ),
+      )
+    }
+
     return { success: true as const }
   })
 }
@@ -868,6 +878,13 @@ export async function saveCadLabProjectRfq(
     if (error) {
       return { error: `Failed to save RFQ linkage: ${sanitizeErrorMessage(error)}` }
     }
+
+    // INTENT: Auto-promote to Products when RFQ is created (fire-and-forget)
+    import("@/actions/products").then(({ autoPromoteIfComplete }) =>
+      autoPromoteIfComplete(projectId).catch((err) =>
+        console.error("[THE-FORGE] Auto-promote on RFQ failed:", err),
+      ),
+    )
 
     return { success: true as const }
   })
