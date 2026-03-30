@@ -118,7 +118,9 @@ export function SpecialistBriefingHero({
     setCollapsed(getInitialCollapsed(key))
   }, [key])
 
-  const config = severityConfig[severity]
+  // GOTCHA: severity may be undefined if an upstream action returns an unexpected shape.
+  // Default to 'success' to prevent runtime crash.
+  const config = severityConfig[severity] ?? severityConfig['success']
   const SeverityIcon = config.icon
 
   const toggleCollapse = useCallback(() => {
