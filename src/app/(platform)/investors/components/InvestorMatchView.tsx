@@ -711,23 +711,22 @@ export function InvestorMatchView() {
             </Button>
           )}
 
-          {/* Refresh button */}
-          <Button
-            onClick={startMatching}
-            disabled={isLoading}
-            className={cn(
-              isLoading
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-international-orange hover:bg-international-orange-hover'
-            )}
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            Refresh Matches
-          </Button>
+          {/* Refresh button — only for paid users. Free users get cached results. */}
+          {isPaid && (
+            <Button
+              onClick={startMatching}
+              disabled={isLoading}
+              variant="ghost"
+              size="sm"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Refresh Matches
+            </Button>
+          )}
         </div>
       </div>
 

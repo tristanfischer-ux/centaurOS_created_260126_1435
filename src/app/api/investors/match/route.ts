@@ -122,10 +122,24 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  // ── Check for cached results (< 7 days old) ──────────────
+  // ── Check for cached results ──────────────
   // INTENT: Use active_foundry_id (current workspace) not foundry_id (primary)
   const { data: profileData } = await supabase.from("profiles").select("foundry_id, active_foundry_id").eq("id", user.id).single()
   const foundryId = profileData?.active_foundry_id || profileData?.foundry_id
+
+  // SECURITY: Check tier early — free users ALWAYS get cached results (no regeneration).
+  // This prevents free users from burning AI credits by refreshing.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: earlySubCheck } = await (supabase as any)
+    .from("user_subscriptions")
+    .select("tier")
+    .eq("user_id", user.id)
+    .in("status", ["active", "trialing"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const earlyTier = earlySubCheck?.tier || "free"
+  const isFreeUser = earlyTier === "free"
 
   if (foundryId) {
     // INTENT: Use admin client for cache read — RLS SELECT policy may not
@@ -144,8 +158,10 @@ export async function POST(request: Request) {
 
       if (cacheRow?.report_data && cacheRow.generated_at) {
         const cacheAge = Date.now() - new Date(cacheRow.generated_at).getTime()
-        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
-        if (cacheAge < SEVEN_DAYS) {
+        // SECURITY: Free users get cache indefinitely (30 days) — no regeneration.
+        // Paid users get 7-day cache that can be refreshed via button.
+        const cacheTTL = isFreeUser ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000
+        if (cacheAge < cacheTTL) {
           return NextResponse.json({ cached: true, ...cacheRow.report_data })
         }
       }
