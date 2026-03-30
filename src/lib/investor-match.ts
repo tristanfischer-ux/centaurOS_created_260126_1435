@@ -114,9 +114,10 @@ export function calculateMatchScore(
   const userTerms: string[] = []
   if (profile.sector) userTerms.push(profile.sector.toLowerCase())
   if (profile.industry) userTerms.push(profile.industry.toLowerCase())
-  if (userTerms.length > 0 && attrs.sectors && attrs.sectors.length > 0) {
+  const sectorsList = Array.isArray(attrs.sectors) ? attrs.sectors : []
+  if (userTerms.length > 0 && sectorsList.length > 0) {
     const matches = userTerms.filter(ut =>
-      attrs.sectors!.some(s => s.toLowerCase().includes(ut) || ut.includes(s.toLowerCase()))
+      sectorsList.some(s => s.toLowerCase().includes(ut) || ut.includes(s.toLowerCase()))
     ).length
     if (matches >= 2) {
       sectorScore = 25
@@ -229,7 +230,7 @@ export function findSimilarInvestors(
   candidates: InvestorFirm[],
   limit = 5
 ): { firm: InvestorFirm; similarity: number }[] {
-  const targetSectors = new Set((target.attributes.sectors ?? []).map(s => s.toLowerCase()))
+  const targetSectors = new Set((Array.isArray(target.attributes.sectors) ? target.attributes.sectors : []).map(s => s.toLowerCase()))
   const targetStages = new Set((target.attributes.stage_focus ?? []).map(s => s.toLowerCase()))
   const targetGeo = new Set((target.attributes.geo_focus ?? []).map(g => g.toLowerCase()))
   const targetFundSize = target.attributes.fund_size_gbp ?? 0
@@ -237,7 +238,7 @@ export function findSimilarInvestors(
   const scored = candidates
     .filter(c => c.id !== target.id)
     .map(c => {
-      const cSectors = new Set((c.attributes.sectors ?? []).map(s => s.toLowerCase()))
+      const cSectors = new Set((Array.isArray(c.attributes.sectors) ? c.attributes.sectors : []).map(s => s.toLowerCase()))
       const cStages = new Set((c.attributes.stage_focus ?? []).map(s => s.toLowerCase()))
       const cGeo = new Set((c.attributes.geo_focus ?? []).map(g => g.toLowerCase()))
 

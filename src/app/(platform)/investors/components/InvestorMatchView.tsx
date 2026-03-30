@@ -134,7 +134,7 @@ function generateCsv(matches: EnrichedMatch[]): string {
     escapeCsvField(m.investor.type),
     String(m.matchScore),
     escapeCsvField(m.investor.stageFocus.join('; ')),
-    escapeCsvField(m.investor.sectors.join('; ')),
+    escapeCsvField((Array.isArray(m.investor.sectors) ? m.investor.sectors : []).join('; ')),
     escapeCsvField(m.rationale),
     escapeCsvField(m.partner?.name ?? ''),
     escapeCsvField(m.partner?.title ?? ''),

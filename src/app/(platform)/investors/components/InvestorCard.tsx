@@ -75,7 +75,7 @@ function computeDataDepth(firm: InvestorFirm): number {
   // 1. Basics: location OR fund size (DD-02: OR not AND — either is valuable)
   if (a.hq_city || (a.fund_size_gbp != null && a.fund_size_gbp !== 0)) depth++
   // 2. Strategy: stage focus or sectors
-  if ((a.stage_focus ?? []).length > 0 || (a.sectors ?? []).length > 0) depth++
+  if ((a.stage_focus ?? []).length > 0 || (Array.isArray(a.sectors) ? a.sectors.length : 0) > 0) depth++
   // 3. Track record: portfolio companies
   if ((a.portfolio_companies?.length ?? 0) > 0) depth++
   // 4. Intelligence: thesis, geo focus, or cheque range (DD-01: check bounds not just truthy)
@@ -113,7 +113,7 @@ export function InvestorCard({
 }: InvestorCardProps) {
   const attrs = firm.attributes
   const stageFocus = (attrs.stage_focus ?? []).slice(0, 2)
-  const sectors = (attrs.sectors ?? []).slice(0, 3)
+  const sectors = (Array.isArray(attrs.sectors) ? attrs.sectors : []).slice(0, 3)
   const qualityClass = qualityDotClass(attrs.data_quality_score)
   const portfolioCount = attrs.portfolio_companies?.length ?? 0
   const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
@@ -268,9 +268,9 @@ export function InvestorCard({
                 {s}
               </Badge>
             ))}
-            {(attrs.sectors ?? []).length > 3 && (
+            {(Array.isArray(attrs.sectors) ? attrs.sectors : []).length > 3 && (
               <span className="text-xs text-muted-foreground self-center">
-                +{(attrs.sectors ?? []).length - 3}
+                +{(Array.isArray(attrs.sectors) ? attrs.sectors : []).length - 3}
               </span>
             )}
           </div>

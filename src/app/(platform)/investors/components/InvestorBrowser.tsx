@@ -568,9 +568,9 @@ export function InvestorBrowser({
                     firm={firm}
                     matchScore={matchScores[firm.id]}
                     productFit={
-                      productSectors.length > 0 && firm.attributes.sectors && firm.attributes.sectors.length > 0
+                      productSectors.length > 0 && Array.isArray(firm.attributes.sectors) && firm.attributes.sectors.length > 0
                         ? (() => {
-                            const investorSectors = firm.attributes.sectors!.map(s => s.toLowerCase())
+                            const investorSectors = firm.attributes.sectors.map(s => s.toLowerCase())
                             const overlap = productSectors.filter(ps =>
                               investorSectors.some(is => is.includes(ps) || ps.includes(is))
                             ).length

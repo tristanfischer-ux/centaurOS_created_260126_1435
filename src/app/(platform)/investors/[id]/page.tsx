@@ -447,7 +447,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             )}
 
             {/* Sectors */}
-            {attrs.sectors && attrs.sectors.length > 0 && (
+            {Array.isArray(attrs.sectors) && attrs.sectors.length > 0 && (
               <Card>
                 <CardHeader>
                   <h2 className="text-base font-semibold text-foreground">Sectors</h2>
