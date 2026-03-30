@@ -12,6 +12,7 @@ import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess } from '@/actions/investors'
 import { getProducts } from '@/actions/products'
+import { createClient } from '@/lib/supabase/server'
 import type { InvestorStats, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
@@ -103,6 +104,35 @@ export default async function InvestorDirectoryPage() {
     }
   }
 
+  // INTENT: Fetch company profile data so Fiona's briefing gives actionable advice
+  // (e.g., "You're pre-seed in manufacturing, here are 23 active VCs in your sector")
+  let companyContext: { sector?: string | null; stage?: string | null; fundingStatus?: string | null; seekingFunding?: boolean } = {}
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('foundry_id').eq('id', user.id).single()
+      if (profile?.foundry_id) {
+        const { data: foundry } = await supabase
+          .from('foundries')
+          .select('sector, stage, company_profile')
+          .eq('id', profile.foundry_id)
+          .single()
+        if (foundry) {
+          const cp = foundry.company_profile as { funding_status?: string; seeking_funding?: boolean } | null
+          companyContext = {
+            sector: foundry.sector,
+            stage: foundry.stage,
+            fundingStatus: cp?.funding_status ?? null,
+            seekingFunding: cp?.seeking_funding ?? false,
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-critical — Fiona falls back to generic advice
+  }
+
   // FLOW: Fetch product sectors for "Product Fit" badges on investor cards
   let productSectors: string[] = []
   try {
@@ -141,7 +171,18 @@ export default async function InvestorDirectoryPage() {
 
       {/* Tabbed view: For You + Browse All */}
       <InvestorPageTabs
-        headerContent={<InvestorSpecialistBanner />}
+        headerContent={
+          <InvestorSpecialistBanner
+            companyContext={companyContext}
+            investorStats={stats ? {
+              total: stats.total,
+              activeDeploying: stats.activeDeployingCount,
+              deepProfiled: stats.forgeCapitalCount,
+              partnerCount: stats.partnerCount,
+            } : undefined}
+            shortlistCount={Object.keys(shortlistIds).length}
+          />
+        }
         browseContent={
           <>
             {/* Insights panel */}
