@@ -287,11 +287,13 @@ export function calculateSupplierMatchScore(
   }
 
   // 4. Stage fit (10 pts)
+  // GOTCHA: Don't normalise company_size — normalise() converts hyphens to spaces,
+  // breaking "11-50".includes("11-50") comparisons.
   let stageScore = 5 // Default: neutral
-  const userStage = normalise(profile.stage || '').replace(/\s+/g, '_')
+  const userStage = (profile.stage || '').toLowerCase().trim().replace(/\s+/g, '_')
   if (userStage && STAGE_SIZE_FIT[userStage]) {
     const goodSizes = STAGE_SIZE_FIT[userStage]
-    const supplierSize = normalise(listing.company_size || '')
+    const supplierSize = (listing.company_size || '').toLowerCase().trim()
     if (supplierSize && goodSizes.some(s => supplierSize.includes(s))) {
       stageScore = 10
     } else if (supplierSize) {
