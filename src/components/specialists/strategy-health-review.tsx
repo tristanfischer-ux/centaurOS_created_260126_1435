@@ -119,7 +119,11 @@ export function StrategyHealthReview({
       totalObjectives: totalObjectives ?? 0,
       unlinkedObjectiveCount: unlinkedObjectiveCount ?? 0,
     }).then((result) => {
-      if (result) setBriefing(result)
+      // GOTCHA: withAuth may return { error: string } instead of the expected shape.
+      // Only update briefing if result has the correct properties.
+      if (result && 'severity' in result && !('error' in result)) {
+        setBriefing(result as { narrative: string | null; severity: 'success' | 'warning' | 'error' })
+      }
     }).catch(() => { /* Non-critical — local insight remains */ })
       .finally(() => setIsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
