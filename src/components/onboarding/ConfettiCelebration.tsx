@@ -13,6 +13,8 @@ interface Particle {
   color: string
   size: number
   rotation: number
+  /** Pre-generated shape flag to avoid Math.random() in render path (hydration safety) */
+  isCircle: boolean
 }
 
 const CONFETTI_COLORS = [
@@ -46,6 +48,7 @@ export function ConfettiCelebration(): React.ReactNode {
       color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
       size: 4 + Math.random() * 8,
       rotation: Math.random() * 360,
+      isCircle: Math.random() > 0.5,
     }))
     setParticles(generated)
 
@@ -84,7 +87,7 @@ export function ConfettiCelebration(): React.ReactNode {
             width: p.size,
             height: p.size * 0.6,
             backgroundColor: p.color,
-            borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+            borderRadius: p.isCircle ? '50%' : '2px',
             transform: `rotate(${p.rotation}deg)`,
             '--delay': `${p.delay}s`,
             '--duration': `${p.duration}s`,

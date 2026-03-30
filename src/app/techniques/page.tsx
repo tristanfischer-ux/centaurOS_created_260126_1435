@@ -301,7 +301,7 @@ export default function TechniquesPage() {
             FRACTIONAL FORGE
           </Link>
           <p className="text-xs text-muted-foreground font-mono tracking-wider">
-            &copy; {new Date().getFullYear()} Fractional Forge Ltd.
+            &copy; 2026 Fractional Forge Ltd.
           </p>
         </div>
       </footer>

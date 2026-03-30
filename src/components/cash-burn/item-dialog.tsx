@@ -105,8 +105,9 @@ export function ItemDialog({
   // Fetch products on mount
   useEffect(() => {
     getProducts().then((result) => {
-      if (result.data) setProducts(result.data)
-    })
+      // GOTCHA: withAuth may return { error: string } instead of { data: ... }
+      if (result && 'data' in result && result.data) setProducts(result.data)
+    }).catch(() => { /* Non-critical — product selector remains empty */ })
   }, [])
 
   // Shared fields

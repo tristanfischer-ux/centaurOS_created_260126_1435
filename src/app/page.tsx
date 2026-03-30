@@ -319,7 +319,7 @@ export default function MarketingPage() {
           </div>
           <div className="border-t border-muted pt-6 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
             <p className="text-xs sm:text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.
+              &copy; 2026 Fractional Forge Ltd. All rights reserved.
             </p>
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <Link href="/terms" className="hover:text-foreground transition-colors min-h-[44px] flex items-center">Terms</Link>

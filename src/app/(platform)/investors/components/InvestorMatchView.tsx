@@ -436,14 +436,15 @@ export function InvestorMatchView() {
     setTierInfo(null)
     setProgressText('Connecting...')
 
-    // INTENT: Force a session refresh before SSE to prevent stale token errors.
-    // The TypeError: Failed to fetch in _useSession/_getUser was caused by
-    // expired access tokens during SSE streaming.
+    // INTENT: Force a full session refresh (not just getSession which reads cache)
+    // before SSE to prevent stale token errors. The TypeError: Failed to fetch
+    // in _useSession/_getUser was caused by expired access tokens during SSE streaming.
     try {
       const supabase = createBrowserClient()
-      await supabase.auth.getSession()
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) console.warn('[InvestorMatch] Pre-SSE session refresh failed:', refreshError.message)
     } catch (refreshErr) {
-      console.warn('[InvestorMatch] Session refresh failed before SSE:', refreshErr)
+      console.warn('[InvestorMatch] Session refresh exception before SSE:', refreshErr)
     }
 
     // DECISION: Retry once on auth/fetch failure after forcing a fresh session

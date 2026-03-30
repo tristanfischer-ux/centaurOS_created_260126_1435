@@ -89,7 +89,9 @@ export function usePageBriefing(
 
     fetchFn()
       .then((result) => {
-        if (result.narrative) {
+        // GOTCHA: withAuth may return { error: string } instead of the expected shape.
+        // Only update state if result has the correct properties and no error.
+        if (result && 'narrative' in result && !('error' in result) && result.narrative) {
           setNarrative(result.narrative)
           setSeverity(result.severity)
           if (cacheKey) {

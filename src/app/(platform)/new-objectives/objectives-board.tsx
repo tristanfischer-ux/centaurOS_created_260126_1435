@@ -236,7 +236,11 @@ export function ObjectivesBoard({
       avgProgress,
       pillarCount: strategicObjectives.length,
     }).then((result) => {
-      if (result) setSageBriefing(result)
+      // GOTCHA: withAuth may return { error: string } instead of the expected shape.
+      // Only update briefing if result has the correct properties and no error.
+      if (result && 'severity' in result && !('error' in result)) {
+        setSageBriefing(result)
+      }
     }).catch(() => { /* Non-critical — local fallback remains */ })
       .finally(() => setIsSageLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
