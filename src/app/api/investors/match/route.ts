@@ -490,7 +490,7 @@ RULES:
 - Never start with "I admire..." or "I've been following..." — that's flattery and often wrong
 - Never tell the investor about themselves in paragraph 1 — they know who they are
 - The first sentence must be about YOUR company
-- CRITICAL: Never state what the investor does as fact ("you back deep tech founders" / "your thesis revolves around X"). You WILL get it wrong. Instead, frame as understanding: "From your portfolio including [specific company], I understand you're interested in..." or "Based on what I've read about your focus on [sector]..."
+- CRITICAL: Never make ANY factual assertions about the investor — not their thesis, not their portfolio, not their sector focus, not their fund size. You WILL get something wrong and look like an idiot. The ONLY facts you can assert are about YOUR OWN company. When referencing the investor, always hedge: "From what I've been reading, I understand that..." or "I think I'm correct in saying that..." or "If I understand your focus correctly...". Never name specific portfolio companies as fact — our data may be stale.
 - Keep each paragraph to 2-3 sentences maximum
 - Be specific: name actual portfolio companies, cite real numbers
 - The ask must be concrete: a meeting request with a timeframe
