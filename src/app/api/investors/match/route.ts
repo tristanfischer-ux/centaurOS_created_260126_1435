@@ -476,7 +476,27 @@ Only return the JSON array.`
           // visible matches (free tier sees 5 with full outreach content).
           let partnerRationales: { partnerRationale?: string; emailSubject?: string; emailBody?: string }[] = []
           if (Object.keys(contactsByListing).length > 0) {
-            const partnerPrompt = `For each investor, write: (1) why this specific partner is the right person (reference their investments), (2) a personalised cold email subject line, (3) a 3-paragraph cold email body referencing the partner's portfolio and how this company fits.
+            const emailSystemPrompt = `You write cold outreach emails from startup founders to investors. Your emails are direct, substantive, and credibility-first.
+
+STRUCTURE (strictly follow this order):
+1. SUBJECT LINE: Specific to what the company does. No flattery. Lead with the product/technology, not the investor's name.
+2. GREETING: "Dear [FirstName],"
+3. PARAGRAPH 1 — WHO WE ARE (2-3 sentences): Establish the company's credibility immediately. What have you built? What's the core technical achievement? Why should this person keep reading? Never open with flattery about the investor — they know who they are.
+4. PARAGRAPH 2 — THE SUBSTANCE (2-3 sentences): What the product does, the market opportunity, why it matters. Be specific about numbers, cost reduction, market size. This is the meat.
+5. PARAGRAPH 3 — WHY THIS INVESTOR (2-3 sentences): Now reference what they've invested in or their thesis. Connect their existing portfolio or strategy to your company. End with a specific, time-bounded ask ("20 minutes next week" or "a conversation this month").
+6. SIGN-OFF: "Best regards,"
+
+RULES:
+- Never start with "I admire..." or "I've been following..." — that's flattery and often wrong
+- Never tell the investor about themselves in paragraph 1 — they know who they are
+- The first sentence must be about YOUR company
+- CRITICAL: Never state what the investor does as fact ("you back deep tech founders" / "your thesis revolves around X"). You WILL get it wrong. Instead, frame as understanding: "From your portfolio including [specific company], I understand you're interested in..." or "Based on what I've read about your focus on [sector]..."
+- Keep each paragraph to 2-3 sentences maximum
+- Be specific: name actual portfolio companies, cite real numbers
+- The ask must be concrete: a meeting request with a timeframe
+- If partner name is unknown, address to "[Firm] Team"`
+
+            const partnerPrompt = `Write outreach emails for this company to these investors.
 
 ## Company
 ${companyContext}
@@ -484,16 +504,18 @@ ${companyContext}
 ## Investors + Partners
 ${batchItems.map((item, i) => {
   const contact = contactsByListing[item.firm.id]?.[0]
-  return `[${i + 1}] ${item.firm.title} — Partner: ${contact?.name || "Unknown"} (${contact?.title || ""})
+  return `[${i + 1}] ${item.firm.title} — Contact: ${contact?.name || "Unknown"} (${contact?.title || ""})
 Thesis: ${(item.firm.attributes?.investment_thesis as string) || "N/A"}
-Portfolio: ${(item.firm.attributes?.notable_portfolio as string[])?.slice(0, 3).join(", ") || "N/A"}`
+Portfolio: ${(item.firm.attributes?.notable_portfolio as string[])?.slice(0, 5).join(", ") || "N/A"}
+Sectors: ${(item.firm.attributes?.sectors as string[])?.slice(0, 3).join(", ") || "N/A"}
+Stage: ${(item.firm.attributes?.stage_focus as string[])?.join(", ") || "N/A"}`
 }).join("\n\n")}
 
-Return a JSON array of ${batchItems.length} objects: [{"partnerRationale": "...", "emailSubject": "...", "emailBody": "..."}]
-Only return the JSON array.`
+Return a JSON array of ${batchItems.length} objects: [{"partnerRationale": "1-2 sentence reason why this specific person is the right contact", "emailSubject": "specific subject line about our product", "emailBody": "3-paragraph email following the structure rules exactly"}]
+Only return the JSON array, no markdown.`
 
             try {
-              const result = await callOpus("Write concise, personalised outreach. Be specific about the investor's portfolio and thesis. Reference real companies they've backed.", partnerPrompt, 4000)
+              const result = await callOpus(emailSystemPrompt, partnerPrompt, 4000)
               partnerRationales = safeParseJSON(result)
             } catch (err) {
               console.warn("[InvestorMatch] Partner/email generation failed:", err)
