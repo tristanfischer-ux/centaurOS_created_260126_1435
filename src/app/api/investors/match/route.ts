@@ -159,17 +159,37 @@ export async function POST(request: Request) {
   const foundryId = profileData?.active_foundry_id || profileData?.foundry_id
 
   // SECURITY: Check tier early — free users ALWAYS get cached results (no regeneration).
-  // This prevents free users from burning AI credits by refreshing.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: earlySubCheck } = await (supabase as any)
-    .from("user_subscriptions")
-    .select("tier")
-    .eq("user_id", user.id)
-    .in("status", ["active", "trialing"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const earlyTier = earlySubCheck?.tier || "free"
+  // INTENT: Use the FOUNDRY OWNER's subscription (same as sidebar credits bar).
+  // Team members inherit the foundry's tier — a founder on Enterprise means
+  // all team members in that foundry get Enterprise features.
+  let earlyTier = "free"
+  if (foundryId) {
+    try {
+      const adminDb = createAdminClient()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: foundry } = await (adminDb as any)
+        .from("foundries")
+        .select("owner_id")
+        .eq("id", foundryId)
+        .single()
+
+      if (foundry?.owner_id) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: ownerSub } = await (adminDb as any)
+          .from("user_subscriptions")
+          .select("tier")
+          .eq("user_id", foundry.owner_id)
+          .in("status", ["active", "trialing"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (ownerSub?.tier) earlyTier = ownerSub.tier
+      }
+    } catch {
+      // Fall through with free tier
+    }
+  }
   const isFreeUser = earlyTier === "free"
 
   if (foundryId) {
