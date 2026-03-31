@@ -55,6 +55,8 @@ interface EnrichedMatch {
     chequeRange: { min: number; max: number } | null
     thesis: string
     portfolio: string[]
+    geo: string[]
+    website: string | null
   }
   matchScore: number
   topFactors: string[]
@@ -299,6 +301,60 @@ function MatchRow({
         <p className="text-sm text-muted-foreground leading-relaxed">{match.rationale}</p>
       </div>
 
+      {/* Investor intel — thesis, portfolio, sectors, geo, website */}
+      <div className="pl-[52px] space-y-2">
+        {match.investor.thesis && (
+          <p className="text-xs text-muted-foreground italic line-clamp-2">
+            &ldquo;{match.investor.thesis}&rdquo;
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {match.investor.portfolio && match.investor.portfolio.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Portfolio:</span>
+              {match.investor.portfolio.slice(0, 4).map((co) => (
+                <Badge key={co} variant="outline" className="text-[10px] px-1.5 py-0">
+                  {co}
+                </Badge>
+              ))}
+              {match.investor.portfolio.length > 4 && (
+                <span className="text-[10px] text-muted-foreground">+{match.investor.portfolio.length - 4}</span>
+              )}
+            </div>
+          )}
+
+          {match.investor.sectors && match.investor.sectors.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Sectors:</span>
+              {match.investor.sectors.slice(0, 3).map((s) => (
+                <Badge key={s} variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {s}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {match.investor.geo && match.investor.geo.length > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              <span className="font-medium uppercase tracking-wide">Geo:</span> {match.investor.geo.slice(0, 3).join(', ')}
+            </span>
+          )}
+
+          {match.investor.website && (
+            <a
+              href={match.investor.website.startsWith('http') ? match.investor.website : `https://${match.investor.website}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-international-orange hover:underline inline-flex items-center gap-0.5"
+            >
+              Website
+              <ExternalLink className="h-2.5 w-2.5" />
+            </a>
+          )}
+        </div>
+      </div>
+
       {/* Partner + Email — shown for all visible matches (partner name/title for free, email for pro) */}
       {(
         <div className="pl-[52px] space-y-2">
@@ -352,61 +408,7 @@ function MatchRow({
             </div>
           )}
 
-          {/* Non-Pro paid: expand/collapse for draft email */}
-          {!isPro && match.draftEmail && (
-            <div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setEmailExpanded(!emailExpanded)}
-                className="text-xs gap-1 px-2"
-              >
-                <Mail className="h-3.5 w-3.5" />
-                Draft outreach email
-                {emailExpanded ? (
-                  <ChevronUp className="h-3 w-3" />
-                ) : (
-                  <ChevronDown className="h-3 w-3" />
-                )}
-              </Button>
-
-              <AnimatePresence>
-                {emailExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-2 border border-border rounded-md bg-muted/50 p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium text-foreground">
-                          Subject: {match.draftEmail.subject}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleCopyEmail}
-                          className="text-xs gap-1 h-7"
-                        >
-                          {copied ? (
-                            <Check className="h-3 w-3 text-success" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                          {copied ? 'Copied' : 'Copy'}
-                        </Button>
-                      </div>
-                      <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-                        {match.draftEmail.body}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+          {/* DECISION: Duplicate chevron section removed — inline email is the single display */}
         </div>
       )}
     </motion.div>

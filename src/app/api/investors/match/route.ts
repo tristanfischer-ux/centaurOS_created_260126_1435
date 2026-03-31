@@ -71,6 +71,37 @@ async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2
   return (data.content?.[0]?.text ?? "").trim()
 }
 
+// INTENT: Opus for high-quality draft emails — the most important user-facing content.
+// Rationales stay on Haiku (shorter, less critical). Opus produces substantially
+// better cold emails with more natural tone and specific portfolio references.
+async function callOpus(systemPrompt: string, userPrompt: string, maxTokens = 4000): Promise<string> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-20250514",
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  })
+
+  if (!response.ok) {
+    // Fallback to Haiku if Opus fails
+    console.warn("[InvestorMatch] Opus failed, falling back to Haiku")
+    return callHaiku(systemPrompt, userPrompt, maxTokens)
+  }
+  const data = await response.json()
+  return (data.content?.[0]?.text ?? "").trim()
+}
+
 function safeParseJSON<T>(text: string): T[] {
   try {
     const match = text.match(/\[[\s\S]*\]/)
@@ -269,18 +300,9 @@ export async function POST(request: Request) {
           companyProfileData?.funding_status ? `Funding status: ${companyProfileData.funding_status}` : null,
         ].filter(Boolean).join("\n")
 
-        // ── Get Tier Access ──────────────────────────────
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: subscription } = await (supabase as any)
-          .from("user_subscriptions")
-          .select("tier, status")
-          .eq("user_id", user.id)
-          .in("status", ["active", "trialing"])
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const tier = subscription?.tier || "free"
+        // INTENT: Use earlyTier from the cache check (single source of truth for tier).
+        // Avoids duplicate subscription query and ensures batch count matches cache TTL.
+        const tier = earlyTier
         const isPro = tier === "professional" || tier === "enterprise"
         const isStarter = tier === "starter" || isPro
         const maxVisible = isStarter ? 50 : 5
@@ -451,7 +473,7 @@ Return a JSON array of ${batchItems.length} objects: [{"partnerRationale": "..."
 Only return the JSON array.`
 
             try {
-              const result = await callHaiku("Write concise, personalised outreach.", partnerPrompt, 3000)
+              const result = await callOpus("Write concise, personalised outreach. Be specific about the investor's portfolio and thesis. Reference real companies they've backed.", partnerPrompt, 4000)
               partnerRationales = safeParseJSON(result)
             } catch (err) {
               console.warn("[InvestorMatch] Partner/email generation failed:", err)
@@ -475,6 +497,8 @@ Only return the JSON array.`
                 chequeRange: (attrs.cheque_range_gbp as { min: number; max: number }) || null,
                 thesis: (attrs.investment_thesis as string) || "",
                 portfolio: (attrs.notable_portfolio as string[]) || [],
+                geo: (attrs.geo_focus as string[]) || [],
+                website: (attrs.website_url as string) || null,
               },
               matchScore: item.breakdown.total,
               topFactors: item.breakdown.topFactors,
