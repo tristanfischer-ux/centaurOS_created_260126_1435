@@ -241,7 +241,7 @@ export async function POST(request: Request) {
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("foundry_id")
+          .select("foundry_id, full_name, role")
           .eq("id", user.id)
           .single()
 
@@ -310,7 +310,12 @@ export async function POST(request: Request) {
           industry: foundry.industry,
           businessKeywords: uniqueKeywords,
         }
+        // INTENT: Include founder's name so the email can open with "I'm [Name], [role] of [Company]"
+        const founderName = profile?.full_name || "the founder"
+        const founderRole = profile?.role === 'Founder' ? 'CEO & Founder' : profile?.role === 'Executive' ? 'Co-Founder' : 'Founder'
+
         const companyContext = [
+          `Founder writing the email: ${founderName}, ${founderRole} of ${foundry.name}`,
           `Company: ${foundry.name}`,
           `Stage: ${foundry.stage}`,
           `Sector: ${foundry.sector || foundry.industry || "Not specified"}`,
@@ -476,24 +481,32 @@ Only return the JSON array.`
           // visible matches (free tier sees 5 with full outreach content).
           let partnerRationales: { partnerRationale?: string; emailSubject?: string; emailBody?: string }[] = []
           if (Object.keys(contactsByListing).length > 0) {
-            const emailSystemPrompt = `You write cold outreach emails from startup founders to investors. Your emails are direct, substantive, and credibility-first.
+            const emailSystemPrompt = `You write cold outreach emails from startup founders to investors. Direct, substantive, personal.
 
 STRUCTURE (strictly follow this order):
-1. SUBJECT LINE: Specific to what the company does. No flattery. Lead with the product/technology, not the investor's name.
-2. GREETING: "Dear [FirstName],"
-3. PARAGRAPH 1 — WHO WE ARE (2-3 sentences): Establish the company's credibility immediately. What have you built? What's the core technical achievement? Why should this person keep reading? Never open with flattery about the investor — they know who they are.
-4. PARAGRAPH 2 — THE SUBSTANCE (2-3 sentences): What the product does, the market opportunity, why it matters. Be specific about numbers, cost reduction, market size. This is the meat.
-5. PARAGRAPH 3 — WHY THIS INVESTOR (2-3 sentences): Now reference what they've invested in or their thesis. Connect their existing portfolio or strategy to your company. End with a specific, time-bounded ask ("20 minutes next week" or "a conversation this month").
-6. SIGN-OFF: "Best regards,"
 
-RULES:
-- Never start with "I admire..." or "I've been following..." — that's flattery and often wrong
-- Never tell the investor about themselves in paragraph 1 — they know who they are
-- The first sentence must be about YOUR company
-- CRITICAL: Never make ANY factual assertions about the investor — not their thesis, not their portfolio, not their sector focus, not their fund size. You WILL get something wrong and look like an idiot. The ONLY facts you can assert are about YOUR OWN company. When referencing the investor, always hedge: "From what I've been reading, I understand that..." or "I think I'm correct in saying that..." or "If I understand your focus correctly...". Never name specific portfolio companies as fact — our data may be stale.
-- Keep each paragraph to 2-3 sentences maximum
-- Be specific: name actual portfolio companies, cite real numbers
-- The ask must be concrete: a meeting request with a timeframe
+1. SUBJECT LINE: About what the company does. Not the investor. Specific and concrete.
+
+2. GREETING: "Dear [FirstName]," (or "Dear [Firm] Team," if name unknown)
+
+3. OPENING (1-2 sentences): Introduce the PERSON writing — their name, role, and one credibility point. The reader needs to know within the first sentence who is writing and why it's worth continuing. Example: "I'm [Name], CEO of [Company]. We've [concrete achievement — e.g. completed successful test flights / secured 3 institutional partners / built proprietary recovery technology]."
+
+4. THE COMPANY (2-3 sentences): What you've built, what it does, what you're looking for. Be specific with numbers — cost reduction percentages, market size, unit economics. These are facts about YOUR company so state them confidently.
+
+5. WHY THIS INVESTOR (2-3 sentences): Why you're reaching out to THEM specifically. CRITICAL: hedge everything about the investor. Use "From what I've been reading..." / "I think I'm correct in saying..." / "If I understand correctly...". Never assert facts about their portfolio, thesis, or strategy — our data may be wrong or stale.
+
+6. THE ASK (2 sentences): Request a specific meeting — "Would you have 20 minutes in the next two weeks?" or "Could we arrange a brief call this month?" Give a concrete timeframe.
+
+7. THE REFERRAL (1 sentence): "If this isn't the right fit for you, I'd be very grateful if you could point me toward anyone in your network who might be interested."
+
+8. SIGN-OFF: "Best regards,"
+
+ABSOLUTE RULES:
+- First sentence: who is the PERSON writing. Not the company name alone.
+- The ONLY facts you can assert confidently are about YOUR OWN company.
+- NEVER assert facts about the investor — not their thesis, not their portfolio companies, not their sectors, not their fund size. Always hedge.
+- No flattery. No "I admire..." No "I've been following..."
+- Each paragraph: 2-3 sentences maximum.
 - If partner name is unknown, address to "[Firm] Team"`
 
             const partnerPrompt = `Write outreach emails for this company to these investors.
