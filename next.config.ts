@@ -121,8 +121,28 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // SECURITY: unsafe-inline needed for Next.js/React, unsafe-eval removed for security
-              // Note: If eval is needed for specific features, use nonces instead
+              // SECURITY (H-5 audit, 2026-04-02): 'unsafe-inline' is REQUIRED and cannot
+              // be removed without breaking the app. Reasons:
+              //
+              // script-src 'unsafe-inline':
+              //   1. Next.js injects inline <script> tags for hydration data (__NEXT_DATA__),
+              //      route prefetching, and chunk loading — these are not controllable by app code
+              //   2. Next.js does not yet support nonce-based CSP in the App Router production
+              //      build (https://github.com/vercel/next.js/issues/43743)
+              //   3. Sentry SDK initialization requires inline script execution
+              //
+              // style-src 'unsafe-inline':
+              //   1. Radix UI (shadcn/ui) injects inline styles for portal positioning
+              //      (dropdowns, tooltips, dialogs, popovers) — cannot be externalized
+              //   2. Recharts uses inline SVG styles for chart rendering
+              //   3. next/font injects inline style tags for font-face declarations
+              //
+              // MITIGATION: unsafe-eval is NOT allowed. XSS risk is reduced by:
+              //   - All user content rendered via React (auto-escaped)
+              //   - No dangerouslySetInnerHTML usage in app code
+              //   - Strict form-action, base-uri, and object-src restrictions below
+              //
+              // TODO: Migrate to nonce-based CSP when Next.js App Router supports it
               "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.stripe.com https://*.sentry.io",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
