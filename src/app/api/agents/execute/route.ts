@@ -211,7 +211,8 @@ export async function POST(request: Request) {
     }
 
     // SECURITY: Rate limit to prevent API cost abuse (AI calls are expensive)
-    const rateLimitResult = await rateLimit('api', `agent-execute:${user.id}`, { limit: 30, window: 3600 * 1000 })
+    // Tight default — tier-based quota enforced later by checkAILimit()
+    const rateLimitResult = await rateLimit('api', `agent-execute:${user.id}`, { limit: 15, window: 3600 * 1000 })
     if (!rateLimitResult.success) {
         return NextResponse.json(
             { error: "Rate limit exceeded. Please wait before running more AI agents." },

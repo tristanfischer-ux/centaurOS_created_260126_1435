@@ -151,15 +151,16 @@ export async function uploadReferenceDocuments(
           continue
         }
 
-        const { data: urlData } = admin.storage
+        // SECURITY: Use signed URL — user-uploaded reference documents are confidential
+        const { data: urlData } = await admin.storage
           .from(STORAGE_BUCKET)
-          .getPublicUrl(storagePath)
+          .createSignedUrl(storagePath, 3600)
 
         stored.push({
           id: doc.id,
           name: doc.name.slice(0, MAX_NAME_LENGTH),
           mimeType: doc.mimeType,
-          storageUrl: urlData.publicUrl,
+          storageUrl: urlData?.signedUrl ?? '',
           originalSize: doc.originalSize,
           fileType: doc.fileType,
         })

@@ -173,11 +173,12 @@ export async function POST(request: Request): Promise<Response> {
           throw new Error(`STL upload failed: ${uploadError.message}`)
         }
 
-        const { data: publicUrl } = admin.storage
+        // SECURITY: Use signed URL — generated STL files are confidential CAD data
+        const { data: signedData } = await admin.storage
           .from(CAD_LAB_STORAGE_BUCKET)
-          .getPublicUrl(stlPath)
+          .createSignedUrl(stlPath, 3600)
 
-        const stlUrl = publicUrl.publicUrl
+        const stlUrl = signedData?.signedUrl ?? ''
         const stlSizeKb = Math.round(result.stlBuffer.length / 1024)
 
         // 4. Update unified_result JSONB with STL URL

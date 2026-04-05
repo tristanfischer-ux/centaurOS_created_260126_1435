@@ -3307,8 +3307,9 @@ export async function generateMashup(
           upsert: true,
         })
       if (!stepErr) {
-        const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/mashup.step`)
-        stepUrl = d.publicUrl
+        // SECURITY: Use signed URL — STEP/STL mashup files are user-confidential CAD data
+        const { data: d } = await admin.storage.from(bucket).createSignedUrl(`${pathPrefix}/mashup.step`, 3600)
+        stepUrl = d?.signedUrl ?? ''
       }
     }
     if (modalResult.stl) {
@@ -3319,8 +3320,9 @@ export async function generateMashup(
           upsert: true,
         })
       if (!stlErr) {
-        const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/mashup.stl`)
-        stlUrl = d.publicUrl
+        // SECURITY: Use signed URL — STEP/STL mashup files are user-confidential CAD data
+        const { data: d } = await admin.storage.from(bucket).createSignedUrl(`${pathPrefix}/mashup.stl`, 3600)
+        stlUrl = d?.signedUrl ?? ''
       }
     }
 
@@ -3575,8 +3577,9 @@ export async function executeMashupPlan(
           upsert: true,
         })
       if (!stepErr) {
-        const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/mashup.step`)
-        stepUrl = d.publicUrl
+        // SECURITY: Use signed URL — STEP/STL mashup files are user-confidential CAD data
+        const { data: d } = await admin.storage.from(bucket).createSignedUrl(`${pathPrefix}/mashup.step`, 3600)
+        stepUrl = d?.signedUrl ?? ''
       }
     }
     if (modalResult.stl) {
@@ -3587,8 +3590,9 @@ export async function executeMashupPlan(
           upsert: true,
         })
       if (!stlErr) {
-        const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/mashup.stl`)
-        stlUrl = d.publicUrl
+        // SECURITY: Use signed URL — STEP/STL mashup files are user-confidential CAD data
+        const { data: d } = await admin.storage.from(bucket).createSignedUrl(`${pathPrefix}/mashup.stl`, 3600)
+        stlUrl = d?.signedUrl ?? ''
       }
     }
 
@@ -3838,8 +3842,9 @@ export async function generateSystemAssembly(
         if (stepErr) {
           console.error("[THE-FORGE] Assembly STEP upload failed:", stepErr.message)
         } else {
-          const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/assembly.step`)
-          stepUrl = d.publicUrl
+          // SECURITY: Use signed URL — assembly STEP files are user-confidential CAD data
+          const { data: d } = await admin.storage.from(bucket).createSignedUrl(`${pathPrefix}/assembly.step`, 3600)
+          stepUrl = d?.signedUrl ?? ''
         }
       }
       if (modalResult.stl) {
@@ -3852,8 +3857,9 @@ export async function generateSystemAssembly(
         if (stlErr) {
           console.error("[THE-FORGE] Assembly STL upload failed:", stlErr.message)
         } else {
-          const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/assembly.stl`)
-          stlUrl = d.publicUrl
+          // SECURITY: Use signed URL — assembly STL files are user-confidential CAD data
+          const { data: d } = await admin.storage.from(bucket).createSignedUrl(`${pathPrefix}/assembly.stl`, 3600)
+          stlUrl = d?.signedUrl ?? ''
         }
       }
 

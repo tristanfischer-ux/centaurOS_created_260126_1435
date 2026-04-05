@@ -115,15 +115,16 @@ export async function uploadReferenceImages(
           continue
         }
 
-        const { data: urlData } = admin.storage
+        // SECURITY: Use signed URL — user-uploaded reference images are confidential
+        const { data: urlData } = await admin.storage
           .from(STORAGE_BUCKET)
-          .getPublicUrl(storagePath)
+          .createSignedUrl(storagePath, 3600)
 
         stored.push({
           id: img.id,
           name: img.name.slice(0, MAX_NAME_LENGTH),
           mimeType: img.mimeType,
-          storageUrl: urlData.publicUrl,
+          storageUrl: urlData?.signedUrl ?? '',
           originalSize: img.originalSize,
         })
       }

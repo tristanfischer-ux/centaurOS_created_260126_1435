@@ -180,6 +180,7 @@ export async function sendNewMessage(
 
       // Get the sender info separately since types aren't generated yet
       // SECURITY: Don't include email in client-facing response
+      // SECURITY: intentional unscoped query — fetching own profile by auth user.id
       const { data: sender } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
@@ -226,6 +227,7 @@ export async function startConversation(
 
       const { sellerId, orderId, rfqId, listingId, initialMessage } = params
 
+      // SECURITY: intentional cross-foundry for marketplace/messaging — seller may be in different foundry
       // VALIDATION: Verify seller exists and prevent self-messaging
       const { data: seller } = await supabase
         .from('profiles')
@@ -370,6 +372,7 @@ export async function createSystemMessage(
     try {
       // SECURITY: Only platform admins can create system messages.
       // Regular users must not forge messages that appear as platform-generated.
+      // SECURITY: intentional unscoped query — fetching own profile by auth user.id for role check
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
@@ -412,6 +415,7 @@ export async function startDirectMessage(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // SECURITY: intentional cross-foundry for marketplace/messaging — DM participant may be in different foundry
       // VALIDATION: Validate participant exists
       const { data: participant } = await supabase
         .from('profiles')
@@ -659,6 +663,7 @@ export async function contactExpert(
       }
       const expertUserId = provider.user_id
 
+      // SECURITY: intentional cross-foundry for marketplace/messaging — expert may be in different foundry
       // VALIDATION: Validate expert user exists
       const { data: expertProfile } = await supabase
         .from('profiles')

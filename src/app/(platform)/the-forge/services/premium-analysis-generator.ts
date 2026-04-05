@@ -309,9 +309,10 @@ async function uploadAnalysisFile(
     throw new Error(`[XRayPremium] Storage upload failed: ${error.message}`)
   }
 
-  const { data: urlData } = supabase.storage
+  // SECURITY: Use signed URL — premium analysis results are confidential
+  const { data: urlData } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .getPublicUrl(path)
+    .createSignedUrl(path, 3600)
 
-  return urlData.publicUrl
+  return urlData?.signedUrl ?? ''
 }

@@ -74,8 +74,9 @@ export async function uploadSharedImageAssetsAction(
         if (refErr) {
           console.error("[CAD-LAB-IMAGES] Failed to upload reference:", refErr.message)
         } else {
-          const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(refPath)
-          referenceUrl = data.publicUrl
+          // SECURITY: Use signed URL — user-uploaded reference images are confidential
+          const { data } = await admin.storage.from(STORAGE_BUCKET).createSignedUrl(refPath, 3600)
+          referenceUrl = data?.signedUrl ?? ''
         }
       }
 
@@ -90,8 +91,9 @@ export async function uploadSharedImageAssetsAction(
         if (styleErr) {
           console.error("[CAD-LAB-IMAGES] Failed to upload visual style:", styleErr.message)
         } else {
-          const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(stylePath)
-          visualStyleUrl = data.publicUrl
+          // SECURITY: Use signed URL — visual style specs are project-confidential
+          const { data } = await admin.storage.from(STORAGE_BUCKET).createSignedUrl(stylePath, 3600)
+          visualStyleUrl = data?.signedUrl ?? ''
         }
       }
 

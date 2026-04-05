@@ -140,13 +140,13 @@ export async function uploadMessageFile(
     throw new Error(`Failed to upload file: ${error.message}`)
   }
   
-  // Get public URL
-  const { data: urlData } = supabase.storage
+  // SECURITY: Use signed URL — message files are confidential user content
+  const { data: urlData } = await supabase.storage
     .from('message-files')
-    .getPublicUrl(filePath)
-  
+    .createSignedUrl(filePath, 3600)
+
   return {
-    url: urlData.publicUrl,
+    url: urlData?.signedUrl ?? '',
     fileName: file.name,
     fileSize: file.size,
     fileType: file.type
@@ -186,12 +186,13 @@ export async function uploadTaskFile(
     throw new Error(`Failed to upload file: ${error.message}`)
   }
   
-  const { data: urlData } = supabase.storage
+  // SECURITY: Use signed URL — task files are confidential user content
+  const { data: urlData } = await supabase.storage
     .from('task-files')
-    .getPublicUrl(filePath)
-  
+    .createSignedUrl(filePath, 3600)
+
   return {
-    url: urlData.publicUrl,
+    url: urlData?.signedUrl ?? '',
     fileName: file.name,
     fileSize: file.size,
     fileType: file.type

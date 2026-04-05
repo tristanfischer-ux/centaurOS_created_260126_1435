@@ -91,12 +91,13 @@ async function uploadComparisonAsset(
 
   if (error) throw new Error(`Failed to upload ${filename}: ${error.message}`)
 
-  const { data: publicUrl } = admin.storage
+  // SECURITY: Use signed URL — generated CAD comparison files are confidential
+  const { data: signedData } = await admin.storage
     .from(CAD_LAB_STORAGE_BUCKET)
-    .getPublicUrl(path)
+    .createSignedUrl(path, 3600)
 
   return {
-    url: publicUrl.publicUrl,
+    url: signedData?.signedUrl ?? '',
     sizeKb: Math.round(buffer.length / 1024),
   }
 }

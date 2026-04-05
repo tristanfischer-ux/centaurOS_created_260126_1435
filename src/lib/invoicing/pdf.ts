@@ -113,12 +113,12 @@ export async function uploadInvoicePDF(
       return { url: null, error: 'Failed to upload PDF' }
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
+    // SECURITY: Use signed URL — invoice PDFs are confidential financial documents
+    const { data: urlData } = await supabase.storage
       .from(INVOICES_BUCKET)
-      .getPublicUrl(path)
+      .createSignedUrl(path, 3600)
 
-    return { url: urlData.publicUrl, error: null }
+    return { url: urlData?.signedUrl ?? null, error: null }
   } catch (err) {
     console.error('Error in uploadInvoicePDF:', err)
     return { url: null, error: 'An unexpected error occurred' }

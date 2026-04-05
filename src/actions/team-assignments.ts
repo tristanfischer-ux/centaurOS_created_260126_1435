@@ -44,51 +44,53 @@ export async function addMemberToTeam(
     }
     
     // AUTH: Get current user's profile to check role
+    // SECURITY: intentional unscoped query — fetching own profile by auth user.id, foundry_id used for subsequent checks
     const { data: currentProfile } = await supabase
         .from('profiles')
         .select('id, role, foundry_id')
         .eq('id', user.id)
         .single()
-    
+
     if (!currentProfile) {
         return { success: false, error: 'Profile not found' }
     }
-    
+
     // AUTH: Only Founders and Executives can manage team assignments
     if (!['Founder', 'Executive'].includes(currentProfile.role)) {
         return { success: false, error: 'Only Founders and Executives can manage team assignments' }
     }
-    
+
     // RLS: Verify team belongs to same foundry
     const { data: team } = await supabase
         .from('teams')
         .select('foundry_id')
         .eq('id', teamId)
         .single()
-    
+
     if (!team) {
         return { success: false, error: 'Team not found' }
     }
-    
+
     if (team.foundry_id !== currentProfile.foundry_id) {
         return { success: false, error: 'Team belongs to different foundry' }
     }
-    
+
+    // SECURITY: foundry_id check below ensures member is in same foundry — cross-foundry assignment blocked
     // RLS: Verify member belongs to same foundry
     const { data: memberProfile } = await supabase
         .from('profiles')
         .select('foundry_id')
         .eq('id', memberId)
         .single()
-    
+
     if (!memberProfile) {
         return { success: false, error: 'Member not found' }
     }
-    
+
     if (memberProfile.foundry_id !== currentProfile.foundry_id) {
         return { success: false, error: 'Member belongs to different foundry' }
     }
-    
+
     // Insert team membership
     const { error: insertError } = await supabase
         .from('team_members')
@@ -137,36 +139,37 @@ export async function removeMemberFromTeam(
     }
     
     // AUTH: Get current user's profile to check role
+    // SECURITY: intentional unscoped query — fetching own profile by auth user.id, foundry_id used for subsequent checks
     const { data: currentProfile } = await supabase
         .from('profiles')
         .select('id, role, foundry_id')
         .eq('id', user.id)
         .single()
-    
+
     if (!currentProfile) {
         return { success: false, error: 'Profile not found' }
     }
-    
+
     // AUTH: Only Founders and Executives can manage team assignments
     if (!['Founder', 'Executive'].includes(currentProfile.role)) {
         return { success: false, error: 'Only Founders and Executives can manage team assignments' }
     }
-    
+
     // RLS: Verify team belongs to same foundry
     const { data: team } = await supabase
         .from('teams')
         .select('foundry_id')
         .eq('id', teamId)
         .single()
-    
+
     if (!team) {
         return { success: false, error: 'Team not found' }
     }
-    
+
     if (team.foundry_id !== currentProfile.foundry_id) {
         return { success: false, error: 'Team belongs to different foundry' }
     }
-    
+
     // Delete team membership
     const { error: deleteError } = await supabase
         .from('team_members')
@@ -215,46 +218,48 @@ export async function assignTaskToMember(
     }
     
     // AUTH: Get current user's profile
+    // SECURITY: intentional unscoped query — fetching own profile by auth user.id, foundry_id used for subsequent checks
     const { data: currentProfile } = await supabase
         .from('profiles')
         .select('foundry_id')
         .eq('id', user.id)
         .single()
-    
+
     if (!currentProfile) {
         return { success: false, error: 'Profile not found' }
     }
-    
+
     // RLS: Verify task belongs to same foundry
     const { data: task } = await supabase
         .from('tasks')
         .select('foundry_id, assignee_id')
         .eq('id', taskId)
         .single()
-    
+
     if (!task) {
         return { success: false, error: 'Task not found' }
     }
-    
+
     if (task.foundry_id !== currentProfile.foundry_id) {
         return { success: false, error: 'Task belongs to different foundry' }
     }
-    
+
+    // SECURITY: foundry_id check below ensures member is in same foundry — cross-foundry assignment blocked
     // RLS: Verify member belongs to same foundry
     const { data: memberProfile } = await supabase
         .from('profiles')
         .select('foundry_id')
         .eq('id', memberId)
         .single()
-    
+
     if (!memberProfile) {
         return { success: false, error: 'Member not found' }
     }
-    
+
     if (memberProfile.foundry_id !== currentProfile.foundry_id) {
         return { success: false, error: 'Member belongs to different foundry' }
     }
-    
+
     // Insert into task_assignees junction table
     const { error: insertError } = await supabase
         .from('task_assignees')
@@ -313,31 +318,32 @@ export async function unassignTaskFromMember(
     }
     
     // AUTH: Get current user's profile
+    // SECURITY: intentional unscoped query — fetching own profile by auth user.id, foundry_id used for subsequent checks
     const { data: currentProfile } = await supabase
         .from('profiles')
         .select('foundry_id')
         .eq('id', user.id)
         .single()
-    
+
     if (!currentProfile) {
         return { success: false, error: 'Profile not found' }
     }
-    
+
     // RLS: Verify task belongs to same foundry
     const { data: task } = await supabase
         .from('tasks')
         .select('foundry_id, assignee_id')
         .eq('id', taskId)
         .single()
-    
+
     if (!task) {
         return { success: false, error: 'Task not found' }
     }
-    
+
     if (task.foundry_id !== currentProfile.foundry_id) {
         return { success: false, error: 'Task belongs to different foundry' }
     }
-    
+
     // Delete from task_assignees junction table
     const { error: deleteError } = await supabase
         .from('task_assignees')

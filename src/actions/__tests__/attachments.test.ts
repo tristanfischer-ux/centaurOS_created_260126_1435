@@ -26,6 +26,17 @@ jest.mock('@/lib/supabase/server', () => ({
     createClient: jest.fn(() => Promise.resolve(mockSupabaseClient))
 }))
 
+// Mock admin client for signed URL generation in getTaskAttachments
+const mockAdminStorage = {
+    from: jest.fn()
+}
+const mockAdminClient = {
+    storage: mockAdminStorage
+}
+jest.mock('@/lib/supabase/admin', () => ({
+    createAdminClient: jest.fn(() => mockAdminClient)
+}))
+
 jest.mock('next/cache', () => ({
     revalidatePath: jest.fn()
 }))
@@ -281,25 +292,29 @@ describe('Attachment Actions', () => {
             expect(result).toEqual([])
         })
 
-        it('should return list of attachments with public URLs', async () => {
+        it('should return list of attachments with signed URLs', async () => {
             const mockFiles = [
                 { name: 'file1.pdf', metadata: { size: 1024 } },
                 { name: 'file2.jpg', metadata: { size: 2048 } }
             ]
             const mockStorage = {
                 list: jest.fn().mockResolvedValue({ data: mockFiles, error: null }),
-                getPublicUrl: jest.fn((path: string) => ({
-                    data: { publicUrl: `https://example.com/${path}` }
+            }
+            // SECURITY: Admin client now generates signed URLs instead of public URLs
+            const mockAdminStorageBucket = {
+                createSignedUrl: jest.fn((path: string) => Promise.resolve({
+                    data: { signedUrl: `https://example.com/signed/${path}` }
                 }))
             }
 
             mockSupabaseClient.storage.from.mockReturnValue(mockStorage)
+            mockAdminStorage.from.mockReturnValue(mockAdminStorageBucket)
 
             const result = await getTaskAttachments(VALID_TASK_ID)
 
             expect(result).toEqual([
-                { name: 'file1.pdf', url: `https://example.com/${VALID_TASK_ID}/file1.pdf`, size: 1024 },
-                { name: 'file2.jpg', url: `https://example.com/${VALID_TASK_ID}/file2.jpg`, size: 2048 }
+                { name: 'file1.pdf', url: `https://example.com/signed/${VALID_TASK_ID}/file1.pdf`, size: 1024 },
+                { name: 'file2.jpg', url: `https://example.com/signed/${VALID_TASK_ID}/file2.jpg`, size: 2048 }
             ])
         })
     })

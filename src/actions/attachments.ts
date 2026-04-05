@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { uploadAttachmentSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeFileName, escapeHtml, sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
@@ -144,23 +145,19 @@ export async function getTaskAttachments(taskId: string) {
 
     if (error || !data) return []
 
-    // Get public URLs for each
-    return data.map(file => {
-        const { data: urlData } = supabase.storage
-            .from('task-files')
-            .getPublicUrl(`${taskId}/${file.name}`)
-        // Check if urlData exists before accessing publicUrl
-        if (!urlData) {
+    // SECURITY: Use signed URLs — task attachments are confidential foundry data
+    const admin = createAdminClient()
+    const results = await Promise.all(
+        data.map(async (file) => {
+            const { data: urlData } = await admin.storage
+                .from('task-files')
+                .createSignedUrl(`${taskId}/${file.name}`, 3600)
             return {
                 name: file.name,
-                url: '',
+                url: urlData?.signedUrl ?? '',
                 size: file.metadata?.size || 0
             }
-        }
-        return {
-            name: file.name,
-            url: urlData.publicUrl,
-            size: file.metadata?.size || 0
-        }
-    })
+        })
+    )
+    return results
 }

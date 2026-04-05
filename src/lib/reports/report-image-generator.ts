@@ -200,11 +200,12 @@ async function uploadReportImage(
       return null
     }
 
-    const { data: urlData } = supabase.storage
+    // SECURITY: Use signed URL — report images are confidential business content
+    const { data: urlData } = await supabase.storage
       .from(STORAGE_BUCKET)
-      .getPublicUrl(path)
+      .createSignedUrl(path, 3600)
 
-    return urlData.publicUrl
+    return urlData?.signedUrl ?? null
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown"
     console.error("[ReportImageGen] Upload error:", msg)

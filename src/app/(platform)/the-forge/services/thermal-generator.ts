@@ -326,9 +326,10 @@ async function uploadAnalysisFile(
     throw new Error(`[XRayThermal] Storage upload failed: ${error.message}`)
   }
 
-  const { data: urlData } = supabase.storage
+  // SECURITY: Use signed URL — thermal analysis results are confidential
+  const { data: urlData } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .getPublicUrl(path)
+    .createSignedUrl(path, 3600)
 
-  return urlData.publicUrl
+  return urlData?.signedUrl ?? ''
 }

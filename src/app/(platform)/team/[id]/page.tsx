@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Mail, Briefcase, Shield, Award, ChevronRight } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 import { CompareToDialog } from './compare-to-dialog'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -24,6 +25,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
 
     if (!foundry_id) {
         return <div className="p-8 text-destructive">Error: This profile is not correctly associated with a Foundry.</div>
+    }
+
+    // SECURITY: Verify the profile belongs to the current user's foundry (IDOR prevention)
+    const userFoundryId = await getFoundryIdCached()
+    if (profile.foundry_id !== userFoundryId) {
+        notFound()
     }
 
     // Fetch assigned tasks for this profile

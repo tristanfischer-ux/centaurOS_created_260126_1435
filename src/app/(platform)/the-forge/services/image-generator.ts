@@ -604,11 +604,12 @@ async function uploadToStorage(
     throw new Error(`[XRayImageGen] Storage upload failed: ${error.message}`)
   }
 
-  const { data: urlData } = supabase.storage
+  // SECURITY: Use signed URL — generated engineering images are confidential
+  const { data: urlData } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .getPublicUrl(path)
+    .createSignedUrl(path, 3600)
 
-  return urlData.publicUrl
+  return urlData?.signedUrl ?? ''
 }
 
 // ─── Reference Image Preparation ────────────────────────────────────
