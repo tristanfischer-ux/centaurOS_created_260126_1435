@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { createTeamSchema, inviteMemberSchema, validate } from '@/lib/validations'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { withAuth } from '@/lib/server-action-utils'
+import { getFoundryTier } from '@/lib/ai/limit-check'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 
 // ============ MEMBER ACTIONS ============
 
@@ -55,6 +57,32 @@ export async function createMember(formData: FormData) {
         }
 
         const { email: validatedEmail, name: validatedName, role: validatedRole } = validation.data
+
+        // SECURITY: Enforce team member limit based on subscription tier
+        const tier = await getFoundryTier(foundryId)
+        const plan = SUBSCRIPTION_PLANS[tier]
+        const maxMembers = plan.limits.maxTeamMembers
+
+        if (maxMembers !== undefined) {
+            const { count: memberCount, error: countError } = await supabase
+                .from('foundry_memberships')
+                .select('id', { count: 'exact', head: true })
+                .eq('foundry_id', foundryId)
+
+            if (countError) {
+                console.error('[Team] Failed to count team members:', {
+                    foundryId,
+                    error: countError.message,
+                })
+                return { error: 'Failed to verify team member limit' }
+            }
+
+            if ((memberCount || 0) >= maxMembers) {
+                return {
+                    error: `Team member limit reached for your ${plan.name} plan (${maxMembers} members). Upgrade to add more members.`,
+                }
+            }
+        }
 
         const id = crypto.randomUUID()
 

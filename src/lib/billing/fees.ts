@@ -47,7 +47,7 @@ export async function getEffectiveFeePercent(
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('buyer_id', buyerUserId)
-      .in('status', ['completed', 'in_progress', 'accepted'])
+      .in('status', ['completed'])
 
     const orderCount = completedOrders ?? 0
     const introOrdersRemaining = Math.max(0, INTRO_FREE_ORDERS - orderCount)

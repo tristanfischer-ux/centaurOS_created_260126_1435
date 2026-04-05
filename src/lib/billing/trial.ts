@@ -110,15 +110,16 @@ export async function getTrialStatus(): Promise<TrialStatus> {
     }
   } catch (error) {
     console.error('[Trial] Error checking trial status:', error)
-    // DECISION: Fail-open during trial check errors to avoid blocking users.
-    // Better to give temporary free access than to block a paying customer
-    // due to a transient DB error.
+    // DECISION: Fail-closed for AI/premium features on trial check errors.
+    // AI features are metered and costly — granting free access on error
+    // creates an exploit vector (trigger DB errors → unlimited AI).
+    // Basic UI access is unaffected; only hasFullAccess is denied.
     return {
-      isInTrial: true,
-      trialExpired: false,
-      daysRemaining: 14,
+      isInTrial: false,
+      trialExpired: true,
+      daysRemaining: 0,
       trialEndsAt: null,
-      hasFullAccess: true,
+      hasFullAccess: false,
     }
   }
 }

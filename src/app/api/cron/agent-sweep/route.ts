@@ -20,6 +20,12 @@ import { runSweepOrchestration } from '@/lib/agents/sweep-orchestrator'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 // AUDIT: verifyCronSecret extracted to shared cron-auth.ts (2026-02-19, refactor step 1 of 8)
 import { verifyCronSecret } from '@/lib/security/cron-auth'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+/** SECURITY: Daily cost ceiling in USD. If total AI spend across all foundries
+ * exceeds this amount, the cron sweep is skipped to prevent runaway costs.
+ * £50 ≈ $65 at typical exchange rates. */
+const DAILY_COST_CEILING_USD = 65
 
 /**
  * GET /api/cron/agent-sweep
@@ -38,6 +44,48 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const authFailure = verifyCronSecret(req)
   if (authFailure) {
     return authFailure
+  }
+
+  // SECURITY: Check daily cost ceiling before executing any sweeps
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const adminSupabase = createAdminClient()
+    const { data: costRows, error: costError } = await adminSupabase
+      .from('ai_usage_log')
+      .select('estimated_cost_usd')
+      .gte('created_at', `${today}T00:00:00.000Z`)
+      .lt('created_at', `${today}T23:59:59.999Z`)
+
+    if (costError) {
+      console.error('[AgentSweep] Failed to check daily cost ceiling:', costError.message)
+      // SECURITY: Fail closed — skip sweep if we can't verify cost
+      return NextResponse.json({
+        skipped: true,
+        reason: 'Failed to verify daily cost ceiling',
+      }, { status: 500 })
+    }
+
+    const dailyCost = (costRows || []).reduce(
+      (sum, row) => sum + (row.estimated_cost_usd || 0),
+      0
+    )
+
+    if (dailyCost > DAILY_COST_CEILING_USD) {
+      console.warn(`[AgentSweep] Daily cost ceiling exceeded: $${dailyCost.toFixed(2)} > $${DAILY_COST_CEILING_USD}`)
+      return NextResponse.json({
+        skipped: true,
+        reason: 'Daily AI cost ceiling exceeded',
+        dailyCost: Number(dailyCost.toFixed(2)),
+        ceiling: DAILY_COST_CEILING_USD,
+      })
+    }
+  } catch (ceilingError) {
+    console.error('[AgentSweep] Cost ceiling check threw:', ceilingError)
+    // SECURITY: Fail closed
+    return NextResponse.json({
+      skipped: true,
+      reason: 'Cost ceiling check failed',
+    }, { status: 500 })
   }
 
   try {

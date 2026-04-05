@@ -139,7 +139,7 @@ export async function checkAILimit(
  * @param foundryId - The foundry ID to look up
  * @returns The owner's subscription tier, defaults to 'free'
  */
-async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
+export async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
   try {
     const supabase = await createClient()
 

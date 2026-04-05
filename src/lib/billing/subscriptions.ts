@@ -310,16 +310,17 @@ export async function handleSubscriptionEvent(
       const metadataTier = subscription.metadata?.tier
       const priceDerivedTier = priceId ? PRICE_ID_TO_TIER[priceId] : undefined
 
+      // SECURITY: Derive tier ONLY from the Stripe price ID — never trust metadata.
+      // Metadata is user-controllable via the Stripe API; the price they paid is not.
+      // If price ID doesn't map, default to 'starter' (least-privileged tier).
       let tier: SubscriptionTier = 'starter'
       if (priceDerivedTier) {
         tier = priceDerivedTier
         if (metadataTier && metadataTier !== priceDerivedTier) {
           console.error('[Subscriptions] SECURITY: Tier mismatch — metadata says', metadataTier, 'but price ID maps to', priceDerivedTier)
         }
-      } else if (metadataTier && VALID_TIERS.has(metadataTier)) {
-        tier = metadataTier as SubscriptionTier
       } else {
-        console.warn('[Subscriptions] Could not derive tier from price ID or metadata, defaulting to starter')
+        console.warn('[Subscriptions] Could not derive tier from price ID, defaulting to starter. metadata tier ignored:', metadataTier)
       }
 
       const { error: upsertError } = await supabase.from('user_subscriptions').upsert({

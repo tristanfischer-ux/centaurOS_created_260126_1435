@@ -6,6 +6,8 @@ import { compilePersonalityPrompt, compileArchetypePrompt } from '@/lib/agents/p
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { compileTemporalPrompt } from '@/lib/agents/temporal-context'
+import { checkAILimit } from '@/lib/ai/limit-check'
+import { trackAIUsage } from '@/lib/ai/usage-tracking'
 import type { ArchetypeId } from '@/lib/agents/archetypes'
 
 export async function runAIWorker(taskId: string, assigneeId: string) {
@@ -32,6 +34,23 @@ export async function runAIWorker(taskId: string, assigneeId: string) {
             .single()
 
         if (!task) return
+
+        // 2b. SECURITY: Check AI quota before making any API calls (defense-in-depth).
+        // Callers should also gate, but this prevents unmetered calls if runAIWorker
+        // is invoked from a code path that forgets to check.
+        if (task.foundry_id) {
+            const limitCheck = await checkAILimit(task.foundry_id)
+            if (!limitCheck.allowed) {
+                console.info('[GhostWorker] Skipped — AI quota exceeded for foundry:', task.foundry_id, {
+                    currentUsage: limitCheck.currentUsage,
+                    limit: limitCheck.limit,
+                })
+                return
+            }
+        } else {
+            console.error('[GhostWorker] Task has no foundry_id — skipping AI call for safety')
+            return
+        }
 
         // 3. Generate Content
         const apiKey = process.env.OPENAI_API_KEY?.trim()
@@ -126,6 +145,19 @@ Do not say "I will do this". DO IT.`
             console.error('AI returned no choices')
             throw new Error('AI returned no response')
         }
+
+        // SECURITY: Track AI usage for quota enforcement and cost monitoring
+        trackAIUsage({
+            foundryId: task.foundry_id,
+            userId: assigneeId,
+            feature: 'ghost_agent',
+            model: 'gpt-5.4',
+            promptTokens: completion.usage?.prompt_tokens,
+            completionTokens: completion.usage?.completion_tokens,
+            metadata: { taskId },
+        }).catch((err) => {
+            console.error('[GhostWorker] Failed to track AI usage:', err)
+        })
 
         const aiResponse = completion.choices[0].message.content || "I have analyzed the task."
 

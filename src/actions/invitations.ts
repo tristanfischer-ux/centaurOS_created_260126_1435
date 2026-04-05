@@ -9,6 +9,8 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 import { getBaseUrl } from '@/lib/domains'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { logAudit } from '@/actions/audit'
+import { getFoundryTier } from '@/lib/ai/limit-check'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { Database } from '@/types/database.types'
 
 type MemberRole = Database['public']['Enums']['member_role']
@@ -108,7 +110,45 @@ export async function createInvitation(
   if (existingMember) {
     return { success: false, error: 'This person is already a member of your company' }
   }
-  
+
+  // SECURITY: Enforce team member limit based on subscription tier
+  const tier = await getFoundryTier(foundry.id)
+  const plan = SUBSCRIPTION_PLANS[tier]
+  const maxMembers = plan.limits.maxTeamMembers
+
+  if (maxMembers !== undefined) {
+    // Count current members (profiles in this foundry) + pending invitations
+    const { count: memberCount, error: countError } = await supabase
+      .from('foundry_memberships')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', foundry.id)
+
+    if (countError) {
+      console.error('[Invitations] Failed to count team members:', {
+        foundryId: foundry.id,
+        error: countError.message,
+      })
+      return { success: false, error: 'Failed to verify team member limit' }
+    }
+
+    // Also count pending (non-expired, non-accepted) invitations
+    const { count: pendingCount } = await supabase
+      .from('company_invitations')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', foundry.id)
+      .is('accepted_at', null)
+      .gt('expires_at', new Date().toISOString())
+
+    const totalCommitted = (memberCount || 0) + (pendingCount || 0)
+
+    if (totalCommitted >= maxMembers) {
+      return {
+        success: false,
+        error: `Team member limit reached for your ${plan.name} plan (${maxMembers} members). Upgrade to add more members.`,
+      }
+    }
+  }
+
   // Generate token and expiry
   const token = generateToken()
   const expiresAt = new Date()
@@ -262,12 +302,31 @@ export async function acceptInvitation(token: string): Promise<{
   
   // SECURITY: Verify the invitation email matches the user's email
   if (user.email?.toLowerCase() !== invitation.email.toLowerCase()) {
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: `This invitation was sent to ${invitation.email}. Please log in with that email address.`
     }
   }
-  
+
+  // SECURITY: Enforce team member limit at acceptance time (double-check)
+  const acceptTier = await getFoundryTier(invitation.foundryId)
+  const acceptPlan = SUBSCRIPTION_PLANS[acceptTier]
+  const acceptMaxMembers = acceptPlan.limits.maxTeamMembers
+
+  if (acceptMaxMembers !== undefined) {
+    const { count: currentMembers } = await supabase
+      .from('foundry_memberships')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', invitation.foundryId)
+
+    if ((currentMembers || 0) >= acceptMaxMembers) {
+      return {
+        success: false,
+        error: `This company has reached its team member limit. Ask the team admin to upgrade their plan.`,
+      }
+    }
+  }
+
   // Add user to the foundry via foundry_memberships (supports multi-foundry)
   const { error: membershipError } = await supabase
     .from('foundry_memberships')
