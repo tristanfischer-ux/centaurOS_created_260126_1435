@@ -343,3 +343,24 @@ Every specialist workflow output MUST follow the Voice Sandwich pattern:
 
 ### Config Interface Integrity Rule
 Any time a field is added to a config interface (not just personality — any interface), grep for where it's consumed, not just where it's defined. An interface field without a consumer is a bug, not a feature.
+
+### Baseline Scores (April 5, 2026 — Post-Optimization, All 13 Specialists)
+Live API benchmarks (claude-sonnet-4-20250514, LLM-as-judge). 5 AutoAgent mutation cycles per specialist. Any personality change must not drop composite below these baselines minus 0.2.
+
+| Specialist | ID | Composite | Action. | Spec. | Depth | Voice | Scenarios |
+|---|---|---|---|---|---|---|---|
+| Sage (Strategy) | strategist | **4.40** | 4.30 | 4.20 | 4.40 | 4.67 | 20 |
+| Max (CTO) | cto | **4.46** | 4.30 | 4.20 | 4.50 | 4.85 | 10 |
+| Jian (VP Eng) | vp-engineering | **4.38** | 4.20 | 4.20 | 4.25 | 4.85 | 10 |
+| Fang (VP Mfg) | vp-manufacturing | **4.33** | 4.40 | 4.15 | 4.25 | 4.50 | 10 |
+| Chase (VP Supply) | vp-supply-chain | **4.39** | 4.40 | 4.35 | 4.20 | 4.60 | 10 |
+| Priya (Product) | product-lead | **4.37** | 4.55 | 4.15 | 4.35 | 4.40 | 10 |
+| Mia (Marketing) | growth-marketer | **4.35** | 4.50 | 4.05 | 4.40 | 4.45 | 10 |
+| Sal (Sales) | sales-lead | **4.42** | 4.55 | 4.30 | 4.25 | 4.65 | 10 |
+| Cal (Chief of Staff) | chief-of-staff | **4.35** | 4.50 | 4.05 | 4.25 | 4.55 | 10 |
+| Finn (Finance) | finance-lead | **4.39** | 4.45 | 4.40 | 4.20 | 4.50 | 10 |
+| Fiona (Fundraising) | fundraising-advisor | **4.39** | 4.25 | 4.25 | 4.35 | 4.70 | 10 |
+| Harper (HR) | hiring-team | **4.29** | 4.40 | 4.15 | 4.25 | 4.35 | 10 |
+| Leo (Legal) | legal-counsel | **4.38** | 4.55 | 4.10 | 4.25 | 4.65 | 10 |
+
+**Fleet average: 4.38 composite (+0.04 from pre-optimization).** Top: Max (4.46), Sal (4.42), Sage (4.40). Most improved: Priya (+0.12), Chase (+0.10), Sal (+0.08), Leo (+0.08).

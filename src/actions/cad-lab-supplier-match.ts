@@ -461,7 +461,7 @@ export async function matchCadLabModuleSuppliers(
 
   if (listings) {
     for (const listing of listings) {
-      const listingText = `${listing.title} ${listing.description || ""} ${listing.subcategory || ""}`.toLowerCase()
+      const listingText = `${listing.title || ""} ${listing.description || ""} ${listing.subcategory || ""}`.toLowerCase()
       const attrs = listing.attributes as Record<string, unknown> | null
 
       // Factor 1: Semantic
@@ -534,7 +534,7 @@ export async function matchCadLabModuleSuppliers(
 
         matches.push({
           id: listing.id,
-          name: listing.title,
+          name: listing.title || "Unknown Supplier",
           matchScore: breakdown.total,
           scoreBreakdown: breakdown,
           matchReasons: [...new Set(reasons)].slice(0, 3),
@@ -550,7 +550,7 @@ export async function matchCadLabModuleSuppliers(
 
   const deduped = new Map<string, CadLabSupplierMatch>()
   for (const m of matches) {
-    const key = m.name.toLowerCase()
+    const key = (m.name || "").toLowerCase()
     const existing = deduped.get(key)
     if (!existing || m.matchScore > existing.matchScore) {
       deduped.set(key, m)
