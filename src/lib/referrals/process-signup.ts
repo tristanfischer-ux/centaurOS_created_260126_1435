@@ -40,6 +40,7 @@ async function trackReferralSignup(
       return { error: 'Invalid referral code format' }
     }
 
+    // SECURITY: admin client — cross-foundry referral processing during signup, scoped by newUserId param
     const admin = createAdminClient()
 
     // SECURITY: Check if this user was already referred (prevent duplicate credits)

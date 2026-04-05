@@ -34,6 +34,7 @@ export async function retrieveEngineeringDataForPrompt(
   materials: string[] = [],
   processes: string[] = [],
 ): Promise<EngineeringDataPromptResult> {
+  // SECURITY: admin client — global reference data (material_properties, hardware_components, process_capabilities), foundry_id not needed
   const supabase = createAdminClient()
   const lower = description.toLowerCase()
   const sections: string[] = []

@@ -269,6 +269,7 @@ async function fetchDirectoryExperts(): Promise<NormalizedExpert[]> {
 
 async function fetchListingExecutives(): Promise<NormalizedExpert[]> {
   try {
+    // SECURITY: admin client — cross-foundry marketplace expert search, foundry_id not needed: marketplace is public
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("listing_executives")
@@ -329,6 +330,7 @@ async function fetchListingExecutives(): Promise<NormalizedExpert[]> {
 
 async function fetchProfileExecutives(): Promise<NormalizedExpert[]> {
   try {
+    // SECURITY: admin client — cross-foundry profile search for expert matching, foundry_id not needed: profiles SELECT is public
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("profiles")

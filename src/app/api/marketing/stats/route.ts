@@ -20,6 +20,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
  */
 export async function GET(): Promise<NextResponse> {
   try {
+    // SECURITY: admin client — public marketing endpoint, foundry_id not needed: only returns aggregate count (no PII)
     const supabase = createAdminClient()
 
     // SECURITY: Only returns aggregate count, no individual data

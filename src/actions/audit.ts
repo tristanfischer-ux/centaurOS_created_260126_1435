@@ -83,6 +83,7 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
     // Some flows (e.g. supplier claim) may not have a foundry — skip audit
     if (!foundryId) return
 
+    // SECURITY: admin client — audit log writes, foundry_id filtered
     const adminClient = createAdminClient()
     const { error } = await adminClient.from('audit_log').insert({
       foundry_id: foundryId,

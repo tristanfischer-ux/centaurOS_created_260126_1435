@@ -138,6 +138,7 @@ export async function createCompanyFoundry(params: {
       // Rollback: delete the orphaned foundry using admin client
       // SECURITY: User's RLS client may not have DELETE policy on foundries
       console.error("[createCompanyFoundry] Membership creation failed:", membershipError)
+      // SECURITY: admin client — rollback orphaned foundry, scoped by foundryId just created
       const adminClient = createAdminClient()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- admin client type doesn't match user client type
       await (adminClient as any).from("foundries").delete().eq("id", foundryId)

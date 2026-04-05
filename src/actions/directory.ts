@@ -46,6 +46,7 @@ export async function getDirectoryExperts(params?: {
     offset?: number
 }): Promise<{ experts: DirectoryExpert[]; total: number }> {
     try {
+        // SECURITY: admin client — public directory data via RPCs, foundry_id not needed: public profiles
         const supabase = createAdminClient()
 
         const [expertsResult, countResult] = await Promise.all([

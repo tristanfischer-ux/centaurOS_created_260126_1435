@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // SECURITY: admin client — waitlist operations (non-tenant data), foundry_id not needed: waitlist is pre-signup
   const admin = createAdminClient();
   const { data: entry, error: fetchError } = await admin
     .from("waitlist")

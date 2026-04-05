@@ -42,6 +42,7 @@ export async function retrieveStandardsForPrompt(
   maxTokenBudget: number = 200_000,
   detail: "summary" | "full" = "full",
 ): Promise<StandardsPromptResult> {
+  // SECURITY: admin client — global reference data (design_standards), foundry_id not needed
   const supabase = createAdminClient()
 
   // Fetch standards for this domain, then score in JS (tag matching via GIN would

@@ -27,6 +27,7 @@ export async function GET(
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
   }
 
+  // SECURITY: admin client — public share link endpoint, foundry_id not needed: intentionally cross-foundry for unauthenticated viewers
   const supabase = createAdminClient()
 
   // SECURITY: Fetch only metadata first — check expiry BEFORE loading artifact content

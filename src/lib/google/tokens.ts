@@ -114,7 +114,7 @@ export async function saveGoogleToken(
         return { success: true }
     }
 
-    // Fallback: admin client (bypasses RLS). Use when RLS blocks or admin key is required.
+    // SECURITY: admin client — fallback for OAuth token upsert when RLS blocks, scoped by userId+foundryId params
     let adminClient
     try {
         adminClient = createAdminClient()

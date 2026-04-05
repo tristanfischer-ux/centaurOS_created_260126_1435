@@ -187,6 +187,7 @@ async function uploadReportImage(
   base64Data: string,
 ): Promise<string | null> {
   try {
+    // SECURITY: admin client — storage upload for report images, scoped by reportId
     const supabase = createAdminClient()
     const buffer = Buffer.from(base64Data, "base64")
     const path = `${reportId}/${filename}`

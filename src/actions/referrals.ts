@@ -80,6 +80,7 @@ export async function lookupReferrer(
     const sanitized = code.toUpperCase().trim()
     if (!REFERRAL_CODE_REGEX.test(sanitized)) return null
 
+    // SECURITY: admin client — cross-foundry referral code lookup (intentional), foundry_id not needed
     const admin = createAdminClient()
 
     const { data: referrer } = await admin
@@ -117,6 +118,7 @@ export async function lookupReferrer(
 export const getFoundingMemberCount = unstable_cache(
   async (): Promise<number> => {
     try {
+      // SECURITY: admin client — aggregate count RPC, foundry_id not needed
       const admin = createAdminClient()
       const { data } = await admin.rpc('get_founding_member_count')
       return data || 0

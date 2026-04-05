@@ -290,8 +290,7 @@ export async function resumeSubscription(
 export async function handleSubscriptionEvent(
   event: Stripe.Event
 ): Promise<void> {
-  // SECURITY: Use admin client — this is called from webhook handler (no user session/cookies).
-  // createClient() would create an unauthenticated client, causing RLS-blocked upserts.
+  // SECURITY: admin client — webhook handler (no user session/cookies), foundry_id not needed: subscription is per-user via Stripe metadata
   const supabase = createAdminClient()
   
   switch (event.type) {

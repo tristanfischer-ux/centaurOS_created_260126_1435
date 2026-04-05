@@ -96,6 +96,7 @@ export async function retrieveProductDimensionsForPrompt(
 // because unstable_cache can revalidate during a different user's request.
 const getCachedProductDimensions = unstable_cache(
   async () => {
+    // SECURITY: admin client — global reference data (product_reference_dimensions), foundry_id not needed
     const supabase = createAdminClient()
     const { data } = await supabase
       .from("product_reference_dimensions")

@@ -44,6 +44,7 @@ export interface MarketplaceStats {
 // ─── Fetch + Aggregate (runs inside cache) ──────────────────────────────────
 
 const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
+  // SECURITY: admin client — aggregate stats over marketplace_listings (cross-foundry by design), foundry_id not needed
   const supabase = createAdminClient()
 
   // Fetch all Products & Services listings with attributes + new columns

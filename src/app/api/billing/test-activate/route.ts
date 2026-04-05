@@ -102,7 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Simulate subscription activation — upsert user_subscriptions row
-    // SECURITY: Use admin client to bypass RLS (same pattern as webhook handler)
+    // SECURITY: admin client — test activation endpoint, scoped by authenticated user.id. foundry_id not needed: subscription is per-user
     const adminClient = createAdminClient()
     const now = new Date()
     const periodEnd = new Date(now)

@@ -39,6 +39,7 @@ export async function createMatchAlert(
     listingId?: string,
     metadata?: Record<string, unknown>
 ) {
+    // SECURITY: admin client — system-generated alerts, scoped by userId param
     const supabase = createAdminClient()
 
     const { error } = await untypedFrom(supabase, 'match_alerts')

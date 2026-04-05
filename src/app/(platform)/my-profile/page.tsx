@@ -41,6 +41,7 @@ export default async function MyProfilePage() {
   const [data, foundriesResult, telegramResult, completionHistoryResult] = await Promise.all([
     getProfileHubData(),
     getUserFoundries(),
+    // SECURITY: admin client — messaging_links filtered by authenticated user.id
     createAdminClient()
       .from('messaging_links')
       .select('id, platform_username, verified_at')

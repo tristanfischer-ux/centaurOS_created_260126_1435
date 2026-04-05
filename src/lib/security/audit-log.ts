@@ -59,6 +59,7 @@ export interface SecurityEvent {
  */
 async function persistSecurityEvent(event: SecurityEvent): Promise<void> {
     try {
+        // SECURITY: admin client — security audit log writes (system-level), foundry_id not needed: security events are global
         const adminClient = createAdminClient()
         const { error } = await adminClient.rpc('insert_security_audit_log', {
             p_event_type: event.type,

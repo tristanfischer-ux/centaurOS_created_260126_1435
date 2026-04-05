@@ -171,6 +171,7 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
     if (newStandards.length === 0) return []
 
     // Store in Supabase
+    // SECURITY: admin client — design_standards is global reference data, foundry_id not needed
     const supabase = createAdminClient()
     const toInsert = newStandards.map(s => ({
       standard_code: s.standard_code,

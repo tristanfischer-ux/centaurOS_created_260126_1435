@@ -37,6 +37,7 @@ export async function dispatchSheetSync(
     operation: 'create' | 'update' | 'delete'
 ): Promise<void> {
     try {
+        // SECURITY: admin client — foundry_id filtered in query below
         const admin = createAdminClient()
 
         // Find all active spreadsheet integrations for this foundry

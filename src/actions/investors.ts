@@ -576,6 +576,7 @@ const INVESTOR_FIRM_TYPES = new Set([
  */
 export const getInvestorStats = unstable_cache(
   async (): Promise<InvestorStats> => {
+    // SECURITY: admin client — aggregate stats over marketplace_listings (cross-foundry by design), foundry_id not needed
     const supabase = createAdminClient()
 
     // DECISION: Cap at 2000 rows to prevent OOM on Vercel. Stats are approximate at scale.

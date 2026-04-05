@@ -106,6 +106,7 @@ function loginPage(error?: string): string {
 
 // ── Main Dashboard ─────────────────────────────────────────────────
 async function buildDashboard(): Promise<string> {
+  // SECURITY: admin client — platform admin dashboard (password-gated), foundry_id not needed: cross-foundry by design
   const sb = createAdminClient()
 
   const [profilesRes, aiMonthRes, aiDailyRes, authUsersRes] = await Promise.all([
@@ -217,6 +218,7 @@ ${CSS}
 
 // ── User Detail Page ───────────────────────────────────────────────
 async function buildUserDetail(userId: string): Promise<string> {
+  // SECURITY: admin client — platform admin user detail (password-gated), scoped by userId param
   const sb = createAdminClient()
 
   const [profileRes, aiRes, eventsRes, authRes] = await Promise.all([

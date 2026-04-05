@@ -27,6 +27,13 @@ interface BackfillResult {
  * @returns Summary of how many listings were processed, succeeded, and failed
  */
 export async function backfillMarketplaceEmbeddings(): Promise<BackfillResult> {
+  // SECURITY: Auth gate — only authenticated users can trigger backfill.
+  const { createClient } = await import("@/lib/supabase/server")
+  const userSupabase = await createClient()
+  const { data: { user } } = await userSupabase.auth.getUser()
+  if (!user) throw new Error("Not authenticated")
+
+  // SECURITY: admin client — marketplace_listings is cross-foundry, foundry_id not needed for backfill
   const supabase = createAdminClient()
 
   // Fetch all listings missing embeddings

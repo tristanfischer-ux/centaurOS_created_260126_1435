@@ -214,6 +214,12 @@ export async function getEngineeringIntelligenceForReport(
  * Verify a single standard (admin action — uses service role to bypass RLS).
  */
 export async function verifyStandard(id: string): Promise<{ success: boolean; error?: string }> {
+  // SECURITY: Auth gate — only authenticated users should verify standards.
+  const userSupabase = await createClient()
+  const { data: { user } } = await userSupabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  // SECURITY: admin client — design_standards is global (not per-foundry), foundry_id not needed
   const supabase = createAdminClient()
   const { error } = await supabase
     .from("design_standards")
@@ -228,6 +234,13 @@ export async function verifyStandard(id: string): Promise<{ success: boolean; er
  */
 export async function bulkVerifyStandards(ids: string[]): Promise<{ success: boolean; count: number; error?: string }> {
   if (ids.length === 0) return { success: true, count: 0 }
+
+  // SECURITY: Auth gate — only authenticated users should verify standards.
+  const userSupabase = await createClient()
+  const { data: { user } } = await userSupabase.auth.getUser()
+  if (!user) return { success: false, count: 0, error: 'Not authenticated' }
+
+  // SECURITY: admin client — design_standards is global (not per-foundry), foundry_id not needed
   const supabase = createAdminClient()
   const { error, count } = await supabase
     .from("design_standards")

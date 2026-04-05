@@ -26,6 +26,7 @@ export interface ProcessInsights {
 
 export async function getTechniqueEnrichment(slug: string): Promise<TechniqueEnrichment | null> {
   try {
+    // SECURITY: admin client — technique enrichments are global reference data, foundry_id not needed
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('manufacturing_technique_enrichments')

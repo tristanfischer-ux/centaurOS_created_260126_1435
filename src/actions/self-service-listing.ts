@@ -11,7 +11,7 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 async function repairListingLink(supabase: any, providerId: string, listingId: string) {
     // GOTCHA: RLS UPDATE policy on marketplace_listings checks created_by_provider_id,
     // which is NULL for Nightshift-pushed listings. The user client can't update it.
-    // Use admin client (service role, bypasses RLS) for the marketplace_listings repair.
+    // SECURITY: admin client — RLS UPDATE policy on marketplace_listings checks created_by_provider_id (NULL for Nightshift), foundry_id not needed: marketplace is cross-foundry
     const admin = createAdminClient()
     await Promise.allSettled([
         supabase

@@ -52,6 +52,7 @@ export async function getRecruitsStats(): Promise<MarketplaceStats | null> {
 // reject the query if user B's cookies triggered revalidation of user A's cache.
 // Safe because auth is verified in getRecruitsStats() before calling this.
 const fetchRecruitsStats = async (): Promise<MarketplaceStats | null> => {
+  // SECURITY: admin client — aggregate stats over marketplace_listings (cross-foundry by design), foundry_id not needed. Auth checked in getRecruitsStats() caller.
   const supabase = createAdminClient()
 
   // Paginate to handle large datasets

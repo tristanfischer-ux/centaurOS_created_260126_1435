@@ -43,6 +43,7 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
   // INTENT: supabase from withUser is user-scoped; we need admin for cross-table ops
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return withUser(async ({ supabase: _userSupabase, user }) => {
+    // SECURITY: admin client — account deletion needs cross-table ops, scoped by user.id from withUser
     const adminSupabase = createAdminClient()
 
     // SECURITY: Check sole-founder status across ALL foundries

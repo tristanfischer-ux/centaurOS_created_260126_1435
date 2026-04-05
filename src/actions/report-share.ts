@@ -136,6 +136,7 @@ export async function getSharedReport(
       return { success: false, error: 'Invalid share token' }
     }
 
+    // SECURITY: admin client — shared report lookup by token (intentionally cross-foundry for public share links), foundry_id not needed
     const supabaseAdmin = createAdminClient()
 
     // DECISION: Single query joining shared_reports → report_snapshots avoids
