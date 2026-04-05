@@ -68,7 +68,10 @@ export async function generateDocumentQuestions(
     // Collect auto-data if requested (for smarter questions)
     let autoDataText = ''
     if (includeAutoData && skill.autoDataSources.length > 0) {
-      if (foundryId) {
+      // SECURITY: auto-data MUST be scoped to foundry — skip if no foundry context
+      if (!foundryId) {
+        console.warn('[DocumentQuestions] No foundry context — skipping auto-data')
+      } else {
         try {
           autoDataText = await collectAutoData(skill.autoDataSources, foundryId)
         } catch (err) {

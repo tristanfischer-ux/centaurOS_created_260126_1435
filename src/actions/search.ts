@@ -133,7 +133,9 @@ export async function searchMessages(
           .from('profiles')
           .select('id')
           .ilike('full_name', `%${escapeIlike(username)}%`)
-        if (foundryId) userMatchQuery = userMatchQuery.eq('foundry_id', foundryId)
+        // SECURITY: foundry_id filter is MANDATORY — never run unscoped profile queries
+        if (!foundryId) return { success: true, data: [] }
+        userMatchQuery = userMatchQuery.eq('foundry_id', foundryId)
         const { data: userMatch } = await userMatchQuery
           .limit(1)
           .single()
@@ -240,7 +242,9 @@ export async function getSearchSuggestions(
         .from('profiles')
         .select('id, full_name')
         .ilike('full_name', `%${escapeIlike(query)}%`)
-      if (foundryId) usersQuery = usersQuery.eq('foundry_id', foundryId)
+      // SECURITY: foundry_id filter is MANDATORY — never run unscoped profile queries
+      if (!foundryId) return { success: true, data: [] }
+      usersQuery = usersQuery.eq('foundry_id', foundryId)
       const { data: users, error } = await usersQuery
         .limit(10)
       

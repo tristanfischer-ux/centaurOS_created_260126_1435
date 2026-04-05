@@ -260,7 +260,9 @@ export async function getAvailableSkills(): Promise<{ data: string[]; error: str
             .from('profiles')
             .select('skills')
             .not('skills', 'is', null)
-        if (foundryId) query = query.eq('foundry_id', foundryId)
+        // SECURITY: foundry_id filter is MANDATORY
+        if (!foundryId) return { data: [], error: 'No foundry context' }
+        query = query.eq('foundry_id', foundryId)
         const { data, error } = await query
 
         if (error) {
@@ -299,7 +301,9 @@ export async function getSkillDistribution(): Promise<{
             .from('profiles')
             .select('skills')
             .not('skills', 'is', null)
-        if (foundryId) skillQuery = skillQuery.eq('foundry_id', foundryId)
+        // SECURITY: foundry_id filter is MANDATORY
+        if (!foundryId) return { data: [], error: 'No foundry context' }
+        skillQuery = skillQuery.eq('foundry_id', foundryId)
         const { data, error } = await skillQuery
 
         if (error) {

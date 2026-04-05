@@ -89,22 +89,16 @@ Return ONLY a raw JSON object (no markdown formatting) with this structure:
     ]
 }`
 
-            // SECURITY: Use authenticated foundryId/userId instead of client-provided values
+            // SECURITY: foundry context is MANDATORY — no cross-foundry data leakage
             let contextSection = ''
-            if (foundryId) {
+            if (!foundryId) {
+                contextSection = 'No company context available yet. Please complete your company setup.'
+            } else {
                 contextSection = await buildAIContext(
                     foundryId,
                     user.id,
                     { includeActivity: true, includeObjectives: true }
                 )
-            } else if (input.foundry_context) {
-                // Fallback to legacy manual context if no foundry_id provided
-                contextSection = `
-Context about the business:
-- Industry: ${input.foundry_context.industry || 'Not specified'}
-- Stage: ${input.foundry_context.stage || 'Not specified'}
-- Team Size: ${input.foundry_context.team_size || 'Not specified'}
-- Location: ${input.foundry_context.location || 'Not specified'}`
             }
 
             const previousContext = input.previous_answers?.length 

@@ -310,8 +310,10 @@ export async function fillOrgBlueprintGap(
   if (result.success && result.orderId) {
     // Get foundry ID for task creation
     const foundryId = await getFoundryIdCached()
-    if (foundryId) {
-      // Auto-create tasks for the new order
+    // SECURITY: foundry_id required for task creation
+    if (!foundryId) {
+      console.error('[integrations] No foundry context — cannot create order tasks')
+    } else {
       await createOrderTasks(supabase, result.orderId, foundryId, user.id)
     }
 

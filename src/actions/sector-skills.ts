@@ -114,7 +114,9 @@ export async function getExpertsForSector(
       .from('profiles')
       .select('id, full_name, role, skills')
       .not('skills', 'is', null)
-    if (foundryId) profilesQuery = profilesQuery.eq('foundry_id', foundryId)
+    // SECURITY: foundry_id filter is MANDATORY
+    if (!foundryId) return { data: [], error: 'No foundry context' }
+    profilesQuery = profilesQuery.eq('foundry_id', foundryId)
     const { data: profiles, error: profilesError } = await profilesQuery
 
     if (profilesError) {
