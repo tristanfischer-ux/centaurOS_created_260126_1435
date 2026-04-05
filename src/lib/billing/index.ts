@@ -28,6 +28,12 @@ export {
   type UserSubscription,
 } from './subscriptions'
 
+// Storage quota enforcement
+export {
+  checkStorageQuota,
+  type StorageQuotaResult,
+} from './storage-quota'
+
 // Bank transfers
 export {
   createBankTransferRequest,

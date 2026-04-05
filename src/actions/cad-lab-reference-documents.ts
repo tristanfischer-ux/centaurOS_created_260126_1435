@@ -15,6 +15,7 @@
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { checkStorageQuota } from "@/lib/billing/storage-quota"
 import type { Json } from "@/types/database.types"
 import type { StoredReferenceDocument, DocumentFileType } from "@/lib/cad-lab/reference-document-types"
 import { EXTRACTABLE_TYPES, MAX_DOCUMENTS_PER_PROJECT } from "@/lib/cad-lab/reference-document-types"
@@ -70,11 +71,17 @@ export async function uploadReferenceDocuments(
     fileType: DocumentFileType
   }>,
 ): Promise<{ stored: Array<{ id: string; name: string; mimeType: string; storageUrl: string; originalSize: number; fileType: DocumentFileType }>; failed: string[] } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId) return { error: "Project ID required" }
     if (!UUID_RE.test(projectId)) return { error: "Invalid project ID format" }
     if (!documents.length) return { error: "No documents to upload" }
     if (documents.length > MAX_DOCS_PER_REQUEST) return { error: `Maximum ${MAX_DOCS_PER_REQUEST} documents per upload` }
+
+    // SECURITY: Enforce per-foundry storage quota before upload
+    const quota = await checkStorageQuota(foundryId)
+    if (!quota.allowed) {
+      return { error: `Storage limit reached (${quota.currentMB}MB / ${quota.limitMB}MB). Upgrade your plan for more storage.` }
+    }
 
     // SECURITY: Verify project belongs to caller's foundry (RLS enforces this via SELECT)
     const { data: project, error: projectErr } = await supabase

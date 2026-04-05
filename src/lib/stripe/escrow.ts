@@ -61,6 +61,8 @@ export interface ProcessRefundParams {
   amount?: number
   /** Reason for refund */
   reason?: string
+  /** SECURITY: Authenticated user ID requesting the refund */
+  callerUserId: string
 }
 
 /**
@@ -205,18 +207,31 @@ export async function transferToSeller(
 
 /**
  * Refunds a payment intent (full or partial)
+ *
  * @param paymentIntentId - The payment intent ID to refund
+ * @param callerUserId - The authenticated user requesting the refund
  * @param amount - Optional amount to refund (in smallest currency unit). If not provided, refunds full amount
+ * @param reason - Optional reason for audit trail
  * @returns The created refund
+ *
+ * @security Verifies the caller is the buyer, seller, or a foundry admin
+ * for the order associated with the payment intent before processing.
  */
 export async function refundPayment(
   paymentIntentId: string,
-  amount?: number
+  callerUserId: string,
+  amount?: number,
+  reason?: string
 ): Promise<
   | { refund: { id: string; amount: number; status: string }; error: null }
   | { refund: null; error: string }
 > {
   try {
+    // VALIDATION: Caller must be identified
+    if (!callerUserId) {
+      return { refund: null, error: 'Caller user ID is required for refund authorization' }
+    }
+
     // Validate amount if provided
     if (amount !== undefined && amount <= 0) {
       return {
@@ -225,9 +240,56 @@ export async function refundPayment(
       }
     }
 
+    // SECURITY: Verify caller is authorized to refund this payment
+    // Look up the order associated with this payment intent
+    const supabase = await createClient()
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('id, buyer_id, seller_id, foundry_id')
+      .eq('stripe_payment_intent_id', paymentIntentId)
+      .single()
+
+    if (orderError || !order) {
+      return { refund: null, error: 'Order not found for this payment intent' }
+    }
+
+    // Check if caller is buyer, seller, or foundry admin
+    const isBuyer = order.buyer_id === callerUserId
+    const isSeller = order.seller_id === callerUserId
+
+    if (!isBuyer && !isSeller) {
+      // Check if caller is a foundry admin for this order's foundry
+      const { data: membership } = await supabase
+        .from('foundry_memberships')
+        .select('role')
+        .eq('user_id', callerUserId)
+        .eq('foundry_id', order.foundry_id)
+        .in('role', ['admin', 'owner'])
+        .single()
+
+      if (!membership) {
+        console.warn('[Refund] Unauthorized refund attempt:', {
+          paymentIntentId,
+          callerUserId,
+          orderId: order.id,
+        })
+        return { refund: null, error: 'Not authorized to refund this payment' }
+      }
+    }
+
     const refund = await stripe.refunds.create({
       payment_intent: paymentIntentId,
       ...(amount && { amount }),
+    })
+
+    // AUDIT: Log every refund for financial traceability
+    console.info('[Refund] Processed:', {
+      paymentIntentId,
+      amount: refund.amount ?? amount ?? 'full',
+      callerUserId,
+      reason: reason ?? 'none',
+      refundId: refund.id,
+      orderId: order.id,
     })
 
     return {
@@ -688,7 +750,7 @@ export async function processRefund(
   | { refund: null; transaction: null; error: string }
 > {
   try {
-    const { orderId, amount, reason } = params
+    const { orderId, amount, reason, callerUserId } = params
 
     const supabase = await createClient()
 
@@ -799,7 +861,7 @@ export async function processRefund(
     }
 
     // Process refund through Stripe
-    const refundResult = await refundPayment(order.stripe_payment_intent_id, refundAmount)
+    const refundResult = await refundPayment(order.stripe_payment_intent_id, callerUserId, refundAmount, reason)
 
     if (refundResult.error || !refundResult.refund) {
       return {

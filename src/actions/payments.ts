@@ -468,6 +468,7 @@ export async function requestRefund(
       orderId,
       amount,
       reason,
+      callerUserId: user.id,
     })
 
     if (result.error || !result.refund) {

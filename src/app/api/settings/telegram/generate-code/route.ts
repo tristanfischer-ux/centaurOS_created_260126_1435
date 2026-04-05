@@ -46,6 +46,7 @@ export async function POST() {
             return NextResponse.json({ error: 'User not in a foundry' }, { status: 403 })
         }
 
+        // SECURITY: admin client — messaging_links filtered by authenticated user.id
         const admin = createAdminClient()
 
         // Generate new code

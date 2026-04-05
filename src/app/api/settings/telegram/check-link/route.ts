@@ -28,6 +28,7 @@ export async function GET() {
             )
         }
 
+        // SECURITY: admin client — messaging_links filtered by authenticated user.id
         const admin = createAdminClient()
 
         // Check for verified link

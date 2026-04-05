@@ -43,17 +43,6 @@ async function trackReferralSignup(
     // SECURITY: admin client — cross-foundry referral processing during signup, scoped by newUserId param
     const admin = createAdminClient()
 
-    // SECURITY: Check if this user was already referred (prevent duplicate credits)
-    const { data: existingProfile } = await admin
-      .from('profiles')
-      .select('referred_by')
-      .eq('id', newUserId)
-      .single()
-
-    if (existingProfile?.referred_by) {
-      return { error: 'User already referred' }
-    }
-
     // Look up the referrer by code
     const { data: referrer, error: lookupError } = await admin
       .from('profiles')
@@ -70,11 +59,25 @@ async function trackReferralSignup(
       return { error: 'Cannot refer yourself' }
     }
 
-    // Set referred_by on the new user
-    await admin
+    // SECURITY: Atomic check-and-set — the WHERE clause `referred_by IS NULL` ensures
+    // only the first concurrent request succeeds. Prevents duplicate credit grants
+    // from rapid duplicate signup requests (race condition).
+    const { data: updated, error: updateError } = await admin
       .from('profiles')
       .update({ referred_by: referrer.id })
       .eq('id', newUserId)
+      .is('referred_by', null)
+      .select('id')
+
+    if (updateError) {
+      console.error('[Referral] Failed to set referred_by:', updateError.message)
+      return { error: 'Failed to process referral' }
+    }
+
+    // If no rows were updated, the user was already referred (lost the race)
+    if (!updated || updated.length === 0) {
+      return { error: 'User already referred' }
+    }
 
     // Grant +10 credits to referee (new user)
     await admin.from('referral_credits').insert({

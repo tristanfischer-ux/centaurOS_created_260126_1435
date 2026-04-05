@@ -48,6 +48,8 @@ export interface SubscriptionPlan {
     investorDeepAccess: boolean
     /** Can see portfolio companies, fund performance, exits */
     investorIntelligenceAccess: boolean
+    /** Maximum storage in MB per foundry (undefined = unlimited) */
+    maxStorageMB?: number
   }
   stripePriceIdMonthly?: string
   stripePriceIdAnnual?: string
@@ -102,6 +104,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorContactsVisible: false,
       investorDeepAccess: false,
       investorIntelligenceAccess: false,
+      maxStorageMB: 500,
     },
   },
   starter: {
@@ -134,6 +137,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorContactsVisible: true,
       investorDeepAccess: false,
       investorIntelligenceAccess: false,
+      maxStorageMB: 5_000,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL,
@@ -168,6 +172,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorContactsVisible: true,
       investorDeepAccess: true,
       investorIntelligenceAccess: true,
+      maxStorageMB: 50_000,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_PROFESSIONAL_ANNUAL,

@@ -25,6 +25,7 @@ export async function POST() {
             )
         }
 
+        // SECURITY: admin client — messaging_links filtered by authenticated user.id
         const admin = createAdminClient()
 
         // Delete the messaging link

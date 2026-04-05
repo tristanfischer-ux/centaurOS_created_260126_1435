@@ -7,6 +7,7 @@ import { uploadAttachmentSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeFileName, escapeHtml, sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { checkStorageQuota } from '@/lib/billing/storage-quota'
 
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
@@ -51,6 +52,12 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
 
     if (task.foundry_id !== foundry_id) {
         return { error: 'Unauthorized: Task belongs to a different foundry' }
+    }
+
+    // SECURITY: Enforce per-foundry storage quota before upload
+    const quota = await checkStorageQuota(foundry_id)
+    if (!quota.allowed) {
+        return { error: `Storage limit reached (${quota.currentMB}MB / ${quota.limitMB}MB). Upgrade your plan for more storage.` }
     }
 
     // SECURITY: Sanitize filename to prevent path traversal

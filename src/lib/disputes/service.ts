@@ -450,6 +450,7 @@ export async function resolveDispute(
         orderId: order.id,
         amount: buyerRefundAmount,
         reason: `Dispute resolution: ${resolution}`,
+        callerUserId: resolverId,
       })
 
       if (refundResult.error || !refundResult.refund) {

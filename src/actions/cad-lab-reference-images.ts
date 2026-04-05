@@ -13,6 +13,7 @@
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { checkStorageQuota } from "@/lib/billing/storage-quota"
 import type { Json } from "@/types/database.types"
 import type { StoredReferenceImage } from "@/lib/cad-lab/reference-image-types"
 
@@ -39,12 +40,18 @@ export async function uploadReferenceImages(
   projectId: string,
   images: Array<{ id: string; name: string; mimeType: string; base64: string; originalSize: number }>,
 ): Promise<{ stored: StoredReferenceImage[]; failed: string[] } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     // VALIDATION: Input checks
     if (!projectId) return { error: "Project ID required" }
     if (!UUID_RE.test(projectId)) return { error: "Invalid project ID format" }
     if (!images.length) return { error: "No images to upload" }
     if (images.length > MAX_IMAGES_PER_REQUEST) return { error: `Maximum ${MAX_IMAGES_PER_REQUEST} images per upload` }
+
+    // SECURITY: Enforce per-foundry storage quota before upload
+    const quota = await checkStorageQuota(foundryId)
+    if (!quota.allowed) {
+      return { error: `Storage limit reached (${quota.currentMB}MB / ${quota.limitMB}MB). Upgrade your plan for more storage.` }
+    }
 
     // SECURITY: Verify project belongs to caller's foundry (RLS enforces this via SELECT)
     const { data: project, error: projectErr } = await supabase
