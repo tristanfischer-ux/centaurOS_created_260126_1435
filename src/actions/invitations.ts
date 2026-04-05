@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
@@ -74,15 +75,49 @@ export async function createInvitation(
     return { success: false, error: 'Only Founders and Executives can invite team members' }
   }
   
-  // Get the foundry details
-  const { data: foundry, error: foundryError } = await supabase
-    .from('foundries')
-    .select('id, name')
-    .eq('id', profile.foundry_id)
-    .single()
-  
-  if (foundryError || !foundry) {
-    return { success: false, error: 'Your company/foundry is not properly set up. Please contact support.' }
+  // DECISION: Use admin client for the foundries lookup to bypass RLS.
+  // The foundries SELECT policy depends on get_my_foundry_id() which calls
+  // is_active on profiles — this can return NULL for newly-created accounts
+  // due to function caching or timing issues with the SECURITY DEFINER function.
+  // Since we've already verified the user's identity and role above, using
+  // the admin client here is safe and avoids a class of RLS edge-case bugs.
+  let foundry: { id: string; name: string } | null = null
+  try {
+    const adminSupabase = createAdminClient()
+    const { data, error: foundryError } = await adminSupabase
+      .from('foundries')
+      .select('id, name')
+      .eq('id', profile.foundry_id)
+      .single()
+
+    if (foundryError || !data) {
+      console.error('[Invitations] Foundry lookup failed:', {
+        foundryId: profile.foundry_id,
+        userId: user.id,
+        error: foundryError?.message,
+      })
+      return { success: false, error: 'Your company/foundry is not properly set up. Please contact support.' }
+    }
+    foundry = data
+  } catch (adminError) {
+    // GOTCHA: If admin client is unavailable (missing service role key in dev),
+    // fall back to the user's client. This preserves backward compatibility.
+    console.warn('[Invitations] Admin client unavailable, falling back to user client:', adminError)
+    const { data, error: foundryError } = await supabase
+      .from('foundries')
+      .select('id, name')
+      .eq('id', profile.foundry_id)
+      .single()
+
+    if (foundryError || !data) {
+      console.error('[Invitations] Foundry lookup failed (fallback):', {
+        foundryId: profile.foundry_id,
+        userId: user.id,
+        error: foundryError?.message,
+      })
+      return { success: false, error: 'Your company/foundry is not properly set up. Please contact support.' }
+    }
+    foundry = data
   }
   
   // Check if there's already a pending invitation for this email
@@ -659,12 +694,25 @@ export async function resendInvitation(invitationId: string): Promise<{
     return { success: false, error: 'Failed to resend invitation' }
   }
 
-  // Get foundry name and inviter name for the email
-  const { data: foundry } = await supabase
-    .from('foundries')
-    .select('name')
-    .eq('id', foundryId)
-    .single()
+  // DECISION: Use admin client for foundry name lookup (same RLS bypass as createInvitation)
+  let foundryName = 'Your company'
+  try {
+    const adminSupabase = createAdminClient()
+    const { data: foundryData } = await adminSupabase
+      .from('foundries')
+      .select('name')
+      .eq('id', foundryId)
+      .single()
+    if (foundryData) foundryName = foundryData.name
+  } catch {
+    // Fallback to user client
+    const { data: foundryData } = await supabase
+      .from('foundries')
+      .select('name')
+      .eq('id', foundryId)
+      .single()
+    if (foundryData) foundryName = foundryData.name
+  }
 
   const { data: inviterProfile } = await supabase
     .from('profiles')
@@ -676,7 +724,7 @@ export async function resendInvitation(invitationId: string): Promise<{
   const inviteUrl = `${getBaseUrl()}/invite/${newToken}`
   await sendInvitationEmail({
     to: invitation.email,
-    foundryName: foundry?.name || 'Your company',
+    foundryName,
     role: invitation.role,
     invitedByName: inviterProfile?.full_name || 'A team member',
     inviteUrl,
