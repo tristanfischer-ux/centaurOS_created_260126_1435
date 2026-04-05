@@ -17,6 +17,7 @@ import { SUBSCRIPTION_PLANS } from '@/lib/billing/subscriptions'
 import type { SubscriptionTier } from '@/lib/billing/subscriptions'
 import { getCurrentMonthUsage } from '@/lib/ai/usage-tracking'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 /** Result of an AI limit check */
 export interface AILimitCheckResult {
@@ -141,21 +142,43 @@ export async function checkAILimit(
  */
 export async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
   try {
-    const supabase = await createClient()
+    // DECISION: Use admin client for foundries lookup to bypass RLS.
+    // The foundries SELECT policy depends on get_my_foundry_id() which calls
+    // is_active on profiles — this can return NULL for newly-created accounts
+    // due to function caching or timing issues with the SECURITY DEFINER function.
+    // Since getFoundryTier is only called from server-side code that has already
+    // verified user identity, using admin client here is safe and avoids a class
+    // of RLS edge-case bugs where the tier always defaults to 'free'.
+    let foundry: { owner_id: string | null } | null = null
+    try {
+      const adminSupabase = createAdminClient()
+      const { data, error: foundryError } = await adminSupabase
+        .from('foundries')
+        .select('owner_id')
+        .eq('id', foundryId)
+        .maybeSingle()
 
-    // Find the foundry owner
-    // DECISION: Use maybeSingle() instead of single() to avoid PostgREST 406
-    // errors for foundries that don't exist (e.g. shared "forge-guild" foundry
-    // may lack an owner_id). Default to 'free' tier instead of throwing.
-    const { data: foundry, error: foundryError } = await supabase
-      .from('foundries')
-      .select('owner_id')
-      .eq('id', foundryId)
-      .maybeSingle()
+      if (foundryError) {
+        console.warn('[AILimitCheck] Foundry lookup error (admin), defaulting to free:', { foundryId, error: foundryError.message })
+        return 'free'
+      }
+      foundry = data
+    } catch (adminError) {
+      // GOTCHA: If admin client is unavailable (missing service role key in dev),
+      // fall back to the user's client. This preserves backward compatibility.
+      console.warn('[AILimitCheck] Admin client unavailable, falling back to user client:', adminError)
+      const supabase = await createClient()
+      const { data, error: foundryError } = await supabase
+        .from('foundries')
+        .select('owner_id')
+        .eq('id', foundryId)
+        .maybeSingle()
 
-    if (foundryError) {
-      console.warn('[AILimitCheck] Foundry lookup error, defaulting to free:', { foundryId, error: foundryError.message })
-      return 'free'
+      if (foundryError) {
+        console.warn('[AILimitCheck] Foundry lookup error (fallback), defaulting to free:', { foundryId, error: foundryError.message })
+        return 'free'
+      }
+      foundry = data
     }
 
     if (!foundry?.owner_id) {
@@ -166,16 +189,30 @@ export async function getFoundryTier(foundryId: string): Promise<SubscriptionTie
     }
 
     // Check their subscription
-    // GOTCHA: Must use maybeSingle() — not single() — because free-tier users
-    // have no row in user_subscriptions. single() throws a PostgREST 406 error
-    // when zero rows match, which cascades through the fail-closed catch chain
-    // and blocks ALL AI features for free users (including Cal's briefing).
-    const { data: subscription } = await supabase
-      .from('user_subscriptions')
-      .select('tier, status')
-      .eq('user_id', foundry.owner_id)
-      .in('status', ['active', 'trialing'])
-      .maybeSingle()
+    // DECISION: Also use admin client here to bypass RLS on user_subscriptions.
+    // Even though we added a SELECT policy, using admin is more robust and avoids
+    // future breakage if the policy changes.
+    let subscription: { tier: string; status: string } | null = null
+    try {
+      const adminSupabase = createAdminClient()
+      const { data } = await adminSupabase
+        .from('user_subscriptions')
+        .select('tier, status')
+        .eq('user_id', foundry.owner_id)
+        .in('status', ['active', 'trialing'])
+        .maybeSingle()
+      subscription = data
+    } catch {
+      // Fallback to user client
+      const supabase = await createClient()
+      const { data } = await supabase
+        .from('user_subscriptions')
+        .select('tier, status')
+        .eq('user_id', foundry.owner_id)
+        .in('status', ['active', 'trialing'])
+        .maybeSingle()
+      subscription = data
+    }
 
     if (!subscription) return 'free'
 
