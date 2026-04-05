@@ -65,6 +65,15 @@ export interface AgentInteractionStyle {
     uncertaintyBehavior: string
     /** How they hand off to or reference other specialists */
     handoffStyle: string
+    /**
+     * Domain-specific rules of engagement that shape output quality.
+     * Compiled into a dedicated prompt section after HOW YOU ENGAGE.
+     * Each rule is a short, imperative instruction (e.g., "Ground every insight in their numbers").
+     * Optional — if omitted, no rules block is generated.
+     *
+     * @since AutoAgent experiment — validated +30% quality improvement on Strategy specialist
+     */
+    rulesOfEngagement?: string[]
 }
 
 /**
@@ -291,11 +300,23 @@ export function compilePersonalityPrompt(
         `Opening: ${interactionStyle.openingBehavior}`,
         `When challenged: ${interactionStyle.conflictStyle}`,
         `When uncertain: ${interactionStyle.uncertaintyBehavior}`,
+        `Handoff: ${interactionStyle.handoffStyle}`,
     ]
     sections.push(
         "HOW YOU ENGAGE:\n" +
             interactionLines.map((line) => `- ${line}`).join("\n"),
     )
+
+    // ── Rules of Engagement (specialist-specific quality rules) ─────────
+    // INTENT: These domain-specific rules significantly improve output quality
+    // (validated +30% in AutoAgent experiment). They shape HOW the specialist
+    // thinks and responds, complementing the personality voice instructions.
+    if (interactionStyle.rulesOfEngagement && interactionStyle.rulesOfEngagement.length > 0) {
+        const rulesBlock = interactionStyle.rulesOfEngagement
+            .map((rule, i) => `${i + 1}. ${rule}`)
+            .join("\n")
+        sections.push(`YOUR RULES OF ENGAGEMENT:\n${rulesBlock}`)
+    }
 
     // ── Celebration Style ─────────────────────────────────────────────────
     const celebrationStyle = personality.celebrationStyle
