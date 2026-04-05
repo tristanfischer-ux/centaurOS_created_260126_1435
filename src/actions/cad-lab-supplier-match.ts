@@ -450,9 +450,13 @@ export async function matchCadLabModuleSuppliers(
   }
 
   // Fetch full data for all candidates (includes process_capabilities for capability scoring)
+  // DECISION: Select top-level enrichment columns alongside attributes JSONB.
+  // Nightshift (script 35) writes certifications, materials, industries, key_equipment
+  // as top-level columns, NOT inside attributes. Without these columns the scoring
+  // engine can't see enrichment data, causing weak process/material matches.
   const { data: listings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities")
+    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties")
     .in("id", [...candidateIds])
 
   const matches: CadLabSupplierMatch[] = []
@@ -461,8 +465,28 @@ export async function matchCadLabModuleSuppliers(
 
   if (listings) {
     for (const listing of listings) {
-      const listingText = `${listing.title || ""} ${listing.description || ""} ${listing.subcategory || ""}`.toLowerCase()
-      const attrs = listing.attributes as Record<string, unknown> | null
+      // INTENT: Build scoring text from ALL data sources — title, description,
+      // subcategory, AND top-level enrichment columns that Nightshift writes.
+      // This ensures process/material scoring sees the full enrichment picture.
+      const enrichmentParts = [
+        ...(Array.isArray(listing.certifications) ? listing.certifications : []),
+        ...(Array.isArray(listing.materials) ? listing.materials : []),
+        ...(Array.isArray(listing.industries) ? listing.industries : []),
+        ...(Array.isArray(listing.key_equipment) ? listing.key_equipment : []),
+        ...(Array.isArray(listing.specialties) ? listing.specialties : []),
+      ].join(" ")
+      const listingText = `${listing.title || ""} ${listing.description || ""} ${listing.subcategory || ""} ${enrichmentParts}`.toLowerCase()
+
+      // Merge top-level columns into attrs so scoreStructuredMatch sees them
+      const baseAttrs = (listing.attributes as Record<string, unknown>) || {}
+      const attrs: Record<string, unknown> = {
+        ...baseAttrs,
+        ...(listing.certifications != null && { certifications: listing.certifications }),
+        ...(listing.materials != null && { materials: listing.materials }),
+        ...(listing.industries != null && { industries: listing.industries }),
+        ...(listing.key_equipment != null && { key_equipment: listing.key_equipment }),
+        ...(listing.specialties != null && { specialties: listing.specialties }),
+      }
 
       // Factor 1: Semantic
       const semanticRaw = semanticScores.get(listing.id) ?? 0
