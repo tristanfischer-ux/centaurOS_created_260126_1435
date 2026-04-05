@@ -56,14 +56,47 @@ export interface SupplierCard {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Maps a raw marketplace_listings row to a SupplierCard.
+ *
+ * DECISION: Nightshift push (script 35) writes enrichment data to top-level
+ * columns (certifications, industries, materials, key_equipment, key_people,
+ * website_url, country, city, company_size, founded_year) rather than inside
+ * the `attributes` JSONB. UI components read everything from `attributes`,
+ * so we merge top-level columns into the attributes object here.
+ *
+ * Top-level columns take precedence over any stale attributes values because
+ * they're the most recently pushed data from the Nightshift pipeline.
+ */
 function mapToSupplierCard(row: Record<string, unknown>): SupplierCard {
+  const baseAttrs = (row.attributes as Record<string, unknown>) || {}
+
+  // INTENT: Merge top-level DB columns into attributes so UI components can
+  // access enrichment data uniformly via `supplier.attributes.*`
+  const mergedAttrs: Record<string, unknown> = {
+    ...baseAttrs,
+    // Top-level columns from Nightshift push (script 35)
+    ...(row.website_url != null && { website_url: row.website_url }),
+    ...(row.country != null && { country: row.country }),
+    ...(row.city != null && { city: row.city }),
+    ...(row.certifications != null && { certifications: row.certifications }),
+    ...(row.industries != null && { industries: row.industries }),
+    ...(row.materials != null && { materials: row.materials }),
+    ...(row.key_equipment != null && { key_equipment: row.key_equipment }),
+    ...(row.key_people != null && { key_people: row.key_people }),
+    ...(row.company_size != null && { company_size: row.company_size, employee_count: row.company_size }),
+    ...(row.founded_year != null && { founded_year: row.founded_year, year_founded: row.founded_year }),
+    ...(row.relevance_score != null && { relevance_score: row.relevance_score }),
+    ...(row.enrichment_quality != null && { enrichment_quality: row.enrichment_quality }),
+  }
+
   return {
     id: row.id as string,
     name: (row.title as string) || '',
     description: (row.description as string | null) ?? null,
     category: (row.category as string) || '',
     subcategory: (row.subcategory as string) || '',
-    attributes: (row.attributes as Record<string, unknown>) || {},
+    attributes: mergedAttrs,
     similarity: row.similarity as number | undefined,
     is_verified: (row.is_verified as boolean) ?? true,
   }
@@ -100,26 +133,49 @@ export async function searchSuppliers(
 
       if (error) throw error
 
-      // Filter to non-Finance categories (suppliers only)
-      let results = (data || [])
+      // Filter to non-Finance categories (suppliers only) and extract IDs + similarity
+      const supplierMatches = (data || [])
         .filter((r: Record<string, unknown>) => r.category !== 'Finance')
 
-      // Apply additional filters
+      if (supplierMatches.length === 0) {
+        return { results: [], total: 0, searchMode: 'semantic' }
+      }
+
+      // DECISION: The RPC returns only id, category, title, description, similarity — NOT
+      // top-level columns (certifications, country, etc.) or attributes JSONB.
+      // Re-fetch full rows by ID so all filters and mapToSupplierCard work correctly.
+      const matchIds = supplierMatches.map((r: Record<string, unknown>) => r.id as string)
+      const similarityMap = new Map<string, number>(
+        supplierMatches.map((r: Record<string, unknown>) => [r.id as string, r.similarity as number])
+      )
+
+      const { data: fullRows, error: fullError } = await supabase
+        .from('marketplace_listings')
+        .select('*')
+        .in('id', matchIds)
+
+      if (fullError) throw fullError
+
+      // Merge similarity scores back into full rows
+      let results = (fullRows || []).map((row: Record<string, unknown>) => ({
+        ...row,
+        similarity: similarityMap.get(row.id as string) ?? 0,
+      }))
+
+      // Apply additional filters (now with full data from re-fetch)
       if (filters.category) {
         results = results.filter((r: Record<string, unknown>) => r.category === filters.category)
       }
       if (filters.country) {
         const countryLower = filters.country.toLowerCase()
         results = results.filter((r: Record<string, unknown>) => {
-          const attrs = (r.attributes as Record<string, unknown>) || {}
-          const country = (attrs.country as string) || ''
+          const country = (r.country as string) || ''
           return country.toLowerCase().includes(countryLower)
         })
       }
       if (filters.certifications && filters.certifications.length > 0) {
         results = results.filter((r: Record<string, unknown>) => {
-          const attrs = (r.attributes as Record<string, unknown>) || {}
-          const certs = attrs.certifications as string | string[] | null | undefined
+          const certs = r.certifications as string | string[] | null | undefined
           const certsStr = typeof certs === 'string' ? certs.toLowerCase() : Array.isArray(certs) ? certs.map(c => (c as string).toLowerCase()).join(',') : ''
           return filters.certifications!.some(cert => certsStr.includes(cert.toLowerCase()))
         })

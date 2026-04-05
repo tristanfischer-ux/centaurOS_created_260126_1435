@@ -19,6 +19,19 @@ import {
 } from 'recharts'
 import type { InvestorStats } from '@/actions/investors'
 
+// DECISION: recharts renders SVG fill attributes directly — CSS custom properties
+// like `hsl(var(--color-x))` don't resolve in inline SVG attributes. Must use
+// actual color values. These match the design system tokens in tailwind.config.ts.
+const CHART_COLORS = {
+  orange: '#ff4500',      // international-orange
+  blue: '#3b82f6',        // electric-blue
+  green: '#22c55e',       // success
+  amber: '#f59e0b',       // warning
+  red: '#ef4444',         // destructive
+  muted: '#94a3b8',       // muted-foreground (slate-400)
+} as const
+const PALETTE = Object.values(CHART_COLORS)
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -183,14 +196,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
                       {stats.typeBreakdown.map((_, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={[
-                            'hsl(var(--color-international-orange))',
-                            'hsl(var(--color-electric-blue))',
-                            'hsl(var(--color-success))',
-                            'hsl(var(--color-warning))',
-                            'hsl(var(--color-destructive))',
-                            'hsl(var(--muted-foreground))',
-                          ][index % 6]}
+                          fill={PALETTE[index % PALETTE.length]}
                         />
                       ))}
                     </Pie>
@@ -223,7 +229,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
                       tickFormatter={(v: string) => truncate(v, 14)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill="hsl(var(--color-electric-blue))" radius={[0, 3, 3, 0]} />
+                    <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -255,7 +261,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
                       tickFormatter={(v: string) => truncate(v, 14)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill="hsl(var(--color-success))" radius={[0, 3, 3, 0]} />
+                    <Bar dataKey="count" fill={CHART_COLORS.green} radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -280,7 +286,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
                     />
                     <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill="hsl(var(--color-warning))" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="count" fill={CHART_COLORS.amber} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -297,20 +303,20 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
                 <BarChart
                   layout="vertical"
                   data={stats.regionBreakdown}
-                  margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
+                  margin={{ top: 0, right: 16, bottom: 0, left: 10 }}
                 >
                   <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                   <YAxis
                     type="category"
                     dataKey="name"
-                    width={120}
+                    width={110}
                     tick={{ fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v: string) => truncate(v, 16)}
                   />
                   <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                  <Bar dataKey="count" fill="hsl(var(--color-electric-blue))" radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

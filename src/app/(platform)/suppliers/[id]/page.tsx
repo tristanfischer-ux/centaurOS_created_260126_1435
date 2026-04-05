@@ -67,6 +67,31 @@ function arrayToList(
   return defaultValue
 }
 
+/**
+ * Extracts people/leadership data from various formats:
+ * - string[] (ch_directors legacy): ["John Smith", "Jane Doe"]
+ * - object[] (key_people from Nightshift): [{name: "John", title: "CEO"}, ...]
+ * Returns a normalized array of {name, title?} objects.
+ */
+function extractPeople(data: unknown): Array<{ name: string; title?: string }> {
+  if (!data) return []
+  if (!Array.isArray(data)) return []
+
+  return data
+    .map((item) => {
+      if (typeof item === 'string') return { name: item }
+      if (typeof item === 'object' && item !== null) {
+        const obj = item as Record<string, unknown>
+        const name = (obj.name as string) || (obj.full_name as string) || ''
+        if (!name) return null
+        const title = (obj.title as string) || (obj.role as string) || undefined
+        return { name, title }
+      }
+      return null
+    })
+    .filter((x): x is { name: string; title?: string } => x !== null && x.name.length > 0)
+}
+
 function objectToEntries(data: unknown): Array<[string, unknown]> {
   if (!data || typeof data !== 'object') return []
   if (Array.isArray(data)) return []
@@ -91,22 +116,38 @@ export default async function SupplierDetailPage({ params }: PageProps) {
 
   const attrs = supplier.attributes as Record<string, unknown> | undefined || {}
 
-  // Extract nested attributes
+  // DECISION: Field names vary by data source. Nightshift push (script 35) writes
+  // top-level columns (merged into attrs by mapToSupplierCard). Companies House
+  // enrichment writes ch_directors. Synthesis pipeline writes capability_summary.
+  // We use fallback chains to handle all variants.
   const website = (attrs.website_url as string) || ''
   const country = (attrs.country as string) || ''
-  const hqLocation = (attrs.hq_location as string) || ''
-  const yearFounded = (attrs.year_founded as number) || null
-  const employeeCount = (attrs.employee_count as number | string) || null
-  const verificationStatus = (attrs.verification_status as string) || 'unverified'
-  const dataQualityScore = (attrs.data_quality_score as number) || null
-  const directors = arrayToList(attrs.directors)
+  const city = (attrs.city as string) || ''
+  const hqLocation = city && country ? `${city}, ${country}` : (attrs.hq_location as string) || city || country || ''
+  const yearFounded = (attrs.year_founded as number) || (attrs.founded_year as number) || null
+  const employeeCount = (attrs.employee_count as number | string) || (attrs.company_size as string) || null
+  const verificationStatus = (attrs.verification_status as string) || (attrs.enrichment_quality as string) || 'unverified'
+  const dataQualityScore = (attrs.data_quality_score as number) || (attrs.relevance_score as number) || null
 
-  // INTENT: Use public_synthesis (polished) over description (raw)
-  const aboutText = (attrs.public_synthesis as string) || supplier.description || ''
+  // DECISION: key_people comes from Nightshift verification (script 35), key_contacts
+  // from synthesis attrs, ch_directors from Companies House enrichment, directors as legacy fallback.
+  // These can be string[] or object[] — extractPeople normalizes both formats.
+  const leadership = extractPeople(attrs.key_people).length > 0
+    ? extractPeople(attrs.key_people)
+    : extractPeople(attrs.key_contacts).length > 0
+      ? extractPeople(attrs.key_contacts)
+      : extractPeople(attrs.ch_directors).length > 0
+        ? extractPeople(attrs.ch_directors)
+        : extractPeople(attrs.directors)
 
-  // Extract list-type attributes
+  // INTENT: Use capability_summary (synthesis) > public_synthesis (legacy) > description (raw)
+  const aboutText = (attrs.capability_summary as string) || (attrs.public_synthesis as string) || supplier.description || ''
+
+  // Extract list-type attributes (merged from top-level columns by mapToSupplierCard)
   const certifications = arrayToList(attrs.certifications)
-  const industries = arrayToList(attrs.industries)
+  const industries = arrayToList(attrs.industries).length > 0
+    ? arrayToList(attrs.industries)
+    : arrayToList(attrs.industries_served)
   const materials = arrayToList(attrs.materials)
   const equipment = arrayToList(attrs.key_equipment)
 
@@ -290,8 +331,8 @@ export default async function SupplierDetailPage({ params }: PageProps) {
             </Card>
           )}
 
-          {/* Directors/Leadership */}
-          {directors.length > 0 && (
+          {/* Leadership */}
+          {leadership.length > 0 && (
             <Card>
               <CardHeader>
                 <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -301,12 +342,15 @@ export default async function SupplierDetailPage({ params }: PageProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {directors.map((director, idx) => (
+                  {leadership.map((person, idx) => (
                     <div
                       key={idx}
-                      className="text-sm text-muted-foreground border-b border-border last:border-b-0 pb-2 last:pb-0"
+                      className="border-b border-border last:border-b-0 pb-2 last:pb-0"
                     >
-                      {director}
+                      <p className="text-sm font-medium text-foreground">{person.name}</p>
+                      {person.title && (
+                        <p className="text-xs text-muted-foreground">{person.title}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -323,6 +367,8 @@ export default async function SupplierDetailPage({ params }: PageProps) {
               <h2 className="text-lg font-semibold text-foreground">Company Details</h2>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* DECISION: Show combined location when city+country available,
+                  otherwise show country alone. Avoids redundant display. */}
               {hqLocation && (
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
@@ -335,7 +381,7 @@ export default async function SupplierDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {country && (
+              {!hqLocation && country && (
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
                     Country

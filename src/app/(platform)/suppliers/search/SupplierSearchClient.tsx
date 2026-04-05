@@ -342,11 +342,11 @@ function SupplierResultCard({ supplier }: { supplier: SupplierCard }) {
   const attrs = supplier.attributes as Record<string, unknown>
   const location = [attrs.city, attrs.country].filter(Boolean).join(', ')
   const certs = (attrs.certifications as string | string[] | null) || ''
-  const industries = (attrs.industries as string | string[] | null) || ''
-  const employeeCount = attrs.employee_count as number | string | null
+  const industries = (attrs.industries as string | string[] | null) || (attrs.industries_served as string | string[] | null) || ''
+  const employeeCount = (attrs.employee_count as number | string | null) || (attrs.company_size as string | null)
 
-  // Get synthesis or fallback to description
-  const synthesis = attrs.public_synthesis as string | null
+  // DECISION: capability_summary (synthesis) > public_synthesis (legacy) > description (raw)
+  const synthesis = (attrs.capability_summary as string | null) || (attrs.public_synthesis as string | null)
   const snippet = synthesis || supplier.description
 
   // Safely parse certifications and industries

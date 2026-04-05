@@ -53,7 +53,8 @@ function formatChequeRange(cheque: { min: number | null; max: number | null } | 
   if (cheque.min != null && cheque.max != null) {
     return `${formatValue(cheque.min)}-${formatValue(cheque.max)}`
   }
-  if (cheque.min != null) return `£${formatValue(cheque.min)}+`
+  // GOTCHA: formatValue already includes £ prefix — don't double it
+  if (cheque.min != null) return `${formatValue(cheque.min)}+`
   return `up to ${formatValue(cheque.max!)}`
 }
 

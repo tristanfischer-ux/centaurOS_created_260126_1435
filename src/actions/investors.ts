@@ -378,12 +378,36 @@ export async function searchInvestors(
 
       if (semanticError) throw semanticError
 
-      // Filter to Finance category only (investors)
-      let results = (semanticData || []).filter(
-        (r: Record<string, unknown>) => r.category === 'Finance'
+      // Filter to Finance category only (investors) and extract IDs + similarity scores
+      const financeMatches = (semanticData || [])
+        .filter((r: Record<string, unknown>) => r.category === 'Finance')
+
+      if (financeMatches.length === 0) {
+        return { firms: [], total: 0, searchMode: 'semantic' as const }
+      }
+
+      // DECISION: The RPC returns only id, category, title, description, similarity — NOT
+      // the `attributes` JSONB or other top-level columns needed for filtering and display.
+      // Re-fetch full rows by ID so all JSONB filters work correctly.
+      const matchIds = financeMatches.map((r: Record<string, unknown>) => r.id as string)
+      const similarityMap = new Map<string, number>(
+        financeMatches.map((r: Record<string, unknown>) => [r.id as string, r.similarity as number])
       )
 
-      // Apply JSONB filters on top of semantic results
+      const { data: fullRows, error: fullError } = await supabase
+        .from('marketplace_listings')
+        .select('*')
+        .in('id', matchIds)
+
+      if (fullError) throw fullError
+
+      // Merge similarity scores back into full rows
+      let results = (fullRows || []).map((row: Record<string, unknown>) => ({
+        ...row,
+        similarity: similarityMap.get(row.id as string) ?? 0,
+      }))
+
+      // Apply JSONB filters on top of semantic results (now with full attributes)
       if (firmType && firmType.length > 0) {
         const safeFirmTypes = firmType.filter((t: string) => VALID_FIRM_TYPES.has(t))
         if (safeFirmTypes.length > 0) {
