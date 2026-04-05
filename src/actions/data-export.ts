@@ -49,9 +49,17 @@ export async function exportFoundryData(
         return { error: 'Your account is not active' }
     }
     
-    // Check if founder, executive, or has admin permission
-    const hasAccess = profile.role === 'Founder' || profile.role === 'Executive'
-    
+    // SECURITY: Verify user is a member of THIS foundry with sufficient role
+    // Global profile.role is NOT sufficient — must check foundry_memberships
+    const { data: membership } = await supabase
+        .from('foundry_memberships')
+        .select('role')
+        .eq('foundry_id', foundry_id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+    const hasAccess = membership?.role === 'Founder' || membership?.role === 'Executive'
+
     if (!hasAccess) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: adminPerm } = await supabase
@@ -60,7 +68,7 @@ export async function exportFoundryData(
             .eq('foundry_id', foundry_id)
             .eq('profile_id', user.id)
             .maybeSingle()
-        
+
         if (!adminPerm) {
             return { error: 'Admin permission required to export data' }
         }
