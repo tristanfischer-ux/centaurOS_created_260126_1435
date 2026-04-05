@@ -77,7 +77,7 @@ function mapToSupplierCard(row: Record<string, unknown>): SupplierCard {
  * Searches suppliers in the marketplace. Uses semantic search (pgvector) when a
  * natural-language query is provided (> 5 chars), falling back to keyword/browse.
  *
- * @param filters Search filters including optional query, category, country
+ * @param filters Search filters including optional query, category, country, certifications, sortBy
  * @returns Ranked supplier results with search mode indicator
  */
 export async function searchSuppliers(
@@ -116,6 +116,23 @@ export async function searchSuppliers(
           return country.toLowerCase().includes(countryLower)
         })
       }
+      if (filters.certifications && filters.certifications.length > 0) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          const certs = attrs.certifications as string | string[] | null | undefined
+          const certsStr = typeof certs === 'string' ? certs.toLowerCase() : Array.isArray(certs) ? certs.map(c => (c as string).toLowerCase()).join(',') : ''
+          return filters.certifications!.some(cert => certsStr.includes(cert.toLowerCase()))
+        })
+      }
+
+      // Apply sorting to semantic results
+      if (filters.sortBy === 'name') {
+        results = results.sort((a, b) => {
+          const nameA = ((a.title as string) || '').toLowerCase()
+          const nameB = ((b.title as string) || '').toLowerCase()
+          return nameA.localeCompare(nameB)
+        })
+      }
 
       // Paginate after filtering
       const paginatedResults = results.slice(offset, offset + limit)
@@ -145,6 +162,12 @@ export async function searchSuppliers(
     // GOTCHA: category is an enum in DB — cast string filter to match
     query = query.eq('category', filters.category as 'People' | 'Products' | 'Services' | 'AI')
   }
+  if (filters.country) {
+    const countryLower = filters.country.toLowerCase()
+    // Note: filtering by country in attributes requires text search or custom logic
+    // For now, this is post-filtered on the client side in semantic path
+    // For keyword search, we apply it after fetching
+  }
 
   query = query.range(offset, offset + limit - 1)
 
@@ -160,9 +183,30 @@ export async function searchSuppliers(
     throw new Error(`Failed to search suppliers: ${error.message}`)
   }
 
+  // Apply country and certifications filters to keyword results
+  let results = (data || []).map((row: Record<string, unknown>) => mapToSupplierCard(row))
+
+  if (filters.country) {
+    const countryLower = filters.country.toLowerCase()
+    results = results.filter(r => {
+      const attrs = r.attributes as Record<string, unknown>
+      const country = (attrs.country as string) || ''
+      return country.toLowerCase().includes(countryLower)
+    })
+  }
+
+  if (filters.certifications && filters.certifications.length > 0) {
+    results = results.filter(r => {
+      const attrs = r.attributes as Record<string, unknown>
+      const certs = attrs.certifications as string | string[] | null | undefined
+      const certsStr = typeof certs === 'string' ? certs.toLowerCase() : Array.isArray(certs) ? certs.map(c => (c as string).toLowerCase()).join(',') : ''
+      return filters.certifications!.some(cert => certsStr.includes(cert.toLowerCase()))
+    })
+  }
+
   return {
-    results: (data || []).map((row: Record<string, unknown>) => mapToSupplierCard(row)),
-    total: count || 0,
+    results,
+    total: results.length,
     searchMode: filters.query ? 'keyword' : 'browse',
   }
 }

@@ -33,12 +33,14 @@ import { SimilarInvestorsSection } from '../components/SimilarInvestorsSection'
 import { InvestorDetailActions } from '../components/InvestorDetailActions'
 import {
   ArrowLeft,
+  Briefcase,
   Building2,
   Calendar,
   CheckCircle2,
   Circle,
   Database,
   Globe,
+  Lightbulb,
   Linkedin,
   Lock,
   Mail,
@@ -317,18 +319,11 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     )}
                   </div>
                 )}
-
-                {attrs.recent_deals_summary && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Recent Activity</p>
-                    <p className="text-sm text-foreground leading-relaxed">{attrs.recent_deals_summary}</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
-            {/* Investment Thesis */}
-            {(attrs.investment_thesis || attrs.ideal_company_profile || attrs.value_add) && (
+            {/* Investment Thesis — Prominent section */}
+            {attrs.investment_thesis && (
               <Card>
                 <CardHeader>
                   <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
@@ -336,24 +331,131 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     Investment Thesis
                   </h2>
                 </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.investment_thesis}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Key Details Card */}
+            {(attrs.fund_size_gbp || attrs.cheque_range_gbp || attrs.stage_focus?.length || attrs.sectors?.length || attrs.geo_focus?.length || attrs.firm_type) && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    Key Details
+                  </h2>
+                </CardHeader>
                 <CardContent className="space-y-4">
-                  {attrs.investment_thesis && (
-                    <p className="text-sm text-muted-foreground leading-relaxed">{attrs.investment_thesis}</p>
-                  )}
+                  {/* Fund Size and Cheque Range */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {attrs.fund_size_gbp && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Fund Size</p>
+                        <p className="text-sm font-semibold text-foreground">{fundSizeLabel}</p>
+                      </div>
+                    )}
+                    {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cheque Range</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {formatFundSize(attrs.cheque_range_gbp.min) ?? '?'} — {formatFundSize(attrs.cheque_range_gbp.max) ?? '?'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
-                  {attrs.ideal_company_profile && (
+                  {/* Stage Focus */}
+                  {attrs.stage_focus && attrs.stage_focus.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Ideal Company</p>
-                      <p className="text-sm text-foreground leading-relaxed">{attrs.ideal_company_profile}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Stage Focus</p>
+                      <div className="flex flex-wrap gap-2">
+                        {attrs.stage_focus.map(s => (
+                          <Badge key={s} variant="outline">{s}</Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {attrs.value_add && (
+                  {/* Sector Focus */}
+                  {Array.isArray(attrs.sectors) && attrs.sectors.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Value-Add</p>
-                      <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Sector Focus</p>
+                      <div className="flex flex-wrap gap-2">
+                        {attrs.sectors.slice(0, 6).map(s => (
+                          <Badge key={s} variant="secondary">{s}</Badge>
+                        ))}
+                        {attrs.sectors.length > 6 && (
+                          <Badge variant="outline">+{attrs.sectors.length - 6}</Badge>
+                        )}
+                      </div>
                     </div>
                   )}
+
+                  {/* Geographic Focus */}
+                  {attrs.geo_focus && attrs.geo_focus.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Geographic Focus</p>
+                      <div className="flex flex-wrap gap-2">
+                        {attrs.geo_focus.map(g => (
+                          <Badge key={g} variant="outline">{g}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Entity Type */}
+                  {attrs.firm_type && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Entity Type</p>
+                      <p className="text-sm text-foreground">{attrs.firm_type}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Ideal Company Profile */}
+            {attrs.ideal_company_profile && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                    Ideal Company Profile
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.ideal_company_profile}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Value-Add */}
+            {attrs.value_add && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground" />
+                    Value-Add
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Recent Activity */}
+            {attrs.recent_deals_summary && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    Recent Activity
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.recent_deals_summary}</p>
                 </CardContent>
               </Card>
             )}
@@ -426,41 +528,6 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               factCheckStatus={attrs.fact_check_status}
               hasAccess={access.intelligenceAccess}
             />
-
-            {/* Stage focus */}
-            {attrs.stage_focus && attrs.stage_focus.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    Stage Focus
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {attrs.stage_focus.map(s => (
-                      <Badge key={s} variant="outline">{s}</Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Sectors */}
-            {Array.isArray(attrs.sectors) && attrs.sectors.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground">Sectors</h2>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {attrs.sectors.map(s => (
-                      <Badge key={s} variant="secondary">{s}</Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Notes & Activity (starter+) */}
             {access.detailAccess && <InvestorNoteTimeline listingId={id} />}
@@ -538,24 +605,43 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            {/* Data quality */}
-            {attrs.data_quality_score != null && (
+            {/* Data Freshness */}
+            {(attrs.data_quality_score != null || attrs.last_synced || attrs.last_verified || attrs.data_source) && (
               <Card>
                 <CardHeader>
                   <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                     <Database className="h-4 w-4 text-muted-foreground" />
-                    Data Quality
+                    Data Freshness
                   </h2>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Score</p>
-                    <p className="text-sm font-semibold text-foreground">{Number(attrs.data_quality_score).toFixed(1)}/10</p>
-                  </div>
-                  {attrs.data_source && (
+                  {attrs.data_quality_score != null && (
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Source</p>
-                      <p className="text-sm text-foreground capitalize">{attrs.data_source.replace(/_/g, ' ')}</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Quality Score</p>
+                        <p className="text-sm font-semibold text-foreground">{Number(attrs.data_quality_score).toFixed(1)}/10</p>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                        {/* Visual bar representing quality score */}
+                        <div
+                          className={`h-full rounded-full ${
+                            attrs.data_quality_score >= 8
+                              ? 'bg-success'
+                              : attrs.data_quality_score >= 6
+                              ? 'bg-warning'
+                              : 'bg-destructive'
+                          }`}
+                          style={{ width: `${(attrs.data_quality_score / 10) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {attrs.last_verified && !isNaN(new Date(attrs.last_verified).getTime()) && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Last Verified</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(attrs.last_verified).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
                     </div>
                   )}
                   {attrs.last_synced && !isNaN(new Date(attrs.last_synced).getTime()) && (
@@ -564,6 +650,12 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                       <p className="text-xs text-muted-foreground">
                         {new Date(attrs.last_synced).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
+                    </div>
+                  )}
+                  {attrs.data_source && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Data Source</p>
+                      <p className="text-sm text-foreground capitalize">{attrs.data_source.replace(/_/g, ' ')}</p>
                     </div>
                   )}
                 </CardContent>

@@ -5,10 +5,13 @@
  *
  * @description Tab wrapper for the Investors page.
  * "For You" tab (default) shows AI-matched investors.
- * "Browse All" tab shows the existing directory/filter view.
+ * "Browse All" tab shows the existing directory/filter view with semantic search results.
+ *
+ * FLOW: When a semantic search is triggered (InvestorSearchHero), this component
+ * auto-switches to "Browse All" tab to display results.
  */
 
-import { useState, type ReactNode } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { Sparkles, Grid3X3 } from "lucide-react"
 import { InvestorMatchView } from "./InvestorMatchView"
@@ -17,10 +20,21 @@ interface InvestorPageTabsProps {
   browseContent: ReactNode
   /** Content rendered above the tab bar (e.g. specialist banner) */
   headerContent?: ReactNode
+  /** Callback when search is triggered — passed from hero component */
+  onSearchTriggered?: (query: string) => void
 }
 
-export function InvestorPageTabs({ browseContent, headerContent }: InvestorPageTabsProps): React.ReactElement {
+export function InvestorPageTabs({ browseContent, headerContent, onSearchTriggered }: InvestorPageTabsProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<"for-you" | "browse">("for-you")
+  const [shouldSwitchToBrowse, setShouldSwitchToBrowse] = useState(false)
+
+  // INTENT: Auto-switch to Browse tab when search is triggered
+  useEffect(() => {
+    if (shouldSwitchToBrowse) {
+      setActiveTab("browse")
+      setShouldSwitchToBrowse(false)
+    }
+  }, [shouldSwitchToBrowse])
 
   return (
     <div className="space-y-6">

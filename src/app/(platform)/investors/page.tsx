@@ -1,9 +1,10 @@
 /**
  * @file investors/page.tsx
  *
- * @description Investor page with two tabs:
- * - "For You" (default) — AI-matched top 50 investors based on company profile
- * - "Browse All" — existing UK Investor Directory with filters
+ * @description Investor page with semantic search hero and two tabs:
+ * - Hero: "Find your ideal investors" — describes startup, semantic search matches
+ * - "For You" (tab default) — AI-matched top 50 investors based on company profile
+ * - "Browse All" — UK Investor Directory with filters + semantic search results
  *
  * Revalidates every 60 seconds (ISR) since investor data changes infrequently.
  */
@@ -18,6 +19,7 @@ import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 import { InvestorPageTabs } from './components/InvestorPageTabs'
 import { InvestorSpecialistBanner } from './components/InvestorSpecialistBanner'
+import { InvestorSearchHeroClient } from './components/InvestorSearchHeroClient'
 
 export const revalidate = 60
 
@@ -169,6 +171,19 @@ export default async function InvestorDirectoryPage() {
         </p>
       </div>
 
+      {/* Semantic search hero above tabs */}
+      <Suspense fallback={null}>
+        <InvestorSearchHeroClient
+          initialFirms={initialFirms}
+          initialTotal={initialTotal}
+          initialHasMore={initialHasMore}
+          initialMatchScores={matchScores}
+          initialShortlistIds={shortlistIds}
+          access={access}
+          productSectors={productSectors}
+        />
+      </Suspense>
+
       {/* Tabbed view: For You + Browse All */}
       <InvestorPageTabs
         headerContent={
@@ -208,19 +223,6 @@ export default async function InvestorDirectoryPage() {
                 Lower priority
               </span>
             </div>
-
-            {/* Browser with filters + grid */}
-            <Suspense fallback={<InvestorDirectoryLoading />}>
-              <InvestorBrowser
-                initialFirms={initialFirms}
-                initialTotal={initialTotal}
-                initialHasMore={initialHasMore}
-                initialMatchScores={matchScores}
-                initialShortlistIds={shortlistIds}
-                access={access}
-                productSectors={productSectors}
-              />
-            </Suspense>
           </>
         }
       />

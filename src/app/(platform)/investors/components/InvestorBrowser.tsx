@@ -102,6 +102,10 @@ interface InvestorBrowserProps {
   access?: InvestorTierAccess
   /** Product sector keywords for computing Product Fit badges */
   productSectors?: string[]
+  /** Initial search query from semantic search hero (if any) */
+  initialSearchQuery?: string
+  /** Callback when search state changes (for loading indicator in parent) */
+  onSearchStateChange?: (isLoading: boolean) => void
 }
 
 export function InvestorBrowser({
@@ -112,6 +116,8 @@ export function InvestorBrowser({
   initialShortlistIds = {},
   access,
   productSectors = [],
+  initialSearchQuery = '',
+  onSearchStateChange,
 }: InvestorBrowserProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -126,8 +132,8 @@ export function InvestorBrowser({
     return FIRM_TYPES.includes(t) ? t : 'All'
   })
   const [activeOnly, setActiveOnly] = useState(() => searchParams.get('active') === '1')
-  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
-  const [debouncedQuery, setDebouncedQuery] = useState(() => searchParams.get('q') ?? '')
+  const [searchQuery, setSearchQuery] = useState(() => initialSearchQuery || searchParams.get('q') ?? '')
+  const [debouncedQuery, setDebouncedQuery] = useState(() => initialSearchQuery || searchParams.get('q') ?? '')
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     const s = searchParams.get('sort') as SortOption
     return ['match', 'fund_size', 'quality', 'hardware_fit', 'cheque', 'priority', 'name'].includes(s) ? s : 'name'
@@ -202,6 +208,14 @@ export function InvestorBrowser({
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
     }
   }, [searchQuery])
+
+  // ---------------------------------------------------------------------------
+  // Notify parent of search state changes (for loading indicator)
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    onSearchStateChange?.(isPending)
+  }, [isPending, onSearchStateChange])
 
   // ---------------------------------------------------------------------------
   // URL sync

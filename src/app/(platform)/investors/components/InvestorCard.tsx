@@ -12,11 +12,50 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Briefcase, Heart, GitCompare } from 'lucide-react'
+import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Briefcase, Heart, GitCompare, Clock } from 'lucide-react'
 import { MatchScoreBadge } from './MatchScoreBadge'
 import { cn } from '@/lib/utils'
 import { formatFundSize } from '@/lib/format'
 import type { InvestorFirm } from '@/actions/investors'
+
+// ---------------------------------------------------------------------------
+// Date formatting helper
+// ---------------------------------------------------------------------------
+
+function formatDateRelative(dateString: string | undefined): string | null {
+  if (!dateString) return null
+  try {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays}d ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`
+    return `${Math.floor(diffDays / 365)}y ago`
+  } catch {
+    return null
+  }
+}
+
+function formatChequeRange(cheque: { min: number | null; max: number | null } | undefined): string | null {
+  if (!cheque || (cheque.min == null && cheque.max == null)) return null
+
+  const formatValue = (n: number) => {
+    if (n >= 1000000) return `£${(n / 1000000).toFixed(1)}M`
+    if (n >= 1000) return `£${(n / 1000).toFixed(0)}K`
+    return `£${n}`
+  }
+
+  if (cheque.min != null && cheque.max != null) {
+    return `${formatValue(cheque.min)}-${formatValue(cheque.max)}`
+  }
+  if (cheque.min != null) return `£${formatValue(cheque.min)}+`
+  return `up to ${formatValue(cheque.max!)}`
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,6 +90,17 @@ function qualityDotClass(score: number | undefined): string | null {
   if (score >= 9) return 'bg-success'
   if (score >= 7) return 'bg-warning'
   return 'bg-muted-foreground'
+}
+
+/**
+ * Returns semantic text color class for quality score display.
+ * 8-10: success, 5-7: warning, 0-4: destructive
+ */
+function qualityScoreColor(score: number | undefined): 'success' | 'warning' | 'destructive' {
+  if (score == null) return 'warning'
+  if (score >= 8) return 'success'
+  if (score >= 5) return 'warning'
+  return 'destructive'
 }
 
 /** True if value is a non-empty string, non-empty array, or non-null/zero number. */
@@ -245,6 +295,50 @@ export function InvestorCard({
           <p className="text-sm text-muted-foreground line-clamp-2">{firm.description}</p>
         )}
 
+        {/* Quality Score Bar */}
+        {attrs.data_quality_score != null && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Quality</span>
+                    <span className={cn(
+                      'text-xs font-semibold',
+                      qualityScoreColor(attrs.data_quality_score) === 'success' && 'text-success',
+                      qualityScoreColor(attrs.data_quality_score) === 'warning' && 'text-warning',
+                      qualityScoreColor(attrs.data_quality_score) === 'destructive' && 'text-destructive'
+                    )}>
+                      {attrs.data_quality_score.toFixed(1)}/10
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        qualityScoreColor(attrs.data_quality_score) === 'success' && 'bg-success',
+                        qualityScoreColor(attrs.data_quality_score) === 'warning' && 'bg-warning',
+                        qualityScoreColor(attrs.data_quality_score) === 'destructive' && 'bg-destructive'
+                      )}
+                      style={{ width: `${Math.min((attrs.data_quality_score / 10) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Data quality score: {attrs.data_quality_score.toFixed(1)}/10</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {/* Thesis Snippet */}
+        {(attrs.investment_thesis || attrs.ideal_company_profile) && (
+          <p className="text-xs text-muted-foreground line-clamp-2 italic">
+            "{attrs.investment_thesis || attrs.ideal_company_profile}"
+          </p>
+        )}
+
         {stageFocus.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <TrendingUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -276,6 +370,31 @@ export function InvestorCard({
           </div>
         )}
 
+        {/* Cheque Range Badge */}
+        {formatChequeRange(attrs.cheque_range_gbp) && (
+          <div className="flex items-center gap-2">
+            <Badge variant="info" className="text-xs">
+              {formatChequeRange(attrs.cheque_range_gbp)}
+            </Badge>
+          </div>
+        )}
+
+        {/* Geo Focus Badges */}
+        {(attrs.geo_focus ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {(attrs.geo_focus ?? []).slice(0, 3).map(geo => (
+              <Badge key={geo} variant="outline" className="text-xs">
+                {geo}
+              </Badge>
+            ))}
+            {(attrs.geo_focus ?? []).length > 3 && (
+              <Badge variant="outline" className="text-xs">
+                +{(attrs.geo_focus ?? []).length - 3}
+              </Badge>
+            )}
+          </div>
+        )}
+
         {portfolioCount > 0 && (
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             <Briefcase className="h-3 w-3" />
@@ -290,69 +409,80 @@ export function InvestorCard({
         )}
       </CardContent>
 
-      <CardFooter className="pt-0 flex items-center justify-between gap-2">
-        <Link
-          href={`/investors/${firm.id}`}
-          className="text-xs text-international-orange font-medium hover:underline"
-        >
-          View profile →
-        </Link>
-        <div className="flex items-center gap-3">
-          {/* Data depth indicator — DD-09: hidden when depth is 0 */}
-          {dataDepth > 0 && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/* DD-06: role="meter" for screen readers; DD-07: tabIndex for keyboard focus */}
-                  <div
-                    className="flex items-center gap-1"
-                    role="meter"
-                    aria-label="Profile data depth"
-                    aria-valuenow={dataDepth}
-                    aria-valuemin={0}
-                    aria-valuemax={5}
-                    aria-valuetext={`${DEPTH_LABELS[dataDepth] ?? 'Unknown'} — ${dataDepth} of 5 data dimensions`}
-                    tabIndex={0}
-                  >
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <span
-                        key={i}
-                        className={cn(
-                          'h-1.5 w-2.5 rounded-sm transition-colors',
-                          i < dataDepth ? 'bg-international-orange' : 'bg-border'
-                        )}
-                      />
-                    ))}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{DEPTH_LABELS[dataDepth] ?? 'Unknown'} profile — {dataDepth}/5 data dimensions</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          {websiteHref && (
-            <a
-              href={websiteHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={`${firm.title} website`}
-            >
-              <Globe className="h-3.5 w-3.5" />
-            </a>
-          )}
-          {linkedinHref && (
-            <a
-              href={linkedinHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={`${firm.title} LinkedIn`}
-            >
-              <Linkedin className="h-3.5 w-3.5" />
-            </a>
-          )}
+      <CardFooter className="pt-0 flex flex-col gap-2">
+        {/* Data freshness indicator */}
+        {(attrs.last_synced || attrs.last_verified) && (
+          <div className="text-xs text-muted-foreground flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {formatDateRelative(attrs.last_synced || attrs.last_verified)}
+          </div>
+        )}
+
+        {/* View profile link + action buttons */}
+        <div className="flex items-center justify-between gap-2 w-full">
+          <Link
+            href={`/investors/${firm.id}`}
+            className="text-xs text-international-orange font-medium hover:underline"
+          >
+            View profile →
+          </Link>
+          <div className="flex items-center gap-3">
+            {/* Data depth indicator — DD-09: hidden when depth is 0 */}
+            {dataDepth > 0 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* DD-06: role="meter" for screen readers; DD-07: tabIndex for keyboard focus */}
+                    <div
+                      className="flex items-center gap-1"
+                      role="meter"
+                      aria-label="Profile data depth"
+                      aria-valuenow={dataDepth}
+                      aria-valuemin={0}
+                      aria-valuemax={5}
+                      aria-valuetext={`${DEPTH_LABELS[dataDepth] ?? 'Unknown'} — ${dataDepth} of 5 data dimensions`}
+                      tabIndex={0}
+                    >
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            'h-1.5 w-2.5 rounded-sm transition-colors',
+                            i < dataDepth ? 'bg-international-orange' : 'bg-border'
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{DEPTH_LABELS[dataDepth] ?? 'Unknown'} profile — {dataDepth}/5 data dimensions</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {websiteHref && (
+              <a
+                href={websiteHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={`${firm.title} website`}
+              >
+                <Globe className="h-3.5 w-3.5" />
+              </a>
+            )}
+            {linkedinHref && (
+              <a
+                href={linkedinHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={`${firm.title} LinkedIn`}
+              >
+                <Linkedin className="h-3.5 w-3.5" />
+              </a>
+            )}
+          </div>
         </div>
       </CardFooter>
     </Card>

@@ -139,6 +139,14 @@ export interface InvestorStats {
   partnerCount: number
   subcategoryBreakdown: { name: string; count: number }[]
   regionBreakdown: { name: string; count: number }[]
+  // Phase 1: New chart data
+  typeBreakdown: { name: string; count: number }[]
+  topSectors: { name: string; count: number }[]
+  stageFocusBreakdown: { name: string; count: number }[]
+  qualityDistribution: { range: string; count: number }[]
+  hwFit7PlusCount: number
+  portfolioCompanyCount: number
+  avgQuality: number
 }
 
 /**
@@ -713,12 +721,12 @@ export const getInvestorStats = unstable_cache(
     // SECURITY: admin client — aggregate stats over marketplace_listings (cross-foundry by design), foundry_id not needed
     const supabase = createAdminClient()
 
-    // DECISION: Cap at 2000 rows to prevent OOM on Vercel. Stats are approximate at scale.
+    // INTENT: Removed 2000-row limit to reflect the full database in statistics.
+    // Stats computation is O(n) but acceptable for ~10k investors on modern servers.
     const { data, error } = await supabase
       .from('marketplace_listings')
       .select('subcategory, attributes')
       .eq('category', 'Finance')
-      .limit(2000)
 
     if (error) {
       console.error('[getInvestorStats] Supabase error:', error)
@@ -732,6 +740,13 @@ export const getInvestorStats = unstable_cache(
         partnerCount: 0,
         subcategoryBreakdown: [],
         regionBreakdown: [],
+        typeBreakdown: [],
+        topSectors: [],
+        stageFocusBreakdown: [],
+        qualityDistribution: [],
+        hwFit7PlusCount: 0,
+        portfolioCompanyCount: 0,
+        avgQuality: 0,
       }
     }
 
@@ -743,8 +758,23 @@ export const getInvestorStats = unstable_cache(
     let withWebsiteCount = 0
     let activeDeployingCount = 0
     let forgeCapitalCount = 0
+    let hwFit7PlusCount = 0
+    let portfolioCompanyCount = 0
+    let totalQualityScore = 0
+    let qualityScoreCount = 0
+
     const subcategoryCounts: Record<string, number> = {}
     const regionCounts: Record<string, number> = {}
+    const typeCounts: Record<string, number> = {}
+    const sectorCounts: Record<string, number> = {}
+    const stageCounts: Record<string, number> = {}
+    const qualityBuckets: Record<string, number> = {
+      '0-2': 0,
+      '2-4': 0,
+      '4-6': 0,
+      '6-8': 0,
+      '8-10': 0,
+    }
 
     for (const row of rows) {
       const attrs = (row.attributes as Record<string, unknown>) ?? {}
@@ -756,9 +786,47 @@ export const getInvestorStats = unstable_cache(
         serviceProviderCount++
       }
 
+      // Track type breakdown
+      if (firmType) {
+        typeCounts[firmType] = (typeCounts[firmType] ?? 0) + 1
+      }
+
       if (attrs.website_url) withWebsiteCount++
       if (attrs.is_active_deploying === true) activeDeployingCount++
       if (attrs.data_source === 'forge_capital') forgeCapitalCount++
+
+      // Hardware fit score
+      const hwScore = (attrs.hardware_fit_score as number) ?? 0
+      if (hwScore >= 7) hwFit7PlusCount++
+
+      // Data quality score
+      const qualityScore = (attrs.data_quality_score as number) ?? 0
+      if (qualityScore > 0) {
+        totalQualityScore += qualityScore
+        qualityScoreCount++
+        // Bucket by quality range
+        if (qualityScore <= 2) qualityBuckets['0-2']++
+        else if (qualityScore <= 4) qualityBuckets['2-4']++
+        else if (qualityScore <= 6) qualityBuckets['4-6']++
+        else if (qualityScore <= 8) qualityBuckets['6-8']++
+        else qualityBuckets['8-10']++
+      }
+
+      // Portfolio companies
+      const portfolio = (attrs.portfolio_companies as Array<{ company_name?: string }>) ?? []
+      portfolioCompanyCount += portfolio.length
+
+      // Sectors
+      const sectors = toStringArray(attrs.sector_focus ?? attrs.sectors)
+      for (const sector of sectors) {
+        sectorCounts[sector] = (sectorCounts[sector] ?? 0) + 1
+      }
+
+      // Stage focus
+      const stages = toStringArray(attrs.stage_focus)
+      for (const stage of stages) {
+        stageCounts[stage] = (stageCounts[stage] ?? 0) + 1
+      }
 
       const sub = (row.subcategory as string) || 'Unknown'
       subcategoryCounts[sub] = (subcategoryCounts[sub] ?? 0) + 1
@@ -777,6 +845,8 @@ export const getInvestorStats = unstable_cache(
       if (region) regionCounts[region] = (regionCounts[region] ?? 0) + 1
     }
 
+    const avgQuality = qualityScoreCount > 0 ? totalQualityScore / qualityScoreCount : 0
+
     // Count total partners
     const { count: partnerCount } = await supabase
       .from('vc_pe_contacts')
@@ -792,6 +862,22 @@ export const getInvestorStats = unstable_cache(
       .sort((a, b) => b.count - a.count)
       .slice(0, 11)
 
+    const typeBreakdown = Object.entries(typeCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+
+    const topSectors = Object.entries(sectorCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+
+    const stageFocusBreakdown = Object.entries(stageCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+
+    const qualityDistribution = Object.entries(qualityBuckets)
+      .map(([range, count]) => ({ range, count }))
+
     return {
       total,
       investorCount,
@@ -802,6 +888,13 @@ export const getInvestorStats = unstable_cache(
       partnerCount: partnerCount ?? 0,
       subcategoryBreakdown,
       regionBreakdown,
+      typeBreakdown,
+      topSectors,
+      stageFocusBreakdown,
+      qualityDistribution,
+      hwFit7PlusCount,
+      portfolioCompanyCount,
+      avgQuality: Math.round(avgQuality * 100) / 100,
     }
   },
   ['investor-stats'],

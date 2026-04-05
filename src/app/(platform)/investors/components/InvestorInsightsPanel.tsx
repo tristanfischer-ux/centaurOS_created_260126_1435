@@ -2,15 +2,16 @@
  * @file InvestorInsightsPanel.tsx
  *
  * @description Collapsible insights panel for the investor directory.
- * Shows 4 stat cards and 3 charts (subcategory distribution, active deploying
- * donut, top cities) using recharts. Data is pre-aggregated server-side.
+ * Shows 6 stat cards and 5 charts (type distribution, top sectors, stage focus,
+ * data quality histogram, regional coverage) using recharts. Data is pre-aggregated
+ * server-side.
  */
 
 "use client"
 
 import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Building2, TrendingUp, Globe, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Building2, TrendingUp, Globe, CheckCircle2, ChevronDown, ChevronUp, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip,
@@ -35,7 +36,7 @@ interface InvestorInsightsPanelProps {
 
 interface StatCardProps {
   icon: React.ReactNode
-  value: number
+  value: number | string
   label: string
 }
 
@@ -48,7 +49,7 @@ function StatCard({ icon, value, label }: StatCardProps) {
         </div>
         <div>
           <p className="text-2xl font-bold text-foreground leading-none">
-            {value.toLocaleString()}
+            {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
         </div>
@@ -125,132 +126,193 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
 
       {!collapsed && (
         <div className="p-5 space-y-6">
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Row 1: Key stat cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard
               icon={<Building2 className="h-4 w-4 text-international-orange" />}
               value={stats.total}
-              label="Total firms"
-            />
-            <StatCard
-              icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
-              value={stats.forgeCapitalCount}
-              label="Deep-profiled"
-            />
-            <StatCard
-              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
-              value={stats.activeDeployingCount}
-              label="Actively deploying"
+              label="Total Investors"
             />
             <StatCard
               icon={<Globe className="h-4 w-4 text-international-orange" />}
               value={stats.partnerCount}
-              label="Partner contacts"
+              label="Contacts"
+            />
+            <StatCard
+              icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
+              value={stats.portfolioCompanyCount}
+              label="Portfolio Cos"
+            />
+            <StatCard
+              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
+              value={stats.avgQuality.toFixed(1)}
+              label="Avg Quality"
+            />
+            <StatCard
+              icon={<Award className="h-4 w-4 text-international-orange" />}
+              value={stats.forgeCapitalCount}
+              label="Deep Profiles"
+            />
+            <StatCard
+              icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
+              value={stats.hwFit7PlusCount}
+              label="HW Fit 7+"
             />
           </div>
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Chart 1: Subcategory Distribution */}
+          {/* Row 2: Type distribution pie chart and Top sectors bar chart */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Chart: Investors by Type */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Subcategory Distribution
+                Investors by Type
               </p>
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    layout="vertical"
-                    data={stats.subcategoryBreakdown}
-                    margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
-                  >
-                    <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={140}
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: string) => truncate(v, 20)}
-                    />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill="var(--color-international-orange)" radius={[0, 3, 3, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Chart 2: Active Deploying Donut */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Active Deploying Capital
-              </p>
-              <div className="h-[220px] relative">
+              <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={activeDeployingData}
+                      data={stats.typeBreakdown}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={75}
-                      paddingAngle={2}
-                      dataKey="value"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={1}
+                      dataKey="count"
                       strokeWidth={0}
                     >
-                      <Cell fill="hsl(var(--status-success))" />
-                      <Cell fill="hsl(var(--muted-foreground) / 0.2)" />
+                      {stats.typeBreakdown.map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={[
+                            'hsl(var(--color-international-orange))',
+                            'hsl(var(--color-electric-blue))',
+                            'hsl(var(--color-success))',
+                            'hsl(var(--color-warning))',
+                            'hsl(var(--color-destructive))',
+                            'hsl(var(--muted-foreground))',
+                          ][index % 6]}
+                        />
+                      ))}
                     </Pie>
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                   </PieChart>
                 </ResponsiveContainer>
-                {/* Center text — aligned to cy="50%" */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-bold text-foreground">
-                    {stats.activeDeployingCount}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">active</span>
-                </div>
-                {/* Legend */}
-                <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3 text-success" />
-                    Active ({stats.activeDeployingCount})
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/20" />
-                    Other ({Math.max(0, stats.total - stats.activeDeployingCount)})
-                  </span>
-                </div>
               </div>
             </div>
 
-            {/* Chart 3: Regional Coverage */}
+            {/* Chart: Top Sectors */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Regional Coverage
+                Top Sectors
               </p>
-              <div className="h-[220px]">
+              <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     layout="vertical"
-                    data={stats.regionBreakdown}
-                    margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
+                    data={stats.topSectors}
+                    margin={{ top: 0, right: 16, bottom: 0, left: 100 }}
                   >
                     <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={120}
+                      width={100}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: string) => truncate(v, 16)}
+                      tickFormatter={(v: string) => truncate(v, 14)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill="var(--color-electric-blue)" radius={[0, 3, 3, 0]} />
+                    <Bar dataKey="count" fill="hsl(var(--color-electric-blue))" radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </div>
+
+          {/* Row 3: Stage Focus and Data Quality Distribution */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Chart: Stage Focus */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Stage Focus Distribution
+              </p>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    layout="vertical"
+                    data={stats.stageFocusBreakdown}
+                    margin={{ top: 0, right: 16, bottom: 0, left: 100 }}
+                  >
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={100}
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v: string) => truncate(v, 14)}
+                    />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                    <Bar dataKey="count" fill="hsl(var(--color-success))" radius={[0, 3, 3, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Chart: Data Quality Distribution */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Data Quality Distribution
+              </p>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={stats.qualityDistribution}
+                    margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
+                  >
+                    <XAxis
+                      dataKey="range"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                    <Bar dataKey="count" fill="hsl(var(--color-warning))" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 4: Regional Coverage */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Regional Coverage
+            </p>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={stats.regionBreakdown}
+                  margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
+                >
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={120}
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v: string) => truncate(v, 16)}
+                  />
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                  <Bar dataKey="count" fill="hsl(var(--color-electric-blue))" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>

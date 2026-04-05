@@ -39,13 +39,13 @@ export default async function SupplierSearchPage() {
   const initialData = await searchSuppliers({ limit: 24 })
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto py-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">
           Supplier Directory
         </h1>
-        <p className="text-gray-500 mb-6">
-          Describe what you need — we&apos;ll find the best suppliers using AI-powered semantic search.
+        <p className="text-muted-foreground mb-8 max-w-2xl">
+          Describe what you need — we&apos;ll find the best suppliers using semantic search.
         </p>
 
         <Suspense fallback={<SearchLoading />}>
