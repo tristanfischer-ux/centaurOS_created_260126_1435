@@ -272,3 +272,28 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   const union = a.size + b.size - intersection
   return union > 0 ? intersection / union : 0
 }
+
+// ---------------------------------------------------------------------------
+// Hybrid scoring (semantic similarity + attribute match)
+// ---------------------------------------------------------------------------
+
+/**
+ * Blends a semantic similarity score (from pgvector cosine distance) with
+ * the deterministic attribute match score to produce a single ranking value.
+ *
+ * DECISION: 60/40 weighting — semantic similarity is the primary signal because
+ * the user typed a natural-language query, but attribute match prevents irrelevant
+ * firms from ranking high just because their description mentions similar words.
+ *
+ * @param similarity Cosine similarity from match_marketplace_listings RPC (0–1)
+ * @param matchScore Deterministic attribute match from calculateMatchScore (0–100)
+ * @returns Blended score 0–100
+ */
+export function computeHybridScore(similarity: number, matchScore: number): number {
+  // Normalise similarity (0–1) to 0–100 scale
+  const semanticComponent = similarity * 100
+  // DECISION: 60% semantic, 40% attribute — semantic leads because the user
+  // is actively searching with intent, but attributes keep results grounded
+  const blended = semanticComponent * 0.6 + matchScore * 0.4
+  return Math.round(Math.min(100, Math.max(0, blended)))
+}

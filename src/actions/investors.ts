@@ -26,8 +26,9 @@ import {
 import { getUserSubscription } from '@/lib/billing/subscriptions'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
-import { calculateMatchScore, findSimilarInvestors } from '@/lib/investor-match'
+import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
 import type { FoundryProfile } from '@/lib/investor-match'
+import { embedQuery } from '@/lib/embeddings'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,6 +89,9 @@ export type InvestorFirm = {
       description?: string | null
       why_appealing?: string | null
     }[]
+    // Semantic search scoring (set only when query uses semantic path)
+    _hybridScore?: number
+    _similarity?: number
   }
 }
 
@@ -343,8 +347,139 @@ export async function searchInvestors(
   // SECURITY: Bound pagination to prevent DoS
   const safePage = Math.max(1, page)
   const safePageSize = Math.min(Math.max(1, pageSize), 100)
+  const from = (safePage - 1) * safePageSize
 
   const supabase = await createClient()
+
+  // ── Semantic search path ──
+  // INTENT: When the user types a meaningful query (> 5 chars), use pgvector cosine
+  // similarity for far better recall than naive ilike (e.g. "pre-seed deep tech London"
+  // finds relevant firms even when those exact words aren't in the title).
+  if (query && query.trim().length > 5) {
+    try {
+      const queryEmbedding = await embedQuery(query.trim())
+      // GOTCHA: over-fetch to allow for post-RPC filtering (firm_type, stage, geo, etc.)
+      const { data: semanticData, error: semanticError } = await supabase.rpc(
+        'match_marketplace_listings',
+        {
+          query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
+          match_threshold: 0.25,
+          match_count: 500,
+        }
+      )
+
+      if (semanticError) throw semanticError
+
+      // Filter to Finance category only (investors)
+      let results = (semanticData || []).filter(
+        (r: Record<string, unknown>) => r.category === 'Finance'
+      )
+
+      // Apply JSONB filters on top of semantic results
+      if (firmType && firmType.length > 0) {
+        const safeFirmTypes = firmType.filter((t: string) => VALID_FIRM_TYPES.has(t))
+        if (safeFirmTypes.length > 0) {
+          results = results.filter((r: Record<string, unknown>) => {
+            const attrs = (r.attributes as Record<string, unknown>) || {}
+            return safeFirmTypes.includes(attrs.firm_type as string)
+          })
+        }
+      }
+      if (activeOnly) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          return attrs.is_active_deploying === true
+        })
+      }
+      if (stage && stage.length > 0) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          const sf = toStringArray(attrs.stage_focus)
+          return stage.some((s: string) => sf.some(f => f.toLowerCase() === s.toLowerCase()))
+        })
+      }
+      if (sector && sector.length > 0) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          const sec = toStringArray(attrs.sectors)
+          return sector.some((s: string) => sec.some(f => f.toLowerCase() === s.toLowerCase()))
+        })
+      }
+      if (geoFocus && geoFocus.length > 0) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          const gf = toStringArray(attrs.geo_focus)
+          return geoFocus.some((g: string) => gf.some(f => f.toLowerCase().includes(g.toLowerCase())))
+        })
+      }
+      if (minQuality != null && minQuality > 0) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          return (attrs.data_quality_score as number ?? 0) >= minQuality
+        })
+      }
+      if (minHardwareFit != null && minHardwareFit > 0) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          return (attrs.hardware_fit_score as number ?? 0) >= minHardwareFit
+        })
+      }
+      if (bvcaOnly) {
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          return attrs.bvca_member === true
+        })
+      }
+      if (hqCity && hqCity.trim().length > 0) {
+        const cityLower = hqCity.trim().toLowerCase()
+        results = results.filter((r: Record<string, unknown>) => {
+          const attrs = (r.attributes as Record<string, unknown>) || {}
+          return ((attrs.hq_city as string) || '').toLowerCase().includes(cityLower)
+        })
+      }
+
+      // Convert to InvestorFirm and apply tier gating
+      const access = await getInvestorTierAccess()
+      let firms = results.map((r: Record<string, unknown>) => {
+        const firm = rowToFirm(r)
+        return stripTierGatedFields(firm, access)
+      })
+
+      // INTENT: Blend semantic similarity with attribute match for ranking.
+      // Fetch foundry profile for attribute scoring (best-effort — null = skip).
+      const profile = await getFoundryProfileCached()
+      if (profile) {
+        firms = firms.map(firm => {
+          const matchedRow = results.find((r: Record<string, unknown>) => r.id === firm.id)
+          const simScore = (matchedRow?.similarity as number) ?? 0
+          const attrBreakdown = calculateMatchScore(firm, profile)
+          const hybridScore = computeHybridScore(simScore, attrBreakdown.total)
+          return { ...firm, attributes: { ...firm.attributes, _hybridScore: hybridScore, _similarity: simScore } }
+        })
+        // Sort by hybrid score descending
+        firms.sort((a, b) => (b.attributes._hybridScore ?? 0) - (a.attributes._hybridScore ?? 0))
+      } else {
+        // No profile — sort by raw semantic similarity
+        firms = firms.map(firm => {
+          const matchedRow = results.find((r: Record<string, unknown>) => r.id === firm.id)
+          const simScore = (matchedRow?.similarity as number) ?? 0
+          return { ...firm, attributes: { ...firm.attributes, _similarity: simScore } }
+        })
+        firms.sort((a, b) => (b.attributes._similarity ?? 0) - (a.attributes._similarity ?? 0))
+      }
+
+      const total = firms.length
+      const paginatedFirms = firms.slice(from, from + safePageSize)
+      const hasMore = from + paginatedFirms.length < total
+
+      return { firms: paginatedFirms, total, hasMore }
+    } catch (err) {
+      // FLOW: Semantic search failed — fall through to keyword path below
+      console.error('[searchInvestors] Semantic search failed, falling back to keyword:', err)
+    }
+  }
+
+  // ── Keyword/browse path (fallback or short/no query) ──
 
   let q = supabase
     .from('marketplace_listings')
@@ -439,7 +574,6 @@ export async function searchInvestors(
   // DECISION: For JSONB attribute sorts (fund_size, quality, etc.), PostgREST can't natively
   // order by nested JSONB paths. We fetch all matching rows (capped at 2000), sort server-side,
   // then manually paginate. For name sort, DB handles ordering + pagination directly.
-  const from = (safePage - 1) * safePageSize
   // GOTCHA: 'match' sort is handled client-side — exclude from server-sort path
   // to avoid fetching 2000 rows for a no-op sort (the switch has no 'match' case).
   const needsServerSort = sortBy != null && sortBy !== 'name' && sortBy !== 'match'
@@ -784,6 +918,14 @@ const VALID_NOTE_TYPES = new Set(['note', 'meeting', 'email', 'call', 'milestone
 // ---------------------------------------------------------------------------
 // Match Scores
 // ---------------------------------------------------------------------------
+
+/**
+ * Fetches the current user's foundry profile for match scoring.
+ * Cached variant used by semantic search to avoid duplicate auth round-trips.
+ */
+async function getFoundryProfileCached(): Promise<FoundryProfile | null> {
+  return getFoundryProfile()
+}
 
 /**
  * Fetches the current user's foundry profile for match scoring.
