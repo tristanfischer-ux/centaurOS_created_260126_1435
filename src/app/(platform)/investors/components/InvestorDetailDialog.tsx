@@ -1,18 +1,12 @@
 /**
  * @file InvestorDetailDialog.tsx
  *
- * @description Modal overlay for viewing investor firm details without navigating
- * away from the directory. Fetches firm data and contacts on open, shows a
- * scrollable dialog with all available intelligence sections.
+ * @description Modal overlay for viewing investor firm details with drill-down
+ * navigation to partners and portfolio companies (matching Forge Capital
+ * dashboard's modal pattern with breadcrumb navigation).
  *
- * @usage
- * ```tsx
- * <InvestorDetailDialog
- *   firmId={selectedFirmId}
- *   open={!!selectedFirmId}
- *   onOpenChange={(open) => !open && setSelectedFirmId(null)}
- * />
- * ```
+ * Views: Investor → Partner detail | Portfolio company detail
+ * Breadcrumbs: FirmName > PartnerName | FirmName > CompanyName
  */
 
 'use client'
@@ -33,81 +27,57 @@ import {
   Globe,
   Linkedin,
   Mail,
-  X,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
-// Props
+// Types
 // ---------------------------------------------------------------------------
 
 interface InvestorDetailDialogProps {
-  /** The marketplace_listings ID of the investor firm to display */
   firmId: string | null
-  /** Controls dialog visibility */
   open: boolean
-  /** Called when the dialog requests to close */
   onOpenChange: (open: boolean) => void
 }
+
+type DialogView =
+  | { type: 'investor' }
+  | { type: 'partner'; contact: InvestorContact }
+  | { type: 'portfolio'; company: NonNullable<InvestorFirm['attributes']['portfolio_companies']>[number] }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Returns a semantic color class for the data quality dot indicator.
- *
- * @param score - Data quality score (0-10)
- * @returns Tailwind class for the dot background
- */
 function qualityDotClass(score: number | undefined): string {
   if (score == null) return 'bg-muted-foreground'
-  if (score >= 9) return 'bg-success'
-  if (score >= 7) return 'bg-warning'
+  if (score >= 7) return 'bg-success'
+  if (score >= 4) return 'bg-warning'
   return 'bg-muted-foreground'
 }
 
-/**
- * Formats a cheque range into a readable string.
- */
 function formatChequeRange(range: { min: number | null; max: number | null } | undefined): string | null {
   if (!range) return null
-  const min = formatFundSize(range.min)
-  const max = formatFundSize(range.max)
+  const min = range.min ? formatFundSize(range.min) : null
+  const max = range.max ? formatFundSize(range.max) : null
   if (!min && !max) return null
-  return `${min ?? '?'} - ${max ?? '?'}`
+  return `${min ?? '?'} – ${max ?? '?'}`
 }
 
-/**
- * Ensures a URL has a protocol prefix. Blocks non-http(s) schemes.
- *
- * @param url - Raw URL string
- * @returns Safe URL with https:// prefix, or empty string for unsafe schemes
- */
 function ensureProtocol(url: string): string {
   if (/^https?:\/\//i.test(url)) return url
-  // SECURITY: Block non-http(s) schemes (javascript:, data:, etc.)
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return ''
   return `https://${url}`
 }
 
-/**
- * Formats a date string for display. Returns null if unparseable.
- */
 function formatDate(dateStr: string | undefined): string | null {
   if (!dateStr) return null
   try {
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-  } catch {
-    return null
-  }
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  } catch { return null }
 }
 
 // ---------------------------------------------------------------------------
-// Section Components
+// Sub-components
 // ---------------------------------------------------------------------------
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -123,54 +93,19 @@ function TextSection({ title, content }: { title: string; content: string | unde
   return (
     <div>
       <SectionHeading>{title}</SectionHeading>
-      <p className="text-sm text-foreground whitespace-pre-line">{content}</p>
+      <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{content}</p>
     </div>
   )
 }
 
-function ContactCard({ contact }: { contact: InvestorContact }) {
-  const dotClass = contact.email_verified ? 'bg-success' : 'bg-muted-foreground'
-  const linkedinUrl = contact.linkedin_url ? ensureProtocol(contact.linkedin_url) : null
-
+function Breadcrumb({ firmName, current, onBack }: { firmName: string; current: string; onBack: () => void }) {
   return (
-    <div className="bg-muted rounded-lg p-3 mb-2">
-      <div className="flex items-start gap-2">
-        <span className={cn('inline-block h-2 w-2 rounded-full shrink-0 mt-1.5', dotClass)} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            {linkedinUrl ? (
-              <a
-                href={linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-semibold text-foreground hover:text-international-orange transition-colors"
-              >
-                {contact.full_name}
-              </a>
-            ) : (
-              <span className="text-sm font-semibold text-foreground">{contact.full_name}</span>
-            )}
-            {contact.is_decision_maker && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0">DM</Badge>
-            )}
-          </div>
-          {contact.title && (
-            <p className="text-xs text-muted-foreground mt-0.5">{contact.title}</p>
-          )}
-          {contact.deep_bio && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-3">{contact.deep_bio}</p>
-          )}
-          {contact.email && (
-            <a
-              href={`mailto:${contact.email}`}
-              className="inline-flex items-center gap-1 text-xs text-international-orange hover:underline mt-1"
-            >
-              <Mail className="h-3 w-3" />
-              {contact.email}
-            </a>
-          )}
-        </div>
-      </div>
+    <div className="flex items-center gap-1 text-xs mb-3 flex-wrap">
+      <button onClick={onBack} className="text-international-orange hover:underline cursor-pointer">
+        {firmName}
+      </button>
+      <span className="text-muted-foreground">›</span>
+      <span className="text-foreground font-medium">{current}</span>
     </div>
   )
 }
@@ -178,28 +113,331 @@ function ContactCard({ contact }: { contact: InvestorContact }) {
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Header skeleton */}
       <div className="space-y-2">
         <Skeleton className="h-7 w-3/4" />
         <div className="flex gap-2">
           <Skeleton className="h-5 w-16" />
           <Skeleton className="h-5 w-20" />
-          <Skeleton className="h-5 w-24" />
         </div>
       </div>
-      {/* Section skeletons */}
       {[1, 2, 3].map((i) => (
         <div key={i} className="space-y-2">
           <Skeleton className="h-4 w-32" />
           <Skeleton className="h-16 w-full" />
         </div>
       ))}
-      {/* Partner cards skeleton */}
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Partner Detail View
+// ---------------------------------------------------------------------------
+
+function PartnerDetailView({
+  contact,
+  firmName,
+  allContacts,
+  portfolioCompanies,
+  onBack,
+  onSelectPartner,
+  onSelectCompany,
+}: {
+  contact: InvestorContact
+  firmName: string
+  allContacts: InvestorContact[]
+  portfolioCompanies: NonNullable<InvestorFirm['attributes']['portfolio_companies']>
+  onBack: () => void
+  onSelectPartner: (c: InvestorContact) => void
+  onSelectCompany: (c: NonNullable<InvestorFirm['attributes']['portfolio_companies']>[number]) => void
+}) {
+  const linkedinUrl = contact.linkedin_url ? ensureProtocol(contact.linkedin_url) : null
+  const otherPartners = allContacts.filter(c => c.id !== contact.id)
+
+  return (
+    <div className="space-y-5">
+      <Breadcrumb firmName={firmName} current={contact.full_name} onBack={onBack} />
+
+      <div>
+        <div className="flex items-center gap-2">
+          <span className={cn('inline-block h-2.5 w-2.5 rounded-full', contact.email_verified ? 'bg-success' : 'bg-muted-foreground')} />
+          <h2 className="text-xl font-bold text-foreground">{contact.full_name}</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">
+          {contact.title && <span>{contact.title}</span>}
+          {contact.seniority && <span> ({contact.seniority})</span>}
+        </p>
       </div>
+
+      {/* Biography */}
+      {contact.deep_bio && (
+        <div>
+          <SectionHeading>Biography</SectionHeading>
+          <p className="text-sm text-foreground leading-relaxed">{contact.deep_bio}</p>
+        </div>
+      )}
+
+      {/* Contact Info */}
+      {(contact.email || linkedinUrl) && (
+        <div>
+          <SectionHeading>Contact</SectionHeading>
+          <div className="space-y-1">
+            {contact.email && (
+              <p className="text-sm">
+                <span className="text-muted-foreground">Email:</span>{' '}
+                <a href={`mailto:${contact.email}`} className="text-international-orange hover:underline">{contact.email}</a>
+              </p>
+            )}
+            {linkedinUrl && (
+              <p className="text-sm">
+                <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-international-orange hover:underline">
+                  <Linkedin className="h-3.5 w-3.5" /> LinkedIn <ExternalLink className="h-3 w-3" />
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Other Partners at this firm */}
+      {otherPartners.length > 0 && (
+        <div>
+          <SectionHeading>Other Partners at {firmName} ({otherPartners.length})</SectionHeading>
+          {otherPartners.map(p => (
+            <div key={p.id} className="bg-muted rounded-lg p-3 mb-2">
+              <button onClick={() => onSelectPartner(p)} className="text-sm font-semibold text-international-orange hover:underline text-left">
+                {p.full_name}
+              </button>
+              {p.title && <p className="text-xs text-muted-foreground">{p.title}</p>}
+              {p.deep_bio && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.deep_bio}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Investor's Portfolio */}
+      {portfolioCompanies.length > 0 && (
+        <div>
+          <SectionHeading>Investor&apos;s Portfolio ({portfolioCompanies.length})</SectionHeading>
+          <ul className="space-y-1">
+            {portfolioCompanies.map((pc, i) => (
+              <li key={i} className="text-sm">
+                <button onClick={() => onSelectCompany(pc)} className="text-international-orange hover:underline font-medium text-left">
+                  {pc.company_name}
+                </button>
+                {pc.sector && <span className="text-muted-foreground"> ({pc.sector})</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio Company Detail View
+// ---------------------------------------------------------------------------
+
+function PortfolioCompanyDetailView({
+  company,
+  firmName,
+  allPortfolio,
+  onBack,
+  onSelectCompany,
+}: {
+  company: NonNullable<InvestorFirm['attributes']['portfolio_companies']>[number]
+  firmName: string
+  allPortfolio: NonNullable<InvestorFirm['attributes']['portfolio_companies']>
+  onBack: () => void
+  onSelectCompany: (c: NonNullable<InvestorFirm['attributes']['portfolio_companies']>[number]) => void
+}) {
+  const others = allPortfolio.filter(p => p.company_name !== company.company_name)
+
+  return (
+    <div className="space-y-5">
+      <Breadcrumb firmName={firmName} current={company.company_name} onBack={onBack} />
+
+      <div>
+        <h2 className="text-xl font-bold text-foreground">{company.company_name}</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {firmName}
+          {company.sector && <span> · Sector: {company.sector}</span>}
+          {company.stage && <span> · Stage: {company.stage}</span>}
+        </p>
+      </div>
+
+      {/* Overview */}
+      {(company.description || company.why_appealing) && (
+        <div>
+          <SectionHeading>Overview</SectionHeading>
+          {company.description && <p className="text-sm text-foreground leading-relaxed">{company.description}</p>}
+          {company.why_appealing && (
+            <p className="text-sm text-foreground leading-relaxed mt-2 italic">{company.why_appealing}</p>
+          )}
+        </div>
+      )}
+
+      {/* Investment Details */}
+      <div>
+        <SectionHeading>Investment Details</SectionHeading>
+        <ul className="text-sm space-y-1">
+          <li><span className="font-medium">Amount:</span> {company.amount_usd ? `$${company.amount_usd.toLocaleString()}` : 'Not disclosed'}</li>
+          <li><span className="font-medium">Sector:</span> {company.sector || 'Unknown'}</li>
+          <li><span className="font-medium">Stage:</span> {company.stage || 'N/A'}</li>
+        </ul>
+      </div>
+
+      {/* Other Investments by this firm */}
+      {others.length > 0 && (
+        <div>
+          <SectionHeading>Other Investments by {firmName} ({others.length})</SectionHeading>
+          <ul className="space-y-1">
+            {others.map((pc, i) => (
+              <li key={i} className="text-sm">
+                <button onClick={() => onSelectCompany(pc)} className="text-international-orange hover:underline font-medium text-left">
+                  {pc.company_name}
+                </button>
+                {pc.sector && <span className="text-muted-foreground"> ({pc.sector})</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main Investor View
+// ---------------------------------------------------------------------------
+
+function InvestorMainView({
+  firm,
+  contacts,
+  onSelectPartner,
+  onSelectCompany,
+}: {
+  firm: InvestorFirm
+  contacts: InvestorContact[]
+  onSelectPartner: (c: InvestorContact) => void
+  onSelectCompany: (c: NonNullable<InvestorFirm['attributes']['portfolio_companies']>[number]) => void
+}) {
+  const attrs = firm.attributes
+  const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
+  const chequeLabel = formatChequeRange(attrs.cheque_range_gbp)
+  const portfolioCompanies = attrs.portfolio_companies ?? []
+  const stages = attrs.stage_focus ?? []
+  const sectors = attrs.sectors ?? []
+  const geoFocus = attrs.geo_focus ?? []
+  const websiteUrl = attrs.website_url ? ensureProtocol(attrs.website_url) : null
+  const linkedinUrl = attrs.linkedin_company_url ? ensureProtocol(attrs.linkedin_company_url) : null
+  const lastVerified = formatDate(attrs.last_verified)
+  const lastSynced = formatDate(attrs.last_synced)
+
+  return (
+    <div className="space-y-5">
+      <TextSection title="Thesis" content={attrs.investment_thesis} />
+      <TextSection title="Investment Pattern" content={attrs.investment_pattern} />
+      <TextSection title="Team Expertise" content={attrs.team_expertise} />
+      <TextSection title="Connection Brief" content={attrs.connection_brief} />
+      <TextSection title="Value Add" content={attrs.value_add} />
+      <TextSection title="Ideal Company Profile" content={attrs.ideal_company_profile} />
+
+      {/* Partners — clickable for drill-down */}
+      {contacts.length > 0 && (
+        <div>
+          <SectionHeading>Partners ({contacts.length})</SectionHeading>
+          {contacts.map((contact) => (
+            <div key={contact.id} className="bg-muted rounded-lg p-3 mb-2">
+              <div className="flex items-start gap-2">
+                <span className={cn('inline-block h-2 w-2 rounded-full shrink-0 mt-1.5', contact.email_verified ? 'bg-success' : 'bg-muted-foreground')} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={() => onSelectPartner(contact)} className="text-sm font-semibold text-international-orange hover:underline text-left">
+                      {contact.full_name}
+                    </button>
+                    {contact.is_decision_maker && <Badge variant="outline" className="text-[10px] px-1.5 py-0">DM</Badge>}
+                  </div>
+                  {contact.title && <p className="text-xs text-muted-foreground mt-0.5">{contact.title}</p>}
+                  {contact.deep_bio && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{contact.deep_bio}</p>}
+                  {contact.email && (
+                    <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 text-xs text-international-orange hover:underline mt-1">
+                      <Mail className="h-3 w-3" /> {contact.email}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Portfolio — clickable for drill-down */}
+      {portfolioCompanies.length > 0 && (
+        <div>
+          <SectionHeading>Portfolio ({portfolioCompanies.length})</SectionHeading>
+          <ul className="space-y-1">
+            {portfolioCompanies.map((pc, i) => (
+              <li key={i} className="text-sm flex items-start gap-2">
+                <span className="text-muted-foreground mt-0.5 shrink-0">•</span>
+                <span>
+                  <button onClick={() => onSelectCompany(pc)} className="text-international-orange hover:underline font-semibold text-left">
+                    {pc.company_name}
+                  </button>
+                  {pc.sector && <span className="text-muted-foreground"> ({pc.sector})</span>}
+                  {pc.description && <span className="text-muted-foreground"> — {pc.description}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Fund Details */}
+      {(fundSizeLabel || chequeLabel || stages.length > 0 || sectors.length > 0 || geoFocus.length > 0 || attrs.firm_type) && (
+        <div>
+          <SectionHeading>Fund Details</SectionHeading>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {fundSizeLabel && <div><span className="text-muted-foreground">Size:</span> <span className="font-medium">{fundSizeLabel}</span></div>}
+            {chequeLabel && <div><span className="text-muted-foreground">Cheque Size:</span> <span className="font-medium">{chequeLabel}</span></div>}
+            {stages.length > 0 && <div><span className="text-muted-foreground">Stage:</span> <span className="font-medium">{stages.join(', ')}</span></div>}
+            {sectors.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Sectors:</span> <span className="font-medium">{sectors.join(', ')}</span></div>}
+            {geoFocus.length > 0 && <div><span className="text-muted-foreground">Geography:</span> <span className="font-medium">{geoFocus.join(', ')}</span></div>}
+            {attrs.firm_type && <div><span className="text-muted-foreground">Entity Type:</span> <span className="font-medium">{attrs.firm_type}</span></div>}
+          </div>
+        </div>
+      )}
+
+      {/* Links */}
+      {(websiteUrl || linkedinUrl) && (
+        <div>
+          <SectionHeading>Links</SectionHeading>
+          <div className="flex items-center gap-4">
+            {websiteUrl && (
+              <a href={websiteUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:underline">
+                <Globe className="h-4 w-4" /> Website <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {linkedinUrl && (
+              <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:underline">
+                <Linkedin className="h-4 w-4" /> LinkedIn <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      {(lastVerified || lastSynced) && (
+        <div className="border-t border-border pt-3 mt-4">
+          <p className="text-xs text-muted-foreground">
+            {lastVerified && <span>Website verified: {lastVerified}</span>}
+            {lastVerified && lastSynced && <span> · </span>}
+            {lastSynced && <span>Intel synthesised: {lastSynced}</span>}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -208,25 +446,19 @@ function LoadingSkeleton() {
 // Main Component
 // ---------------------------------------------------------------------------
 
-/**
- * Modal dialog that displays full investor firm details. Fetches data on open
- * and shows a loading skeleton while requests are in flight.
- *
- * @param props.firmId - The investor firm ID to fetch and display
- * @param props.open - Whether the dialog is visible
- * @param props.onOpenChange - Callback when dialog open state changes
- */
 export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDetailDialogProps) {
   const [firm, setFirm] = useState<InvestorFirm | null>(null)
   const [contacts, setContacts] = useState<InvestorContact[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<DialogView>({ type: 'investor' })
 
   const fetchData = useCallback(async (id: string) => {
     setLoading(true)
     setError(null)
     setFirm(null)
     setContacts([])
+    setView({ type: 'investor' })
 
     try {
       const [firmResult, contactsResult] = await Promise.all([
@@ -242,7 +474,7 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDet
       setFirm(firmResult.firm)
       setContacts(contactsResult.contacts)
     } catch (err) {
-      console.error('[InvestorDetailDialog] Failed to fetch investor:', err)
+      console.error('[InvestorDetailDialog] Failed to fetch:', err)
       setError('Failed to load investor details.')
     } finally {
       setLoading(false)
@@ -254,26 +486,25 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDet
       fetchData(firmId)
     }
     if (!open) {
-      // INTENT: Reset state when dialog closes so stale data doesn't flash on next open
       setFirm(null)
       setContacts([])
       setError(null)
+      setView({ type: 'investor' })
     }
   }, [open, firmId, fetchData])
 
   const attrs = firm?.attributes
-  const fundSizeLabel = formatFundSize(attrs?.fund_size_gbp)
-  const chequeLabel = formatChequeRange(attrs?.cheque_range_gbp)
   const portfolioCompanies = attrs?.portfolio_companies ?? []
-  const stages = attrs?.stage_focus ?? []
-  const sectors = attrs?.sectors ?? []
-  const geoFocus = attrs?.geo_focus ?? []
 
-  const websiteUrl = attrs?.website_url ? ensureProtocol(attrs.website_url) : null
-  const linkedinUrl = attrs?.linkedin_company_url ? ensureProtocol(attrs.linkedin_company_url) : null
-
-  const lastVerified = formatDate(attrs?.last_verified)
-  const lastSynced = formatDate(attrs?.last_synced)
+  // Derive the dialog title from current view
+  let dialogTitle = ''
+  if (view.type === 'investor' && firm) {
+    dialogTitle = firm.title
+  } else if (view.type === 'partner') {
+    dialogTitle = view.contact.full_name
+  } else if (view.type === 'portfolio') {
+    dialogTitle = view.company.company_name
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -283,186 +514,60 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDet
             <Skeleton className="h-7 w-2/3" />
           ) : error ? (
             <DialogTitle className="text-destructive">{error}</DialogTitle>
-          ) : firm ? (
+          ) : firm && view.type === 'investor' ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    'inline-block h-2.5 w-2.5 rounded-full shrink-0',
-                    qualityDotClass(attrs?.data_quality_score)
-                  )}
-                />
-                <DialogTitle className="text-xl font-bold text-foreground">
-                  {firm.title}
-                </DialogTitle>
+                <span className={cn('inline-block h-2.5 w-2.5 rounded-full shrink-0', qualityDotClass(attrs?.data_quality_score))} />
+                <DialogTitle className="text-xl font-bold text-foreground">{firm.title}</DialogTitle>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {attrs?.firm_type && (
-                  <Badge variant="outline">{attrs.firm_type}</Badge>
-                )}
-                {fundSizeLabel && (
-                  <Badge variant="secondary">{fundSizeLabel}</Badge>
-                )}
+                {attrs?.firm_type && <Badge variant="outline">{attrs.firm_type}</Badge>}
+                {attrs?.fund_size_gbp && <Badge variant="secondary">{formatFundSize(attrs.fund_size_gbp)}</Badge>}
                 {attrs?.data_quality_score != null && (
-                  <span className="text-xs text-muted-foreground">
-                    Quality: {attrs.data_quality_score.toFixed(1)}/10
-                  </span>
+                  <span className="text-xs text-muted-foreground">Quality: {attrs.data_quality_score.toFixed(1)}/10</span>
                 )}
               </div>
             </div>
+          ) : (view.type === 'partner' || view.type === 'portfolio') ? (
+            <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>
           ) : null}
         </DialogHeader>
 
         {loading && <LoadingSkeleton />}
 
         {error && !loading && (
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            {error}
-          </p>
+          <p className="text-sm text-muted-foreground py-8 text-center">{error}</p>
         )}
 
-        {firm && !loading && (
-          <div className="space-y-6 mt-2">
-            {/* Thesis */}
-            <TextSection title="Thesis" content={attrs?.investment_thesis} />
+        {firm && !loading && view.type === 'investor' && (
+          <InvestorMainView
+            firm={firm}
+            contacts={contacts}
+            onSelectPartner={(c) => setView({ type: 'partner', contact: c })}
+            onSelectCompany={(c) => setView({ type: 'portfolio', company: c })}
+          />
+        )}
 
-            {/* Investment Pattern */}
-            <TextSection title="Investment Pattern" content={attrs?.investment_pattern} />
+        {firm && !loading && view.type === 'partner' && (
+          <PartnerDetailView
+            contact={view.contact}
+            firmName={firm.title}
+            allContacts={contacts}
+            portfolioCompanies={portfolioCompanies}
+            onBack={() => setView({ type: 'investor' })}
+            onSelectPartner={(c) => setView({ type: 'partner', contact: c })}
+            onSelectCompany={(c) => setView({ type: 'portfolio', company: c })}
+          />
+        )}
 
-            {/* Team Expertise */}
-            <TextSection title="Team Expertise" content={attrs?.team_expertise} />
-
-            {/* Connection Brief */}
-            <TextSection title="Connection Brief" content={attrs?.connection_brief} />
-
-            {/* Value Add */}
-            <TextSection title="Value Add" content={attrs?.value_add} />
-
-            {/* Ideal Company Profile */}
-            <TextSection title="Ideal Company Profile" content={attrs?.ideal_company_profile} />
-
-            {/* Partners */}
-            {contacts.length > 0 && (
-              <div>
-                <SectionHeading>Partners ({contacts.length})</SectionHeading>
-                {contacts.map((contact) => (
-                  <ContactCard key={contact.id} contact={contact} />
-                ))}
-              </div>
-            )}
-
-            {/* Portfolio */}
-            {portfolioCompanies.length > 0 && (
-              <div>
-                <SectionHeading>Portfolio ({portfolioCompanies.length})</SectionHeading>
-                <ul className="space-y-1.5">
-                  {portfolioCompanies.map((pc, idx) => (
-                    <li key={idx} className="text-sm text-foreground flex items-start gap-2">
-                      <span className="text-muted-foreground mt-1.5 shrink-0">&#8226;</span>
-                      <span>
-                        <span className="font-semibold">{pc.company_name}</span>
-                        {pc.sector && (
-                          <span className="text-muted-foreground"> &mdash; {pc.sector}</span>
-                        )}
-                        {pc.description && (
-                          <span className="text-muted-foreground"> &mdash; {pc.description}</span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Fund Details */}
-            {(fundSizeLabel || chequeLabel || stages.length > 0 || sectors.length > 0 || geoFocus.length > 0 || attrs?.firm_type) && (
-              <div>
-                <SectionHeading>Fund Details</SectionHeading>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  {fundSizeLabel && (
-                    <div>
-                      <span className="text-muted-foreground">Size</span>
-                      <p className="font-medium text-foreground">{fundSizeLabel}</p>
-                    </div>
-                  )}
-                  {chequeLabel && (
-                    <div>
-                      <span className="text-muted-foreground">Cheque Size</span>
-                      <p className="font-medium text-foreground">{chequeLabel}</p>
-                    </div>
-                  )}
-                  {stages.length > 0 && (
-                    <div>
-                      <span className="text-muted-foreground">Stage</span>
-                      <p className="font-medium text-foreground">{stages.join(', ')}</p>
-                    </div>
-                  )}
-                  {sectors.length > 0 && (
-                    <div>
-                      <span className="text-muted-foreground">Sectors</span>
-                      <p className="font-medium text-foreground">{sectors.join(', ')}</p>
-                    </div>
-                  )}
-                  {geoFocus.length > 0 && (
-                    <div>
-                      <span className="text-muted-foreground">Geography</span>
-                      <p className="font-medium text-foreground">{geoFocus.join(', ')}</p>
-                    </div>
-                  )}
-                  {attrs?.firm_type && (
-                    <div>
-                      <span className="text-muted-foreground">Entity Type</span>
-                      <p className="font-medium text-foreground">{attrs.firm_type}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Links */}
-            {(websiteUrl || linkedinUrl) && (
-              <div>
-                <SectionHeading>Links</SectionHeading>
-                <div className="flex items-center gap-3">
-                  {websiteUrl && (
-                    <a
-                      href={websiteUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:underline transition-colors"
-                    >
-                      <Globe className="h-4 w-4" />
-                      Website
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                  {linkedinUrl && (
-                    <a
-                      href={linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:underline transition-colors"
-                    >
-                      <Linkedin className="h-4 w-4" />
-                      LinkedIn
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Footer metadata */}
-            {(lastVerified || lastSynced) && (
-              <div className="border-t border-border pt-3 mt-4">
-                <p className="text-xs text-muted-foreground">
-                  {lastVerified && <span>Website verified: {lastVerified}</span>}
-                  {lastVerified && lastSynced && <span> &middot; </span>}
-                  {lastSynced && <span>Intel synthesised: {lastSynced}</span>}
-                </p>
-              </div>
-            )}
-          </div>
+        {firm && !loading && view.type === 'portfolio' && (
+          <PortfolioCompanyDetailView
+            company={view.company}
+            firmName={firm.title}
+            allPortfolio={portfolioCompanies}
+            onBack={() => setView({ type: 'investor' })}
+            onSelectCompany={(c) => setView({ type: 'portfolio', company: c })}
+          />
         )}
       </DialogContent>
     </Dialog>
