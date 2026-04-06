@@ -150,8 +150,12 @@ describe('setupNewUser', () => {
     // Default: provider_profiles insert succeeds
     mock.getChain('provider_profiles').insert.mockResolvedValue({ error: null })
 
-    // Default: marketplace_listings insert succeeds
-    mock.getChain('marketplace_listings').insert.mockResolvedValue({ error: null })
+    // Default: marketplace_listings insert succeeds (chainable: .insert().select().single())
+    mock.getChain('marketplace_listings').insert.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        single: jest.fn().mockResolvedValue({ data: { id: 'listing-123' }, error: null }),
+      }),
+    })
 
     // Default: foundry owner update succeeds
     mock.getChain('foundries').update.mockReturnValue({
@@ -229,10 +233,21 @@ describe('setupNewUser', () => {
         })
       }
 
-      if (table === 'provider_profiles' || table === 'marketplace_listings') {
+      if (table === 'provider_profiles') {
         chain.insert.mockImplementation((data: unknown) => {
           insertedData.push({ table, ...(data as Record<string, unknown>) })
           return Promise.resolve({ error: null })
+        })
+      }
+
+      if (table === 'marketplace_listings') {
+        chain.insert.mockImplementation((data: unknown) => {
+          insertedData.push({ table, ...(data as Record<string, unknown>) })
+          return {
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: { id: 'listing-123' }, error: null }),
+            }),
+          }
         })
       }
 
@@ -297,7 +312,11 @@ describe('setupNewUser', () => {
       if (table === 'marketplace_listings') {
         chain.insert.mockImplementation((data: unknown) => {
           insertedData.push({ table, ...(data as Record<string, unknown>) })
-          return Promise.resolve({ error: null })
+          return {
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: { id: 'listing-123' }, error: null }),
+            }),
+          }
         })
       }
 
