@@ -41,7 +41,6 @@ interface ProfileCompletionWizardProps {
   open: boolean
   userRole?: string
   onboardingData: OnboardingData | null
-  onComplete: () => void
 }
 
 type WizardStep = 'identity' | 'expertise' | 'experience' | 'availability'
@@ -224,7 +223,6 @@ export function ProfileCompletionWizard({
   open,
   userRole,
   onboardingData,
-  onComplete,
 }: ProfileCompletionWizardProps) {
   const router = useRouter()
   const [stepIndex, setStepIndex] = useState(0)
@@ -336,9 +334,8 @@ export function ProfileCompletionWizard({
       setIsCompleted(true)
       toast.success('Profile complete! You\'re now visible to companies looking for talent.')
       router.refresh()
-      onComplete()
     }
-  }, [stepIndex, validateStep, saveDraft, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, router, onComplete])
+  }, [stepIndex, validateStep, saveDraft, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, router])
 
   const goBack = useCallback(() => {
     if (stepIndex > 0) {
