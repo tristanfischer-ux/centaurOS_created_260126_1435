@@ -541,6 +541,31 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
                                     </p>
                                 </div>
 
+                                {/* Capability Summary (from Nightshift synthesis) */}
+                                {attrs.capability_summary && (
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-international-orange border-b border-border pb-1 mb-2">Capability Summary</h3>
+                                        <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
+                                            {attrs.capability_summary as string}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Competitive Positioning (from Nightshift synthesis) */}
+                                {attrs.competitive_positioning && typeof attrs.competitive_positioning === 'object' && (
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-international-orange border-b border-border pb-1 mb-2">Competitive Positioning</h3>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                            {Object.entries(attrs.competitive_positioning as Record<string, string>).map(([key, value]) => (
+                                                <div key={key}>
+                                                    <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>{' '}
+                                                    <span className="text-foreground font-medium">{value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Skills / Tags */}
                                 {tags.length > 0 && (
                                     <div>

@@ -48,7 +48,7 @@ export function MarketplacePageTabs({ browseContent }: MarketplacePageTabsProps)
           )}
         >
           <Grid3X3 className="h-4 w-4" />
-          Browse All
+          Suppliers
         </button>
       </div>
 
