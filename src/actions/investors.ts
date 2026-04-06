@@ -849,16 +849,45 @@ export const getInvestorStats = unstable_cache(
       const portfolio = (attrs.portfolio_companies as Array<{ company_name?: string }>) ?? []
       portfolioCompanyCount += portfolio.length
 
-      // Sectors
+      // Sectors — normalize case to deduplicate (e.g. "FinTech" vs "fintech" vs "Fintech")
+      const SECTOR_NORMALIZE: Record<string, string> = {
+        'fintech': 'FinTech', 'Fintech': 'FinTech', 'FINTECH': 'FinTech',
+        'ai': 'AI', 'Ai': 'AI',
+        'saas': 'SaaS', 'SAAS': 'SaaS', 'Saas': 'SaaS',
+        'biotech': 'BioTech', 'Biotech': 'BioTech',
+        'cleantech': 'CleanTech', 'Cleantech': 'CleanTech', 'climate tech': 'Climate Tech',
+        'deep tech': 'Deep Tech', 'deeptech': 'Deep Tech', 'DeepTech': 'Deep Tech',
+        'healthtech': 'HealthTech', 'health tech': 'HealthTech',
+        'edtech': 'EdTech', 'ed tech': 'EdTech',
+        'proptech': 'PropTech', 'prop tech': 'PropTech',
+        'agtech': 'AgTech', 'agritech': 'AgTech',
+        'e-commerce': 'E-commerce', 'ecommerce': 'E-commerce',
+        'cybersecurity': 'Cybersecurity', 'cyber security': 'Cybersecurity',
+      }
       const sectors = toStringArray(attrs.sector_focus ?? attrs.sectors)
       for (const sector of sectors) {
-        sectorCounts[sector] = (sectorCounts[sector] ?? 0) + 1
+        const normalized = SECTOR_NORMALIZE[sector] ?? SECTOR_NORMALIZE[sector.toLowerCase()] ?? sector
+        sectorCounts[normalized] = (sectorCounts[normalized] ?? 0) + 1
       }
 
-      // Stage focus
+      // Stage focus — normalize to canonical labels
+      const STAGE_NORMALIZE: Record<string, string> = {
+        'pre-seed': 'Pre-Seed', 'preseed': 'Pre-Seed', 'Pre-seed': 'Pre-Seed',
+        'seed': 'Seed', 'Seed': 'Seed',
+        'series a': 'Series A', 'Series A': 'Series A', 'series-a': 'Series A',
+        'series b': 'Series B', 'Series B': 'Series B', 'series-b': 'Series B',
+        'series c': 'Series C', 'Series C': 'Series C', 'series-c': 'Series C',
+        'series d': 'Series D', 'Series D': 'Series D', 'series-d': 'Series D',
+        'growth': 'Growth', 'Growth': 'Growth',
+        'late stage': 'Late Stage', 'Late Stage': 'Late Stage', 'late-stage': 'Late Stage',
+        'early-stage': 'Seed', 'early stage': 'Seed', 'Early-stage': 'Seed',
+        'venture': 'Seed', 'angel': 'Pre-Seed',
+      }
       const stages = toStringArray(attrs.stage_focus)
       for (const stage of stages) {
-        stageCounts[stage] = (stageCounts[stage] ?? 0) + 1
+        const normalized = STAGE_NORMALIZE[stage] ?? STAGE_NORMALIZE[stage.toLowerCase()] ?? null
+        if (normalized) stageCounts[normalized] = (stageCounts[normalized] ?? 0) + 1
+        // Skip unrecognized stages to keep charts clean
       }
 
       const sub = (row.subcategory as string) || 'Unknown'
