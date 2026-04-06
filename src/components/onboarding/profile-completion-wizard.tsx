@@ -230,6 +230,7 @@ export function ProfileCompletionWizard({
   const [stepIndex, setStepIndex] = useState(0)
   const [direction, setDirection] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCompleted, setIsCompleted] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const hydrated = useRef(false)
 
@@ -332,6 +333,7 @@ export function ProfileCompletionWizard({
         return
       }
 
+      setIsCompleted(true)
       toast.success('Profile complete! You\'re now visible to companies looking for talent.')
       router.refresh()
       onComplete()
@@ -346,7 +348,7 @@ export function ProfileCompletionWizard({
     }
   }, [stepIndex])
 
-  if (!open) return null
+  if (!open || isCompleted) return null
 
   const stepInfo = STEP_LABELS[currentStep]
   const StepIcon = stepInfo.icon

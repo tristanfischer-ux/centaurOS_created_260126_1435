@@ -15,7 +15,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { determineFunctionCategory } from '@/lib/recruit-match'
-import { sanitizeErrorMessage, escapeHtml } from '@/lib/security/sanitize'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { OnboardingData } from '@/actions/onboarding'
 
 export interface ProfileWizardInput {
@@ -33,6 +33,17 @@ const VALID_AVAILABILITY_TYPES = ['full-time', 'part-time', 'advisory', 'project
 const MAX_ARRAY_LENGTH = 20
 const MAX_TAG_LENGTH = 100
 
+// SECURITY: Strip HTML tags without encoding entities. React handles output encoding;
+// escapeHtml would double-encode ("R&D" → "R&amp;D" → displayed as "R&amp;D").
+function stripTags(str: string): string {
+  return str.replace(/<[^>]*>/g, '').trim()
+}
+
+function sanitizeTag(str: string): string {
+  const cleaned = stripTags(str.trim())
+  return cleaned.slice(0, MAX_TAG_LENGTH)
+}
+
 export async function completeProfileWizard(
   input: ProfileWizardInput
 ): Promise<{ success?: boolean; error?: string }> {
@@ -41,23 +52,20 @@ export async function completeProfileWizard(
   if (!user) return { error: 'Unauthorized' }
 
   // ── Validation & Sanitization ─────────────────────────────────────
-  const headline = escapeHtml(input.headline?.trim() || '')
-  const bio = escapeHtml(input.bio?.trim() || '')
+  const headline = stripTags(input.headline?.trim() || '')
+  const bio = stripTags(input.bio?.trim() || '')
   const skills = (input.skills || [])
-    .map(s => escapeHtml(s.trim()))
+    .map(sanitizeTag)
     .filter(Boolean)
     .slice(0, MAX_ARRAY_LENGTH)
-    .filter(s => s.length <= MAX_TAG_LENGTH)
   const industries = (input.industries || [])
-    .map(s => escapeHtml(s.trim()))
+    .map(sanitizeTag)
     .filter(Boolean)
     .slice(0, MAX_ARRAY_LENGTH)
-    .filter(s => s.length <= MAX_TAG_LENGTH)
   const expertiseAreas = (input.expertise_areas || [])
-    .map(s => escapeHtml(s.trim()))
+    .map(sanitizeTag)
     .filter(Boolean)
     .slice(0, MAX_ARRAY_LENGTH)
-    .filter(s => s.length <= MAX_TAG_LENGTH)
 
   // SECURITY: Allow 0 for apprentices ("Still studying")
   const yearsExperience = typeof input.years_experience === 'number' ? input.years_experience : -1
