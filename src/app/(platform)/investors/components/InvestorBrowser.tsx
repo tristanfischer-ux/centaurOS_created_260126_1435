@@ -26,6 +26,7 @@ import { InvestorShortlistBoard } from './InvestorShortlistBoard'
 import { InvestorMapView } from './InvestorMapView'
 import { InvestorExportMenu } from './InvestorExportMenu'
 import { InvestorTableView } from './InvestorTableView'
+import { InvestorDetailDialog } from './InvestorDetailDialog'
 import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScores } from '@/actions/investors'
 import { Search, X, RefreshCw, Building2, LayoutGrid, List, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -159,9 +160,10 @@ export function InvestorBrowser({
     }
     return EMPTY_ADVANCED
   })
+  // DECISION: Default to table view to match Forge Capital dashboard's information density
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const v = searchParams.get('view') as ViewMode
-    return ['grid', 'board', 'map'].includes(v) ? v : 'grid'
+    return ['grid', 'table', 'board', 'map'].includes(v) ? v : 'table'
   })
 
   // Data state
@@ -187,6 +189,9 @@ export function InvestorBrowser({
   // Compare state
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [showCompare, setShowCompare] = useState(false)
+
+  // Modal detail state — click investor row opens modal instead of navigating
+  const [selectedFirmId, setSelectedFirmId] = useState<string | null>(null)
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasEverFetched = useRef(hasUrlFilters)
@@ -662,6 +667,7 @@ export function InvestorBrowser({
           onToggleCompare={handleToggleCompare}
           compareIds={compareIds}
           isPending={isPending}
+          onSelectFirm={setSelectedFirmId}
         />
       )}
 
@@ -690,6 +696,13 @@ export function InvestorBrowser({
         onOpenChange={setShowCompare}
         firms={compareFirms}
         matchScores={matchScores}
+      />
+
+      {/* Investor detail modal — opens on row/card click */}
+      <InvestorDetailDialog
+        firmId={selectedFirmId}
+        open={!!selectedFirmId}
+        onOpenChange={(open) => { if (!open) setSelectedFirmId(null) }}
       />
     </div>
   )

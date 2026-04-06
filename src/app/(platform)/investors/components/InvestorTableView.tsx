@@ -29,6 +29,8 @@ interface InvestorTableViewProps {
   onToggleCompare: (firmId: string) => void
   compareIds: string[]
   isPending: boolean
+  /** Called when user clicks a row — opens modal detail instead of navigating */
+  onSelectFirm?: (firmId: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +80,7 @@ export function InvestorTableView({
   onToggleCompare: _onToggleCompare,
   compareIds: _compareIds,
   isPending,
+  onSelectFirm,
 }: InvestorTableViewProps) {
   const router = useRouter()
 
@@ -121,7 +124,7 @@ export function InvestorTableView({
             return (
               <tr
                 key={firm.id}
-                onClick={() => router.push(`/investors/${firm.id}`)}
+                onClick={() => onSelectFirm ? onSelectFirm(firm.id) : router.push(`/investors/${firm.id}`)}
                 className="hover:bg-muted/50 transition-colors cursor-pointer"
               >
                 {/* 1. Quality dot */}

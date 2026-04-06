@@ -141,13 +141,13 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
 
   return (
     <Card className="bg-background border-border">
-      <CardContent className="pt-8 pb-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-foreground">Find your ideal investors</h2>
-            <p className="text-sm text-muted-foreground">
-              Describe your startup for investor matching
+      <CardContent className="pt-4 pb-4">
+        <div className="space-y-3">
+          {/* Header — compact */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-foreground">Find your ideal investors</h2>
+            <p className="text-xs text-muted-foreground">
+              Describe your startup for semantic matching
             </p>
           </div>
 
@@ -187,15 +187,12 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
                     'border-input focus:border-international-orange focus:outline-none focus:ring-1 focus:ring-international-orange',
                     'resize-none'
                   )}
-                  rows={4}
+                  rows={2}
                 />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Cmd/Ctrl + Enter to search
-                </p>
               </div>
 
               {/* Example chips */}
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">Examples:</p>
                 <div className="flex flex-wrap gap-2">
                   {EXAMPLE_QUERIES.map((example) => (
@@ -222,7 +219,7 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
                 onDrop={handleDrop}
                 onClick={handleUploadClick}
                 className={cn(
-                  'rounded-lg border-2 border-dashed px-6 py-8 text-center cursor-pointer',
+                  'rounded-lg border-2 border-dashed px-4 py-3 text-center cursor-pointer',
                   'transition-colors duration-200',
                   dragOverRef.current
                     ? 'border-international-orange bg-international-orange/5'
@@ -244,15 +241,12 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
                     </p>
                   </>
                 ) : (
-                  <>
-                    <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium text-foreground">
-                      Drop your pitch deck or business plan
+                  <div className="flex items-center justify-center gap-2">
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Drop pitch deck or plan (PDF, DOCX, PPTX)
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Text, PDF, DOCX, PPTX, XLSX
-                    </p>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
