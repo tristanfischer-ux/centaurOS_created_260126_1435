@@ -155,7 +155,7 @@ export default async function InvestorDirectoryPage() {
     const [investorResult, contactResult, portfolioResult, grantsResult] = await Promise.allSettled([
       adminDb.from('marketplace_listings').select('id', { count: 'exact', head: true }).eq('category', 'Finance'),
       adminDb.from('vc_pe_contacts').select('id', { count: 'exact', head: true }),
-      adminDb.from('investor_portfolio_companies').select('id', { count: 'exact', head: true }),
+      adminDb.from('investor_portfolio_companies').select('company_name', { count: 'exact', head: true }),
       adminDb.from('investor_grants').select('id', { count: 'exact', head: true }),
     ])
     if (investorResult.status === 'fulfilled') investorCount = investorResult.value.count ?? 0
@@ -197,7 +197,7 @@ export default async function InvestorDirectoryPage() {
         </div>
         <p className="text-muted-foreground text-sm font-medium pl-4">
           {investorCount > 0
-            ? `${investorCount.toLocaleString()} firms · ${contactCount.toLocaleString()} contacts · ${portfolioCount.toLocaleString()} portfolio cos · ${grantsCount.toLocaleString()} grants`
+            ? `${investorCount.toLocaleString()} firms · ${contactCount.toLocaleString()} contacts · ${grantsCount.toLocaleString()} grants`
             : 'Find the right investors for your company'}
         </p>
       </div>
