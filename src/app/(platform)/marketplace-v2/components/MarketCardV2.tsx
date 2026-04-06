@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useState, useCallback, useEffect } from 'react'
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -260,7 +261,13 @@ export const MarketCardV2 = memo(function MarketCardV2({
 
                         {/* Title */}
                         <h3 className="text-base font-bold tracking-tight text-foreground line-clamp-1">
-                            {listing.title}
+                            <Link
+                                href={`/marketplace/${listing.id}`}
+                                className="hover:text-international-orange transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {listing.title}
+                            </Link>
                         </h3>
                     </div>
                 </div>
@@ -371,13 +378,24 @@ export const MarketCardV2 = memo(function MarketCardV2({
                             size="sm"
                             variant="default"
                             className="gap-1.5 shrink-0"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onViewDetail(listing)
-                            }}
+                            asChild
                         >
-                            {getCTALabel(listing.category)}
-                            <ArrowRight className="w-3.5 h-3.5" />
+                            <Link
+                                href={`/marketplace/${listing.id}`}
+                                onClick={(e) => {
+                                    // Left-click without modifier: use dialog/detail view
+                                    if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        onViewDetail(listing)
+                                    } else {
+                                        e.stopPropagation()
+                                    }
+                                }}
+                            >
+                                {getCTALabel(listing.category)}
+                                <ArrowRight className="w-3.5 h-3.5" />
+                            </Link>
                         </Button>
                     </div>
                 </div>
