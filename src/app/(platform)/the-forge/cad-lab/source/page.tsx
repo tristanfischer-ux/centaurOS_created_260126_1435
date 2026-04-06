@@ -23,6 +23,7 @@ import {
   FileDown,
 } from "lucide-react"
 
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
@@ -749,11 +750,33 @@ export default function SourcePage(): React.ReactNode {
                 </CardContent>
               </Card>
             ) : (
-              <SupplierProcurementFlow
-                modules={eligibleModules}
-                diagnosticAnswers={diagnosticAnswers}
-                aiCostEstimates={aiCostEstimates}
-              />
+              <>
+                <SupplierProcurementFlow
+                  modules={eligibleModules}
+                  diagnosticAnswers={diagnosticAnswers}
+                  aiCostEstimates={aiCostEstimates}
+                />
+
+                {/* Link to marketplace for broader supplier discovery */}
+                {(() => {
+                  const processes = new Set<string>()
+                  for (const moduleAnswers of Object.values(diagnosticAnswers || {})) {
+                    const ans = moduleAnswers as Record<string, string> | null
+                    if (ans?.mfg_process) processes.add(ans.mfg_process)
+                  }
+                  if (processes.size === 0) return null
+                  return (
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      <Link
+                        href={`/marketplace?q=${encodeURIComponent(Array.from(processes).join(' '))}`}
+                        className="text-international-orange hover:underline"
+                      >
+                        Browse more suppliers in the marketplace →
+                      </Link>
+                    </p>
+                  )
+                })()}
+              </>
             )}
 
             {/* Forward navigation — visible when manufacturing orders exist */}

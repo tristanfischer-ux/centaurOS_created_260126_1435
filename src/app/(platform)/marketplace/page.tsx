@@ -7,7 +7,9 @@ import { getFoundryContext } from '@/actions/foundry-context'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
 import { ProcessDiscoveryGrid } from '@/components/marketplace/process-discovery-grid'
+import { ProjectContextBanner } from '@/components/marketplace/project-context-banner'
 import { getProcessCategoryCounts } from '@/actions/marketplace-process-discovery'
+import { getActiveProjectContext } from '@/actions/marketplace-project-context'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -47,7 +49,7 @@ export default async function MarketplacePage() {
     let stats: MarketplaceStats | null = null
 
     // Fetch first page of listings (Products + Services), foundry context, and stats in parallel
-    const [searchResult, foundryContext, statsResult, processCountsResult] = await Promise.allSettled([
+    const [searchResult, foundryContext, statsResult, processCountsResult, projectContextResult] = await Promise.allSettled([
         searchMarketplaceListings({
             categories: ['Products', 'Services'],
             page: 1,
@@ -57,6 +59,7 @@ export default async function MarketplacePage() {
         getFoundryContext(),
         getMarketplaceStats(),
         getProcessCategoryCounts(),
+        getActiveProjectContext(),
     ])
 
     if (searchResult.status === 'fulfilled') {
@@ -77,6 +80,7 @@ export default async function MarketplacePage() {
     }
 
     const processGroups = processCountsResult.status === 'fulfilled' ? processCountsResult.value : []
+    const projectContext = projectContextResult.status === 'fulfilled' ? projectContextResult.value : null
 
     // Fetch foundry context for optional features
     let foundryId: string | null = ctx?.foundryId || null
@@ -153,6 +157,11 @@ export default async function MarketplacePage() {
                 context={{ type: 'general', title: 'Marketplace', description: briefingContext, metadata: {} }}
                 storageKey="marketplace"
             />
+
+            {/* Project context banner — connects CAD Lab projects to supplier discovery */}
+            {projectContext && (
+                <ProjectContextBanner context={projectContext} />
+            )}
 
             {/* Process-based discovery grid */}
             {processGroups.length > 0 && (

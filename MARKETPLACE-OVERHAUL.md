@@ -146,13 +146,35 @@ The **1,471 demo listings** are pre-Nightshift seed data from early development.
 
 After demo filtering, users see **~13,710 real supplier listings**.
 
-## Verification Checklist
+## Verification Checklist (Original Overhaul)
 
-- [ ] No "For You" tab on marketplace
-- [ ] Stats count matches category pill count (Products+Services only, no People)
-- [ ] Supplier cards show certifications, location, industries
-- [ ] Search returns relevant results for "CNC machining" and "sheet metal fabrication"
-- [ ] Semantic search is working (embeddings populated)
-- [ ] Page loads fast (< 2s)
-- [ ] `npx tsc --noEmit` clean (no new errors)
-- [ ] `npm run lint` clean (no new errors)
+- [x] No "For You" tab on marketplace — commit `3fdc90ad`
+- [x] Stats count matches category pill count — commit `3fdc90ad` (exact count query)
+- [x] Supplier cards show certifications, location, company size — commit `3fdc90ad`
+- [x] Semantic search working — 16,623/22,629 embeddings (73%)
+- [x] Demo suppliers filtered out — commit `42da821d`
+- [x] Card titles link-navigable for new tabs — commit `6d4bc462`
+- [x] Semantic filter leakage fixed — commit `42da821d`
+- [x] tsc + lint clean
+
+---
+
+## Procurement Upgrade — Round 1: Process Discovery
+
+**Commit:** `0968fc76`
+
+- [x] Server action `getProcessCategoryCounts()` with 5-min cache
+- [x] ProcessDiscoveryGrid component (responsive 2/3/4/5 col)
+- [x] Integrated above MarketplaceBrowse on marketplace page
+- [x] ?subcategory=X,Y,Z URL param pre-populates filter
+- [x] Pattern matching verified for 22 test subcategories
+- [x] 10 process groups + "Other" for generic subcategories
+- [x] tsc + lint clean, committed + pushing
+
+## Procurement Upgrade — Round 2: Project Context
+
+_(In progress)_
+
+## Procurement Upgrade — Round 3: Email RFQ
+
+_(Not started)_
