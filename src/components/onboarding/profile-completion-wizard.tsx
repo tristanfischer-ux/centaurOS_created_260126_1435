@@ -126,9 +126,11 @@ function TagInput({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const filteredSuggestions = suggestions.filter(
-    s => s.toLowerCase().includes(inputValue.toLowerCase()) && !value.includes(s)
-  ).slice(0, 6)
+  // Show all unselected suggestions, filtered by typed text if any
+  const availableSuggestions = suggestions.filter(s => !value.includes(s))
+  const filteredDropdown = inputValue.length > 0
+    ? availableSuggestions.filter(s => s.toLowerCase().includes(inputValue.toLowerCase())).slice(0, 6)
+    : []
 
   const addTag = useCallback((tag: string) => {
     const trimmed = tag.trim()
@@ -143,6 +145,22 @@ function TagInput({
   const removeTag = useCallback((tag: string) => {
     onChange(value.filter(t => t !== tag))
   }, [value, onChange])
+
+  // INTENT: Flush any typed-but-not-entered text before parent validates.
+  // Called by the wizard's goNext before checking required minimums.
+  const flushInput = useCallback(() => {
+    if (inputValue.trim()) {
+      addTag(inputValue)
+    }
+  }, [inputValue, addTag])
+
+  // Expose flush via ref so parent can call it
+  useEffect(() => {
+    if (inputRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (inputRef.current as any).__flushTag = flushInput
+    }
+  }, [flushInput])
 
   return (
     <div className="space-y-2">
@@ -164,6 +182,7 @@ function TagInput({
       <div className="relative">
         <Input
           ref={inputRef}
+          data-tag-input="true"
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value)
@@ -184,9 +203,9 @@ function TagInput({
           disabled={value.length >= maxTags}
           className="bg-card"
         />
-        {showSuggestions && filteredSuggestions.length > 0 && inputValue.length > 0 && (
+        {showSuggestions && filteredDropdown.length > 0 && (
           <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg py-1">
-            {filteredSuggestions.map(s => (
+            {filteredDropdown.map(s => (
               <button
                 key={s}
                 type="button"
@@ -199,14 +218,16 @@ function TagInput({
           </div>
         )}
       </div>
-      {value.length === 0 && (
+      {/* INTENT: Always show clickable suggestion chips (not just when empty).
+          Users can click these instead of typing. Chips that are already selected are hidden. */}
+      {availableSuggestions.length > 0 && value.length < maxTags && (
         <div className="flex flex-wrap gap-1.5">
-          {suggestions.slice(0, 8).map(s => (
+          {availableSuggestions.slice(0, 12).map(s => (
             <button
               key={s}
               type="button"
               onClick={() => addTag(s)}
-              className="text-xs px-2 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-international-orange hover:text-international-orange transition-colors"
+              className="text-xs px-2.5 py-1.5 rounded-full border border-dashed border-border text-muted-foreground hover:border-international-orange hover:text-international-orange hover:bg-international-orange/5 transition-colors"
             >
               + {s}
             </button>
@@ -303,6 +324,15 @@ export function ProfileCompletionWizard({
   }, [currentStep, headline, bio, skills, industries, yearsExperience, availabilityType])
 
   const goNext = useCallback(async () => {
+    // INTENT: Auto-add any typed-but-not-entered text in tag inputs before validating.
+    // Users often type a skill then click Continue without pressing Enter.
+    document.querySelectorAll<HTMLInputElement>('input[data-tag-input]').forEach(el => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((el as any).__flushTag) (el as any).__flushTag()
+    })
+    // Wait one tick for state to update after flush
+    await new Promise(r => setTimeout(r, 0))
+
     if (!validateStep()) return
 
     if (stepIndex < STEPS.length - 1) {
