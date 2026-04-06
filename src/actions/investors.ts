@@ -930,7 +930,7 @@ export const getInvestorStats = unstable_cache(
       avgQuality: Math.round(avgQuality * 100) / 100,
     }
   },
-  ['investor-stats'],
+  ['investor-stats-v3'],
   { revalidate: 60 }
 )
 

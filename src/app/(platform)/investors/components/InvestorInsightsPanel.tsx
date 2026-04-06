@@ -142,7 +142,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
       {!collapsed && (
         <div className="p-5 space-y-6">
           {/* Row 1: Key stat cards — matching Forge Capital overview */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             <StatCard
               icon={<Building2 className="h-4 w-4 text-international-orange" />}
               value={stats.total}
@@ -167,11 +167,6 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
               icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
               value={stats.portfolioCompanyCount}
               label="Portfolio Cos"
-            />
-            <StatCard
-              icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
-              value={stats.hwFit7PlusCount}
-              label="Hardware Fit 7+"
             />
             <StatCard
               icon={<Award className="h-4 w-4 text-international-orange" />}

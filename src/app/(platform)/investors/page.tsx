@@ -141,16 +141,23 @@ export default async function InvestorDirectoryPage() {
     // Non-critical — Fiona falls back to generic advice
   }
 
-  // FLOW: Fetch tab counts for Contacts, Portfolio, Grants
+  // FLOW: Fetch tab counts for Investors, Contacts, Portfolio, Grants
+  // INTENT: Use direct count queries (not cached stats) for accurate tab labels
+  let investorCount = 0
   let contactCount = 0
+  let portfolioCount = 0
   let grantsCount = 0
   try {
     const supabase = await createClient()
-    const [contactResult, grantsResult] = await Promise.allSettled([
+    const [investorResult, contactResult, portfolioResult, grantsResult] = await Promise.allSettled([
+      supabase.from('marketplace_listings').select('id', { count: 'exact', head: true }).eq('category', 'Finance'),
       supabase.from('vc_pe_contacts').select('id', { count: 'exact', head: true }),
+      supabase.from('investor_portfolio_companies').select('id', { count: 'exact', head: true }),
       supabase.from('investor_grants').select('id', { count: 'exact', head: true }),
     ])
+    if (investorResult.status === 'fulfilled') investorCount = investorResult.value.count ?? 0
     if (contactResult.status === 'fulfilled') contactCount = contactResult.value.count ?? 0
+    if (portfolioResult.status === 'fulfilled') portfolioCount = portfolioResult.value.count ?? 0
     if (grantsResult.status === 'fulfilled') grantsCount = grantsResult.value.count ?? 0
   } catch {
     // Non-critical — tab counts just won't show
@@ -186,8 +193,8 @@ export default async function InvestorDirectoryPage() {
           <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">Investors</h1>
         </div>
         <p className="text-muted-foreground text-sm font-medium pl-4">
-          {stats
-            ? `${stats.total.toLocaleString()} firms · ${contactCount.toLocaleString()} contacts · ${stats.portfolioCompanyCount.toLocaleString()} portfolio cos · ${grantsCount.toLocaleString()} grants`
+          {investorCount > 0
+            ? `${investorCount.toLocaleString()} firms · ${contactCount.toLocaleString()} contacts · ${portfolioCount.toLocaleString()} portfolio cos · ${grantsCount.toLocaleString()} grants`
             : 'Find the right investors for your company'}
         </p>
       </div>
@@ -206,29 +213,37 @@ export default async function InvestorDirectoryPage() {
 
       {/* Tabs: Overview, For You, Investors, Grants, Contacts, Portfolio */}
       <InvestorPageTabs
-        investorCount={stats?.total ?? 0}
+        investorCount={investorCount}
         contactCount={contactCount}
-        portfolioCount={stats?.portfolioCompanyCount ?? 0}
+        portfolioCount={portfolioCount}
         grantsCount={grantsCount}
         overviewContent={
           stats && <InvestorInsightsPanel stats={stats} grantsCount={grantsCount} />
         }
+        forYouContent={
+          <Suspense fallback={null}>
+            <InvestorSearchHeroClient
+              initialFirms={initialFirms}
+              initialTotal={initialTotal}
+              initialHasMore={initialHasMore}
+              initialMatchScores={matchScores}
+              initialShortlistIds={shortlistIds}
+              access={access}
+              productSectors={productSectors}
+              companyContext={companyContext}
+            />
+          </Suspense>
+        }
         investorsContent={
-          <>
-            {/* Semantic search hero */}
-            <Suspense fallback={null}>
-              <InvestorSearchHeroClient
-                initialFirms={initialFirms}
-                initialTotal={initialTotal}
-                initialHasMore={initialHasMore}
-                initialMatchScores={matchScores}
-                initialShortlistIds={shortlistIds}
-                access={access}
-                productSectors={productSectors}
-                companyContext={companyContext}
-              />
-            </Suspense>
-          </>
+          <InvestorBrowser
+            initialFirms={initialFirms}
+            initialTotal={initialTotal}
+            initialHasMore={initialHasMore}
+            initialMatchScores={matchScores}
+            initialShortlistIds={shortlistIds}
+            access={access}
+            productSectors={productSectors}
+          />
         }
         contactsContent={
           <Suspense fallback={<Skeleton className="h-96 w-full" />}>

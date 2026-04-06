@@ -11,12 +11,12 @@
 import { useState, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { BarChart3, Sparkles, Grid3X3, Award, Users, Briefcase } from "lucide-react"
-import { InvestorMatchView } from "./InvestorMatchView"
 
 type TabId = "overview" | "for-you" | "investors" | "grants" | "contacts" | "portfolio"
 
 interface InvestorPageTabsProps {
   overviewContent?: ReactNode
+  forYouContent?: ReactNode
   investorsContent: ReactNode
   contactsContent?: ReactNode
   portfolioContent?: ReactNode
@@ -44,6 +44,7 @@ const TAB_CONFIG: {
 
 export function InvestorPageTabs({
   overviewContent,
+  forYouContent,
   investorsContent,
   contactsContent,
   portfolioContent,
@@ -94,7 +95,7 @@ export function InvestorPageTabs({
 
       {/* Tab content */}
       {activeTab === "overview" && (overviewContent ?? <div />)}
-      {activeTab === "for-you" && <InvestorMatchView />}
+      {activeTab === "for-you" && (forYouContent ?? <div />)}
       {activeTab === "investors" && <div className="space-y-6">{investorsContent}</div>}
       {activeTab === "grants" && (grantsContent ?? <TabPlaceholder label="Grants" />)}
       {activeTab === "contacts" && (contactsContent ?? <TabPlaceholder label="Contacts" />)}
