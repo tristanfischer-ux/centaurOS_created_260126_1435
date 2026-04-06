@@ -662,11 +662,11 @@ export function OrbitSVG({
       <rect x={CX - 48} y={CY - SPEC_R - 3} width={96} height={16} rx={8} fill="#F3E8FF" />
       <text x={CX} y={CY - SPEC_R + 8} textAnchor="middle" fill="#7C3AED" fontSize="8.5" fontWeight="800" letterSpacing="2.5">SPECIALISTS</text>
 
-      <rect x={CX - 44} y={CY - EXEC_R - 3} width={88} height={16} rx={8} fill="white" />
-      <text x={CX} y={CY - EXEC_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">EXECUTIVES</text>
+      <rect x={CX - 48} y={CY - EXEC_R - 3} width={96} height={16} rx={8} fill="white" />
+      <text x={CX} y={CY - EXEC_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">LEADERSHIP</text>
 
-      <rect x={CX - 48} y={CY - APPR_R - 3} width={96} height={16} rx={8} fill="white" />
-      <text x={CX} y={CY - APPR_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">APPRENTICES</text>
+      <rect x={CX - 56} y={CY - APPR_R - 3} width={112} height={16} rx={8} fill="white" />
+      <text x={CX} y={CY - APPR_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">TEAM MEMBERS</text>
 
       <rect x={CX - 48} y={CY - BOUNDARY_R - 19} width={96} height={16} rx={8} fill="#EEF2FF" />
       <text x={CX} y={CY - BOUNDARY_R - 8} textAnchor="middle" fill="#4F46E5" fontSize="9" fontWeight="800" letterSpacing="3">MARKETPLACE</text>

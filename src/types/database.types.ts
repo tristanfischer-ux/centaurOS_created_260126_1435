@@ -3781,13 +3781,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "buyer_intent_signals_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "buyer_intent_signals_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
@@ -4357,7 +4350,9 @@ export type Database = {
           name: string
           notes: string | null
           probability_pct: number
+          product_id: string | null
           sort_order: number
+          source: string | null
           source_type: string
           updated_at: string
         }
@@ -4375,7 +4370,9 @@ export type Database = {
           name: string
           notes?: string | null
           probability_pct?: number
+          product_id?: string | null
           sort_order?: number
+          source?: string | null
           source_type: string
           updated_at?: string
         }
@@ -4393,7 +4390,9 @@ export type Database = {
           name?: string
           notes?: string | null
           probability_pct?: number
+          product_id?: string | null
           sort_order?: number
+          source?: string | null
           source_type?: string
           updated_at?: string
         }
@@ -4403,6 +4402,13 @@ export type Database = {
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cash_in_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -4424,7 +4430,9 @@ export type Database = {
           name: string
           notes: string | null
           pnl_category: string
+          product_id: string | null
           sort_order: number
+          source: string | null
           updated_at: string
         }
         Insert: {
@@ -4443,7 +4451,9 @@ export type Database = {
           name: string
           notes?: string | null
           pnl_category?: string
+          product_id?: string | null
           sort_order?: number
+          source?: string | null
           updated_at?: string
         }
         Update: {
@@ -4462,7 +4472,9 @@ export type Database = {
           name?: string
           notes?: string | null
           pnl_category?: string
+          product_id?: string | null
           sort_order?: number
+          source?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4471,6 +4483,13 @@ export type Database = {
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cash_out_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -5108,13 +5127,6 @@ export type Database = {
             referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "crop_advisor_alerts_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
         ]
       }
       currency_exchange_rates: {
@@ -5268,6 +5280,56 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_briefs: {
+        Row: {
+          brief_content: Json
+          cad_lab_project_id: string | null
+          created_at: string
+          foundry_id: string
+          id: string
+          product_id: string
+          review_notes: string | null
+          reviewed_by: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          brief_content?: Json
+          cad_lab_project_id?: string | null
+          created_at?: string
+          foundry_id: string
+          id?: string
+          product_id: string
+          review_notes?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          brief_content?: Json
+          cad_lab_project_id?: string | null
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          product_id?: string
+          review_notes?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_briefs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -8366,6 +8428,7 @@ export type Database = {
           created_at: string
           description: string
           domain_id: string | null
+          embedding: string | null
           extraction_metadata: Json
           foundry_id: string
           id: string
@@ -8393,6 +8456,7 @@ export type Database = {
           created_at?: string
           description?: string
           domain_id?: string | null
+          embedding?: string | null
           extraction_metadata?: Json
           foundry_id: string
           id?: string
@@ -8420,6 +8484,7 @@ export type Database = {
           created_at?: string
           description?: string
           domain_id?: string | null
+          embedding?: string | null
           extraction_metadata?: Json
           foundry_id?: string
           id?: string
@@ -12473,15 +12538,7 @@ export type Database = {
           volume_kg?: number
           week_start?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "price_index_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       process_capabilities: {
         Row: {
@@ -12567,6 +12624,56 @@ export type Database = {
         }
         Relationships: []
       }
+      product_iterations: {
+        Row: {
+          changes_made: Json | null
+          convergence_delta: number | null
+          convergence_status: string | null
+          created_at: string
+          foundry_id: string
+          hypothesis: string | null
+          id: string
+          iteration_number: number
+          outcome: string | null
+          pareto_scores: Json
+          product_id: string
+        }
+        Insert: {
+          changes_made?: Json | null
+          convergence_delta?: number | null
+          convergence_status?: string | null
+          created_at?: string
+          foundry_id: string
+          hypothesis?: string | null
+          id?: string
+          iteration_number?: number
+          outcome?: string | null
+          pareto_scores?: Json
+          product_id: string
+        }
+        Update: {
+          changes_made?: Json | null
+          convergence_delta?: number | null
+          convergence_status?: string | null
+          created_at?: string
+          foundry_id?: string
+          hypothesis?: string | null
+          id?: string
+          iteration_number?: number
+          outcome?: string | null
+          pareto_scores?: Json
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_iterations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_reference_dimensions: {
         Row: {
           common_materials: string[] | null
@@ -12650,25 +12757,58 @@ export type Database = {
       }
       products: {
         Row: {
-          category: string
+          cad_lab_project_id: string | null
           created_at: string
+          created_by: string
+          description: string | null
+          foundry_id: string
+          fundability_score: Json | null
+          hero_image_url: string | null
           id: string
+          lifecycle: string
+          market_assessment: Json | null
           name: string
-          slug: string
+          product_synthesis: Json | null
+          target_monthly_units: number | null
+          unit_economics: Json | null
+          unit_price_pence: number | null
+          updated_at: string
         }
         Insert: {
-          category: string
+          cad_lab_project_id?: string | null
           created_at?: string
+          created_by: string
+          description?: string | null
+          foundry_id: string
+          fundability_score?: Json | null
+          hero_image_url?: string | null
           id?: string
+          lifecycle?: string
+          market_assessment?: Json | null
           name: string
-          slug: string
+          product_synthesis?: Json | null
+          target_monthly_units?: number | null
+          unit_economics?: Json | null
+          unit_price_pence?: number | null
+          updated_at?: string
         }
         Update: {
-          category?: string
+          cad_lab_project_id?: string | null
           created_at?: string
+          created_by?: string
+          description?: string | null
+          foundry_id?: string
+          fundability_score?: Json | null
+          hero_image_url?: string | null
           id?: string
+          lifecycle?: string
+          market_assessment?: Json | null
           name?: string
-          slug?: string
+          product_synthesis?: Json | null
+          target_monthly_units?: number | null
+          unit_economics?: Json | null
+          unit_price_pence?: number | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -17658,9 +17798,10 @@ export type Database = {
           current_period_end: string
           current_period_start: string
           id: string
+          source: string
           status: string
-          stripe_customer_id: string
-          stripe_subscription_id: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           tier: string
           trial_end: string | null
           updated_at: string | null
@@ -17672,9 +17813,10 @@ export type Database = {
           current_period_end: string
           current_period_start: string
           id?: string
+          source?: string
           status: string
-          stripe_customer_id: string
-          stripe_subscription_id: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           tier: string
           trial_end?: string | null
           updated_at?: string | null
@@ -17686,9 +17828,10 @@ export type Database = {
           current_period_end?: string
           current_period_start?: string
           id?: string
+          source?: string
           status?: string
-          stripe_customer_id?: string
-          stripe_subscription_id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           tier?: string
           trial_end?: string | null
           updated_at?: string | null
@@ -19295,6 +19438,26 @@ export type Database = {
           tags: string[]
         }[]
       }
+      match_knowledge_notes: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_foundry_id: string
+          query_embedding: string
+        }
+        Returns: {
+          confidence: number
+          content: string
+          description: string
+          domain_id: string
+          id: string
+          note_type: string
+          similarity: number
+          source_specialist: string
+          tags: string[]
+          title: string
+        }[]
+      }
       match_marketplace_listings: {
         Args: {
           match_count?: number
@@ -20188,6 +20351,10 @@ export type Database = {
       }
       update_foundry_sector: {
         Args: { p_foundry_id: string; p_sector: string }
+        Returns: undefined
+      }
+      update_knowledge_embedding: {
+        Args: { p_embedding: string; p_note_id: string }
         Returns: undefined
       }
       update_listing_executive: {

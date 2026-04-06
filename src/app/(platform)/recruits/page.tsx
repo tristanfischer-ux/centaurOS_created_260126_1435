@@ -13,7 +13,7 @@
  */
 
 import { getSavedMarketplaceListings } from '@/actions/marketplace'
-import { getEnrichedPeopleListings, enrichPeopleListingsBatch } from '@/actions/people-marketplace'
+import { getEnrichedPeopleListings, getDemoPeopleCount, enrichPeopleListingsBatch } from '@/actions/people-marketplace'
 import { getRecruitsStats } from '@/actions/recruits-stats'
 import { getMatchAlerts } from '@/actions/match-alerts'
 import { createClient } from '@/lib/supabase/server'
@@ -56,7 +56,13 @@ export const revalidate = 30
  * "Browse All" shows the full People marketplace. Harper provides hiring context
  * via the specialist briefing hero.
  */
-export default async function RecruitsPage(): Promise<React.ReactElement> {
+export default async function RecruitsPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>
+}): Promise<React.ReactElement> {
+    const params = await searchParams
+    const showDemo = params.demo === '1'
     let listings: MarketplaceListing[] = []
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
@@ -65,16 +71,18 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
 
     // Fetch enriched People listings, foundry context, stats, and match alerts in parallel
     const parallelResults = await Promise.allSettled([
-        getEnrichedPeopleListings(),
+        getEnrichedPeopleListings({ includeDemo: showDemo }),
         getFoundryContext(),
         getRecruitsStats(),
         getMatchAlerts({ unreadOnly: true, limit: 8 }),
+        getDemoPeopleCount(),
     ])
 
     const enrichedResult = parallelResults[0]
     const foundryContext = parallelResults[1]
     const statsResult = parallelResults[2]
     const alertsResult = parallelResults[3]
+    const demoCountResult = parallelResults[4]
 
     if (enrichedResult.status === 'fulfilled') {
         listings = enrichedResult.value
@@ -82,6 +90,7 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
     if (alertsResult.status === 'fulfilled') {
         matchAlerts = alertsResult.value
     }
+    const demoPeopleCount = demoCountResult.status === 'fulfilled' ? demoCountResult.value : 0
 
     const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
     const recruitsStats = statsResult.status === 'fulfilled' ? statsResult.value : null
@@ -195,6 +204,8 @@ Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
                         />
                     </div>
                 }
+                demoPeopleCount={demoPeopleCount}
+                showDemo={showDemo}
             />
         </div>
     )

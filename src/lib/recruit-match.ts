@@ -122,6 +122,36 @@ const ADVISORY_FUNCTION_MAP: Record<string, string[]> = {
 }
 
 // ---------------------------------------------------------------------------
+// Exported helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Determines the primary function category for a person based on their role,
+ * title, and skills. Used to set marketplace listing subcategory.
+ *
+ * @returns One of: Finance, Operations, Engineering, Sales, Marketing, HR, Legal, Product, or "General"
+ */
+export function determineFunctionCategory(
+  role: string,
+  title: string,
+  skills: string[] = []
+): string {
+  const text = [role, title, ...skills].join(' ').toLowerCase()
+  let bestMatch = 'General'
+  let bestCount = 0
+
+  for (const [fn, keywords] of Object.entries(FUNCTION_KEYWORDS)) {
+    const count = keywords.filter(kw => text.includes(kw)).length
+    if (count > bestCount) {
+      bestCount = count
+      bestMatch = fn
+    }
+  }
+
+  return bestMatch
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

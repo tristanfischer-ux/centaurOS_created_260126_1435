@@ -117,7 +117,10 @@ function listingToCandidate(
   colorIndex: number
 ): MarketplaceCandidate {
   const attrs = listing.attributes || {}
-  const isExec = listing.subcategory === 'Executive'
+  // DECISION: With subcategory now being function category (Engineering, Finance, etc.),
+  // derive exec/apprentice type from experience level instead.
+  const yearsExp = (attrs.years_experience as number) || 0
+  const isExec = yearsExp >= 5 || (attrs.role as string || '').toLowerCase().includes('fractional')
   const fnCategory = (attrs.function_category as string) || 'product'
 
   return {

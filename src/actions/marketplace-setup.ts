@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { determineFunctionCategory } from '@/lib/recruit-match'
 
 /**
  * Creates a marketplace listing for a Founder, Executive, or Apprentice during onboarding.
@@ -72,17 +73,18 @@ export async function createMarketplacePresence(formData: FormData): Promise<{
     return { success: false, error: 'Please provide a headline for your listing' }
   }
 
-  // Determine subcategory based on role
-  const subcategory = profile.role === 'Founder'
-    ? 'Founder'
-    : profile.role === 'Executive'
-      ? 'Fractional Executive'
-      : 'Apprentice'
-
   // Parse skills into an array
   const skillsArray = skills
     ? skills.split(',').map((s: string) => s.trim()).filter(Boolean)
     : []
+
+  // DECISION: Subcategory is the person's function category (Engineering, Finance, etc.)
+  // derived from their headline and skills. More useful than the old Executive/Apprentice label.
+  const subcategory = determineFunctionCategory(
+    (profile.role as string) || '',
+    headline,
+    skillsArray
+  )
 
   // Build attributes — availability is optional for Founders
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -22,6 +22,7 @@ import {
   ChevronUp,
   MapPin,
   Building2,
+  Search,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -521,6 +522,21 @@ export function RecruitMatchView() {
       {/* Profile incomplete gate */}
       {phase === 'incomplete_profile' && (
         <ProfileIncompleteCard missingFields={missingFields} />
+      )}
+
+      {/* Empty state — complete but no real matches */}
+      {phase === 'complete' && matches.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center space-y-3">
+            <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+              <Search className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground">No talent matches yet</p>
+            <p className="text-xs text-muted-foreground">
+              Check back as more professionals join the platform. You can still browse all candidates in the Browse tab.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Match cards */}

@@ -476,7 +476,7 @@ export function OrbitSidePanel({
                       color: c.type === 'exec' ? '#4F46E5' : '#7C3AED',
                     }}
                   >
-                    {c.type === 'exec' ? 'EXEC' : 'APPR'}
+                    {c.type === 'exec' ? 'SR' : 'JR'}
                   </span>
                 </div>
                 {/* Action buttons for each candidate */}

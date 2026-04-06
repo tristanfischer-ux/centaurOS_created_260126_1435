@@ -279,6 +279,7 @@ export async function POST(request: Request) {
             .from("marketplace_listings")
             .select("id, title, description, subcategory, attributes, is_verified")
             .eq("category", "People")
+            .eq("is_demo", false)
             .range(offset, offset + pageSize - 1)
 
           if (error || !data || data.length === 0) break

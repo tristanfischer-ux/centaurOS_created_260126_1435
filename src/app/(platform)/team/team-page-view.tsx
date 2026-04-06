@@ -203,6 +203,8 @@ interface TeamPageViewProps {
     functionCategoryMap?: Record<string, string>
     /** Business function definitions (custom or default) */
     orbitFunctions?: BusinessFunction[]
+    /** Function categories with coverage gaps — marketplace candidates for these are prioritised */
+    gapFunctions?: string[]
     /** Foundry ID for editing functions */
     foundryId?: string
     /** Hiring requirements from business plan analysis */
@@ -239,6 +241,7 @@ export function TeamPageView({
         { id: 'operations', label: 'Operations', short: 'OPS' },
         { id: 'product', label: 'Product', short: 'PROD' },
     ],
+    gapFunctions = [],
     foundryId,
     hiringRequirements = [],
     retainersWithStats = [],
@@ -264,7 +267,7 @@ export function TeamPageView({
     const totalMembers = founders.length + executives.length + apprentices.length
     useRegisterScreenContext(useMemo(() => ({
         pageTitle: 'Team',
-        summary: `Viewing the team page. ${totalMembers} team members: ${founders.length} founders, ${executives.length} executives, ${apprentices.length} apprentices. ${teams.length} teams.${insights?.overloadedMembers?.length ? ` ${insights.overloadedMembers.length} overloaded members.` : ''}${insights?.overdueTaskCount ? ` ${insights.overdueTaskCount} overdue tasks.` : ''}`,
+        summary: `Viewing the team page. ${totalMembers} team members: ${founders.length + executives.length} leadership (${founders.length} founders, ${executives.length} executives), ${apprentices.length} team members. ${teams.length} teams.${insights?.overloadedMembers?.length ? ` ${insights.overloadedMembers.length} overloaded members.` : ''}${insights?.overdueTaskCount ? ` ${insights.overdueTaskCount} overdue tasks.` : ''}`,
         entities: [
             ...founders.map(m => ({ type: 'founder', title: m.full_name || 'Unknown', status: 'active' })),
             ...executives.map(m => ({ type: 'executive', title: m.full_name || 'Unknown', status: 'active' })),
@@ -366,7 +369,7 @@ export function TeamPageView({
     // ── Harper live AI briefing ──────────────────────────────
     const harperBriefingContext = useMemo(() => {
         const parts: string[] = []
-        parts.push(`${totalPeople} team members: ${founders.length} founders, ${executives.length} executives, ${apprentices.length} apprentices`)
+        parts.push(`${totalPeople} team members: ${founders.length + executives.length} leadership, ${apprentices.length} team members`)
         parts.push(`${totalTeams} teams formed`)
         parts.push(`Average capacity: ${avgCapacity}%`)
         if (insights?.overloadedMembers?.length) {
@@ -433,17 +436,27 @@ export function TeamPageView({
         functions: orbitFunctions,
     })
 
-    /** Marketplace candidates visible in orbit, ordered by function */
+    /** Marketplace candidates visible in orbit, ordered by function.
+     * DECISION: Gap functions get more slots (4) to surface relevant hires.
+     * Covered functions get fewer (2) since the need is less urgent. */
     const orbitVisibleCandidates = useMemo(() => {
-        return orbitFunctions.flatMap(fn => {
+        const gapSet = new Set(gapFunctions)
+        // Sort gap functions first so they get prominence in the orbit
+        const sortedFunctions = [...orbitFunctions].sort((a, b) => {
+            const aIsGap = gapSet.has(a.id) ? 0 : 1
+            const bIsGap = gapSet.has(b.id) ? 0 : 1
+            return aIsGap - bIsGap
+        })
+        return sortedFunctions.flatMap(fn => {
             const candidates = teamData.marketplaceByFunction[fn.id] || []
-            return candidates.slice(0, 4).map(c => ({
+            const limit = gapSet.has(fn.id) ? 4 : 2
+            return candidates.slice(0, limit).map(c => ({
                 ...c,
                 functionLabel: fn.label,
                 functionId: fn.id,
             }))
         })
-    }, [teamData.marketplaceByFunction, orbitFunctions])
+    }, [teamData.marketplaceByFunction, orbitFunctions, gapFunctions])
 
     // ─── Search Filter ─────────────────────────
 
@@ -469,6 +482,8 @@ export function TeamPageView({
     const filteredFounders = filterMembers(founders)
     const filteredExecutives = filterMembers(executives)
     const filteredApprentices = filterMembers(apprentices)
+    const filteredLeadership = [...filteredFounders, ...filteredExecutives]
+    const filteredTeamMembers = filteredApprentices
     const filteredTeams = filterTeams(teams)
 
     // ─── Handlers ──────────────────────────────
@@ -747,7 +762,7 @@ export function TeamPageView({
                                                     variant="info"
                                                     className="text-[10px]"
                                                 >
-                                                    {c.type === 'exec' ? 'Executive' : 'Apprentice'}
+                                                    {c.type === 'exec' ? 'Senior' : 'Junior'}
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground text-xs font-medium">
@@ -1216,22 +1231,16 @@ export function TeamPageView({
                     <TeamAnalytics members={allMembers} />
 
                     <MemberSection
-                        title="Founders"
-                        subtitle="Decision makers"
+                        title="Leadership"
+                        subtitle="Founders and executives"
                         accentColor="bg-international-orange"
-                        members={filteredFounders}
+                        members={filteredLeadership}
                     />
                     <MemberSection
-                        title="Executives"
-                        subtitle="Evaluators"
-                        accentColor="bg-international-orange/60"
-                        members={filteredExecutives}
-                    />
-                    <MemberSection
-                        title="Apprentices"
-                        subtitle="Executors"
+                        title="Team Members"
+                        subtitle="Contributors"
                         accentColor="bg-muted-foreground"
-                        members={filteredApprentices}
+                        members={filteredTeamMembers}
                     />
 
                     {/* Marketplace Candidates — same set as orbit, ordered by function */}
@@ -1251,22 +1260,16 @@ export function TeamPageView({
                     <TeamAnalytics members={allMembers} />
 
                     <MemberSection
-                        title="Founders"
-                        subtitle="Decision makers"
+                        title="Leadership"
+                        subtitle="Founders and executives"
                         accentColor="bg-international-orange"
-                        members={filteredFounders}
+                        members={filteredLeadership}
                     />
                     <MemberSection
-                        title="Executives"
-                        subtitle="Evaluators"
-                        accentColor="bg-international-orange/60"
-                        members={filteredExecutives}
-                    />
-                    <MemberSection
-                        title="Apprentices"
-                        subtitle="Executors"
+                        title="Team Members"
+                        subtitle="Contributors"
                         accentColor="bg-muted-foreground"
-                        members={filteredApprentices}
+                        members={filteredTeamMembers}
                     />
 
                     {/* Marketplace Candidates — same set as orbit, ordered by function */}

@@ -304,7 +304,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/apprenticeship',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'demo',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'Launched the Apprenticeship program for tracking on-the-job training. Manage apprentice progress, competencies, and milestones.'
     },
@@ -462,7 +462,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/guild',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'demo',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'The Guild connects executives with apprentices. Browse the apprentice pool, assign apprentices to projects, and attend networking events.'
     },

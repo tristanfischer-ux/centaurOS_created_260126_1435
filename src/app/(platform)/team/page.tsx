@@ -160,10 +160,12 @@ export default async function TeamPage() {
     })
 
     // Fetch marketplace People listings (for orbit outer ring + card view)
+    // DECISION: Exclude demo/sample listings — only show real people as potential hires
     const { data: marketplacePeople, error: marketplaceError } = await supabase
         .from('marketplace_listings')
         .select('id, title, subcategory, description, attributes')
         .eq('category', 'People')
+        .eq('is_demo', false)
 
     if (marketplaceError) {
         console.error('[TeamPage] Failed to fetch marketplace listings:', { error: marketplaceError.message })
@@ -437,6 +439,7 @@ export default async function TeamPage() {
             }))}
             functionCategoryMap={functionCategoryMap}
             orbitFunctions={orbitFunctions}
+            gapFunctions={Object.keys(coverageByCategoryMap).filter(cat => !coverageByCategoryMap[cat].hasPartialOrCovered)}
             foundryId={foundry_id}
             hiringRequirements={hiringRequirements}
             retainersWithStats={retainersWithStats}

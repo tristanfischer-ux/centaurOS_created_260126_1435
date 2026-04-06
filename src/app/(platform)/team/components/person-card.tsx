@@ -169,7 +169,7 @@ export function PersonCard({
           <span className="text-xs text-amber-500 font-bold">★ {mkt?.rating}</span>
           <span className="text-xs text-muted-foreground">{mkt?.hourlyRate}</span>
           <span className="text-[11px] text-muted-foreground">
-            {mkt?.type === 'exec' ? 'Executive' : 'Apprentice'}
+            {mkt?.type === 'exec' ? 'Senior' : 'Junior'}
           </span>
         </div>
       )}
