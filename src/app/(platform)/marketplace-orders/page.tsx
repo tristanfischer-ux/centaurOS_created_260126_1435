@@ -1,90 +1,16 @@
-import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { getBuyerOrders } from '@/actions/buyer'
-import { MarketplaceOrdersView } from './marketplace-orders-view'
-import { Skeleton } from '@/components/ui/skeleton'
+import type { Metadata } from 'next'
+import { ComingSoon } from '@/components/coming-soon'
 
-export const revalidate = 30
-
-export const metadata = {
-    title: 'Marketplace Orders | ForgeOS',
-    description: 'View and manage your marketplace orders'
+export const metadata: Metadata = {
+  title: 'Orders | ForgeOS',
+  description: 'View and manage your marketplace orders',
 }
 
-function OrdersLoadingSkeleton() {
-    return (
-        <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-                <div key={i} className="border rounded-xl p-6">
-                    <div className="flex gap-4">
-                        <Skeleton className="h-14 w-14 rounded-full" />
-                        <div className="flex-1 space-y-2">
-                            <Skeleton className="h-5 w-48" />
-                            <Skeleton className="h-4 w-32" />
-                            <div className="flex gap-4 mt-2">
-                                <Skeleton className="h-4 w-20" />
-                                <Skeleton className="h-4 w-24" />
-                                <Skeleton className="h-4 w-28" />
-                            </div>
-                        </div>
-                        <Skeleton className="h-6 w-24" />
-                    </div>
-                </div>
-            ))}
-        </div>
-    )
-}
-
-export default async function MarketplaceOrdersPage() {
-    const supabase = await createClient()
-
-    // Check authentication
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-        redirect('/login?redirect=/marketplace-orders')
-    }
-
-    // Fetch orders for all tabs with limit for pagination
-    const INITIAL_LIMIT = 20
-    const [activeResult, completedResult, cancelledResult] = await Promise.all([
-        getBuyerOrders('active', INITIAL_LIMIT),
-        getBuyerOrders('completed', INITIAL_LIMIT),
-        getBuyerOrders('cancelled', INITIAL_LIMIT)
-    ])
-
-    // Collect any errors
-    const errors = [
-        activeResult.error && `Active orders: ${activeResult.error}`,
-        completedResult.error && `Completed orders: ${completedResult.error}`,
-        cancelledResult.error && `Cancelled orders: ${cancelledResult.error}`,
-    ].filter(Boolean) as string[]
-
-    return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
-                            Marketplace Orders
-                        </h1>
-                    </div>
-                    <p className="text-muted-foreground text-sm font-medium pl-4">
-                        View and manage your marketplace orders
-                    </p>
-                </div>
-            </div>
-
-            <Suspense fallback={<OrdersLoadingSkeleton />}>
-                <MarketplaceOrdersView
-                    activeOrders={activeResult.data ?? []}
-                    completedOrders={completedResult.data ?? []}
-                    cancelledOrders={cancelledResult.data ?? []}
-                    errors={errors}
-                />
-            </Suspense>
-        </div>
-    )
+export default function OrdersPage() {
+  return (
+    <ComingSoon
+      title="Orders"
+      description="View and manage your marketplace orders, track deliverables, and handle payments. Coming soon."
+    />
+  )
 }

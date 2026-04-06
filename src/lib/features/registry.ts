@@ -43,6 +43,7 @@ export type FeatureStatus =
     | 'beta'           // Available but still being refined
     | 'alpha'          // Early access, may have issues
     | 'demo'           // Demonstration / showcase stage
+    | 'coming_soon'    // Visible in nav but not functional yet
     | 'hidden'         // Coded but intentionally hidden from UI
     | 'deprecated'     // Being phased out
 
@@ -304,7 +305,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/apprenticeship',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'beta',
+        status: 'coming_soon',
         isVisibleInNav: true,
         changelog: 'Launched the Apprenticeship program for tracking on-the-job training. Manage apprentice progress, competencies, and milestones.'
     },
@@ -331,6 +332,30 @@ export const FEATURE_REGISTRY: Feature[] = [
         changelog: 'Added timeline view with Gantt chart visualization. See all your tasks and objectives plotted over time with dependencies and milestones.'
     },
     
+    // === Coming Soon ===
+    {
+        id: 'fundraise',
+        name: 'Fundraise',
+        description: 'Track your fundraise pipeline — shortlisted investors, outreach, and coverage',
+        route: '/fundraise',
+        releasedAt: new Date('2026-04-06'),
+        category: 'strategic',
+        section: 'plan',
+        status: 'coming_soon',
+        isVisibleInNav: true,
+    },
+    {
+        id: 'browse',
+        name: 'Browse',
+        description: 'Browse the web with your specialist — get real-time guidance and analysis',
+        route: '/browse',
+        releasedAt: new Date('2026-04-06'),
+        category: 'core',
+        section: 'workshop',
+        status: 'coming_soon',
+        isVisibleInNav: true,
+    },
+
     // === Hidden/Undiscovered Features ===
     {
         id: 'admin-analytics',
@@ -394,7 +419,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/marketplace-orders',
         releasedAt: new Date('2026-01-10'),
         category: 'marketplace',
-        status: 'beta',
+        status: 'coming_soon',
         isVisibleInNav: true,
         changelog: 'Orders management page for viewing order history, tracking active orders, and managing deliverables.'
     },
@@ -462,7 +487,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/guild',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'beta',
+        status: 'coming_soon',
         isVisibleInNav: true,
         changelog: 'The Guild connects executives with apprentices. Browse the apprentice pool, assign apprentices to projects, and attend networking events.'
     },
@@ -539,6 +564,14 @@ export function isRouteAlpha(route: string): boolean {
 export function isRouteDemo(route: string): boolean {
     const feature = FEATURE_REGISTRY.find(f => f.route === route)
     return feature?.status === 'demo'
+}
+
+/**
+ * Check if a route's feature is coming soon
+ */
+export function isRouteComingSoon(route: string): boolean {
+    const feature = FEATURE_REGISTRY.find(f => f.route === route)
+    return feature?.status === 'coming_soon'
 }
 
 /**

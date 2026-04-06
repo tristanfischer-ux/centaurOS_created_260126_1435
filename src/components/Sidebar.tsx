@@ -84,7 +84,7 @@ import { AICreditsBarLoader } from "@/components/ui/ai-credits-bar"
 import { TimeWeekBarLoader } from "@/components/ui/time-week-bar"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
-import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
+import { isRouteAlpha, isRouteBeta, isRouteDemo, isRouteComingSoon } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import { getMyReferralInfo } from "@/actions/referrals"
@@ -125,11 +125,11 @@ const meNavigation = [
 // ─────────────────────────────────────────────────────────────────────────────
 const planNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
-    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your team's collective intelligence — the more you add, the smarter your specialists become" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
     { name: "Red Team", href: "/red-team", icon: Swords, tooltip: "Stress-test decisions with multi-LLM adversarial debate" },
+    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your team's collective intelligence — the more you add, the smarter your specialists become" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,6 +288,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandb
         const isAlpha = isRouteAlpha(item.href)
         const isBeta = isRouteBeta(item.href)
         const isDemo = isRouteDemo(item.href)
+        const isComingSoon = isRouteComingSoon(item.href)
 
         const navLink = (
             <Link
@@ -329,6 +330,11 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandb
                 {isDemo && (
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
                         Demo
+                    </span>
+                )}
+                {isComingSoon && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                        Soon
                     </span>
                 )}
             </Link>
