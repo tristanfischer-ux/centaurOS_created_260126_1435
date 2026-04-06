@@ -120,7 +120,13 @@ export function useMarketplaceState({
     const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
     const [sortBy, setSortBy] = useState<SortOption>('relevance')
     const [savedIds, setSavedIds] = useState<Set<string>>(new Set(initialSavedIds))
-    const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set())
+    // INTENT: Pre-populate subcategory filter from URL params so the process
+    // discovery grid links (?subcategory=X,Y,Z) work on page load.
+    const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(() => {
+        const param = searchParams?.get('subcategory')
+        if (param) return new Set(param.split(',').map(s => s.trim()).filter(Boolean))
+        return new Set<string>()
+    })
     const [showFilters, setShowFilters] = useState(false)
     const [selectedListing, setSelectedListing] = useState<MarketplaceListing | null>(null)
     /** When set, shows "AI interpreted" badge with this explanation. Cleared when user changes filters. */

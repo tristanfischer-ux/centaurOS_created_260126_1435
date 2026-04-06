@@ -6,6 +6,8 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
+import { ProcessDiscoveryGrid } from '@/components/marketplace/process-discovery-grid'
+import { getProcessCategoryCounts } from '@/actions/marketplace-process-discovery'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -45,7 +47,7 @@ export default async function MarketplacePage() {
     let stats: MarketplaceStats | null = null
 
     // Fetch first page of listings (Products + Services), foundry context, and stats in parallel
-    const [searchResult, foundryContext, statsResult] = await Promise.allSettled([
+    const [searchResult, foundryContext, statsResult, processCountsResult] = await Promise.allSettled([
         searchMarketplaceListings({
             categories: ['Products', 'Services'],
             page: 1,
@@ -54,6 +56,7 @@ export default async function MarketplacePage() {
         }),
         getFoundryContext(),
         getMarketplaceStats(),
+        getProcessCategoryCounts(),
     ])
 
     if (searchResult.status === 'fulfilled') {
@@ -72,6 +75,8 @@ export default async function MarketplacePage() {
     } else {
         console.error('[Marketplace] Failed to fetch stats:', statsResult.reason)
     }
+
+    const processGroups = processCountsResult.status === 'fulfilled' ? processCountsResult.value : []
 
     // Fetch foundry context for optional features
     let foundryId: string | null = ctx?.foundryId || null
@@ -149,7 +154,12 @@ export default async function MarketplacePage() {
                 storageKey="marketplace"
             />
 
-            {/* Supplier browse — direct, no tabs */}
+            {/* Process-based discovery grid */}
+            {processGroups.length > 0 && (
+                <ProcessDiscoveryGrid groups={processGroups} totalCount={totalCount} />
+            )}
+
+            {/* Supplier browse */}
             <Suspense fallback={<MarketplaceLoading />}>
                 <MarketplaceBrowse
                     initialListings={listings}
