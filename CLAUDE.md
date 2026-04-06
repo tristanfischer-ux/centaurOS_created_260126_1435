@@ -31,13 +31,25 @@
 
 ## Tracking Documents for Autonomous Work
 
+**The user frequently works away from the terminal and expects fully autonomous execution.** You must be able to control yourself using reference documents — there is no one to catch mistakes.
+
 **For any autonomous multi-phase task, create a markdown tracking document BEFORE starting work.** This is non-negotiable.
 
 1. Create a `TRACKER.md` (or equivalent) in the relevant directory with: phases, checklist items, success criteria, abort criteria, and a score card.
-2. Reference the tracker before and after every major action — it prevents drift and ensures completeness.
+2. **Reference the tracker BEFORE and AFTER every major action.** Before: "what am I supposed to do next?" After: "did I actually do it?" This prevents drift.
 3. The tracker is the contract between "what was planned" and "what was executed." If something isn't on the tracker, it doesn't get skipped silently — it gets added or explicitly descoped.
-4. After completion, the tracker serves as documentation for the user to review what happened and why.
-5. For iterative experiments: include a scoring ledger that tracks metrics across cycles so improvements are measurable, not vibes-based.
+4. **Tick off checklist items as you go.** At the end, every item must be either ticked or explicitly explained as not done.
+5. After completion, the tracker serves as proof-of-work. The user should be able to read it and verify every claim.
+6. For iterative experiments: include a scoring ledger that tracks metrics across cycles so improvements are measurable, not vibes-based.
+
+### Autonomous Execution Protocol
+When the user says "do it without me" or "I'm going away":
+1. **Create the tracking document first** — this is your supervision replacement
+2. **Work in rounds, not marathons** — implement one chunk, red team it, fix issues, then move to the next
+3. **After each round:** update the tracker, commit, push, verify the deployment
+4. **Verify as a user would** — don't just run `tsc`. Check the actual page loads, data appears, features work
+5. **If something fails that you can't fix:** stop, document it in the tracker, and move to the next independent item. Don't get stuck in loops.
+6. **At the end:** review the tracker against the original request. For every item the user asked for, you must be able to point to where it was done.
 
 ---
 
