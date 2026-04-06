@@ -12,7 +12,7 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { embedText } from "@/lib/search/semantic-search"
+import { embedText, composeListingEmbeddingText } from "@/lib/search/semantic-search"
 
 interface BackfillResult {
   total: number
@@ -39,7 +39,7 @@ export async function backfillMarketplaceEmbeddings(): Promise<BackfillResult> {
   // Fetch all listings missing embeddings
   const { data: listings, error } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, subcategory, category")
+    .select("id, title, description, subcategory, category, attributes")
     .is("embedding", null)
 
   if (error) {
@@ -63,14 +63,13 @@ export async function backfillMarketplaceEmbeddings(): Promise<BackfillResult> {
     const batch = listings.slice(i, i + BATCH_SIZE)
 
     const promises = batch.map(async (listing) => {
-      const embeddingText = [
-        listing.title,
-        listing.description,
-        listing.subcategory,
-        listing.category,
-      ]
-        .filter(Boolean)
-        .join(" ")
+      const embeddingText = composeListingEmbeddingText(listing as {
+        title: string
+        description: string | null
+        subcategory: string | null
+        category: string | null
+        attributes: Record<string, unknown> | null
+      })
 
       try {
         const embedding = await embedText(embeddingText)

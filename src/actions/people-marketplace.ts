@@ -50,18 +50,28 @@ export interface EnrichedPersonListing extends MarketplaceListing {
  * Does not need foundry scoping — listing data is public-read via RLS and
  * not tenant-specific. Compare with `findTalentMatches` which uses `withUser`.
  */
-export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing[]> {
+export async function getEnrichedPeopleListings(options?: { includeDemo?: boolean }): Promise<EnrichedPersonListing[]> {
     const supabase = await createClient()
+    const includeDemo = options?.includeDemo ?? false
 
     // AUTH: Verify user is authenticated
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return []
 
     // Fetch People listings
-    const { data: listings, error } = await supabase
+    let query = supabase
         .from('marketplace_listings')
         .select('*')
         .eq('category', 'People')
+
+    if (!includeDemo) {
+        query = query.eq('is_demo', false)
+    } else {
+        // When showing all, real listings first
+        query = query.order('is_demo', { ascending: true })
+    }
+
+    const { data: listings, error } = await query
         .order('is_verified', { ascending: false })
         .limit(200)
 
@@ -186,6 +196,56 @@ export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing
             trustData,
         } as EnrichedPersonListing
     })
+}
+
+/**
+ * Returns the count of demo/sample People listings.
+ * Used to show "Show sample profiles (N)" toggle on the Recruits page.
+ */
+export async function getDemoPeopleCount(): Promise<number> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return 0
+
+    const { count, error } = await supabase
+        .from('marketplace_listings')
+        .select('*', { count: 'exact', head: true })
+        .eq('category', 'People')
+        .eq('is_demo', true)
+
+    if (error) return 0
+    return count ?? 0
+}
+
+/**
+ * Fetches People marketplace listings by specific IDs, enriched with trust signals.
+ * Used by semantic search pre-filtering: RPC returns IDs, this fetches full data.
+ *
+ * @param ids - Array of marketplace_listing UUIDs to fetch
+ * @returns Enriched People listings for the given IDs (preserves order by input)
+ */
+export async function getEnrichedPeopleByIds(ids: string[]): Promise<EnrichedPersonListing[]> {
+    if (ids.length === 0) return []
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    const { data: listings, error } = await supabase
+        .from('marketplace_listings')
+        .select('*')
+        .in('id', ids)
+
+    if (error || !listings || listings.length === 0) return []
+
+    // Reuse the batch enrichment pipeline
+    const enriched = await enrichPeopleListingsBatch(listings as MarketplaceListing[])
+
+    // Preserve the order from the input IDs (semantic similarity order)
+    const enrichedMap = new Map(enriched.map(l => [l.id, l]))
+    return ids
+        .map(id => enrichedMap.get(id))
+        .filter((l): l is EnrichedPersonListing => l != null && 'trustData' in l)
 }
 
 /**

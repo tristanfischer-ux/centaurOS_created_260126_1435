@@ -23,8 +23,9 @@ import {
     Award,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
+import { getEnrichedPeopleListings, getEnrichedPeopleByIds } from '@/actions/people-marketplace'
 import type { EnrichedPersonListing, TalentMatch, TalentMatchResult } from '@/actions/people-marketplace'
+import { searchMarketplaceListingsSemantic } from '@/lib/search/semantic-search'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 /**
@@ -174,10 +175,27 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
         setAnimationComplete(false)
 
         try {
-            // DECISION: Try AI-powered matching via API route (browser sends cookies
-            // so auth works, unlike server-action-to-API which sends empty cookies).
-            // Fall back to keyword matching if AI route fails.
-            const listings = await getEnrichedPeopleListings()
+            // DECISION: Semantic pre-filter first — embed the query, find the top 25
+            // most similar People listings via pgvector, then send those to GPT for
+            // detailed scoring. This gives better results (semantically relevant
+            // candidates) with fewer tokens (25 pre-filtered vs 50 random).
+            // Falls back to full fetch + keyword matching if semantic search fails.
+            let listings: EnrichedPersonListing[]
+            try {
+                const semanticHits = await searchMarketplaceListingsSemantic(query.trim(), {
+                    matchThreshold: 0.3,
+                    matchCount: 25,
+                })
+                if (semanticHits.length > 0) {
+                    listings = await getEnrichedPeopleByIds(semanticHits.map(h => h.id))
+                } else {
+                    listings = await getEnrichedPeopleListings()
+                }
+            } catch {
+                console.warn('[TalentFinder] Semantic pre-filter failed, falling back to full fetch')
+                listings = await getEnrichedPeopleListings()
+            }
+
             if (listings.length === 0) {
                 setResults({ matches: [], explanation: 'No talent listings available yet.', error: null })
                 return
@@ -190,7 +208,7 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         query: query.trim(),
-                        listings: listings.slice(0, 50).map(l => ({
+                        listings: listings.slice(0, 25).map(l => ({
                             id: l.id,
                             title: l.title,
                             description: l.description,
@@ -227,8 +245,6 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
             }
 
             // Fallback to keyword matching using already-fetched listings.
-            // DECISION: Inline keyword matching instead of calling findTalentMatches()
-            // (which would re-fetch all listings via getEnrichedPeopleListings).
             if (!result) {
                 result = clientKeywordMatch(query.trim(), listings)
             }

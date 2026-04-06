@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { Json } from '@/types/database.types'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { embedMarketplaceListing } from '@/lib/search/semantic-search'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function repairListingLink(supabase: any, providerId: string, listingId: string) {
@@ -107,7 +108,12 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
         .single()
     
     if (listingError) return { success: false, error: sanitizeErrorMessage(listingError) }
-    
+
+    // FLOW: Fire-and-forget embedding generation for semantic search
+    embedMarketplaceListing(listing.id).catch((e: unknown) =>
+        console.warn('[SelfServiceListing] Embedding failed (non-blocking):', e)
+    )
+
     // Link the listing to the provider profile
     const { error: linkError } = await supabase
         .from('provider_profiles')
@@ -187,6 +193,11 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
         .eq('id', listingId)
 
     if (error) return { success: false, error: sanitizeErrorMessage(error) }
+
+    // FLOW: Re-embed after content change — stale embedding is worse than none
+    embedMarketplaceListing(listingId).catch((e: unknown) =>
+        console.warn('[SelfServiceListing] Re-embedding failed (non-blocking):', e)
+    )
 
     // Ensure created_by_provider_id is set for future RLS checks
     if (!ownsViaProvider) {

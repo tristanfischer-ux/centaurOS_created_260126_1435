@@ -19,6 +19,7 @@ import {
 } from "@/types/search"
 import { calculateAllScores, sortByScore } from "./ranking"
 import { applyFilters, calculateFacets, cleanFilters } from "./filters"
+import { searchMarketplaceListingsSemantic } from "./semantic-search"
 
 // ==========================================
 // MAIN SEARCH FUNCTION
@@ -64,26 +65,69 @@ export async function searchMarketplace(params: SearchParams): Promise<SearchRes
       )
     }
 
-    // Execute the query
-    const { data: listings, error } = await query
+    // DECISION: Run keyword query and semantic search in parallel when a text
+    // query is present. Semantic search surfaces listings that match by meaning
+    // (e.g. "supply chain expert" matches "logistics consultant") even when
+    // ILIKE keyword matching misses them. Results are merged below.
+    const hasQuery = !!(params.query && params.query.trim())
+
+    const [keywordResult, semanticResult] = await Promise.allSettled([
+      query,
+      hasQuery
+        ? searchMarketplaceListingsSemantic(params.query!.trim(), {
+            matchThreshold: 0.35,
+            matchCount: 50,
+          })
+        : Promise.resolve([]),
+    ])
+
+    // Extract keyword results
+    const keywordData = keywordResult.status === 'fulfilled' ? keywordResult.value : null
+    const listings = keywordData?.data ?? null
+    const error = keywordData?.error ?? null
+
+    // Extract semantic results (graceful degradation — empty on failure)
+    const semanticHits = semanticResult.status === 'fulfilled' ? semanticResult.value : []
+    const semanticSimilarityMap = new Map(
+      (semanticHits as { id: string; similarity: number }[]).map(h => [h.id, h.similarity])
+    )
 
     if (error) {
       console.error('[SearchService] Search query error:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return createEmptyResponse(params)
     }
 
-    if (!listings || listings.length === 0) {
+    // Merge: start with keyword results, add any semantic-only hits
+    const keywordIds = new Set((listings ?? []).map(l => l.id))
+    const semanticOnlyIds = (semanticHits as { id: string }[])
+      .filter(h => !keywordIds.has(h.id))
+      .map(h => h.id)
+
+    // Fetch semantic-only listings if any (they matched semantically but not by keyword)
+    let mergedListings = listings ?? []
+    if (semanticOnlyIds.length > 0) {
+      const { data: extraListings } = await supabase
+        .from('marketplace_listings')
+        .select(`id, category, subcategory, title, description, attributes, image_url, is_verified, created_at`)
+        .in('id', semanticOnlyIds)
+
+      if (extraListings) {
+        mergedListings = [...mergedListings, ...extraListings]
+      }
+    }
+
+    if (mergedListings.length === 0) {
       return createEmptyResponse(params)
     }
 
-    // Fetch provider data for relevant listings
+    // Fetch provider data for all listings (keyword + semantic)
     const providerData = await fetchProviderData(
       supabase,
-      listings.map(l => l.id)
+      mergedListings.map(l => l.id)
     )
 
     // Transform to SearchResult format with scores
-    let results: SearchResult[] = listings.map(listing => {
+    let results: SearchResult[] = mergedListings.map(listing => {
       const provider = providerData[listing.id]
       
       const { scores, totalScore } = calculateAllScores({
@@ -131,7 +175,11 @@ export async function searchMarketplace(params: SearchParams): Promise<SearchRes
           currency: provider.currency || 'GBP',
         } : undefined,
         scores,
-        totalScore,
+        // FLOW: Semantic boost — listings that match by meaning get a score bump
+        // proportional to their cosine similarity (0-1). Weight: 15% of total.
+        // This ensures "supply chain expert" ranks a "logistics consultant" higher
+        // than a random keyword-miss listing, without disrupting the existing weights.
+        totalScore: totalScore + (semanticSimilarityMap.get(listing.id) ?? 0) * 0.15,
       }
     })
 

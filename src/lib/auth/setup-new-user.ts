@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/types/database.types";
+import { embedMarketplaceListing } from "@/lib/search/semantic-search";
 
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
 
@@ -363,7 +364,7 @@ export async function setupNewUser({
     // presence — they're invisible to companies looking for fractional talent.
     if (role === "executive") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: listingError } = await (supabase as any).from("marketplace_listings").insert({
+      const { data: newListing, error: listingError } = await (supabase as any).from("marketplace_listings").insert({
         category: "People",
         subcategory: "Executive",
         title: fullName,
@@ -374,9 +375,16 @@ export async function setupNewUser({
           profile_id: userId,
         },
         is_verified: false,
-      });
+      }).select("id").single();
       if (listingError) {
         console.warn("[setupNewUser] Marketplace listing failed:", listingError);
+      }
+
+      // FLOW: Fire-and-forget embedding generation — don't block signup if OpenAI is down
+      if (newListing?.id) {
+        embedMarketplaceListing(newListing.id).catch((e: unknown) =>
+          console.warn("[setupNewUser] Embedding failed (non-blocking):", e)
+        );
       }
     }
   }
