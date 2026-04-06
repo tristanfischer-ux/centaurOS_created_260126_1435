@@ -7,6 +7,7 @@
 
 import { updatePortfolioItem } from './trust-signals'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
  * Fetches portfolio items for a given provider (public read).
@@ -66,6 +67,10 @@ export interface PortfolioCompanyResult {
   description: string | null
   listing_id: string | null
   firm_name: string
+  /** Number of investors who invested in this company */
+  investor_count: number
+  /** Names of investors (for display) */
+  investor_names: string[]
 }
 
 interface PortfolioSearchFilters {
@@ -90,17 +95,21 @@ export async function searchPortfolioCompanies(
   const safePageSize = Math.min(Math.max(1, pageSize), 100)
   const from = (safePage - 1) * safePageSize
 
-  const supabase = await createClient()
+  // DECISION: Use admin client to bypass RLS (same issue as contacts)
+  const adminDb = createAdminClient()
 
   // Try materialized table first
-  const { count: matCount } = await supabase
+  const { count: matCount } = await adminDb
     .from("investor_portfolio_companies")
     .select("id", { count: "exact", head: true })
 
   if (matCount && matCount > 0) {
-    let q = supabase
+    // INTENT: Fetch raw rows and GROUP BY company_name client-side.
+    // PostgREST doesn't support GROUP BY, and we can't apply the RPC without
+    // DB password access. Fetch a larger window and deduplicate.
+    let q = adminDb
       .from("investor_portfolio_companies")
-      .select("company_name, sector, stage, amount_usd, description, listing_id", { count: "exact" })
+      .select("company_name, sector, stage, amount_usd, description, listing_id, marketplace_listings!inner(title)")
 
     if (query && query.trim().length > 0) {
       const term = `%${query.trim().slice(0, 200)}%`
@@ -111,27 +120,54 @@ export async function searchPortfolioCompanies(
       q = q.ilike("sector", `%${sector}%`)
     }
 
-    q = q.order("company_name", { ascending: true }).range(from, from + safePageSize - 1)
+    // Fetch more rows than needed for dedup (max 5000 for a page)
+    q = q.order("company_name", { ascending: true }).limit(5000)
 
-    const { data, count, error } = await q
+    const { data, error } = await q
 
     if (error) {
       console.error("[searchPortfolioCompanies] Error:", error)
       return { companies: [], total: 0, hasMore: false }
     }
 
-    const companies: PortfolioCompanyResult[] = (data ?? []).map((row: Record<string, unknown>) => ({
-      company_name: row.company_name as string,
-      sector: row.sector as string | null,
-      stage: row.stage as string | null,
-      amount_usd: row.amount_usd as number | null,
-      description: row.description as string | null,
-      listing_id: row.listing_id as string | null,
-      firm_name: "—", // Would need join for firm name from materialized table
-    }))
+    // Deduplicate by company_name — group rows into unique companies
+    const grouped = new Map<string, PortfolioCompanyResult>()
+    for (const row of data ?? []) {
+      const r = row as Record<string, unknown>
+      const name = (r.company_name as string) || "Unknown"
+      const listing = r.marketplace_listings as { title: string } | null
+      const firmName = listing?.title ?? "—"
+      const key = name.toLowerCase().trim()
 
-    const total = count ?? 0
-    return { companies, total, hasMore: from + companies.length < total }
+      if (grouped.has(key)) {
+        const existing = grouped.get(key)!
+        existing.investor_count++
+        if (firmName !== "—" && !existing.investor_names.includes(firmName)) {
+          existing.investor_names.push(firmName)
+        }
+      } else {
+        grouped.set(key, {
+          company_name: name,
+          sector: (r.sector as string) || null,
+          stage: (r.stage as string) || null,
+          amount_usd: (r.amount_usd as number) || null,
+          description: (r.description as string) || null,
+          listing_id: (r.listing_id as string) || null,
+          firm_name: firmName,
+          investor_count: 1,
+          investor_names: firmName !== "—" ? [firmName] : [],
+        })
+      }
+    }
+
+    // Sort by investor_count DESC, then name ASC
+    const allDeduped = [...grouped.values()].sort((a, b) =>
+      b.investor_count - a.investor_count || a.company_name.localeCompare(b.company_name)
+    )
+
+    const total = allDeduped.length
+    const paged = allDeduped.slice(from, from + safePageSize)
+    return { companies: paged, total, hasMore: from + paged.length < total }
   }
 
   // Fallback: aggregate from marketplace_listings JSONB

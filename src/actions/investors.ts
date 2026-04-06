@@ -1009,8 +1009,8 @@ export const getInvestorStats = unstable_cache(
       avgQuality: Math.round(avgQuality * 100) / 100,
     }
   },
-  ['investor-stats-v5-country-regions'],
-  { revalidate: 300 }
+  ['investor-stats-v6-dedup-portfolio'],
+  { revalidate: 600 }
 )
 
 // ---------------------------------------------------------------------------
@@ -1881,13 +1881,16 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
     return { contacts: [], total: 0, hasMore: false }
   }
 
-  const total = count ?? 0
+  // Filter out organisation names (not actual people)
+  const ORG_FILTER = /\b(LLP|Ltd|Limited|PLC|Inc|LLC|Association|Chamber|Authority|Institute|Foundation|Council|Bureau|Commission|Agency|Corporation|Group|Partners|Fund|Trust|Board|Network)\b/i
+  const filteredData = (data ?? []).filter((row: Record<string, unknown>) => !ORG_FILTER.test(row.full_name as string))
+  const total = filteredData.length < (data ?? []).length ? (count ?? 0) - ((data ?? []).length - filteredData.length) : (count ?? 0)
 
   // Tier gating — contacts directory is accessible to all authenticated users.
   // Sensitive fields (email, deep_bio) are gated by tier.
   const access = await getInvestorTierAccess()
 
-  const contacts: ContactSearchResult[] = (data ?? []).map((row: Record<string, unknown>) => {
+  const contacts: ContactSearchResult[] = filteredData.map((row: Record<string, unknown>) => {
     // GOTCHA: Supabase join returns marketplace_listings as an object (inner join = single row)
     const listing = row.marketplace_listings as { title: string } | null
     const firmName = listing?.title ?? 'Unknown Firm'

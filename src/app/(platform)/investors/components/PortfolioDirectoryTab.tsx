@@ -154,10 +154,11 @@ export function PortfolioDirectoryTab() {
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Company</th>
+                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Investors</th>
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Sector</th>
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Stage</th>
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Amount</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
+                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Description</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,6 +178,12 @@ export function PortfolioDirectoryTab() {
                             </Link>
                           ) : company.firm_name}
                         </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 tabular-nums">
+                      <span className="font-medium text-foreground">{company.investor_count}</span>
+                      {company.investor_count > 1 && (
+                        <span className="text-xs text-muted-foreground ml-1">investors</span>
                       )}
                     </td>
                     <td className="py-3 px-3">
