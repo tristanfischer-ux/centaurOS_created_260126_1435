@@ -752,16 +752,37 @@ export const getInvestorStats = unstable_cache(
     // SECURITY: admin client — aggregate stats over marketplace_listings (cross-foundry by design), foundry_id not needed
     const supabase = createAdminClient()
 
-    // INTENT: Fetch ALL investors for stats computation (not capped by PostgREST default of 1000).
-    // Stats computation is O(n) but acceptable for ~10k investors on modern servers.
-    // GOTCHA: Supabase PostgREST defaults to 1000 rows without an explicit limit.
-    const { data, error } = await supabase
-      .from('marketplace_listings')
-      .select('subcategory, attributes')
-      .eq('category', 'Finance')
-      .limit(20000)
+    // INTENT: Fetch ALL investors for stats computation.
+    // GOTCHA: Supabase PostgREST has a server-side max_rows setting (default 1000)
+    // that caps ANY request regardless of .limit(). Must paginate to get all rows.
+    const PAGE_SIZE = 1000
+    let allRows: Record<string, unknown>[] = []
+    let page = 0
+    let hasMore = true
 
-    if (error) {
+    while (hasMore) {
+      const from = page * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+      const { data: pageData, error: pageError } = await supabase
+        .from('marketplace_listings')
+        .select('subcategory, attributes')
+        .eq('category', 'Finance')
+        .range(from, to)
+
+      if (pageError) {
+        console.error('[getInvestorStats] Pagination error:', pageError)
+        break
+      }
+
+      const rows = pageData ?? []
+      allRows = allRows.concat(rows as Record<string, unknown>[])
+      hasMore = rows.length === PAGE_SIZE
+      page++
+    }
+
+    const data = allRows
+
+    if (data.length === 0) {
       console.error('[getInvestorStats] Supabase error:', error)
       return {
         total: 0,
@@ -959,7 +980,7 @@ export const getInvestorStats = unstable_cache(
       avgQuality: Math.round(avgQuality * 100) / 100,
     }
   },
-  ['investor-stats-v3'],
+  ['investor-stats-v4-paginated'],
   { revalidate: 60 }
 )
 
@@ -1026,7 +1047,11 @@ export async function getInvestorContacts(listingId: string, precomputedAccess?:
     return { contacts: [], access }
   }
 
-  let contacts = (data ?? []) as InvestorContact[]
+  // INTENT: Filter out organization/company names that were incorrectly stored as contacts.
+  // These come from Companies House data where entity names (law firms, associations, etc.)
+  // were scraped alongside actual people.
+  const ORG_PATTERNS = /\b(LLP|Ltd|Limited|PLC|Inc|LLC|Association|Chamber|Authority|Institute|Foundation|Council|Bureau|Commission|Agency|Corporation|Group|Partners|Fund|Trust|Board|Network)\b/i
+  let contacts = ((data ?? []) as InvestorContact[]).filter(c => !ORG_PATTERNS.test(c.full_name))
 
   // Strip deep fields for users below professional tier
   // DECISION: Expose has_deep_bio/has_email flags so the UI can show lock indicators
