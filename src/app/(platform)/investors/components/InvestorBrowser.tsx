@@ -626,6 +626,7 @@ export function InvestorBrowser({
                     onToggleShortlist={() => handleToggleShortlist(firm.id)}
                     isCompareSelected={compareIds.includes(firm.id)}
                     onToggleCompare={() => handleToggleCompare(firm.id)}
+                    onClick={() => setSelectedFirmId(firm.id)}
                   />
                 ))}
               </div>

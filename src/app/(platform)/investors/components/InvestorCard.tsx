@@ -151,6 +151,8 @@ interface InvestorCardProps {
   onToggleShortlist?: () => void
   isCompareSelected?: boolean
   onToggleCompare?: () => void
+  /** Called when card is clicked — opens modal detail */
+  onClick?: () => void
 }
 
 export function InvestorCard({
@@ -161,6 +163,7 @@ export function InvestorCard({
   onToggleShortlist,
   isCompareSelected,
   onToggleCompare,
+  onClick,
 }: InvestorCardProps) {
   const attrs = firm.attributes
   const stageFocus = (attrs.stage_focus ?? []).slice(0, 2)
@@ -174,7 +177,7 @@ export function InvestorCard({
   const linkedinHref = attrs.linkedin_company_url ? ensureProtocol(attrs.linkedin_company_url) : ''
 
   return (
-    <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all group relative">
+    <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all group relative cursor-pointer" onClick={onClick}>
       {/* Compare checkbox — shown on hover */}
       {onToggleCompare && (
         <button
