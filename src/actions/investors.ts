@@ -866,9 +866,8 @@ export const getInvestorStats = unstable_cache(
         else qualityBuckets['8-10']++
       }
 
-      // Portfolio companies
-      const portfolio = (attrs.portfolio_companies as Array<{ company_name?: string }>) ?? []
-      portfolioCompanyCount += portfolio.length
+      // Portfolio companies — count from JSONB for per-investor display
+      // (actual portfolioCompanyCount is fetched separately from materialized table)
 
       // Sectors — normalize case to deduplicate (e.g. "FinTech" vs "fintech" vs "Fintech")
       const SECTOR_NORMALIZE: Record<string, string> = {
@@ -914,15 +913,43 @@ export const getInvestorStats = unstable_cache(
       const sub = (row.subcategory as string) || 'Unknown'
       subcategoryCounts[sub] = (subcategoryCounts[sub] ?? 0) + 1
 
-      let region: string | null = null
+      // INTENT: Extract country/region from location for geographic distribution chart.
+      // Previous approach was UK-postcode-only. Now extract country from location text.
       const hqCity = (attrs.hq_city as string) || ''
       const location = (attrs.location as string) || ''
+      const gf = toStringArray(attrs.geo_focus)
       const locationText = hqCity || location
 
-      if (locationText) {
-        const postcode = extractPostcode(locationText)
-        if (postcode) region = deriveRegionFromPostcode(postcode)
-        if (!region) region = deriveRegionFromKeywords(locationText)
+      let region: string | null = null
+      // Use geo_focus first if available (most reliable)
+      if (gf.length > 0) {
+        region = gf[0] // First geo focus entry (e.g. "UK", "US", "Europe")
+      } else if (locationText) {
+        // Extract country from location string
+        const COUNTRY_PATTERNS: [RegExp, string][] = [
+          [/\bUK\b|\bUnited Kingdom\b|\bEngland\b|\bScotland\b|\bWales\b/i, 'UK'],
+          [/\bUS\b|\bUSA\b|\bUnited States\b|\bAmerica\b/i, 'US'],
+          [/\bFrance\b|\bParis\b/i, 'France'],
+          [/\bGermany\b|\bBerlin\b|\bMunich\b/i, 'Germany'],
+          [/\bIsrael\b|\bTel Aviv\b/i, 'Israel'],
+          [/\bIndia\b|\bMumbai\b|\bBangalore\b/i, 'India'],
+          [/\bChina\b|\bBeijing\b|\bShanghai\b/i, 'China'],
+          [/\bCanada\b|\bToronto\b|\bVancouver\b/i, 'Canada'],
+          [/\bSingapore\b/i, 'Singapore'],
+          [/\bJapan\b|\bTokyo\b/i, 'Japan'],
+          [/\bSwitzerland\b|\bZurich\b/i, 'Switzerland'],
+          [/\bNetherlands\b|\bAmsterdam\b/i, 'Netherlands'],
+          [/\bSweden\b|\bStockholm\b/i, 'Sweden'],
+          [/\bItaly\b|\bMilan\b/i, 'Italy'],
+          [/\bSpain\b|\bMadrid\b|\bBarcelona\b/i, 'Spain'],
+          [/\bLondon\b|\bManchester\b|\bBirmingham\b|\bEdinburgh\b|\bBristol\b|\bCambridge\b|\bOxford\b/i, 'UK'],
+          [/\bNew York\b|\bSan Francisco\b|\bBoston\b|\bChicago\b|\bLos Angeles\b|\bSeattle\b|\bAustin\b|\bMiami\b/i, 'US'],
+          [/\bEurope\b/i, 'Europe'],
+          [/\bGlobal\b/i, 'Global'],
+        ]
+        for (const [pattern, country] of COUNTRY_PATTERNS) {
+          if (pattern.test(locationText)) { region = country; break }
+        }
       }
 
       if (region) regionCounts[region] = (regionCounts[region] ?? 0) + 1
@@ -930,10 +957,12 @@ export const getInvestorStats = unstable_cache(
 
     const avgQuality = qualityScoreCount > 0 ? totalQualityScore / qualityScoreCount : 0
 
-    // Count total partners
-    const { count: partnerCount } = await supabase
-      .from('vc_pe_contacts')
-      .select('id', { count: 'exact', head: true })
+    // Count total partners + portfolio companies from materialized table
+    const [{ count: partnerCount }, { count: portfolioDbCount }] = await Promise.all([
+      supabase.from('vc_pe_contacts').select('id', { count: 'exact', head: true }),
+      supabase.from('investor_portfolio_companies').select('id', { count: 'exact', head: true }),
+    ])
+    portfolioCompanyCount = portfolioDbCount ?? 0
 
     const subcategoryBreakdown = Object.entries(subcategoryCounts)
       .map(([name, count]) => ({ name, count }))
@@ -980,8 +1009,8 @@ export const getInvestorStats = unstable_cache(
       avgQuality: Math.round(avgQuality * 100) / 100,
     }
   },
-  ['investor-stats-v4-paginated'],
-  { revalidate: 60 }
+  ['investor-stats-v5-country-regions'],
+  { revalidate: 300 }
 )
 
 // ---------------------------------------------------------------------------
@@ -1809,7 +1838,9 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
   const pageSize = Math.max(1, Math.min(100, rawPageSize))
   const offset = (Math.max(1, page) - 1) * pageSize
 
-  const supabase = await createClient()
+  // GOTCHA: Must use admin client — createClient() in server context lacks auth
+  // cookies, causing RLS to deny access and return 0 rows.
+  const supabase = createAdminClient()
 
   // Build query — join marketplace_listings for firm name (title)
   let dbQuery = supabase

@@ -14,7 +14,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Building2, TrendingUp, Globe, CheckCircle2, ChevronDown, ChevronUp, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip,
+  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
   PieChart, Pie, Cell,
 } from 'recharts'
 import type { InvestorStats } from '@/actions/investors'
@@ -208,6 +208,14 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      iconSize={8}
+                      iconType="circle"
+                      formatter={(value: string) => <span style={{ color: 'hsl(var(--foreground))', fontSize: 11 }}>{value}</span>}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -300,10 +308,10 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
             </div>
           </div>
 
-          {/* Row 4: Regional Coverage */}
+          {/* Row 4: Geographic Distribution */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Regional Coverage
+              Geographic Distribution
             </p>
             <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">

@@ -157,8 +157,7 @@ export function PortfolioDirectoryTab() {
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Sector</th>
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Stage</th>
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Amount</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Description</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Investor</th>
+                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
                 </tr>
               </thead>
               <tbody>
@@ -167,7 +166,19 @@ export function PortfolioDirectoryTab() {
                     key={`${company.listing_id}-${company.company_name}-${idx}`}
                     className="border-b border-border/50 hover:bg-muted/50 transition-colors"
                   >
-                    <td className="py-3 px-3 font-medium text-foreground">{company.company_name}</td>
+                    <td className="py-3 px-3">
+                      <div className="font-medium text-foreground">{company.company_name}</div>
+                      {company.firm_name && company.firm_name !== '—' && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          by{' '}
+                          {company.listing_id ? (
+                            <Link href={`/investors/${company.listing_id}`} className="text-international-orange hover:underline" onClick={(e) => e.stopPropagation()}>
+                              {company.firm_name}
+                            </Link>
+                          ) : company.firm_name}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-3">
                       {company.sector ? (
                         <Badge variant="outline" className="text-xs">{company.sector}</Badge>
@@ -185,21 +196,8 @@ export function PortfolioDirectoryTab() {
                     <td className="py-3 px-3 hidden lg:table-cell tabular-nums text-foreground">
                       {formatAmount(company.amount_usd)}
                     </td>
-                    <td className="py-3 px-3 hidden lg:table-cell max-w-xs">
-                      <p className="text-muted-foreground line-clamp-1">{company.description || "—"}</p>
-                    </td>
-                    <td className="py-3 px-3">
-                      {company.listing_id ? (
-                        <Link
-                          href={`/investors/${company.listing_id}`}
-                          className="text-international-orange hover:underline inline-flex items-center gap-1"
-                        >
-                          {company.firm_name}
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">{company.firm_name}</span>
-                      )}
+                    <td className="py-3 px-3 max-w-sm">
+                      <p className="text-muted-foreground line-clamp-1 text-xs">{company.description || "—"}</p>
                     </td>
                   </tr>
                 ))}

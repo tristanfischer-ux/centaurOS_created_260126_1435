@@ -40,8 +40,16 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
   // INTENT: Build a description from company profile to pre-fill the search textarea
   const initialDescription = useMemo(() => {
     if (!companyContext) return ''
+    // INTENT: Convert snake_case DB values to human-readable labels
+    const STAGE_LABELS: Record<string, string> = {
+      pre_seed: 'Pre-Seed', seed: 'Seed', series_a: 'Series A',
+      series_b: 'Series B', series_c: 'Series C', growth: 'Growth',
+      late_stage: 'Late Stage',
+    }
     const parts: string[] = []
-    if (companyContext.stage) parts.push(companyContext.stage.replace(/_/g, ' '))
+    if (companyContext.stage) {
+      parts.push(STAGE_LABELS[companyContext.stage] ?? companyContext.stage.replace(/_/g, ' '))
+    }
     if (companyContext.sector) parts.push(companyContext.sector)
     if (companyContext.fundingStatus) parts.push(companyContext.fundingStatus)
     if (companyContext.seekingFunding) parts.push('seeking funding')
@@ -230,7 +238,7 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
                   ref={fileInputRef}
                   type="file"
                   onChange={(e) => e.target.files?.[0] && handleFileChange(e.target.files[0])}
-                  accept=".txt,.pdf,.docx,.pptx,.xlsx,.md,.csv"
+                  accept=".txt,.pdf,.docx,.pptx,.xlsx,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   className="hidden"
                 />
                 {isExtracting ? (

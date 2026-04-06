@@ -57,6 +57,7 @@ function truncate(text: string | undefined | null, max: number): string {
 // ---------------------------------------------------------------------------
 
 const COLUMN_HEADERS: { label: string; className?: string }[] = [
+  { label: '' },                           // shortlist heart (LEFT)
   { label: '' },                           // quality dot
   { label: 'Firm' },
   { label: 'Type' },
@@ -68,7 +69,6 @@ const COLUMN_HEADERS: { label: string; className?: string }[] = [
   { label: 'Quality' },
   { label: 'Contacts', className: 'hidden md:table-cell' },
   { label: 'Portfolio', className: 'hidden lg:table-cell' },
-  { label: '' },                           // shortlist heart
 ]
 
 // ---------------------------------------------------------------------------
@@ -131,6 +131,28 @@ export function InvestorTableView({
                 onClick={() => onSelectFirm ? onSelectFirm(firm.id) : router.push(`/investors/${firm.id}`)}
                 className="hover:bg-muted/50 transition-colors cursor-pointer"
               >
+                {/* 0. Shortlist heart (LEFT) */}
+                <td className="px-2 py-2">
+                  <button
+                    type="button"
+                    aria-label={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleShortlist(firm.id)
+                    }}
+                    className="p-1 rounded-md hover:bg-muted transition-colors"
+                  >
+                    <Heart
+                      className={cn(
+                        'h-4 w-4 transition-colors',
+                        isShortlisted
+                          ? 'fill-international-orange text-international-orange'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    />
+                  </button>
+                </td>
+
                 {/* 1. Quality dot */}
                 <td className="px-3 py-2">
                   <span
@@ -241,27 +263,7 @@ export function InvestorTableView({
                   {portfolioCount}
                 </td>
 
-                {/* 11. Shortlist heart */}
-                <td className="px-3 py-2">
-                  <button
-                    type="button"
-                    aria-label={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onToggleShortlist(firm.id)
-                    }}
-                    className="p-1 rounded-md hover:bg-muted transition-colors"
-                  >
-                    <Heart
-                      className={cn(
-                        'h-4 w-4 transition-colors',
-                        isShortlisted
-                          ? 'fill-international-orange text-international-orange'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    />
-                  </button>
-                </td>
+                {/* Heart moved to column 0 (left side) */}
               </tr>
             )
           })}

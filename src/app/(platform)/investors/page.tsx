@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess } from '@/actions/investors'
 import { getProducts } from '@/actions/products'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { InvestorStats, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
@@ -143,18 +144,19 @@ export default async function InvestorDirectoryPage() {
   }
 
   // FLOW: Fetch tab counts for Investors, Contacts, Portfolio, Grants
-  // INTENT: Use direct count queries (not cached stats) for accurate tab labels
+  // GOTCHA: Must use admin client — createClient() lacks auth cookies in server
+  // component context, causing RLS to deny access and return 0 for all counts.
   let investorCount = 0
   let contactCount = 0
   let portfolioCount = 0
   let grantsCount = 0
   try {
-    const supabase = await createClient()
+    const adminDb = createAdminClient()
     const [investorResult, contactResult, portfolioResult, grantsResult] = await Promise.allSettled([
-      supabase.from('marketplace_listings').select('id', { count: 'exact', head: true }).eq('category', 'Finance'),
-      supabase.from('vc_pe_contacts').select('id', { count: 'exact', head: true }),
-      supabase.from('investor_portfolio_companies').select('id', { count: 'exact', head: true }),
-      supabase.from('investor_grants').select('id', { count: 'exact', head: true }),
+      adminDb.from('marketplace_listings').select('id', { count: 'exact', head: true }).eq('category', 'Finance'),
+      adminDb.from('vc_pe_contacts').select('id', { count: 'exact', head: true }),
+      adminDb.from('investor_portfolio_companies').select('id', { count: 'exact', head: true }),
+      adminDb.from('investor_grants').select('id', { count: 'exact', head: true }),
     ])
     if (investorResult.status === 'fulfilled') investorCount = investorResult.value.count ?? 0
     if (contactResult.status === 'fulfilled') contactCount = contactResult.value.count ?? 0
