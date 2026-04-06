@@ -4,10 +4,8 @@
  * @file PortfolioDirectoryTab.tsx
  *
  * @description Portfolio companies directory tab for the Investors page.
- * Shows portfolio companies from investor_portfolio_companies table
- * (materialized from JSONB attributes during Forge Capital push).
- * Falls back to aggregating from marketplace_listings JSONB until
- * the materialized table is populated.
+ * Shows portfolio companies from investor_portfolio_companies table.
+ * Clicking a company opens a dialog showing all investors who invested in it.
  */
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -15,10 +13,15 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Search, X, Briefcase, Loader2, ExternalLink } from "lucide-react"
-import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Search, X, Briefcase, Loader2, Building2 } from "lucide-react"
 import Link from "next/link"
-import { searchPortfolioCompanies, type PortfolioCompanyResult } from "@/actions/portfolio"
+import { searchPortfolioCompanies, getCompanyInvestors, type PortfolioCompanyResult, type PortfolioCompanyInvestor } from "@/actions/portfolio"
 
 export function PortfolioDirectoryTab() {
   const [companies, setCompanies] = useState<PortfolioCompanyResult[]>([])
@@ -31,6 +34,11 @@ export function PortfolioDirectoryTab() {
   const [sectorFilter, setSectorFilter] = useState("")
   const [page, setPage] = useState(1)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Detail dialog state
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null)
+  const [companyInvestors, setCompanyInvestors] = useState<PortfolioCompanyInvestor[]>([])
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
 
   // Debounce search
   useEffect(() => {
@@ -72,6 +80,20 @@ export function PortfolioDirectoryTab() {
       setIsLoadingMore(false)
     }
   }, [page, debouncedQuery, sectorFilter])
+
+  const handleRowClick = useCallback(async (companyName: string) => {
+    setSelectedCompany(companyName)
+    setIsLoadingDetail(true)
+    try {
+      const result = await getCompanyInvestors(companyName)
+      setCompanyInvestors(result.investors)
+    } catch (err) {
+      console.error("[PortfolioDirectoryTab] Failed to load investors:", err)
+      setCompanyInvestors([])
+    } finally {
+      setIsLoadingDetail(false)
+    }
+  }, [])
 
   const formatAmount = (usd: number | null) => {
     if (!usd) return "—"
@@ -165,10 +187,11 @@ export function PortfolioDirectoryTab() {
                 {companies.map((company, idx) => (
                   <tr
                     key={`${company.listing_id}-${company.company_name}-${idx}`}
-                    className="border-b border-border/50 hover:bg-muted/50 transition-colors"
+                    className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => handleRowClick(company.company_name)}
                   >
                     <td className="py-3 px-3">
-                      <div className="font-medium text-foreground">{company.company_name}</div>
+                      <div className="font-medium text-foreground hover:text-international-orange transition-colors">{company.company_name}</div>
                       {company.firm_name && company.firm_name !== '—' && (
                         <div className="text-xs text-muted-foreground mt-0.5">
                           by{' '}
@@ -182,9 +205,7 @@ export function PortfolioDirectoryTab() {
                     </td>
                     <td className="py-3 px-3 tabular-nums">
                       <span className="font-medium text-foreground">{company.investor_count}</span>
-                      {company.investor_count > 1 && (
-                        <span className="text-xs text-muted-foreground ml-1">investors</span>
-                      )}
+                      <span className="text-xs text-muted-foreground ml-1">{company.investor_count === 1 ? 'investor' : 'investors'}</span>
                     </td>
                     <td className="py-3 px-3">
                       {company.sector ? (
@@ -203,7 +224,7 @@ export function PortfolioDirectoryTab() {
                     <td className="py-3 px-3 hidden lg:table-cell tabular-nums text-foreground">
                       {formatAmount(company.amount_usd)}
                     </td>
-                    <td className="py-3 px-3 max-w-sm">
+                    <td className="py-3 px-3 max-w-sm hidden md:table-cell">
                       <p className="text-muted-foreground line-clamp-1 text-xs">{company.description || "—"}</p>
                     </td>
                   </tr>
@@ -228,6 +249,65 @@ export function PortfolioDirectoryTab() {
           )}
         </>
       )}
+
+      {/* Company Detail Dialog */}
+      <Dialog open={!!selectedCompany} onOpenChange={(open) => { if (!open) setSelectedCompany(null) }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-international-orange" />
+              {selectedCompany}
+            </DialogTitle>
+          </DialogHeader>
+
+          {isLoadingDetail ? (
+            <div className="space-y-3 py-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded" />
+              ))}
+            </div>
+          ) : companyInvestors.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No investor records found.</p>
+          ) : (
+            <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+              <p className="text-sm text-muted-foreground mb-3">
+                {companyInvestors.length} investor{companyInvestors.length !== 1 ? 's' : ''} in this company
+              </p>
+              {companyInvestors.map((inv, idx) => (
+                <div
+                  key={`${inv.listing_id}-${idx}`}
+                  className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-international-orange/10 flex items-center justify-center">
+                      <Building2 className="h-4 w-4 text-international-orange" />
+                    </div>
+                    <div className="min-w-0">
+                      {inv.listing_id ? (
+                        <Link
+                          href={`/investors/${inv.listing_id}`}
+                          className="text-sm font-medium text-foreground hover:text-international-orange transition-colors"
+                          onClick={() => setSelectedCompany(null)}
+                        >
+                          {inv.firm_name}
+                        </Link>
+                      ) : (
+                        <span className="text-sm font-medium text-foreground">{inv.firm_name}</span>
+                      )}
+                      {inv.stage && (
+                        <span className="text-xs text-muted-foreground ml-2">{inv.stage}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-sm tabular-nums text-foreground flex-shrink-0">
+                    {formatAmount(inv.amount_usd)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

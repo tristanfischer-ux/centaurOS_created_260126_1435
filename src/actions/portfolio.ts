@@ -220,3 +220,54 @@ export async function searchPortfolioCompanies(
 
   return { companies: paged, total, hasMore: from + paged.length < total }
 }
+
+// ---------------------------------------------------------------------------
+// Portfolio Company Detail — All Investors for a Specific Company
+// ---------------------------------------------------------------------------
+
+export interface PortfolioCompanyInvestor {
+  listing_id: string | null
+  firm_name: string
+  sector: string | null
+  stage: string | null
+  amount_usd: number | null
+  description: string | null
+}
+
+/**
+ * Get all investors who have a specific portfolio company.
+ */
+export async function getCompanyInvestors(
+  companyName: string
+): Promise<{ investors: PortfolioCompanyInvestor[]; companyName: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { investors: [], companyName }
+
+  const adminDb = createAdminClient()
+
+  const { data: rows, error } = await adminDb
+    .from('investor_portfolio_companies')
+    .select('listing_id, sector, stage, amount_usd, description, marketplace_listings!inner(title)')
+    .ilike('company_name', companyName)
+    .limit(100)
+
+  if (error || !rows) {
+    console.error('[getCompanyInvestors] Error:', error)
+    return { investors: [], companyName }
+  }
+
+  const investors: PortfolioCompanyInvestor[] = rows.map((row) => {
+    const listing = row.marketplace_listings as unknown as { title: string } | null
+    return {
+      listing_id: row.listing_id,
+      firm_name: listing?.title || '—',
+      sector: row.sector as string | null,
+      stage: row.stage as string | null,
+      amount_usd: row.amount_usd as number | null,
+      description: row.description as string | null,
+    }
+  })
+
+  return { investors, companyName }
+}
