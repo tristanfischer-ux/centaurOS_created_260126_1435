@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,14 +32,36 @@ interface InvestorSearchHeroProps {
   onSearch: (query: string) => void
   /** Whether search is currently in progress */
   isSearching?: boolean
+  /** Company profile data for auto-filling the search textarea */
+  companyContext?: { sector?: string | null; stage?: string | null; fundingStatus?: string | null; seekingFunding?: boolean }
 }
 
-export function InvestorSearchHero({ onSearch, isSearching = false }: InvestorSearchHeroProps) {
-  const [searchQuery, setSearchQuery] = useState('')
+export function InvestorSearchHero({ onSearch, isSearching = false, companyContext }: InvestorSearchHeroProps) {
+  // INTENT: Build a description from company profile to pre-fill the search textarea
+  const initialDescription = useMemo(() => {
+    if (!companyContext) return ''
+    const parts: string[] = []
+    if (companyContext.stage) parts.push(companyContext.stage.replace(/_/g, ' '))
+    if (companyContext.sector) parts.push(companyContext.sector)
+    if (companyContext.fundingStatus) parts.push(companyContext.fundingStatus)
+    if (companyContext.seekingFunding) parts.push('seeking funding')
+    return parts.join(', ')
+  }, [companyContext])
+
+  const [searchQuery, setSearchQuery] = useState(initialDescription)
   const [uploadedText, setUploadedText] = useState<string | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragOverRef = useRef(false)
+  const hasAutoSearched = useRef(false)
+
+  // INTENT: Auto-trigger semantic search on mount if company context provides a meaningful query
+  useEffect(() => {
+    if (initialDescription && initialDescription.length > 5 && !hasAutoSearched.current) {
+      hasAutoSearched.current = true
+      onSearch(initialDescription)
+    }
+  }, [initialDescription, onSearch])
 
   // INTENT: Allow users to click example chips to populate search
   const handleExampleClick = useCallback((example: string) => {
@@ -125,7 +147,7 @@ export function InvestorSearchHero({ onSearch, isSearching = false }: InvestorSe
           <div className="space-y-2">
             <h2 className="text-xl font-semibold text-foreground">Find your ideal investors</h2>
             <p className="text-sm text-muted-foreground">
-              Describe your startup to find the right investor match
+              Describe your startup for investor matching
             </p>
           </div>
 

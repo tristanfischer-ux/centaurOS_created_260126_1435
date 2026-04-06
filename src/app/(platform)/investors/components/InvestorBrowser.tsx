@@ -194,6 +194,27 @@ export function InvestorBrowser({
   const filterGeneration = useRef(0)
   // Skip URL sync on initial mount to preserve UTM/ref params
   const urlSyncMounted = useRef(false)
+  // INTENT: Track whether the hero query useEffect has run its initial mount
+  const heroQueryMounted = useRef(false)
+
+  // ---------------------------------------------------------------------------
+  // Sync hero search query into browser state
+  // ---------------------------------------------------------------------------
+
+  // INTENT: useState initializer only runs once on mount, so subsequent changes
+  // to initialSearchQuery (from the hero "Search investors" button) are ignored.
+  // This useEffect propagates hero queries into the browser's internal state,
+  // bypassing the 300ms debounce since the user already clicked a button.
+  useEffect(() => {
+    if (!heroQueryMounted.current) {
+      heroQueryMounted.current = true
+      return
+    }
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery)
+      setDebouncedQuery(initialSearchQuery)
+    }
+  }, [initialSearchQuery])
 
   // ---------------------------------------------------------------------------
   // Debounce search query

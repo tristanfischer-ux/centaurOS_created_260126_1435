@@ -171,6 +171,18 @@ export default async function InvestorDirectoryPage() {
         </p>
       </div>
 
+      {/* Specialist banner — right after header, like all other pages */}
+      <InvestorSpecialistBanner
+        companyContext={companyContext}
+        investorStats={stats ? {
+          total: stats.total,
+          activeDeploying: stats.activeDeployingCount,
+          deepProfiled: stats.forgeCapitalCount,
+          partnerCount: stats.partnerCount,
+        } : undefined}
+        shortlistCount={Object.keys(shortlistIds).length}
+      />
+
       {/* Semantic search hero above tabs */}
       <Suspense fallback={null}>
         <InvestorSearchHeroClient
@@ -181,23 +193,12 @@ export default async function InvestorDirectoryPage() {
           initialShortlistIds={shortlistIds}
           access={access}
           productSectors={productSectors}
+          companyContext={companyContext}
         />
       </Suspense>
 
       {/* Tabbed view: For You + Browse All */}
       <InvestorPageTabs
-        headerContent={
-          <InvestorSpecialistBanner
-            companyContext={companyContext}
-            investorStats={stats ? {
-              total: stats.total,
-              activeDeploying: stats.activeDeployingCount,
-              deepProfiled: stats.forgeCapitalCount,
-              partnerCount: stats.partnerCount,
-            } : undefined}
-            shortlistCount={Object.keys(shortlistIds).length}
-          />
-        }
         browseContent={
           <>
             {/* Insights panel */}

@@ -28,6 +28,7 @@ interface InvestorSearchHeroClientProps {
   initialShortlistIds?: Record<string, ShortlistStage>
   access?: InvestorTierAccess
   productSectors?: string[]
+  companyContext?: { sector?: string | null; stage?: string | null; fundingStatus?: string | null; seekingFunding?: boolean }
 }
 
 export function InvestorSearchHeroClient({
@@ -38,6 +39,7 @@ export function InvestorSearchHeroClient({
   initialShortlistIds = {},
   access,
   productSectors = [],
+  companyContext,
 }: InvestorSearchHeroClientProps) {
   const [heroSearchQuery, setHeroSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
@@ -54,7 +56,7 @@ export function InvestorSearchHeroClient({
   // We wrap browser and pass the initial search query.
   return (
     <div className="space-y-8">
-      <InvestorSearchHero onSearch={handleHeroSearch} isSearching={isSearching} />
+      <InvestorSearchHero onSearch={handleHeroSearch} isSearching={isSearching} companyContext={companyContext} />
       <InvestorBrowser
         initialFirms={initialFirms}
         initialTotal={initialTotal}

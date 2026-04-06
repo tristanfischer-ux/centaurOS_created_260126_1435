@@ -18,13 +18,11 @@ import { InvestorMatchView } from "./InvestorMatchView"
 
 interface InvestorPageTabsProps {
   browseContent: ReactNode
-  /** Content rendered above the tab bar (e.g. specialist banner) */
-  headerContent?: ReactNode
   /** Callback when search is triggered — passed from hero component */
   onSearchTriggered?: (query: string) => void
 }
 
-export function InvestorPageTabs({ browseContent, headerContent, onSearchTriggered }: InvestorPageTabsProps): React.ReactElement {
+export function InvestorPageTabs({ browseContent, onSearchTriggered }: InvestorPageTabsProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<"for-you" | "browse">("for-you")
   const [shouldSwitchToBrowse, setShouldSwitchToBrowse] = useState(false)
 
@@ -38,9 +36,6 @@ export function InvestorPageTabs({ browseContent, headerContent, onSearchTrigger
 
   return (
     <div className="space-y-6">
-      {/* Specialist banner above tabs */}
-      {headerContent}
-
       {/* Tab bar */}
       <div className="flex items-center gap-1 border-b border-border">
         <button
