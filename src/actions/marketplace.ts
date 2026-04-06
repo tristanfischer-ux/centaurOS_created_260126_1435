@@ -220,6 +220,8 @@ export interface MarketplaceListing {
     city: string | null
     /** Company size descriptor (Nightshift enrichment). */
     company_size: string | null
+    /** Contact email for quote requests. */
+    contact_email: string | null
     /** Denormalised average rating (1.00–5.00) from marketplace_reviews. */
     average_rating: number | null
     /** Denormalised review count from marketplace_reviews. */
@@ -238,7 +240,7 @@ const LISTING_COLUMNS = [
     'certifications', 'materials', 'key_equipment', 'financial_health',
     'enrichment_quality', 'security_clearances', 'created_at',
     'data_quality_score', 'average_rating', 'review_count',
-    'country', 'city', 'company_size',
+    'country', 'city', 'company_size', 'contact_email',
 ].join(', ')
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'

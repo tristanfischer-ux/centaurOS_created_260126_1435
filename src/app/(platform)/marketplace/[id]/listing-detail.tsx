@@ -44,8 +44,10 @@ import {
     ExternalLink,
     Globe,
     Mail,
+    Send,
 } from "lucide-react"
 import Link from "next/link"
+import { QuoteRequestDialog } from "@/components/marketplace/quote-request-dialog"
 import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
 import { CompanyLocationMap } from "@/components/marketplace/CompanyLocationMap"
 import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
@@ -181,6 +183,18 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                             </a>
                         </Button>
                     ) : null}
+                    {/* Request Quote — available for any listing with contact_email */}
+                    {category !== 'People' && listing.contact_email && (
+                        <QuoteRequestDialog
+                            listings={listing}
+                            trigger={
+                                <Button variant="default" className="bg-international-orange hover:bg-international-orange-hover">
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Request Quote
+                                </Button>
+                            }
+                        />
+                    )}
                     {attrs.provider_id && (
                         <Button
                             variant="default"

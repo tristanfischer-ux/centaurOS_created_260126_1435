@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { MarketplaceToolbar } from './MarketplaceToolbar'
 import { MarketplaceFilterPanel } from './MarketplaceFilterPanel'
 import { MarketplaceListingGrid } from './MarketplaceListingGrid'
+import { QuoteRequestDialog } from '@/components/marketplace/quote-request-dialog'
 import { MarketplaceDetailDialog } from './MarketplaceDetailDialog'
 import { MarketplaceRecommendations } from './MarketplaceRecommendations'
 import { MarketplaceSavedView } from './MarketplaceSavedView'
@@ -23,6 +24,7 @@ import {
     X,
     ArrowRight,
     BarChart3,
+    Send,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -582,6 +584,44 @@ export function MarketplaceBrowse({
                         onLoadMore={state.loadMore}
                     />
                     </div>
+
+                    {/* Floating action bar — visible when 2+ suppliers selected */}
+                    {selectedForCompare.size >= 2 && (
+                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-xl bg-card border border-border shadow-xl">
+                            <span className="text-sm font-medium text-foreground">
+                                {selectedForCompare.size} selected
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={handleCompareFromBrowse}
+                                className="gap-1"
+                            >
+                                <Scale className="h-3.5 w-3.5" />
+                                Compare
+                            </Button>
+                            <QuoteRequestDialog
+                                listings={state.filteredListings.filter(l => selectedForCompare.has(l.id))}
+                                trigger={
+                                    <Button
+                                        size="sm"
+                                        className="gap-1 bg-international-orange hover:bg-international-orange-hover"
+                                    >
+                                        <Send className="h-3.5 w-3.5" />
+                                        Request Quotes
+                                    </Button>
+                                }
+                                onComplete={() => clearCompareSelection()}
+                            />
+                            <button
+                                onClick={clearCompareSelection}
+                                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                                aria-label="Clear selection"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
                 </>
             )}
 

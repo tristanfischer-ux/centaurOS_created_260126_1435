@@ -171,10 +171,28 @@ After demo filtering, users see **~13,710 real supplier listings**.
 - [x] 10 process groups + "Other" for generic subcategories
 - [x] tsc + lint clean, committed + pushing
 
-## Procurement Upgrade — Round 2: Project Context
+## Procurement Upgrade — Round 2: Project Context (commit `8e71a568`)
 
-_(In progress)_
+- [x] Server action `getActiveProjectContext()` — fetches latest project, extracts mfg_process + material
+- [x] `ProjectContextBanner` component — "Working on [Project]? 47 suppliers match"
+- [x] Dismissible per project (localStorage)
+- [x] CAD Lab Source page: "Browse more suppliers in the marketplace →" link
+- [x] All data fetched in parallel with existing marketplace data
+- [x] tsc + lint clean
 
 ## Procurement Upgrade — Round 3: Email RFQ
 
-_(Not started)_
+- [x] Migration `20260406300000_quote_requests.sql` — table with RLS (users see own)
+- [x] Server action `sendSupplierQuoteRequest()` — validate, send email via Resend, record in DB
+- [x] Server action `sendBulkQuoteRequests()` — sequential send to up to 10 suppliers
+- [x] Server action `getMyQuoteRequests()` — fetch user's request history
+- [x] Professional email template with International Orange branding, reply-to user's email
+- [x] Rate limited: 10 per hour per user
+- [x] `QuoteRequestDialog` component — single-form dialog (subject, message, quantity, deadline)
+- [x] Works for single supplier (detail page) and bulk (browse selection)
+- [x] Warning shown for suppliers without contact_email
+- [x] "Request Quote" button on supplier detail page (non-People, with contact_email)
+- [x] Floating action bar: appears for 2+ selected suppliers with Compare + Request Quotes
+- [x] Quote tracking page at `/marketplace/quotes` — table of sent requests with status badges
+- [x] `contact_email` added to MarketplaceListing interface + LISTING_COLUMNS
+- [x] tsc + lint clean
