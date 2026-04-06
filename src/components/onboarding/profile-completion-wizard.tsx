@@ -1,0 +1,611 @@
+'use client'
+
+/**
+ * @file profile-completion-wizard.tsx
+ *
+ * @description Mandatory 4-step profile completion wizard that fires after
+ * the company name step in unified onboarding. Collects headline, bio,
+ * skills, industries, experience, and availability — the minimum fields
+ * needed for recruits matching.
+ *
+ * No skip button. No Escape dismiss. Users must complete this to proceed.
+ * Draft auto-saves on each step transition to survive page refresh.
+ */
+
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import {
+  ArrowRight,
+  ArrowLeft,
+  User,
+  Sparkles,
+  Briefcase,
+  Clock,
+  X,
+  Loader2,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { completeProfileWizard } from '@/actions/complete-profile-wizard'
+import { updateOnboardingData } from '@/actions/onboarding'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+
+import type { OnboardingData } from '@/actions/onboarding'
+
+// ── Types ──────────────────────────────────────────────────────────────
+
+interface ProfileCompletionWizardProps {
+  open: boolean
+  userRole?: string
+  onboardingData: OnboardingData | null
+  onComplete: () => void
+}
+
+type WizardStep = 'identity' | 'expertise' | 'experience' | 'availability'
+const STEPS: WizardStep[] = ['identity', 'expertise', 'experience', 'availability']
+
+const STEP_LABELS: Record<WizardStep, { title: string; subtitle: string; icon: typeof User }> = {
+  identity: { title: 'Your Professional Identity', subtitle: 'How companies will see you', icon: User },
+  expertise: { title: 'Your Expertise', subtitle: 'What you bring to the table', icon: Sparkles },
+  experience: { title: 'Your Experience', subtitle: 'Your professional background', icon: Briefcase },
+  availability: { title: 'Your Availability', subtitle: 'How much time you can give', icon: Clock },
+}
+
+// ── Suggestion Lists ───────────────────────────────────────────────────
+
+const SKILL_SUGGESTIONS = [
+  'Financial Planning', 'Fundraising', 'FP&A', 'Treasury',
+  'Operations', 'Supply Chain', 'Manufacturing', 'Lean',
+  'Software Engineering', 'DevOps', 'Firmware', 'Architecture',
+  'Sales', 'Business Development', 'Revenue Operations',
+  'Marketing', 'Growth', 'Brand Strategy', 'SEO',
+  'Talent Acquisition', 'People Operations', 'HR',
+  'Legal', 'Compliance', 'IP', 'Contracts',
+  'Product Management', 'UX Design', 'Product Strategy',
+]
+
+const INDUSTRY_SUGGESTIONS = [
+  'Manufacturing', 'Engineering', 'Aerospace', 'Defence',
+  'Automotive', 'Energy', 'CleanTech', 'HealthTech',
+  'FinTech', 'SaaS', 'Hardware', 'IoT',
+  'Construction', 'Food & Beverage', 'Retail',
+  'Logistics', 'Agriculture', 'Education',
+  'Life Sciences', 'Biotech', 'Medtech',
+]
+
+const EXPERIENCE_RANGES = [
+  { value: 1, label: '0–2 years' },
+  { value: 3, label: '3–5 years' },
+  { value: 7, label: '5–10 years' },
+  { value: 12, label: '10–15 years' },
+  { value: 17, label: '15–20 years' },
+  { value: 25, label: '20+ years' },
+]
+
+const APPRENTICE_EXPERIENCE_RANGES = [
+  { value: 0, label: 'Still studying' },
+  { value: 1, label: 'Less than 1 year' },
+  { value: 2, label: '1–3 years' },
+  { value: 4, label: '3–5 years' },
+  { value: 7, label: '5+ years' },
+]
+
+const AVAILABILITY_OPTIONS = [
+  { value: 'full-time', label: 'Full-time', desc: '40+ hours/week' },
+  { value: 'part-time', label: 'Part-time', desc: '10–30 hours/week' },
+  { value: 'advisory', label: 'Advisory only', desc: '2–8 hours/week' },
+  { value: 'project-based', label: 'Project-based', desc: 'Flexible commitment' },
+]
+
+// ── Animation ──────────────────────────────────────────────────────────
+
+const slideVariants = {
+  enter: (direction: number) => ({ x: direction > 0 ? 300 : -300, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (direction: number) => ({ x: direction < 0 ? 300 : -300, opacity: 0 }),
+}
+
+// ── Tag Input Component ────────────────────────────────────────────────
+
+function TagInput({
+  value,
+  onChange,
+  suggestions,
+  placeholder,
+  maxTags = 10,
+}: {
+  value: string[]
+  onChange: (tags: string[]) => void
+  suggestions: string[]
+  placeholder: string
+  maxTags?: number
+}) {
+  const [inputValue, setInputValue] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const filteredSuggestions = suggestions.filter(
+    s => s.toLowerCase().includes(inputValue.toLowerCase()) && !value.includes(s)
+  ).slice(0, 6)
+
+  const addTag = useCallback((tag: string) => {
+    const trimmed = tag.trim()
+    if (trimmed && !value.includes(trimmed) && value.length < maxTags) {
+      onChange([...value, trimmed])
+    }
+    setInputValue('')
+    setShowSuggestions(false)
+    inputRef.current?.focus()
+  }, [value, onChange, maxTags])
+
+  const removeTag = useCallback((tag: string) => {
+    onChange(value.filter(t => t !== tag))
+  }, [value, onChange])
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5 min-h-[2rem]">
+        {value.map(tag => (
+          <Badge key={tag} variant="secondary" className="gap-1 pr-1">
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeTag(tag)}
+              aria-label={`Remove ${tag}`}
+              className="ml-0.5 rounded-full hover:bg-muted p-0.5"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
+      </div>
+      <div className="relative">
+        <Input
+          ref={inputRef}
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value)
+            setShowSuggestions(true)
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ',') {
+              e.preventDefault()
+              if (inputValue.trim()) addTag(inputValue)
+            }
+            if (e.key === 'Backspace' && !inputValue && value.length) {
+              removeTag(value[value.length - 1])
+            }
+          }}
+          placeholder={value.length >= maxTags ? `Maximum ${maxTags} tags` : placeholder}
+          disabled={value.length >= maxTags}
+          className="bg-card"
+        />
+        {showSuggestions && filteredSuggestions.length > 0 && inputValue.length > 0 && (
+          <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg py-1">
+            {filteredSuggestions.map(s => (
+              <button
+                key={s}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); addTag(s) }}
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {value.length === 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {suggestions.slice(0, 8).map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => addTag(s)}
+              className="text-xs px-2 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-international-orange hover:text-international-orange transition-colors"
+            >
+              + {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main Component ─────────────────────────────────────────────────────
+
+export function ProfileCompletionWizard({
+  open,
+  userRole,
+  onboardingData,
+  onComplete,
+}: ProfileCompletionWizardProps) {
+  const router = useRouter()
+  const [stepIndex, setStepIndex] = useState(0)
+  const [direction, setDirection] = useState(1)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const hydrated = useRef(false)
+
+  // ── Form State ────────────────────────────────────────────────────
+  const [headline, setHeadline] = useState('')
+  const [bio, setBio] = useState('')
+  const [skills, setSkills] = useState<string[]>([])
+  const [industries, setIndustries] = useState<string[]>([])
+  const [yearsExperience, setYearsExperience] = useState<number | null>(null)
+  const [expertiseAreas, setExpertiseAreas] = useState<string[]>([])
+  const [availabilityType, setAvailabilityType] = useState('')
+  const [hoursPerWeek, setHoursPerWeek] = useState<number | null>(null)
+
+  // ── Hydrate from draft ────────────────────────────────────────────
+  useEffect(() => {
+    if (hydrated.current) return
+    const draft = onboardingData?.profile_wizard_draft
+    if (draft) {
+      if (draft.headline) setHeadline(draft.headline)
+      if (draft.bio) setBio(draft.bio)
+      if (draft.skills) setSkills(draft.skills)
+      if (draft.industries) setIndustries(draft.industries)
+      if (draft.years_experience != null) setYearsExperience(draft.years_experience)
+      if (draft.expertise_areas) setExpertiseAreas(draft.expertise_areas)
+      if (draft.availability_type) setAvailabilityType(draft.availability_type)
+      if (draft.availability_hours_per_week != null) setHoursPerWeek(draft.availability_hours_per_week)
+      if (draft.current_step != null) setStepIndex(draft.current_step)
+    }
+    hydrated.current = true
+  }, [onboardingData])
+
+  // ── Draft Save ────────────────────────────────────────────────────
+  const saveDraft = useCallback(async (nextStep: number) => {
+    updateOnboardingData({
+      profile_wizard_draft: {
+        headline, bio, skills, industries,
+        years_experience: yearsExperience ?? undefined,
+        expertise_areas: expertiseAreas,
+        availability_type: availabilityType,
+        availability_hours_per_week: hoursPerWeek ?? undefined,
+        current_step: nextStep,
+      },
+    }).catch(() => {}) // Non-blocking
+  }, [headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek])
+
+  // ── Navigation ────────────────────────────────────────────────────
+  const currentStep = STEPS[stepIndex]
+  const progressPercent = ((stepIndex + 1) / STEPS.length) * 100
+
+  const validateStep = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    if (currentStep === 'identity') {
+      if (!headline.trim() || headline.trim().length < 3) newErrors.headline = 'Headline must be at least 3 characters'
+      if (headline.trim().length > 120) newErrors.headline = 'Headline must be under 120 characters'
+      if (!bio.trim() || bio.trim().length < 10) newErrors.bio = 'Tell us a bit more (at least 10 characters)'
+      if (bio.trim().length > 500) newErrors.bio = 'Bio must be under 500 characters'
+    }
+    if (currentStep === 'expertise') {
+      if (skills.length < 2) newErrors.skills = 'Add at least 2 skills'
+      if (industries.length < 1) newErrors.industries = 'Add at least 1 industry'
+    }
+    if (currentStep === 'experience') {
+      if (yearsExperience == null) newErrors.yearsExperience = 'Please select your experience level'
+    }
+    if (currentStep === 'availability') {
+      if (!availabilityType) newErrors.availabilityType = 'Please select your availability'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }, [currentStep, headline, bio, skills, industries, yearsExperience, availabilityType])
+
+  const goNext = useCallback(async () => {
+    if (!validateStep()) return
+
+    if (stepIndex < STEPS.length - 1) {
+      setDirection(1)
+      const next = stepIndex + 1
+      setStepIndex(next)
+      setErrors({})
+      saveDraft(next)
+    } else {
+      // Final submit
+      setIsSubmitting(true)
+      const result = await completeProfileWizard({
+        headline: headline.trim(),
+        bio: bio.trim(),
+        skills,
+        industries,
+        years_experience: yearsExperience!,
+        expertise_areas: expertiseAreas,
+        availability_type: availabilityType,
+        availability_hours_per_week: hoursPerWeek,
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+        setIsSubmitting(false)
+        return
+      }
+
+      toast.success('Profile complete! You\'re now visible to companies looking for talent.')
+      router.refresh()
+      onComplete()
+    }
+  }, [stepIndex, validateStep, saveDraft, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, router, onComplete])
+
+  const goBack = useCallback(() => {
+    if (stepIndex > 0) {
+      setDirection(-1)
+      setStepIndex(stepIndex - 1)
+      setErrors({})
+    }
+  }, [stepIndex])
+
+  if (!open) return null
+
+  const stepInfo = STEP_LABELS[currentStep]
+  const StepIcon = stepInfo.icon
+  const isApprentice = userRole === 'Apprentice'
+  const experienceRanges = isApprentice ? APPRENTICE_EXPERIENCE_RANGES : EXPERIENCE_RANGES
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Complete your profile" className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+      {/* Progress bar */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-muted">
+        <motion.div
+          className="h-full bg-international-orange"
+          initial={{ width: 0 }}
+          animate={{ width: `${progressPercent}%` }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        />
+      </div>
+
+      {/* Step counter */}
+      <div className="absolute top-6 right-8 text-sm text-muted-foreground">
+        Step {stepIndex + 1} of {STEPS.length}
+      </div>
+
+      {/* Content */}
+      <div className="w-full max-w-lg px-6">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={currentStep}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            {/* Step header */}
+            <div className="text-center mb-8">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-international-orange/10 mb-4"
+              >
+                <StepIcon className="h-6 w-6 text-international-orange" />
+              </motion.div>
+              <h2 className="text-2xl font-semibold text-foreground">{stepInfo.title}</h2>
+              <p className="text-muted-foreground mt-1">{stepInfo.subtitle}</p>
+            </div>
+
+            {/* Step content */}
+            <div className="space-y-5">
+              {currentStep === 'identity' && (
+                <>
+                  <div>
+                    <label htmlFor="headline" className="block text-sm font-medium text-foreground mb-1.5">
+                      Your headline
+                    </label>
+                    <Input
+                      id="headline"
+                      value={headline}
+                      onChange={(e) => { setHeadline(e.target.value); setErrors(prev => ({ ...prev, headline: '' })) }}
+                      placeholder="e.g., CFO & Finance Leader | SaaS & Manufacturing"
+                      maxLength={120}
+                      className={cn("bg-card", errors.headline && "border-destructive")}
+                      aria-invalid={!!errors.headline}
+                    />
+                    <div className="flex justify-between mt-1">
+                      {errors.headline ? (
+                        <p className="text-sm text-destructive">{errors.headline}</p>
+                      ) : <span />}
+                      <span className="text-xs text-muted-foreground">{headline.length}/120</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="bio" className="block text-sm font-medium text-foreground mb-1.5">
+                      About you
+                    </label>
+                    <textarea
+                      id="bio"
+                      value={bio}
+                      onChange={(e) => { setBio(e.target.value); setErrors(prev => ({ ...prev, bio: '' })) }}
+                      placeholder="Tell companies what you bring to the table in 2-3 sentences..."
+                      maxLength={500}
+                      rows={4}
+                      className={cn(
+                        "flex w-full rounded-md border border-input bg-card px-3 py-2 text-sm",
+                        "placeholder:text-muted-foreground focus-visible:outline-none",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        "resize-none",
+                        errors.bio && "border-destructive"
+                      )}
+                      aria-invalid={!!errors.bio}
+                    />
+                    <div className="flex justify-between mt-1">
+                      {errors.bio ? (
+                        <p className="text-sm text-destructive">{errors.bio}</p>
+                      ) : <span />}
+                      <span className="text-xs text-muted-foreground">{bio.length}/500</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {currentStep === 'expertise' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Your skills
+                    </label>
+                    <TagInput
+                      value={skills}
+                      onChange={(v) => { setSkills(v); setErrors(prev => ({ ...prev, skills: '' })) }}
+                      suggestions={SKILL_SUGGESTIONS}
+                      placeholder="Type a skill and press Enter..."
+                    />
+                    {errors.skills && <p className="text-sm text-destructive mt-1">{errors.skills}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Industries you know
+                    </label>
+                    <TagInput
+                      value={industries}
+                      onChange={(v) => { setIndustries(v); setErrors(prev => ({ ...prev, industries: '' })) }}
+                      suggestions={INDUSTRY_SUGGESTIONS}
+                      placeholder="Type an industry and press Enter..."
+                    />
+                    {errors.industries && <p className="text-sm text-destructive mt-1">{errors.industries}</p>}
+                  </div>
+                </>
+              )}
+
+              {currentStep === 'experience' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Years of experience
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {experienceRanges.map(range => (
+                        <button
+                          key={range.value}
+                          type="button"
+                          onClick={() => { setYearsExperience(range.value); setErrors(prev => ({ ...prev, yearsExperience: '' })) }}
+                          className={cn(
+                            "px-4 py-3 rounded-lg border text-sm font-medium transition-all",
+                            yearsExperience === range.value
+                              ? "border-international-orange bg-international-orange/10 text-international-orange"
+                              : "border-border bg-card text-foreground hover:border-international-orange/50"
+                          )}
+                        >
+                          {range.label}
+                        </button>
+                      ))}
+                    </div>
+                    {errors.yearsExperience && <p className="text-sm text-destructive mt-1">{errors.yearsExperience}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Areas of expertise <span className="text-muted-foreground font-normal">(optional)</span>
+                    </label>
+                    <TagInput
+                      value={expertiseAreas}
+                      onChange={setExpertiseAreas}
+                      suggestions={['Strategy', 'Turnaround', 'M&A', 'IPO Readiness', 'Scale-up', 'Digital Transformation', 'Restructuring', 'International Expansion']}
+                      placeholder="e.g., Scale-up, M&A..."
+                      maxTags={6}
+                    />
+                  </div>
+                </>
+              )}
+
+              {currentStep === 'availability' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      {userRole === 'Founder'
+                        ? 'How much time can you give beyond your company?'
+                        : 'How available are you?'}
+                    </label>
+                    <div className="space-y-2">
+                      {AVAILABILITY_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => { setAvailabilityType(opt.value); setErrors(prev => ({ ...prev, availabilityType: '' })) }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-4 py-3 rounded-lg border text-sm transition-all text-left",
+                            availabilityType === opt.value
+                              ? "border-international-orange bg-international-orange/10"
+                              : "border-border bg-card hover:border-international-orange/50"
+                          )}
+                        >
+                          <span className="font-medium text-foreground">{opt.label}</span>
+                          <span className="text-muted-foreground">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {errors.availabilityType && <p className="text-sm text-destructive mt-1">{errors.availabilityType}</p>}
+                  </div>
+                  {(availabilityType === 'part-time' || availabilityType === 'advisory') && (
+                    <div>
+                      <label htmlFor="hours" className="block text-sm font-medium text-foreground mb-1.5">
+                        Hours per week
+                      </label>
+                      <Input
+                        id="hours"
+                        type="number"
+                        min={1}
+                        max={40}
+                        value={hoursPerWeek ?? ''}
+                        onChange={(e) => setHoursPerWeek(e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder={availabilityType === 'advisory' ? '2-8' : '10-30'}
+                        className="bg-card w-32"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Navigation */}
+            <div className="flex justify-between mt-8">
+              {stepIndex > 0 ? (
+                <Button
+                  variant="ghost"
+                  onClick={goBack}
+                  className="gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </Button>
+              ) : <div />}
+
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  onClick={goNext}
+                  disabled={isSubmitting}
+                  className="gap-2 bg-international-orange hover:bg-international-orange/90 text-white px-6"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : stepIndex < STEPS.length - 1 ? (
+                    <>
+                      Continue <ArrowRight className="h-4 w-4" />
+                    </>
+                  ) : (
+                    <>
+                      Complete Profile <Sparkles className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}

@@ -199,8 +199,8 @@ export function UnifiedOnboarding({
       setOpen(false)
       router.refresh()
 
-      // Launch guided tour
-      setShowGuidedTour(true)
+      // INTENT: Guided tour now launches after the profile completion wizard,
+      // not here. The profile wizard fires immediately after this modal closes.
     } catch (error) {
       console.error('[UnifiedOnboarding] Failed to create company:', error)
       toast.error('Something went wrong. Please try again.')

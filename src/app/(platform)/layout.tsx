@@ -10,7 +10,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { UnifiedOnboarding } from "@/components/onboarding/unified-onboarding";
 import { WelcomeBackBanner } from "@/components/WelcomeBackBanner";
-import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
+import { ExecutiveProfilePrompt, VerificationSuccessToast, ProfileCompletionWizard } from "@/components/onboarding";
 import { ActivityTracker } from "@/components/ActivityTracker";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -146,7 +146,13 @@ export default async function PlatformLayout({
                         {!needsProfileRepair && (
                             <>
                                 <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} />
-                                <ExecutiveProfilePrompt userRole={profile?.role ?? undefined} onboardingCompleted={!!(profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed)} />
+                                <ProfileCompletionWizard
+                                    open={!!(profile?.account_type !== 'supplier' && profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed && !(profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)}
+                                    userRole={profile?.role ?? undefined}
+                                    onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null}
+                                    onComplete={() => {}}
+                                />
+                                <ExecutiveProfilePrompt userRole={profile?.role ?? undefined} onboardingCompleted={!!(profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)} />
                             </>
                         )}
                         <Suspense fallback={null}>

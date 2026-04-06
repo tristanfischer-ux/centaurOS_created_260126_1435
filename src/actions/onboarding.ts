@@ -288,6 +288,20 @@ export interface OnboardingData {
   intent_selection?: 'setup_company' | 'join_company' | 'exploring'
   /** Sandbox welcome banner dismissed on Today page */
   sandbox_banner_dismissed?: boolean
+  /** Profile completion wizard (mandatory, post-company-name) */
+  profile_wizard_completed?: boolean
+  profile_wizard_completed_at?: string
+  profile_wizard_draft?: {
+    headline?: string
+    bio?: string
+    skills?: string[]
+    industries?: string[]
+    years_experience?: number
+    expertise_areas?: string[]
+    availability_type?: string
+    availability_hours_per_week?: number
+    current_step?: number
+  }
 }
 
 /**

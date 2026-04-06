@@ -1,0 +1,220 @@
+'use server'
+
+/**
+ * @file complete-profile-wizard.ts
+ *
+ * @description Server action for the mandatory profile completion wizard.
+ * Saves profile data to profiles table, syncs to marketplace_listings
+ * (People category), and marks the wizard as completed in onboarding_data.
+ *
+ * @security Uses authenticated supabase client. Validates and sanitizes all inputs.
+ * Marketplace listing lookup uses provider_profiles.listing_id (user-scoped),
+ * NOT title matching (which could hit another user's record).
+ */
+
+import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { determineFunctionCategory } from '@/lib/recruit-match'
+import { sanitizeErrorMessage, escapeHtml } from '@/lib/security/sanitize'
+import type { OnboardingData } from '@/actions/onboarding'
+
+export interface ProfileWizardInput {
+  headline: string
+  bio: string
+  skills: string[]
+  industries: string[]
+  years_experience: number
+  expertise_areas: string[]
+  availability_type: string
+  availability_hours_per_week: number | null
+}
+
+const VALID_AVAILABILITY_TYPES = ['full-time', 'part-time', 'advisory', 'project-based']
+const MAX_ARRAY_LENGTH = 20
+const MAX_TAG_LENGTH = 100
+
+export async function completeProfileWizard(
+  input: ProfileWizardInput
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // ── Validation & Sanitization ─────────────────────────────────────
+  const headline = escapeHtml(input.headline?.trim() || '')
+  const bio = escapeHtml(input.bio?.trim() || '')
+  const skills = (input.skills || [])
+    .map(s => escapeHtml(s.trim()))
+    .filter(Boolean)
+    .slice(0, MAX_ARRAY_LENGTH)
+    .filter(s => s.length <= MAX_TAG_LENGTH)
+  const industries = (input.industries || [])
+    .map(s => escapeHtml(s.trim()))
+    .filter(Boolean)
+    .slice(0, MAX_ARRAY_LENGTH)
+    .filter(s => s.length <= MAX_TAG_LENGTH)
+  const expertiseAreas = (input.expertise_areas || [])
+    .map(s => escapeHtml(s.trim()))
+    .filter(Boolean)
+    .slice(0, MAX_ARRAY_LENGTH)
+    .filter(s => s.length <= MAX_TAG_LENGTH)
+
+  // SECURITY: Allow 0 for apprentices ("Still studying")
+  const yearsExperience = typeof input.years_experience === 'number' ? input.years_experience : -1
+  const availabilityType = input.availability_type?.trim() || ''
+  const hoursPerWeek = typeof input.availability_hours_per_week === 'number'
+    ? Math.max(0, Math.min(80, Math.round(input.availability_hours_per_week)))
+    : null
+
+  if (!headline || headline.length < 3 || headline.length > 120) {
+    return { error: 'Headline must be 3-120 characters' }
+  }
+  if (!bio || bio.length < 10 || bio.length > 500) {
+    return { error: 'Bio must be 10-500 characters' }
+  }
+  if (skills.length < 2) {
+    return { error: 'Please add at least 2 skills' }
+  }
+  if (industries.length < 1) {
+    return { error: 'Please add at least 1 industry' }
+  }
+  if (yearsExperience < 0 || yearsExperience > 50) {
+    return { error: 'Please select your years of experience' }
+  }
+  if (!VALID_AVAILABILITY_TYPES.includes(availabilityType)) {
+    return { error: 'Please select a valid availability type' }
+  }
+
+  try {
+    // ── Get current profile ───────────────────────────────────────────
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, full_name, onboarding_data')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return { error: 'Failed to load profile' }
+    }
+
+    // SECURITY: Idempotency — don't re-process if already completed
+    const existingOnboarding = (profile.onboarding_data as OnboardingData) || {}
+    if (existingOnboarding.profile_wizard_completed) {
+      return { success: true }
+    }
+
+    const subcategory = determineFunctionCategory(
+      profile.role || '',
+      headline,
+      skills
+    )
+
+    // ── Update profiles table ─────────────────────────────────────────
+    const updatedOnboarding: OnboardingData = {
+      ...existingOnboarding,
+      profile_wizard_completed: true,
+      profile_wizard_completed_at: new Date().toISOString(),
+      profile_wizard_draft: undefined,
+      checklist_profile_completed: true,
+    }
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        headline,
+        bio,
+        skills,
+        industries,
+        years_experience: yearsExperience,
+        expertise_areas: expertiseAreas,
+        availability_type: availabilityType,
+        availability_hours_per_week: hoursPerWeek,
+        onboarding_data: updatedOnboarding as unknown as Record<string, unknown>,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+
+    if (updateError) {
+      console.error('[ProfileWizard] Profile update failed:', updateError.message)
+      return { error: sanitizeErrorMessage(updateError) }
+    }
+
+    // ── Sync to marketplace_listings ─────────────────────────────────
+    // SECURITY: Find listing via provider_profiles (user-scoped), NOT by title
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: providerProfile } = await (supabase as any)
+      .from('provider_profiles')
+      .select('id, listing_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const listingAttributes = {
+      skills,
+      industries,
+      years_experience: yearsExperience,
+      headline,
+      availability: availabilityType,
+      availability_hours_per_week: hoursPerWeek,
+      expertise_areas: expertiseAreas,
+    }
+
+    if (providerProfile?.listing_id) {
+      // Update existing listing — scoped by user's own listing_id
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: listingError } = await (supabase as any)
+        .from('marketplace_listings')
+        .update({
+          description: bio,
+          subcategory,
+          attributes: listingAttributes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', providerProfile.listing_id)
+
+      if (listingError) {
+        console.error('[ProfileWizard] Listing update failed:', listingError.message)
+      }
+    } else {
+      // Create listing if none exists (Founders don't get one during signup)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: newListing, error: insertError } = await (supabase as any)
+        .from('marketplace_listings')
+        .insert({
+          category: 'People',
+          subcategory,
+          title: profile.full_name || headline,
+          description: bio,
+          attributes: listingAttributes,
+          is_verified: false,
+          is_demo: false,
+          is_self_created: true,
+          created_by_provider_id: providerProfile?.id || null,
+          approval_status: 'approved',
+        })
+        .select('id')
+        .maybeSingle()
+
+      if (insertError) {
+        console.error('[ProfileWizard] Listing insert failed:', insertError.message)
+      } else if (newListing?.id && providerProfile?.id) {
+        // Link listing back to provider profile
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('provider_profiles')
+          .update({ listing_id: newListing.id, headline, bio })
+          .eq('id', providerProfile.id)
+      }
+    }
+
+    // ── Revalidate ────────────────────────────────────────────────────
+    revalidatePath('/', 'layout')
+    revalidatePath('/recruits')
+    revalidatePath('/marketplace')
+    revalidatePath('/my-profile')
+
+    return { success: true }
+  } catch (err) {
+    console.error('[ProfileWizard] Unexpected error:', err)
+    return { error: 'An unexpected error occurred' }
+  }
+}
