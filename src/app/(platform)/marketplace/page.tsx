@@ -80,6 +80,9 @@ export default async function MarketplacePage() {
     }
 
     const processGroups = processCountsResult.status === 'fulfilled' ? processCountsResult.value : []
+    if (processCountsResult.status === 'rejected') {
+        console.error('[Marketplace] Failed to fetch process counts:', processCountsResult.reason)
+    }
     const projectContext = projectContextResult.status === 'fulfilled' ? projectContextResult.value : null
 
     // Fetch foundry context for optional features

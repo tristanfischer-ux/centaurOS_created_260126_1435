@@ -37,7 +37,7 @@ export function ProjectContextBanner({ context }: ProjectContextBannerProps) {
 
     function handleShowMatching() {
         const params = new URLSearchParams()
-        params.set('subcategory', context.matchingSubcategories.join(','))
+        params.set('subcategory', context.matchingSubcategories.join('|'))
         router.push(`/marketplace?${params.toString()}`)
     }
 

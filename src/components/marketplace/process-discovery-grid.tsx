@@ -33,10 +33,10 @@ export function ProcessDiscoveryGrid({ groups, totalCount }: ProcessDiscoveryGri
     const router = useRouter()
 
     function handleGroupClick(group: ProcessGroup) {
-        // Navigate with subcategory filter — the marketplace state hook
-        // reads ?subcategory= from the URL and pre-selects those subcategories
+        // Navigate with subcategory filter — uses pipe delimiter to avoid
+        // breaking on subcategory names containing commas
         const params = new URLSearchParams()
-        params.set('subcategory', group.subcategories.join(','))
+        params.set('subcategory', group.subcategories.join('|'))
         router.push(`/marketplace?${params.toString()}`)
     }
 

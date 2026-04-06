@@ -127,13 +127,20 @@ const PROCESS_GROUP_DEFINITIONS: {
 ]
 
 /**
- * Assigns a subcategory to a process group based on pattern matching.
+ * Assigns a subcategory to a process group based on word-boundary matching.
  * Returns null if no group matches (listing will be in "Other").
+ * Uses regex \b to avoid false positives like "Systems" matching "ems".
  */
 function matchSubcategoryToGroup(subcategory: string): string | null {
     const lower = subcategory.toLowerCase()
     for (const group of PROCESS_GROUP_DEFINITIONS) {
-        if (group.patterns.some(p => lower.includes(p))) {
+        if (group.patterns.some(p => {
+            // Multi-word patterns: use includes (already specific enough)
+            if (p.includes(' ')) return lower.includes(p)
+            // Single-word patterns: use word boundary to avoid substring false positives
+            const regex = new RegExp(`\\b${p}\\b`, 'i')
+            return regex.test(lower)
+        })) {
             return group.id
         }
     }
@@ -145,28 +152,42 @@ function matchSubcategoryToGroup(subcategory: string): string | null {
 async function fetchProcessCategoryCounts(): Promise<ProcessGroup[]> {
     const supabase = createAdminClient()
 
-    // Paginate through all non-demo Products+Services to aggregate subcategories
-    const subcategoryCounts: Record<string, number> = {}
-    let offset = 0
-    const pageSize = 1000
+    // DECISION: Use parallel paginated fetches instead of sequential loop.
+    // First get the total count, then fetch all pages in parallel.
+    const { count: totalCount } = await supabase
+        .from("marketplace_listings")
+        .select("id", { count: "exact", head: true })
+        .in("category", ["Products", "Services"])
+        .eq("is_demo", false)
+        .not("subcategory", "is", null)
 
-    while (true) {
-        const { data, error } = await supabase
+    const subcategoryCounts: Record<string, number> = {}
+    const total = totalCount ?? 0
+    const pageSize = 1000
+    const pageCount = Math.ceil(total / pageSize)
+
+    // Fetch all pages in parallel (max ~14 concurrent, cached so only first hit is slow)
+    const pagePromises = Array.from({ length: pageCount }, (_, i) =>
+        supabase
             .from("marketplace_listings")
             .select("subcategory")
             .in("category", ["Products", "Services"])
             .eq("is_demo", false)
             .not("subcategory", "is", null)
-            .range(offset, offset + pageSize - 1)
+            .range(i * pageSize, (i + 1) * pageSize - 1)
+    )
+    const pageResults = await Promise.all(pagePromises)
 
-        if (error || !data || data.length === 0) break
-        for (const row of data) {
+    for (const { data, error } of pageResults) {
+        if (error) {
+            console.error("[getProcessCategoryCounts] Page fetch failed:", error.message)
+            continue
+        }
+        for (const row of (data ?? [])) {
             if (row.subcategory) {
                 subcategoryCounts[row.subcategory] = (subcategoryCounts[row.subcategory] || 0) + 1
             }
         }
-        if (data.length < pageSize) break
-        offset += pageSize
     }
 
     // Assign each subcategory to a process group

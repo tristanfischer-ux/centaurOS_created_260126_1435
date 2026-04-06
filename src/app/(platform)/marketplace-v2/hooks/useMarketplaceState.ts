@@ -121,10 +121,11 @@ export function useMarketplaceState({
     const [sortBy, setSortBy] = useState<SortOption>('relevance')
     const [savedIds, setSavedIds] = useState<Set<string>>(new Set(initialSavedIds))
     // INTENT: Pre-populate subcategory filter from URL params so the process
-    // discovery grid links (?subcategory=X,Y,Z) work on page load.
+    // discovery grid links (?subcategory=X|Y|Z) work on page load.
+    // Uses pipe delimiter to avoid breaking on subcategory names with commas.
     const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(() => {
         const param = searchParams?.get('subcategory')
-        if (param) return new Set(param.split(',').map(s => s.trim()).filter(Boolean))
+        if (param) return new Set(param.split('|').map(s => s.trim()).filter(Boolean))
         return new Set<string>()
     })
     const [showFilters, setShowFilters] = useState(false)

@@ -761,14 +761,18 @@ export default function SourcePage(): React.ReactNode {
                 {(() => {
                   const processes = new Set<string>()
                   for (const moduleAnswers of Object.values(diagnosticAnswers || {})) {
-                    const ans = moduleAnswers as Record<string, string> | null
-                    if (ans?.mfg_process) processes.add(ans.mfg_process)
+                    if (moduleAnswers && typeof moduleAnswers === 'object' && !Array.isArray(moduleAnswers)) {
+                      const ans = moduleAnswers as Record<string, string>
+                      if (ans.mfg_process) processes.add(ans.mfg_process)
+                    }
                   }
                   if (processes.size === 0) return null
+                  // Use the process names as search terms (consistent with project banner)
+                  const searchTerms = Array.from(processes).join(' ')
                   return (
                     <p className="text-xs text-muted-foreground text-center mt-2">
                       <Link
-                        href={`/marketplace?q=${encodeURIComponent(Array.from(processes).join(' '))}`}
+                        href={`/marketplace?q=${encodeURIComponent(searchTerms)}`}
                         className="text-international-orange hover:underline"
                       >
                         Browse more suppliers in the marketplace →

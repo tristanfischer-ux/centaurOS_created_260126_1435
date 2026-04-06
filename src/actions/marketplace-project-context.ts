@@ -115,18 +115,29 @@ const getMatchingSubcategories = unstable_cache(
     async (terms: string[]): Promise<{ count: number; subcategories: string[] }> => {
         const supabase = createAdminClient()
 
-        // Build OR filter for subcategory ILIKE matching
-        const filters = terms.map(t => `subcategory.ilike.%${t}%`).join(",")
+        // SECURITY: Sanitize terms to prevent PostgREST filter injection
+        // (terms are hardcoded today but sanitized for defense-in-depth)
+        const sanitize = (v: string) => v.replace(/[,()\."*]/g, '')
+        const filters = terms.map(t => `subcategory.ilike.%${sanitize(t)}%`).join(",")
 
-        const { count, data } = await supabase
+        // DECISION: Two queries — one for exact count (head-only), one for unique subcategory names.
+        // The old approach used count + limit(1000) which returned wrong subcategories on large datasets.
+        const { count } = await supabase
             .from("marketplace_listings")
-            .select("subcategory", { count: "exact" })
+            .select("id", { count: "exact", head: true })
             .in("category", ["Products", "Services"])
             .eq("is_demo", false)
             .or(filters)
-            .limit(1000)
 
-        // Get unique matching subcategories for the filter URL
+        // Fetch a sample to get unique subcategory names (don't need all rows, just distinct values)
+        const { data } = await supabase
+            .from("marketplace_listings")
+            .select("subcategory")
+            .in("category", ["Products", "Services"])
+            .eq("is_demo", false)
+            .or(filters)
+            .limit(500)
+
         const uniqueSubcats = [...new Set((data ?? []).map(r => r.subcategory).filter(Boolean) as string[])]
 
         return { count: count ?? 0, subcategories: uniqueSubcats }
