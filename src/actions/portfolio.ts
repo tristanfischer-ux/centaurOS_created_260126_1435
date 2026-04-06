@@ -140,7 +140,7 @@ export async function searchPortfolioCompanies(
     .select("id, title, attributes")
     .eq("category", "Finance")
     .not("attributes->portfolio_companies", "is", null)
-    .limit(500)
+    .limit(10000)
 
   if (listError || !listings) {
     console.error("[searchPortfolioCompanies] Fallback error:", listError)

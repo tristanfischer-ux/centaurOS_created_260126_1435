@@ -752,12 +752,14 @@ export const getInvestorStats = unstable_cache(
     // SECURITY: admin client — aggregate stats over marketplace_listings (cross-foundry by design), foundry_id not needed
     const supabase = createAdminClient()
 
-    // INTENT: Removed 2000-row limit to reflect the full database in statistics.
+    // INTENT: Fetch ALL investors for stats computation (not capped by PostgREST default of 1000).
     // Stats computation is O(n) but acceptable for ~10k investors on modern servers.
+    // GOTCHA: Supabase PostgREST defaults to 1000 rows without an explicit limit.
     const { data, error } = await supabase
       .from('marketplace_listings')
       .select('subcategory, attributes')
       .eq('category', 'Finance')
+      .limit(20000)
 
     if (error) {
       console.error('[getInvestorStats] Supabase error:', error)

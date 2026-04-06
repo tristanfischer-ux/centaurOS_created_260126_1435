@@ -204,50 +204,29 @@ export default async function InvestorDirectoryPage() {
         shortlistCount={Object.keys(shortlistIds).length}
       />
 
-      {/* Semantic search hero above tabs */}
-      <Suspense fallback={null}>
-        <InvestorSearchHeroClient
-          initialFirms={initialFirms}
-          initialTotal={initialTotal}
-          initialHasMore={initialHasMore}
-          initialMatchScores={matchScores}
-          initialShortlistIds={shortlistIds}
-          access={access}
-          productSectors={productSectors}
-          companyContext={companyContext}
-        />
-      </Suspense>
-
-      {/* Tabbed view: For You + Browse All + Contacts + Portfolio + Grants */}
+      {/* Tabs directly after Fiona — search hero + browser inside Browse All */}
       <InvestorPageTabs
         contactCount={contactCount}
         portfolioCount={stats?.portfolioCompanyCount ?? 0}
         grantsCount={grantsCount}
         browseContent={
           <>
+            {/* Semantic search hero */}
+            <Suspense fallback={null}>
+              <InvestorSearchHeroClient
+                initialFirms={initialFirms}
+                initialTotal={initialTotal}
+                initialHasMore={initialHasMore}
+                initialMatchScores={matchScores}
+                initialShortlistIds={shortlistIds}
+                access={access}
+                productSectors={productSectors}
+                companyContext={companyContext}
+              />
+            </Suspense>
+
             {/* Insights panel */}
             {stats && <InvestorInsightsPanel stats={stats} />}
-
-            {/* Color legend */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground border-b border-border pb-4">
-              <span className="font-medium text-foreground text-sm">Legend:</span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-flex h-2 w-2 rounded-full bg-success" />
-                Actively deploying
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block px-2 py-0.5 rounded text-xs bg-destructive/10 text-destructive font-medium">Priority A</span>
-                High priority
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block px-2 py-0.5 rounded text-xs bg-warning/10 text-warning font-medium">Priority B</span>
-                Medium priority
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block px-2 py-0.5 rounded text-xs bg-secondary text-secondary-foreground font-medium">Priority C</span>
-                Lower priority
-              </span>
-            </div>
           </>
         }
         contactsContent={

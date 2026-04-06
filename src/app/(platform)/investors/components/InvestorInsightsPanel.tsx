@@ -169,7 +169,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
             <StatCard
               icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
               value={stats.hwFit7PlusCount}
-              label="HW Fit 7+"
+              label="Hardware Fit 7+"
             />
           </div>
 
