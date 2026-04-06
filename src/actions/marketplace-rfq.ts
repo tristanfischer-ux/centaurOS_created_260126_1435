@@ -14,6 +14,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { Resend } from "resend"
 import { escapeHtml } from "@/lib/security/sanitize"
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit"
+import { headers } from "next/headers"
 
 const resend = process.env.RESEND_API_KEY
     ? new Resend(process.env.RESEND_API_KEY)
@@ -71,15 +73,12 @@ export async function sendSupplierQuoteRequest(
     if (params.subject.length > 500) return { success: false, error: "Subject too long (max 500 chars)" }
     if (params.message.length > 5000) return { success: false, error: "Message too long (max 5000 chars)" }
 
-    // Rate limiting: check recent requests
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    const { count: recentCount } = await supabase
-        .from("quote_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .gte("created_at", oneHourAgo)
-
-    if ((recentCount ?? 0) >= 10) {
+    // SECURITY: Atomic rate limiting (prevents concurrent bypass)
+    const hdrs = await headers()
+    const ip = getClientIP(hdrs)
+    const rateLimitKey = `quote-request:${user.id}`
+    const { allowed } = await rateLimit(rateLimitKey, 10, 3600, ip)
+    if (!allowed) {
         return { success: false, error: "Rate limit reached. You can send up to 10 quote requests per hour." }
     }
 
@@ -107,7 +106,7 @@ export async function sendSupplierQuoteRequest(
             message: params.message.trim(),
             quantity: params.quantity?.trim() || null,
             deadline: params.deadline || null,
-            status: "sent",
+            status: "draft", // DECISION: Start as draft, update to sent on email success
         })
         .select("id")
         .single()
@@ -127,7 +126,7 @@ export async function sendSupplierQuoteRequest(
                 from: FROM_ADDRESS,
                 to: listing.contact_email,
                 replyTo: profile.email,
-                subject: `Quote Request: ${escapeHtml(params.subject.trim())}`,
+                subject: `Quote Request: ${params.subject.trim()}`,
                 html: buildQuoteEmailHtml({
                     senderName,
                     companyName,
@@ -140,11 +139,12 @@ export async function sendSupplierQuoteRequest(
                 }),
             })
 
-            // Update record with email metadata
+            // Update record: mark as sent with email metadata
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (supabase as any)
                 .from("quote_requests")
                 .update({
+                    status: "sent",
                     email_sent_at: new Date().toISOString(),
                     email_message_id: emailResult.data?.id || null,
                 })
@@ -152,8 +152,7 @@ export async function sendSupplierQuoteRequest(
 
         } catch (emailErr) {
             console.error("[MarketplaceRFQ] Email send failed:", emailErr)
-            // Record still exists with status 'sent' — email failed silently
-            // Don't fail the whole operation — the record is useful for tracking
+            // Record stays as 'draft' — user can see it failed on the tracking page
         }
     } else {
         console.warn("[MarketplaceRFQ] RESEND_API_KEY not configured — email not sent")
@@ -191,6 +190,7 @@ export async function sendBulkQuoteRequests(
 export async function getMyQuoteRequests(): Promise<{
     id: string
     created_at: string
+    listing_id: string
     supplier_name: string
     subject: string
     status: string
@@ -204,7 +204,7 @@ export async function getMyQuoteRequests(): Promise<{
 
     const { data } = await supabase
         .from("quote_requests")
-        .select("id, created_at, supplier_name, subject, status, quantity, deadline, email_sent_at")
+        .select("id, created_at, listing_id, supplier_name, subject, status, quantity, deadline, email_sent_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50)

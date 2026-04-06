@@ -57,7 +57,10 @@ export function QuoteRequestDialog({ listings, trigger, onComplete }: QuoteReque
                     { subject: sub, message: message.trim(), quantity: quantity.trim() || undefined, deadline: deadline || undefined }
                 )
                 if (result.sentCount > 0) {
-                    toast.success(`Sent to ${result.sentCount} supplier${result.sentCount > 1 ? 's' : ''}. They'll reply to your email.`)
+                    toast.success(`Sent to ${result.sentCount} supplier${result.sentCount > 1 ? 's' : ''}`, {
+                        description: 'They\'ll reply to your email.',
+                        action: { label: 'View requests', onClick: () => window.location.href = '/marketplace/quotes' },
+                    })
                 }
                 if (result.failedCount > 0) {
                     toast.error(`${result.failedCount} failed to send`)
@@ -71,7 +74,10 @@ export function QuoteRequestDialog({ listings, trigger, onComplete }: QuoteReque
                     deadline: deadline || undefined,
                 })
                 if (result.success) {
-                    toast.success("Quote request sent. They'll reply to your email.")
+                    toast.success("Quote request sent", {
+                        description: "They'll reply to your email.",
+                        action: { label: 'View requests', onClick: () => window.location.href = '/marketplace/quotes' },
+                    })
                 } else {
                     toast.error(result.error || 'Failed to send')
                 }
@@ -101,8 +107,16 @@ export function QuoteRequestDialog({ listings, trigger, onComplete }: QuoteReque
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">
-                    {/* Warning for suppliers without email */}
-                    {withoutEmail.length > 0 && (
+                    {/* All suppliers lack email — show error and disable form */}
+                    {isBulk && withEmail.length === 0 && (
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                            <span>None of the selected suppliers have contact emails on file. Try selecting different suppliers.</span>
+                        </div>
+                    )}
+
+                    {/* Warning for some suppliers without email */}
+                    {withoutEmail.length > 0 && withEmail.length > 0 && (
                         <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 text-warning text-sm">
                             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                             <span>

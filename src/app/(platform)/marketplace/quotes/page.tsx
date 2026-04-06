@@ -60,7 +60,7 @@ export default async function QuoteRequestsPage() {
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
                                                 <Link
-                                                    href={`/marketplace/${req.id}`}
+                                                    href={`/marketplace/${req.listing_id}`}
                                                     className="text-sm font-medium text-foreground hover:text-international-orange transition-colors truncate"
                                                 >
                                                     {req.supplier_name}
