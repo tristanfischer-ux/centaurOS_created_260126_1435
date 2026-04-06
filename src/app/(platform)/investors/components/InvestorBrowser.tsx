@@ -27,7 +27,7 @@ import { InvestorMapView } from './InvestorMapView'
 import { InvestorExportMenu } from './InvestorExportMenu'
 import { InvestorTableView } from './InvestorTableView'
 import { InvestorDetailDialog } from './InvestorDetailDialog'
-import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScores } from '@/actions/investors'
+import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScores, getContactCounts } from '@/actions/investors'
 import { Search, X, RefreshCw, Building2, LayoutGrid, List, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -180,6 +180,7 @@ export function InvestorBrowser({
   const [initialUrlFetchDone, setInitialUrlFetchDone] = useState(!hasUrlFilters)
   const [page, setPage] = useState(1)
   const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores)
+  const [contactCounts, setContactCounts] = useState<Record<string, number>>({})
   const [shortlistIds, setShortlistIds] = useState<Record<string, ShortlistStage>>(initialShortlistIds)
 
   const [isPending, startTransition] = useTransition()
@@ -307,10 +308,14 @@ export function InvestorBrowser({
         setPage(1)
         // Clear compare selection — old IDs may not be in new results
         setCompareIds([])
-        // Compute match scores for new firms so match sort works after refetch
+        // Compute match scores + contact counts for new firms
         if (result.firms.length > 0) {
-          computeMatchScores(result.firms.map(f => f.id))
+          const ids = result.firms.map(f => f.id)
+          computeMatchScores(ids)
             .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+            .catch(() => { /* non-critical */ })
+          getContactCounts(ids)
+            .then(counts => setContactCounts(prev => ({ ...prev, ...counts })))
             .catch(() => { /* non-critical */ })
         }
         if (!initialUrlFetchDone) setInitialUrlFetchDone(true)
@@ -669,6 +674,7 @@ export function InvestorBrowser({
           compareIds={compareIds}
           isPending={isPending}
           onSelectFirm={setSelectedFirmId}
+          contactCounts={contactCounts}
         />
       )}
 

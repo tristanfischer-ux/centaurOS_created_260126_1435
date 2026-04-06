@@ -1113,6 +1113,34 @@ export async function computeMatchScores(
   return result
 }
 
+/**
+ * Batch-fetch contact counts per investor listing.
+ * Used by InvestorTableView to show the "Contacts" column.
+ */
+export async function getContactCounts(
+  listingIds: string[]
+): Promise<Record<string, number>> {
+  if (listingIds.length === 0) return {}
+  const safeIds = listingIds.filter(id => UUID_RE.test(id)).slice(0, 200)
+  if (safeIds.length === 0) return {}
+
+  const supabase = await createClient()
+  // INTENT: Single query to count contacts per listing, avoiding N+1
+  const { data, error } = await supabase
+    .from('vc_pe_contacts')
+    .select('listing_id')
+    .in('listing_id', safeIds)
+
+  if (error || !data) return {}
+
+  const counts: Record<string, number> = {}
+  for (const row of data) {
+    const lid = (row as Record<string, unknown>).listing_id as string
+    counts[lid] = (counts[lid] ?? 0) + 1
+  }
+  return counts
+}
+
 // ---------------------------------------------------------------------------
 // Shortlist CRUD
 // ---------------------------------------------------------------------------

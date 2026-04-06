@@ -31,6 +31,8 @@ interface InvestorTableViewProps {
   isPending: boolean
   /** Called when user clicks a row — opens modal detail instead of navigating */
   onSelectFirm?: (firmId: string) => void
+  /** Contact counts per listing_id — from batch query */
+  contactCounts?: Record<string, number>
 }
 
 // ---------------------------------------------------------------------------
@@ -62,8 +64,9 @@ const COLUMN_HEADERS: { label: string; className?: string }[] = [
   { label: 'Sectors' },
   { label: 'Stage' },
   { label: 'Fund Size', className: 'hidden lg:table-cell' },
-  { label: 'Thesis', className: 'hidden lg:table-cell' },
+  { label: 'Intel Preview', className: 'hidden xl:table-cell' },
   { label: 'Quality' },
+  { label: 'Contacts', className: 'hidden md:table-cell' },
   { label: 'Portfolio', className: 'hidden lg:table-cell' },
   { label: '' },                           // shortlist heart
 ]
@@ -81,6 +84,7 @@ export function InvestorTableView({
   compareIds: _compareIds,
   isPending,
   onSelectFirm,
+  contactCounts = {},
 }: InvestorTableViewProps) {
   const router = useRouter()
 
@@ -205,10 +209,10 @@ export function InvestorTableView({
                   {fundLabel ?? <span className="text-muted-foreground">—</span>}
                 </td>
 
-                {/* 8. Thesis snippet */}
-                <td className="hidden lg:table-cell px-3 py-2 text-muted-foreground max-w-[240px]">
-                  <span className="line-clamp-1">
-                    {truncate(attrs.investment_thesis, 80)}
+                {/* 8. Intel Preview (thesis/connection brief snippet) */}
+                <td className="hidden xl:table-cell px-3 py-2 text-muted-foreground max-w-[260px]">
+                  <span className="line-clamp-2 text-xs leading-snug">
+                    {truncate(attrs.connection_brief || attrs.investment_thesis, 120)}
                   </span>
                 </td>
 
@@ -227,7 +231,12 @@ export function InvestorTableView({
                   </div>
                 </td>
 
-                {/* 10. Portfolio count */}
+                {/* 10. Contacts count */}
+                <td className="hidden md:table-cell px-3 py-2 text-muted-foreground tabular-nums">
+                  {contactCounts[firm.id] ?? 0}
+                </td>
+
+                {/* 11. Portfolio count */}
                 <td className="hidden lg:table-cell px-3 py-2 text-muted-foreground tabular-nums">
                   {portfolioCount}
                 </td>
