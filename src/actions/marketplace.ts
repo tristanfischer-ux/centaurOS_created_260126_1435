@@ -475,6 +475,7 @@ export async function searchMarketplaceListings(
         const semanticIds = semanticRows.map((r) => r.id)
         if (semanticIds.length > 0) {
             let semQuery = supabase.from('marketplace_listings').select(LISTING_COLUMNS).in('id', semanticIds)
+                .eq('is_demo', false)
             if (params.categories?.length) {
                 semQuery = semQuery.in('category', params.categories as ("People" | "Products" | "Services")[])
             } else if (params.category) {
@@ -503,6 +504,16 @@ export async function searchMarketplaceListings(
                         `attributes->>company_size.ilike.%${sanitize(s)}%`,
                     ]).join(',')
                     semQuery = semQuery.or(sizeFilters)
+                }
+                // DECISION: Apply same industry/certification filters to semantic results
+                // to prevent filter leakage (showing unfiltered semantic matches on page 1)
+                if (af.industries && af.industries.length > 0) {
+                    const industryFilters = af.industries.map(ind => `industries.cs.["${sanitize(ind)}"]`).join(',')
+                    semQuery = semQuery.or(industryFilters)
+                }
+                if (af.certifications && af.certifications.length > 0) {
+                    const certFilters = af.certifications.map(c => `certifications.cs.["${sanitize(c)}"]`).join(',')
+                    semQuery = semQuery.or(certFilters)
                 }
             }
             const { data: semanticListings } = await semQuery

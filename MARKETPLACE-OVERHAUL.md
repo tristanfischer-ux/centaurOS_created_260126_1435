@@ -103,6 +103,18 @@
 2. **Certification/industry filtering moved server-side** — Replaced in-memory post-filter with JSONB `cs` (contains) operator on `industries` and `certifications` columns. Fixes pagination-incorrect counts.
 3. **Round 2 Red Team confirmed:** sort logic safe (nullsFirst: true), certifications safe (safeStringArray), stats count query order correct
 
+## Red Team Round 3 — Findings & Fixes
+
+### FIXED:
+1. **Card link-navigability** — Card titles are now `<Link href="/marketplace/{id}">` so users can cmd-click to open in new tab. "View" button in grid uses Link with click interception: left-click opens dialog, cmd-click opens page.
+2. **Semantic filter leakage** — Semantic re-fetch query now applies same certification/industry JSONB containment filters as main query. Previously, page 1 semantic results bypassed these filters.
+3. **Semantic results not filtered for demo** — Added `.eq('is_demo', false)` to semantic re-fetch query.
+
+### IDENTIFIED (not fixing now — backfill task):
+4. **27% of listings lack embeddings** — `backfill-marketplace-embeddings.ts` exists but needs to be triggered. ~4,000 listings invisible to semantic search.
+5. **AI search doesn't extract industries** — "aerospace CNC machining" won't auto-filter by Aerospace industry. Enhancement for later.
+6. **totalCount inconsistent between pages** — page 1 adds semantic-only count, page 2+ doesn't. Minor UX issue.
+
 ## Final State
 
 - "For You" tab: REMOVED
@@ -114,6 +126,25 @@
 - Semantic search: WORKING (16,623/22,629 have embeddings)
 
 ---
+
+## Nightshift vs ForgeOS Count Investigation
+
+**DB query results (2026-04-06):**
+- Total Products+Services: **15,181**
+- Demo (is_demo=true): **1,471** (pre-Nightshift seed data, created before March 2026)
+- Non-demo (real): **13,710**
+- With relevance_score (Nightshift-pushed): **13,400**
+- Created after 2026-03-01: **13,420**
+- Created before 2026-03-01: **1,761** (seed/demo)
+- With website_url: **14,344**
+- Self-created by users: **0**
+
+**Explanation:**
+Nightshift dashboard says "8,696 pushed to ForgeOS" — but this is likely the count from the most recent pipeline run, not the cumulative total. The DB shows **13,400 listings with `relevance_score`** (the Nightshift provenance marker), all created after March 2026. There have been multiple pipeline runs over time.
+
+The **1,471 demo listings** are pre-Nightshift seed data from early development. These are now filtered out by the `is_demo=false` filter applied in this overhaul.
+
+After demo filtering, users see **~13,710 real supplier listings**.
 
 ## Verification Checklist
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { MarketCardV2 } from './MarketCardV2'
 import { PersonCard } from '@/components/marketplace/person-card'
 import type { EnrichedPersonListing } from '@/actions/people-marketplace'
@@ -217,7 +218,13 @@ function ListRow({
                     <VerificationBadge tier={listing.verification_tier} size="sm" />
                 </div>
                 <h3 className="text-sm font-semibold text-foreground truncate mt-0.5">
-                    {listing.title}
+                    <Link
+                        href={`/marketplace/${listing.id}`}
+                        className="hover:text-international-orange transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {listing.title}
+                    </Link>
                 </h3>
                 <p className="text-xs text-muted-foreground truncate">
                     {headline || listing.description}
@@ -289,13 +296,24 @@ function ListRow({
                     size="sm"
                     variant="ghost"
                     className="gap-1 shrink-0 hidden sm:flex"
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        onViewDetail(listing)
-                    }}
+                    asChild
                 >
-                    View
-                    <ArrowRight className="w-3 h-3" />
+                    <Link
+                        href={`/marketplace/${listing.id}`}
+                        onClick={(e) => {
+                            // Left-click without modifier: use dialog/detail view
+                            if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onViewDetail(listing)
+                            } else {
+                                e.stopPropagation()
+                            }
+                        }}
+                    >
+                        View
+                        <ArrowRight className="w-3 h-3" />
+                    </Link>
                 </Button>
             </div>
         </div>

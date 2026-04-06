@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useState, useCallback, useEffect } from "react"
+import Link from "next/link"
 import { MarketplaceListing, saveMarketplaceListing, unsaveMarketplaceListing } from "@/actions/marketplace"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -235,7 +236,13 @@ export const MarketCard = memo(function MarketCard({
                                     )}
                                 </div>
                                 <h3 className="text-sm font-bold tracking-tight text-foreground truncate">
-                                    {listing.title}
+                                    <Link
+                                        href={`/marketplace/${listing.id}`}
+                                        className="hover:text-international-orange transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {listing.title}
+                                    </Link>
                                 </h3>
                             </div>
 
@@ -290,7 +297,13 @@ export const MarketCard = memo(function MarketCard({
                                     )}
                                 </div>
                                 <h3 className="text-base font-bold tracking-tight text-foreground truncate">
-                                    {listing.title}
+                                    <Link
+                                        href={`/marketplace/${listing.id}`}
+                                        className="hover:text-international-orange transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {listing.title}
+                                    </Link>
                                 </h3>
                             </div>
                         </div>
@@ -461,7 +474,13 @@ export const MarketCard = memo(function MarketCard({
                                     )}
                                 </div>
                                 <h3 className="text-lg font-bold tracking-tight text-foreground">
-                                    {listing.title}
+                                    <Link
+                                        href={`/marketplace/${listing.id}`}
+                                        className="hover:text-international-orange transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {listing.title}
+                                    </Link>
                                 </h3>
                                 {isPerson && attrs.role && (
                                     <p className="text-sm font-medium text-muted-foreground mt-1">{attrs.role}</p>

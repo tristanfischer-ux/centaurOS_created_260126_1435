@@ -41,6 +41,18 @@
 
 ---
 
+## Do What Was Asked — Completely
+
+**When the user asks for N iterations, do N iterations.** Do not collapse, skip, or "triage to later."
+
+1. **Count explicitly.** If asked for 3 rounds of red-teaming, number them in the tracker: Round 1, Round 2, Round 3. Each must produce findings AND fixes before the next begins.
+2. **Fix everything found, not just P1s.** If a red team round surfaces 5 issues, fix all 5 — not just the "critical" ones. The user asked for thorough, not triaged.
+3. **Investigate root causes, not symptoms.** If the user says "these numbers don't match," don't just fix the display — query the database, trace the data pipeline, and explain WHY they don't match.
+4. **"Do it without me" means MORE thorough, not less.** The user won't be there to catch mistakes. Verify the deployed result. Test the actual user experience. Don't substitute `tsc --noEmit` for real verification.
+5. **Compilation is not verification.** After code changes, test the feature as a user would: search for something, click through, check the output makes sense. `tsc` passing means the code compiles, not that the marketplace is useful.
+
+---
+
 ## Self-Improvement Loop
 
 After ANY correction, mistake, or unexpected behaviour:

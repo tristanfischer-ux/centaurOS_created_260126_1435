@@ -126,3 +126,45 @@ NEVER: Estimate specialist quality without running the benchmark.
 ALWAYS: Compare against the real baseline (sage-baseline-20260405.json: composite 4.4, actionability 4.3, specificity 4.2, depth 4.4, voice 4.67). Any personality change that drops composite below 4.2 or voice below 4.0 must be discarded.
 REASON: First real API-backed benchmark run produced reliable scores across 20 scenarios. These are the numbers future changes are measured against.
 RELATED: experiments/autoagent-strategy-specialist/benchmark/results/sage-baseline-20260405.json
+
+### 2026-04-05 - RULE: get_my_foundry_id() is unreliable — ALWAYS use admin client for server-side foundry/subscription lookups
+NEVER: Use `createClient()` (user client) for foundry or subscription lookups in server actions that gate access (AI limits, invitations, tier checks). The RLS depends on `get_my_foundry_id()` which calls `is_active` — this returns NULL for newly-created accounts or due to function caching.
+ALWAYS: Use `createAdminClient()` as the primary path with `createClient()` as fallback (for dev environments without service role key). Document with `// DECISION:` comment.
+REASON: Bugs #1, #2, #4 in the red team simulation all stem from this root cause. Fixed for `getFoundryTier()` and foundries lookup in invitations, but the `company_invitations` INSERT is still broken.
+RELATED: src/lib/ai/limit-check.ts, src/actions/invitations.ts, RED-TEAM-SIMULATION.md
+
+### 2026-04-05 - RULE: Supabase email login requires BOTH auth.users AND auth.identities records
+NEVER: Assume creating an `auth.users` record is sufficient for email/password login. Supabase will return "Invalid login credentials" if `auth.identities` is missing.
+ALWAYS: When creating user accounts via direct SQL, create records in both `auth.users` (with `crypt()` password + `gen_salt('bf')`) AND `auth.identities` (with `provider='email'`, `provider_id=user.id`, `identity_data` JSON with email/sub).
+REASON: Spent significant debugging time during red team simulation when executive accounts couldn't log in despite auth.users records existing.
+RELATED: RED-TEAM-SIMULATION.md
+
+### 2026-04-05 - RULE: Never call Date.now() or new Date() in a React render path
+NEVER: Compute `Date.now()` or `new Date()` inside a render-time expression (IIFE, inline variable, or non-memoized computation) that feeds into a useMemo dependency.
+ALWAYS: Use `useRef` for timestamps that need to be stable across renders, or `useEffect` to update them on specific dependency changes. For server/client consistency, defer time-dependent values to `useEffect` (not `useState` initializers).
+REASON: `Date.now()` produces a new value every render. When used in an object that's a useMemo dependency, the memo always produces a new reference, triggering all consumers to re-render. In ScreenContextProvider, this caused React error #310 (infinite re-renders) because consumer hooks called setState on mount → re-render → new Date.now() → new context → consumer re-renders → setState → loop. Same class of bug as the Cash Burn hydration mismatch (R2-10) where `new Date()` in useState caused server/client divergence.
+RELATED: src/contexts/screen-context.tsx, src/app/(platform)/cash-burn/cash-burn-view.tsx
+
+### 2026-04-05 - RULE: After fixing one instance of an RLS bypass, grep for ALL similar patterns
+NEVER: Fix a single RLS bypass (e.g., foundries lookup in `limit-check.ts`) without checking all other files that do the same query pattern.
+ALWAYS: After fixing an RLS-dependent query, run `grep -r "createClient" src/actions/ src/lib/ | grep -v node_modules` and check every result for the same vulnerability.
+REASON: Bug #4 (invitations INSERT) is the exact same class of bug as Bug #1 (foundries lookup) — just in a different file. Should have been caught in the same fix pass.
+RELATED: src/actions/invitations.ts, src/lib/ai/limit-check.ts
+
+### 2026-04-06 - RULE: When asked for N iterations, do exactly N iterations
+NEVER: Collapse 3 requested red-team rounds into 2, or skip P2 issues found in a round.
+ALWAYS: Number each iteration explicitly in the tracker. Each round must produce findings AND fixes before the next begins. Fix ALL issues found, not just the ones you judge as critical.
+REASON: Marketplace overhaul — user asked for 3 red-team/fix cycles. Only did 2. Skipped P2 issues (card link-navigability, AI search certification extraction) by triaging them as "later" despite user explicitly asking to fix everything found.
+RELATED: MARKETPLACE-OVERHAUL.md
+
+### 2026-04-06 - RULE: Investigate root causes, not display symptoms
+NEVER: See "8,813 vs 15,181 count mismatch" and only fix the display query. Always investigate WHY the data diverges.
+ALWAYS: When numbers don't match between systems (Nightshift 8,696 pushed vs ForgeOS 15,181 in DB), query the DB to trace provenance: which listings came from Nightshift, which are seed data, which are from other sources.
+REASON: Fixed the stats pagination bug but never explained why ForgeOS has ~6,500 more suppliers than Nightshift pushed. User specifically asked about this discrepancy.
+RELATED: src/actions/marketplace-stats.ts, Nightshift push pipeline
+
+### 2026-04-06 - RULE: "Do it without me" means be MORE thorough
+NEVER: Treat autonomous work as license to cut scope or rush to commit.
+ALWAYS: When the user is away, verify the deployed result, test as a user would (search, click, check results), and do MORE rounds of review — not fewer.
+REASON: Interpreted "I'm going away" as "ship fast" instead of "be thorough because I can't review."
+RELATED: CLAUDE.md "Do What Was Asked" section
