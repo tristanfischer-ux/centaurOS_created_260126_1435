@@ -28,7 +28,7 @@ interface InvestorPageTabsProps {
 
 const TAB_CONFIG: { id: TabId; label: string; icon: typeof Sparkles; countKey?: keyof Pick<InvestorPageTabsProps, 'contactCount' | 'portfolioCount' | 'grantsCount'> }[] = [
   { id: "for-you", label: "For You", icon: Sparkles },
-  { id: "browse", label: "Browse All", icon: Grid3X3 },
+  { id: "browse", label: "Investors", icon: Grid3X3 },
   { id: "contacts", label: "Contacts", icon: Users, countKey: "contactCount" },
   { id: "portfolio", label: "Portfolio", icon: Briefcase, countKey: "portfolioCount" },
   { id: "grants", label: "Grants", icon: Award, countKey: "grantsCount" },

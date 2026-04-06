@@ -1770,13 +1770,9 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
 
   const total = count ?? 0
 
-  // Tier gating
+  // Tier gating — contacts directory is accessible to all authenticated users.
+  // Sensitive fields (email, deep_bio) are gated by tier.
   const access = await getInvestorTierAccess()
-
-  // Free tier: no contacts visible at all
-  if (!access.contactsVisible) {
-    return { contacts: [], total, hasMore: false }
-  }
 
   const contacts: ContactSearchResult[] = (data ?? []).map((row: Record<string, unknown>) => {
     // GOTCHA: Supabase join returns marketplace_listings as an object (inner join = single row)
