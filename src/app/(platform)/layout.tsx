@@ -146,12 +146,15 @@ export default async function PlatformLayout({
                         {!needsProfileRepair && (
                             <>
                                 <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} />
-                                <ProfileCompletionWizard
-                                    open={!!(profile?.account_type !== 'supplier' && profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed && !(profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)}
-                                    userRole={profile?.role ?? undefined}
-                                    onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null}
-                                    onComplete={() => {}}
-                                />
+                                {/* INTENT: ProfileCompletionWizard wrapped in Suspense to prevent layout crash */}
+                                <Suspense fallback={null}>
+                                    <ProfileCompletionWizard
+                                        open={!!(profile?.account_type !== 'supplier' && profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed && !(profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)}
+                                        userRole={profile?.role ?? undefined}
+                                        onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null}
+                                        onComplete={() => {}}
+                                    />
+                                </Suspense>
                                 <ExecutiveProfilePrompt userRole={profile?.role ?? undefined} onboardingCompleted={!!(profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)} />
                             </>
                         )}
