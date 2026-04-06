@@ -214,6 +214,12 @@ export interface MarketplaceListing {
     enrichment_quality: string | null
     /** Security clearances held (Nightshift enrichment). */
     security_clearances: string[] | null
+    /** Country (Nightshift enrichment). */
+    country: string | null
+    /** City (Nightshift enrichment). */
+    city: string | null
+    /** Company size descriptor (Nightshift enrichment). */
+    company_size: string | null
     /** Denormalised average rating (1.00–5.00) from marketplace_reviews. */
     average_rating: number | null
     /** Denormalised review count from marketplace_reviews. */
@@ -232,6 +238,7 @@ const LISTING_COLUMNS = [
     'certifications', 'materials', 'key_equipment', 'financial_health',
     'enrichment_quality', 'security_clearances', 'created_at',
     'data_quality_score', 'average_rating', 'review_count',
+    'country', 'city', 'company_size',
 ].join(', ')
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
@@ -322,6 +329,7 @@ export async function searchMarketplaceListings(
     const to = from + pageSize - 1
 
     let query = supabase.from('marketplace_listings').select(LISTING_COLUMNS, { count: 'exact' })
+        .eq('is_demo', false) // DECISION: Exclude demo/sample listings from marketplace browse
 
     const queryTrimmed = params.query?.trim()
     if (queryTrimmed) {
@@ -388,6 +396,18 @@ export async function searchMarketplaceListings(
             ]).join(',')
             query = query.or(sizeFilters)
         }
+        // DECISION: Move certification and industry filtering to DB level using JSONB
+        // containment. The old post-filter approach was broken with pagination — it
+        // filtered AFTER fetching a page, producing wrong counts and incomplete pages.
+        if (af.industries && af.industries.length > 0) {
+            // Build OR filter: listing matches if its industries array contains ANY of the wanted industries
+            const industryFilters = af.industries.map(ind => `industries.cs.["${sanitize(ind)}"]`).join(',')
+            query = query.or(industryFilters)
+        }
+        if (af.certifications && af.certifications.length > 0) {
+            const certFilters = af.certifications.map(c => `certifications.cs.["${sanitize(c)}"]`).join(',')
+            query = query.or(certFilters)
+        }
     }
 
     const sort = params.sort ?? 'verified'
@@ -412,7 +432,15 @@ export async function searchMarketplaceListings(
         case 'relevance':
         case 'verified':
         default:
-            query = query.order('data_quality_score', { ascending: false }).order('is_verified', { ascending: false }).order('created_at', { ascending: false })
+            // DECISION: Verified first, then relevance_score (Nightshift quality metric),
+            // then data_quality_score as tiebreaker. Verified listings always rank above
+            // unverified. nullsFirst: true so listings without Nightshift data don't
+            // get penalised — they just sort by the next criteria.
+            query = query
+                .order('is_verified', { ascending: false })
+                .order('relevance_score', { ascending: false, nullsFirst: true })
+                .order('data_quality_score', { ascending: false })
+                .order('created_at', { ascending: false })
     }
 
     query = query.range(from, to)
@@ -503,39 +531,13 @@ export async function searchMarketplaceListings(
         })
     }
 
-    // INTENT: In-memory post-filter for industries and certifications JSONB arrays.
-    // PostgREST doesn't support JSONB array containment without RPC, so we filter
-    // client-side (same approach as investor stage/sector filtering).
-    if (af && af.industries && af.industries.length > 0) {
-        const wanted = new Set(af.industries.map(i => i.toLowerCase()))
-        listings = listings.filter((l) => {
-            const attrs = l.attributes as Record<string, unknown> | null
-            const industries = l.industries ?? attrs?.industries
-            if (!Array.isArray(industries)) return false
-            return industries.some((ind: unknown) =>
-                typeof ind === 'string' && wanted.has(ind.toLowerCase())
-            )
-        })
-    }
-
-    if (af && af.certifications && af.certifications.length > 0) {
-        const wanted = new Set(af.certifications.map(c => c.toLowerCase()))
-        listings = listings.filter((l) => {
-            const attrs = l.attributes as Record<string, unknown> | null
-            const certs = l.certifications ?? attrs?.certifications
-            if (!Array.isArray(certs)) return false
-            return certs.some((cert: unknown) =>
-                typeof cert === 'string' && wanted.has(cert.toLowerCase())
-            )
-        })
-    }
-
     // INTENT: Fetch per-category counts so the UI pills show real totals, not just
     // the count from the loaded page. Uses the same text-search filter but grouped
     // by category, scoped to the allowed categories. Also applies advanced filters.
     const countCategories = params.categories ?? ['People', 'Products', 'Services']
     const categoryCountPromises = countCategories.map(async (cat) => {
         let cq = supabase.from('marketplace_listings').select('id', { count: 'exact', head: true })
+            .eq('is_demo', false)
         if (queryTrimmed) {
             cq = cq.textSearch('search_vector', queryTrimmed, { type: 'websearch', config: 'english' })
         }

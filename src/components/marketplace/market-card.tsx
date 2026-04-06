@@ -10,7 +10,7 @@ import { cn, getInitials } from "@/lib/utils"
 import { safeParseAttributes, safeStringArray } from "@/lib/marketplace-utils"
 import { getCategoryBadgeClasses, getAvatarGradient, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import { 
-    ShieldCheck, MapPin, Clock, Briefcase,
+    ShieldCheck, MapPin, Clock, Briefcase, Building2,
     GitCompareArrows, Mail, Eye, ChevronDown, ChevronUp,
     Star, Calendar, Award, Globe, Wrench, Heart, FlaskConical
 } from "lucide-react"
@@ -307,16 +307,18 @@ export const MarketCard = memo(function MarketCard({
 
                         {/* Key metrics row */}
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-3">
+                            {(listing.country || listing.city || attrs.location) && (
+                                <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {listing.city && listing.country
+                                        ? `${listing.city}, ${listing.country}`
+                                        : listing.country || listing.city || attrs.location}
+                                </span>
+                            )}
                             {attrs.years_experience && (
                                 <span className="flex items-center gap-1">
                                     <Briefcase className="w-3 h-3" />
                                     {attrs.years_experience}y
-                                </span>
-                            )}
-                            {attrs.location && (
-                                <span className="flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" />
-                                    {attrs.location}
                                 </span>
                             )}
                             {attrs.lead_time && (
@@ -325,7 +327,32 @@ export const MarketCard = memo(function MarketCard({
                                     {attrs.lead_time}
                                 </span>
                             )}
+                            {listing.company_size && (
+                                <span className="flex items-center gap-1">
+                                    <Building2 className="w-3 h-3" />
+                                    {listing.company_size}
+                                </span>
+                            )}
                         </div>
+
+                        {/* Certifications — first 2, from promoted column or attributes */}
+                        {(() => {
+                            const certList = safeStringArray(listing.certifications || attrs.certifications)
+                            return certList.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mb-3">
+                                    {certList.slice(0, 2).map((cert, i) => (
+                                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">
+                                            {cert}
+                                        </span>
+                                    ))}
+                                    {certList.length > 2 && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                            +{certList.length - 2} certs
+                                        </span>
+                                    )}
+                                </div>
+                            ) : null
+                        })()}
 
                         {/* Skills/Tags - 3 max */}
                         {allTags.length > 0 && (

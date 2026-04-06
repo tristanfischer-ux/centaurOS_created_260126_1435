@@ -123,10 +123,17 @@ function ListRow({
         ? { average: trust.averageRating, count: trust.totalReviews }
         : getRating(attrs)
     const responseTime = getResponseTime(attrs)
-    const location = attrs.location as string | undefined
+    // DECISION: Prefer top-level promoted columns (from Nightshift) over attributes
+    const location = listing.city && listing.country
+        ? `${listing.city}, ${listing.country}`
+        : listing.country || (attrs.location as string | undefined)
     const headline = attrs.headline as string | undefined
     const hiredCount = attrs.total_bookings as number | undefined
-    const tags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications).slice(0, 2)
+    // Show certifications from top-level column, fall back to attributes
+    const certs = listing.certifications && Array.isArray(listing.certifications) && listing.certifications.length > 0
+        ? (listing.certifications as string[]).slice(0, 2)
+        : safeStringArray(attrs.certifications).slice(0, 2)
+    const tags = certs.length > 0 ? certs : safeStringArray(attrs.skills || attrs.expertise || attrs.integrations).slice(0, 2)
     const availability = isPeopleEnriched ? (attrs.availability as string | undefined) : undefined
 
     const handleSave = async (e: React.MouseEvent) => {

@@ -6,7 +6,6 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
-import { MarketplacePageTabs } from '../marketplace-v2/components/MarketplacePageTabs'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -150,26 +149,22 @@ export default async function MarketplacePage() {
                 storageKey="marketplace"
             />
 
-            {/* Tabs: For You + Browse All */}
+            {/* Supplier browse — direct, no tabs */}
             <Suspense fallback={<MarketplaceLoading />}>
-                <MarketplacePageTabs
-                    browseContent={
-                        <MarketplaceBrowse
-                            initialListings={listings}
-                            initialTotalCount={totalCount}
-                            initialHasMore={hasMore}
-                            initialCategoryCounts={categoryCounts}
-                            recommendations={recommendations}
-                            initialSavedIds={savedIds}
-                            initialSavedListings={savedListings}
-                            foundryContext={ctx || undefined}
-                            allowedCategories={['Products', 'Services']}
-                            pageSubtitle="Find products and services to grow your business"
-                            stats={stats || undefined}
-                            hidePageHeader
-                            hideSpecialistBriefing
-                        />
-                    }
+                <MarketplaceBrowse
+                    initialListings={listings}
+                    initialTotalCount={totalCount}
+                    initialHasMore={hasMore}
+                    initialCategoryCounts={categoryCounts}
+                    recommendations={recommendations}
+                    initialSavedIds={savedIds}
+                    initialSavedListings={savedListings}
+                    foundryContext={ctx || undefined}
+                    allowedCategories={['Products', 'Services']}
+                    pageSubtitle="Find products and services to grow your business"
+                    stats={stats || undefined}
+                    hidePageHeader
+                    hideSpecialistBriefing
                 />
             </Suspense>
         </div>

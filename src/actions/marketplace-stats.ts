@@ -70,6 +70,7 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
       .from("marketplace_listings")
       .select("is_verified, attributes, subcategory, industries, certifications, process_capabilities, country")
       .in("category", ["Products", "Services"])
+      .eq("is_demo", false)
       .range(offset, offset + pageSize - 1)
 
     if (error) {
@@ -83,7 +84,15 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
     offset += pageSize
   }
 
-  if (allRows.length === 0) {
+  // DECISION: Get the accurate total via a count query (not limited by pagination).
+  // The row iteration above may hit PostgREST row limits on large datasets.
+  const { count: exactTotalCount } = await supabase
+    .from("marketplace_listings")
+    .select("id", { count: "exact", head: true })
+    .in("category", ["Products", "Services"])
+    .eq("is_demo", false)
+
+  if (allRows.length === 0 && !exactTotalCount) {
     return {
       totalListings: 0,
       verifiedCount: 0,
@@ -103,7 +112,9 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
 
   // ── Compute stats (single pass) ─────────────────────────────────────────
 
-  const totalListings = allRows.length
+  // INTENT: Use the exact count query for the headline number, not allRows.length.
+  // allRows may be capped by PostgREST pagination limits on large datasets.
+  const totalListings = exactTotalCount ?? allRows.length
   const currentYear = new Date().getFullYear()
   let verifiedCount = 0
   let totalAge = 0
