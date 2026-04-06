@@ -483,3 +483,24 @@ function performKeywordMatching(
         error: null,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Semantic search wrapper (server action for client components)
+// ---------------------------------------------------------------------------
+
+export type { SemanticMarketplaceHit } from '@/lib/search/semantic-search'
+
+/**
+ * Server action wrapper for semantic marketplace search.
+ *
+ * @description Client components cannot import semantic-search.ts directly
+ * because it depends on next/headers via server.ts. This server action
+ * proxies the call so client components can use semantic pre-filtering.
+ */
+export async function searchPeopleSemanticAction(
+    query: string,
+    options?: { matchThreshold?: number; matchCount?: number }
+): Promise<{ id: string; category: string; subcategory: string | null; title: string; description: string | null; similarity: number }[]> {
+    const { searchMarketplaceListingsSemantic } = await import('@/lib/search/semantic-search')
+    return searchMarketplaceListingsSemantic(query, options)
+}

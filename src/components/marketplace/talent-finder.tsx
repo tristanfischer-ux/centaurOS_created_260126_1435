@@ -23,9 +23,8 @@ import {
     Award,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getEnrichedPeopleListings, getEnrichedPeopleByIds } from '@/actions/people-marketplace'
+import { getEnrichedPeopleListings, getEnrichedPeopleByIds, searchPeopleSemanticAction } from '@/actions/people-marketplace'
 import type { EnrichedPersonListing, TalentMatch, TalentMatchResult } from '@/actions/people-marketplace'
-import { searchMarketplaceListingsSemantic } from '@/lib/search/semantic-search'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 /**
@@ -182,7 +181,7 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
             // Falls back to full fetch + keyword matching if semantic search fails.
             let listings: EnrichedPersonListing[]
             try {
-                const semanticHits = await searchMarketplaceListingsSemantic(query.trim(), {
+                const semanticHits = await searchPeopleSemanticAction(query.trim(), {
                     matchThreshold: 0.3,
                     matchCount: 25,
                 })
