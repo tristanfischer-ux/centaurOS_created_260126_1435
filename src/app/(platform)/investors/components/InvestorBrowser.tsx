@@ -284,6 +284,7 @@ export function InvestorBrowser({
     }
     hasEverFetched.current = true
     filterGeneration.current += 1
+    const gen = filterGeneration.current
     startTransition(async () => {
       try {
         const result = await searchInvestors({
@@ -302,6 +303,8 @@ export function InvestorBrowser({
           page: 1,
           pageSize: PAGE_SIZE,
         })
+        // DECISION: Discard stale results if filters changed while this was in-flight
+        if (gen !== filterGeneration.current) return
         setFirms(result.firms)
         setTotal(result.total)
         setHasMore(result.hasMore)

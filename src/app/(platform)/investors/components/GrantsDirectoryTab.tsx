@@ -139,7 +139,7 @@ function GrantDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg">
+      <DialogContent size="lg" className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl pr-8">{grant.grant_name}</DialogTitle>
           <DialogDescription className="flex items-center gap-2 pt-1">

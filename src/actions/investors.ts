@@ -454,13 +454,14 @@ export async function searchInvestors(
       if (minQuality != null && minQuality > 0) {
         results = results.filter((r: Record<string, unknown>) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
-          return (attrs.data_quality_score as number ?? 0) >= minQuality
+          // GOTCHA: JSONB values may be strings — use Number() for runtime conversion
+          return Number(attrs.data_quality_score ?? 0) >= minQuality
         })
       }
       if (minHardwareFit != null && minHardwareFit > 0) {
         results = results.filter((r: Record<string, unknown>) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
-          return (attrs.hardware_fit_score as number ?? 0) >= minHardwareFit
+          return Number(attrs.hardware_fit_score ?? 0) >= minHardwareFit
         })
       }
       if (bvcaOnly) {
