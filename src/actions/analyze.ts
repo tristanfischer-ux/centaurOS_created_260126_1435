@@ -11,7 +11,6 @@ import {
   capacityRequirementSchema,
   fundingRequirementSchema,
   MAX_FILE_SIZE_BYTES,
-  ALLOWED_FILE_TYPES,
 } from '@/lib/business-plan-types'
 import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 
@@ -168,26 +167,15 @@ export async function analyzeBusinessPlan(
           return { error: 'File too large. Maximum size is 20 MB.' }
         }
 
-        if (!ALLOWED_FILE_TYPES.includes(file.type as typeof ALLOWED_FILE_TYPES[number])) {
-          return { error: 'Unsupported file type. Please upload a PDF, DOCX, or TXT file.' }
+        // FLOW: Use the shared extractDocumentText action for all file types
+        const { extractDocumentText } = await import('@/actions/extract-document-text')
+        const extractForm = new FormData()
+        extractForm.append('file', file)
+        const extractResult = await extractDocumentText(extractForm)
+        if (!extractResult.success) {
+          return { error: extractResult.error }
         }
-
-        if (file.type === 'application/pdf') {
-          const buffer = Buffer.from(await file.arrayBuffer())
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const pdfParse = require('pdf-parse')
-          const data = await pdfParse(buffer)
-          text = data.text
-        } else if (
-          file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        ) {
-          const buffer = Buffer.from(await file.arrayBuffer())
-          const mammoth = await import('mammoth')
-          const result = await mammoth.extractRawText({ buffer })
-          text = result.value
-        } else {
-          text = await file.text()
-        }
+        text = extractResult.text
       } else if (textInput) {
         text = textInput
       }

@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Upload, Search, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { extractDocumentText } from '@/actions/extract-document-text'
 
 /**
  * Example search queries to inspire users.
@@ -36,6 +37,7 @@ interface InvestorSearchHeroProps {
 export function InvestorSearchHero({ onSearch, isSearching = false }: InvestorSearchHeroProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [uploadedText, setUploadedText] = useState<string | null>(null)
+  const [isExtracting, setIsExtracting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragOverRef = useRef(false)
 
@@ -54,31 +56,27 @@ export function InvestorSearchHero({ onSearch, isSearching = false }: InvestorSe
     onSearch(query)
   }, [searchQuery, uploadedText, onSearch])
 
-  // INTENT: File upload handler — extract text from simple formats
-  const handleFileChange = useCallback((file: File) => {
+  // INTENT: File upload handler — extract text from all supported document types
+  const handleFileChange = useCallback(async (file: File) => {
     if (!file) return
 
-    // DECISION: MVP supports text and basic file types.
-    // PDF/DOCX parsing is "coming soon" — show helpful message
-    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const text = e.target?.result as string
-        if (text && text.trim().length > 0) {
-          setUploadedText(text.slice(0, 2000)) // Cap at 2000 chars
-          toast.success('Document loaded')
-        } else {
-          toast.error('File is empty')
-        }
+    setIsExtracting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const result = await extractDocumentText(formData)
+
+      if (result.success) {
+        setUploadedText(result.text.slice(0, 2000)) // Cap for search context
+        toast.success(`Text extracted from ${result.fileName}`)
+      } else {
+        toast.error(result.error)
       }
-      reader.onerror = () => {
-        toast.error('Failed to read file')
-      }
-      reader.readAsText(file)
-    } else if (file.type === 'application/pdf' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      toast.info('PDF and DOCX parsing coming soon. Try copying text and pasting below.')
-    } else {
-      toast.error('Please upload a .txt, .pdf, or .docx file')
+    } catch {
+      toast.error('Failed to extract text from file')
+    } finally {
+      setIsExtracting(false)
     }
   }, [])
 
@@ -127,7 +125,7 @@ export function InvestorSearchHero({ onSearch, isSearching = false }: InvestorSe
           <div className="space-y-2">
             <h2 className="text-xl font-semibold text-foreground">Find your ideal investors</h2>
             <p className="text-sm text-muted-foreground">
-              Describe your startup for AI-powered investor matching
+              Describe your startup to find the right investor match
             </p>
           </div>
 
@@ -213,16 +211,27 @@ export function InvestorSearchHero({ onSearch, isSearching = false }: InvestorSe
                   ref={fileInputRef}
                   type="file"
                   onChange={(e) => e.target.files?.[0] && handleFileChange(e.target.files[0])}
-                  accept=".txt,.pdf,.docx"
+                  accept=".txt,.pdf,.docx,.pptx,.xlsx,.md,.csv"
                   className="hidden"
                 />
-                <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm font-medium text-foreground">
-                  Drop your pitch deck or business plan
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Text, PDF, DOCX (text extraction coming soon)
-                </p>
+                {isExtracting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mx-auto text-muted-foreground mb-2 animate-spin" />
+                    <p className="text-sm font-medium text-foreground">
+                      Extracting text...
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-foreground">
+                      Drop your pitch deck or business plan
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Text, PDF, DOCX, PPTX, XLSX
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           )}

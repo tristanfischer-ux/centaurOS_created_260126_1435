@@ -35,7 +35,7 @@ const STEP_LABELS = {
 function validateFile(file: File): string | null {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
   if (!ALLOWED_EXTENSIONS.includes(ext as typeof ALLOWED_EXTENSIONS[number])) {
-    return `Unsupported file type "${ext}". Please use PDF, DOCX, or TXT.`
+    return `Unsupported file type "${ext}". Please use PDF, DOCX, PPTX, XLSX, TXT, MD, or CSV.`
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
     const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
@@ -153,7 +153,7 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept=".pdf,.txt,.docx"
+        accept=".pdf,.docx,.pptx,.xlsx,.txt,.md,.csv"
         onChange={handleInputChange}
       />
 
@@ -191,7 +191,7 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
               Drop your business plan here
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              PDF, DOCX, or TXT — generates your strategy, team plan, and funding needs
+              PDF, DOCX, PPTX, XLSX, TXT — generates your strategy, team plan, and funding needs
             </p>
           </div>
           {lastAnalyzedAt && (

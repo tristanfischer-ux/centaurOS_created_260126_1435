@@ -83,9 +83,13 @@ export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20 MB
 export const ALLOWED_FILE_TYPES = [
   'application/pdf',
   'text/plain',
+  'text/markdown',
+  'text/csv',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ] as const
-export const ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.docx'] as const
+export const ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.docx', '.pptx', '.xlsx', '.md', '.csv'] as const
 
 // ─── Smart Merge ─────────────────────────────────────────────────────────────
 

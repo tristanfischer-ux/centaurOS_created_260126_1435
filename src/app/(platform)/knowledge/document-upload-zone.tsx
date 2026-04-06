@@ -3,7 +3,7 @@
 /**
  * DocumentUploadZone — Drag-and-drop zone for extracting knowledge from documents.
  *
- * @description Accepts PDF, DOCX, or TXT files. Parses the document server-side,
+ * @description Accepts PDF, DOCX, PPTX, XLSX, TXT, MD, and CSV files. Parses the document server-side,
  * runs the knowledge extraction pipeline, and saves notes to the Knowledge Vault.
  * All specialists can then reference the extracted knowledge.
  *
@@ -21,7 +21,7 @@ import { extractKnowledgeFromUpload } from '@/actions/knowledge'
 import { toast } from 'sonner'
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt'] as const
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.xlsx', '.txt', '.md', '.csv'] as const
 
 type UploadState = 'idle' | 'extracting' | 'done' | 'error'
 
@@ -35,7 +35,7 @@ interface DocumentUploadZoneProps {
 function validateFile(file: File): string | null {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
   if (!ALLOWED_EXTENSIONS.includes(ext as typeof ALLOWED_EXTENSIONS[number])) {
-    return `Unsupported file type "${ext}". Use PDF, DOCX, or TXT.`
+    return `Unsupported file type "${ext}". Use PDF, DOCX, PPTX, XLSX, TXT, MD, or CSV.`
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
     const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
@@ -113,7 +113,7 @@ export function DocumentUploadZone({ onExtractionComplete, compact }: DocumentUp
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept=".pdf,.txt,.docx"
+          accept=".pdf,.docx,.pptx,.xlsx,.txt,.md,.csv"
           onChange={handleInputChange}
         />
         <Button
@@ -156,7 +156,7 @@ export function DocumentUploadZone({ onExtractionComplete, compact }: DocumentUp
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept=".pdf,.txt,.docx"
+        accept=".pdf,.docx,.pptx,.xlsx,.txt,.md,.csv"
         onChange={handleInputChange}
       />
 
@@ -195,7 +195,7 @@ export function DocumentUploadZone({ onExtractionComplete, compact }: DocumentUp
               Drop a document to extract knowledge
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              PDF, DOCX, or TXT — extracts facts, insights, and decisions into your vault
+              PDF, DOCX, PPTX, XLSX, TXT — extracts facts, insights, and decisions into your vault
             </p>
           </div>
           <Button variant="outline" size="sm" className="mt-1 pointer-events-none">

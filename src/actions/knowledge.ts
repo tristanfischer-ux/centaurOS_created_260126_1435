@@ -457,7 +457,11 @@ const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024 // 20MB
 const ALLOWED_DOCUMENT_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/plain',
+  'text/markdown',
+  'text/csv',
 ] as const
 
 /**
@@ -491,7 +495,7 @@ export async function extractKnowledgeFromUpload(
   }
 
   if (!ALLOWED_DOCUMENT_TYPES.includes(file.type as typeof ALLOWED_DOCUMENT_TYPES[number])) {
-    return { data: null, error: 'Unsupported file type. Please upload a PDF, DOCX, or TXT file.' }
+    return { data: null, error: 'Unsupported file type. Please upload a PDF, DOCX, PPTX, XLSX, TXT, MD, or CSV file.' }
   }
 
   try {
@@ -738,28 +742,19 @@ export async function verifyAndUpdateNote(
 // ─── File Parsing Helper ────────────────────────────────────────────
 
 /**
- * Extracts plaintext from a document file (PDF, DOCX, or TXT).
- *
- * GOTCHA: pdf-parse and mammoth are dynamically imported to keep them
- * out of the client bundle and avoid issues with SSR.
+ * Extracts plaintext from a document file.
+ * Delegates to the shared extractDocumentText action which supports
+ * PDF, DOCX, PPTX, XLSX, TXT, MD, and CSV.
  */
 async function parseDocumentText(file: File): Promise<string> {
-  if (file.type === 'application/pdf') {
-    const buffer = Buffer.from(await file.arrayBuffer())
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse')
-    const data = await pdfParse(buffer)
-    return data.text
+  const { extractDocumentText } = await import('@/actions/extract-document-text')
+  const formData = new FormData()
+  formData.append('file', file)
+  const result = await extractDocumentText(formData)
+  if (!result.success) {
+    throw new Error(result.error)
   }
-
-  if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const mammoth = await import('mammoth')
-    const result = await mammoth.extractRawText({ buffer })
-    return result.value
-  }
-
-  return await file.text()
+  return result.text
 }
 
 // ─── Semantic Search ─────────────────────────────────────────────────
