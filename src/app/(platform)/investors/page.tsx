@@ -204,12 +204,16 @@ export default async function InvestorDirectoryPage() {
         shortlistCount={Object.keys(shortlistIds).length}
       />
 
-      {/* Tabs directly after Fiona — search hero + browser inside Browse All */}
+      {/* Tabs: Overview, For You, Investors, Grants, Contacts, Portfolio */}
       <InvestorPageTabs
+        investorCount={stats?.total ?? 0}
         contactCount={contactCount}
         portfolioCount={stats?.portfolioCompanyCount ?? 0}
         grantsCount={grantsCount}
-        browseContent={
+        overviewContent={
+          stats && <InvestorInsightsPanel stats={stats} grantsCount={grantsCount} />
+        }
+        investorsContent={
           <>
             {/* Semantic search hero */}
             <Suspense fallback={null}>
@@ -224,9 +228,6 @@ export default async function InvestorDirectoryPage() {
                 companyContext={companyContext}
               />
             </Suspense>
-
-            {/* Insights panel */}
-            {stats && <InvestorInsightsPanel stats={stats} />}
           </>
         }
         contactsContent={

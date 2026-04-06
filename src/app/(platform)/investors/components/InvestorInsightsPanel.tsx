@@ -41,6 +41,8 @@ interface InvestorInsightsPanelProps {
   /** When provided, shows "Filtered: X of Y" and computes stats from this subset */
   filteredFirms?: { attributes: Record<string, unknown> }[]
   filteredCount?: number
+  /** Grants count from investor_grants table */
+  grantsCount?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +85,7 @@ function truncate(s: string, max: number): string {
 /**
  * Collapsible panel showing investor directory statistics and charts.
  */
-export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: InvestorInsightsPanelProps) {
+export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, grantsCount = 0 }: InvestorInsightsPanelProps) {
   // DECISION: Persist collapse state to localStorage so the user's preference
   // survives navigation and page refreshes.
   // GOTCHA: Read localStorage in useEffect (not useState initialiser) to avoid
@@ -139,8 +141,8 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
 
       {!collapsed && (
         <div className="p-5 space-y-6">
-          {/* Row 1: Key stat cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Row 1: Key stat cards — matching Forge Capital overview */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
             <StatCard
               icon={<Building2 className="h-4 w-4 text-international-orange" />}
               value={stats.total}
@@ -148,8 +150,18 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
             />
             <StatCard
               icon={<Globe className="h-4 w-4 text-international-orange" />}
+              value={stats.withWebsiteCount}
+              label="With Websites"
+            />
+            <StatCard
+              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
+              value={stats.forgeCapitalCount}
+              label="Deep Profiles"
+            />
+            <StatCard
+              icon={<Globe className="h-4 w-4 text-international-orange" />}
               value={stats.partnerCount}
-              label="Contacts"
+              label="Partners"
             />
             <StatCard
               icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
@@ -157,19 +169,19 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: I
               label="Portfolio Cos"
             />
             <StatCard
-              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
-              value={stats.avgQuality.toFixed(1)}
-              label="Avg Quality"
-            />
-            <StatCard
-              icon={<Award className="h-4 w-4 text-international-orange" />}
-              value={stats.forgeCapitalCount}
-              label="Deep Profiles"
-            />
-            <StatCard
               icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
               value={stats.hwFit7PlusCount}
               label="Hardware Fit 7+"
+            />
+            <StatCard
+              icon={<Award className="h-4 w-4 text-international-orange" />}
+              value={grantsCount}
+              label="Grants"
+            />
+            <StatCard
+              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
+              value={stats.avgQuality.toFixed(1)}
+              label="Avg Quality"
             />
           </div>
 
