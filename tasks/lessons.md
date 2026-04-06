@@ -168,3 +168,27 @@ NEVER: Treat autonomous work as license to cut scope or rush to commit.
 ALWAYS: When the user is away, verify the deployed result, test as a user would (search, click, check results), and do MORE rounds of review — not fewer.
 REASON: Interpreted "I'm going away" as "ship fast" instead of "be thorough because I can't review."
 RELATED: CLAUDE.md "Do What Was Asked" section
+
+### 2026-04-06 - RULE: Never flag an issue without fixing it
+NEVER: Report "this is a data quality issue" or "this needs subscription gating" without actually fixing it. Listing issues is not the same as resolving them.
+ALWAYS: If you identify a problem, fix it in the same session. If it truly cannot be fixed (needs external action), create a concrete next step and explain WHY it can't be done now.
+REASON: Repeatedly noted "For You shows 0 matches" and "Key People shows organizations" across 5+ responses without fixing either. User had to explicitly call this out.
+RELATED: All server actions, data pipeline scripts
+
+### 2026-04-06 - RULE: Supabase PostgREST max_rows is 1000 regardless of .limit()
+NEVER: Use `.limit(N)` where N > 1000 and assume it works. The hosted Supabase PostgREST has a server-side `max_rows` setting (default 1000) that caps ANY request.
+ALWAYS: Paginate with `.range(from, to)` in a loop to fetch all rows. Test the actual count returned, don't assume.
+REASON: Stats showed 1,000 investors for an entire day. `.limit(20000)` was silently capped at 1,000 by PostgREST.
+RELATED: src/actions/investors.ts getInvestorStats, any bulk fetch from Supabase
+
+### 2026-04-06 - RULE: Verify counts match after data pushes
+NEVER: Push data and assume it landed correctly. Always query Supabase to verify the actual count matches expectations.
+ALWAYS: After any push script run, curl the Supabase REST API with `Prefer: count=exact` to verify the row count.
+REASON: Portfolio push mapped only 846 of 7,084 listings because the mapping query also hit the 1000-row limit. Reported "14,448 pushed" without checking if that was the expected number.
+RELATED: 13-push-forgeos.js, any data pipeline script
+
+### 2026-04-06 - RULE: tsc passing does NOT mean the feature works
+NEVER: Use `npx tsc --noEmit` as the sole verification step.
+ALWAYS: After code changes that affect UI or data, verify the actual deployed feature: check the page loads, counts are correct, clicking works, data appears. TypeScript compilation checks types, not functionality.
+REASON: Multiple deploys where tsc passed but the feature was broken (wrong counts, missing components, empty tabs).
+RELATED: All UI components, CLAUDE.md "Compilation is not verification" section
