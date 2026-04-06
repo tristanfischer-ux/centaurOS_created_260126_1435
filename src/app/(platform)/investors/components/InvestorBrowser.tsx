@@ -25,8 +25,9 @@ import { InvestorCompareDialog } from './InvestorCompareDialog'
 import { InvestorShortlistBoard } from './InvestorShortlistBoard'
 import { InvestorMapView } from './InvestorMapView'
 import { InvestorExportMenu } from './InvestorExportMenu'
+import { InvestorTableView } from './InvestorTableView'
 import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScores } from '@/actions/investors'
-import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'lucide-react'
+import { Search, X, RefreshCw, Building2, LayoutGrid, List, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
@@ -42,7 +43,7 @@ type FirmTypeFilter = typeof FIRM_TYPES[number]
 
 const PAGE_SIZE = 24
 
-type ViewMode = 'grid' | 'board' | 'map'
+type ViewMode = 'grid' | 'table' | 'board' | 'map'
 
 const EMPTY_ADVANCED: AdvancedFilters = {
   stages: [],
@@ -527,6 +528,7 @@ export function InvestorBrowser({
           <div className="flex items-center border border-border rounded-lg overflow-hidden">
             {([
               { mode: 'grid' as const, icon: LayoutGrid, label: 'Grid view' },
+              { mode: 'table' as const, icon: List, label: 'Table view' },
               { mode: 'board' as const, icon: Kanban, label: 'Board view' },
               { mode: 'map' as const, icon: MapPin, label: 'Map view' },
             ]).map(({ mode, icon: Icon, label }) => (
@@ -649,6 +651,18 @@ export function InvestorBrowser({
             </>
           )}
         </>
+      )}
+
+      {viewMode === 'table' && (
+        <InvestorTableView
+          firms={displayFirms}
+          matchScores={matchScores}
+          shortlistIds={shortlistIds}
+          onToggleShortlist={handleToggleShortlist}
+          onToggleCompare={handleToggleCompare}
+          compareIds={compareIds}
+          isPending={isPending}
+        />
       )}
 
       {viewMode === 'board' && (

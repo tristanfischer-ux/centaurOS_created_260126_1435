@@ -33,6 +33,7 @@ import { SimilarInvestorsSection } from '../components/SimilarInvestorsSection'
 import { InvestorDetailActions } from '../components/InvestorDetailActions'
 import {
   ArrowLeft,
+  BarChart3,
   Briefcase,
   Building2,
   Calendar,
@@ -41,6 +42,7 @@ import {
   Database,
   Globe,
   Lightbulb,
+  Link2,
   Linkedin,
   Lock,
   Mail,
@@ -443,6 +445,75 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                   <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Investment Pattern (professional+) */}
+            {access.intelligenceAccess && attrs.investment_pattern ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                    Investment Pattern
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.investment_pattern}</p>
+                </CardContent>
+              </Card>
+            ) : !access.intelligenceAccess && (
+              <LockedSection
+                title="Investment Pattern"
+                requiredTier="professional"
+                featureDescription="Synthesized investment behavior analysis from portfolio data."
+              >
+                <div className="h-16 bg-muted/50 rounded" />
+              </LockedSection>
+            )}
+
+            {/* Team Expertise (professional+) */}
+            {access.intelligenceAccess && attrs.team_expertise ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    Team Expertise
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.team_expertise}</p>
+                </CardContent>
+              </Card>
+            ) : !access.intelligenceAccess && (
+              <LockedSection
+                title="Team Expertise"
+                requiredTier="professional"
+                featureDescription="Analysis of the team's domain expertise and track record."
+              >
+                <div className="h-16 bg-muted/50 rounded" />
+              </LockedSection>
+            )}
+
+            {/* Connection Brief (professional+) */}
+            {access.intelligenceAccess && attrs.connection_brief ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Link2 className="h-4 w-4 text-muted-foreground" />
+                    Connection Brief
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.connection_brief}</p>
+                </CardContent>
+              </Card>
+            ) : !access.intelligenceAccess && (
+              <LockedSection
+                title="Connection Brief"
+                requiredTier="professional"
+                featureDescription="Outreach intelligence — warm intro paths, networking context, and approach strategy."
+              >
+                <div className="h-16 bg-muted/50 rounded" />
+              </LockedSection>
             )}
 
             {/* Recent Activity */}

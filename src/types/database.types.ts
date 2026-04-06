@@ -8170,6 +8170,102 @@ export type Database = {
           },
         ]
       }
+      investor_grants: {
+        Row: {
+          actively_accepting: boolean | null
+          amount_max_usd: number | null
+          amount_min_usd: number | null
+          application_url: string | null
+          cofunding_pct: number | null
+          company_age_max_years: number | null
+          company_size_max: number | null
+          country: string | null
+          created_at: string | null
+          data_quality_score: number | null
+          deadline: string | null
+          deadline_type: string | null
+          deep_profile: string | null
+          description: string | null
+          eligibility_summary: string | null
+          equity_free: boolean | null
+          forge_capital_id: number | null
+          grant_name: string
+          id: string
+          last_checked: string | null
+          managing_body: string | null
+          region: string | null
+          sector_focus: string[] | null
+          stage_focus: string[] | null
+          total_pool_usd: number | null
+          trl_max: number | null
+          trl_min: number | null
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          actively_accepting?: boolean | null
+          amount_max_usd?: number | null
+          amount_min_usd?: number | null
+          application_url?: string | null
+          cofunding_pct?: number | null
+          company_age_max_years?: number | null
+          company_size_max?: number | null
+          country?: string | null
+          created_at?: string | null
+          data_quality_score?: number | null
+          deadline?: string | null
+          deadline_type?: string | null
+          deep_profile?: string | null
+          description?: string | null
+          eligibility_summary?: string | null
+          equity_free?: boolean | null
+          forge_capital_id?: number | null
+          grant_name: string
+          id?: string
+          last_checked?: string | null
+          managing_body?: string | null
+          region?: string | null
+          sector_focus?: string[] | null
+          stage_focus?: string[] | null
+          total_pool_usd?: number | null
+          trl_max?: number | null
+          trl_min?: number | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          actively_accepting?: boolean | null
+          amount_max_usd?: number | null
+          amount_min_usd?: number | null
+          application_url?: string | null
+          cofunding_pct?: number | null
+          company_age_max_years?: number | null
+          company_size_max?: number | null
+          country?: string | null
+          created_at?: string | null
+          data_quality_score?: number | null
+          deadline?: string | null
+          deadline_type?: string | null
+          deep_profile?: string | null
+          description?: string | null
+          eligibility_summary?: string | null
+          equity_free?: boolean | null
+          forge_capital_id?: number | null
+          grant_name?: string
+          id?: string
+          last_checked?: string | null
+          managing_body?: string | null
+          region?: string | null
+          sector_focus?: string[] | null
+          stage_focus?: string[] | null
+          total_pool_usd?: number | null
+          trl_max?: number | null
+          trl_min?: number | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       investor_notes: {
         Row: {
           content: string
@@ -8205,6 +8301,66 @@ export type Database = {
           },
           {
             foreignKeyName: "investor_notes_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      investor_portfolio_companies: {
+        Row: {
+          amount_usd: number | null
+          company_name: string
+          created_at: string | null
+          description: string | null
+          forge_capital_investor_id: number | null
+          id: string
+          investment_date: string | null
+          listing_id: string | null
+          sector: string | null
+          source_url: string | null
+          stage: string | null
+          why_appealing: string | null
+        }
+        Insert: {
+          amount_usd?: number | null
+          company_name: string
+          created_at?: string | null
+          description?: string | null
+          forge_capital_investor_id?: number | null
+          id?: string
+          investment_date?: string | null
+          listing_id?: string | null
+          sector?: string | null
+          source_url?: string | null
+          stage?: string | null
+          why_appealing?: string | null
+        }
+        Update: {
+          amount_usd?: number | null
+          company_name?: string
+          created_at?: string | null
+          description?: string | null
+          forge_capital_investor_id?: number | null
+          id?: string
+          investment_date?: string | null
+          listing_id?: string | null
+          sector?: string | null
+          source_url?: string | null
+          stage?: string | null
+          why_appealing?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_portfolio_companies_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_portfolio_companies_listing_id_fkey"
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "supplier_search_ranking"

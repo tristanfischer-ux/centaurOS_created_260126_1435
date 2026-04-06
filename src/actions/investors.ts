@@ -75,6 +75,10 @@ export type InvestorFirm = {
     value_add?: string
     forge_capital_id?: number
     last_synced?: string
+    // Tier-gated intelligence fields (professional+)
+    investment_pattern?: string
+    team_expertise?: string
+    connection_brief?: string
     // Tier-gated deep fields (professional+)
     fund_history?: unknown
     exits?: unknown
@@ -239,6 +243,9 @@ function stripTierGatedFields(firm: InvestorFirm, access: InvestorTierAccess): I
     delete stripped.attributes.exits
     delete stripped.attributes.fund_performance
     delete stripped.attributes.fact_check_status
+    delete stripped.attributes.investment_pattern
+    delete stripped.attributes.team_expertise
+    delete stripped.attributes.connection_brief
     // DECISION: Don't strip hardware_fit_score — UI gates display (shows lock for
     // non-professional, score for professional). The 0-10 value is not sensitive.
   }
@@ -371,8 +378,8 @@ export async function searchInvestors(
         'match_marketplace_listings',
         {
           query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
-          match_threshold: 0.25,
-          match_count: 500,
+          match_threshold: 0.5,
+          match_count: 200,
         }
       )
 
@@ -1649,4 +1656,158 @@ const STAGE_MAP_DASHBOARD: Record<string, string[]> = {
   series_b: ['Series B', 'Growth', 'Late Stage'],
   growth: ['Growth', 'Late Stage', 'Series B'],
   late_stage: ['Late Stage', 'Growth'],
+}
+
+// ---------------------------------------------------------------------------
+// Contacts Directory (cross-firm contact search)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalised shape of a contact in the cross-firm directory search results.
+ */
+export interface ContactSearchResult {
+  id: string
+  full_name: string
+  title: string | null
+  firm_name: string
+  listing_id: string
+  email: string | null
+  email_verified: boolean | null
+  linkedin_url: string | null
+  seniority: string | null
+  is_decision_maker: boolean | null
+  notes: string | null
+  deep_bio: string | null
+  /** Indicates whether this contact has an email (even if gated) */
+  has_email: boolean
+  /** Indicates whether this contact has a deep bio (even if gated) */
+  has_deep_bio: boolean
+}
+
+/**
+ * Filter parameters for the contacts directory search.
+ */
+export interface ContactSearchFilters {
+  query?: string
+  decisionMakersOnly?: boolean
+  withEmailOnly?: boolean
+  withBioOnly?: boolean
+  page?: number
+  pageSize?: number
+}
+
+/**
+ * Searches across ALL investor contacts (vc_pe_contacts) with firm name join,
+ * text search, boolean filters, and tier-gated field stripping.
+ *
+ * @description Powers the "Contacts" tab on the Investors page. Joins with
+ * marketplace_listings to surface the firm name. Applies tier gating so
+ * non-professional users see has_email/has_deep_bio flags but not the values.
+ *
+ * @security Query input is sanitized via sanitizeFilterValue. Email and deep_bio
+ * are stripped for users without professional tier access.
+ */
+export async function searchContacts(filters: ContactSearchFilters = {}): Promise<{
+  contacts: ContactSearchResult[]
+  total: number
+  hasMore: boolean
+}> {
+  const {
+    query,
+    decisionMakersOnly = false,
+    withEmailOnly = false,
+    withBioOnly = false,
+    page = 1,
+    pageSize: rawPageSize = 50,
+  } = filters
+
+  // VALIDATION: clamp page size between 1 and 100
+  const pageSize = Math.max(1, Math.min(100, rawPageSize))
+  const offset = (Math.max(1, page) - 1) * pageSize
+
+  const supabase = await createClient()
+
+  // Build query — join marketplace_listings for firm name (title)
+  let dbQuery = supabase
+    .from('vc_pe_contacts')
+    .select(
+      'id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, notes, deep_bio, listing_id, marketplace_listings!inner(title)',
+      { count: 'exact' },
+    )
+
+  // SECURITY: sanitize text search input
+  if (query && query.trim().length > 0) {
+    const sanitized = sanitizeFilterValue(query.trim().slice(0, 200))
+    // Search across full_name and title (role)
+    dbQuery = dbQuery.or(`full_name.ilike.%${sanitized}%,title.ilike.%${sanitized}%`)
+  }
+
+  // Boolean filters
+  if (decisionMakersOnly) {
+    dbQuery = dbQuery.eq('is_decision_maker', true)
+  }
+  if (withEmailOnly) {
+    dbQuery = dbQuery.not('email', 'is', null)
+  }
+  if (withBioOnly) {
+    dbQuery = dbQuery.not('deep_bio', 'is', null)
+  }
+
+  // Ordering: decision makers first, then alphabetical
+  dbQuery = dbQuery
+    .order('is_decision_maker', { ascending: false })
+    .order('full_name', { ascending: true })
+    .range(offset, offset + pageSize - 1)
+
+  const { data, count, error } = await dbQuery
+
+  if (error) {
+    console.error('[searchContacts] Supabase error:', error)
+    return { contacts: [], total: 0, hasMore: false }
+  }
+
+  const total = count ?? 0
+
+  // Tier gating
+  const access = await getInvestorTierAccess()
+
+  // Free tier: no contacts visible at all
+  if (!access.contactsVisible) {
+    return { contacts: [], total, hasMore: false }
+  }
+
+  const contacts: ContactSearchResult[] = (data ?? []).map((row: Record<string, unknown>) => {
+    // GOTCHA: Supabase join returns marketplace_listings as an object (inner join = single row)
+    const listing = row.marketplace_listings as { title: string } | null
+    const firmName = listing?.title ?? 'Unknown Firm'
+
+    const rawEmail = row.email as string | null
+    const rawDeepBio = row.deep_bio as string | null
+    const hasEmail = !!rawEmail
+    const hasDeepBio = !!rawDeepBio
+
+    return {
+      id: row.id as string,
+      full_name: row.full_name as string,
+      title: (row.title as string | null) ?? null,
+      firm_name: firmName,
+      listing_id: row.listing_id as string,
+      // SECURITY: Strip sensitive fields for non-professional users
+      email: access.deepAccess ? rawEmail : null,
+      email_verified: access.deepAccess ? (row.email_verified as boolean | null) : null,
+      linkedin_url: (row.linkedin_url as string | null) ?? null,
+      seniority: (row.seniority as string | null) ?? null,
+      is_decision_maker: (row.is_decision_maker as boolean | null) ?? null,
+      notes: (row.notes as string | null) ?? null,
+      deep_bio: access.deepAccess ? rawDeepBio : null,
+      has_email: hasEmail,
+      has_deep_bio: hasDeepBio,
+    }
+  })
+
+  return {
+    contacts,
+    total,
+    hasMore: offset + pageSize < total,
+  }
 }

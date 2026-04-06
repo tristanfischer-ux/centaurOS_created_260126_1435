@@ -1,10 +1,13 @@
 /**
  * @file investors/page.tsx
  *
- * @description Investor page with semantic search hero and two tabs:
- * - Hero: "Find your ideal investors" — describes startup, semantic search matches
- * - "For You" (tab default) — AI-matched top 50 investors based on company profile
- * - "Browse All" — UK Investor Directory with filters + semantic search results
+ * @description Investor Intelligence page with 5 tabs matching Forge Capital parity:
+ * - Hero: Semantic search + company context auto-fill
+ * - "For You" — AI-matched top 50 investors
+ * - "Browse All" — Full directory with filters, grid/table/board/map views
+ * - "Contacts" — 49K+ partner directory with search
+ * - "Portfolio" — 92K+ portfolio companies across all investors
+ * - "Grants" — 3K+ non-dilutive funding sources
  *
  * Revalidates every 60 seconds (ISR) since investor data changes infrequently.
  */
@@ -20,6 +23,9 @@ import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 import { InvestorPageTabs } from './components/InvestorPageTabs'
 import { InvestorSpecialistBanner } from './components/InvestorSpecialistBanner'
 import { InvestorSearchHeroClient } from './components/InvestorSearchHeroClient'
+import { ContactsDirectoryTab } from './components/ContactsDirectoryTab'
+import { GrantsDirectoryTab } from './components/GrantsDirectoryTab'
+import { PortfolioDirectoryTab } from './components/PortfolioDirectoryTab'
 
 export const revalidate = 60
 
@@ -135,6 +141,21 @@ export default async function InvestorDirectoryPage() {
     // Non-critical — Fiona falls back to generic advice
   }
 
+  // FLOW: Fetch tab counts for Contacts, Portfolio, Grants
+  let contactCount = 0
+  let grantsCount = 0
+  try {
+    const supabase = await createClient()
+    const [contactResult, grantsResult] = await Promise.allSettled([
+      supabase.from('vc_pe_contacts').select('id', { count: 'exact', head: true }),
+      supabase.from('investor_grants').select('id', { count: 'exact', head: true }),
+    ])
+    if (contactResult.status === 'fulfilled') contactCount = contactResult.value.count ?? 0
+    if (grantsResult.status === 'fulfilled') grantsCount = grantsResult.value.count ?? 0
+  } catch {
+    // Non-critical — tab counts just won't show
+  }
+
   // FLOW: Fetch product sectors for "Product Fit" badges on investor cards
   let productSectors: string[] = []
   try {
@@ -166,7 +187,7 @@ export default async function InvestorDirectoryPage() {
         </div>
         <p className="text-muted-foreground text-sm font-medium pl-4">
           {stats
-            ? `${stats.total.toLocaleString()} firms · ${stats.forgeCapitalCount.toLocaleString()} deep-profiled · ${stats.partnerCount.toLocaleString()} partners`
+            ? `${stats.total.toLocaleString()} firms · ${contactCount.toLocaleString()} contacts · ${stats.portfolioCompanyCount.toLocaleString()} portfolio cos · ${grantsCount.toLocaleString()} grants`
             : 'Find the right investors for your company'}
         </p>
       </div>
@@ -197,8 +218,11 @@ export default async function InvestorDirectoryPage() {
         />
       </Suspense>
 
-      {/* Tabbed view: For You + Browse All */}
+      {/* Tabbed view: For You + Browse All + Contacts + Portfolio + Grants */}
       <InvestorPageTabs
+        contactCount={contactCount}
+        portfolioCount={stats?.portfolioCompanyCount ?? 0}
+        grantsCount={grantsCount}
         browseContent={
           <>
             {/* Insights panel */}
@@ -225,6 +249,21 @@ export default async function InvestorDirectoryPage() {
               </span>
             </div>
           </>
+        }
+        contactsContent={
+          <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <ContactsDirectoryTab />
+          </Suspense>
+        }
+        portfolioContent={
+          <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <PortfolioDirectoryTab />
+          </Suspense>
+        }
+        grantsContent={
+          <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <GrantsDirectoryTab />
+          </Suspense>
         }
       />
     </div>
