@@ -44,40 +44,76 @@ export async function subscribeToNewsletter(
         // content type, which gives us foundry isolation and versioning for free.
         // In practice, a dedicated table would be better at scale.
 
-        // Check for duplicates first
-        const { data: existing } = await supabase
-            .from('agent_artifacts')
+        // DECISION: Store newsletter subscribers in site_settings.metadata
+        // as a JSON array. This avoids FK issues with agent_artifacts (which
+        // requires a real foundry_id) and doesn't need a new migration.
+        // Scale limit: ~10K emails before JSONB gets slow. Upgrade to a
+        // dedicated table or Resend Audiences when volume justifies it.
+
+        // Find or create the platform-wide site_settings row
+        // Use the first foundry that exists (platform settings)
+        const { data: foundries } = await supabase
+            .from('foundries')
             .select('id')
-            .eq('content_type', 'email-template')
-            .eq('title', 'newsletter_subscriber')
-            .eq('content', email)
             .limit(1)
 
-        if (existing && existing.length > 0) {
-            // Already subscribed — don't error, just acknowledge
-            return { error: null }
+        if (!foundries || foundries.length === 0) {
+            console.error('[Newsletter] No foundries exist — cannot store subscriber')
+            return { error: 'Something went wrong. Please try again.' }
         }
 
-        // Store the subscription
-        // DECISION: Using agent_artifacts with a special content_type is a hack.
-        // A proper newsletter_subscribers table should be created when this grows.
-        // For MVP, this works and avoids another migration.
-        const { error } = await supabase
-            .from('agent_artifacts')
-            .insert({
-                title: 'newsletter_subscriber',
-                content: email,
-                content_type: 'email-template',
-                foundry_id: 'fractional-forge', // INTENT: Newsletter is platform-wide, not per-foundry
-                metadata: {
-                    type: 'newsletter_subscription',
-                    subscribed_at: new Date().toISOString(),
-                },
-            })
+        const platformFoundryId = foundries[0].id
 
-        if (error) {
-            console.error('[Newsletter] Failed to store subscription:', error.message)
-            return { error: 'Something went wrong. Please try again.' }
+        // Upsert site_settings for this foundry
+        const { data: settings } = await supabase
+            .from('site_settings')
+            .select('id, metadata')
+            .eq('foundry_id', platformFoundryId)
+            .single()
+
+        const currentMeta = (settings?.metadata || {}) as Record<string, unknown>
+        const subscribers = (currentMeta.newsletter_subscribers || []) as string[]
+
+        // Check for duplicate
+        if (subscribers.includes(email)) {
+            return { error: null } // Already subscribed
+        }
+
+        const updatedSubscribers = [...subscribers, email]
+        const updatedMeta = {
+            ...currentMeta,
+            newsletter_subscribers: updatedSubscribers,
+            last_subscriber_at: new Date().toISOString(),
+        }
+
+        if (settings) {
+            // Update existing
+            const { error } = await supabase
+                .from('site_settings')
+                .update({
+                    metadata: updatedMeta,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', settings.id)
+
+            if (error) {
+                console.error('[Newsletter] Failed to update subscribers:', error.message)
+                return { error: 'Something went wrong. Please try again.' }
+            }
+        } else {
+            // Create new
+            const { error } = await supabase
+                .from('site_settings')
+                .insert({
+                    foundry_id: platformFoundryId,
+                    metadata: updatedMeta,
+                    newsletter_enabled: true,
+                })
+
+            if (error) {
+                console.error('[Newsletter] Failed to create settings:', error.message)
+                return { error: 'Something went wrong. Please try again.' }
+            }
         }
 
         return { error: null }
