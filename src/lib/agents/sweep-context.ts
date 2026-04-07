@@ -305,11 +305,20 @@ export async function buildRevisionRequestContext(
   const supabase = createAdminClient()
 
   try {
+    // SECURITY: Only show revisions relevant to this specialist (#11).
+    // Filter by content_type mapped to specialist capabilities.
+    const contentTypeFilter = specialistId === 'growth-marketer'
+      ? ['blog', 'page', 'case-study', 'landing-page']
+      : specialistId === 'sales-lead'
+        ? ['email-template', 'case-study']
+        : ['blog', 'page'] // default for any specialist
+
     const { data: revisions } = await supabase
       .from('agent_artifacts')
       .select('id, title, content_type, publish_metadata')
       .eq('foundry_id', foundryId)
       .eq('publish_status', 'revision_requested')
+      .in('content_type', contentTypeFilter)
       .order('updated_at', { ascending: false })
       .limit(5)
 

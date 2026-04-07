@@ -255,7 +255,7 @@ export function PublishContentCard({ action, onDismiss }: PublishContentCardProp
             {/* Content Preview / Edit */}
             {cardState === "editing" ? (
                 // DECISION: Side-by-side split for editing — textarea left, rendered preview right
-                <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                     <textarea
                         value={editedContent}
                         onChange={(e) => setEditedContent(e.target.value)}

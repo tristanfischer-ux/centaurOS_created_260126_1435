@@ -23,14 +23,17 @@ export async function subscribeToNewsletter(
     email: string
 ): Promise<{ error: string | null }> {
     try {
+        // VALIDATION: Normalize email (#3)
+        const normalizedEmail = email.toLowerCase().trim()
+
         // VALIDATION: Basic email format check
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(email)) {
+        if (!emailRegex.test(normalizedEmail)) {
             return { error: 'Please enter a valid email address' }
         }
 
         // VALIDATION: Length check
-        if (email.length > 320) {
+        if (normalizedEmail.length > 320) {
             return { error: 'Email address is too long' }
         }
 
@@ -75,11 +78,17 @@ export async function subscribeToNewsletter(
         const subscribers = (currentMeta.newsletter_subscribers || []) as string[]
 
         // Check for duplicate
-        if (subscribers.includes(email)) {
+        if (subscribers.includes(normalizedEmail)) {
             return { error: null } // Already subscribed
         }
 
-        const updatedSubscribers = [...subscribers, email]
+        // SECURITY: Cap subscriber count to prevent JSONB bloat abuse (#3)
+        if (subscribers.length >= 10000) {
+            console.warn('[Newsletter] Subscriber limit reached')
+            return { error: null } // Silent success to not leak limit info
+        }
+
+        const updatedSubscribers = [...subscribers, normalizedEmail]
         const updatedMeta = {
             ...currentMeta,
             newsletter_subscribers: updatedSubscribers,

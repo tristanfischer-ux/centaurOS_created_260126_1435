@@ -32,6 +32,7 @@ import type {
     PitchDeckPayload,
     PublishContentPayload,
     ExecutionPlanPayload,
+    SiteConfigPayload,
 } from "@/lib/agents/tools/permission-guard"
 import {
     createGoogleSheet,
@@ -545,6 +546,41 @@ function PayloadPreview({ action }: { action: ProposedExternalAction }) {
                     <p className="text-muted-foreground">
                         {p.slides?.length ?? 0} slide(s){p.subtitle ? ` — ${p.subtitle}` : ""}
                     </p>
+                </div>
+            )
+        }
+
+        case "publish_content": {
+            const p = action.payload as unknown as PublishContentPayload
+            return (
+                <div className="rounded bg-card/50 border border-border/50 p-2 text-[10px] space-y-1">
+                    <p className="text-foreground font-medium truncate">{p.title}</p>
+                    <p className="text-muted-foreground">
+                        {p.content_type} &middot; /{p.slug}
+                    </p>
+                    {p.tags?.length > 0 && (
+                        <p className="text-muted-foreground truncate">Tags: {p.tags.join(', ')}</p>
+                    )}
+                </div>
+            )
+        }
+
+        case "create_execution_plan": {
+            const p = action.payload as unknown as ExecutionPlanPayload
+            return (
+                <div className="rounded bg-card/50 border border-border/50 p-2 text-[10px] space-y-1">
+                    <p className="text-foreground font-medium truncate">{p.title}</p>
+                    <p className="text-muted-foreground">{p.tasks?.length ?? 0} task(s)</p>
+                </div>
+            )
+        }
+
+        case "update_site_config": {
+            const p = action.payload as unknown as SiteConfigPayload
+            return (
+                <div className="rounded bg-card/50 border border-border/50 p-2 text-[10px] space-y-1">
+                    <p className="text-foreground">{p.description}</p>
+                    <p className="text-muted-foreground">Setting: {p.setting}</p>
                 </div>
             )
         }

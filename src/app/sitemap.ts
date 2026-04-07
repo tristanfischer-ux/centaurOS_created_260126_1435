@@ -99,12 +99,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             p_offset: 0,
         })
         if (posts) {
-            blogPages = posts.map((post: { publish_metadata: Record<string, unknown>; created_at: string }) => ({
-                url: `${appUrl}/blog/${(post.publish_metadata as Record<string, unknown>)?.slug ?? ''}`,
-                lastModified: new Date((post.publish_metadata as Record<string, unknown>)?.published_at as string || post.created_at),
-                changeFrequency: 'weekly' as const,
-                priority: 0.7,
-            }))
+            // SECURITY: Filter out posts without slugs to prevent invalid sitemap entries (#15)
+            blogPages = posts
+                .filter((post: { publish_metadata: Record<string, unknown> }) =>
+                    (post.publish_metadata as Record<string, unknown>)?.slug)
+                .map((post: { publish_metadata: Record<string, unknown>; created_at: string }) => ({
+                    url: `${appUrl}/blog/${(post.publish_metadata as Record<string, unknown>).slug}`,
+                    lastModified: new Date((post.publish_metadata as Record<string, unknown>)?.published_at as string || post.created_at),
+                    changeFrequency: 'weekly' as const,
+                    priority: 0.7,
+                }))
         }
     } catch (error) {
         console.error('[Sitemap] Failed to fetch published blog posts:', error)

@@ -73,6 +73,7 @@ async function getDraftTasks(foundryId: string): Promise<DraftTask[]> {
         .like('title', '[Draft]%')
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
+        .limit(50) // PERF: Cap to prevent unbounded fetches
 
     if (error) {
         console.error('[ReviewQueue] Failed to fetch draft tasks:', error.message)
@@ -89,6 +90,7 @@ async function getPendingActions(foundryId: string): Promise<PendingAction[]> {
         .eq('foundry_id', foundryId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
+        .limit(50) // PERF: Cap to prevent unbounded fetches
 
     if (error) {
         console.error('[ReviewQueue] Failed to fetch pending actions:', error.message)

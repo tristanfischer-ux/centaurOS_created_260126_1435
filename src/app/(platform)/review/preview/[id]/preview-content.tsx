@@ -234,8 +234,8 @@ export function PreviewContent({ artifact, appUrl }: PreviewContentProps) {
                 </div>
             )}
             {success && (
-                <div className="bg-success/10 border border-success rounded-lg px-4 py-3">
-                    <p className="text-sm text-success">{success}</p>
+                <div className="bg-status-success/10 border border-status-success rounded-lg px-4 py-3">
+                    <p className="text-sm text-status-success" role="status">{success}</p>
                 </div>
             )}
 

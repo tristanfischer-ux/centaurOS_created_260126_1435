@@ -39,6 +39,13 @@ interface PublishResult {
     error: string | null
 }
 
+// SECURITY: Only these content types are allowed for publishing.
+const VALID_CONTENT_TYPES = ['blog', 'page', 'case-study', 'landing-page'] as const
+
+// SECURITY: Only these metadata fields can be overridden by the caller.
+// Prevents accidental overwrite of internal fields like view_count, published_at.
+const ALLOWED_METADATA_OVERRIDES = ['slug', 'meta_title', 'meta_description', 'og_image_url', 'tags', 'content_category'] as const
+
 // ─── Slug Generation ────────────────────────────────────────────────
 
 /**
@@ -54,6 +61,11 @@ function slugify(title: string): string {
         .replace(/^-|-$/g, '')
         .slice(0, 120)
 }
+
+// DECISION: Slug uniqueness is enforced by the DB unique index
+// (idx_artifacts_publish_slug). If a collision occurs, we catch the
+// constraint error and append a timestamp suffix. This is simpler and
+// more correct than a check-then-insert approach (no TOCTOU race).
 
 // ─── Publish Content (from specialist proposal) ─────────────────────
 
@@ -78,9 +90,20 @@ export async function createPublishableContent(
         const foundryId = await getFoundryIdCached()
         if (!foundryId) return { artifactId: null, error: 'No active foundry' }
 
-        const slug = slugify(payload.slug || payload.title)
+        // VALIDATION: content_type must be in allowlist (#6)
+        if (!VALID_CONTENT_TYPES.includes(payload.content_type as typeof VALID_CONTENT_TYPES[number])) {
+            return { artifactId: null, error: 'Invalid content type' }
+        }
 
-        const { data, error } = await supabase
+        // VALIDATION: slug must not be empty after slugification (#8)
+        const slug = slugify(payload.slug || payload.title)
+        if (!slug) {
+            return { artifactId: null, error: 'Could not generate a valid URL slug. Please provide one manually.' }
+        }
+
+        // Try insert with original slug, retry with suffix on collision (#7)
+        let finalSlug = slug
+        let { data, error } = await supabase
             .from('agent_artifacts')
             .insert({
                 foundry_id: foundryId,
@@ -90,7 +113,7 @@ export async function createPublishableContent(
                 content_type: payload.content_type,
                 publish_status: 'review',
                 publish_metadata: {
-                    slug,
+                    slug: finalSlug,
                     meta_title: payload.title,
                     meta_description: payload.meta_description,
                     og_image_url: payload.og_image_url || null,
@@ -102,7 +125,36 @@ export async function createPublishableContent(
             .select('id')
             .single()
 
+        // Handle slug collision — retry with timestamp suffix
+        if (error?.message?.includes('idx_artifacts_publish_slug')) {
+            finalSlug = `${slug}-${Date.now().toString(36).slice(-4)}`
+            const retry = await supabase
+                .from('agent_artifacts')
+                .insert({
+                    foundry_id: foundryId,
+                    created_by: user.id,
+                    title: payload.title,
+                    content: payload.content,
+                    content_type: payload.content_type,
+                    publish_status: 'review',
+                    publish_metadata: {
+                        slug: finalSlug,
+                        meta_title: payload.title,
+                        meta_description: payload.meta_description,
+                        og_image_url: payload.og_image_url || null,
+                        tags: payload.tags || [],
+                        view_count: 0,
+                    },
+                    metadata: {},
+                })
+                .select('id')
+                .single()
+            data = retry.data
+            error = retry.error
+        }
+
         if (error) return { artifactId: null, error: sanitizeErrorMessage(error.message) }
+        if (!data) return { artifactId: null, error: 'Failed to create content' }
 
         return { artifactId: data.id, error: null }
     } catch (err) {
@@ -172,9 +224,18 @@ export async function publishContent(
         }
 
         const now = new Date().toISOString()
+        // SECURITY: Only allow overriding specific metadata fields (#9)
+        const safeOverrides: Record<string, unknown> = {}
+        if (metadata) {
+            for (const key of ALLOWED_METADATA_OVERRIDES) {
+                if (key in metadata && metadata[key as keyof typeof metadata] !== undefined) {
+                    safeOverrides[key] = metadata[key as keyof typeof metadata]
+                }
+            }
+        }
         const updatedMeta = {
             ...currentMeta,
-            ...(metadata || {}),
+            ...safeOverrides,
             slug,
             published_at: now,
             published_by: user.id,
@@ -193,10 +254,9 @@ export async function publishContent(
             return { url: null, error: sanitizeErrorMessage(updateError.message) }
         }
 
-        // Determine URL based on content type
-        const contentType = artifact.content_type as string
-        const urlPrefix = contentType === 'blog' ? '/blog' : '/pages'
-        const liveUrl = `${urlPrefix}/${slug}`
+        // DECISION: Only /blog route exists currently. All content types
+        // publish to /blog until dedicated /pages route is created (#14).
+        const liveUrl = `/blog/${slug}`
 
         // Trigger ISR revalidation so the page is immediately available
         revalidatePath(liveUrl)
@@ -310,7 +370,7 @@ export async function updateContentBeforePublish(
         }
 
         const currentMeta = (artifact.publish_metadata || {}) as Record<string, unknown>
-        const newVersion = (artifact.version_number || 1) + 1
+        const newVersion = (artifact.version_number ?? 1) + 1
 
         // Save current version to history
         await supabase.from('agent_artifact_versions').insert({
@@ -379,6 +439,7 @@ export async function getReviewQueue(): Promise<{
             .eq('foundry_id', foundryId)
             .in('publish_status', ['review', 'revision_requested'])
             .order('created_at', { ascending: false })
+            .limit(50) // PERF: Cap review queue to prevent unbounded fetches (#R4-2)
 
         if (error) return { items: [], error: sanitizeErrorMessage(error.message) }
 

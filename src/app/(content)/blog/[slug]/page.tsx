@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import Link from 'next/link'
@@ -82,7 +83,8 @@ function formatDate(dateString: string): string {
  * Fetches a published blog post by slug.
  * Returns null if not found or not published.
  */
-async function getPost(slug: string): Promise<PublishedPost | null> {
+// PERF: Deduplicate RPC calls — getPost is called from both generateMetadata and the page component (#R4-6)
+const getPost = cache(async function getPost(slug: string): Promise<PublishedPost | null> {
     // SECURITY: admin client — public content via SECURITY DEFINER RPC
     const supabase = createAdminClient()
 
@@ -99,7 +101,7 @@ async function getPost(slug: string): Promise<PublishedPost | null> {
     if (!data || (Array.isArray(data) && data.length === 0)) return null
 
     return Array.isArray(data) ? data[0] : data
-}
+})
 
 /**
  * Looks up author display name from profiles table.
@@ -229,9 +231,10 @@ export default async function BlogPostPage({ params }: PageProps) {
     return (
         <>
             {/* JSON-LD structured data */}
+            {/* SECURITY: Escape </ sequences to prevent script injection (#5) */}
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
             />
 
             <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
