@@ -27,6 +27,7 @@ import type { Database } from '@/types/database.types'
 import { countTokens, countMessagesTokens } from './token-counter'
 import { runObserver } from './observer'
 import { runReflector } from './reflector'
+import { embedObservation } from './semantic-search'
 import type {
   MemoryContextType,
   MemoryThread,
@@ -534,6 +535,28 @@ export async function processMemory(
     )
   }
 
+  // 6b. Fire-and-forget: embed observations for semantic memory recall
+  // FLOW: Embedding runs async post-response — zero user-facing latency
+  {
+    const obsId = existingObs?.id
+    if (obsId) {
+      void embedObservation(obsId, mergedObservations)
+    } else {
+      // Fetch the newly-inserted observation ID for embedding
+      // GOTCHA: Supabase query builder returns PromiseLike (no .catch), wrap in Promise.resolve
+      void Promise.resolve(
+        supabase
+          .from('agent_memory_observations')
+          .select('id')
+          .eq('thread_id', threadId)
+          .limit(1)
+          .single()
+      ).then(({ data }) => {
+        if (data?.id) void embedObservation(data.id, mergedObservations)
+      }).catch(() => { /* embedding is best-effort */ })
+    }
+  }
+
   // 7. Mark messages as observed
   const messageIds = (unobservedMessages as MemoryMessage[]).map((m) => m.id)
   await supabase
@@ -585,6 +608,9 @@ export async function processMemory(
           updated_at: new Date().toISOString(),
         })
         .eq('id', latestObs.id)
+
+      // Re-embed after reflection (text changed significantly)
+      void embedObservation(latestObs.id, reflectedText)
     }
   }
 }

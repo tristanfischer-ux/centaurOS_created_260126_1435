@@ -75,6 +75,7 @@ const LAYER_PRIORITIES: Record<string, number> = {
     'Founder Preferences': 85,     // Communication style matters
     'Decision Journal': 80,        // "Remember when" references
     'Specialist Knowledge': 75,    // Persistent facts from past conversations
+    'Semantic Memory': 73,          // Past conversations/decisions via embedding similarity
     'Temporal Awareness': 70,      // Time-of-day, milestones
     'External Intelligence': 60,   // Sweep reports
     'Engineering Reference Data': 58, // Verified material/process/standards data
@@ -330,6 +331,28 @@ export async function buildContextLayers(params: ContextLayerParams & {
                     (async () => {
                         const block = await buildEngineeringReferenceLayer(input, foundryId, cadLabProjectId)
                         return { block, layer: 'Engineering Reference Data' }
+                    })()
+                )
+            }
+
+            // Layer 10: Semantic Memory — past conversations + decisions via embedding search
+            // INTENT: Enables "what did we discuss about X?" across ALL threads
+            if (input) {
+                layerPromises.push(
+                    (async () => {
+                        const { searchObservations, searchDecisions, formatObservationHitsForPrompt, formatDecisionHitsForPrompt } =
+                            await import('@/lib/agent-memory/semantic-search')
+                        const [obsHits, decHits] = await Promise.all([
+                            searchObservations(foundryId, input, { limit: 5, threshold: 0.45 }),
+                            searchDecisions(foundryId, input, { limit: 5, threshold: 0.45 }),
+                        ])
+                        const obsPart = formatObservationHitsForPrompt(obsHits)
+                        const decPart = formatDecisionHitsForPrompt(decHits)
+                        const parts = [obsPart, decPart].filter(Boolean)
+                        const block = parts.length > 0
+                            ? `## Relevant Past Conversations\n${parts.join('\n\n')}`
+                            : ''
+                        return { block, layer: 'Semantic Memory' }
                     })()
                 )
             }

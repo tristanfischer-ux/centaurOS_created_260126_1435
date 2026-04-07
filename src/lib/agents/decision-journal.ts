@@ -17,6 +17,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { embedDecision } from '@/lib/agent-memory/semantic-search'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -103,12 +104,17 @@ export async function recordDecision(
 
     try {
         // AUDIT: Record decision for pattern recognition and "remember when" references
-        await supabase.from('specialist_decision_journal').insert({
+        const { data } = await supabase.from('specialist_decision_journal').insert({
             foundry_id: foundryId,
             specialist_id: specialistId,
             decision,
             context,
-        })
+        }).select('id').single()
+
+        // Fire-and-forget: embed for semantic memory recall
+        if (data?.id) {
+            void embedDecision(data.id, decision, context)
+        }
     } catch (error) {
         console.error('[decision-journal] Failed to record decision:', error)
     }

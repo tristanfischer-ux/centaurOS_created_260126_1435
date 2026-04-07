@@ -1223,6 +1223,7 @@ export type Database = {
       agent_memory_observations: {
         Row: {
           created_at: string
+          embedding: string | null
           foundry_id: string
           id: string
           observations_text: string
@@ -1233,6 +1234,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          embedding?: string | null
           foundry_id: string
           id?: string
           observations_text?: string
@@ -1243,6 +1245,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          embedding?: string | null
           foundry_id?: string
           id?: string
           observations_text?: string
@@ -15793,6 +15796,7 @@ export type Database = {
           context: string | null
           created_at: string
           decision: string
+          embedding: string | null
           foundry_id: string
           id: string
           outcome: string | null
@@ -15805,6 +15809,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           decision: string
+          embedding?: string | null
           foundry_id: string
           id?: string
           outcome?: string | null
@@ -15817,6 +15822,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           decision?: string
+          embedding?: string | null
           foundry_id?: string
           id?: string
           outcome?: string | null
@@ -19196,6 +19202,15 @@ export type Database = {
           spend: number
         }[]
       }
+      get_co_investors: {
+        Args: { p_limit?: number; p_listing_id: string }
+        Returns: {
+          co_investor_listing_id: string
+          co_investor_name: string
+          shared_company_count: number
+          shared_company_names: string[]
+        }[]
+      }
       get_completion_trend: {
         Args: { p_days?: number; p_foundry_id: string }
         Returns: {
@@ -19749,6 +19764,23 @@ export type Database = {
           tags: string[]
         }[]
       }
+      match_decisions: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_foundry_id: string
+          query_embedding: string
+        }
+        Returns: {
+          context: string
+          created_at: string
+          decision: string
+          id: string
+          outcome: string
+          similarity: number
+          specialist_id: string
+        }[]
+      }
       match_investor_grants: {
         Args: {
           match_count?: number
@@ -19810,6 +19842,24 @@ export type Database = {
           similarity: number
           subcategory: string
           title: string
+        }[]
+      }
+      match_observations: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_foundry_id: string
+          query_embedding: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          observations_text: string
+          similarity: number
+          thread_id: string
+          token_count: number
+          updated_at: string
+          version: number
         }[]
       }
       match_people_semantic: {
