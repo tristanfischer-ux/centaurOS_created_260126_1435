@@ -41,6 +41,7 @@ export interface InvestorIntel {
   recent_deals: string | null
   generated_at: string
   generated_by: string
+  generated_by_user_id: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +85,7 @@ export async function getInvestorIntel(listingId: string): Promise<InvestorIntel
   const expiresAt = new Date(generatedAt.getTime() + INTEL_CACHE_DAYS * 24 * 60 * 60 * 1000)
   if (new Date() > expiresAt) return null
 
-  return data as InvestorIntel
+  return data as unknown as InvestorIntel
 }
 
 /**
@@ -113,7 +114,7 @@ export async function getInvestorIntelBatch(
 
   for (const row of data) {
     if (new Date(row.generated_at) > cutoff) {
-      result[row.listing_id] = row as InvestorIntel
+      result[row.listing_id] = row as unknown as InvestorIntel
     }
   }
 

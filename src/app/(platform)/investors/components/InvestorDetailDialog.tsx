@@ -338,6 +338,7 @@ function InvestorMainView({
   const geoFocus = attrs.geo_focus ?? []
   const websiteUrl = attrs.website_url ? ensureProtocol(attrs.website_url) : null
   const linkedinUrl = attrs.linkedin_company_url ? ensureProtocol(attrs.linkedin_company_url) : null
+  const twitterUrl = attrs.twitter_company_url ? ensureProtocol(attrs.twitter_company_url) : null
   const lastVerified = formatDate(attrs.last_verified)
   const lastSynced = formatDate(attrs.last_synced)
 
@@ -419,7 +420,7 @@ function InvestorMainView({
       )}
 
       {/* Links */}
-      {(websiteUrl || linkedinUrl) && (
+      {(websiteUrl || linkedinUrl || twitterUrl) && (
         <div>
           <SectionHeading>Links</SectionHeading>
           <div className="flex items-center gap-4">
@@ -431,6 +432,11 @@ function InvestorMainView({
             {linkedinUrl && (
               <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:underline">
                 <Linkedin className="h-4 w-4" /> LinkedIn <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {twitterUrl && (
+              <a href={twitterUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:underline">
+                <ExternalLink className="h-4 w-4" /> X / Twitter <ExternalLink className="h-3 w-3" />
               </a>
             )}
           </div>

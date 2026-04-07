@@ -54,6 +54,8 @@ export type InvestorFirm = {
     outreach_status?: string
     website_url?: string
     linkedin_company_url?: string
+    twitter_company_url?: string
+    twitter_company_bio?: string
     investment_thesis?: string
     notable_portfolio?: string[]
     last_verified?: string
@@ -202,6 +204,8 @@ function rowToFirm(row: Record<string, unknown>): InvestorFirm {
       outreach_status: attrs.outreach_status as string | undefined,
       website_url: attrs.website_url as string | undefined,
       linkedin_company_url: attrs.linkedin_company_url as string | undefined,
+      twitter_company_url: attrs.twitter_company_url as string | undefined,
+      twitter_company_bio: attrs.twitter_company_bio as string | undefined,
       investment_thesis: attrs.investment_thesis as string | undefined,
       notable_portfolio: toStringArray(attrs.notable_portfolio),
       last_verified: attrs.last_verified as string | undefined,
@@ -1923,5 +1927,64 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
     contacts,
     total,
     hasMore: offset + pageSize < total,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Contact Detail
+// ---------------------------------------------------------------------------
+
+/**
+ * Extended contact detail with fields not included in directory search results.
+ */
+export interface ContactDetail extends ContactSearchResult {
+  warm_intro_path: string | null
+  outreach_status: string | null
+  last_contacted_at: string | null
+}
+
+/**
+ * Fetches full detail for a single contact by ID, including warm intro path
+ * and outreach status. Tier-gated: email and deep_bio require professional+.
+ */
+export async function getContactById(contactId: string): Promise<ContactDetail | null> {
+  if (!UUID_RE.test(contactId)) return null
+
+  // SECURITY: admin client needed — same RLS context issue as searchContacts
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('vc_pe_contacts')
+    .select('id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, notes, deep_bio, warm_intro_path, outreach_status, last_contacted_at, listing_id, marketplace_listings!inner(title)')
+    .eq('id', contactId)
+    .single()
+
+  if (error || !data) {
+    console.error('[getContactById] Not found:', error)
+    return null
+  }
+
+  const access = await getInvestorTierAccess()
+  const rawEmail = data.email as string | null
+  const rawDeepBio = data.deep_bio as string | null
+  const listing = data.marketplace_listings as unknown as { title: string }
+
+  return {
+    id: data.id,
+    full_name: data.full_name,
+    title: data.title ?? null,
+    firm_name: listing.title,
+    listing_id: data.listing_id,
+    email: access.deepAccess ? rawEmail : null,
+    email_verified: access.deepAccess ? data.email_verified : null,
+    linkedin_url: data.linkedin_url ?? null,
+    seniority: data.seniority ?? null,
+    is_decision_maker: data.is_decision_maker ?? null,
+    notes: data.notes ?? null,
+    deep_bio: access.deepAccess ? rawDeepBio : null,
+    has_email: !!rawEmail,
+    has_deep_bio: !!rawDeepBio,
+    warm_intro_path: access.deepAccess ? (data.warm_intro_path ?? null) : null,
+    outreach_status: data.outreach_status ?? null,
+    last_contacted_at: data.last_contacted_at ?? null,
   }
 }

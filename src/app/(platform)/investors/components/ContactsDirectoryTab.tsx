@@ -33,6 +33,7 @@ import {
   type ContactSearchResult,
   type ContactSearchFilters,
 } from "@/actions/investors"
+import { ContactDetailDialog } from "./ContactDetailDialog"
 import Link from "next/link"
 
 // ---------------------------------------------------------------------------
@@ -54,10 +55,13 @@ export function ContactsDirectoryTab(): React.ReactElement {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
 
+  // Contact detail dialog
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
+
   // Filters
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
-  const [activeFilter, setActiveFilter] = useState<FilterChip>("all")
+  const [activeFilters, setActiveFilters] = useState<Set<FilterChip>>(new Set())
 
   // Debounce ref
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -77,13 +81,13 @@ export function ContactsDirectoryTab(): React.ReactElement {
   const buildFilters = useCallback(
     (pageNum: number): ContactSearchFilters => ({
       query: debouncedQuery || undefined,
-      decisionMakersOnly: activeFilter === "decision_makers",
-      withEmailOnly: activeFilter === "with_email",
-      withBioOnly: activeFilter === "with_bio",
+      decisionMakersOnly: activeFilters.has("decision_makers"),
+      withEmailOnly: activeFilters.has("with_email"),
+      withBioOnly: activeFilters.has("with_bio"),
       page: pageNum,
       pageSize: 50,
     }),
-    [debouncedQuery, activeFilter],
+    [debouncedQuery, activeFilters],
   )
 
   // Fetch contacts (initial / filter change)
@@ -156,21 +160,37 @@ export function ContactsDirectoryTab(): React.ReactElement {
 
         {/* Filter chips */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {filterChips.map((chip) => (
-            <Button
-              key={chip.key}
-              variant={activeFilter === chip.key ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveFilter(chip.key)}
-              className={cn(
-                "h-8 text-xs gap-1.5",
-                activeFilter === chip.key && "bg-international-orange hover:bg-international-orange/90",
-              )}
-            >
-              {chip.icon}
-              {chip.label}
-            </Button>
-          ))}
+          {filterChips.map((chip) => {
+            const isActive = chip.key === "all"
+              ? activeFilters.size === 0
+              : activeFilters.has(chip.key)
+            return (
+              <Button
+                key={chip.key}
+                variant={isActive ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (chip.key === "all") {
+                    setActiveFilters(new Set())
+                  } else {
+                    setActiveFilters(prev => {
+                      const next = new Set(prev)
+                      if (next.has(chip.key)) next.delete(chip.key)
+                      else next.add(chip.key)
+                      return next
+                    })
+                  }
+                }}
+                className={cn(
+                  "h-8 text-xs gap-1.5",
+                  isActive && "bg-international-orange hover:bg-international-orange/90",
+                )}
+              >
+                {chip.icon}
+                {chip.label}
+              </Button>
+            )
+          })}
         </div>
       </div>
 
@@ -219,7 +239,7 @@ export function ContactsDirectoryTab(): React.ReactElement {
                 </thead>
                 <tbody>
                   {contacts.map((contact) => (
-                    <ContactRow key={contact.id} contact={contact} />
+                    <ContactRow key={contact.id} contact={contact} onSelect={setSelectedContactId} />
                   ))}
                 </tbody>
               </table>
@@ -249,6 +269,13 @@ export function ContactsDirectoryTab(): React.ReactElement {
           )}
         </>
       )}
+
+      {/* Contact detail dialog */}
+      <ContactDetailDialog
+        contactId={selectedContactId}
+        open={selectedContactId !== null}
+        onOpenChange={(open) => { if (!open) setSelectedContactId(null) }}
+      />
     </div>
   )
 }
@@ -257,12 +284,17 @@ export function ContactsDirectoryTab(): React.ReactElement {
 // Contact row
 // ---------------------------------------------------------------------------
 
-function ContactRow({ contact }: { contact: ContactSearchResult }): React.ReactElement {
+function ContactRow({ contact, onSelect }: { contact: ContactSearchResult; onSelect: (id: string) => void }): React.ReactElement {
   return (
     <tr className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-      {/* Name */}
+      {/* Name — clickable to open detail dialog */}
       <td className="px-4 py-2.5">
-        <span className="font-medium text-foreground">{contact.full_name}</span>
+        <button
+          onClick={() => onSelect(contact.id)}
+          className="font-medium text-foreground hover:text-international-orange transition-colors text-left"
+        >
+          {contact.full_name}
+        </button>
         {contact.seniority && (
           <span className="ml-1.5 text-xs text-muted-foreground">({contact.seniority})</span>
         )}
