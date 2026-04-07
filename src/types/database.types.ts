@@ -661,6 +661,8 @@ export type Database = {
           is_shared_with_foundry: boolean
           is_starred: boolean
           metadata: Json
+          publish_metadata: Json | null
+          publish_status: string | null
           run_id: string | null
           shared_with: string[] | null
           title: string
@@ -678,6 +680,8 @@ export type Database = {
           is_shared_with_foundry?: boolean
           is_starred?: boolean
           metadata?: Json
+          publish_metadata?: Json | null
+          publish_status?: string | null
           run_id?: string | null
           shared_with?: string[] | null
           title: string
@@ -695,6 +699,8 @@ export type Database = {
           is_shared_with_foundry?: boolean
           is_starred?: boolean
           metadata?: Json
+          publish_metadata?: Json | null
+          publish_status?: string | null
           run_id?: string | null
           shared_with?: string[] | null
           title?: string
@@ -6059,6 +6065,77 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      execution_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          foundry_id: string
+          id: string
+          metadata: Json
+          source_artifact_id: string | null
+          specialist_owner_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          foundry_id: string
+          id?: string
+          metadata?: Json
+          source_artifact_id?: string | null
+          specialist_owner_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          foundry_id?: string
+          id?: string
+          metadata?: Json
+          source_artifact_id?: string | null
+          specialist_owner_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "execution_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "execution_plans_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "execution_plans_source_artifact_id_fkey"
+            columns: ["source_artifact_id"]
+            isOneToOne: false
+            referencedRelation: "agent_artifacts"
             referencedColumns: ["id"]
           },
         ]
@@ -15714,6 +15791,61 @@ export type Database = {
           },
         ]
       }
+      site_settings: {
+        Row: {
+          analytics_config: Json
+          custom_head_scripts: string[] | null
+          foundry_id: string
+          id: string
+          metadata: Json
+          newsletter_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          analytics_config?: Json
+          custom_head_scripts?: string[] | null
+          foundry_id: string
+          id?: string
+          metadata?: Json
+          newsletter_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          analytics_config?: Json
+          custom_head_scripts?: string[] | null
+          foundry_id?: string
+          id?: string
+          metadata?: Json
+          newsletter_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_settings_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: true
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "site_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spatial_ref_sys: {
         Row: {
           auth_name: string | null
@@ -16978,11 +17110,13 @@ export type Database = {
           objective_id: string
           owner_agent_id: string | null
           parent_task_id: string | null
+          plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number
+          task_type: string
           title: string
           updated_at: string | null
           workstream: string | null
@@ -17015,11 +17149,13 @@ export type Database = {
           objective_id: string
           owner_agent_id?: string | null
           parent_task_id?: string | null
+          plan_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_number?: number
+          task_type?: string
           title: string
           updated_at?: string | null
           workstream?: string | null
@@ -17052,11 +17188,13 @@ export type Database = {
           objective_id?: string
           owner_agent_id?: string | null
           parent_task_id?: string | null
+          plan_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_number?: number
+          task_type?: string
           title?: string
           updated_at?: string | null
           workstream?: string | null
@@ -17130,6 +17268,13 @@ export type Database = {
             columns: ["parent_task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "execution_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -19000,11 +19145,13 @@ export type Database = {
           objective_id: string
           owner_agent_id: string | null
           parent_task_id: string | null
+          plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number
+          task_type: string
           title: string
           updated_at: string | null
           workstream: string | null
@@ -19177,11 +19324,13 @@ export type Database = {
           objective_id: string
           owner_agent_id: string | null
           parent_task_id: string | null
+          plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number
+          task_type: string
           title: string
           updated_at: string | null
           workstream: string | null
@@ -19360,11 +19509,13 @@ export type Database = {
           objective_id: string
           owner_agent_id: string | null
           parent_task_id: string | null
+          plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number
+          task_type: string
           title: string
           updated_at: string | null
           workstream: string | null
@@ -19561,6 +19712,7 @@ export type Database = {
           title: string
         }[]
       }
+      get_plan_progress: { Args: { p_plan_id: string }; Returns: Json }
       get_platform_fee_percent: {
         Args: { p_order_type?: string; p_role?: string }
         Returns: number
@@ -19580,6 +19732,20 @@ export type Database = {
           date: string
           earnings: number
           order_count: number
+        }[]
+      }
+      get_published_content: {
+        Args: { p_slug: string }
+        Returns: {
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string
+          foundry_id: string
+          id: string
+          publish_metadata: Json
+          title: string
+          updated_at: string
         }[]
       }
       get_tasks_needing_escalation: {
@@ -19639,6 +19805,7 @@ export type Database = {
           monthly_task_count: number
         }[]
       }
+      increment_content_view: { Args: { p_slug: string }; Returns: undefined }
       increment_profile_views: {
         Args: { provider_id_input: string }
         Returns: undefined
@@ -19699,6 +19866,18 @@ export type Database = {
         Returns: boolean
       }
       is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
+      list_published_content: {
+        Args: { p_content_type?: string; p_limit?: number; p_offset?: number }
+        Returns: {
+          content_type: string
+          created_at: string
+          created_by: string
+          foundry_id: string
+          id: string
+          publish_metadata: Json
+          title: string
+        }[]
+      }
       log_agent_action: {
         Args: {
           p_action_description: string

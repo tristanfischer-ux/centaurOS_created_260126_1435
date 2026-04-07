@@ -69,6 +69,7 @@ import {
     Clock,
     Swords,
     Package,
+    ClipboardCheck,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -127,6 +128,7 @@ const planNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
+    { name: "Review", href: "/review", icon: ClipboardCheck, tooltip: "Content, tasks, and actions awaiting your approval" },
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
     { name: "Red Team", href: "/red-team", icon: Swords, tooltip: "Stress-test decisions with multi-LLM adversarial debate" },
     { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your team's collective intelligence — the more you add, the smarter your specialists become" },

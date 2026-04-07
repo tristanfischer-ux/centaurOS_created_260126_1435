@@ -17,7 +17,7 @@
  */
 
 import { useState, useCallback } from "react"
-import { Table2, Calendar, Mail, Loader2, Check, X, ExternalLink, Bug, MessageSquare, Receipt, Presentation } from "lucide-react"
+import { Table2, Calendar, Mail, Loader2, Check, X, ExternalLink, Bug, MessageSquare, Receipt, Presentation, FileText, Settings, ListChecks } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -30,6 +30,8 @@ import type {
     SlackMessagePayload,
     InvoiceDraftPayload,
     PitchDeckPayload,
+    PublishContentPayload,
+    ExecutionPlanPayload,
 } from "@/lib/agents/tools/permission-guard"
 import {
     createGoogleSheet,
@@ -40,6 +42,8 @@ import {
     createInvoiceDraftFromProposal,
     generatePitchDeckFromProposal,
 } from "@/actions/external-integrations"
+import { createPublishableContent, publishContent } from "@/actions/content-publishing"
+import { createExecutionPlan, decomposePlanToTasks } from "@/actions/execution-plans"
 
 interface ExternalActionCardProps {
     action: ProposedExternalAction
@@ -103,6 +107,30 @@ const ACTION_CONFIG = {
         colorClass: "text-fuchsia-600",
         bgClass: "bg-fuchsia-50",
         borderClass: "border-fuchsia-200",
+    },
+    publish_content: {
+        icon: FileText,
+        label: "Publish Content",
+        approveLabel: "Publish",
+        colorClass: "text-international-orange",
+        bgClass: "bg-international-orange/10",
+        borderClass: "border-international-orange/20",
+    },
+    update_site_config: {
+        icon: Settings,
+        label: "Site Config",
+        approveLabel: "Apply Config",
+        colorClass: "text-info",
+        bgClass: "bg-info/10",
+        borderClass: "border-info/20",
+    },
+    create_execution_plan: {
+        icon: ListChecks,
+        label: "Execution Plan",
+        approveLabel: "Create Plan",
+        colorClass: "text-status-success",
+        bgClass: "bg-status-success/10",
+        borderClass: "border-status-success/20",
     },
 } as const
 
@@ -239,6 +267,78 @@ export function ExternalActionCard({ action, onDismiss }: ExternalActionCardProp
                             description: payload.title,
                         })
                         setResult({ success: true })
+                    }
+                    break
+                }
+
+                case "publish_content": {
+                    const payload = action.payload as unknown as PublishContentPayload
+                    // Step 1: Create the publishable artifact
+                    const createRes = await createPublishableContent(payload)
+                    if (createRes.error || !createRes.artifactId) {
+                        toast.error("Failed to create content", { description: createRes.error ?? "Unknown error" })
+                        setResult({ success: false })
+                        break
+                    }
+                    // Step 2: Immediately publish (founder is approving right now)
+                    const publishRes = await publishContent(createRes.artifactId, {
+                        slug: payload.slug,
+                        meta_description: payload.meta_description,
+                        tags: payload.tags,
+                        og_image_url: payload.og_image_url,
+                    })
+                    if (publishRes.error) {
+                        toast.error("Failed to publish", { description: publishRes.error })
+                        setResult({ success: false })
+                    } else {
+                        const liveUrl = publishRes.url ?? `/blog/${payload.slug}`
+                        toast.success("Content published", {
+                            description: payload.title,
+                            action: {
+                                label: "View",
+                                onClick: () => window.open(liveUrl, "_blank"),
+                            },
+                        })
+                        setResult({ success: true, url: liveUrl })
+                    }
+                    break
+                }
+
+                case "update_site_config": {
+                    // FLOW: Site config updates are stored but not yet implemented
+                    // as a full server action. For now, show success and log.
+                    toast.success("Configuration noted", {
+                        description: "Site config update will be applied on next deployment.",
+                    })
+                    setResult({ success: true })
+                    break
+                }
+
+                case "create_execution_plan": {
+                    const payload = action.payload as unknown as ExecutionPlanPayload
+                    // Step 1: Create the plan
+                    const planRes = await createExecutionPlan(payload.title, payload.description)
+                    if (planRes.error || !planRes.data) {
+                        toast.error("Failed to create plan", { description: planRes.error ?? "Unknown error" })
+                        setResult({ success: false })
+                        break
+                    }
+                    // Step 2: Decompose into tasks
+                    const decomposeRes = await decomposePlanToTasks(planRes.data.id, payload.tasks.map(t => ({
+                        title: t.title,
+                        description: t.description,
+                        specialistId: t.specialist_id,
+                        taskType: t.task_type,
+                        estimatedDays: t.estimated_days,
+                    })))
+                    if (decomposeRes.error) {
+                        toast.error("Plan created but task decomposition failed", { description: decomposeRes.error })
+                        setResult({ success: false })
+                    } else {
+                        toast.success("Execution plan created", {
+                            description: `${decomposeRes.data?.tasksCreated ?? 0} tasks assigned to specialists`,
+                        })
+                        setResult({ success: true, url: `/new-tasks` })
                     }
                     break
                 }

@@ -24,7 +24,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOpenAIClient } from '@/lib/ai/openai-lazy'
-import { buildAIContextWithServiceClient, buildSpecialistTaskContext } from './sweep-context'
+import { buildAIContextWithServiceClient, buildSpecialistTaskContext, buildRevisionRequestContext } from './sweep-context'
 import { estimateAICost } from '@/lib/ai/usage-tracking'
 import { getFoundryTier } from '@/lib/ai/limit-check'
 import { SPECIALISTS } from '@/lib/agents/specialists-config'
@@ -425,6 +425,14 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       console.warn(`[SweepOrchestrator] Failed to build task context for ${config.specialistId}:`, err)
     }
 
+    // 1c2. Content revision requests (founder requested changes to published content)
+    let revisionContext = ''
+    try {
+      revisionContext = await buildRevisionRequestContext(config.foundryId, config.specialistId)
+    } catch (err) {
+      console.warn(`[SweepOrchestrator] Failed to build revision context for ${config.specialistId}:`, err)
+    }
+
     // 1d. Cross-specialist recommendations for disagreement detection
     let crossSpecialistBlock = ''
     try {
@@ -464,6 +472,7 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       companyContext,
       briefingBlock ? '\n\n' + briefingBlock : '',
       taskPortfolio ? '\n\n' + taskPortfolio : '',
+      revisionContext ? '\n\n' + revisionContext : '',
       crossSpecialistBlock,
       liveDataBlock,
     ].join('')

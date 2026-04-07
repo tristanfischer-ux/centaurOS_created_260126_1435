@@ -285,3 +285,45 @@ export async function buildSpecialistTaskContext(
     return ''
   }
 }
+
+/**
+ * Build context for content revision requests.
+ *
+ * @description Fetches artifacts in 'revision_requested' status for this foundry.
+ * When a founder rejects published content and requests revisions, the specialist
+ * needs to see the feedback and re-generate the content.
+ *
+ * FLOW: Founder clicks "Request Revision" on publish-content-card → artifact gets
+ * publish_status='revision_requested' with review_notes in publish_metadata →
+ * this function picks it up on the next sweep → specialist sees feedback and
+ * should produce a revised PROPOSED_EXTERNAL_ACTION: publish_content.
+ */
+export async function buildRevisionRequestContext(
+  foundryId: string,
+  specialistId: string,
+): Promise<string> {
+  const supabase = createAdminClient()
+
+  try {
+    const { data: revisions } = await supabase
+      .from('agent_artifacts')
+      .select('id, title, content_type, publish_metadata')
+      .eq('foundry_id', foundryId)
+      .eq('publish_status', 'revision_requested')
+      .order('updated_at', { ascending: false })
+      .limit(5)
+
+    if (!revisions || revisions.length === 0) return ''
+
+    const items = revisions.map(r => {
+      const meta = (r.publish_metadata || {}) as Record<string, unknown>
+      const notes = (meta.review_notes as string) || 'No specific feedback provided'
+      return `  - **${r.title}** (${r.content_type}): Founder feedback: "${notes}"`
+    })
+
+    return `\n--- Content Revision Requests ---\nThe founder has reviewed your published content and requested revisions. For each item below, produce an updated version as a PROPOSED_EXTERNAL_ACTION with type "publish_content". Address the founder's feedback directly.\n\n${items.join('\n')}\n--- End Revision Requests ---\n`
+  } catch (err) {
+    console.error('[SweepContext] Error building revision request context:', err)
+    return ''
+  }
+}

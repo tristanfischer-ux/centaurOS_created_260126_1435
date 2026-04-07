@@ -28,6 +28,9 @@ export type ExternalActionType =
     | "send_slack_message"
     | "draft_invoice"
     | "generate_pitch_deck"
+    | "publish_content"
+    | "update_site_config"
+    | "create_execution_plan"
 
 /**
  * A structured proposal for an external service action, parsed from
@@ -97,6 +100,37 @@ export interface PitchDeckPayload {
     companyName?: string
 }
 
+/** Payload shape for content publishing (blog posts, pages, case studies). */
+export interface PublishContentPayload {
+    title: string
+    content: string
+    content_type: 'blog' | 'page' | 'case-study' | 'landing-page'
+    slug: string
+    meta_description: string
+    tags: string[]
+    og_image_url?: string
+}
+
+/** Payload shape for site configuration updates (analytics, newsletter, etc.). */
+export interface SiteConfigPayload {
+    setting: 'analytics' | 'newsletter' | 'scripts'
+    value: unknown
+    description: string
+}
+
+/** Payload shape for execution plan creation (strategy -> task decomposition). */
+export interface ExecutionPlanPayload {
+    title: string
+    description: string
+    tasks: Array<{
+        title: string
+        description: string
+        specialist_id: string
+        task_type: 'content' | 'configuration' | 'code_change' | 'external_action' | 'general'
+        estimated_days?: number
+    }>
+}
+
 // ─── Validation ─────────────────────────────────────────────────────
 
 const VALID_EXTERNAL_TYPES: ExternalActionType[] = [
@@ -107,6 +141,9 @@ const VALID_EXTERNAL_TYPES: ExternalActionType[] = [
     "send_slack_message",
     "draft_invoice",
     "generate_pitch_deck",
+    "publish_content",
+    "update_site_config",
+    "create_execution_plan",
 ]
 
 /**
