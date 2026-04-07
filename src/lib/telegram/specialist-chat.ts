@@ -35,7 +35,7 @@ import {
 } from '@/lib/agent-memory'
 
 import type { AIProviderId } from '@/lib/ai-providers/types'
-import { checkAILimit } from '@/lib/ai/limit-check'
+import { checkAILimit, checkDailyFeatureCap, FREE_TIER_SPECIALISTS } from '@/lib/ai/limit-check'
 import { trackAIUsage } from '@/lib/ai/usage-tracking'
 import { rateLimit } from '@/lib/security/rate-limit'
 
@@ -315,6 +315,18 @@ export async function sendToSpecialist(
     if (!limitCheck.allowed) {
         throw new Error(limitCheck.message || 'AI usage limit reached')
     }
+
+    // SECURITY: Free-tier specialist gating (mirrors execute/route.ts)
+    if (limitCheck.tier === 'free' && !FREE_TIER_SPECIALISTS.has(session.specialistId)) {
+        throw new Error('This specialist is available on paid plans. Upgrade to unlock all 13 specialists.')
+    }
+
+    // Daily feature cap for specialist text chat
+    const dailyCap = await checkDailyFeatureCap(session.foundryId, 'specialist_text', limitCheck.tier)
+    if (!dailyCap.allowed) {
+        throw new Error(dailyCap.message || 'Daily chat limit reached. Try again tomorrow.')
+    }
+
     const rl = await rateLimit('telegramSpecialist', session.userId)
     if (!rl.success) {
         throw new Error(rl.error || 'Too many messages. Please wait a moment.')

@@ -121,6 +121,12 @@ export interface TrackAIUsageParams {
   durationSeconds?: number
   /** Conversation mode used (text, voice, avatar) */
   conversationMode?: ConversationModeTracking
+  /** Pipeline step for per-callsite attribution (e.g., 'research_synthesis', 'code_generation') */
+  step?: string
+  /** Prompt cache read tokens (90% input cost reduction) */
+  cacheReadTokens?: number
+  /** Prompt cache write tokens (25% extra input cost) */
+  cacheWriteTokens?: number
   metadata?: Record<string, unknown>
 }
 
@@ -235,9 +241,15 @@ export function estimateAICost(
   promptTokens: number,
   completionTokens: number
 ): number {
-  const costs = MODEL_COSTS_PER_1M_TOKENS[model] || MODEL_COSTS_PER_1M_TOKENS['gpt-5.4']
-  const inputCost = (promptTokens / 1_000_000) * costs.input
-  const outputCost = (completionTokens / 1_000_000) * costs.output
+  const costs = MODEL_COSTS_PER_1M_TOKENS[model]
+  if (!costs) {
+    // AUDIT: Unknown model — falling back to gpt-5.4 pricing which may over/under-estimate.
+    // This should be caught and the cost table updated before the model goes to production.
+    console.warn(`[AIUsageTracking] Unknown model "${model}" — using gpt-5.4 fallback pricing. Add it to MODEL_COSTS_PER_1M_TOKENS.`)
+  }
+  const effectiveCosts = costs || MODEL_COSTS_PER_1M_TOKENS['gpt-5.4']
+  const inputCost = (promptTokens / 1_000_000) * effectiveCosts.input
+  const outputCost = (completionTokens / 1_000_000) * effectiveCosts.output
   return Number((inputCost + outputCost).toFixed(6))
 }
 
@@ -270,6 +282,14 @@ export async function trackAIUsage(
     const estimatedCost = params.estimatedCostUsd
       ?? estimateAICost(model, promptTokens, completionTokens)
 
+    // Merge step and cache metrics into metadata for observability
+    const enrichedMetadata: Record<string, string | number | boolean> = {
+      ...(params.metadata || {}) as Record<string, string | number | boolean>,
+      ...(params.step ? { step: params.step } : {}),
+      ...(params.cacheReadTokens ? { cacheReadTokens: params.cacheReadTokens } : {}),
+      ...(params.cacheWriteTokens ? { cacheWriteTokens: params.cacheWriteTokens } : {}),
+    }
+
     const { data, error } = await supabase.rpc('increment_ai_usage', {
       p_foundry_id: params.foundryId,
       p_user_id: params.userId,
@@ -278,7 +298,7 @@ export async function trackAIUsage(
       p_prompt_tokens: promptTokens,
       p_completion_tokens: completionTokens,
       p_estimated_cost_usd: estimatedCost,
-      p_metadata: (params.metadata || {}) as Record<string, string | number | boolean>,
+      p_metadata: enrichedMetadata,
     })
 
     if (error) {

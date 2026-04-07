@@ -192,10 +192,17 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
     // Extended thinking adds an internal chain-of-thought step before the
     // final response, improving reasoning quality for complex analysis.
     const thinkingBudget = opts.thinkingBudget ?? 10_000
+    // AUDIT: Prompt caching — system prompt cached for 5-min TTL (90% input cost reduction on hits).
+    // The Anthropic SDK supports cache_control on system content blocks natively.
+    const cachedSystem = [{
+        type: 'text' as const,
+        text: opts.systemPrompt,
+        cache_control: { type: 'ephemeral' as const },
+    }]
     const streamParams: Parameters<typeof client.messages.stream>[0] = {
         model: opts.modelId,
         max_tokens: opts.maxTokens ?? 4096,
-        system: opts.systemPrompt,
+        system: cachedSystem,
         messages: conversationMessages,
         ...(opts.enableThinking && {
             thinking: {
@@ -216,6 +223,26 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
                 opts.onChunk(event.delta.text)
             }
         }
+
+        // AUDIT: Log cache metrics from streaming response for observability.
+        // The Anthropic SDK provides usage data on the final message.
+        try {
+            const finalMsg = await stream.finalMessage()
+            const usageAny = finalMsg.usage as unknown as Record<string, number>
+            const cacheRead = usageAny?.cache_read_input_tokens ?? 0
+            const cacheWrite = usageAny?.cache_creation_input_tokens ?? 0
+            if (cacheRead > 0 || cacheWrite > 0) {
+                console.info("[streamAnthropic] Cache metrics:", {
+                    model: opts.modelId,
+                    cacheRead,
+                    cacheWrite,
+                    inputTokens: finalMsg.usage?.input_tokens ?? 0,
+                })
+            }
+        } catch {
+            // Non-critical — cache metrics are observability, not functional
+        }
+
         opts.onDone()
     } catch (err) {
         // Extract meaningful error details from Anthropic SDK errors
@@ -252,6 +279,12 @@ async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise
     }
     conversationMessages.push({ role: "user", content: opts.userPrompt })
 
+    // AUDIT: Prompt caching for web search path (same pattern as streaming)
+    const cachedSystem = [{
+        type: 'text' as const,
+        text: opts.systemPrompt,
+        cache_control: { type: 'ephemeral' as const },
+    }]
     const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
     const webSearchTool = {
         type: "web_search_20260209",
@@ -262,7 +295,7 @@ async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise
     const createParams = {
         model: opts.modelId,
         max_tokens: opts.maxTokens ?? 4096,
-        system: opts.systemPrompt,
+        system: cachedSystem,
         messages: conversationMessages,
         tools: [webSearchTool],
         betas: [WEB_SEARCH_BETA],

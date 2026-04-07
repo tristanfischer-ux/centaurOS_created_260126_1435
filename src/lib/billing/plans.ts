@@ -50,6 +50,13 @@ export interface SubscriptionPlan {
     investorIntelligenceAccess: boolean
     /** Maximum storage in MB per foundry (undefined = unlimited) */
     maxStorageMB?: number
+    /**
+     * Maximum AI compute spend in USD per month.
+     * Acts as a secondary cost ceiling alongside task counts — whichever
+     * limit is hit first blocks further AI calls. Prevents expensive
+     * model usage from exceeding tier revenue.
+     */
+    maxComputeBudgetUsd: number
   }
   stripePriceIdMonthly?: string
   stripePriceIdAnnual?: string
@@ -105,6 +112,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorDeepAccess: false,
       investorIntelligenceAccess: false,
       maxStorageMB: 500,
+      maxComputeBudgetUsd: 2,
     },
   },
   starter: {
@@ -138,6 +146,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorDeepAccess: false,
       investorIntelligenceAccess: false,
       maxStorageMB: 5_000,
+      maxComputeBudgetUsd: 25,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL,
@@ -173,6 +182,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorDeepAccess: true,
       investorIntelligenceAccess: true,
       maxStorageMB: 50_000,
+      maxComputeBudgetUsd: 100,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_PROFESSIONAL_ANNUAL,
@@ -206,6 +216,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorContactsVisible: true,
       investorDeepAccess: true,
       investorIntelligenceAccess: true,
+      maxComputeBudgetUsd: 400,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL,

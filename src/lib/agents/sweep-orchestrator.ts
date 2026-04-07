@@ -26,6 +26,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getOpenAIClient } from '@/lib/ai/openai-lazy'
 import { buildAIContextWithServiceClient, buildSpecialistTaskContext } from './sweep-context'
 import { estimateAICost } from '@/lib/ai/usage-tracking'
+import { getFoundryTier } from '@/lib/ai/limit-check'
 import { SPECIALISTS } from '@/lib/agents/specialists-config'
 import { compilePersonalityPrompt } from './personality'
 import { getBackgroundSweepPrompt } from './sweep-prompts'
@@ -277,10 +278,30 @@ export async function runSweepOrchestration(): Promise<OrchestrationResult> {
   const sweepQueue: SweepConfig[] = []
   const specialistIds = SPECIALISTS.map(s => s.id)
 
+  // Cache tier lookups to avoid N+1 queries
+  const tierCache = new Map<string, string>()
+
   for (const foundry of foundries) {
     const prefs = preferencesMap.get(foundry.id)
     const sweepsEnabled = prefs?.sweeps_enabled ?? true
     if (!sweepsEnabled) continue
+
+    // SECURITY: Gate sweeps by subscription tier to prevent unmetered background costs.
+    // Free tier: no sweeps (no revenue to cover compute costs).
+    // Starter tier: no sweeps (£49/month doesn't justify background AI spend).
+    // Professional+ tiers: full sweep access.
+    let tier = tierCache.get(foundry.id)
+    if (!tier) {
+      try {
+        tier = await getFoundryTier(foundry.id)
+        tierCache.set(foundry.id, tier)
+      } catch {
+        // SECURITY: Fail closed — skip sweep if we can't determine tier
+        console.warn(`[SweepOrchestrator] Could not determine tier for foundry ${foundry.id}, skipping sweeps`)
+        continue
+      }
+    }
+    if (tier === 'free' || tier === 'starter') continue
 
     const budget = prefs?.monthly_budget_usd ?? DEFAULT_MONTHLY_BUDGET_USD
     const currentSpend = monthlySpendMap.get(foundry.id) ?? 0

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/security/rate-limit"
-import { checkAILimit } from "@/lib/ai/limit-check"
+import { checkAILimit, checkDailyFeatureCap, FREE_TIER_SPECIALISTS } from "@/lib/ai/limit-check"
 import { estimateAICost, trackAIUsage, MODALITY_FEATURE_MAP } from "@/lib/ai/usage-tracking"
 import { countTokens } from "@/lib/agent-memory"
 import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider } from "@/lib/ai-providers/registry"
@@ -364,6 +364,36 @@ export async function POST(request: Request) {
             },
             { status: 429 }
         )
+    }
+
+    // SECURITY: Free-tier specialist access control.
+    // Free users get 5 of 13 specialists (the cheapest ones). This drives
+    // upgrades via "unlock more experts" framing, not quality degradation.
+    // FREE_TIER_SPECIALISTS is shared with Telegram specialist-chat.ts.
+    if (limitCheck.tier === 'free' && specialistId && !FREE_TIER_SPECIALISTS.has(specialistId)) {
+        return NextResponse.json(
+            {
+                error: `This specialist is available on paid plans. Upgrade to unlock all 13 specialists.`,
+                code: "SPECIALIST_LOCKED",
+                specialistId,
+            },
+            { status: 403 }
+        )
+    }
+
+    // Daily feature cap for specialist text chat (Free: 5/day, Starter: 15/day)
+    if (modality === 'text') {
+        const dailyCheck = await checkDailyFeatureCap(foundryId, 'specialist_text', limitCheck.tier)
+        if (!dailyCheck.allowed) {
+            return NextResponse.json(
+                {
+                    error: dailyCheck.message,
+                    code: "DAILY_CAP",
+                    usage: { todayUsage: dailyCheck.todayUsage, dailyCap: dailyCheck.dailyCap },
+                },
+                { status: 429 }
+            )
+        }
     }
 
     // 4a. Validate threadId belongs to user's foundry (IDOR prevention)

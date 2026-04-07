@@ -72,6 +72,10 @@ import {
   getAssemblyCodeGenUserPrompt,
   type AssemblyModuleInfo,
 } from "@/lib/cad-lab/assembly-prompts"
+import { checkAILimit, checkDailyFeatureCap } from "@/lib/ai/limit-check"
+import { trackAIUsage, estimateAICost } from "@/lib/ai/usage-tracking"
+import type { AIFeature } from "@/lib/ai/usage-tracking"
+import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
@@ -104,6 +108,96 @@ import { retrieveStandardsForPrompt } from "@/lib/cad-lab/standards-retriever"
 import { generateAndStoreStandards } from "@/lib/cad-lab/standards-auto-learn"
 import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
 import { retrieveProductDimensionsForPrompt } from "@/lib/cad-lab/product-dimensions-retriever"
+
+// ─── AI Usage Limit Enforcement ────────────────────────────────────
+// SECURITY: CAD Lab functions were previously unmetered — no limit checks,
+// no usage tracking. This helper enforces the foundry's monthly AI quota
+// and provides a callback to log actual token/cost consumption.
+
+/**
+ * Enforce AI usage limits for CAD Lab operations.
+ *
+ * @description Gets the user's foundryId, checks their monthly quota,
+ * and returns a `trackUsage` callback for post-call logging. If the limit
+ * is exceeded, returns `{ allowed: false }` so callers can exit early.
+ *
+ * @param userId - The authenticated user's ID
+ * @param feature - Which CAD Lab feature is being used
+ * @returns Gate result with optional trackUsage callback
+ */
+async function enforceCadLabLimit(userId: string, feature: AIFeature): Promise<{
+  allowed: boolean
+  foundryId: string | null
+  error?: string
+  trackUsage: (params: {
+    model: string
+    promptTokens: number
+    completionTokens: number
+  }) => Promise<void>
+}> {
+  const noopTrack = async () => {}
+
+  try {
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) {
+      // SECURITY: Fail closed — no foundry means no way to enforce limits or track usage.
+      // This can happen with partially-onboarded accounts or malformed sessions.
+      return {
+        allowed: false,
+        foundryId: null,
+        error: 'Unable to verify usage limits. Please try again.',
+        trackUsage: noopTrack,
+      }
+    }
+
+    const limit = await checkAILimit(foundryId)
+    if (!limit.allowed) {
+      return {
+        allowed: false,
+        foundryId,
+        error: limit.message ?? 'AI usage limit reached. Please upgrade your plan.',
+        trackUsage: noopTrack,
+      }
+    }
+
+    // Daily feature cap (Free: 1 CAD/day, Starter: 5/day, Pro+: unlimited)
+    const dailyCap = await checkDailyFeatureCap(foundryId, feature, limit.tier)
+    if (!dailyCap.allowed) {
+      return {
+        allowed: false,
+        foundryId,
+        error: dailyCap.message ?? 'Daily feature limit reached. Try again tomorrow.',
+        trackUsage: noopTrack,
+      }
+    }
+
+    return {
+      allowed: true,
+      foundryId,
+      trackUsage: async (params) => {
+        await trackAIUsage({
+          foundryId,
+          userId,
+          feature,
+          model: params.model,
+          promptTokens: params.promptTokens,
+          completionTokens: params.completionTokens,
+          estimatedCostUsd: estimateAICost(params.model, params.promptTokens, params.completionTokens),
+        }).catch((err) => {
+          console.warn(`[CadLab] Failed to track usage for ${feature}:`, err)
+        })
+      },
+    }
+  } catch {
+    // SECURITY: Fail closed — deny on error to prevent unmetered usage
+    return {
+      allowed: false,
+      foundryId: null,
+      error: 'Unable to verify usage limits. Please try again.',
+      trackUsage: noopTrack,
+    }
+  }
+}
 
 /** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
  * because "use server" files cannot export non-function values */
@@ -161,6 +255,10 @@ export async function runCadLabResearch(
   // SECURITY: Rate limit AI calls to prevent cost abuse
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { error: rateLimitError } as unknown as CadLabResearchResult
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { error: gate.error } as unknown as CadLabResearchResult
 
   // SECURITY: Cap input lengths to prevent token/cost abuse
   if (!description || description.length > 5000) {
@@ -410,6 +508,10 @@ export async function generateCadLabInterface(
   // SECURITY: Rate limit
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { error: rateLimitError } as unknown as CadLabInterfaceResult
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { error: gate.error } as unknown as CadLabInterfaceResult
 
   const start = Date.now()
 
@@ -706,6 +808,10 @@ export async function generateCadLabModel(
   // SECURITY: Rate limit
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { error: rateLimitError } as unknown as CadLabResult
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { error: gate.error } as unknown as CadLabResult
 
   const pipelineStart = Date.now()
   let totalTokensIn = 0
@@ -1831,6 +1937,10 @@ export async function prepareDecomposition(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) throw new Error(gate.error ?? "AI usage limit reached")
+
   // DECISION: Keyword heuristic instead of Claude API call — saves 2-5s with equivalent accuracy
   const domain = detectDomainFromText(researchReport)
   const prompt = getModuleDecompositionPrompt(domain)
@@ -1879,6 +1989,10 @@ export async function skeletonDecompose(
   // SECURITY: Rate limit
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { success: false, error: rateLimitError, modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 }
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached", modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 } as SkeletonDecompositionResult
 
   const start = Date.now()
 
@@ -2045,6 +2159,10 @@ export async function expandModuleDetail(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Unauthorized", moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 }
 
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate_module')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached", moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 } as ModuleExpansionResult
+
   const target = skeletonModules.find(m => m.id === targetModuleId)
   if (!target) return { success: false, error: `Module ${targetModuleId} not found in skeleton`, moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 }
 
@@ -2206,6 +2324,10 @@ export async function decomposeIntoModules(
   // SECURITY: Rate limit
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { error: rateLimitError } as unknown as CadLabDecompositionResult
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { error: gate.error } as unknown as CadLabDecompositionResult
 
   const start = Date.now()
   const triedModels: Array<{ model: string; error: string }> = []
@@ -2547,6 +2669,15 @@ export async function extractInterfaceContracts(
   researchReport: string,
   modelId: ClaudeModelId = "claude-opus-4-6",
 ): Promise<InterfaceContractResult> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { contracts: [], unmatchedOutputs: [], unmatchedInputs: [], warnings: ["Unauthorized"], extractionTimeMs: 0, tokensIn: 0, tokensOut: 0 }
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { contracts: [], unmatchedOutputs: [], unmatchedInputs: [], warnings: [gate.error ?? "AI usage limit reached"], extractionTimeMs: 0, tokensIn: 0, tokensOut: 0 }
+
   const start = Date.now()
 
   if (modules.length < 2) {
@@ -2754,6 +2885,10 @@ export async function prefillDiagnostics(
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { success: false, answers: {}, enrichment: {}, error: rateLimitError }
 
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, answers: {}, enrichment: {}, error: gate.error ?? "AI usage limit reached" }
+
   try {
     const domain = domainHint ?? (await detectDomainFromResearchReport(researchReport))
     console.info("[THE-FORGE] Pre-filling diagnostics (domain: %s)...", domain)
@@ -2895,6 +3030,10 @@ export async function executeCadQueryAction(
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { success: false, error: rateLimitError }
 
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" }
+
   // VALIDATION: Length bounds to prevent abuse
   if (!code || code.length < 50) {
     return { success: false, error: "Code too short to be a valid CadQuery script" }
@@ -2991,6 +3130,10 @@ export async function refineCadQueryCodeAction(
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { success: false, error: rateLimitError }
 
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" }
+
   if (!currentCode.trim() || !instruction.trim()) {
     return { success: false, error: "Code and instruction are required" }
   }
@@ -3072,6 +3215,15 @@ export async function generateCadLabModelSmart(
   blueprintImageUrl?: string,
   documentContext?: string,
 ): Promise<CadLabResult & { grammarUsed?: string }> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized" } as unknown as CadLabResult
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { error: gate.error } as unknown as CadLabResult
+
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
   try {
@@ -3153,6 +3305,10 @@ export async function generateMashup(
   if (rateLimitError) {
     return { success: false, error: rateLimitError }
   }
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" } as MashupResult
 
   if (!concept?.trim()) {
     return { success: false, error: "Mashup concept is required" }
@@ -3382,6 +3538,10 @@ export async function planMashup(
   const rateLimitError = await checkRateLimit("aiCadLab", `mashup:${user.id}`)
   if (rateLimitError) return { success: false, error: rateLimitError }
 
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" } as MashupPlanResult
+
   if (!concept?.trim()) return { success: false, error: "Mashup concept is required" }
   if (!Array.isArray(sources) || sources.length < 2) {
     return { success: false, error: "At least two sources are required" }
@@ -3478,6 +3638,10 @@ export async function executeMashupPlan(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Unauthorized" }
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" } as MashupExecuteResult
 
   const modelId = options?.modelId ?? "claude-opus-4-6"
   const materialDensity = options?.materialDensity ?? 1240
@@ -3663,6 +3827,10 @@ export async function generateSystemAssembly(
   // SECURITY: Rate limit AI calls to prevent cost abuse
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { success: false, error: rateLimitError }
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" }
 
   const startTime = Date.now()
 
@@ -3912,6 +4080,10 @@ export async function suggestMashupCombinations(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "Unauthorized" }
+
+  // SECURITY: Enforce monthly AI usage limits
+  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  if (!gate.allowed) return { error: gate.error ?? "AI usage limit reached" }
 
   const trimmedQuery = query.trim()
   if (!trimmedQuery) return { error: "Query is required" }

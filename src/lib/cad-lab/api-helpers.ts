@@ -111,97 +111,23 @@ export async function callClaude(
   tokensIn: number
   tokensOut: number
 }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
-
-  const makeRequest = async (model: ClaudeModelId) => {
-    // INTENT: Build multimodal content array when images are provided.
-    // When both imageBase64 (hero) and renderedSvgBase64 (previous render) exist,
-    // send both for side-by-side comparison so Claude can see what it produced vs target.
-    type ContentBlock = { type: string; source?: { type: string; media_type: string; data: string }; text?: string }
-    let userContent: string | ContentBlock[]
-
-    if (imageBase64 && renderedSvgBase64) {
-      // INTENT: Visual feedback loop — show Claude the target AND its previous output
-      userContent = [
-        {
-          type: "image" as const,
-          source: { type: "base64" as const, media_type: "image/png", data: imageBase64 },
-        },
-        {
-          type: "image" as const,
-          source: { type: "base64" as const, media_type: "image/svg+xml", data: renderedSvgBase64 },
-        },
-        {
-          type: "text" as const,
-          text: "Image 1 is the TARGET product you must model. Image 2 is what your previous code produced.\nCompare them carefully — identify SPECIFIC geometric differences (wrong shape primitives, missing features, wrong proportions).\nFix your code so the output matches Image 1.\n\n" + userPrompt,
-        },
-      ]
-    } else if (imageBase64) {
-      userContent = [
-        {
-          type: "image" as const,
-          source: { type: "base64" as const, media_type: "image/png", data: imageBase64 },
-        },
-        {
-          type: "text" as const,
-          text: "CRITICAL: The image above is the product you must model. Your primary goal is to produce CadQuery code whose 3D shape closely matches the proportions, silhouette, and features visible in this image. Study it carefully — every major geometric feature you see must appear in your model.\n\n" + userPrompt,
-        },
-      ]
-    } else {
-      userContent = userPrompt
-    }
-
-    const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: maxTokens,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userContent }],
-        }),
-      },
-      timeoutMs,
-    )
-
-    if (!response.ok) {
-      const errText = await response.text()
-      throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
-    }
-
-    const data = await response.json()
-    const text: string = data.content?.[0]?.text ?? ""
-
-    return {
-      text,
-      tokensIn: data.usage?.input_tokens ?? 0,
-      tokensOut: data.usage?.output_tokens ?? 0,
-    }
-  }
-
-  // INTENT: Retry on transient API errors (rate limit, overloaded), then throw.
-  // DECISION: No Haiku fallback — Haiku produces unusable CadQuery code that wastes
-  // Modal execution time and (before the res.success fix) got silently marked as "generated".
-  // Better to throw and let client-side retry handle it after rate limits cool down.
-  return await withRetry(() => makeRequest(modelId), {
+  // FLOW: Delegates to centralized claude-client.ts which handles prompt caching,
+  // truncation detection, and cache metrics. This wrapper preserves the existing
+  // signature so all callers (40+ callsites) don't need to change.
+  const { callClaudeCentral } = await import('@/lib/ai/claude-client')
+  const result = await callClaudeCentral({
+    systemPrompt,
+    userPrompt,
+    modelId,
+    maxTokens,
+    timeoutMs,
     maxRetries,
-    baseDelay: 4000,
-    maxDelay: 30000,
-    shouldRetry: (error) => {
-      const msg = error.message
-      // INTENT: Only retry on rate limits / overloaded — these are transient and worth waiting for.
-      // TRIED: Retrying on 500/502/503 (commit d2b72fa8) — burns timeout budget retrying
-      // persistent API errors instead of failing fast to fallback. Reverted.
-      return msg.includes("429") || msg.includes("529") || msg.includes("overloaded")
-    },
+    enableCache: true,
+    retryOnServerErrors: false, // DECISION: Fail fast to Gemini/OpenAI fallback
+    imageBase64,
+    renderedSvgBase64,
   })
+  return { text: result.text, tokensIn: result.tokensIn, tokensOut: result.tokensOut }
 }
 
 // ─── Gemini API Call with Google Search Grounding ────────────────────

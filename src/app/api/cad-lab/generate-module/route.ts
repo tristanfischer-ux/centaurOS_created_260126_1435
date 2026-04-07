@@ -495,7 +495,9 @@ export async function POST(request: Request): Promise<Response> {
 
       const elapsedMs = Date.now() - startTime
 
-      guard.trackUsage({ model: 'cad-lab-generate' }).catch(() => {})
+      // NOTE: Usage tracking handled internally by generateCadLabInterface()
+      // and generateCadLabModelSmart() via enforceCadLabLimit(). Do NOT call
+      // guard.trackUsage() here to avoid double-counting.
 
       // AUDIT: Log module generation complete
       console.info("[CAD-LAB-MODULE] Generation complete:", {

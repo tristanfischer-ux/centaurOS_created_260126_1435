@@ -48,8 +48,10 @@ export interface InvestorIntel {
 // Constants
 // ---------------------------------------------------------------------------
 
-// DECISION: 7-day cache — investor news is relatively stable at firm level
-const INTEL_CACHE_DAYS = 7
+// DECISION: 14-day cache — investor news is relatively stable at firm level.
+// Extended from 7 days during Apr 2026 profitability audit. Reduces web search
+// costs ($0.01/search) with minimal staleness risk for most data.
+const INTEL_CACHE_DAYS = 14
 
 // SECURITY: Rate limit — max generations per user per hour
 const MAX_GENERATIONS_PER_HOUR = 10

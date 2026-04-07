@@ -19,6 +19,19 @@ import { getCurrentMonthUsage } from '@/lib/ai/usage-tracking'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+/**
+ * Specialist IDs available on the free tier.
+ * Free users get 5 of 13 specialists — the ones that use cheap model tiers.
+ * Exported so both the execute route and Telegram specialist chat can enforce.
+ */
+export const FREE_TIER_SPECIALISTS = new Set([
+  'strategist',       // Sage — Google/Gemini (cheap)
+  'finance-lead',     // Finn — DeepSeek (cheapest)
+  'growth-marketer',  // Mia — Google/Gemini (cheap)
+  'product-lead',     // Priya — Sonnet (mid-cost)
+  'hiring-team',      // Harper — Sonnet (mid-cost)
+])
+
 /** Result of an AI limit check */
 export interface AILimitCheckResult {
   allowed: boolean
@@ -31,6 +44,10 @@ export interface AILimitCheckResult {
   bonusUsed?: boolean
   /** Remaining bonus credits after this check */
   bonusRemaining?: number
+  /** Current month's estimated AI cost in USD */
+  currentCostUsd?: number
+  /** Monthly cost budget ceiling in USD */
+  costBudgetUsd?: number
 }
 
 /**
@@ -67,9 +84,34 @@ export async function checkAILimit(
     const usage = await getCurrentMonthUsage(foundryId)
     const currentUsage = usage.totalAiTasks
     const remaining = Math.max(0, limit - currentUsage)
+    const costBudget = plan.limits.maxComputeBudgetUsd
+    const currentCost = usage.totalCostUsd
 
-    if (currentUsage >= limit) {
-      // FLOW: Before denying, check if the foundry has bonus referral credits
+    // SECURITY: Dual-limit check — deny if EITHER task count or cost budget is exceeded.
+    // Task count prevents "death by a thousand paper cuts" (many cheap calls).
+    // Cost budget prevents "one expensive call blows the budget" (e.g., heavy Opus usage).
+    const taskLimitHit = currentUsage >= limit
+    const costLimitHit = currentCost >= costBudget
+
+    if (taskLimitHit || costLimitHit) {
+      // SECURITY: Cost budget is a hard ceiling — bonus credits cannot bypass it.
+      // Bonus credits only help with task count limits, not cost overruns.
+      // Without this guard, a user could use bonus credits to make unlimited
+      // expensive calls (one credit per call regardless of cost).
+      if (costLimitHit) {
+        return {
+          allowed: false,
+          currentUsage,
+          limit,
+          remaining: 0,
+          tier,
+          message: `You've reached your monthly AI compute budget. Upgrade your plan for more capacity.`,
+          currentCostUsd: currentCost,
+          costBudgetUsd: costBudget,
+        }
+      }
+
+      // FLOW: Task limit hit — check if the foundry has bonus referral credits
       try {
         const supabase = await createClient()
         const { data: bonus } = await supabase.rpc('get_bonus_credits', {
@@ -90,6 +132,8 @@ export async function checkAILimit(
               tier,
               bonusUsed: true,
               bonusRemaining: bonus - 1,
+              currentCostUsd: currentCost,
+              costBudgetUsd: costBudget,
             }
           }
         }
@@ -98,13 +142,18 @@ export async function checkAILimit(
         console.warn('[AILimitCheck] Bonus credit check failed:', bonusError)
       }
 
+      const denyMessage = costLimitHit && !taskLimitHit
+        ? `You've reached your monthly AI compute budget. Upgrade your plan for more capacity.`
+        : `You've reached your monthly AI limit of ${limit} tasks. Invite a friend to get 10 more, or upgrade your plan.`
       return {
         allowed: false,
         currentUsage,
         limit,
         remaining: 0,
         tier,
-        message: `You've reached your monthly AI limit of ${limit} tasks. Invite a friend to get 10 more, or upgrade your plan.`,
+        message: denyMessage,
+        currentCostUsd: currentCost,
+        costBudgetUsd: costBudget,
       }
     }
 
@@ -114,6 +163,8 @@ export async function checkAILimit(
       limit,
       remaining,
       tier,
+      currentCostUsd: currentCost,
+      costBudgetUsd: costBudget,
     }
   } catch (error) {
     console.error('[AILimitCheck] Error checking limit:', {
@@ -229,5 +280,102 @@ export async function getFoundryTier(foundryId: string): Promise<SubscriptionTie
     })
     // SECURITY: Re-throw so checkAILimit fails closed
     throw error
+  }
+}
+
+// ==========================================
+// DAILY FEATURE CAPS
+// ==========================================
+
+/**
+ * Daily caps per feature by subscription tier.
+ * Only features with explicit caps are listed — uncapped features
+ * fall through to the monthly task limit instead.
+ */
+const DAILY_FEATURE_CAPS: Record<string, Partial<Record<SubscriptionTier, number>>> = {
+  specialist_text:        { free: 5, starter: 15 },
+  cad_lab_generate:       { free: 1, starter: 5 },
+  cad_lab_generate_module:{ free: 1, starter: 5 },
+  // Red team debates are not available on free tier (no daily cap needed — handled by specialist gating)
+  business_plan_analysis: { free: 1, starter: 3 },
+  xray:                   { free: 1, starter: 3 },
+  strategic_briefing:     { free: 1, starter: 2 },
+}
+
+/** Result of a daily feature cap check */
+export interface DailyCapCheckResult {
+  allowed: boolean
+  todayUsage: number
+  dailyCap: number | null
+  message?: string
+}
+
+/**
+ * Check whether a foundry has remaining daily capacity for a specific feature.
+ *
+ * @description Enforces per-feature daily caps for lower tiers to prevent
+ * expensive features from burning through the monthly budget too quickly.
+ * Professional and Enterprise tiers have no daily caps.
+ *
+ * @param foundryId - The foundry making the call
+ * @param feature - The AI feature being used
+ * @param tier - The foundry's subscription tier
+ * @returns Check result with allowed/denied status
+ */
+export async function checkDailyFeatureCap(
+  foundryId: string,
+  feature: string,
+  tier: SubscriptionTier,
+): Promise<DailyCapCheckResult> {
+  // Professional and Enterprise have no daily caps
+  if (tier === 'professional' || tier === 'enterprise') {
+    return { allowed: true, todayUsage: 0, dailyCap: null }
+  }
+
+  const featureCaps = DAILY_FEATURE_CAPS[feature]
+  if (!featureCaps) {
+    // Feature has no daily cap — rely on monthly limit
+    return { allowed: true, todayUsage: 0, dailyCap: null }
+  }
+
+  const cap = featureCaps[tier]
+  if (cap === undefined) {
+    return { allowed: true, todayUsage: 0, dailyCap: null }
+  }
+
+  try {
+    const adminSupabase = createAdminClient()
+    const todayStart = new Date()
+    todayStart.setUTCHours(0, 0, 0, 0)
+
+    const { count, error } = await adminSupabase
+      .from('ai_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .eq('feature', feature)
+      .gte('created_at', todayStart.toISOString())
+
+    if (error) {
+      console.warn('[DailyCapCheck] Query error, allowing:', error.message)
+      // DECISION: Fail open for daily caps (they are a soft limit, not a security control).
+      // The monthly budget is the hard ceiling; daily caps are UX smoothing.
+      return { allowed: true, todayUsage: 0, dailyCap: cap }
+    }
+
+    const todayUsage = count ?? 0
+    if (todayUsage >= cap) {
+      return {
+        allowed: false,
+        todayUsage,
+        dailyCap: cap,
+        message: `You've reached the daily limit of ${cap} for this feature. Limits reset at midnight UTC.`,
+      }
+    }
+
+    return { allowed: true, todayUsage, dailyCap: cap }
+  } catch (error) {
+    console.warn('[DailyCapCheck] Error:', error)
+    // Fail open — daily caps are UX smoothing, not a security control
+    return { allowed: true, todayUsage: 0, dailyCap: cap }
   }
 }
