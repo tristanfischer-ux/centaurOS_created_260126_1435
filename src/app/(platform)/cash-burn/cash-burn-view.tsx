@@ -57,7 +57,11 @@ const WEEKS = 52
 export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   const [scenarios, setScenarios] = useState<BurnScenario[]>(initialData?.scenarios ?? [])
   const [error, setError] = useState<string | null>(null)
-  const [startDate] = useState(() => new Date())
+  // DECISION: Defer Date creation to avoid React hydration mismatch (error #418).
+  // Server renders with one timestamp, client hydrates milliseconds later with a
+  // different one. Using useEffect ensures the date is only set client-side.
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  useEffect(() => { setStartDate(new Date()) }, [])
   const [activeScenario, setActiveScenario] = useState<BurnScenario>(
     () => scenarios.find(s => s.isDefault) ?? scenarios[0] ?? {
       id: '', name: 'Base Case', openingBalance: 0,
@@ -98,12 +102,15 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   }, [])
 
   // Pre-compute the weekly grids (these don't change with scenario)
+  // GOTCHA: startDate is null on first render (deferred to avoid hydration mismatch).
+  // Return empty grids until the client-side date is set — projection will show zeros
+  // for one frame, which is invisible because the page shell renders first.
   const cashOutGrid = useMemo(
-    () => generateCashOutGrid(cashOut, WEEKS, startDate),
+    () => startDate ? generateCashOutGrid(cashOut, WEEKS, startDate) : [],
     [cashOut, startDate]
   )
   const cashInGrid = useMemo(
-    () => generateCashInGrid(cashIn, WEEKS, startDate),
+    () => startDate ? generateCashInGrid(cashIn, WEEKS, startDate) : [],
     [cashIn, startDate]
   )
 
@@ -115,6 +122,9 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
 
   // Cash-zero date
   const cashZeroDate = useMemo(() => {
+    // INTENT: No meaningful cash-zero date when user hasn't entered any financial data.
+    // Without this guard, runwayWeeks=0 (from 0/0 balance) triggers a past-date display.
+    if (cashOut.length === 0 && cashIn.length === 0) return null
     if (projection.runwayWeeks === null) return null
     // INTENT: Match computeRunway which uses <= 0 (balance at exactly 0 = exhausted)
     const cliffWeek = projection.weeks.find(w => w.cumulativeBalance <= 0)
@@ -126,7 +136,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       return d.toISOString().split('T')[0]
     }
     return null
-  }, [projection])
+  }, [projection, cashOut.length, cashIn.length])
 
   // Expense breakdown toggle: by category or by product
   const [breakdownByProduct, setBreakdownByProduct] = useState(false)
@@ -351,10 +361,18 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         },
         {
           label: 'Cash-Zero Date',
+          // DECISION: suppressHydrationWarning not needed — cashZeroDate is derived from
+          // server-provided data, not new Date(). The extrapolation branch uses new Date()
+          // but only fires when runwayWeeks > 52 (rare). For that edge case, the mismatch
+          // is cosmetic (off by seconds) and acceptable.
           value: cashZeroDate
             ? new Date(cashZeroDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
             : 'N/A',
-          detail: cashZeroDate ? undefined : 'Cash positive throughout',
+          detail: cashZeroDate
+            ? undefined
+            : cashOut.length === 0 && cashIn.length === 0
+              ? 'No data entered'
+              : 'Cash positive throughout',
         },
       ]} />
 

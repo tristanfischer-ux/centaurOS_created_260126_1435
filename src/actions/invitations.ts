@@ -120,8 +120,14 @@ export async function createInvitation(
     foundry = data
   }
   
+  // SECURITY: Use admin client for company_invitations and profiles checks.
+  // Same RLS bypass rationale as the INSERT below — get_my_foundry_id() can return NULL.
+  const checkClient = (() => {
+    try { return createAdminClient() } catch { return supabase }
+  })()
+
   // Check if there's already a pending invitation for this email
-  const { data: existingInvitation } = await supabase
+  const { data: existingInvitation } = await checkClient
     .from('company_invitations')
     .select('id, expires_at, accepted_at')
     .eq('foundry_id', foundry.id)
@@ -129,19 +135,19 @@ export async function createInvitation(
     .is('accepted_at', null)
     .gt('expires_at', new Date().toISOString())
     .maybeSingle()
-  
+
   if (existingInvitation) {
     return { success: false, error: 'An active invitation already exists for this email address' }
   }
-  
+
   // Check if user is already a member of this foundry
-  const { data: existingMember } = await supabase
+  const { data: existingMember } = await checkClient
     .from('profiles')
     .select('id')
     .eq('email', email.toLowerCase())
     .eq('foundry_id', profile.foundry_id)
     .single()
-  
+
   if (existingMember) {
     return { success: false, error: 'This person is already a member of your company' }
   }
@@ -152,8 +158,13 @@ export async function createInvitation(
   const maxMembers = plan.limits.maxTeamMembers
 
   if (maxMembers !== undefined) {
+    // SECURITY: Use admin client (or fallback) for count queries — same RLS bypass rationale.
+    const countClient = (() => {
+      try { return createAdminClient() } catch { return supabase }
+    })()
+
     // Count current members (profiles in this foundry) + pending invitations
-    const { count: memberCount, error: countError } = await supabase
+    const { count: memberCount, error: countError } = await countClient
       .from('foundry_memberships')
       .select('id', { count: 'exact', head: true })
       .eq('foundry_id', foundry.id)
@@ -167,7 +178,7 @@ export async function createInvitation(
     }
 
     // Also count pending (non-expired, non-accepted) invitations
-    const { count: pendingCount } = await supabase
+    const { count: pendingCount } = await countClient
       .from('company_invitations')
       .select('id', { count: 'exact', head: true })
       .eq('foundry_id', foundry.id)
@@ -189,27 +200,63 @@ export async function createInvitation(
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS)
   
-  // Create the invitation
-  const { data: invitation, error: inviteError } = await supabase
-    .from('company_invitations')
-    .insert({
-      foundry_id: foundry.id,
-      email: email.toLowerCase(),
-      role,
-      token,
-      invited_by: user.id,
-      expires_at: expiresAt.toISOString(),
-    })
-    .select('id, token')
-    .single()
-  
-  if (inviteError) {
-    console.error('[Invitations] Failed to create invitation:', {
-      foundryId: foundry.id,
-      email: email.toLowerCase(),
-      error: inviteError.message,
-    })
-    return { success: false, error: 'Failed to create invitation' }
+  // SECURITY: Use admin client for the INSERT into company_invitations.
+  // The INSERT policy depends on get_my_foundry_id() which returns NULL for
+  // newly-created accounts due to SECURITY DEFINER function caching — same
+  // root cause as Bug #1 (foundries lookup) and Bug #2 (user_subscriptions).
+  // We've already verified the user's identity, role, and foundry membership above,
+  // so using the admin client here is safe.
+  let invitation: { id: string; token: string } | null = null
+  try {
+    const adminSupabase = createAdminClient()
+    const { data, error: inviteError } = await adminSupabase
+      .from('company_invitations')
+      .insert({
+        foundry_id: foundry.id,
+        email: email.toLowerCase(),
+        role,
+        token,
+        invited_by: user.id,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select('id, token')
+      .single()
+
+    if (inviteError || !data) {
+      console.error('[Invitations] Failed to create invitation:', {
+        foundryId: foundry.id,
+        email: email.toLowerCase(),
+        error: inviteError?.message,
+      })
+      return { success: false, error: 'Failed to create invitation' }
+    }
+    invitation = data
+  } catch (adminError) {
+    // GOTCHA: If admin client is unavailable (missing service role key in dev),
+    // fall back to the user's client. This preserves backward compatibility.
+    console.warn('[Invitations] Admin client unavailable for INSERT, falling back to user client:', adminError)
+    const { data, error: inviteError } = await supabase
+      .from('company_invitations')
+      .insert({
+        foundry_id: foundry.id,
+        email: email.toLowerCase(),
+        role,
+        token,
+        invited_by: user.id,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select('id, token')
+      .single()
+
+    if (inviteError || !data) {
+      console.error('[Invitations] Failed to create invitation (fallback):', {
+        foundryId: foundry.id,
+        email: email.toLowerCase(),
+        error: inviteError?.message,
+      })
+      return { success: false, error: 'Failed to create invitation' }
+    }
+    invitation = data
   }
   
   // Get inviter's name for the email

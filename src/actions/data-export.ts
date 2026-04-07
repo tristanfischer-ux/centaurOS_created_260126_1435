@@ -2,6 +2,7 @@
 
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -49,9 +50,19 @@ export async function exportFoundryData(
         return { error: 'Your account is not active' }
     }
     
-    // SECURITY: Verify user is a member of THIS foundry with sufficient role
-    // Global profile.role is NOT sufficient — must check foundry_memberships
-    const { data: membership } = await supabase
+    // SECURITY: Verify user is a member of THIS foundry with sufficient role.
+    // Global profile.role is NOT sufficient — must check foundry_memberships.
+    // DECISION: Use admin client for membership check — RLS on foundry_memberships
+    // depends on get_my_foundry_id() which can return NULL for new accounts.
+    // User identity is already verified via auth above.
+    let authClient: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>
+    try {
+        authClient = createAdminClient()
+    } catch {
+        authClient = supabase
+    }
+
+    const { data: membership } = await authClient
         .from('foundry_memberships')
         .select('role')
         .eq('foundry_id', foundry_id)
@@ -61,8 +72,7 @@ export async function exportFoundryData(
     const hasAccess = membership?.role === 'Founder' || membership?.role === 'Executive'
 
     if (!hasAccess) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: adminPerm } = await supabase
+        const { data: adminPerm } = await authClient
             .from('foundry_admin_permissions')
             .select('id')
             .eq('foundry_id', foundry_id)

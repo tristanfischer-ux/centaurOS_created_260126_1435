@@ -28,6 +28,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react"
 import { usePathname } from "next/navigation"
@@ -535,9 +536,20 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
   // Auto-inject page knowledge from the registry
   const pageKnowledge = useMemo(() => getPageKnowledge(pathname), [pathname])
 
+  // DECISION: Use a ref for the fallback registeredAt timestamp so it only
+  // updates on navigation, not every render. The IIFE previously called
+  // Date.now() during render, creating a new object reference every time and
+  // causing React error #310 (too many re-renders) via unstable useMemo deps.
+  const fallbackRegisteredAtRef = useRef(Date.now())
+  useEffect(() => {
+    fallbackRegisteredAtRef.current = Date.now()
+  }, [pathname])
+
   // Resolve: use rich context if fresh and on the same route, otherwise route fallback
   // Then enrich with page knowledge and first-visit status
-  const screenContext: ScreenContextData = (() => {
+  // INTENT: Memoized to produce a stable object reference. Dependencies are all
+  // values that legitimately change the screen context — no Date.now() calls.
+  const screenContext: ScreenContextData = useMemo(() => {
     let base: ScreenContextData
 
     if (
@@ -552,7 +564,7 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
         pageTitle: fallback.title,
         route: pathname,
         summary: fallback.summary,
-        registeredAt: Date.now(),
+        registeredAt: fallbackRegisteredAtRef.current,
       }
     }
 
@@ -563,7 +575,7 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
       gettingStarted: base.gettingStarted ?? pageKnowledge?.gettingStarted,
       isFirstVisit: firstVisitFlag,
     }
-  })()
+  }, [richContext, pathname, pageKnowledge, firstVisitFlag])
 
   const serializeScreenContext = useCallback((): string => {
     const lines: string[] = []

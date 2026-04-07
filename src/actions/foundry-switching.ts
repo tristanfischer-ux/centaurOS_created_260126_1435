@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { clearFoundryCache } from '@/lib/supabase/foundry-context'
 import { revalidatePath } from 'next/cache'
 
@@ -56,8 +57,17 @@ export async function getFoundryCount(): Promise<number> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return 0
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count, error } = await supabase
+  // SECURITY: Use admin client for foundry_memberships count — RLS depends on
+  // get_my_foundry_id() which can return NULL for new accounts, causing count=0
+  // and breaking post-login routing. User identity is already verified above.
+  let queryClient: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>
+  try {
+    queryClient = createAdminClient()
+  } catch {
+    queryClient = supabase
+  }
+
+  const { count, error } = await queryClient
     .from('foundry_memberships')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)

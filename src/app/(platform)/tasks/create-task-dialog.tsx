@@ -127,7 +127,6 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 setTitleValue('')
                 setIsPrivate(false)
                 setSharedWith([])
-                if (titleObjRef.current) titleObjRef.current.value = ''
             }, 300)
         } else {
             // When opening, set smart defaults + prefill
@@ -138,10 +137,6 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             setShowAdvanced(!!prefillDescription)
             if (prefillTitle) {
                 setTitleValue(prefillTitle)
-                // Set input value after render
-                setTimeout(() => {
-                    if (titleObjRef.current) titleObjRef.current.value = prefillTitle
-                }, 50)
             }
             if (prefillDescription) {
                 setDescription(prefillDescription)
@@ -152,7 +147,6 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     /** Handle accepting a SMART suggestion from the hint bar */
     const handleAcceptSmartSuggestion = (suggestion: SmartGoalSuggestion) => {
         setTitleValue(suggestion.title)
-        if (titleObjRef.current) titleObjRef.current.value = suggestion.title
         if (suggestion.description && !description) {
             setDescription(suggestion.description)
             setShowAdvanced(true)
@@ -430,6 +424,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 aria-required={true}
                                 enterKeyHint="next"
                                 ref={titleObjRef}
+                                value={titleValue}
                                 aria-describedby={titleError ? "title-error" : undefined}
                                 aria-invalid={!!titleError}
                                 className={cn(titleError && "border-destructive")}
