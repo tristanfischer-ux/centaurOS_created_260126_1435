@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { formatFundSize } from '@/lib/format'
 import type { InvestorFirm, ShortlistStage } from '@/actions/investors'
+import type { InvestorIntel } from '@/actions/investor-intel'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -33,6 +34,8 @@ interface InvestorTableViewProps {
   onSelectFirm?: (firmId: string) => void
   /** Contact counts per listing_id — from batch query */
   contactCounts?: Record<string, number>
+  /** Cached news intel per listing_id — from batch query */
+  intelMap?: Record<string, InvestorIntel>
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +88,7 @@ export function InvestorTableView({
   isPending,
   onSelectFirm,
   contactCounts = {},
+  intelMap = {},
 }: InvestorTableViewProps) {
   const router = useRouter()
 
@@ -231,11 +235,29 @@ export function InvestorTableView({
                   {fundLabel ?? <span className="text-muted-foreground">—</span>}
                 </td>
 
-                {/* 8. Intel Preview (thesis/connection brief snippet) */}
+                {/* 8. Intel Preview — prefer live news intel over static thesis */}
                 <td className="hidden xl:table-cell px-3 py-2 text-muted-foreground max-w-[260px]">
-                  <span className="line-clamp-2 text-xs leading-snug">
-                    {truncate(attrs.connection_brief || attrs.investment_thesis, 120)}
-                  </span>
+                  {intelMap[firm.id] ? (
+                    <div className="space-y-0.5">
+                      <span className="line-clamp-2 text-xs leading-snug text-foreground">
+                        {truncate(intelMap[firm.id].intel_summary, 120)}
+                      </span>
+                      {intelMap[firm.id].key_signals.length > 0 && (
+                        <span className={cn(
+                          'inline-flex items-center text-[10px] font-medium px-1 rounded',
+                          intelMap[firm.id].key_signals[0].sentiment === 'positive' && 'bg-success/10 text-success',
+                          intelMap[firm.id].key_signals[0].sentiment === 'negative' && 'bg-destructive/10 text-destructive',
+                          intelMap[firm.id].key_signals[0].sentiment === 'neutral' && 'bg-muted text-muted-foreground',
+                        )}>
+                          {truncate(intelMap[firm.id].key_signals[0].signal, 50)}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="line-clamp-2 text-xs leading-snug">
+                      {truncate(attrs.connection_brief || attrs.investment_thesis, 120)}
+                    </span>
+                  )}
                 </td>
 
                 {/* 9. Quality bar */}

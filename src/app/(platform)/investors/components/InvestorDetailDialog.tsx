@@ -22,11 +22,17 @@ import {
   getInvestorContacts,
 } from '@/actions/investors'
 import type { InvestorFirm, InvestorContact } from '@/actions/investors'
+import { getInvestorIntel, generateInvestorIntel } from '@/actions/investor-intel'
+import type { InvestorIntel } from '@/actions/investor-intel'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import {
   ExternalLink,
   Globe,
   Linkedin,
   Mail,
+  Newspaper,
+  RefreshCw,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -80,9 +86,9 @@ function formatDate(dateStr: string | undefined): string | null {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+function SectionHeading({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <h3 className="text-sm font-semibold text-international-orange border-b border-border pb-1 mb-2">
+    <h3 className={cn("text-sm font-semibold text-international-orange border-b border-border pb-1 mb-2", className)}>
       {children}
     </h3>
   )
@@ -337,6 +343,9 @@ function InvestorMainView({
 
   return (
     <div className="space-y-5">
+      {/* News Intelligence section — live web-searched data */}
+      <InvestorIntelSection firmId={firm.id} />
+
       <TextSection title="Thesis" content={attrs.investment_thesis} />
       <TextSection title="Investment Pattern" content={attrs.investment_pattern} />
       <TextSection title="Team Expertise" content={attrs.team_expertise} />
@@ -571,5 +580,165 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDet
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// News Intel Section
+// ---------------------------------------------------------------------------
+
+function InvestorIntelSection({ firmId }: { firmId: string }) {
+  const [intel, setIntel] = useState<InvestorIntel | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getInvestorIntel(firmId)
+      .then(data => { if (!cancelled) setIntel(data) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [firmId])
+
+  const handleGenerate = async (forceRefresh = false) => {
+    setGenerating(true)
+    try {
+      const result = await generateInvestorIntel(firmId, forceRefresh)
+      if (result) {
+        setIntel(result)
+      } else {
+        toast.error('Could not generate intelligence — try again later')
+      }
+    } catch {
+      toast.error('Failed to generate intelligence')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <SectionHeading>News Intelligence</SectionHeading>
+        <Skeleton className="h-16 w-full rounded-lg" />
+      </div>
+    )
+  }
+
+  if (!intel) {
+    return (
+      <div className="bg-muted/50 rounded-lg p-4 border border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Newspaper className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">No recent intelligence</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleGenerate()}
+            disabled={generating}
+            className="gap-1.5"
+          >
+            {generating ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Newspaper className="h-3 w-3" />}
+            {generating ? 'Searching...' : 'Search Web'}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const daysAgo = Math.floor((Date.now() - new Date(intel.generated_at).getTime()) / (24 * 60 * 60 * 1000))
+
+  return (
+    <div className="bg-muted/30 rounded-lg p-4 border border-border space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Newspaper className="h-4 w-4 text-international-orange" />
+          <SectionHeading className="!mb-0">News Intelligence</SectionHeading>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">
+            {daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleGenerate(true)}
+            disabled={generating}
+            className="h-6 w-6 p-0"
+          >
+            <RefreshCw className={cn('h-3 w-3', generating && 'animate-spin')} />
+          </Button>
+        </div>
+      </div>
+
+      <p className="text-sm text-foreground leading-relaxed">{intel.intel_summary}</p>
+
+      {/* Key Signals */}
+      {intel.key_signals.length > 0 && (
+        <div className="space-y-1.5">
+          {intel.key_signals.slice(0, 3).map((signal, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={cn(
+                'inline-block h-1.5 w-1.5 rounded-full mt-1.5 shrink-0',
+                signal.sentiment === 'positive' && 'bg-success',
+                signal.sentiment === 'negative' && 'bg-destructive',
+                signal.sentiment === 'neutral' && 'bg-muted-foreground',
+              )} />
+              <span className="text-xs text-muted-foreground">{signal.signal}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Social Activity */}
+      {intel.social_activity && (
+        <TextSection title="Social Activity" content={intel.social_activity} />
+      )}
+
+      {/* Current Focus */}
+      {intel.current_focus && (
+        <TextSection title="Current Focus" content={intel.current_focus} />
+      )}
+
+      {/* Recent Deals */}
+      {intel.recent_deals && (
+        <TextSection title="Recent Deals" content={intel.recent_deals} />
+      )}
+
+      {/* Sources */}
+      {intel.sources.length > 0 && (
+        <div className="pt-2 border-t border-border">
+          <p className="text-[10px] text-muted-foreground mb-1">Sources:</p>
+          <div className="flex flex-wrap gap-1">
+            {intel.sources.slice(0, 5).map((source, i) => {
+              // SECURITY H-3: Only allow http/https URLs to prevent javascript: XSS
+              const safeUrl = /^https?:\/\//i.test(source.url) ? source.url : null
+              if (!safeUrl) return null
+              // SECURITY H-2: Safe hostname extraction (new URL() can throw on malformed URLs)
+              let displayLabel = source.title
+              if (!displayLabel) {
+                try { displayLabel = new URL(safeUrl).hostname } catch { displayLabel = safeUrl }
+              }
+              return (
+                <a
+                  key={i}
+                  href={safeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 text-[10px] text-international-orange hover:underline"
+                >
+                  <ExternalLink className="h-2.5 w-2.5" />
+                  {displayLabel}
+                </a>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

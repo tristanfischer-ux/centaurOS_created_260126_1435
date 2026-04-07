@@ -28,6 +28,8 @@ import { InvestorExportMenu } from './InvestorExportMenu'
 import { InvestorTableView } from './InvestorTableView'
 import { InvestorDetailDialog } from './InvestorDetailDialog'
 import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScores, getContactCounts } from '@/actions/investors'
+import { getInvestorIntelBatch } from '@/actions/investor-intel'
+import type { InvestorIntel } from '@/actions/investor-intel'
 import { Search, X, RefreshCw, Building2, LayoutGrid, List, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -181,6 +183,7 @@ export function InvestorBrowser({
   const [page, setPage] = useState(1)
   const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores)
   const [contactCounts, setContactCounts] = useState<Record<string, number>>({})
+  const [intelMap, setIntelMap] = useState<Record<string, InvestorIntel>>({})
   const [shortlistIds, setShortlistIds] = useState<Record<string, ShortlistStage>>(initialShortlistIds)
 
   const [isPending, startTransition] = useTransition()
@@ -319,6 +322,9 @@ export function InvestorBrowser({
             .catch(() => { /* non-critical */ })
           getContactCounts(ids)
             .then(counts => setContactCounts(prev => ({ ...prev, ...counts })))
+            .catch(() => { /* non-critical */ })
+          getInvestorIntelBatch(ids)
+            .then(intel => setIntelMap(prev => ({ ...prev, ...intel })))
             .catch(() => { /* non-critical */ })
         }
         if (!initialUrlFetchDone) setInitialUrlFetchDone(true)
@@ -678,6 +684,7 @@ export function InvestorBrowser({
           isPending={isPending}
           onSelectFirm={setSelectedFirmId}
           contactCounts={contactCounts}
+          intelMap={intelMap}
         />
       )}
 

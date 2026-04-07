@@ -331,6 +331,7 @@ function sanitizeFilterValue(value: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/%/g, '\\%')
     .replace(/_/g, '\\_')
+    .replace(/[\n\r\t]/g, ' ')
     .replace(/[,()\."*:!'[\]{}]/g, '')
 }
 
@@ -341,15 +342,11 @@ export async function searchInvestors(
   filters: InvestorFilters = {}
 ): Promise<InvestorSearchResult> {
   const {
-    firmType,
-    stage,
-    sector,
     hqCity,
     activeOnly,
     priority,
     query,
     minQuality,
-    geoFocus,
     chequeMin,
     chequeMax,
     minHardwareFit,
@@ -358,6 +355,13 @@ export async function searchInvestors(
     page = 1,
     pageSize = 24,
   } = filters
+
+  // SECURITY: Cap array filter lengths to prevent DoS via thousands of OR clauses
+  const MAX_FILTER_ARRAY = 50
+  const firmType = filters.firmType?.slice(0, MAX_FILTER_ARRAY)
+  const stage = filters.stage?.slice(0, MAX_FILTER_ARRAY)
+  const sector = filters.sector?.slice(0, MAX_FILTER_ARRAY)
+  const geoFocus = filters.geoFocus?.slice(0, MAX_FILTER_ARRAY)
 
   // SECURITY: Bound pagination to prevent DoS
   const safePage = Math.max(1, page)
@@ -370,14 +374,18 @@ export async function searchInvestors(
   // INTENT: When the user types a meaningful query (> 5 chars), use pgvector cosine
   // similarity for far better recall than naive ilike (e.g. "pre-seed deep tech London"
   // finds relevant firms even when those exact words aren't in the title).
+  // DECISION: Uses match_marketplace_listings_v2 which returns attributes + accepts
+  // category filter, eliminating the 200-row re-fetch and client-side filtering.
   if (query && query.trim().length > 5) {
     try {
       const queryEmbedding = await embedQuery(query.trim())
-      // GOTCHA: over-fetch to allow for post-RPC filtering (firm_type, stage, geo, etc.)
+      // DECISION: v2 RPC returns attributes + filters by category at DB level,
+      // eliminating the re-fetch + client-side filter pattern.
       const { data: semanticData, error: semanticError } = await supabase.rpc(
-        'match_marketplace_listings',
+        'match_marketplace_listings_v2',
         {
           query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
+          filter_category: 'Finance',
           match_threshold: 0.5,
           match_count: 200,
         }
@@ -385,94 +393,72 @@ export async function searchInvestors(
 
       if (semanticError) throw semanticError
 
-      // Filter to Finance category only (investors) and extract IDs + similarity scores
-      const financeMatches = (semanticData || [])
-        .filter((r: Record<string, unknown>) => r.category === 'Finance')
-
-      if (financeMatches.length === 0) {
-        return { firms: [], total: 0, searchMode: 'semantic' as const }
+      if (!semanticData || semanticData.length === 0) {
+        return { firms: [], total: 0, hasMore: false }
       }
 
-      // DECISION: The RPC returns only id, category, title, description, similarity — NOT
-      // the `attributes` JSONB or other top-level columns needed for filtering and display.
-      // Re-fetch full rows by ID so all JSONB filters work correctly.
-      const matchIds = financeMatches.map((r: Record<string, unknown>) => r.id as string)
-      const similarityMap = new Map<string, number>(
-        financeMatches.map((r: Record<string, unknown>) => [r.id as string, r.similarity as number])
-      )
+      // INTENT: Apply JSONB filters on semantic results. The v2 RPC already returned
+      // attributes, so we can filter without a second round-trip.
+      let results = semanticData as Array<Record<string, unknown>>
 
-      const { data: fullRows, error: fullError } = await supabase
-        .from('marketplace_listings')
-        .select('*')
-        .in('id', matchIds)
-
-      if (fullError) throw fullError
-
-      // Merge similarity scores back into full rows
-      let results = (fullRows || []).map((row: Record<string, unknown>) => ({
-        ...row,
-        similarity: similarityMap.get(row.id as string) ?? 0,
-      }))
-
-      // Apply JSONB filters on top of semantic results (now with full attributes)
       if (firmType && firmType.length > 0) {
         const safeFirmTypes = firmType.filter((t: string) => VALID_FIRM_TYPES.has(t))
         if (safeFirmTypes.length > 0) {
-          results = results.filter((r: Record<string, unknown>) => {
+          results = results.filter((r) => {
             const attrs = (r.attributes as Record<string, unknown>) || {}
             return safeFirmTypes.includes(attrs.firm_type as string)
           })
         }
       }
       if (activeOnly) {
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           return attrs.is_active_deploying === true
         })
       }
       if (stage && stage.length > 0) {
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           const sf = toStringArray(attrs.stage_focus)
           return stage.some((s: string) => sf.some(f => f.toLowerCase() === s.toLowerCase()))
         })
       }
       if (sector && sector.length > 0) {
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           const sec = toStringArray(attrs.sectors)
           return sector.some((s: string) => sec.some(f => f.toLowerCase() === s.toLowerCase()))
         })
       }
       if (geoFocus && geoFocus.length > 0) {
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           const gf = toStringArray(attrs.geo_focus)
           return geoFocus.some((g: string) => gf.some(f => f.toLowerCase().includes(g.toLowerCase())))
         })
       }
       if (minQuality != null && minQuality > 0) {
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           // GOTCHA: JSONB values may be strings — use Number() for runtime conversion
           return Number(attrs.data_quality_score ?? 0) >= minQuality
         })
       }
       if (minHardwareFit != null && minHardwareFit > 0) {
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           return Number(attrs.hardware_fit_score ?? 0) >= minHardwareFit
         })
       }
       if (bvcaOnly) {
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           return attrs.bvca_member === true
         })
       }
       if (hqCity && hqCity.trim().length > 0) {
         const cityLower = hqCity.trim().toLowerCase()
-        results = results.filter((r: Record<string, unknown>) => {
+        results = results.filter((r) => {
           const attrs = (r.attributes as Record<string, unknown>) || {}
           return ((attrs.hq_city as string) || '').toLowerCase().includes(cityLower)
         })
@@ -480,8 +466,8 @@ export async function searchInvestors(
 
       // Convert to InvestorFirm and apply tier gating
       const access = await getInvestorTierAccess()
-      let firms = results.map((r: Record<string, unknown>) => {
-        const firm = rowToFirm(r)
+      let firms = results.map((r) => {
+        const firm = rowToFirm(r as Record<string, unknown>)
         return stripTierGatedFields(firm, access)
       })
 
@@ -490,18 +476,16 @@ export async function searchInvestors(
       const profile = await getFoundryProfileCached()
       if (profile) {
         firms = firms.map(firm => {
-          const matchedRow = results.find((r: Record<string, unknown>) => r.id === firm.id)
+          const matchedRow = results.find((r) => r.id === firm.id)
           const simScore = (matchedRow?.similarity as number) ?? 0
           const attrBreakdown = calculateMatchScore(firm, profile)
           const hybridScore = computeHybridScore(simScore, attrBreakdown.total)
           return { ...firm, attributes: { ...firm.attributes, _hybridScore: hybridScore, _similarity: simScore } }
         })
-        // Sort by hybrid score descending
         firms.sort((a, b) => (b.attributes._hybridScore ?? 0) - (a.attributes._hybridScore ?? 0))
       } else {
-        // No profile — sort by raw semantic similarity
         firms = firms.map(firm => {
-          const matchedRow = results.find((r: Record<string, unknown>) => r.id === firm.id)
+          const matchedRow = results.find((r) => r.id === firm.id)
           const simScore = (matchedRow?.similarity as number) ?? 0
           return { ...firm, attributes: { ...firm.attributes, _similarity: simScore } }
         })
@@ -520,7 +504,60 @@ export async function searchInvestors(
   }
 
   // ── Keyword/browse path (fallback or short/no query) ──
+  // DECISION: For JSONB attribute sorts (quality, fund_size, etc.), use the
+  // search_investors_sorted RPC which handles sorting + filtering at the DB level.
+  // This eliminates the 2000-row over-fetch pattern. For 'name' and 'match' sorts,
+  // use the PostgREST query builder (DB handles ordering natively).
+  const needsServerSort = sortBy != null && sortBy !== 'name' && sortBy !== 'match'
 
+  if (needsServerSort) {
+    // INTENT: DB-level sorting via RPC — sort + filter + paginate in a single query.
+    // No over-fetching: Postgres handles ORDER BY on JSONB attributes directly.
+    const safeFirmTypes = firmType?.filter((t: string) => VALID_FIRM_TYPES.has(t))
+    const safeQuery = query?.trim().slice(0, 200) || null
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'search_investors_sorted',
+      {
+        sort_field: sortBy,
+        sort_direction: 'desc',
+        page_offset: from,
+        page_limit: safePageSize,
+        filter_firm_types: safeFirmTypes?.length ? safeFirmTypes : undefined,
+        filter_stages: stage?.length ? stage : undefined,
+        filter_sectors: sector?.length ? sector : undefined,
+        filter_geo_focus: geoFocus?.length ? geoFocus : undefined,
+        filter_active_only: activeOnly ?? false,
+        filter_bvca_only: bvcaOnly ?? false,
+        filter_min_quality: minQuality ?? undefined,
+        filter_min_hardware_fit: minHardwareFit ?? undefined,
+        filter_cheque_min: chequeMin ?? undefined,
+        filter_cheque_max: chequeMax ?? undefined,
+        filter_hq_city: hqCity ?? undefined,
+        filter_priority: priority ?? undefined,
+        filter_query: safeQuery ?? undefined,
+      }
+    )
+
+    if (rpcError) {
+      console.error('[searchInvestors] RPC error, falling back to PostgREST:', rpcError)
+      // Fall through to PostgREST path below
+    } else {
+      const rows = (rpcData ?? []) as Array<Record<string, unknown>>
+      const total = rows.length > 0 ? Number(rows[0].total_count ?? 0) : 0
+
+      let firms = rows.map((row) => rowToFirm(row))
+
+      // SECURITY: Strip tier-gated fields from search results
+      const access = await getInvestorTierAccess()
+      firms = firms.map(f => stripTierGatedFields(f, access))
+
+      const hasMore = from + firms.length < total
+      return { firms, total, hasMore }
+    }
+  }
+
+  // ── PostgREST path: name sort or match sort (DB handles ORDER BY title natively) ──
   let q = supabase
     .from('marketplace_listings')
     .select('id, title, description, subcategory, attributes', { count: 'exact' })
@@ -563,9 +600,7 @@ export async function searchInvestors(
     q = q.filter('attributes->>outreach_priority', 'eq', priority)
   }
 
-  // JSONB array filter: stage_focus (push to DB via containment)
-  // DECISION: Use cs (contains) operator — firm must contain at least one of the requested stages.
-  // PostgREST cs requires exact array match, so we use OR for each value.
+  // JSONB array filter: stage_focus
   if (stage && stage.length > 0) {
     const stageFilters = stage.map((s: string) => `attributes->stage_focus.cs.["${sanitizeFilterValue(s)}"]`)
     q = q.or(stageFilters.join(','))
@@ -584,8 +619,7 @@ export async function searchInvestors(
   }
 
   // JSONB scalar filter: data_quality_score
-  // GOTCHA: Use -> (JSONB) not ->> (TEXT) for numeric comparisons — ->> returns text,
-  // which causes lexicographic comparison ("9" > "10" would be true).
+  // GOTCHA: Use -> (JSONB) not ->> (TEXT) for numeric comparisons
   if (minQuality != null && minQuality > 0) {
     q = q.filter('attributes->data_quality_score', 'gte', minQuality)
   }
@@ -602,29 +636,15 @@ export async function searchInvestors(
 
   // JSONB scalar filter: cheque range (numeric — use -> not ->>)
   if (chequeMin != null) {
-    // Exclude firms whose max cheque is below our min
     q = q.filter('attributes->cheque_range_gbp->max', 'gte', chequeMin)
   }
   if (chequeMax != null) {
-    // Exclude firms whose min cheque is above our max
     q = q.filter('attributes->cheque_range_gbp->min', 'lte', chequeMax)
   }
 
-  // Pagination + sorting
-  // DECISION: For JSONB attribute sorts (fund_size, quality, etc.), PostgREST can't natively
-  // order by nested JSONB paths. We fetch all matching rows (capped at 2000), sort server-side,
-  // then manually paginate. For name sort, DB handles ordering + pagination directly.
-  // GOTCHA: 'match' sort is handled client-side — exclude from server-sort path
-  // to avoid fetching 2000 rows for a no-op sort (the switch has no 'match' case).
-  const needsServerSort = sortBy != null && sortBy !== 'name' && sortBy !== 'match'
-
-  if (needsServerSort) {
-    // Fetch all matching rows for correct cross-page ordering
-    q = q.order('title', { ascending: true }).limit(2000)
-  } else {
-    const to = from + safePageSize - 1
-    q = q.range(from, to).order('title', { ascending: true })
-  }
+  // Pagination + sorting (name or match — both handled by DB)
+  const to = from + safePageSize - 1
+  q = q.range(from, to).order('title', { ascending: true })
 
   const { data, count, error } = await q
 
@@ -638,42 +658,6 @@ export async function searchInvestors(
   // SECURITY: Strip tier-gated fields from search results
   const access = await getInvestorTierAccess()
   firms = firms.map(f => stripTierGatedFields(f, access))
-
-  // Server-side sort for JSONB attributes — applied BEFORE pagination
-  const PRIORITY_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 }
-  if (needsServerSort) {
-    firms.sort((a: InvestorFirm, b: InvestorFirm) => {
-      switch (sortBy) {
-        case 'fund_size':
-          return (b.attributes.fund_size_gbp ?? 0) - (a.attributes.fund_size_gbp ?? 0)
-        case 'quality':
-          return (b.attributes.data_quality_score ?? 0) - (a.attributes.data_quality_score ?? 0)
-        case 'hardware_fit':
-          return (b.attributes.hardware_fit_score ?? 0) - (a.attributes.hardware_fit_score ?? 0)
-        case 'cheque': {
-          const aMin = a.attributes.cheque_range_gbp?.min ?? 0
-          const bMin = b.attributes.cheque_range_gbp?.min ?? 0
-          return bMin - aMin
-        }
-        case 'priority': {
-          const aP = PRIORITY_ORDER[a.attributes.outreach_priority ?? ''] ?? 99
-          const bP = PRIORITY_ORDER[b.attributes.outreach_priority ?? ''] ?? 99
-          return aP - bP
-        }
-        default:
-          return 0
-      }
-    })
-  }
-
-  if (needsServerSort) {
-    // Manual pagination after sorting
-    // GOTCHA: Use DB exact count (may exceed 2000-row fetch cap), not array length
-    const total = count ?? firms.length
-    const paginatedFirms = firms.slice(from, from + safePageSize)
-    const hasMore = from + paginatedFirms.length < total
-    return { firms: paginatedFirms, total, hasMore }
-  }
 
   const total = count ?? 0
   const hasMore = from + (data ?? []).length < total
@@ -761,7 +745,9 @@ export const getInvestorStats = unstable_cache(
     let page = 0
     let hasMore = true
 
-    while (hasMore) {
+    // SECURITY: Hard cap at 20 pages (20K rows) to prevent OOM on serverless
+    const MAX_PAGES = 20
+    while (hasMore && page < MAX_PAGES) {
       const from = page * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
       const { data: pageData, error: pageError } = await supabase
@@ -784,7 +770,7 @@ export const getInvestorStats = unstable_cache(
     const data = allRows
 
     if (data.length === 0) {
-      console.error('[getInvestorStats] Supabase error:', error)
+      console.error('[getInvestorStats] No data returned')
       return {
         total: 0,
         investorCount: 0,
