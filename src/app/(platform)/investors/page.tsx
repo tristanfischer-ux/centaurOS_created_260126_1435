@@ -155,12 +155,14 @@ export default async function InvestorDirectoryPage() {
     const [investorResult, contactResult, portfolioResult, grantsResult] = await Promise.allSettled([
       adminDb.from('marketplace_listings').select('id', { count: 'exact', head: true }).eq('category', 'Finance'),
       adminDb.from('vc_pe_contacts').select('id', { count: 'exact', head: true }),
-      adminDb.from('investor_portfolio_companies').select('company_name', { count: 'exact', head: true }),
+      // DECISION: Use RPC for deduplicated company count (raw table has ~89K rows = one per investor-company pair,
+      // but only ~689 unique companies). RPC from migration 20260406600000.
+      adminDb.rpc('count_unique_portfolio_companies'),
       adminDb.from('investor_grants').select('id', { count: 'exact', head: true }),
     ])
     if (investorResult.status === 'fulfilled') investorCount = investorResult.value.count ?? 0
     if (contactResult.status === 'fulfilled') contactCount = contactResult.value.count ?? 0
-    if (portfolioResult.status === 'fulfilled') portfolioCount = portfolioResult.value.count ?? 0
+    if (portfolioResult.status === 'fulfilled') portfolioCount = (portfolioResult.value.data as number) ?? 0
     if (grantsResult.status === 'fulfilled') grantsCount = grantsResult.value.count ?? 0
   } catch {
     // Non-critical — tab counts just won't show

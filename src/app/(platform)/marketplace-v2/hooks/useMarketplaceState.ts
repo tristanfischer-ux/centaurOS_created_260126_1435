@@ -368,10 +368,18 @@ export function useMarketplaceState({
 
     /** Apply filters extracted by AI search; refetch is triggered by effect. */
     const applyAIFilters = useCallback(
-        (params: { category?: ContentCategory; subcategory?: string; explanation?: string }) => {
+        (params: { category?: ContentCategory; subcategory?: string; explanation?: string; industries?: string[]; certifications?: string[] }) => {
             if (params.category) setActiveCategory(params.category)
             if (params.subcategory != null) {
                 setSelectedSubcategories(new Set([params.subcategory]))
+                setShowFilters(true)
+            }
+            if (params.industries && params.industries.length > 0) {
+                setAdvancedFilters(prev => ({ ...prev, industries: params.industries }))
+                setShowFilters(true)
+            }
+            if (params.certifications && params.certifications.length > 0) {
+                setAdvancedFilters(prev => ({ ...prev, certifications: params.certifications }))
                 setShowFilters(true)
             }
             setAIInterpretation(params.explanation ?? null)

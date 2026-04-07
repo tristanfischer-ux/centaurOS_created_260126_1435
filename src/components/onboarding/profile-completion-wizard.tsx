@@ -12,7 +12,7 @@
  * Draft auto-saves on each step transition to survive page refresh.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -375,6 +375,35 @@ export function ProfileCompletionWizard({
     }
   }, [stepIndex])
 
+  // ACCESSIBILITY: Focus trap — keep keyboard users inside the wizard
+  const wizardRef = useRef<HTMLDivElement>(null)
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab' || !wizardRef.current) return
+    const focusable = wizardRef.current.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }, [])
+
+  // ACCESSIBILITY: Auto-focus first input on step change
+  useEffect(() => {
+    if (!wizardRef.current) return
+    const timer = setTimeout(() => {
+      const firstInput = wizardRef.current?.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled])')
+      firstInput?.focus()
+    }, 350) // after animation completes
+    return () => clearTimeout(timer)
+  }, [stepIndex])
+
   if (!open || isCompleted) return null
 
   const stepInfo = STEP_LABELS[currentStep]
@@ -383,9 +412,9 @@ export function ProfileCompletionWizard({
   const experienceRanges = isApprentice ? APPRENTICE_EXPERIENCE_RANGES : EXPERIENCE_RANGES
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Complete your profile" className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+    <div ref={wizardRef} role="dialog" aria-modal="true" aria-label="Complete your profile" className="fixed inset-0 z-50 flex items-center justify-center bg-background" onKeyDown={handleKeyDown}>
       {/* Progress bar */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-muted">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-muted" role="progressbar" aria-valuenow={stepIndex + 1} aria-valuemin={1} aria-valuemax={STEPS.length} aria-label={`Step ${stepIndex + 1} of ${STEPS.length}`}>
         <motion.div
           className="h-full bg-international-orange"
           initial={{ width: 0 }}
@@ -394,8 +423,8 @@ export function ProfileCompletionWizard({
         />
       </div>
 
-      {/* Step counter */}
-      <div className="absolute top-6 right-8 text-sm text-muted-foreground">
+      {/* Step counter — announced to screen readers on change */}
+      <div className="absolute top-6 right-8 text-sm text-muted-foreground" aria-live="polite" aria-atomic="true">
         Step {stepIndex + 1} of {STEPS.length}
       </div>
 
@@ -441,10 +470,11 @@ export function ProfileCompletionWizard({
                       maxLength={120}
                       className={cn("bg-card", errors.headline && "border-destructive")}
                       aria-invalid={!!errors.headline}
+                      aria-describedby={errors.headline ? 'headline-error' : undefined}
                     />
                     <div className="flex justify-between mt-1">
                       {errors.headline ? (
-                        <p className="text-sm text-destructive">{errors.headline}</p>
+                        <p id="headline-error" className="text-sm text-destructive" role="alert">{errors.headline}</p>
                       ) : <span />}
                       <span className="text-xs text-muted-foreground">{headline.length}/120</span>
                     </div>
@@ -468,10 +498,11 @@ export function ProfileCompletionWizard({
                         errors.bio && "border-destructive"
                       )}
                       aria-invalid={!!errors.bio}
+                      aria-describedby={errors.bio ? 'bio-error' : undefined}
                     />
                     <div className="flex justify-between mt-1">
                       {errors.bio ? (
-                        <p className="text-sm text-destructive">{errors.bio}</p>
+                        <p id="bio-error" className="text-sm text-destructive" role="alert">{errors.bio}</p>
                       ) : <span />}
                       <span className="text-xs text-muted-foreground">{bio.length}/500</span>
                     </div>
@@ -491,7 +522,7 @@ export function ProfileCompletionWizard({
                       suggestions={SKILL_SUGGESTIONS}
                       placeholder="Type a skill and press Enter..."
                     />
-                    {errors.skills && <p className="text-sm text-destructive mt-1">{errors.skills}</p>}
+                    {errors.skills && <p className="text-sm text-destructive mt-1" role="alert">{errors.skills}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -503,7 +534,7 @@ export function ProfileCompletionWizard({
                       suggestions={INDUSTRY_SUGGESTIONS}
                       placeholder="Type an industry and press Enter..."
                     />
-                    {errors.industries && <p className="text-sm text-destructive mt-1">{errors.industries}</p>}
+                    {errors.industries && <p className="text-sm text-destructive mt-1" role="alert">{errors.industries}</p>}
                   </div>
                 </>
               )}
@@ -514,11 +545,13 @@ export function ProfileCompletionWizard({
                     <label className="block text-sm font-medium text-foreground mb-1.5">
                       Years of experience
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Years of experience" aria-required="true">
                       {experienceRanges.map(range => (
                         <button
                           key={range.value}
                           type="button"
+                          role="radio"
+                          aria-checked={yearsExperience === range.value}
                           onClick={() => { setYearsExperience(range.value); setErrors(prev => ({ ...prev, yearsExperience: '' })) }}
                           className={cn(
                             "px-4 py-3 rounded-lg border text-sm font-medium transition-all",
@@ -531,7 +564,7 @@ export function ProfileCompletionWizard({
                         </button>
                       ))}
                     </div>
-                    {errors.yearsExperience && <p className="text-sm text-destructive mt-1">{errors.yearsExperience}</p>}
+                    {errors.yearsExperience && <p className="text-sm text-destructive mt-1" role="alert">{errors.yearsExperience}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -556,11 +589,13 @@ export function ProfileCompletionWizard({
                         ? 'How much time can you give beyond your company?'
                         : 'How available are you?'}
                     </label>
-                    <div className="space-y-2">
+                    <div className="space-y-2" role="radiogroup" aria-label="Availability" aria-required="true">
                       {AVAILABILITY_OPTIONS.map(opt => (
                         <button
                           key={opt.value}
                           type="button"
+                          role="radio"
+                          aria-checked={availabilityType === opt.value}
                           onClick={() => { setAvailabilityType(opt.value); setErrors(prev => ({ ...prev, availabilityType: '' })) }}
                           className={cn(
                             "w-full flex items-center justify-between px-4 py-3 rounded-lg border text-sm transition-all text-left",
@@ -574,7 +609,7 @@ export function ProfileCompletionWizard({
                         </button>
                       ))}
                     </div>
-                    {errors.availabilityType && <p className="text-sm text-destructive mt-1">{errors.availabilityType}</p>}
+                    {errors.availabilityType && <p className="text-sm text-destructive mt-1" role="alert">{errors.availabilityType}</p>}
                   </div>
                   {(availabilityType === 'part-time' || availabilityType === 'advisory') && (
                     <div>

@@ -139,7 +139,7 @@ function GrantDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg" className="max-h-[85vh] overflow-y-auto">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle className="text-xl pr-8">{grant.grant_name}</DialogTitle>
           <DialogDescription className="flex items-center gap-2 pt-1">
@@ -277,7 +277,7 @@ function GrantDetailDialog({
                 <FileText className="h-4 w-4 text-international-orange" />
                 Deep Profile
               </h4>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
                 {grant.deep_profile}
               </p>
             </div>

@@ -38,7 +38,12 @@ function MarketplaceLoading() {
     )
 }
 
-export default async function MarketplacePage() {
+export default async function MarketplacePage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+    const params = await searchParams
     let listings: MarketplaceListing[] = []
     let totalCount = 0
     let hasMore = false
@@ -166,8 +171,8 @@ export default async function MarketplacePage() {
                 <ProjectContextBanner context={projectContext} />
             )}
 
-            {/* Process-based discovery grid */}
-            {processGroups.length > 0 && (
+            {/* Process-based discovery grid — hidden when user is actively searching */}
+            {processGroups.length > 0 && !params?.q && (
                 <ProcessDiscoveryGrid groups={processGroups} totalCount={totalCount} />
             )}
 

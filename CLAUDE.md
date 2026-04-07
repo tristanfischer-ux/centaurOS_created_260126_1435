@@ -388,3 +388,18 @@ Live API benchmarks (claude-sonnet-4-20250514, LLM-as-judge). 5 AutoAgent mutati
 | Leo (Legal) | legal-counsel | **4.38** | 4.55 | 4.10 | 4.25 | 4.65 | 10 |
 
 **Fleet average: 4.38 composite (+0.04 from pre-optimization).** Top: Max (4.46), Sal (4.42), Sage (4.40). Most improved: Priya (+0.12), Chase (+0.10), Sal (+0.08), Leo (+0.08).
+
+---
+
+## Session End Checklist (MANDATORY)
+
+**Before ending any session, you MUST run this checklist. No exceptions.**
+
+1. **Re-read the original request.** What exactly was asked? List every item.
+2. **For each item, answer:** Done? Partially done? Blocked? Skipped? If not done, why?
+3. **If anything is incomplete:** either finish it now or document it clearly (what's left, why, how to pick it up).
+4. **Verify your work:** lint, type check, test — don't claim "done" without proof.
+5. **Uncommitted changes?** If changes are ready, ask the user if they want them committed and pushed.
+6. **Handover needed?** If items remain, write or update a handover/tracker doc so the next session can pick up cleanly.
+
+**Ask yourself: "If the user reads only my final message, will they know the exact state of everything they asked for?"** If not, your summary is incomplete.

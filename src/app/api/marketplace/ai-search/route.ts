@@ -58,6 +58,7 @@ const ProductsFiltersSchema = z.object({
     .enum(["Manufacturing", "Fabrication", "Electronics", "Materials", "Components"])
     .optional(),
   location: z.string().optional(),
+  industries: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
   technology: z.string().optional(),
 });
@@ -68,6 +69,8 @@ const ServicesFiltersSchema = z.object({
     .enum(["Legal", "Financial", "HR", "Marketing", "Design", "Development"])
     .optional(),
   location: z.string().optional(),
+  industries: z.array(z.string()).optional(),
+  certifications: z.array(z.string()).optional(),
 });
 
 const MarketplaceFiltersSchema = z.discriminatedUnion("category", [
@@ -163,12 +166,12 @@ Your tasks:
 
 Filters must use one of these categories and their allowed subcategories:
 - People: subcategory optional one of "Fractional Executive","Consultant","Contractor","Virtual Assistant","Specialist"; optional location, skills (array of strings), minExperience (number).
-- Products: subcategory optional one of "Manufacturing","Fabrication","Electronics","Materials","Components"; optional location, certifications (array), technology.
-- Services: subcategory optional one of "Legal","Financial","HR","Marketing","Design","Development"; optional location.
+- Products: subcategory optional one of "Manufacturing","Fabrication","Electronics","Materials","Components"; optional location, industries (array of strings like "Aerospace","Automotive","Medical"), certifications (array of strings like "ISO 9001","AS9100","IATF 16949"), technology.
+- Services: subcategory optional one of "Legal","Financial","HR","Marketing","Design","Development"; optional location, industries (array), certifications (array).
 
 ${params.businessContext ? `Business context for intent:\n${params.businessContext}` : ""}
 
-Guidelines: "Fractional CTO" → People, subcategory "Fractional Executive". Skills like "AI","SaaS" go in skills. Location and certifications from the query or search results go in the filters. Set confidence high when intent is clear, medium when category is clear but details ambiguous, low when ambiguous.`;
+Guidelines: "Fractional CTO" → People, subcategory "Fractional Executive". Skills like "AI","SaaS" go in skills. Location, certifications (e.g. "ISO 9001"), and industries (e.g. "Aerospace") from the query or search results go in the filters. Set confidence high when intent is clear, medium when category is clear but details ambiguous, low when ambiguous.`;
 
   const webSearchTool = {
     type: "web_search_20260209",
@@ -287,7 +290,9 @@ MARKETPLACE CATEGORIES:
    - Common roles: CTO, CFO, COO, CMO, designers, developers, marketers, legal advisors
    - Skills can include: AI, Machine Learning, SaaS, B2B Sales, Finance, Legal, etc.
 2. **Products** - Manufacturing capabilities, fabrication, electronics, materials, components
+   - Supports: industries (e.g. "Aerospace","Automotive","Medical"), certifications (e.g. "ISO 9001","AS9100"), technology
 3. **Services** - Professional services (Legal, Financial, HR, Marketing, Design, Development)
+   - Supports: industries, certifications
 
 EXTRACTION GUIDELINES:
 - Identify the primary category based on what the user needs
@@ -297,6 +302,8 @@ EXTRACTION GUIDELINES:
 - Skills like "AI", "blockchain", "fintech" go in the skills array for People
 - Location mentions should be extracted (city, country, or region)
 - Experience mentions (e.g., "senior", "10+ years") → minExperience
+- Industry mentions (e.g., "aerospace", "automotive") → industries array for Products/Services
+- Certification mentions (e.g., "ISO 9001", "AS9100") → certifications array for Products/Services
 - Be generous with skill extraction - include related/implied skills
 
 Set confidence:

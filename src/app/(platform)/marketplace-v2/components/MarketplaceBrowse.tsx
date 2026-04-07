@@ -201,12 +201,14 @@ export function MarketplaceBrowse({
                 return
             }
             if (data.success && data.filters) {
-                const { category, subcategory } = data.filters
+                const { category, subcategory, ...rest } = data.filters
                 const explanation = typeof data.explanation === 'string' ? data.explanation : undefined
                 applyAIFiltersRef.current({
                     category: category ?? undefined,
                     subcategory: subcategory ?? undefined,
                     explanation,
+                    industries: 'industries' in rest ? (rest as { industries?: string[] }).industries : undefined,
+                    certifications: 'certifications' in rest ? (rest as { certifications?: string[] }).certifications : undefined,
                 })
             } else {
                 toast.error('Could not interpret your search')
