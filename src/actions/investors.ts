@@ -222,6 +222,11 @@ function rowToFirm(row: Record<string, unknown>): InvestorFirm {
       value_add: attrs.value_add as string | undefined,
       forge_capital_id: attrs.forge_capital_id as number | undefined,
       last_synced: attrs.last_synced as string | undefined,
+      // Forge-Capital synthesized intelligence fields (pushed by 16-synthesize-intel.js)
+      // These were missing from the mapper — data existed in DB but was silently dropped
+      investment_pattern: attrs.investment_pattern as string | undefined,
+      team_expertise: attrs.team_expertise as string | undefined,
+      connection_brief: attrs.connection_brief as string | undefined,
       fund_history: attrs.fund_history,
       exits: attrs.exits,
       fund_performance: attrs.fund_performance,

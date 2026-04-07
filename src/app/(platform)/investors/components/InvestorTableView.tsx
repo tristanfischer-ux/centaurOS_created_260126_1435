@@ -255,7 +255,7 @@ export function InvestorTableView({
                     </div>
                   ) : (
                     <span className="line-clamp-2 text-xs leading-snug">
-                      {truncate(attrs.connection_brief || attrs.investment_thesis, 120)}
+                      {truncate(attrs.investment_pattern || attrs.connection_brief || attrs.investment_thesis, 120)}
                     </span>
                   )}
                 </td>
