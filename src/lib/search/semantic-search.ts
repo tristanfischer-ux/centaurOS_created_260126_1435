@@ -8,7 +8,6 @@
  * @related supabase/migrations/20260218110000_semantic_search_embeddings.sql
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const EMBEDDING_MODEL = 'text-embedding-3-small'
@@ -143,7 +142,7 @@ export async function retrieveForEngineeringQuery(
   const embedding = await embedText(query)
   if (!embedding) return empty
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const embeddingStr = JSON.stringify(embedding)
 
@@ -349,7 +348,7 @@ export async function searchMarketplaceListingsSemantic(
     const embedding = await embedText(queryText)
     if (!embedding) return []
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase.rpc('match_marketplace_listings', {
       query_embedding: JSON.stringify(embedding),
       match_threshold: options?.matchThreshold ?? 0.35,

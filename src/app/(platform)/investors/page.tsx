@@ -29,7 +29,7 @@ import { ContactsDirectoryTab } from './components/ContactsDirectoryTab'
 import { GrantsDirectoryTab } from './components/GrantsDirectoryTab'
 import { PortfolioDirectoryTab } from './components/PortfolioDirectoryTab'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 // ---------------------------------------------------------------------------
 // Loading skeleton
