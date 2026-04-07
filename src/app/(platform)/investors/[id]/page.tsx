@@ -25,13 +25,14 @@ import {
 import { createClient } from '@/lib/supabase/server'
 import { formatFundSize } from '@/lib/format'
 import type { InvestorTierAccess } from '@/actions/investors'
-import { PartnerCard } from '../components/PartnerCard'
+import { KeyPeopleSection } from '../components/KeyPeopleSection'
 import { PortfolioSection } from '../components/PortfolioSection'
 import { FundPerformanceSection } from '../components/FundPerformanceSection'
 import { LockedSection } from '../components/LockedSection'
 import { InvestorNoteTimeline } from '../components/InvestorNoteTimeline'
 import { SimilarInvestorsSection } from '../components/SimilarInvestorsSection'
 import { CoInvestmentNetworkSection } from '../components/CoInvestmentNetworkSection'
+import { InvestorBreadcrumb } from '../components/InvestorBreadcrumb'
 import { InvestorDetailActions } from '../components/InvestorDetailActions'
 import {
   ArrowLeft,
@@ -220,15 +221,8 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   return (
     <TooltipProvider>
       <div className="space-y-8 max-w-5xl">
-        {/* Back button */}
-        <div>
-          <Button variant="ghost" size="sm" asChild className="-ml-2">
-            <Link href="/investors">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to directory
-            </Link>
-          </Button>
-        </div>
+        {/* Breadcrumb trail — tracks navigation through investor network */}
+        <InvestorBreadcrumb investorId={id} investorName={firm.title} />
 
         {/* Header */}
         <div className="space-y-3">
@@ -535,23 +529,9 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Key People */}
+            {/* Key People — click a partner to see full detail + link to firm */}
             {contacts.length > 0 ? (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    Key People ({contacts.length})
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {contacts.map((contact) => (
-                      <PartnerCard key={contact.id} contact={contact} access={contactAccess} />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <KeyPeopleSection contacts={contacts} access={contactAccess} />
             ) : access.contactsVisible ? null : (
               <LockedSection
                 title="Key People"

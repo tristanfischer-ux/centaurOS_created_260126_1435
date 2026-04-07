@@ -12,6 +12,7 @@ import type { InvestorContact, InvestorTierAccess } from '@/actions/investors'
 interface PartnerCardProps {
   contact: InvestorContact
   access: InvestorTierAccess
+  onViewDetails?: () => void
 }
 
 function formatSeniority(s: string): string {
@@ -25,9 +26,15 @@ function ensureProtocol(url: string): string {
   return `https://${url}`
 }
 
-export function PartnerCard({ contact, access }: PartnerCardProps) {
+export function PartnerCard({ contact, access, onViewDetails }: PartnerCardProps) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+    <div
+      className={`flex items-start gap-3 p-3 rounded-lg bg-muted/50 ${onViewDetails ? 'cursor-pointer hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 hover:bg-muted' : ''}`}
+      onClick={onViewDetails}
+      role={onViewDetails ? 'button' : undefined}
+      tabIndex={onViewDetails ? 0 : undefined}
+      onKeyDown={onViewDetails ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViewDetails() } } : undefined}
+    >
       <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted shrink-0">
         <User className="h-4 w-4 text-muted-foreground" />
       </div>
