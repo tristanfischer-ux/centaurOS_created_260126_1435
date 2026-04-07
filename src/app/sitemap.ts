@@ -3,6 +3,11 @@ import { getDirectoryExpertSlugs, getDirectoryLocations } from '@/actions/direct
 import { DIRECTORY_ROLE_CATEGORIES, locationToSlug } from '@/lib/directory/types'
 import type { DirectoryRoleSlug } from '@/lib/directory/types'
 
+// INTENT: Force dynamic so sitemap is generated at request time, not during build.
+// Supabase calls timeout during Vercel build (60s limit) because the build
+// environment has higher latency to Supabase than the runtime environment.
+export const dynamic = 'force-dynamic'
+
 /**
  * Generates a dynamic sitemap for search engine indexing.
  *

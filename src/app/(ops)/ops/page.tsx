@@ -1,8 +1,10 @@
-import { 
-    getAdminDashboardStats, 
+export const dynamic = 'force-dynamic'
+
+import {
+    getAdminDashboardStats,
     getRecentActivity,
     getPendingApplications,
-    getOpenDisputes 
+    getOpenDisputes
 } from "@/actions/admin"
 import { StatsCard } from "@/components/admin/StatsCard"
 import { ApplicationCard } from "@/components/admin/ApplicationCard"
