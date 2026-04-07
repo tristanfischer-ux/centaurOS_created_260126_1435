@@ -266,7 +266,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
     deepseek: {
         id: "deepseek",
         name: "DeepSeek",
-        description: "DeepSeek V3.2 and R1 reasoning",
+        description: "DeepSeek V4 and R1 reasoning",
         icon: "Sparkles",
         website: "https://platform.deepseek.com",
         capabilities: ["text"],
@@ -274,7 +274,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#1E90FF",
         bgColor: "bg-blue-50",
         models: [
-            { id: "deepseek-chat", name: "DeepSeek V3.2", modality: "text", description: "Frontier model, 81% SWE-bench", maxTokens: 131072, default: true },
+            { id: "deepseek-chat", name: "DeepSeek V4", modality: "text", description: "Frontier model — $0.30/$0.50 per MTok", maxTokens: 131072, default: true },
             { id: "deepseek-reasoner", name: "DeepSeek R1", modality: "text", description: "Advanced reasoning with chain-of-thought", maxTokens: 131072 },
         ],
     },

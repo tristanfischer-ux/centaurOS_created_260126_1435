@@ -625,7 +625,7 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
 
 /**
  * Streams text from DeepSeek via their OpenAI-compatible endpoint.
- * DeepSeek V3.2 and R1 use the same chat completions API at
+ * DeepSeek V4 and R1 use the same chat completions API at
  * `https://api.deepseek.com`.
  */
 async function streamDeepSeek(opts: StreamingTextOptions): Promise<void> {

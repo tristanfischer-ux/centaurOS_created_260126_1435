@@ -125,24 +125,26 @@ const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     claude: [
         { providerId: "anthropic", modelId: "claude-opus-4-6" },
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     sonnet: [
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     qwen: [
         { providerId: "qwen", modelId: "qwen3.5-plus" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "openai", modelId: "gpt-5.4" },
     ],
     minimax: [
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "qwen", modelId: "qwen3.5-plus" },
         { providerId: "openai", modelId: "gpt-5.4" },
@@ -153,6 +155,7 @@ const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     ],
     deepseek: [
         { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" }, // Fallback: 4 specialists switched to deepseek 2026-04-07
         { providerId: "google", modelId: "gemini-2.5-flash" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "openai", modelId: "gpt-5.4" },

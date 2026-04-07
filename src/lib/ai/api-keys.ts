@@ -39,6 +39,11 @@ export function getMiniMaxKey(): string | undefined {
   return process.env.MINIMAX_API_KEY?.trim() || undefined
 }
 
+/** DeepSeek API key (DeepSeek V4, R1) */
+export function getDeepSeekKey(): string | undefined {
+  return process.env.DEEPSEEK_API_KEY?.trim() || undefined
+}
+
 /** Together AI API key (Qwen cloud fallback) */
 export function getTogetherKey(): string | undefined {
   return process.env.TOGETHER_API_KEY?.trim() || undefined

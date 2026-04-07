@@ -163,9 +163,9 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
   'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
   'claude-opus-4-6': { input: 5.00, output: 25.00 },
   'claude-haiku-4-5': { input: 1.00, output: 5.00 },
-  // DeepSeek models
-  'deepseek-chat': { input: 0.28, output: 0.42 },
-  'deepseek-reasoner': { input: 0.28, output: 0.42 },
+  // DeepSeek V4 models (https://api.deepseek.com — Apr 2026)
+  'deepseek-chat': { input: 0.30, output: 0.50 },
+  'deepseek-reasoner': { input: 0.30, output: 0.50 },
   // MiniMax models — dramatically cheaper than OpenAI/Anthropic
   // M2.7: same pricing tier as M2.5 (OpenAI-compatible endpoint)
   'MiniMax-M2.7': { input: 0.15, output: 1.20 },

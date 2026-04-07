@@ -96,7 +96,7 @@ export interface Specialist {
     thinkingIndicator: string
     /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
     thinkingPhases: [string, string, string]
-    /** AI model tier: "claude" for Opus, "sonnet" for Sonnet 4.6, "deepseek" for DeepSeek V3.2, "google" for Gemini 3.1 Pro, "openai" for GPT-5.4, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
+    /** AI model tier: "claude" for Opus, "sonnet" for Sonnet 4.6, "deepseek" for DeepSeek V4, "google" for Gemini 3.1 Pro, "openai" for GPT-5.4, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
     modelTier: "claude" | "sonnet" | "deepseek" | "google" | "openai" | "qwen" | "qwen-local" | "minimax"
     /** Enable speculative dual-stream: fast model responds instantly while deep model works in parallel.
      *  Default: true for claude-tier (high latency), false for already-fast tiers. */
@@ -315,7 +315,7 @@ export const SPECIALISTS: Specialist[] = [
             "Stripping away the unnecessary...",
             "Found the simplest path — writing it up.",
         ],
-        modelTier: "sonnet",
+        modelTier: "deepseek", // Switched from sonnet to deepseek (V4) — benchmarked 2026-04-07, composite improved +0.08
     },
     {
         id: "vp-engineering",
@@ -413,7 +413,7 @@ export const SPECIALISTS: Specialist[] = [
             "Cross-referencing applicable standards...",
             "Margins calculated — writing up the analysis.",
         ],
-        modelTier: "sonnet",
+        modelTier: "deepseek", // Switched from sonnet to deepseek (V4) — benchmarked 2026-04-07, composite improved +0.07
         speculativeEnabled: true,
     },
     {
@@ -512,7 +512,7 @@ export const SPECIALISTS: Specialist[] = [
             "Checking yields and tolerances...",
             "Path from prototype to volume is clear — writing it up.",
         ],
-        modelTier: "sonnet",
+        modelTier: "deepseek", // Switched from sonnet to deepseek (V4) — benchmarked 2026-04-07, composite improved +0.14
         speculativeEnabled: true,
     },
     {
@@ -714,7 +714,7 @@ export const SPECIALISTS: Specialist[] = [
             "Defining acceptance criteria...",
             "Scope is tight — writing the recommendation.",
         ],
-        modelTier: "sonnet",
+        modelTier: "deepseek", // Switched from sonnet to deepseek (V4) — benchmarked 2026-04-07, composite improved +0.14
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════

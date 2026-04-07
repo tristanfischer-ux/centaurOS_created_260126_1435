@@ -389,6 +389,8 @@ Live API benchmarks (claude-sonnet-4-20250514, LLM-as-judge). 5 AutoAgent mutati
 
 **Fleet average: 4.38 composite (+0.04 from pre-optimization).** Top: Max (4.46), Sal (4.42), Sage (4.40). Most improved: Priya (+0.12), Chase (+0.10), Sal (+0.08), Leo (+0.08).
 
+**DeepSeek V4 re-benchmark (April 7, 2026):** 4 specialists switched from Sonnet to DeepSeek V4 after cross-model benchmarking showed consistent improvement. Max (CTO): 4.46 -> 4.54 (+0.08), Jian (VP Eng): 4.38 -> 4.45 (+0.07), Fang (VP Mfg): 4.33 -> 4.47 (+0.14), Priya (Product): 4.37 -> 4.51 (+0.14). Fallback chain: deepseek -> sonnet -> gemini-flash -> minimax -> gpt-5.4.
+
 ---
 
 ## Session End Checklist (MANDATORY)
