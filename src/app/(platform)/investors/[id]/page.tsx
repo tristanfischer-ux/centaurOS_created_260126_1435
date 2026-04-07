@@ -20,6 +20,7 @@ import {
   getInvestorById,
   getInvestorContacts,
   getSimilarInvestors,
+  getCoInvestors,
 } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
 import { formatFundSize } from '@/lib/format'
@@ -30,6 +31,7 @@ import { FundPerformanceSection } from '../components/FundPerformanceSection'
 import { LockedSection } from '../components/LockedSection'
 import { InvestorNoteTimeline } from '../components/InvestorNoteTimeline'
 import { SimilarInvestorsSection } from '../components/SimilarInvestorsSection'
+import { CoInvestmentNetworkSection } from '../components/CoInvestmentNetworkSection'
 import { InvestorDetailActions } from '../components/InvestorDetailActions'
 import {
   ArrowLeft,
@@ -193,10 +195,11 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   }
 
   const attrs = firm.attributes
-  const [contactResult, similarResult, userSectorResult] = await Promise.allSettled([
+  const [contactResult, similarResult, userSectorResult, coInvestorResult] = await Promise.allSettled([
     getInvestorContacts(id, access),
     getSimilarInvestors(id, 5, access),
     access.intelligenceAccess ? getUserSector() : Promise.resolve(null),
+    access.contactsVisible ? getCoInvestors(id, access) : Promise.resolve({ coInvestors: [] }),
   ])
 
   const { contacts, access: contactAccess } = contactResult.status === 'fulfilled'
@@ -209,6 +212,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
     ? similarResult.value.similarityScores
     : {}
   const userSector = userSectorResult.status === 'fulfilled' ? userSectorResult.value : null
+  const coInvestors = coInvestorResult.status === 'fulfilled' ? coInvestorResult.value.coInvestors : []
 
   const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
   const aumLabel = formatFundSize(attrs.aum_gbp)
@@ -585,6 +589,30 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     <div key={i} className="p-3 rounded-lg bg-muted/50 space-y-1">
                       <div className="h-3 w-40 bg-muted rounded" />
                       <div className="h-2 w-24 bg-muted rounded" />
+                    </div>
+                  ))}
+                </div>
+              </LockedSection>
+            ) : null}
+
+            {/* Co-Investment Network (starter+, syndication for professional+) */}
+            {coInvestors.length > 0 ? (
+              <CoInvestmentNetworkSection
+                coInvestors={coInvestors}
+                investorSectors={attrs.sectors}
+                hasIntelligenceAccess={access.intelligenceAccess}
+              />
+            ) : !access.contactsVisible ? (
+              <LockedSection
+                title="Co-Investment Network"
+                requiredTier="starter"
+                featureDescription="See which investors co-invest together, discover syndication partners, and find warm intro paths."
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="p-3 rounded-lg bg-muted/50 space-y-1.5">
+                      <div className="h-3 w-32 bg-muted rounded" />
+                      <div className="h-2 w-20 bg-muted rounded" />
                     </div>
                   ))}
                 </div>

@@ -242,6 +242,9 @@ export interface PortfolioCompanyInvestor {
   stage: string | null
   amount_usd: number | null
   description: string | null
+  firm_type?: string
+  fund_size_gbp?: number
+  hq_city?: string
 }
 
 /**
@@ -258,7 +261,7 @@ export async function getCompanyInvestors(
 
   const { data: rows, error } = await adminDb
     .from('investor_portfolio_companies')
-    .select('listing_id, sector, stage, amount_usd, description, marketplace_listings!inner(title)')
+    .select('listing_id, sector, stage, amount_usd, description, marketplace_listings!inner(title, attributes)')
     .ilike('company_name', companyName)
     .limit(100)
 
@@ -268,7 +271,8 @@ export async function getCompanyInvestors(
   }
 
   const investors: PortfolioCompanyInvestor[] = rows.map((row) => {
-    const listing = row.marketplace_listings as unknown as { title: string } | null
+    const listing = row.marketplace_listings as unknown as { title: string; attributes?: Record<string, unknown> } | null
+    const attrs = listing?.attributes ?? {}
     return {
       listing_id: row.listing_id,
       firm_name: listing?.title || '—',
@@ -276,6 +280,9 @@ export async function getCompanyInvestors(
       stage: row.stage as string | null,
       amount_usd: row.amount_usd as number | null,
       description: row.description as string | null,
+      firm_type: attrs.firm_type as string | undefined,
+      fund_size_gbp: attrs.fund_size_gbp as number | undefined,
+      hq_city: attrs.hq_city as string | undefined,
     }
   })
 

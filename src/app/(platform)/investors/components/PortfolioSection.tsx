@@ -1,14 +1,19 @@
+"use client"
+
 /**
  * @file PortfolioSection.tsx
  *
  * @description Grid of portfolio companies with sector, stage, and amount.
  * Renders as a card section within the investor detail page.
+ * Clicking a company opens PortfolioCompanyDialog to see all investors.
  * Optionally highlights portfolio companies matching the user's sector.
  */
 
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Briefcase, Sparkles } from 'lucide-react'
+import { PortfolioCompanyDialog } from './PortfolioCompanyDialog'
 
 interface PortfolioCompany {
   company_name: string
@@ -46,6 +51,8 @@ function isSectorMatch(companySector: string | null | undefined, userSector: str
 }
 
 export function PortfolioSection({ companies, userSector }: PortfolioSectionProps) {
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null)
+
   if (companies.length === 0) return null
 
   // Sort matching companies to top when userSector is provided
@@ -82,9 +89,11 @@ export function PortfolioSection({ companies, userSector }: PortfolioSectionProp
           {sorted.map((company, i) => {
             const isMatch = userSector && isSectorMatch(company.sector, userSector)
             return (
-              <div
+              <button
+                type="button"
                 key={`${company.company_name}-${i}`}
-                className={`p-3 rounded-lg ${isMatch ? 'bg-success/5 border border-success/20' : 'bg-muted/50'}`}
+                onClick={() => setSelectedCompany(company.company_name)}
+                className={`w-full text-left p-3 rounded-lg cursor-pointer hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 ${isMatch ? 'bg-success/5 border border-success/20' : 'bg-muted/50 hover:bg-muted'}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -117,11 +126,18 @@ export function PortfolioSection({ companies, userSector }: PortfolioSectionProp
                 {company.why_appealing && (
                   <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{company.why_appealing}</p>
                 )}
-              </div>
+              </button>
             )
           })}
         </div>
       </CardContent>
+
+      {/* Company investors dialog */}
+      <PortfolioCompanyDialog
+        companyName={selectedCompany}
+        open={!!selectedCompany}
+        onOpenChange={(open) => { if (!open) setSelectedCompany(null) }}
+      />
     </Card>
   )
 }

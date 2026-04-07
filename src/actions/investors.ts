@@ -1580,6 +1580,87 @@ export async function getSimilarInvestors(
 }
 
 // ---------------------------------------------------------------------------
+// Co-Investment Network
+// ---------------------------------------------------------------------------
+
+export interface CoInvestor {
+  listingId: string
+  firmName: string
+  sharedCompanyCount: number
+  sharedCompanyNames: string[]
+  firmType?: string
+  fundSizeGbp?: number
+  hqCity?: string
+  sectors?: string[]
+}
+
+/**
+ * Find investors who share portfolio companies with the given investor.
+ * Returns co-investors ranked by number of shared companies (descending).
+ *
+ * @param listingId - UUID of the marketplace_listing (investor)
+ * @param precomputedAccess - Optional pre-computed tier access (avoids double auth)
+ */
+export async function getCoInvestors(
+  listingId: string,
+  precomputedAccess?: InvestorTierAccess
+): Promise<{ coInvestors: CoInvestor[] }> {
+  const access = precomputedAccess ?? await getInvestorTierAccess()
+
+  // SECURITY: Starter+ to see co-investment network
+  if (!access.contactsVisible) {
+    return { coInvestors: [] }
+  }
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!UUID_RE.test(listingId)) return { coInvestors: [] }
+
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase.rpc('get_co_investors', {
+    p_listing_id: listingId,
+    p_limit: 30,
+  })
+
+  if (error) {
+    console.error('[getCoInvestors] RPC error:', error.message)
+    return { coInvestors: [] }
+  }
+
+  if (!data || data.length === 0) return { coInvestors: [] }
+
+  // Enrich with firm attributes (firm_type, fund_size, hq_city, sectors)
+  const coInvestorIds = (data as { co_investor_listing_id: string }[]).map(d => d.co_investor_listing_id)
+  const { data: listings } = await supabase
+    .from('marketplace_listings')
+    .select('id, attributes')
+    .in('id', coInvestorIds)
+
+  const attrMap = new Map<string, Record<string, unknown>>()
+  for (const l of (listings ?? [])) {
+    attrMap.set(l.id as string, (l.attributes ?? {}) as Record<string, unknown>)
+  }
+
+  const coInvestors: CoInvestor[] = (data as { co_investor_listing_id: string; co_investor_name: string; shared_company_count: number; shared_company_names: string[] }[]).map(row => {
+    const attrs = attrMap.get(row.co_investor_listing_id) ?? {}
+    const result: CoInvestor = {
+      listingId: row.co_investor_listing_id,
+      firmName: row.co_investor_name,
+      sharedCompanyCount: row.shared_company_count,
+      // TIER GATING: only professional+ sees individual company names
+      sharedCompanyNames: access.intelligenceAccess ? row.shared_company_names : [],
+      firmType: attrs.firm_type as string | undefined,
+      fundSizeGbp: attrs.fund_size_gbp as number | undefined,
+      hqCity: attrs.hq_city as string | undefined,
+      sectors: attrs.sectors as string[] | undefined,
+    }
+    return result
+  })
+
+  return { coInvestors }
+}
+
+// ---------------------------------------------------------------------------
 // Fundraise Dashboard
 // ---------------------------------------------------------------------------
 
