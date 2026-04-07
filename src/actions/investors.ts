@@ -1842,10 +1842,18 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
       { count: 'exact' },
     )
 
-  // SECURITY: sanitize text search input
-  if (query && query.trim().length > 0) {
+  // INTENT: Semantic search for contacts >= 3 chars; fall back to ilike for short queries or empty results.
+  if (query && query.trim().length >= 3) {
     const sanitized = sanitizeFilterValue(query.trim().slice(0, 200))
-    // Search across full_name and title (role)
+    const { searchContactsSemantic } = await import('@/lib/search/semantic-search')
+    const hits = await searchContactsSemantic(sanitized)
+    if (hits.length > 0) {
+      dbQuery = dbQuery.in('id', hits.map(h => h.id))
+    } else {
+      dbQuery = dbQuery.or(`full_name.ilike.%${sanitized}%,title.ilike.%${sanitized}%`)
+    }
+  } else if (query && query.trim().length > 0) {
+    const sanitized = sanitizeFilterValue(query.trim().slice(0, 200))
     dbQuery = dbQuery.or(`full_name.ilike.%${sanitized}%,title.ilike.%${sanitized}%`)
   }
 

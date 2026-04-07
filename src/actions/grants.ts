@@ -97,8 +97,21 @@ export async function searchGrants(filters: GrantSearchFilters = {}): Promise<{
     .from('investor_grants')
     .select('*', { count: 'exact' })
 
-  // Text search across grant_name, managing_body, description
-  if (query.length > 0) {
+  // INTENT: Semantic search for queries >= 3 chars; fall back to ilike for short queries or if semantic returns nothing.
+  let semanticIds: string[] | null = null
+  if (query.length >= 3) {
+    const { searchGrantsSemantic } = await import('@/lib/search/semantic-search')
+    const hits = await searchGrantsSemantic(query)
+    if (hits.length > 0) {
+      semanticIds = hits.map(h => h.id)
+      dbQuery = dbQuery.in('id', semanticIds)
+    } else {
+      // Semantic returned nothing — fall back to keyword
+      dbQuery = dbQuery.or(
+        `grant_name.ilike.%${query}%,managing_body.ilike.%${query}%,description.ilike.%${query}%`
+      )
+    }
+  } else if (query.length > 0) {
     dbQuery = dbQuery.or(
       `grant_name.ilike.%${query}%,managing_body.ilike.%${query}%,description.ilike.%${query}%`
     )

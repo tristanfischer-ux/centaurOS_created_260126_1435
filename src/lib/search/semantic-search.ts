@@ -367,3 +367,152 @@ export async function searchMarketplaceListingsSemantic(
     return []
   }
 }
+
+// ── Investor Semantic Search ──────────────────────────────────────────
+
+export interface SemanticHit {
+  id: string
+  similarity: number
+}
+
+/**
+ * Compose embedding text for an investor grant.
+ * Covers grant_name + managing_body + description + sector/stage focus + eligibility.
+ */
+export function composeGrantEmbeddingText(grant: {
+  grant_name: string
+  managing_body?: string | null
+  description?: string | null
+  sector_focus?: string[] | null
+  stage_focus?: string[] | null
+  eligibility_summary?: string | null
+}): string {
+  const parts: string[] = [grant.grant_name]
+  if (grant.managing_body) parts.push(grant.managing_body)
+  if (grant.description) parts.push(grant.description)
+  if (grant.sector_focus?.length) parts.push(grant.sector_focus.join(' '))
+  if (grant.stage_focus?.length) parts.push(grant.stage_focus.join(' '))
+  if (grant.eligibility_summary) parts.push(grant.eligibility_summary)
+  return parts.filter(Boolean).join(' ')
+}
+
+/**
+ * Compose embedding text for a portfolio company.
+ */
+export function composePortfolioCompanyEmbeddingText(company: {
+  company_name: string
+  sector?: string | null
+  stage?: string | null
+  description?: string | null
+}): string {
+  const parts: string[] = [company.company_name]
+  if (company.sector) parts.push(company.sector)
+  if (company.stage) parts.push(company.stage)
+  if (company.description) parts.push(company.description)
+  return parts.filter(Boolean).join(' ')
+}
+
+/**
+ * Compose embedding text for a VC/PE contact.
+ */
+export function composeContactEmbeddingText(contact: {
+  full_name: string
+  title?: string | null
+  firm_name?: string | null
+  bio?: string | null
+}): string {
+  const parts: string[] = [contact.full_name]
+  if (contact.title) parts.push(contact.title)
+  if (contact.firm_name) parts.push(contact.firm_name)
+  if (contact.bio) parts.push(contact.bio)
+  return parts.filter(Boolean).join(' ')
+}
+
+/**
+ * Semantic search against investor_grants via pgvector RPC.
+ * Returns grant IDs with similarity scores. Caller joins with full data.
+ */
+export async function searchGrantsSemantic(
+  queryText: string,
+  options?: { matchThreshold?: number; matchCount?: number }
+): Promise<SemanticHit[]> {
+  try {
+    const embedding = await embedText(queryText)
+    if (!embedding) return []
+
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.rpc('match_investor_grants', {
+      query_embedding: JSON.stringify(embedding),
+      match_threshold: options?.matchThreshold ?? 0.4,
+      match_count: options?.matchCount ?? 25,
+    })
+
+    if (error) {
+      console.warn('[SearchGrants] RPC failed:', error.message)
+      return []
+    }
+    return (data ?? []) as SemanticHit[]
+  } catch (err) {
+    console.warn('[SearchGrants] Error:', err instanceof Error ? err.message : err)
+    return []
+  }
+}
+
+/**
+ * Semantic search against investor_portfolio_companies via pgvector RPC.
+ * Higher match_count (50) to account for deduplication by company_name.
+ */
+export async function searchPortfolioCompaniesSemantic(
+  queryText: string,
+  options?: { matchThreshold?: number; matchCount?: number }
+): Promise<SemanticHit[]> {
+  try {
+    const embedding = await embedText(queryText)
+    if (!embedding) return []
+
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.rpc('match_portfolio_companies', {
+      query_embedding: JSON.stringify(embedding),
+      match_threshold: options?.matchThreshold ?? 0.4,
+      match_count: options?.matchCount ?? 50,
+    })
+
+    if (error) {
+      console.warn('[SearchPortfolio] RPC failed:', error.message)
+      return []
+    }
+    return (data ?? []) as SemanticHit[]
+  } catch (err) {
+    console.warn('[SearchPortfolio] Error:', err instanceof Error ? err.message : err)
+    return []
+  }
+}
+
+/**
+ * Semantic search against vc_pe_contacts via pgvector RPC.
+ */
+export async function searchContactsSemantic(
+  queryText: string,
+  options?: { matchThreshold?: number; matchCount?: number }
+): Promise<SemanticHit[]> {
+  try {
+    const embedding = await embedText(queryText)
+    if (!embedding) return []
+
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.rpc('match_vc_pe_contacts', {
+      query_embedding: JSON.stringify(embedding),
+      match_threshold: options?.matchThreshold ?? 0.4,
+      match_count: options?.matchCount ?? 25,
+    })
+
+    if (error) {
+      console.warn('[SearchContacts] RPC failed:', error.message)
+      return []
+    }
+    return (data ?? []) as SemanticHit[]
+  } catch (err) {
+    console.warn('[SearchContacts] Error:', err instanceof Error ? err.message : err)
+    return []
+  }
+}

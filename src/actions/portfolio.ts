@@ -111,7 +111,17 @@ export async function searchPortfolioCompanies(
       .from("investor_portfolio_companies")
       .select("company_name, sector, stage, amount_usd, description, listing_id, marketplace_listings!inner(title)")
 
-    if (query && query.trim().length > 0) {
+    // INTENT: Semantic search for portfolio queries >= 3 chars; fall back to ilike.
+    if (query && query.trim().length >= 3) {
+      const { searchPortfolioCompaniesSemantic } = await import('@/lib/search/semantic-search')
+      const hits = await searchPortfolioCompaniesSemantic(query.trim())
+      if (hits.length > 0) {
+        q = q.in('id', hits.map(h => h.id))
+      } else {
+        const term = `%${query.trim().slice(0, 200)}%`
+        q = q.ilike("company_name", term)
+      }
+    } else if (query && query.trim().length > 0) {
       const term = `%${query.trim().slice(0, 200)}%`
       q = q.ilike("company_name", term)
     }
