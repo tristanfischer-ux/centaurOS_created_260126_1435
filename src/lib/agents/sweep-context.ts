@@ -189,7 +189,9 @@ export async function buildSpecialistTaskContext(
       .select('id, title, status, progress, end_date, start_date, priority, last_nudge_at, nudge_count, created_at, updated_at, created_by_agent_id, owner_agent_id')
       .eq('foundry_id', foundryId)
       .is('deleted_at', null)
-      .or(`created_by_agent_id.eq.${specialistId},owner_agent_id.eq.${specialistId}`)
+      // DECISION: Use specialist_id TEXT column (not owner_agent_id UUID) for matching.
+      // The UUID columns have FK to profiles and can't store string specialist IDs.
+      .eq('specialist_id', specialistId)
       .order('created_at', { ascending: false })
       .limit(15)
 
@@ -367,7 +369,7 @@ export async function getExecutableTasks(
       .from('tasks')
       .select('id, title, description, task_type, plan_id, priority')
       .eq('foundry_id', foundryId)
-      .eq('owner_agent_id', specialistId)
+      .eq('specialist_id', specialistId)
       .in('status', ['Pending', 'Accepted'])
       .in('task_type', ['content', 'external_action', 'general'])
       .is('deleted_at', null)

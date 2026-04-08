@@ -10974,6 +10974,7 @@ export type Database = {
           progress: number | null
           resource_suggestions: Json | null
           source_pack_id: string | null
+          specialist_id: string | null
           start_date: string | null
           status: string | null
           strategic_risks: Json | null
@@ -11010,6 +11011,7 @@ export type Database = {
           progress?: number | null
           resource_suggestions?: Json | null
           source_pack_id?: string | null
+          specialist_id?: string | null
           start_date?: string | null
           status?: string | null
           strategic_risks?: Json | null
@@ -11046,6 +11048,7 @@ export type Database = {
           progress?: number | null
           resource_suggestions?: Json | null
           source_pack_id?: string | null
+          specialist_id?: string | null
           start_date?: string | null
           status?: string | null
           strategic_risks?: Json | null
@@ -17113,6 +17116,7 @@ export type Database = {
           plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
+          specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number
@@ -17152,6 +17156,7 @@ export type Database = {
           plan_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
+          specialist_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_number?: number
@@ -17191,6 +17196,7 @@ export type Database = {
           plan_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
+          specialist_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_number?: number
@@ -19148,6 +19154,7 @@ export type Database = {
           plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
+          specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number
@@ -19327,6 +19334,7 @@ export type Database = {
           plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
+          specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number
@@ -19512,6 +19520,7 @@ export type Database = {
           plan_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
+          specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_number: number

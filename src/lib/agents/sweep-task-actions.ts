@@ -6,7 +6,7 @@
  * because sweeps run in a cron context without user authentication.
  *
  * @security All functions require foundryId for isolation. Task ownership
- * is verified before completion (owner_agent_id must match specialistId).
+ * is verified before completion (specialist_id must match specialistId).
  *
  * @related
  * - src/lib/agents/sweep-orchestrator.ts - Calls these functions
@@ -116,7 +116,7 @@ export async function saveDeliverableArtifact(
  * are still in Pending/Accepted status. If another sweep already completed
  * the task, this is a no-op (returns success with updated=false).
  *
- * @security Verifies owner_agent_id matches specialistId before completing.
+ * @security Verifies specialist_id matches specialistId before completing.
  */
 export async function completeTaskFromSweep(
     foundryId: string,
@@ -141,7 +141,7 @@ export async function completeTaskFromSweep(
             })
             .eq('id', taskId)
             .eq('foundry_id', foundryId)
-            .eq('owner_agent_id', specialistId)
+            .eq('specialist_id', specialistId)
             .in('status', ['Pending', 'Accepted'] as any[]) // eslint-disable-line @typescript-eslint/no-explicit-any
             .select('id')
 

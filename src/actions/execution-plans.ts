@@ -196,8 +196,7 @@ export async function decomposePlanToTasks(
           task_type: task.taskType || 'general',
           status: 'Pending' as const,
           creator_id: user.id,
-          created_by_agent_id: task.specialistId,
-          owner_agent_id: task.specialistId,
+          specialist_id: task.specialistId, // TEXT column — stores 'growth-marketer', 'sales-lead', etc.
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: insertError } = await supabase
