@@ -89,7 +89,9 @@ async function ExpertsContent({ search, page }: { search?: string; page: number 
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(searchJsonLd) }}
             />
 
-            <DirectorySearch totalResults={total} />
+            <Suspense fallback={null}>
+                <DirectorySearch totalResults={total} />
+            </Suspense>
 
             {experts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
