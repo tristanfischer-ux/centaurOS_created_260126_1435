@@ -128,11 +128,27 @@ const SWEEP_MODEL = 'MiniMax-M2.7'
 /** Maximum tokens for sweep output */
 const SWEEP_MAX_TOKENS = 4096
 
-/** Model used for execution sweeps (needs higher quality for content generation) */
-const EXECUTION_MODEL = 'claude-sonnet-4-20250514'
-
 /** Maximum tokens for execution output (content needs room) */
 const EXECUTION_MAX_TOKENS = 8192
+
+/**
+ * Map specialist modelTier to the actual model + provider config for execution sweeps.
+ * Uses each specialist's benchmarked model instead of a one-size-fits-all approach.
+ *
+ * DECISION: Execution uses the same model the specialist was benchmarked on for
+ * interactive mode. This ensures output quality matches what was measured.
+ */
+const EXECUTION_MODEL_MAP: Record<string, { model: string; provider: 'anthropic' | 'openai-compat'; baseURL?: string; apiKeyEnv: string }> = {
+  'claude': { model: 'claude-opus-4-20250514', provider: 'anthropic', apiKeyEnv: 'ANTHROPIC_API_KEY' },
+  'sonnet': { model: 'claude-sonnet-4-20250514', provider: 'anthropic', apiKeyEnv: 'ANTHROPIC_API_KEY' },
+  'deepseek': { model: 'deepseek-chat', provider: 'openai-compat', baseURL: 'https://api.deepseek.com/v1', apiKeyEnv: 'DEEPSEEK_API_KEY' },
+  'google': { model: 'gemini-3.1-pro-preview', provider: 'openai-compat', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKeyEnv: 'GOOGLE_AI_API_KEY' },
+  'openai': { model: 'gpt-5.4', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
+  'minimax': { model: 'MiniMax-M2.7', provider: 'openai-compat', baseURL: 'https://api.minimax.io/v1', apiKeyEnv: 'MINIMAX_API_KEY' },
+}
+
+/** Fallback execution model when specialist's model is unavailable */
+const EXECUTION_FALLBACK_MODEL = { model: 'claude-sonnet-4-20250514', provider: 'anthropic' as const, apiKeyEnv: 'ANTHROPIC_API_KEY' }
 
 // ─── Sweep Data Tool Mapping ────────────────────────────────────────
 
@@ -759,31 +775,72 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
           contextWithBriefing,
         ].join('')
 
-        // Use Anthropic Sonnet for execution (higher quality than MiniMax)
-        const Anthropic = (await import('@anthropic-ai/sdk')).default
-        const anthropicKey = process.env.ANTHROPIC_API_KEY
-        if (!anthropicKey) {
-          console.warn('[SweepOrchestrator] ANTHROPIC_API_KEY not set — skipping execution sweep')
+        // DECISION: Use the specialist's own benchmarked model for execution.
+        // Each specialist was scored on a specific model — using that model for
+        // execution ensures output quality matches measured benchmarks.
+        const specialistModelTier = specialist.modelTier || 'sonnet'
+        const modelConfig = EXECUTION_MODEL_MAP[specialistModelTier] || EXECUTION_FALLBACK_MODEL
+        const apiKey = process.env[modelConfig.apiKeyEnv]
+
+        if (!apiKey) {
+          console.warn(`[SweepOrchestrator] ${modelConfig.apiKeyEnv} not set — falling back to Anthropic Sonnet`)
+        }
+
+        const effectiveModelConfig = apiKey ? modelConfig : EXECUTION_FALLBACK_MODEL
+        const effectiveApiKey = apiKey || process.env.ANTHROPIC_API_KEY
+
+        if (!effectiveApiKey) {
+          console.warn('[SweepOrchestrator] No API key available for execution sweep — skipping')
         } else {
-          const anthropic = new Anthropic({ apiKey: anthropicKey })
+          let executionText = ''
 
-          const executionResponse = await anthropic.messages.create({
-            model: EXECUTION_MODEL,
-            max_tokens: EXECUTION_MAX_TOKENS,
-            temperature: 0.4,
-            messages: [
-              { role: 'user', content: executionSystemPrompt + '\n\nExecute your assigned tasks now. Respond with ONLY valid JSON.' },
-            ],
-          })
+          if (effectiveModelConfig.provider === 'anthropic') {
+            // Use Anthropic SDK
+            const Anthropic = (await import('@anthropic-ai/sdk')).default
+            const anthropic = new Anthropic({ apiKey: effectiveApiKey })
 
-          const executionText = executionResponse.content
-            .filter(b => b.type === 'text')
-            .map(b => (b as unknown as { text: string }).text)
-            .join('')
+            const executionResponse = await anthropic.messages.create({
+              model: effectiveModelConfig.model,
+              max_tokens: EXECUTION_MAX_TOKENS,
+              temperature: 0.4,
+              messages: [
+                { role: 'user', content: executionSystemPrompt + '\n\nExecute your assigned tasks now. Respond with ONLY valid JSON.' },
+              ],
+            })
 
-          executionTokensIn = executionResponse.usage?.input_tokens ?? 0
-          executionTokensOut = executionResponse.usage?.output_tokens ?? 0
-          executionCostUsd = estimateAICost(EXECUTION_MODEL, executionTokensIn, executionTokensOut)
+            executionText = executionResponse.content
+              .filter(b => b.type === 'text')
+              .map(b => (b as unknown as { text: string }).text)
+              .join('')
+
+            executionTokensIn = executionResponse.usage?.input_tokens ?? 0
+            executionTokensOut = executionResponse.usage?.output_tokens ?? 0
+          } else {
+            // Use OpenAI-compatible SDK (DeepSeek, Google, OpenAI, MiniMax)
+            const OpenAILib = await getOpenAIClient()
+            const client = new OpenAILib({
+              apiKey: effectiveApiKey,
+              baseURL: effectiveModelConfig.baseURL,
+            })
+
+            const completion = await client.chat.completions.create({
+              model: effectiveModelConfig.model,
+              max_tokens: EXECUTION_MAX_TOKENS,
+              temperature: 0.4,
+              messages: [
+                { role: 'system', content: executionSystemPrompt },
+                { role: 'user', content: 'Execute your assigned tasks now. Respond with ONLY valid JSON.' },
+              ],
+            })
+
+            executionText = completion.choices[0]?.message?.content ?? ''
+            executionTokensIn = completion.usage?.prompt_tokens ?? 0
+            executionTokensOut = completion.usage?.completion_tokens ?? 0
+          }
+
+          executionCostUsd = estimateAICost(effectiveModelConfig.model, executionTokensIn, executionTokensOut)
+
+          console.log(`[SweepOrchestrator] ${config.specialistId} execution: model=${effectiveModelConfig.model}, tokens_in=${executionTokensIn}, tokens_out=${executionTokensOut}, cost=$${executionCostUsd.toFixed(4)}`)
 
           // Parse execution response
           try {
