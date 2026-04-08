@@ -1,7 +1,9 @@
-'use client'
-
 /**
  * ExpertCard - Card component for displaying an expert in the directory grid.
+ *
+ * NOTE: This is a SERVER component — no 'use client'. It only uses Link, cn,
+ * and basic JSX. Making it a server component avoids hydration mismatches
+ * that were causing /experts to crash.
  *
  * @description Shows expert name, headline, location, rating, specializations,
  * and a link to their full profile. Designed for the /experts browse page.

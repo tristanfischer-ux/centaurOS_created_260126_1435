@@ -104,15 +104,19 @@ async function ExpertsContent({ search, page }: { search?: string; page: number 
 
     return (
         <>
-            {/* JSON-LD structured data */}
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(listJsonLd) }}
-            />
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(searchJsonLd) }}
-            />
+            {/* JSON-LD structured data — only render if non-empty */}
+            {Object.keys(listJsonLd).length > 0 && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(listJsonLd).replace(/</g, '\\u003c') }}
+                />
+            )}
+            {Object.keys(searchJsonLd).length > 0 && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(searchJsonLd).replace(/</g, '\\u003c') }}
+                />
+            )}
 
             <Suspense fallback={null}>
                 <DirectorySearch totalResults={total} />
