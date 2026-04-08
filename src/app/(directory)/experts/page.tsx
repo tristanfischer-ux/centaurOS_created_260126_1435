@@ -18,6 +18,10 @@ import { generateDirectoryListJsonLd, generateDirectorySearchJsonLd } from '@/li
  * No sensitive fields (email, Stripe) are ever exposed.
  */
 
+// INTENT: Force dynamic rendering — this page fetches live data from Supabase
+// and uses searchParams. Static rendering causes build-time failures.
+export const dynamic = 'force-dynamic'
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
 
 export const metadata: Metadata = {
