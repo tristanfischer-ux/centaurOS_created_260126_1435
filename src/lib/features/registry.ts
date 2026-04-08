@@ -502,6 +502,51 @@ export const FEATURE_REGISTRY: Feature[] = [
         isVisibleInNav: false,
         changelog: 'Daily focus view with AI-generated briefings, action items, and schedule overview.'
     },
+
+    // ─── April 2026: Specialist Execution + Content Publishing ─────────
+    {
+        id: 'review-queue',
+        name: 'Review Queue',
+        description: 'Review and publish content created by your AI specialists',
+        route: '/review',
+        releasedAt: new Date('2026-04-08'),
+        category: 'core',
+        section: 'plan',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Your AI specialists can now autonomously execute tasks — writing blog posts, drafting outreach emails, producing research reports, and building financial models. When they finish, deliverables appear in the Review Queue for your approval. Preview content, edit inline, and publish to your blog with one click.'
+    },
+    {
+        id: 'blog',
+        name: 'Blog',
+        description: 'Publish specialist-created content to your public blog',
+        route: '/blog',
+        releasedAt: new Date('2026-04-08'),
+        category: 'core',
+        status: 'stable',
+        isVisibleInNav: false,
+        changelog: 'Specialists like Mia (Growth Marketer) can write blog posts that you review and publish directly to fractionalforge.app/blog. Full SEO metadata, reading time, tags, and JSON-LD structured data included automatically.'
+    },
+    {
+        id: 'autonomous-execution',
+        name: 'Autonomous Specialist Execution',
+        description: 'Specialists execute assigned tasks without prompting',
+        releasedAt: new Date('2026-04-08'),
+        category: 'core',
+        status: 'stable',
+        isVisibleInNav: false,
+        changelog: 'Create a strategic plan with Sage, approve it, and watch your AI team execute. Each specialist picks up their assigned tasks during their sweep cycle, produces publication-ready deliverables, and marks tasks complete. The Review Queue shows everything awaiting your approval. Supports: blog posts, email sequences, research reports, financial models, competitive analyses, and executive summaries.'
+    },
+    {
+        id: 'execution-plans',
+        name: 'Execution Plans',
+        description: 'Decompose strategies into specialist-assigned tasks',
+        releasedAt: new Date('2026-04-08'),
+        category: 'strategic',
+        status: 'stable',
+        isVisibleInNav: false,
+        changelog: 'Ask Sage to create a go-to-market strategy and he will propose an Execution Plan — a coordinated set of tasks assigned to the right specialists. Approve the plan and tasks are created automatically. The plan tracks progress and auto-completes when all tasks are done.'
+    },
 ]
 
 /**
