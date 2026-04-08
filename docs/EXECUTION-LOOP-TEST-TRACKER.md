@@ -35,4 +35,24 @@
 - [ ] Round 4: Edge cases & failure modes
 
 ## Results
-(filled during testing)
+
+### Test 1: Manual Task Creation + Sweep Trigger — PASS
+- [x] Created test tasks in Supabase (Sage: PE fund research in forge-guild foundry)
+- [x] Triggered sweep via /api/agents/sweep-trigger with event_type=objective_completed
+- [x] Artifact created: "Strategy Brief: Penetrating UK PE Funds" (6032 chars, content_type: report)
+- [x] Task marked Completed automatically
+- [x] Sweep log shows two entries: analysis ($0.003) + execution ($0.014)
+
+### Bugs Found & Fixed During Testing
+1. **FREE TIER BLOCKS SWEEPS** — foundry-demo is free tier, sweeps skip free/starter. Moved test to forge-guild (Professional).
+2. **`priority` COLUMN DOESN'T EXIST** — getExecutableTasks queried nonexistent column, silently failed. Fixed to use risk_level. Commit `latest`.
+3. **`owner_agent_id` IS UUID** — can't store string specialist IDs. Added `specialist_id TEXT` column. Commit `a064ef49`.
+
+### Content Quality Assessment
+- **Sage's output is excellent** — 6K chars, specific PE fund names, deal sizes, contact approaches
+- **Maintains specialist voice** — opens with "the ONE thing that matters most" (Sage's signature)
+- **Properly structured** — markdown with H3 sections, bullet points
+- **Model used: Gemini 3.1 Pro** (Sage's benchmarked model) — adequate quality, 10x cheaper than Opus
+
+### Model Recommendation
+Gemini 3.1 Pro (for Sage) produced PE-fund-credible content at $0.014/task. Opus would be ~$0.15/task for marginal quality improvement. **Recommendation: Keep specialist's own model.** Upgrade to Opus only if content is rejected >30% of the time.
