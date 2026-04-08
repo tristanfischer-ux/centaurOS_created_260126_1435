@@ -5,7 +5,9 @@ import { DirectorySearch } from '@/components/directory/DirectorySearch'
 import { ExpertCard } from '@/components/directory/ExpertCard'
 import { DirectoryCTA } from '@/components/directory/DirectoryCTA'
 import { Skeleton } from '@/components/ui/skeleton'
-import { generateDirectoryListJsonLd, generateDirectorySearchJsonLd } from '@/lib/directory/structured-data'
+// DECISION: Removed JSON-LD imports to isolate the crash. These will be
+// re-added once we identify the root cause of the 500 error.
+// import { generateDirectoryListJsonLd, generateDirectorySearchJsonLd } from '@/lib/directory/structured-data'
 
 /**
  * /experts - Public expert directory browse page.
@@ -22,8 +24,6 @@ import { generateDirectoryListJsonLd, generateDirectorySearchJsonLd } from '@/li
 // and uses searchParams. Static rendering causes build-time failures.
 export const dynamic = 'force-dynamic'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
-
 export const metadata: Metadata = {
     title: 'Find Fractional Executives | Fractional Forge',
     description:
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
         description:
             'Browse vetted fractional CMOs, CFOs, CTOs, and more. Part-time executive talent, on demand.',
         type: 'website',
-        url: `${APP_URL}/experts`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'}/experts`,
         siteName: 'Fractional Forge',
     },
     twitter: {
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
             'Browse vetted fractional CMOs, CFOs, CTOs, and more. Part-time executive talent, on demand.',
     },
     alternates: {
-        canonical: `${APP_URL}/experts`,
+        canonical: `${process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'}/experts`,
     },
 }
 
@@ -88,36 +88,8 @@ async function ExpertsContent({ search, page }: { search?: string; page: number 
 
     const totalPages = Math.ceil(total / 24)
 
-    // Structured data — wrap in try/catch to prevent render crash
-    let listJsonLd: Record<string, unknown> = {}
-    let searchJsonLd: Record<string, unknown> = {}
-    try {
-        listJsonLd = generateDirectoryListJsonLd(
-            experts,
-            'Fractional Executives Directory',
-            `${APP_URL}/experts`
-        )
-        searchJsonLd = generateDirectorySearchJsonLd()
-    } catch (err) {
-        console.error('[ExpertsContent] JSON-LD generation error:', err)
-    }
-
     return (
         <>
-            {/* JSON-LD structured data — only render if non-empty */}
-            {Object.keys(listJsonLd).length > 0 && (
-                <script
-                    type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: JSON.stringify(listJsonLd).replace(/</g, '\\u003c') }}
-                />
-            )}
-            {Object.keys(searchJsonLd).length > 0 && (
-                <script
-                    type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: JSON.stringify(searchJsonLd).replace(/</g, '\\u003c') }}
-                />
-            )}
-
             <Suspense fallback={null}>
                 <DirectorySearch totalResults={total} />
             </Suspense>
@@ -196,9 +168,16 @@ async function ExpertsContent({ search, page }: { search?: string; page: number 
 }
 
 export default async function ExpertsPage({ searchParams }: PageProps) {
-    const params = await searchParams
-    const search = params.q || undefined
-    const page = Math.max(1, parseInt(params.page || '1', 10) || 1)
+    let search: string | undefined
+    let page = 1
+
+    try {
+        const params = await searchParams
+        search = params.q || undefined
+        page = Math.max(1, parseInt(params.page || '1', 10) || 1)
+    } catch (err) {
+        console.error('[ExpertsPage] Failed to read searchParams:', err)
+    }
 
     return (
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
