@@ -636,6 +636,8 @@ IMPORTANT:
 - For email sequences: include all emails with subject lines
 - For research: include data, analysis, and recommendations
 - Quality bar: would a senior executive approve this without major edits?
+- Do NOT use emojis anywhere in the content — professional tone only
+- Use markdown formatting (## headings, **bold**, bullet points) for structure
 
 --- END EXECUTION MODE ---
 `

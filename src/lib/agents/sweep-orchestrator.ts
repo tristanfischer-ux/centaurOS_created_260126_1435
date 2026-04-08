@@ -829,25 +829,50 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
             executionTokensOut = executionResponse.usage?.output_tokens ?? 0
           } else {
             // Use OpenAI-compatible SDK (DeepSeek, Google, OpenAI, MiniMax)
-            const OpenAILib = await getOpenAIClient()
-            const client = new OpenAILib({
-              apiKey: effectiveApiKey,
-              baseURL: effectiveModelConfig.baseURL,
-            })
+            try {
+              const OpenAILib = await getOpenAIClient()
+              const client = new OpenAILib({
+                apiKey: effectiveApiKey,
+                baseURL: effectiveModelConfig.baseURL,
+              })
 
-            const completion = await client.chat.completions.create({
-              model: effectiveModelConfig.model,
-              max_tokens: EXECUTION_MAX_TOKENS,
-              temperature: 0.4,
-              messages: [
-                { role: 'system', content: executionSystemPrompt },
-                { role: 'user', content: 'Execute your assigned tasks now. Respond with ONLY valid JSON.' },
-              ],
-            })
+              const completion = await client.chat.completions.create({
+                model: effectiveModelConfig.model,
+                max_tokens: EXECUTION_MAX_TOKENS,
+                temperature: 0.4,
+                messages: [
+                  { role: 'system', content: executionSystemPrompt },
+                  { role: 'user', content: 'Execute your assigned tasks now. Respond with ONLY valid JSON.' },
+                ],
+              })
 
-            executionText = completion.choices[0]?.message?.content ?? ''
-            executionTokensIn = completion.usage?.prompt_tokens ?? 0
-            executionTokensOut = completion.usage?.completion_tokens ?? 0
+              executionText = completion.choices[0]?.message?.content ?? ''
+              executionTokensIn = completion.usage?.prompt_tokens ?? 0
+              executionTokensOut = completion.usage?.completion_tokens ?? 0
+            } catch (modelErr) {
+              // FALLBACK: If primary model fails, try Anthropic Sonnet
+              console.warn(`[SweepOrchestrator] ${effectiveModelConfig.model} failed for ${config.specialistId}, falling back to Sonnet:`, modelErr instanceof Error ? modelErr.message : modelErr)
+
+              const Anthropic = (await import('@anthropic-ai/sdk')).default
+              const fallbackKey = process.env.ANTHROPIC_API_KEY
+              if (fallbackKey) {
+                const anthropic = new Anthropic({ apiKey: fallbackKey })
+                const fallbackResponse = await anthropic.messages.create({
+                  model: 'claude-sonnet-4-20250514',
+                  max_tokens: EXECUTION_MAX_TOKENS,
+                  temperature: 0.4,
+                  messages: [
+                    { role: 'user', content: executionSystemPrompt + '\n\nExecute your assigned tasks now. Respond with ONLY valid JSON.' },
+                  ],
+                })
+                executionText = fallbackResponse.content
+                  .filter(b => b.type === 'text')
+                  .map(b => (b as unknown as { text: string }).text)
+                  .join('')
+                executionTokensIn = fallbackResponse.usage?.input_tokens ?? 0
+                executionTokensOut = fallbackResponse.usage?.output_tokens ?? 0
+              }
+            }
           }
 
           executionCostUsd = estimateAICost(effectiveModelConfig.model, executionTokensIn, executionTokensOut)
