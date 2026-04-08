@@ -526,3 +526,117 @@ Title format: "Outcome: [decision summary] — [positive/negative/mixed]"
 export function getSweepCapableSpecialists(): string[] {
   return Object.keys(SWEEP_PROMPTS)
 }
+
+// ============================================================================
+// EXECUTION SWEEP PROMPTS
+// ============================================================================
+// Used when a specialist has assigned tasks to execute during their sweep.
+// These prompts instruct the specialist to PRODUCE deliverables, not just analyze.
+
+/**
+ * Per-specialist execution instructions.
+ * Appended to the execution system prompt to guide deliverable quality.
+ */
+const EXECUTION_SPECIALIST_INSTRUCTIONS: Partial<Record<SpecialistId, string>> = {
+  'growth-marketer': `You are Mia, the Growth Marketer. When executing content tasks:
+- Write complete blog posts with H2/H3 sections, actionable advice, and clear CTAs
+- Match the audience's Schwartz awareness level
+- Include specific examples, data points, and benchmarks where possible
+- End with a measurable call-to-action
+- For email templates: write complete subject line + body + follow-up sequence`,
+
+  'sales-lead': `You are Sal, the Sales Lead. When executing outreach tasks:
+- Write complete cold email sequences (3-5 emails) with subject lines, body text, and timing
+- Use Hormozi's value equation: dream outcome x likelihood / time delay x effort
+- Include specific personalization points marked as [PERSONALIZE: field]
+- Add objection handling scripts where relevant
+- For case studies: write challenge/approach/outcome with quantified results`,
+
+  'strategist': `You are Sage, the Strategist. When executing research/analysis tasks:
+- Produce comprehensive research documents with clear sections
+- Include market sizing, competitive analysis, and strategic recommendations
+- Use specific data points and cite sources where possible
+- End with 3-5 prioritized action items
+- For plans: break into phases with clear milestones and success criteria`,
+
+  'finance-lead': `You are Finn, the Finance Lead. When executing financial tasks:
+- Produce detailed financial models, projections, or analyses
+- Include assumptions, sensitivity analysis, and risk factors
+- Use concrete numbers and benchmarks
+- End with actionable financial recommendations`,
+
+  'chief-of-staff': `You are Cal, the Chief of Staff. When executing coordination tasks:
+- Produce clear process documents, status reports, or coordination plans
+- Include stakeholder mapping, timelines, and decision points
+- Surface cross-functional dependencies
+- End with a prioritized action list`,
+}
+
+/**
+ * Build the execution sweep prompt for a specialist with assigned tasks.
+ *
+ * @param specialistId - Which specialist is executing
+ * @param tasks - The tasks to execute (max 3)
+ * @returns The execution system prompt
+ */
+export function getExecutionSweepPrompt(
+  specialistId: string,
+  tasks: Array<{ id: string; title: string; description: string | null; task_type: string }>
+): string {
+  const specialistInstructions = EXECUTION_SPECIALIST_INSTRUCTIONS[specialistId as SpecialistId] || ''
+
+  const taskList = tasks.map((t, i) => {
+    const desc = t.description ? `\n   Description: ${t.description}` : ''
+    return `${i + 1}. Task ID: ${t.id}
+   Title: ${t.title}
+   Type: ${t.task_type}${desc}`
+  }).join('\n\n')
+
+  return `
+--- AUTONOMOUS EXECUTION MODE ---
+
+You have been assigned the following tasks. Execute them NOW by producing complete deliverables.
+
+Do NOT analyze, discuss, or recommend. PRODUCE the actual deliverable for each task.
+
+${specialistInstructions}
+
+## YOUR ASSIGNED TASKS
+
+${taskList}
+
+## RESPONSE FORMAT
+
+Respond with ONLY valid JSON matching this schema:
+
+{
+  "executions": [
+    {
+      "task_id": "the-task-uuid",
+      "task_title": "The original task title",
+      "status": "completed",
+      "deliverable": {
+        "title": "The deliverable title (e.g., blog post title)",
+        "content": "FULL markdown content of the deliverable. This must be complete, publication-ready content — not a summary or outline.",
+        "content_type": "blog | email-template | case-study | report | document",
+        "meta_description": "Under 160 chars for SEO (for blog/page types)",
+        "tags": ["tag1", "tag2"],
+        "slug": "url-safe-slug-for-blog-posts"
+      }
+    }
+  ]
+}
+
+If you cannot complete a task, set status to "blocked" and add:
+  "blocked_reason": "Explain why and what information you need"
+
+IMPORTANT:
+- The "content" field must contain the FULL deliverable, not a summary
+- For blog posts: minimum 800 words with H2 sections
+- For email sequences: include all emails with subject lines
+- For research: include data, analysis, and recommendations
+- Quality bar: would a senior executive approve this without major edits?
+
+--- END EXECUTION MODE ---
+`
+}

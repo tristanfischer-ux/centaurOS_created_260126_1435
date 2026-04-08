@@ -24,7 +24,9 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOpenAIClient } from '@/lib/ai/openai-lazy'
-import { buildAIContextWithServiceClient, buildSpecialistTaskContext, buildRevisionRequestContext } from './sweep-context'
+import { buildAIContextWithServiceClient, buildSpecialistTaskContext, buildRevisionRequestContext, getExecutableTasks } from './sweep-context'
+import { getExecutionSweepPrompt } from './sweep-prompts'
+import { saveDeliverableArtifact, completeTaskFromSweep, checkAndAdvancePlan } from './sweep-task-actions'
 import { estimateAICost } from '@/lib/ai/usage-tracking'
 import { getFoundryTier } from '@/lib/ai/limit-check'
 import { SPECIALISTS } from '@/lib/agents/specialists-config'
@@ -120,11 +122,17 @@ const MAX_CONCURRENT_SWEEPS = 10
 /** Default monthly budget per foundry (USD) */
 const DEFAULT_MONTHLY_BUDGET_USD = 50.00
 
-/** Model used for all background sweeps */
+/** Model used for analysis background sweeps */
 const SWEEP_MODEL = 'MiniMax-M2.7'
 
 /** Maximum tokens for sweep output */
 const SWEEP_MAX_TOKENS = 4096
+
+/** Model used for execution sweeps (needs higher quality for content generation) */
+const EXECUTION_MODEL = 'claude-sonnet-4-20250514'
+
+/** Maximum tokens for execution output (content needs room) */
+const EXECUTION_MAX_TOKENS = 8192
 
 // ─── Sweep Data Tool Mapping ────────────────────────────────────────
 
@@ -723,15 +731,176 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       p_insights_generated: insightsStored,
     })
 
+    // ─── PHASE 2: EXECUTION SWEEP ──────────────────────────────────
+    // If the specialist has assigned tasks, execute them with a higher-quality
+    // model and save deliverables to the review queue.
+
+    let executionTokensIn = 0
+    let executionTokensOut = 0
+    let executionCostUsd = 0
+    let tasksExecuted = 0
+
+    try {
+      const executableTasks = await getExecutableTasks(config.foundryId, config.specialistId)
+
+      if (executableTasks.length > 0) {
+        console.log(
+          `[SweepOrchestrator] ${config.specialistId}@${config.foundryId}: ${executableTasks.length} executable task(s) found — starting execution sweep`
+        )
+
+        // Build execution prompt with task details
+        const executionPrompt = getExecutionSweepPrompt(config.specialistId, executableTasks)
+
+        const executionSystemPrompt = [
+          personalityPrompt,
+          '\n\n',
+          executionPrompt,
+          '\n\nCompany context for reference:\n',
+          contextWithBriefing,
+        ].join('')
+
+        // Use Anthropic Sonnet for execution (higher quality than MiniMax)
+        const Anthropic = (await import('@anthropic-ai/sdk')).default
+        const anthropicKey = process.env.ANTHROPIC_API_KEY
+        if (!anthropicKey) {
+          console.warn('[SweepOrchestrator] ANTHROPIC_API_KEY not set — skipping execution sweep')
+        } else {
+          const anthropic = new Anthropic({ apiKey: anthropicKey })
+
+          const executionResponse = await anthropic.messages.create({
+            model: EXECUTION_MODEL,
+            max_tokens: EXECUTION_MAX_TOKENS,
+            temperature: 0.4,
+            messages: [
+              { role: 'user', content: executionSystemPrompt + '\n\nExecute your assigned tasks now. Respond with ONLY valid JSON.' },
+            ],
+          })
+
+          const executionText = executionResponse.content
+            .filter(b => b.type === 'text')
+            .map(b => (b as unknown as { text: string }).text)
+            .join('')
+
+          executionTokensIn = executionResponse.usage?.input_tokens ?? 0
+          executionTokensOut = executionResponse.usage?.output_tokens ?? 0
+          executionCostUsd = estimateAICost(EXECUTION_MODEL, executionTokensIn, executionTokensOut)
+
+          // Parse execution response
+          try {
+            // Extract JSON from response (may be wrapped in markdown code blocks)
+            const jsonMatch = executionText.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0])
+              const executions = parsed.executions as Array<{
+                task_id: string
+                task_title?: string
+                status: string
+                blocked_reason?: string
+                deliverable?: {
+                  title: string
+                  content: string
+                  content_type: string
+                  meta_description?: string
+                  tags?: string[]
+                  slug?: string
+                }
+              }>
+
+              if (Array.isArray(executions)) {
+                for (const execution of executions) {
+                  if (execution.status === 'completed' && execution.deliverable) {
+                    // Find the matching task to get plan_id
+                    const matchingTask = executableTasks.find(t => t.id === execution.task_id)
+                    if (!matchingTask) {
+                      console.warn(`[SweepOrchestrator] Execution references unknown task_id: ${execution.task_id}`)
+                      continue
+                    }
+
+                    // Save deliverable as artifact pending review
+                    const { artifactId, error: saveError } = await saveDeliverableArtifact(
+                      config.foundryId,
+                      config.specialistId,
+                      execution.task_id,
+                      execution.deliverable,
+                      matchingTask.plan_id,
+                    )
+
+                    if (saveError) {
+                      console.error(`[SweepOrchestrator] Failed to save deliverable for task ${execution.task_id}:`, saveError)
+                      continue
+                    }
+
+                    // Mark task as completed
+                    const { error: completeError } = await completeTaskFromSweep(
+                      config.foundryId,
+                      execution.task_id,
+                      config.specialistId,
+                      artifactId,
+                    )
+
+                    if (completeError) {
+                      console.error(`[SweepOrchestrator] Failed to complete task ${execution.task_id}:`, completeError)
+                    } else {
+                      tasksExecuted++
+                      console.log(`[SweepOrchestrator] ${config.specialistId}: Task "${matchingTask.title}" executed → deliverable saved (artifact ${artifactId})`)
+                    }
+
+                    // Check if this plan is now complete
+                    if (matchingTask.plan_id) {
+                      await checkAndAdvancePlan(config.foundryId, matchingTask.plan_id)
+                    }
+                  } else if (execution.status === 'blocked') {
+                    // Create an insight about the blocked task
+                    console.log(`[SweepOrchestrator] ${config.specialistId}: Task "${execution.task_title}" blocked: ${execution.blocked_reason}`)
+                    await supabase.rpc('insert_agent_insight', {
+                      p_foundry_id: config.foundryId,
+                      p_specialist_id: config.specialistId,
+                      p_insight_type: 'alert',
+                      p_urgency: 'important',
+                      p_title: `Blocked: ${execution.task_title || execution.task_id}`,
+                      p_body: execution.blocked_reason || 'Task could not be completed. More information needed.',
+                      p_domain_data: { task_id: execution.task_id },
+                      p_suggested_actions: [{ action_type: 'open_specialist', label: 'Discuss with specialist' }],
+                    })
+                  }
+                }
+              }
+            } else {
+              console.warn(`[SweepOrchestrator] Execution response did not contain valid JSON for ${config.specialistId}`)
+            }
+          } catch (parseErr) {
+            console.error(`[SweepOrchestrator] Failed to parse execution response for ${config.specialistId}:`, parseErr)
+          }
+        }
+      }
+    } catch (executionError) {
+      // Execution failure should not break the overall sweep
+      console.error(`[SweepOrchestrator] Execution phase failed for ${config.specialistId}:`, executionError)
+    }
+
+    // Log execution sweep if any tasks were attempted
+    if (tasksExecuted > 0 || executionTokensIn > 0) {
+      await supabase.rpc('log_agent_sweep', {
+        p_foundry_id: config.foundryId,
+        p_specialist_id: config.specialistId,
+        p_status: 'completed',
+        p_tokens_in: executionTokensIn,
+        p_tokens_out: executionTokensOut,
+        p_estimated_cost_usd: executionCostUsd,
+        p_duration_ms: Date.now() - startTime - durationMs, // Execution phase duration only
+        p_insights_generated: tasksExecuted,
+      })
+    }
+
     return {
       foundryId: config.foundryId,
       specialistId: config.specialistId,
       status: 'completed',
-      insightsGenerated: insightsStored,
-      tokensIn,
-      tokensOut,
-      estimatedCostUsd: costUsd,
-      durationMs,
+      insightsGenerated: insightsStored + tasksExecuted,
+      tokensIn: tokensIn + executionTokensIn,
+      tokensOut: tokensOut + executionTokensOut,
+      estimatedCostUsd: costUsd + executionCostUsd,
+      durationMs: Date.now() - startTime,
     }
   } catch (error) {
     const durationMs = Date.now() - startTime

@@ -336,3 +336,55 @@ export async function buildRevisionRequestContext(
     return ''
   }
 }
+
+/**
+ * Fetch executable tasks assigned to this specialist.
+ *
+ * @description Returns tasks that the specialist owns and should execute
+ * during the current sweep. Limited to 3 per sweep for cost control.
+ * Only returns content, external_action, and general task types
+ * (code_change tasks require manual execution).
+ *
+ * @param foundryId - The foundry to scope to
+ * @param specialistId - The specialist's ID (e.g., 'growth-marketer', 'sales-lead')
+ * @returns Array of executable task objects
+ */
+export async function getExecutableTasks(
+  foundryId: string,
+  specialistId: string,
+): Promise<Array<{
+  id: string
+  title: string
+  description: string | null
+  task_type: string
+  plan_id: string | null
+  priority: string | null
+}>> {
+  const supabase = createAdminClient()
+
+  try {
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title, description, task_type, plan_id, priority')
+      .eq('foundry_id', foundryId)
+      .eq('owner_agent_id', specialistId)
+      .in('status', ['Pending', 'Accepted'])
+      .in('task_type', ['content', 'external_action', 'general'])
+      .is('deleted_at', null)
+      .order('priority', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true })
+      .limit(3)
+
+    return (tasks || []).map(t => ({
+      id: t.id,
+      title: t.title ?? '',
+      description: t.description ?? null,
+      task_type: t.task_type ?? 'general',
+      plan_id: t.plan_id ?? null,
+      priority: t.priority ?? null,
+    }))
+  } catch (err) {
+    console.error('[SweepContext] Error fetching executable tasks:', err)
+    return []
+  }
+}
