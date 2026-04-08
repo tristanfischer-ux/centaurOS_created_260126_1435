@@ -367,13 +367,12 @@ export async function getExecutableTasks(
   try {
     const { data: tasks } = await supabase
       .from('tasks')
-      .select('id, title, description, task_type, plan_id, priority')
+      .select('id, title, description, task_type, plan_id, risk_level')
       .eq('foundry_id', foundryId)
       .eq('specialist_id', specialistId)
       .in('status', ['Pending', 'Accepted'])
       .in('task_type', ['content', 'external_action', 'general'])
       .is('deleted_at', null)
-      .order('priority', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true })
       .limit(3)
 
@@ -383,7 +382,7 @@ export async function getExecutableTasks(
       description: t.description ?? null,
       task_type: t.task_type ?? 'general',
       plan_id: t.plan_id ?? null,
-      priority: t.priority ?? null,
+      priority: t.risk_level ?? null,
     }))
   } catch (err) {
     console.error('[SweepContext] Error fetching executable tasks:', err)
