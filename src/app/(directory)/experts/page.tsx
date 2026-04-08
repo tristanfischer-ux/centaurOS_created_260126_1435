@@ -1,6 +1,6 @@
 import { Suspense, cache } from 'react'
 import { Metadata } from 'next'
-import { createAdminClient } from '@/lib/supabase/admin'
+// createAdminClient removed — using native fetch to avoid RSC serialization issues
 import { DirectorySearch } from '@/components/directory/DirectorySearch'
 import { ExpertCard } from '@/components/directory/ExpertCard'
 import { DirectoryCTA } from '@/components/directory/DirectoryCTA'
@@ -15,18 +15,41 @@ import type { DirectoryExpert } from '@/lib/directory/types'
  */
 const fetchExperts = cache(async (search: string | null, limit: number, offset: number) => {
     try {
-        const supabase = createAdminClient()
-        const [expertsResult, countResult] = await Promise.all([
-            supabase.rpc('get_directory_experts', {
-                p_role: null, p_location: null, p_search: search, p_limit: limit, p_offset: offset,
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+        if (!supabaseUrl || !supabaseKey) throw new Error('Missing Supabase config')
+
+        // DECISION: Use native fetch() instead of Supabase JS client.
+        // The Supabase client causes RSC serialization failures in this page.
+        // Native fetch is properly handled by Next.js RSC caching.
+        const [expertsRes, countRes] = await Promise.all([
+            fetch(`${supabaseUrl}/rest/v1/rpc/get_directory_experts`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ p_role: null, p_location: null, p_search: search, p_limit: limit, p_offset: offset }),
+                cache: 'no-store',
             }),
-            supabase.rpc('get_directory_expert_count', {
-                p_role: null, p_location: null, p_search: search,
+            fetch(`${supabaseUrl}/rest/v1/rpc/get_directory_expert_count`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ p_role: null, p_location: null, p_search: search }),
+                cache: 'no-store',
             }),
         ])
 
-        const rawExperts = (expertsResult.data || []) as Array<Record<string, unknown>>
-        const total = (countResult.data as number) || 0
+        const expertsData = expertsRes.ok ? await expertsRes.json() : []
+        const countData = countRes.ok ? await countRes.json() : 0
+
+        const rawExperts = (Array.isArray(expertsData) ? expertsData : []) as Array<Record<string, unknown>>
+        const total = (typeof countData === 'number' ? countData : 0)
 
         const experts: DirectoryExpert[] = rawExperts.map(row => ({
             id: row.id as string,
