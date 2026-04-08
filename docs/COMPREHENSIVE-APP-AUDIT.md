@@ -183,6 +183,39 @@ For each page:
 - Published blog post on /blog
 - Full blog post page with rendered content
 
+## Phase 3: Executive Journey — ALL PASS
+- Provider Portal: PASS (0 errors)
+- Provider Profile: PASS
+- Provider Pricing: PASS
+- Case Studies: PASS
+- Marketplace: PASS (shows Marketplace heading)
+- Recruits: PASS (shows Recruits heading)
+
+## Phase 4: Supplier Journey — ALL PASS
+- /today: PASS
+- /settings: PASS
+- /my-profile: PASS
+- /finance: PASS
+- /cash-burn: PASS
+- /time: PASS
+
+## Phase 6: Cross-User Security — PASS
+- Unauthenticated → /review: Redirects to login (PASS)
+- Unauthenticated → /agents: Redirects to login (PASS)
+- Supplier can see review queue items (same foundry — expected)
+- Supplier CANNOT publish (role check in server action — verified correct)
+
 ## Fixes Applied
-- Set active_foundry_id for test user (DB fix, not code fix)
-- No code fixes needed — all pages from our work function correctly
+- Set active_foundry_id for test user (DB fix)
+- Added error.tsx boundary for /experts page (graceful fallback instead of crash)
+- Added error.tsx boundary for /review/preview/[id] (redirect to review queue)
+- Added Suspense around DirectorySearch in /experts page
+- Updated CLAUDE.md with "Never Give Up, Never Cut Corners" rules
+
+## Final Count
+- **Pages tested:** 45+
+- **Users tested:** 4 (Founder, Executive, Supplier, Unauthenticated)
+- **Interactive flows tested:** Join form validation, objective creation, review queue, preview, publish
+- **Security tested:** Auth redirects, cross-user data access, role-gated publishing
+- **Issues fixed:** 4 (error boundaries, Suspense, CLAUDE.md rules)
+- **Pre-existing issues documented:** /experts RPC crash (root cause TBD)
