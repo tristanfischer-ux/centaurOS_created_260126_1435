@@ -62,24 +62,45 @@ function ExpertsGridSkeleton() {
 }
 
 async function ExpertsContent({ search, page }: { search?: string; page: number }) {
-    const limit = 24
-    const offset = (page - 1) * limit
+    let experts: Awaited<ReturnType<typeof getDirectoryExperts>>['experts'] = []
+    let total = 0
 
-    const { experts, total } = await getDirectoryExperts({
-        search: search || undefined,
-        limit,
-        offset,
-    })
+    try {
+        const result = await getDirectoryExperts({
+            search: search || undefined,
+            limit: 24,
+            offset: (page - 1) * 24,
+        })
+        experts = result.experts
+        total = result.total
+    } catch (err) {
+        console.error('[ExpertsContent] Data fetch error:', err)
+        // Return empty state on error
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <h3 className="text-lg font-semibold text-foreground">No experts found</h3>
+                <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                    Unable to load experts. Please try refreshing the page.
+                </p>
+            </div>
+        )
+    }
 
-    const totalPages = Math.ceil(total / limit)
+    const totalPages = Math.ceil(total / 24)
 
-    // Structured data
-    const listJsonLd = generateDirectoryListJsonLd(
-        experts,
-        'Fractional Executives Directory',
-        `${APP_URL}/experts`
-    )
-    const searchJsonLd = generateDirectorySearchJsonLd()
+    // Structured data — wrap in try/catch to prevent render crash
+    let listJsonLd: Record<string, unknown> = {}
+    let searchJsonLd: Record<string, unknown> = {}
+    try {
+        listJsonLd = generateDirectoryListJsonLd(
+            experts,
+            'Fractional Executives Directory',
+            `${APP_URL}/experts`
+        )
+        searchJsonLd = generateDirectorySearchJsonLd()
+    } catch (err) {
+        console.error('[ExpertsContent] JSON-LD generation error:', err)
+    }
 
     return (
         <>
