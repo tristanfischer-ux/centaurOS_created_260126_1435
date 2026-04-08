@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, cache } from 'react'
 import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DirectorySearch } from '@/components/directory/DirectorySearch'
@@ -6,6 +6,59 @@ import { ExpertCard } from '@/components/directory/ExpertCard'
 import { DirectoryCTA } from '@/components/directory/DirectoryCTA'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { DirectoryExpert } from '@/lib/directory/types'
+
+/**
+ * Fetch experts via admin client. Wrapped in React.cache() to deduplicate
+ * calls between generateMetadata and page render, and to ensure proper
+ * RSC serialization (direct Supabase calls in server components can cause
+ * RSC 500 errors without caching).
+ */
+const fetchExperts = cache(async (search: string | null, limit: number, offset: number) => {
+    try {
+        const supabase = createAdminClient()
+        const [expertsResult, countResult] = await Promise.all([
+            supabase.rpc('get_directory_experts', {
+                p_role: null, p_location: null, p_search: search, p_limit: limit, p_offset: offset,
+            }),
+            supabase.rpc('get_directory_expert_count', {
+                p_role: null, p_location: null, p_search: search,
+            }),
+        ])
+
+        const rawExperts = (expertsResult.data || []) as Array<Record<string, unknown>>
+        const total = (countResult.data as number) || 0
+
+        const experts: DirectoryExpert[] = rawExperts.map(row => ({
+            id: row.id as string,
+            profile_slug: row.profile_slug as string | null,
+            username: row.username as string | null,
+            headline: row.headline as string | null,
+            bio: row.bio as string | null,
+            location: row.location as string | null,
+            years_experience: row.years_experience as number | null,
+            day_rate: row.day_rate as number | null,
+            hourly_rate: row.hourly_rate as number | null,
+            currency: (row.currency as string) || 'GBP',
+            tier: (row.tier as string) || 'standard',
+            specializations: (row.specializations as string[]) || [],
+            industries: (row.industries as string[]) || [],
+            company_stages: (row.company_stages as string[]) || [],
+            is_verified: (row.is_verified as boolean) || false,
+            profile_completeness: (row.profile_completeness as number) || 0,
+            user_name: row.user_name as string | null,
+            user_avatar: row.user_avatar as string | null,
+            average_rating: row.average_rating as number | null,
+            total_reviews: (row.total_reviews as number) || 0,
+            total_transactions: (row.total_transactions as number) || 0,
+            featured_until: row.featured_until as string | null,
+        }))
+
+        return { experts, total }
+    } catch (err) {
+        console.error('[fetchExperts] Error:', err)
+        return { experts: [] as DirectoryExpert[], total: 0 }
+    }
+})
 
 /**
  * /experts - Public expert directory browse page.
@@ -60,10 +113,7 @@ function ExpertsGridSkeleton() {
 }
 
 async function ExpertsContent({ search, page }: { search?: string; page: number }) {
-    // DIAGNOSTIC: Static content only — no data fetching at all.
-    // If THIS still crashes, the issue is in the component tree, not data.
-    const experts: DirectoryExpert[] = []
-    const total = 0
+    const { experts, total } = await fetchExperts(search || null, 24, (page - 1) * 24)
 
     const totalPages = Math.ceil(total / 24)
 
