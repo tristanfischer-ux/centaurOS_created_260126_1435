@@ -2,7 +2,14 @@ import { Suspense, cache } from 'react'
 import { Metadata } from 'next'
 // createAdminClient removed — using native fetch to avoid RSC serialization issues
 import { DirectorySearch } from '@/components/directory/DirectorySearch'
-import { ExpertCard } from '@/components/directory/ExpertCard'
+import nextDynamic from 'next/dynamic'
+
+// DECISION: Dynamic import with ssr:false prevents hydration mismatch crash.
+// ExpertCard uses Radix UI Avatar which causes ID mismatches during RSC hydration.
+const ExpertCard = nextDynamic(() => import('@/components/directory/ExpertCard').then(m => m.ExpertCard), {
+    ssr: false,
+    loading: () => <div className="h-48 rounded-xl bg-muted animate-pulse" />,
+})
 import { DirectoryCTA } from '@/components/directory/DirectoryCTA'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { DirectoryExpert } from '@/lib/directory/types'
