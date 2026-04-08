@@ -66,6 +66,14 @@ export async function saveDeliverableArtifact(
             return { artifactId: null, error: 'Deliverable content is too short (minimum 200 characters)' }
         }
 
+        // VALIDATION: Blog posts need minimum word count (#9)
+        if (deliverable.content_type === 'blog') {
+            const wordCount = deliverable.content.split(/\s+/).length
+            if (wordCount < 500) {
+                return { artifactId: null, error: `Blog post too short: ${wordCount} words (minimum 500)` }
+            }
+        }
+
         const { data, error } = await supabase
             .from('agent_artifacts')
             .insert({
@@ -176,6 +184,19 @@ export async function checkAndAdvancePlan(
 ): Promise<void> {
     try {
         const supabase = createAdminClient()
+
+        // Count total non-deleted tasks (#4: guard against 0 total)
+        const { count: totalCount } = await supabase
+            .from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .eq('plan_id', planId)
+            .eq('foundry_id', foundryId)
+            .is('deleted_at', null)
+
+        if (!totalCount || totalCount === 0) {
+            // No tasks exist — don't auto-complete an empty plan
+            return
+        }
 
         // Count incomplete tasks
         const { count } = await supabase

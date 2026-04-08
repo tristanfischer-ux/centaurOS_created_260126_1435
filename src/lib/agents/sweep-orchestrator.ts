@@ -46,6 +46,8 @@ export interface SweepConfig {
   foundryId: string
   specialistId: string
   sweepIntervalMinutes: number
+  /** Remaining monthly budget in USD. Execution phase checks this before making AI calls. */
+  remainingBudgetUsd?: number
 }
 
 /** Result from a single specialist sweep */
@@ -352,6 +354,7 @@ export async function runSweepOrchestration(): Promise<OrchestrationResult> {
           foundryId: foundry.id,
           specialistId,
           sweepIntervalMinutes: interval,
+          remainingBudgetUsd: budget - currentSpend, // SECURITY: Pass remaining budget for Phase 2 guard (#6)
         })
       }
     }
@@ -760,6 +763,15 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       const executableTasks = await getExecutableTasks(config.foundryId, config.specialistId)
 
       if (executableTasks.length > 0) {
+        // SECURITY: Budget guard — skip execution if monthly budget is exhausted (#6)
+        const remainingBudget = config.remainingBudgetUsd ?? 50 // Default $50 if not passed
+        const phase1Cost = costUsd // Cost of the analysis phase that just ran
+        if (remainingBudget - phase1Cost <= 0.50) { // Leave $0.50 buffer
+          console.warn(
+            `[SweepOrchestrator] ${config.specialistId}@${config.foundryId}: Budget nearly exhausted ($${(remainingBudget - phase1Cost).toFixed(2)} remaining), skipping execution phase`
+          )
+        } else {
+
         console.log(
           `[SweepOrchestrator] ${config.specialistId}@${config.foundryId}: ${executableTasks.length} executable task(s) found — starting execution sweep`
         )
@@ -873,7 +885,25 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
                       continue
                     }
 
-                    // Save deliverable as artifact pending review
+                    // DECISION: Claim task FIRST to prevent duplicate artifacts from race conditions (#11).
+                    // Only save the deliverable if we successfully claimed the task.
+                    const { updated: taskClaimed, error: completeError } = await completeTaskFromSweep(
+                      config.foundryId,
+                      execution.task_id,
+                      config.specialistId,
+                    )
+
+                    if (completeError) {
+                      console.error(`[SweepOrchestrator] Failed to complete task ${execution.task_id}:`, completeError)
+                      continue
+                    }
+
+                    if (!taskClaimed) {
+                      console.warn(`[SweepOrchestrator] Task ${execution.task_id} already completed by another sweep — skipping deliverable`)
+                      continue
+                    }
+
+                    // Task claimed — now save the deliverable
                     const { artifactId, error: saveError } = await saveDeliverableArtifact(
                       config.foundryId,
                       config.specialistId,
@@ -884,19 +914,6 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
 
                     if (saveError) {
                       console.error(`[SweepOrchestrator] Failed to save deliverable for task ${execution.task_id}:`, saveError)
-                      continue
-                    }
-
-                    // Mark task as completed
-                    const { error: completeError } = await completeTaskFromSweep(
-                      config.foundryId,
-                      execution.task_id,
-                      config.specialistId,
-                      artifactId,
-                    )
-
-                    if (completeError) {
-                      console.error(`[SweepOrchestrator] Failed to complete task ${execution.task_id}:`, completeError)
                     } else {
                       tasksExecuted++
                       console.log(`[SweepOrchestrator] ${config.specialistId}: Task "${matchingTask.title}" executed → deliverable saved (artifact ${artifactId})`)
@@ -930,6 +947,7 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
           }
         }
       }
+      } // end budget guard else
     } catch (executionError) {
       // Execution failure should not break the overall sweep
       console.error(`[SweepOrchestrator] Execution phase failed for ${config.specialistId}:`, executionError)
