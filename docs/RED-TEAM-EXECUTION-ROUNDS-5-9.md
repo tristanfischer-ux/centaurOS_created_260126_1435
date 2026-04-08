@@ -123,3 +123,19 @@ Cal's executive summary contains emoji markers (design system says no emojis). A
 
 ### LOW: No web search for competitive analysis
 Sage's competitive analysis uses training data only. For research-type tasks, web search would improve accuracy.
+
+---
+
+## FINAL STATUS: ALL 5 SCENARIOS PASS (after Sonnet fallback fix)
+
+| # | Specialist | Model | Words | Cost | Status |
+|---|-----------|-------|-------|------|--------|
+| 1 | Mia (growth-marketer) | Gemini 3.1 Pro | 879 | ~$0.01 | PASS |
+| 2 | Sal (sales-lead) | GPT-5.4 → Sonnet fallback | 914 | $0.042 | PASS (after fix) |
+| 3 | Finn (finance-lead) | DeepSeek V4 | 1,266 | ~$0.01 | PASS |
+| 4 | Cal (chief-of-staff) | Opus 4.6 | 586 | ~$0.03 | PASS |
+| 5 | Sage (strategist) | Gemini 3.1 Pro | 647 | ~$0.01 | PASS |
+
+**Plan auto-completed: YES** (all 7 tasks done → plan status = 'completed')
+**Total artifacts in review: 7** (all visible in /review queue)
+**GPT-5.4 issue:** Silent failure requiring Sonnet fallback. Root cause TBD (possibly model name mismatch or API rate limit).
