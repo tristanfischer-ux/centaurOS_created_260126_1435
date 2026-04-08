@@ -60,55 +60,10 @@ function ExpertsGridSkeleton() {
 }
 
 async function ExpertsContent({ search, page }: { search?: string; page: number }) {
-    // DECISION: Call Supabase directly instead of via 'use server' action.
-    // The server action import was causing RSC serialization to return 500.
-    const supabase = createAdminClient()
-    const limit = 24
-    const offset = (page - 1) * limit
-
-    const [expertsResult, countResult] = await Promise.all([
-        supabase.rpc('get_directory_experts', {
-            p_role: null,
-            p_location: null,
-            p_search: search || null,
-            p_limit: limit,
-            p_offset: offset,
-        }),
-        supabase.rpc('get_directory_expert_count', {
-            p_role: null,
-            p_location: null,
-            p_search: search || null,
-        }),
-    ])
-
-    const rawExperts = (expertsResult.data || []) as Array<Record<string, unknown>>
-    const total = (countResult.data as number) || 0
-
-    // Map to DirectoryExpert shape
-    const experts: DirectoryExpert[] = rawExperts.map(row => ({
-        id: row.id as string,
-        profile_slug: row.profile_slug as string | null,
-        username: row.username as string | null,
-        headline: row.headline as string | null,
-        bio: row.bio as string | null,
-        location: row.location as string | null,
-        years_experience: row.years_experience as number | null,
-        day_rate: row.day_rate as number | null,
-        hourly_rate: row.hourly_rate as number | null,
-        currency: (row.currency as string) || 'GBP',
-        tier: (row.tier as string) || 'standard',
-        specializations: (row.specializations as string[]) || [],
-        industries: (row.industries as string[]) || [],
-        company_stages: (row.company_stages as string[]) || [],
-        is_verified: (row.is_verified as boolean) || false,
-        profile_completeness: (row.profile_completeness as number) || 0,
-        user_name: row.user_name as string | null,
-        user_avatar: row.user_avatar as string | null,
-        average_rating: row.average_rating as number | null,
-        total_reviews: (row.total_reviews as number) || 0,
-        total_transactions: (row.total_transactions as number) || 0,
-        featured_until: row.featured_until as string | null,
-    }))
+    // DIAGNOSTIC: Static content only — no data fetching at all.
+    // If THIS still crashes, the issue is in the component tree, not data.
+    const experts: DirectoryExpert[] = []
+    const total = 0
 
     const totalPages = Math.ceil(total / 24)
 
@@ -216,16 +171,11 @@ export default async function ExpertsPage({ searchParams }: PageProps) {
                 </p>
             </div>
 
-            {/* Content */}
+            {/* Content — temporarily simplified to isolate crash */}
             <div className="space-y-8">
                 <Suspense fallback={<ExpertsGridSkeleton />}>
                     <ExpertsContent search={search} page={page} />
                 </Suspense>
-            </div>
-
-            {/* Bottom CTA */}
-            <div className="mt-16">
-                <DirectoryCTA variant="both" />
             </div>
         </div>
     )
