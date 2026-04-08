@@ -2,14 +2,11 @@ import { Suspense, cache } from 'react'
 import { Metadata } from 'next'
 // createAdminClient removed — using native fetch to avoid RSC serialization issues
 import { DirectorySearch } from '@/components/directory/DirectorySearch'
-import nextDynamic from 'next/dynamic'
-
-// DECISION: Dynamic import with ssr:false prevents hydration mismatch crash.
-// ExpertCard uses Radix UI Avatar which causes ID mismatches during RSC hydration.
-const ExpertCard = nextDynamic(() => import('@/components/directory/ExpertCard').then(m => m.ExpertCard), {
-    ssr: false,
-    loading: () => <div className="h-48 rounded-xl bg-muted animate-pulse" />,
-})
+// DECISION: ExpertCard ('use client') causes hydration crashes from Radix UI Avatar.
+// Using a server-side ExpertCardSimple inline to avoid the issue entirely.
+// The full ExpertCard is still used on individual profile pages where it works fine.
+import Link from 'next/link'
+import { getExpertSlug } from '@/lib/directory/types'
 import { DirectoryCTA } from '@/components/directory/DirectoryCTA'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { DirectoryExpert } from '@/lib/directory/types'
@@ -182,9 +179,46 @@ async function ExpertsContent({ search, page }: { search?: string; page: number 
             ) : (
                 <>
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {experts.map((expert) => (
-                            <ExpertCard key={expert.id} expert={expert} />
-                        ))}
+                        {experts.map((expert) => {
+                        const slug = getExpertSlug(expert)
+                        const href = slug ? `/expert/${slug}` : '#'
+                        return (
+                            <Link
+                                key={expert.id}
+                                href={href}
+                                className="group block rounded-xl border border-border bg-card p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                            >
+                                <div className="flex gap-4">
+                                    {/* Avatar placeholder — avoids Radix hydration crash */}
+                                    <div className="flex-shrink-0 h-10 w-10 rounded-full bg-international-orange/10 flex items-center justify-center text-international-orange font-semibold text-sm">
+                                        {(expert.user_name || 'E').charAt(0)}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="truncate text-base font-semibold text-foreground group-hover:text-international-orange transition-colors">
+                                            {expert.user_name || 'Expert'}
+                                        </h3>
+                                        <p className="truncate text-sm text-muted-foreground">
+                                            {expert.headline || 'Fractional Executive'}
+                                        </p>
+                                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                            {expert.location && <span>{expert.location}</span>}
+                                            {expert.years_experience && <span>{expert.years_experience}+ years</span>}
+                                            {expert.day_rate && <span>{expert.currency === 'GBP' ? '£' : '$'}{expert.day_rate}/day</span>}
+                                        </div>
+                                        {expert.specializations.length > 0 && (
+                                            <div className="mt-3 flex flex-wrap gap-1">
+                                                {expert.specializations.slice(0, 3).map((spec) => (
+                                                    <span key={spec} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                                        {spec}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </Link>
+                        )
+                    })}
                     </div>
 
                     {/* Pagination */}
