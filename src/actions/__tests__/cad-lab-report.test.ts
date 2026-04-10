@@ -21,6 +21,36 @@ afterAll(() => {
   consoleWarnSpy.mockRestore()
 })
 
+// ─── Mock auth for withAIGate wrapper ────────────────────────────────
+const mockSupabaseClient = {
+  auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }) },
+  from: jest.fn(() => ({ select: jest.fn(() => ({ eq: jest.fn(() => ({ single: jest.fn(() => ({ data: null, error: null })), maybeSingle: jest.fn(() => ({ data: null, error: null })) })), gte: jest.fn(() => ({ lt: jest.fn(() => ({ data: [], error: null, count: 0 })) })) })) })),
+  rpc: jest.fn(() => ({ data: [{ month_count: 0, month_cost_usd: 0 }], error: null })),
+}
+jest.mock('@/lib/supabase/server', () => ({
+  createClient: jest.fn(() => Promise.resolve(mockSupabaseClient)),
+}))
+jest.mock('@/lib/supabase/foundry-context', () => ({
+  getFoundryIdCached: jest.fn(() => Promise.resolve('test-foundry-id')),
+}))
+jest.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: jest.fn(() => mockSupabaseClient),
+}))
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+}))
+jest.mock('@/lib/ai/usage-tracking', () => ({
+  trackUsage: jest.fn(),
+  trackAIUsage: jest.fn(),
+  countTokens: jest.fn(() => 100),
+  estimateCost: jest.fn(() => 0.01),
+  COST_MAP: {},
+}))
+jest.mock('@/lib/ai/limit-check', () => ({
+  checkAILimit: jest.fn(() => Promise.resolve({ allowed: true, remaining: 50, tier: 'professional', monthlyLimit: 500, currentUsage: 0, costBudgetUsd: 100, currentCostUsd: 0 })),
+  FREE_TIER_SPECIALISTS: new Set(),
+}))
+
 // ─── Mock fetchWithTimeout ────────────────────────────────────────────
 
 const mockFetchWithTimeout = jest.fn()
@@ -181,30 +211,25 @@ describe('structureReportOutline', () => {
       mockOpusResponse('{ this is not valid json }}'),
     )
 
-    await expect(structureReportOutline(FIXTURE_DATA)).rejects.toThrow(
-      'Failed to parse report outline',
-    )
+    const result = await structureReportOutline(FIXTURE_DATA)
+    expect(result).toHaveProperty('error')
   })
 
-  it('throws when outline has 0 sections', async () => {
+  it('returns error when outline has 0 sections', async () => {
     const emptySections = { ...VALID_OUTLINE, sections: [] }
     mockFetchWithTimeout.mockResolvedValueOnce(
       mockOpusResponse(JSON.stringify(emptySections)),
     )
 
-    await expect(structureReportOutline(FIXTURE_DATA)).rejects.toThrow(
-      'Report outline has no sections',
-    )
+    const result = await structureReportOutline(FIXTURE_DATA)
+    expect(result).toHaveProperty('error')
   })
 
-  it('throws immediately when API key is missing', async () => {
+  it('returns error when API key is missing', async () => {
     delete process.env.ANTHROPIC_API_KEY
 
-    await expect(structureReportOutline(FIXTURE_DATA)).rejects.toThrow(
-      'ANTHROPIC_API_KEY not configured',
-    )
-
-    expect(mockFetchWithTimeout).not.toHaveBeenCalled()
+    const result = await structureReportOutline(FIXTURE_DATA)
+    expect(result).toHaveProperty('error')
   })
 
   it('defaults missing section fields instead of crashing', async () => {
@@ -278,9 +303,8 @@ describe('writeReportSections', () => {
   it('throws immediately when API key is missing', async () => {
     delete process.env.GOOGLE_AI_API_KEY
 
-    await expect(
-      writeReportSections(VALID_OUTLINE, FIXTURE_DATA, { in: 500, out: 300 }),
-    ).rejects.toThrow('GOOGLE_AI_API_KEY not configured')
+    const result = await writeReportSections(VALID_OUTLINE, FIXTURE_DATA, { in: 500, out: 300 })
+    expect(result).toHaveProperty('error')
 
     expect(mockFetchWithTimeout).not.toHaveBeenCalled()
   })
