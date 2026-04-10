@@ -77,7 +77,7 @@ export async function sendSupplierQuoteRequest(
     const hdrs = await headers()
     const ip = getClientIP(hdrs)
     const rateLimitKey = `quote-request:${user.id}`
-    const { allowed } = await rateLimit(rateLimitKey, 10, 3600, ip)
+    const { success: allowed } = await rateLimit('api', `${rateLimitKey}:${ip}`, { limit: 10, window: 3600 * 1000 })
     if (!allowed) {
         return { success: false, error: "Rate limit reached. You can send up to 10 quote requests per hour." }
     }

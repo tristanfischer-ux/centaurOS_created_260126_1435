@@ -38,13 +38,10 @@ export default async function QuoteRequestsPage() {
 
             {requests.length === 0 ? (
                 <EmptyState
-                    icon={Send}
+                    icon={<Send className="h-10 w-10 text-muted-foreground" />}
                     title="No quote requests yet"
                     description="Browse the marketplace and request quotes from suppliers. Your requests will appear here."
-                    action={{
-                        label: 'Browse Marketplace',
-                        href: '/marketplace',
-                    }}
+                    action={<Link href="/marketplace" className="text-sm font-medium text-primary hover:underline">Browse Marketplace</Link>}
                 />
             ) : (
                 <Card>

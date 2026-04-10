@@ -32,6 +32,7 @@ import {
   updateVelocityUsage 
 } from '@/lib/fraud/detection'
 import { formatCurrencyFromMinorUnits } from '@/lib/format'
+import { getEffectiveFeePercent } from '@/lib/billing/fees'
 
 // Duplicated from stripe/escrow (not exported there) — amount limits in pence
 const MIN_TRANSACTION_AMOUNT = 100 // £1.00
@@ -221,8 +222,9 @@ export async function initiatePayment(
       }
     }
 
-    // Calculate platform fee
-    const platformFee = calculatePlatformFee(amount)
+    // Calculate platform fee using buyer's tiered rate
+    const { feePercent } = await getEffectiveFeePercent(buyer.id)
+    const platformFee = calculatePlatformFee(amount, feePercent)
 
     // Update order with payment intent and fee
     const { error: updateError } = await supabase
@@ -411,6 +413,22 @@ export async function releaseToSeller(
   try {
     const supabase = await createClient()
 
+    // Get order to look up buyer for tiered fee calculation
+    const { data: orderForFee, error: orderFeeError } = await supabase
+      .from('orders')
+      .select('buyer_id')
+      .eq('id', orderId)
+      .single()
+
+    if (orderFeeError || !orderForFee) {
+      return {
+        transfer: null,
+        sellerAmount: null,
+        platformFee: null,
+        error: orderFeeError?.message || 'Order not found',
+      }
+    }
+
     // If milestone ID provided, get milestone amount
     let releaseAmount: number
 
@@ -487,7 +505,9 @@ export async function releaseToSeller(
         .eq('id', milestoneId)
     }
 
-    const platformFee = calculatePlatformFee(releaseAmount)
+    // Use buyer's tiered fee rate (0% intro, 10% standard, 5% professional)
+    const { feePercent } = await getEffectiveFeePercent(orderForFee.buyer_id)
+    const platformFee = calculatePlatformFee(releaseAmount, feePercent)
     const sellerAmount = releaseAmount - platformFee
 
     return {

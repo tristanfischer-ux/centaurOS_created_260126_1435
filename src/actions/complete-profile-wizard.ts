@@ -137,7 +137,8 @@ export async function completeProfileWizard(
         expertise_areas: expertiseAreas,
         availability_type: availabilityType,
         availability_hours_per_week: hoursPerWeek,
-        onboarding_data: updatedOnboarding as unknown as Record<string, unknown>,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onboarding_data: updatedOnboarding as any,
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)

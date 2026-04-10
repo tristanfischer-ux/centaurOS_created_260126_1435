@@ -114,7 +114,7 @@ export function usePageInsights(
         .then((result) => {
           // GOTCHA: withAuth/withAIGate may return { error: string } instead of AgentInsight[].
           // Array.isArray guards against the error shape, but log for debugging.
-          if (result && 'error' in (result as Record<string, unknown>)) return
+          if (result && typeof result === 'object' && !Array.isArray(result) && 'error' in result) return
           if (Array.isArray(result) && result.length > 0) {
             setInsights(result)
             if (cacheKey) setCache(`page-insights:${cacheKey}`, result)
@@ -130,7 +130,7 @@ export function usePageInsights(
       .then((result) => {
         if (sonnetResolved.current) return // Sonnet already won the race
         // GOTCHA: withAuth/withAIGate may return { error: string } — skip gracefully
-        if (result && 'error' in (result as Record<string, unknown>)) return
+        if (result && typeof result === 'object' && !Array.isArray(result) && 'error' in result) return
         if (Array.isArray(result) && result.length > 0) {
           setInsights(result)
           setIsLoading(false)
@@ -142,7 +142,7 @@ export function usePageInsights(
       .then((result) => {
         sonnetResolved.current = true
         // GOTCHA: withAuth/withAIGate may return { error: string } — skip gracefully
-        if (result && 'error' in (result as Record<string, unknown>)) return
+        if (result && typeof result === 'object' && !Array.isArray(result) && 'error' in result) return
         if (Array.isArray(result) && result.length > 0) {
           setInsights(result)
           if (cacheKey) setCache(`page-insights:${cacheKey}`, result)

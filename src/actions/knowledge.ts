@@ -36,6 +36,19 @@ import {
   discoverConnections,
 } from '@/lib/knowledge-vault'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+
+/**
+ * SECURITY: Sanitize a string for use in PostgREST filter expressions.
+ * Escapes ilike wildcards (%, _) and strips PostgREST control characters.
+ */
+function sanitizeFilterValue(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/[\n\r\t]/g, ' ')
+    .replace(/[,()\."*:!'[\]{}]/g, '')
+}
 import type {
   KnowledgeQueryParams,
   KnowledgeQueryResult,
@@ -790,7 +803,7 @@ export async function searchKnowledgeSemantic(
   if (!embedding) {
     // FALLBACK: keyword search if embedding fails
     const supabase = await createClient()
-    const q = `%${query.trim()}%`
+    const q = `%${sanitizeFilterValue(query.trim())}%`
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('knowledge_notes')

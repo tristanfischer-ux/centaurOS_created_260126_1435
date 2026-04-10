@@ -10,6 +10,7 @@
  */
 
 import { createNewRFQ } from "@/actions/rfq"
+import { withAuth } from '@/lib/server-action-utils'
 import type { CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
 import {
   getModuleArtifactReadiness,
@@ -105,6 +106,7 @@ function computeModuleReadiness(
 export async function createCadLabRfqAction(
   input: CreateCadLabRfqInput,
 ): Promise<{ rfqId: string; broadcastCount: number } | { error: string }> {
+  return withAuth(async () => {
   // DECISION: Accept both "specified" and "generated" modules for RFQ creation.
   // CAD artifacts (STEP/STL) are optional score bonuses, not requirements.
   // Specified modules use diagnostics + descriptions + illustrations as RFQ payload.
@@ -372,6 +374,7 @@ export async function createCadLabRfqAction(
   }
 
   return { rfqId: rfqResult.data.id, broadcastCount: rfqResult.data.broadcastCount }
+  }) // end withAuth
 }
 
 // ─── Mashup Lab RFQ ────────────────────────────────────────────────────
@@ -405,6 +408,7 @@ interface CreateMashupRfqInput {
 export async function createMashupRfqAction(
   input: CreateMashupRfqInput,
 ): Promise<{ rfqId: string } | { error: string }> {
+  return withAuth(async () => {
   const { concept, sources, stepUrl, stlUrl, strategy } = input
 
   if (!stepUrl?.trim()) {
@@ -467,4 +471,5 @@ export async function createMashupRfqAction(
   }
 
   return { rfqId: rfqResult.data.id }
+  }) // end withAuth
 }

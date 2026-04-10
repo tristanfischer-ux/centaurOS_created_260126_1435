@@ -23,6 +23,19 @@ import { getGoogleClient } from '@/lib/google/client'
 import { google } from 'googleapis'
 import type { Json } from '@/types/database.types'
 
+/**
+ * SECURITY: Sanitize a string for use in PostgREST filter expressions.
+ * Escapes ilike wildcards (%, _) and strips PostgREST control characters.
+ */
+function sanitizeFilterValue(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/[\n\r\t]/g, ' ')
+    .replace(/[,()\."*:!'[\]{}]/g, '')
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -363,7 +376,7 @@ export async function getArtifacts(filters?: ArtifactFilters): Promise<{
 
   // Full-text search on title
   if (filters?.search?.trim()) {
-    query = query.ilike('title', `%${filters.search.trim()}%`)
+    query = query.ilike('title', `%${sanitizeFilterValue(filters.search.trim())}%`)
   }
 
   // Pagination

@@ -17,6 +17,7 @@ import {
   type SupplierCountMap,
 } from "@/lib/cad-lab/cost-optimisation-engine"
 import { getTechniqueInsightsByProcess } from "@/actions/manufacturing-techniques"
+import { withAuth } from '@/lib/server-action-utils'
 
 export type { CostAlternative }
 
@@ -41,59 +42,61 @@ export async function generateCostAlternatives(
   | { alternatives: CostAlternative[]; baselineCostPerUnit: number }
   | { error: string }
 > {
-  try {
-    // First pass: generate alternatives to discover all distinct processes
-    const preliminary = generateAlternatives(
-      moduleId,
-      moduleName,
-      diagnosticAnswers,
-      estimatedMassKg,
-    )
-
-    // Fetch supplier counts for ALL distinct processes in the alternatives
-    const distinctProcesses = [
-      ...new Set(preliminary.alternatives.map((a) => a.process)),
-    ]
-    let supplierCounts: SupplierCountMap | undefined
+  return withAuth(async () => {
     try {
-      const results = await Promise.allSettled(
-        distinctProcesses.map(async (proc) => {
-          const insights = await getTechniqueInsightsByProcess(proc)
-          return insights && typeof insights.totalSupplierCount === "number"
-            ? { process: proc, count: insights.totalSupplierCount }
-            : null
-        }),
+      // First pass: generate alternatives to discover all distinct processes
+      const preliminary = generateAlternatives(
+        moduleId,
+        moduleName,
+        diagnosticAnswers,
+        estimatedMassKg,
       )
-      const counts: SupplierCountMap = {}
-      for (const r of results) {
-        if (r.status === "fulfilled" && r.value) {
-          counts[r.value.process] = r.value.count
+
+      // Fetch supplier counts for ALL distinct processes in the alternatives
+      const distinctProcesses = [
+        ...new Set(preliminary.alternatives.map((a) => a.process)),
+      ]
+      let supplierCounts: SupplierCountMap | undefined
+      try {
+        const results = await Promise.allSettled(
+          distinctProcesses.map(async (proc) => {
+            const insights = await getTechniqueInsightsByProcess(proc)
+            return insights && typeof insights.totalSupplierCount === "number"
+              ? { process: proc, count: insights.totalSupplierCount }
+              : null
+          }),
+        )
+        const counts: SupplierCountMap = {}
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value) {
+            counts[r.value.process] = r.value.count
+          }
         }
+        if (Object.keys(counts).length > 0) supplierCounts = counts
+      } catch {
+        // Non-critical — engine works without supplier counts
       }
-      if (Object.keys(counts).length > 0) supplierCounts = counts
-    } catch {
-      // Non-critical — engine works without supplier counts
-    }
 
-    // Second pass: re-generate with supplier counts populated
-    const result = generateAlternatives(
-      moduleId,
-      moduleName,
-      diagnosticAnswers,
-      estimatedMassKg,
-      supplierCounts,
-      aiCostPerUnit,
-    )
+      // Second pass: re-generate with supplier counts populated
+      const result = generateAlternatives(
+        moduleId,
+        moduleName,
+        diagnosticAnswers,
+        estimatedMassKg,
+        supplierCounts,
+        aiCostPerUnit,
+      )
 
-    return {
-      alternatives: result.alternatives,
-      baselineCostPerUnit: aiCostPerUnit ?? result.baselineCostPerUnit,
+      return {
+        alternatives: result.alternatives,
+        baselineCostPerUnit: aiCostPerUnit ?? result.baselineCostPerUnit,
+      }
+    } catch (err) {
+      console.error("[CostOptimisation] Error generating alternatives:", err)
+      return {
+        error:
+          err instanceof Error ? err.message : "Failed to generate alternatives",
+      }
     }
-  } catch (err) {
-    console.error("[CostOptimisation] Error generating alternatives:", err)
-    return {
-      error:
-        err instanceof Error ? err.message : "Failed to generate alternatives",
-    }
-  }
+  })
 }

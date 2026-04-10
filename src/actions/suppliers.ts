@@ -184,8 +184,8 @@ export async function searchSuppliers(
       // Apply sorting to semantic results
       if (filters.sortBy === 'name') {
         results = results.sort((a, b) => {
-          const nameA = ((a.title as string) || '').toLowerCase()
-          const nameB = ((b.title as string) || '').toLowerCase()
+          const nameA = (((a as Record<string, unknown>).title as string) || '').toLowerCase()
+          const nameB = (((b as Record<string, unknown>).title as string) || '').toLowerCase()
           return nameA.localeCompare(nameB)
         })
       }

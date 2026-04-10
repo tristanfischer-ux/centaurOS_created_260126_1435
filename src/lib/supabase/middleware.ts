@@ -21,6 +21,10 @@ const PUBLIC_ROUTES = [
     '/claim',  // Public listing claim flow (outreach)
     '/forgot-password',  // Password reset request
     '/update-password',  // Set new password (after reset link)
+    '/pricing',  // Public pricing page
+    '/techniques',  // Public manufacturing techniques explorer (SEO)
+    '/demo',  // Public demo page
+    '/blog',  // Public blog (content group)
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
 ]
 

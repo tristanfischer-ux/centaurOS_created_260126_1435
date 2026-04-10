@@ -245,7 +245,7 @@ export async function refundPayment(
     const supabase = await createClient()
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, buyer_id, seller_id, foundry_id')
+      .select('id, buyer_id, seller_id')
       .eq('stripe_payment_intent_id', paymentIntentId)
       .single()
 
@@ -258,14 +258,23 @@ export async function refundPayment(
     const isSeller = order.seller_id === callerUserId
 
     if (!isBuyer && !isSeller) {
-      // Check if caller is a foundry admin for this order's foundry
-      const { data: membership } = await supabase
-        .from('foundry_memberships')
-        .select('role')
-        .eq('user_id', callerUserId)
-        .eq('foundry_id', order.foundry_id)
-        .in('role', ['admin', 'owner'])
+      // Check if caller is a foundry admin for any foundry the buyer belongs to
+      // (orders don't have foundry_id — resolve via buyer's profile)
+      const { data: buyerProfile } = await supabase
+        .from('profiles')
+        .select('active_foundry_id')
+        .eq('id', order.buyer_id)
         .single()
+
+      const { data: membership } = buyerProfile?.active_foundry_id
+        ? await supabase
+            .from('foundry_memberships')
+            .select('role')
+            .eq('user_id', callerUserId)
+            .eq('foundry_id', buyerProfile.active_foundry_id)
+            .in('role', ['Executive', 'Founder'])
+            .single()
+        : { data: null }
 
       if (!membership) {
         console.warn('[Refund] Unauthorized refund attempt:', {

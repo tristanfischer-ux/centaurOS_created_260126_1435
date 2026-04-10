@@ -98,6 +98,10 @@ export function TeamMap({
       security_clearances: null,
       average_rating: null,
       review_count: null,
+      country: null,
+      city: null,
+      company_size: null,
+      contact_email: null,
     }
   }, [])
 

@@ -180,7 +180,7 @@ export async function processScheduledEmails(): Promise<{
           subject: '',
           body: '',
           template: email.template as EmailTemplate,
-          templateData: email.template_data || {},
+          templateData: (email.template_data as Record<string, unknown>) || {},
         })
 
         // Mark as sent

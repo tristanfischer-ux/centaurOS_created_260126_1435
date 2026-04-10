@@ -1130,7 +1130,11 @@ Rules:
     if (memoryBlock) {
         systemPromptWithContext += `\n\n## Agent Memory\n${memoryBlock}`
     }
-    if (customSystemPromptSuffix) {
+    // SECURITY: Only allow customSystemPromptSuffix if it contains the legitimate
+    // cross-specialist context marker. This prevents arbitrary system prompt injection
+    // from the client side. The suffix is used to pass context between specialists
+    // during handoff workflows — not for user-defined instructions.
+    if (customSystemPromptSuffix && customSystemPromptSuffix.includes("CROSS_SPECIALIST_CONTEXT")) {
         systemPromptWithContext += customSystemPromptSuffix
     }
 

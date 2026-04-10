@@ -42,6 +42,7 @@ export type AIFeature =
   | 'cad_lab_generate_module'
   | 'cad_lab_review'
   | 'cad_lab_cost'
+  | 'cad_lab_report'
   | 'cad_lab_images'
   | 'cad_lab_classify'
   | 'cad_lab_projects'

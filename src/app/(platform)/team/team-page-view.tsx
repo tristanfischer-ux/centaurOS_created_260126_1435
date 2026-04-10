@@ -303,7 +303,7 @@ export function TeamPageView({
             unassignedTasks: insights?.unassignedTaskCount ?? 0,
         }).then((result) => {
             // GOTCHA: withAuth/withAIGate may return { error: string } — skip gracefully
-            if (result && 'error' in (result as Record<string, unknown>)) return
+            if (result && typeof result === 'object' && !Array.isArray(result) && 'error' in result) return
             if (Array.isArray(result) && result.length > 0) {
                 setHarperInsights(result)
             }

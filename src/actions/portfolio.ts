@@ -181,7 +181,7 @@ export async function searchPortfolioCompanies(
   }
 
   // Fallback: aggregate from marketplace_listings JSONB
-  const { data: listings, error: listError } = await supabase
+  const { data: listings, error: listError } = await adminDb
     .from("marketplace_listings")
     .select("id, title, attributes")
     .eq("category", "Finance")
@@ -207,6 +207,8 @@ export async function searchPortfolioCompanies(
         description: (pc.description as string) || null,
         listing_id: listing.id,
         firm_name: listing.title,
+        investor_count: 1,
+        investor_names: [listing.title],
       })
     }
   }

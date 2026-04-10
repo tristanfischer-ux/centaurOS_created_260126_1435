@@ -30,6 +30,7 @@ import {
   getAvailableActions,
   isTerminalStatus,
 } from "@/lib/orders/status-machine"
+import { SUBSCRIPTION_PLANS, type SubscriptionTier } from "@/lib/billing/plans"
 import {
   logOrderEvent,
   getOrderHistoryWithActors,
@@ -46,6 +47,33 @@ export async function createOrder(
     // Validate required fields
     if (!params.sellerId || !params.orderType || params.totalAmount <= 0) {
       return { data: null, error: "Invalid order parameters" }
+    }
+
+    // BILLING: Enforce order limit per subscription tier
+    const { data: subscription } = await supabase
+      .from("user_subscriptions")
+      .select("tier")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .single()
+
+    const tier = (subscription?.tier as SubscriptionTier) || "free"
+    const maxOrders = SUBSCRIPTION_PLANS[tier].limits.maxOrders
+
+    // maxOrders is undefined for unlimited tiers (professional, enterprise)
+    if (maxOrders != null) {
+      const { count: activeOrderCount } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("buyer_id", user.id)
+        .not("status", "eq", "cancelled")
+
+      if ((activeOrderCount ?? 0) >= maxOrders) {
+        return {
+          data: null,
+          error: `Order limit reached for your ${SUBSCRIPTION_PLANS[tier].name} plan (${maxOrders} orders). Upgrade to create more orders.`,
+        }
+      }
     }
 
     const result = await createOrderService(supabase, user.id, params)

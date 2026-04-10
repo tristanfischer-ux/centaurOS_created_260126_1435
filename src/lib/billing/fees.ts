@@ -59,7 +59,7 @@ export async function getEffectiveFeePercent(
 
     // Get buyer's subscription tier
     const { data: subscription } = await supabase
-      .from('subscriptions')
+      .from('user_subscriptions')
       .select('tier')
       .eq('user_id', buyerUserId)
       .eq('status', 'active')

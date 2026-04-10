@@ -120,7 +120,7 @@ async function LocationPageContent({
         <>
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(listJsonLd) }}
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(listJsonLd).replace(/</g, '\\u003c') }}
             />
 
             <DirectorySearch

@@ -18,6 +18,21 @@ import type { Sector } from "@/types/foundry"
 import type { CadLabDomain } from "@/lib/cad-lab/domain-prompts"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
+// ─── Helpers ────────────────────────────────────────────────────────
+
+/**
+ * SECURITY: Sanitize a string for use in PostgREST filter expressions.
+ * Escapes ilike wildcards (%, _) and strips PostgREST control characters.
+ */
+function sanitizeFilterValue(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/[\n\r\t]/g, ' ')
+    .replace(/[,()\."*:!'[\]{}]/g, '')
+}
+
 // ─── Catalogue Browsing Types ────────────────────────────────────────
 
 /** Filters for the component catalogue list view */
@@ -303,7 +318,7 @@ export async function getComponentDetail(
     supabase
       .from("component_compatibility")
       .select("*")
-      .or(`component_a.eq.${name},component_b.eq.${name}`)
+      .or(`component_a.eq.${sanitizeFilterValue(name)},component_b.eq.${sanitizeFilterValue(name)}`)
       .limit(20),
     supabase
       .from("entity_reviews")

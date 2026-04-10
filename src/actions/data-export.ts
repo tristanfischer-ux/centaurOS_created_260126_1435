@@ -55,12 +55,7 @@ export async function exportFoundryData(
     // DECISION: Use admin client for membership check — RLS on foundry_memberships
     // depends on get_my_foundry_id() which can return NULL for new accounts.
     // User identity is already verified via auth above.
-    let authClient: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>
-    try {
-        authClient = createAdminClient()
-    } catch {
-        authClient = supabase
-    }
+    const authClient = createAdminClient()
 
     const { data: membership } = await authClient
         .from('foundry_memberships')

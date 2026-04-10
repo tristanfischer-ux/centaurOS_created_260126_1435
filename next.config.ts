@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
     // back/forward navigation is instant. dynamic:30 means a page you left
     // 30s ago loads from cache while revalidating in the background.
     staleTimes: {
-      dynamic: 60,
+      dynamic: 0,
       static: 300,
     },
     // INTENT: Enable the browser-native View Transitions API so page swaps

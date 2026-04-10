@@ -116,11 +116,11 @@ export async function getLowScoringOutputs(
         entries.push({
             messageId: msg.id,
             createdAt: msg.created_at,
-            overallScore: eval_.overall,
-            relevance: eval_.relevance ?? 0,
-            completeness: eval_.completeness ?? 0,
-            actionability: eval_.actionability ?? 0,
-            feedback: eval_.feedback ?? '',
+            overallScore: (eval_.overall as number) ?? 0,
+            relevance: (eval_.relevance as number) ?? 0,
+            completeness: (eval_.completeness as number) ?? 0,
+            actionability: (eval_.actionability as number) ?? 0,
+            feedback: (eval_.feedback as string) ?? '',
             userPromptSnippet: userSnippet,
         })
     }

@@ -262,7 +262,7 @@ async function ProductView({
   if (productIds.length > 0) {
     const { data: products } = await supabase
       .from('products')
-      .select('id, name, slug')
+      .select('id, name')
       .in('id', productIds as string[])
 
     if (products) {

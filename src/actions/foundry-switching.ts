@@ -60,12 +60,7 @@ export async function getFoundryCount(): Promise<number> {
   // SECURITY: Use admin client for foundry_memberships count — RLS depends on
   // get_my_foundry_id() which can return NULL for new accounts, causing count=0
   // and breaking post-login routing. User identity is already verified above.
-  let queryClient: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>
-  try {
-    queryClient = createAdminClient()
-  } catch {
-    queryClient = supabase
-  }
+  const queryClient = createAdminClient()
 
   const { count, error } = await queryClient
     .from('foundry_memberships')

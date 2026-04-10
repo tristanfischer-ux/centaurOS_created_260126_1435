@@ -19,6 +19,7 @@
 
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { withRetry } from "@/lib/retry"
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import type {
   DesignReportData,
   ReportOutline,
@@ -261,6 +262,7 @@ const STAGE_CONTEXT: Record<string, string> = {
 export async function structureReportOutline(
   rawData: DesignReportData,
 ): Promise<{ outline: ReportOutline; tokensIn: number; tokensOut: number }> {
+  return withAIGate('cad_lab_report', async ({ trackUsage }) => {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
@@ -419,7 +421,10 @@ ${dataSummary}`
   outline.executiveSummary ??= ''
   outline.narrativeThread ??= ''
 
+  await trackUsage({ model: 'claude-opus-4-6', promptTokens: tokensIn, completionTokens: tokensOut })
+
   return { outline, tokensIn, tokensOut }
+  }) // end withAIGate
 }
 
 // ─── Phase 2: Gemini Writes Sections ─────────────────────────────────
@@ -687,6 +692,7 @@ export async function writeReportSections(
   rawData: DesignReportData,
   opusTokens: { in: number; out: number },
 ): Promise<AiReportContent> {
+  return withAIGate('cad_lab_report', async ({ trackUsage }) => {
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
 
@@ -756,6 +762,8 @@ export async function writeReportSections(
     }
   })
 
+  await trackUsage({ model: 'gemini-3.1-pro', promptTokens: geminiIn, completionTokens: geminiOut })
+
   return {
     executiveSummary: outline.executiveSummary,
     sections,
@@ -763,6 +771,7 @@ export async function writeReportSections(
     opusTokens,
     geminiTokens: { in: geminiIn, out: geminiOut },
   }
+  }) // end withAIGate
 }
 
 // ─── Phase 2.5: Slide Image Generation ──────────────────────────────
@@ -779,6 +788,7 @@ export async function generateSlideImages(
   outline: ReportOutline,
   content: AiReportContent,
 ): Promise<AiReportContent> {
+  return withAIGate('cad_lab_report', async () => {
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) {
     console.warn("[CAD-REPORT] GOOGLE_AI_API_KEY not configured, skipping slide images")
@@ -860,4 +870,5 @@ export async function generateSlideImages(
   console.log(`[CAD-REPORT] ${successCount}/${imageJobs.length} slide images generated`)
 
   return { ...content, sections: updatedSections }
+  }) // end withAIGate
 }

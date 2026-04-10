@@ -67,6 +67,7 @@ const statusColors: Record<FeatureStatus, 'success' | 'warning' | 'error' | 'inf
     beta: 'warning',
     alpha: 'error',
     demo: 'info',
+    coming_soon: 'info',
     hidden: 'pending',
     deprecated: 'error',
 }

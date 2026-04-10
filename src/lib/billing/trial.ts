@@ -65,7 +65,7 @@ export async function getTrialStatus(): Promise<TrialStatus> {
 
     // Check if user has an active paid subscription
     const { data: subscription } = await supabase
-      .from('subscriptions')
+      .from('user_subscriptions')
       .select('tier, status')
       .eq('user_id', user.id)
       .eq('status', 'active')

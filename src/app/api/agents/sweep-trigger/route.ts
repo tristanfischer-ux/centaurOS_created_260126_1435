@@ -18,6 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 import { executeSingleSweep } from '@/lib/agents/sweep-orchestrator'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
@@ -95,8 +96,13 @@ function verifyWebhookAuth(req: NextRequest): NextResponse | null {
     return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })
   }
 
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${webhookSecret}`) {
+  // SECURITY: Timing-safe comparison to prevent secret oracle attacks
+  const authHeader = req.headers.get('authorization') || ''
+  const expected = `Bearer ${webhookSecret}`
+  if (
+    authHeader.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+  ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

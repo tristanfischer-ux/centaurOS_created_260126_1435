@@ -14,6 +14,7 @@
 
 import { cn } from "@/lib/utils"
 import { ExternalLink, Clock, User, BookOpen } from "lucide-react"
+import DOMPurify from "isomorphic-dompurify"
 import type { WebPageResult } from "@/actions/web-fetch"
 
 interface ReaderViewProps {
@@ -124,7 +125,7 @@ export function ReaderView({ pageData, className }: ReaderViewProps): React.Reac
               prose-table:text-sm
               prose-th:text-foreground prose-th:font-semibold
               prose-td:text-foreground"
-            dangerouslySetInnerHTML={{ __html: pageData.htmlContent }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pageData.htmlContent, { FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'] }) }}
           />
         </article>
       </div>
