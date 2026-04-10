@@ -2,6 +2,21 @@ import { createCadLabRfqAction } from "../cad-lab-rfq"
 import { computeCadLabQualityScorecard } from "@/lib/cad-lab-quality-scorecard"
 import { CAD_LAB_GOLDEN_BENCHMARKS } from "@/lib/cad-lab-golden-benchmarks"
 
+// Mock auth so withAuth passes through
+const mockSupabaseClient = {
+  auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }) },
+  from: jest.fn(() => ({ select: jest.fn(() => ({ eq: jest.fn(() => ({ single: jest.fn(() => ({ data: null, error: null })) })) })) })),
+}
+jest.mock("@/lib/supabase/server", () => ({
+  createClient: jest.fn(() => Promise.resolve(mockSupabaseClient)),
+}))
+jest.mock("@/lib/supabase/foundry-context", () => ({
+  getFoundryIdCached: jest.fn(() => Promise.resolve("test-foundry-id")),
+}))
+jest.mock("next/cache", () => ({
+  revalidatePath: jest.fn(),
+}))
+
 jest.mock("../rfq", () => ({
   createNewRFQ: jest.fn(),
 }))
