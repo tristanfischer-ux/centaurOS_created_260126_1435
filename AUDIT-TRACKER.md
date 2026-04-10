@@ -20,8 +20,8 @@
 | Red Team 2 | 1 | 0 | 0 | 0 | 1 | DONE (Noted) |
 | Red Team 3 | 2 | 2 | 0 | 2 | 0 | DONE |
 | Red Team 4 | 1 | 1 | 0 | 1 | 0 | DONE |
-| Red Team 5 | - | - | - | - | - | In Progress |
-| **TOTALS** | **62** | **61** | **4** | **15** | **43** | - |
+| Red Team 5 | 6 | 2 | 0 | 1 | 5 | DONE |
+| **TOTALS** | **68** | **63** | **4** | **16** | **48** | **COMPLETE** |
 
 ---
 
@@ -88,4 +88,28 @@
 - MEDIUM: Prompt injection → Restricted to cross-specialist context
 - LOW: Missing foundry_id on mutations → Noted (RLS backstop)
 
-## Red Team Round 5 — In Progress
+## Red Team Round 5 — Integration & Polish (DONE)
+
+### Fixed
+- HIGH: XSS in reader-view.tsx — added DOMPurify sanitization
+- HIGH: XSS in expert directory JSON-LD — added .replace(/</g, '\\u003c') in 3 files
+
+### Noted (future work)
+- MEDIUM: getCachedLayoutData has no try-catch (Supabase outage crashes platform shell)
+- MEDIUM: Booking race condition (no row-level locking between availability check and slot reservation)
+- MEDIUM: Review gate concurrent approval (no optimistic locking on status transitions)
+- MEDIUM: Orphaned orders when user deactivated (offboarding doesn't freeze in-progress orders)
+- LOW: Voice-to-task listed as free feature but voiceMinutesPerMonth=0 in limits
+
+---
+
+## Remaining Items for Next Session
+
+1. **Apply DB migration** `20260410400000_restrict_profile_self_update.sql` to production Supabase
+2. Add try-catch to `getCachedLayoutData` with graceful fallback
+3. Add row-level locking to booking flow
+4. Add optimistic locking to review gate status transitions
+5. Add order freeze to offboarding flow
+6. Add batch size caps to bulk delete operations (tasks, objectives, cash-burn)
+7. Add input validation to cash-burn-in.ts and cash-burn-out.ts
+8. Clarify voice-to-task feature claim on pricing page
