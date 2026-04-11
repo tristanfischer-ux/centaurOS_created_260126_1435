@@ -12,6 +12,7 @@ import { UnifiedOnboarding } from "@/components/onboarding/unified-onboarding";
 import { WelcomeBackBanner } from "@/components/WelcomeBackBanner";
 import { ExecutiveProfilePrompt, VerificationSuccessToast, ProfileCompletionWizard } from "@/components/onboarding";
 import { ActivityTracker } from "@/components/ActivityTracker";
+import { InvestorMatchPrewarmer } from "@/components/investor-match-prewarmer";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
@@ -143,6 +144,7 @@ export default async function PlatformLayout({
                         <OfflineIndicator />
                         <BackgroundOpsIndicator />
                         <ActivityTracker />
+                        <InvestorMatchPrewarmer />
                         {!needsProfileRepair && (
                             <>
                                 <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} />

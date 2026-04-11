@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, GitMerge, X, ChevronDown, ChevronUp, Loader2, Package } from 'lucide-react'
+import { CheckCircle2, GitMerge, X, ChevronDown, ChevronUp, ChevronRight, Loader2, Package, Users, Banknote } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { applyMergeReview } from '@/actions/business-plan'
 import { createProduct, generateMarketAssessment } from '@/actions/products'
 import { toast } from 'sonner'
-import type { MergeReviewState, ObjectiveMergeSuggestion, MergeDisposition, AnalyzedProduct } from '@/lib/business-plan-types'
+import type { MergeReviewState, ObjectiveMergeSuggestion, MergeDisposition, AnalyzedProduct, HiringRequirement, FundingRequirement } from '@/lib/business-plan-types'
 
 // ─── Tabs ────────────────────────────────────────────────────────────
 
@@ -60,6 +60,10 @@ export function MergeReviewDialog({ open, mergeState, onClose, onApplied }: Merg
       created: false,
     }))
   )
+
+  // ── Collapsible sections state ────────────────────────────────────
+  const [hiringExpanded, setHiringExpanded] = useState(false)
+  const [fundingExpanded, setFundingExpanded] = useState(false)
 
   const adopted = suggestions.filter(s => s.disposition === 'adopt').length
   const merged = suggestions.filter(s => s.disposition === 'merge').length
@@ -210,10 +214,11 @@ export function MergeReviewDialog({ open, mergeState, onClose, onApplied }: Merg
             <X className="h-4 w-4" />
             {skipped} skip
           </span>
-          <span className="ml-auto text-xs text-muted-foreground">
-            +{mergeState.hiringRequirements.length} hires · +{mergeState.fundingRequirements.length} funding events
-            {productsToAdopt > 0 ? ` · +${productsToAdopt} product${productsToAdopt !== 1 ? 's' : ''}` : ''}
-          </span>
+          {productsToAdopt > 0 && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              +{productsToAdopt} product{productsToAdopt !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
 
         <ScrollArea className="max-h-[52vh] pr-2">
@@ -252,6 +257,58 @@ export function MergeReviewDialog({ open, mergeState, onClose, onApplied }: Merg
                     onToggle={() => toggleProductAdopt(i)}
                   />
                 ))
+              )}
+            </div>
+          )}
+
+          {/* ── Hiring Requirements Section ────────────────────────────── */}
+          {mergeState.hiringRequirements.length > 0 && (
+            <div className="mt-4 border-t pt-4">
+              <button
+                onClick={() => setHiringExpanded(prev => !prev)}
+                className="flex items-center gap-2 w-full text-left group"
+              >
+                {hiringExpanded
+                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                }
+                <Users className="h-4 w-4 text-international-orange" />
+                <span className="text-sm font-medium text-foreground">
+                  Suggested Hires ({mergeState.hiringRequirements.length})
+                </span>
+              </button>
+              {hiringExpanded && (
+                <div className="mt-3 space-y-2">
+                  {mergeState.hiringRequirements.map((hire, i) => (
+                    <HiringCard key={i} hire={hire} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Funding Requirements Section ───────────────────────────── */}
+          {mergeState.fundingRequirements.length > 0 && (
+            <div className="mt-4 border-t pt-4">
+              <button
+                onClick={() => setFundingExpanded(prev => !prev)}
+                className="flex items-center gap-2 w-full text-left group"
+              >
+                {fundingExpanded
+                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                }
+                <Banknote className="h-4 w-4 text-international-orange" />
+                <span className="text-sm font-medium text-foreground">
+                  Funding Events ({mergeState.fundingRequirements.length})
+                </span>
+              </button>
+              {fundingExpanded && (
+                <div className="mt-3 space-y-2">
+                  {mergeState.fundingRequirements.map((fund, i) => (
+                    <FundingCard key={i} funding={fund} />
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -424,6 +481,96 @@ function ProductCard({
               {adopted ? 'Adopt' : 'Skip'}
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Hiring Requirement Card ────────────────────────────────────────
+
+function HiringCard({ hire }: { hire: HiringRequirement }): React.JSX.Element {
+  const roleTypeLabels: Record<string, string> = {
+    full_time: 'Full-time',
+    fractional: 'Fractional',
+    apprentice: 'Apprentice',
+  }
+
+  return (
+    <div className="rounded-lg border p-3 bg-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-foreground text-sm">{hire.roleTitle}</p>
+            <Badge variant="secondary" size="sm">
+              {roleTypeLabels[hire.roleType] ?? hire.roleType}
+            </Badge>
+          </div>
+          {hire.reason && (
+            <p className="text-xs text-muted-foreground mt-1">{hire.reason}</p>
+          )}
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            {hire.linkedObjectiveTitle && (
+              <span className="text-xs text-muted-foreground">
+                Linked to: <span className="font-medium text-foreground">{hire.linkedObjectiveTitle}</span>
+              </span>
+            )}
+            {hire.suggestedDate && (
+              <span className="text-xs text-muted-foreground">By: {hire.suggestedDate}</span>
+            )}
+            {hire.phase && (
+              <Badge variant="outline" size="sm">Phase: {hire.phase}</Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Funding Requirement Card ───────────────────────────────────────
+
+function FundingCard({ funding }: { funding: FundingRequirement }): React.JSX.Element {
+  const fundingTypeLabels: Record<string, string> = {
+    bootstrapping: 'Bootstrapping',
+    angel: 'Angel',
+    vc: 'VC',
+    grant: 'Grant',
+    revenue_based: 'Revenue-based',
+    debt: 'Debt',
+    other: 'Other',
+  }
+
+  return (
+    <div className="rounded-lg border p-3 bg-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-foreground text-sm">{funding.title}</p>
+            {funding.fundingType && (
+              <Badge variant="secondary" size="sm">
+                {fundingTypeLabels[funding.fundingType] ?? funding.fundingType}
+              </Badge>
+            )}
+          </div>
+          {funding.amountUsd != null && (
+            <p className="text-sm font-medium text-international-orange mt-0.5">
+              ${funding.amountUsd.toLocaleString()}
+            </p>
+          )}
+          {funding.reason && (
+            <p className="text-xs text-muted-foreground mt-1">{funding.reason}</p>
+          )}
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            {funding.neededByDate && (
+              <span className="text-xs text-muted-foreground">Needed by: {funding.neededByDate}</span>
+            )}
+            {funding.linkedObjectiveTitles.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Linked to: <span className="font-medium text-foreground">{funding.linkedObjectiveTitles.join(', ')}</span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

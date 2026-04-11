@@ -1,5 +1,9 @@
 "use server"
 
+// DECISION: Opus for objectives extraction can take 60-120s. Vercel Pro default
+// serverless timeout is 60s. Must extend to 300s to avoid premature timeout.
+export const maxDuration = 300
+
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { z } from 'zod'
