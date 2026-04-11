@@ -19,21 +19,37 @@ import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 // and cheaper. Opus was needed for the monolithic call because it had to
 // maintain coherence across all 5 sections simultaneously.
 const SECTION_MODEL = 'claude-sonnet-4-6'
-const SECTION_MAX_TOKENS = 2048
+const SECTION_MAX_TOKENS = 4096
 
 // ─── Section-Specific Prompts ─────────────────────────────────────────
 
-const OBJECTIVES_PROMPT = `You are an expert business consultant. Extract strategic objectives from the business plan.
+const OBJECTIVES_PROMPT = `You are an expert business consultant and operations strategist. Extract ALL strategic objectives, goals, milestones, and action items from the document.
+
+IMPORTANT: The document may be a traditional business plan, BUT it could also be:
+- A go-to-market action plan with day-by-day or week-by-week tasks
+- A project tracker with checklists and deadlines
+- A commercial audit with recommended actions
+- A strategic roadmap with phases and milestones
+
+Your job is to extract EVERY actionable objective — NOT the products/features described in the plan, but the ACTIONS the company needs to take. For example:
+- "Fix website SEO issues" is an objective (action to take)
+- "ForgeOS CAD Lab" is a product (NOT an objective — skip it)
+- "Reach out to 50 hardware founders" is an objective
+- "Record demo video" is a task under an objective
+
+Group related tasks into objectives. If the document has explicit phases/weeks/days, use those as the grouping.
 
 For each objective:
-- title: the goal name
-- description: what it entails
-- phase: business phase (e.g. "Launch", "Scale", "Consolidate")
+- title: the goal name (action-oriented, e.g. "Launch founder outreach campaign", NOT product names)
+- description: what it entails and why it matters
+- phase: business phase (e.g. "Week 1", "Day 1-2", "Launch", "Scale", "Month 1") — use the document's own phasing if available
 - suggestedStartDate, suggestedEndDate: ISO dates if timing is mentioned or inferable
-- tasks: 3-5 concrete, actionable tasks. Each task has:
+- tasks: 3-8 concrete, actionable tasks. Each task has:
   - title, description
-  - role: "Executive" (decisions/hiring/strategy), "Apprentice" (research/setup/calls), or "AI_Agent" (data/coding/analysis)
+  - role: "Executive" (decisions/hiring/strategy/outreach/demos), "Apprentice" (research/setup/data entry), or "AI_Agent" (data analysis/content generation/coding)
   - estimatedDays (optional)
+
+Aim for 5-15 objectives with 3-8 tasks each. Extract generously — it's better to have too many than too few.
 
 Return ONLY a raw JSON array (no markdown, no code fences):
 [{ "title": "...", "description": "...", "phase": "...", "suggestedStartDate": "...", "suggestedEndDate": "...", "tasks": [...] }]`
@@ -75,7 +91,14 @@ For each funding event:
 Return ONLY a raw JSON array (no markdown, no code fences):
 [{ "title": "...", "amountUsd": 0, "reason": "...", "neededByDate": "...", "fundingType": "...", "linkedObjectiveTitles": [...] }]`
 
-const PRODUCTS_PROMPT = `You are an expert product strategist. Extract all products and services mentioned in the business plan.
+const PRODUCTS_PROMPT = `You are an expert product strategist. Extract DISTINCT products and services that the company SELLS to customers.
+
+IMPORTANT: Only extract products/services that are revenue-generating offerings sold to external customers. Do NOT extract:
+- Internal tools, features, or platform modules (e.g. "CAD Lab", "Task Manager", "Dashboard")
+- Action items, strategies, or objectives from the plan
+- Individual features of a single product (keep the product as one item, not 15 sub-features)
+
+If the document describes a SaaS platform with multiple tiers, that is ONE product with different pricing tiers — NOT multiple products.
 
 For each product/service:
 - name: the product or service name
@@ -87,7 +110,7 @@ For each product/service:
 Return ONLY a raw JSON array (no markdown, no code fences):
 [{ "name": "...", "description": "...", "targetMarket": "...", "revenueModel": "...", "suggestedPrice": 0 }]
 
-If no products or services are identifiable, return an empty array: []`
+If the document is an action plan, audit, or internal strategy document with no distinct product offerings, return an empty array: []`
 
 const SUMMARY_PROMPT = `You are an expert business consultant. Write a 2-3 sentence plain-language executive summary of the business plan.
 

@@ -35,22 +35,24 @@
 
 | # | Issue | Status | Notes |
 |---|-------|--------|-------|
-| 22 | AI specialist interaction: no loading indicator, response dumps at bottom | IN PROGRESS | Need streaming indicator + scroll-to-top |
-| 23 | Strategy page: "Import Business Plan" fails to parse markdown | IN PROGRESS | "Failed to parse AI response" error |
-| 24 | Strategy page: needs drag-and-drop text support for uploads | IN PROGRESS | Currently only file upload button |
+| 22 | AI specialist interaction: no loading indicator, response dumps at bottom | DONE | Bouncing dots indicator + scroll-to-top fix |
+| 23 | Strategy page: "Import Business Plan" fails to parse markdown | DONE | Resilient per-section parsing with regex fallback |
+| 24 | Strategy page: needs drag-and-drop text support for uploads | DONE | Now accepts dragged text, wraps as .md file |
+| 25 | Review queue: missing orange accent bar | DONE | Added typography.pageHeader + pageHeaderAccent |
+| 26 | Review queue: should have AI specialist comment at top | DONE | Added Cal (Chief of Staff) briefing hero |
+| 27 | Business plan import extracts products instead of objectives | DONE | Rewrote OBJECTIVES_PROMPT to be action-plan-aware, fixed PRODUCTS_PROMPT to not extract internal features |
 
 ## To Do
 
 | # | Issue | Priority | Notes |
 |---|-------|----------|-------|
-| 25 | AI specialists should label demo/dummy data clearly | HIGH | Finn shows P&L data as real when it's demo |
-| 26 | Review queue: missing orange dash on sidebar nav item | MEDIUM | Sidebar styling issue |
-| 27 | Review queue: should have AI specialist comment at top | MEDIUM | Like other pages have |
-| 28 | Onboarding "Professional Identity" wizard too intimidating | HIGH | Needs skip option + AI-assisted profile writing |
-| 29 | Custom SMTP for email sender address | MEDIUM | Currently shows noreply@mail.app.supabase.io |
-| 30 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
-| 31 | Write first case study | HIGH | From FF's own usage |
-| 32 | Update mock URLs in product screenshots | LOW | .com -> .app |
+| 28 | AI specialists should label demo/dummy data clearly | HIGH | Finn shows P&L data as real when it's demo |
+| 29 | Onboarding "Professional Identity" wizard too intimidating | HIGH | Needs skip option + AI-assisted profile writing |
+| 30 | Custom SMTP for email sender address | MEDIUM | Currently shows noreply@mail.app.supabase.io |
+| 31 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
+| 32 | Write first case study | HIGH | From FF's own usage |
+| 33 | Update mock URLs in product screenshots | LOW | .com -> .app |
+| 34 | Review queue items show +7 hires, +5 funding that aren't visible | MEDIUM | Summary counts but no detail tabs for hires/funding |
 
 ---
 
