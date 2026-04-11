@@ -8,7 +8,7 @@
  * skills, industries, experience, and availability — the minimum fields
  * needed for recruits matching.
  *
- * No skip button. No Escape dismiss. Users must complete this to proceed.
+ * Users can skip and complete later from My Profile.
  * Draft auto-saves on each step transition to survive page refresh.
  */
 
@@ -47,7 +47,7 @@ type WizardStep = 'identity' | 'expertise' | 'experience' | 'availability'
 const STEPS: WizardStep[] = ['identity', 'expertise', 'experience', 'availability']
 
 const STEP_LABELS: Record<WizardStep, { title: string; subtitle: string; icon: typeof User }> = {
-  identity: { title: 'Your Professional Identity', subtitle: 'How companies will see you', icon: User },
+  identity: { title: 'Your Professional Identity', subtitle: 'Tell us a bit about yourself — you can always change this later', icon: User },
   expertise: { title: 'Your Expertise', subtitle: 'What you bring to the table', icon: Sparkles },
   experience: { title: 'Your Experience', subtitle: 'Your professional background', icon: Briefcase },
   availability: { title: 'Your Availability', subtitle: 'How much time you can give', icon: Clock },
@@ -303,14 +303,12 @@ export function ProfileCompletionWizard({
     const newErrors: Record<string, string> = {}
 
     if (currentStep === 'identity') {
-      if (!headline.trim() || headline.trim().length < 3) newErrors.headline = 'Headline must be at least 3 characters'
+      // DECISION: Allow empty — users can skip and fill later. Only validate max length.
       if (headline.trim().length > 120) newErrors.headline = 'Headline must be under 120 characters'
-      if (!bio.trim() || bio.trim().length < 10) newErrors.bio = 'Tell us a bit more (at least 10 characters)'
       if (bio.trim().length > 500) newErrors.bio = 'Bio must be under 500 characters'
     }
     if (currentStep === 'expertise') {
-      if (skills.length < 2) newErrors.skills = 'Add at least 2 skills'
-      if (industries.length < 1) newErrors.industries = 'Add at least 1 industry'
+      // DECISION: Allow empty — users can add skills later from My Profile.
     }
     if (currentStep === 'experience') {
       if (yearsExperience == null) newErrors.yearsExperience = 'Please select your experience level'
@@ -374,6 +372,16 @@ export function ProfileCompletionWizard({
       setErrors({})
     }
   }, [stepIndex])
+
+  const handleSkip = useCallback(async () => {
+    try {
+      await updateOnboardingData({ profile_wizard_completed: true })
+      toast.success('You can complete your profile anytime from My Profile')
+      router.refresh()
+    } catch {
+      toast.error('Failed to skip. Please try again.')
+    }
+  }, [router])
 
   // ACCESSIBILITY: Focus trap — keep keyboard users inside the wizard
   const wizardRef = useRef<HTMLDivElement>(null)
@@ -462,6 +470,25 @@ export function ProfileCompletionWizard({
                     <label htmlFor="headline" className="block text-sm font-medium text-foreground mb-1.5">
                       Your headline
                     </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Not sure what to write? Click an example to get started:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {[
+                        'Founder building [product type]',
+                        'CTO & Technical Co-founder',
+                        'Fractional CFO | SaaS & Manufacturing',
+                      ].map((example) => (
+                        <button
+                          key={example}
+                          type="button"
+                          onClick={() => { setHeadline(example); setErrors(prev => ({ ...prev, headline: '' })) }}
+                          className="text-xs px-2.5 py-1.5 rounded-full border border-dashed border-border text-muted-foreground hover:border-international-orange hover:text-international-orange hover:bg-international-orange/5 transition-colors"
+                        >
+                          {example}
+                        </button>
+                      ))}
+                    </div>
                     <Input
                       id="headline"
                       value={headline}
@@ -633,39 +660,48 @@ export function ProfileCompletionWizard({
             </div>
 
             {/* Navigation */}
-            <div className="flex justify-between mt-8">
-              {stepIndex > 0 ? (
-                <Button
-                  variant="ghost"
-                  onClick={goBack}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Back
-                </Button>
-              ) : <div />}
+            <div className="flex flex-col items-center gap-3 mt-8">
+              <div className="flex justify-between w-full">
+                {stepIndex > 0 ? (
+                  <Button
+                    variant="ghost"
+                    onClick={goBack}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </Button>
+                ) : <div />}
 
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button
-                  onClick={goNext}
-                  disabled={isSubmitting}
-                  className="gap-2 bg-international-orange hover:bg-international-orange/90 text-white px-6"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : stepIndex < STEPS.length - 1 ? (
-                    <>
-                      Continue <ArrowRight className="h-4 w-4" />
-                    </>
-                  ) : (
-                    <>
-                      Complete Profile <Sparkles className="h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </motion.div>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button
+                    onClick={goNext}
+                    disabled={isSubmitting}
+                    className="gap-2 bg-international-orange hover:bg-international-orange/90 text-white px-6"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : stepIndex < STEPS.length - 1 ? (
+                      <>
+                        Continue <ArrowRight className="h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        Complete Profile <Sparkles className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </motion.div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSkip}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Skip for now — complete later from My Profile
+              </button>
             </div>
           </motion.div>
         </AnimatePresence>
