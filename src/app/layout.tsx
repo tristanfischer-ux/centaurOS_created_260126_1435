@@ -39,8 +39,12 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "Fractional Forge",
-  description: "We build atoms at the speed of bits.",
+  title: {
+    default: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
+    template: "%s | ForgeOS",
+  },
+  description: "Turn product ideas into manufacturing-ready engineering packages with CAD files, BOM, DFM analysis, and matched UK suppliers. Free to start.",
+  metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192x192.png",
@@ -54,6 +58,31 @@ export const metadata: Metadata = {
   },
   formatDetection: {
     telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_GB",
+    siteName: "ForgeOS by Fractional Forge",
+    title: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
+    description: "Turn product ideas into manufacturing-ready engineering packages with CAD files, BOM, DFM analysis, and matched UK suppliers. Free to start.",
+    images: [
+      {
+        url: "/images/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "ForgeOS — The Operating System for Hardware Companies",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
+    description: "Turn product ideas into manufacturing-ready engineering packages. CAD files, BOM, DFM analysis, matched UK suppliers. Free to start.",
+    images: ["/images/og-default.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 

@@ -45,6 +45,7 @@ import {
   Lock,
   Scale,
 } from "lucide-react"
+import { InvestorPreviewSection } from "@/components/marketing/investor-preview"
 import {
   Accordion,
   AccordionContent,
@@ -263,6 +264,7 @@ export default function MarketingPage() {
         <WhyNowStrip />
         <ProblemSection />
         <WhoItsForSection />
+        <InvestorPreviewSection />
         <TrustStrip />
         <FinalCTASection />
         <FAQSection />

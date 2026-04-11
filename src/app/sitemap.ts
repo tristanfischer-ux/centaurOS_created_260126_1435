@@ -45,6 +45,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             changeFrequency: 'daily',
             priority: 0.8,
         },
+        {
+            url: `${appUrl}/pricing`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.9,
+        },
+        {
+            url: `${appUrl}/terms`,
+            lastModified: now,
+            changeFrequency: 'yearly',
+            priority: 0.3,
+        },
+        {
+            url: `${appUrl}/privacy`,
+            lastModified: now,
+            changeFrequency: 'yearly',
+            priority: 0.3,
+        },
     ]
 
     // Role category pages (known set)
