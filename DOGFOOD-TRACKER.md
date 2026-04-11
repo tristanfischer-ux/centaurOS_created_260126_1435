@@ -45,18 +45,23 @@
 | 29 | Onboarding wizard too intimidating | DONE | Skip option, relaxed validation, example chips |
 | 30 | Forge page overselling capability | DONE | "engineering packages" → "explore materials, manufacturing approaches, find suppliers" |
 
+| 31 | Investor Overview layout/charts messy | DONE | Sentence case headers, wider labels, legend below donut, geo normalization |
+| 32 | Investors "For You" returns 0 results | DONE | Foundry missing stage/sector — populated: Seed/manufacturing |
+| 33 | Business plan import: maxDuration timeout | DONE | Added maxDuration=300 for Opus calls |
+| 34 | Merge dialog: hires/funding invisible | DONE | Expandable card sections with full details |
+| 35 | Investor match pre-warming | DONE | Background fetch on first platform page load per session |
+
 ## To Do
 
 | # | Issue | Priority | Notes |
 |---|-------|----------|-------|
-| 31 | Investor Overview page layout/charts messy | HIGH | Charts, labels, donut overlapping |
-| 32 | Investors "For You" search returns 0 results | HIGH | "Failed to load matches" error |
-| 33 | Custom SMTP for email sender address | MEDIUM | Currently shows noreply@mail.app.supabase.io |
-| 34 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
-| 35 | Write first case study | HIGH | From FF's own usage |
-| 36 | Update mock URLs in product screenshots | LOW | .com -> .app |
-| 37 | Review queue items show +hires/+funding with no detail tabs | MEDIUM | Summary counts visible but content hidden |
+| 36 | Custom SMTP for email sender address | MEDIUM | Currently shows noreply@mail.app.supabase.io — needs Resend setup |
+| 37 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
+| 38 | Write first case study | HIGH | From FF's own usage |
+| 39 | Update mock URLs in product screenshots | LOW | .com -> .app |
 
 ---
+
+**Session totals: 35 done, 4 remaining (2 are Tristan tasks, 1 is SMTP setup, 1 is low-priority cosmetic)**
 
 *Updated as issues are found and resolved. Every item Tristan flags gets added here.*
