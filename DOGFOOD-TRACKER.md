@@ -55,13 +55,13 @@
 
 | # | Issue | Priority | Notes |
 |---|-------|----------|-------|
-| 36 | Custom SMTP for email sender address | MEDIUM | Currently shows noreply@mail.app.supabase.io — needs Resend setup |
+| 36 | Custom SMTP for email sender address | DONE | Resend SMTP configured: smtp.resend.com:587, sender "Fractional Forge" <no-reply@fractionalforge.app> |
 | 37 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
 | 38 | Write first case study | HIGH | From FF's own usage |
 | 39 | Update mock URLs in product screenshots | LOW | .com -> .app |
 
 ---
 
-**Session totals: 35 done, 4 remaining (2 are Tristan tasks, 1 is SMTP setup, 1 is low-priority cosmetic)**
+**Session totals: 36 done, 3 remaining (2 are Tristan tasks, 1 is low-priority cosmetic)**
 
 *Updated as issues are found and resolved. Every item Tristan flags gets added here.*
