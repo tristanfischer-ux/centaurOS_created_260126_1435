@@ -419,8 +419,8 @@ function HeroSection() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
             <div className="inline-flex flex-col items-center gap-2">
               <p className="text-sm text-muted-foreground font-mono">
-                <span className="text-2xl font-black text-international-orange">{memberCount}</span>{" "}
-                of 100 founding spots claimed
+                <span className="text-2xl font-black text-international-orange">{100 - memberCount}</span>{" "}
+                of 100 founding spots left
               </p>
               <div className="w-36 sm:w-48 h-1.5 bg-muted rounded-full overflow-hidden">
                 <motion.div
