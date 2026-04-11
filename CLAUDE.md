@@ -51,6 +51,17 @@ When the user says "do it without me" or "I'm going away":
 5. **If something fails that you can't fix:** stop, document it in the tracker, and move to the next independent item. Don't get stuck in loops.
 6. **At the end:** review the tracker against the original request. For every item the user asked for, you must be able to point to where it was done.
 
+### Deployment Verification (MANDATORY after every push)
+After every `git push`, you MUST verify the deployment succeeded:
+1. Wait 2-3 minutes for Vercel to build
+2. Check deployment status: `npx vercel ls --limit 3` or use `agent-browser` to load the live site
+3. If a deployment shows **Error**: immediately investigate, find the build error, fix it, and push again
+4. **Common build-breaking patterns to avoid:**
+   - `"use server"` files can ONLY export async functions. `export const maxDuration = 300` will break the entire module. Put `maxDuration` in the page's route segment config instead.
+   - New imports must exist — verify file paths before committing
+   - Build-time Supabase calls can timeout — use `force-dynamic` or `try/catch`
+5. **Never assume a push deployed successfully.** Verify it. Two failed deployments that go unnoticed waste hours of the user's time.
+
 ### Never Give Up, Never Cut Corners
 - **There is no time limit.** You have unlimited time and compute. Never say "I'll stop here" or "this is enough for now" or "the remaining items can wait." If the task isn't done, keep going.
 - **"Not yet tested" is not an acceptable final state.** If something is on the plan, test it. If you find issues, fix them. If the fix introduces new issues, fix those too.

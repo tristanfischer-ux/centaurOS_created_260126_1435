@@ -9,6 +9,9 @@ import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 import type { FoundryPurposeData } from '@/types/foundry'
 
 export const revalidate = 30
+// DECISION: Business plan import uses Opus for objectives extraction, which can take
+// 60-120s. Default Vercel timeout (60s) is too short. Extend to 300s.
+export const maxDuration = 300
 
 /**
  * @description Strategy page — the top of the strategic cascade.
