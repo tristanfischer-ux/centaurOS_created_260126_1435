@@ -14,11 +14,13 @@ import {
 } from '@/lib/business-plan-types'
 import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 
-// DECISION: Using Sonnet for parallel section extraction. Each section is
-// straightforward extraction (not creative reasoning), so Sonnet is faster
-// and cheaper. Opus was needed for the monolithic call because it had to
-// maintain coherence across all 5 sections simultaneously.
+// DECISION: Objectives extraction needs Opus — Sonnet returns empty arrays
+// on complex action plans because it can't synthesize day-by-day checklists
+// into structured objectives. Other sections (hires, funding, products) are
+// simpler extraction tasks that Sonnet handles fine.
+const OBJECTIVES_MODEL = 'claude-opus-4-6'
 const SECTION_MODEL = 'claude-sonnet-4-6'
+const OBJECTIVES_MAX_TOKENS = 8192
 const SECTION_MAX_TOKENS = 4096
 
 // ─── Section-Specific Prompts ─────────────────────────────────────────
@@ -173,10 +175,12 @@ async function extractSection(
   client: InstanceType<typeof import('@anthropic-ai/sdk').default>,
   businessPlanText: string,
   sectionPrompt: string,
+  modelOverride?: string,
+  maxTokensOverride?: number,
 ): Promise<string> {
   const response = await client.messages.create({
-    model: SECTION_MODEL,
-    max_tokens: SECTION_MAX_TOKENS,
+    model: modelOverride ?? SECTION_MODEL,
+    max_tokens: maxTokensOverride ?? SECTION_MAX_TOKENS,
     system: sectionPrompt,
     messages: [
       { role: 'user', content: `Analyze the following business plan:\n\n${businessPlanText}` },
@@ -261,7 +265,7 @@ export async function analyzeBusinessPlan(
         productsRaw,
         summaryRaw,
       ] = await Promise.all([
-        extractSection(client, truncatedText, OBJECTIVES_PROMPT),
+        extractSection(client, truncatedText, OBJECTIVES_PROMPT, OBJECTIVES_MODEL, OBJECTIVES_MAX_TOKENS),
         extractSection(client, truncatedText, HIRING_PROMPT),
         extractSection(client, truncatedText, CAPACITY_PROMPT),
         extractSection(client, truncatedText, FUNDING_PROMPT),

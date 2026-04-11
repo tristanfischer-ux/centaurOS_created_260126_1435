@@ -79,10 +79,10 @@ const STARTING_PATHS: StartingPath[] = [
     iconColor: "text-international-orange",
     accentBorder: "border-l-international-orange",
     headline: "Start from a description",
-    description: "Describe your product and get research, CAD models, analysis, and a supplier-ready package.",
+    description: "Describe your product idea and explore materials, manufacturing approaches, and potential suppliers.",
     href: `${FORGE_ROUTES.cadLab}?new`,
-    cta: "Start designing",
-    outputs: ["3D CAD", "STEP files", "Engineering report", "DFM analysis", "RFQ package"],
+    cta: "Start exploring",
+    outputs: ["Material research", "Manufacturing approach", "Cost estimates", "DFM analysis", "Supplier matching"],
     pipelineStages: [
       { label: "Concept", icon: Search },
       { label: "Build", icon: Box },
@@ -226,7 +226,7 @@ function StartingPointsSection(): React.ReactNode {
           Get started
         </p>
         <p className="text-sm text-muted-foreground">
-          Describe your product and we&apos;ll build a supplier-ready engineering package.
+          Describe your product idea and we&apos;ll research materials, manufacturing approaches, and match you with suppliers.
         </p>
       </div>
 
@@ -325,7 +325,7 @@ function PageHeader(): React.ReactNode {
           </span>
         </div>
         <p className={cn(typography.pageSubtitle, "mt-1")}>
-          Turn product ideas into manufacturing-ready engineering packages
+          Explore materials, manufacturing approaches, and find suppliers for your product ideas
         </p>
       </div>
     </div>

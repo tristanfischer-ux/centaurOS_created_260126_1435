@@ -167,7 +167,7 @@ const cashBurnNavigation = [
 // Section 4: "Workshop" — Where the work happens
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
-    { name: "The Forge", href: "/the-forge", icon: Hammer, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
+    { name: "The Forge", href: "/the-forge", icon: Hammer, tooltip: "Explore materials, manufacturing approaches, and find suppliers" },
     { name: "Products", href: "/products", icon: Package, tooltip: "Your hardware products — from concept to market" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "13 specialists — strategy, engineering, finance, legal, hiring, and more" },

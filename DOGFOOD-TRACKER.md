@@ -40,19 +40,22 @@
 | 24 | Strategy page: needs drag-and-drop text support for uploads | DONE | Now accepts dragged text, wraps as .md file |
 | 25 | Review queue: missing orange accent bar | DONE | Added typography.pageHeader + pageHeaderAccent |
 | 26 | Review queue: should have AI specialist comment at top | DONE | Added Cal (Chief of Staff) briefing hero |
-| 27 | Business plan import extracts products instead of objectives | DONE | Rewrote OBJECTIVES_PROMPT to be action-plan-aware, fixed PRODUCTS_PROMPT to not extract internal features |
+| 27 | Business plan import extracts products instead of objectives | DONE | Switched objectives to Opus, Sonnet was returning empty arrays |
+| 28 | Demo data disclaimer infrastructure | DONE | isDemoData prop + cleaned cash data |
+| 29 | Onboarding wizard too intimidating | DONE | Skip option, relaxed validation, example chips |
+| 30 | Forge page overselling capability | DONE | "engineering packages" → "explore materials, manufacturing approaches, find suppliers" |
 
 ## To Do
 
 | # | Issue | Priority | Notes |
 |---|-------|----------|-------|
-| 28 | AI specialists should label demo/dummy data clearly | HIGH | Finn shows P&L data as real when it's demo |
-| 29 | Onboarding "Professional Identity" wizard too intimidating | HIGH | Needs skip option + AI-assisted profile writing |
-| 30 | Custom SMTP for email sender address | MEDIUM | Currently shows noreply@mail.app.supabase.io |
-| 31 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
-| 32 | Write first case study | HIGH | From FF's own usage |
-| 33 | Update mock URLs in product screenshots | LOW | .com -> .app |
-| 34 | Review queue items show +7 hires, +5 funding that aren't visible | MEDIUM | Summary counts but no detail tabs for hires/funding |
+| 31 | Investor Overview page layout/charts messy | HIGH | Charts, labels, donut overlapping |
+| 32 | Investors "For You" search returns 0 results | HIGH | "Failed to load matches" error |
+| 33 | Custom SMTP for email sender address | MEDIUM | Currently shows noreply@mail.app.supabase.io |
+| 34 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
+| 35 | Write first case study | HIGH | From FF's own usage |
+| 36 | Update mock URLs in product screenshots | LOW | .com -> .app |
+| 37 | Review queue items show +hires/+funding with no detail tabs | MEDIUM | Summary counts visible but content hidden |
 
 ---
 

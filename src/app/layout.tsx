@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     default: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
     template: "%s | ForgeOS",
   },
-  description: "Turn product ideas into manufacturing-ready engineering packages with CAD files, BOM, DFM analysis, and matched UK suppliers. Free to start.",
+  description: "Explore materials, manufacturing approaches, cost estimates, and matched UK suppliers for your product ideas. Free to start.",
   metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     locale: "en_GB",
     siteName: "ForgeOS by Fractional Forge",
     title: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
-    description: "Turn product ideas into manufacturing-ready engineering packages with CAD files, BOM, DFM analysis, and matched UK suppliers. Free to start.",
+    description: "Explore materials, manufacturing approaches, cost estimates, and matched UK suppliers for your product ideas. Free to start.",
     images: [
       {
         url: "/images/og-default.png",
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
-    description: "Turn product ideas into manufacturing-ready engineering packages. CAD files, BOM, DFM analysis, matched UK suppliers. Free to start.",
+    description: "Explore materials, manufacturing approaches, cost estimates, and matched UK suppliers for your product ideas. Free to start.",
     images: ["/images/og-default.png"],
   },
   robots: {
