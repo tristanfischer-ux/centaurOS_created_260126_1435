@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getReviewQueue } from '@/actions/content-publishing'
 import { typography } from '@/lib/design-system'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { ReviewQueueTabs } from './review-queue-tabs'
 
 export const metadata: Metadata = {
@@ -111,7 +112,10 @@ export default async function ReviewQueuePage() {
         return (
             <div className="max-w-5xl space-y-6">
                 <div>
-                    <h1 className={typography.h1}>Review Queue</h1>
+                    <div className={typography.pageHeader}>
+                        <div className={typography.pageHeaderAccent} />
+                        <h1 className={typography.h1}>Review Queue</h1>
+                    </div>
                     <p className="text-muted-foreground mt-1">Items awaiting your approval</p>
                 </div>
                 <p className="text-muted-foreground">No active foundry found.</p>
@@ -134,9 +138,24 @@ export default async function ReviewQueuePage() {
     return (
         <div className="max-w-5xl space-y-6">
             <div>
-                <h1 className={typography.h1}>Review Queue</h1>
+                <div className={typography.pageHeader}>
+                    <div className={typography.pageHeaderAccent} />
+                    <h1 className={typography.h1}>Review Queue</h1>
+                </div>
                 <p className="text-muted-foreground mt-1">Items awaiting your approval</p>
             </div>
+
+            <SpecialistBriefingHero
+                specialistId="chief-of-staff"
+                specialistName="Cal"
+                specialistTitle="Chief of Staff"
+                narrative={null}
+                fallbackMessage="Your review queue is where AI-generated content, draft tasks, and pending actions land before going live. Review, revise, or publish — nothing goes out without your approval."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: 'Review Queue', description: 'Cal on the review queue.', metadata: {} }}
+                storageKey="review-queue"
+            />
 
             <ReviewQueueTabs
                 contentItems={contentItems}
