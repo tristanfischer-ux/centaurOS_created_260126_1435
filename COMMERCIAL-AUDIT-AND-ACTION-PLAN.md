@@ -1,8 +1,40 @@
 # Fractional Forge — Commercial Audit & Go-To-Market Action Plan
 
 **Date:** 2026-04-11
+**Last Updated:** 2026-04-11 (Session 1 — Day 1 fixes)
 **Objective:** Stop tweaking. Start selling. First paying customers by 2026-04-18.
 **Scope:** Marketing, sales, commercial strategy, red team analysis, week-by-week execution plan.
+
+---
+
+## Progress Tracker
+
+### Day 1 — April 11 (COMPLETED)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Remove test accounts from /experts directory | DONE — Migration 20260411100000 filters test/e2e/qa names |
+| 2 | Deduplicate Trevor HARRIS entries | DONE — Deactivated duplicate profile (is_public=false) |
+| 3 | Fix "Post a Role" 404 link | DONE — Changed from /login to /join?role=founder |
+| 4 | Fix homepage role CTAs | ALREADY WORKING — all 6 link to /join with role params |
+| 5 | Add Open Graph tags to all pages | DONE — Root layout metadata + dynamic OG image generator |
+| 6 | Fix homepage meta title | DONE — "ForgeOS — AI Manufacturing Platform for Hardware Startups" |
+| 7 | Add pricing/terms/privacy to sitemap | DONE |
+| 8 | Create /about page | DONE — Founder bio, mission, company info |
+| 9 | Create /contact page | DONE — Email, Calendly, contact form |
+| 10 | Add cookie consent banner | DONE — GDPR-compliant, slide-up animation |
+| 11 | Tone down CAD Lab claims | DONE — Changed "STEP files" → "concept packages" |
+| 12 | Add investor preview to homepage | DONE — Interactive search with anonymized results |
+| 13 | Search-to-signup pre-fill | DONE — Query parsed into stage/industry URL params |
+| 14 | Record demo video | TODO — Tristan to record 2-min Loom |
+| 15 | Write first case study | TODO |
+| 16 | Update mock URLs in screenshots | TODO |
+
+### Day 2-3 — April 12-13: Remaining tasks
+- [ ] Record 2-min Loom demo of The Forge (concept package generation)
+- [ ] Write 1 case study (from Fractional Forge's own usage)
+- [ ] Build 50-prospect LinkedIn list
+- [ ] **Dogfood: Sign up as Fractional Forge on the app, create tasks from this plan**
 
 ---
 

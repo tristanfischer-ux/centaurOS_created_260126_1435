@@ -3,6 +3,7 @@ import { Outfit, Playfair_Display, Inter, JetBrains_Mono } from "next/font/googl
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { CookieConsent } from "@/components/cookie-consent";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -105,6 +106,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          <CookieConsent />
         </ThemeProvider>
       </body>
     </html>

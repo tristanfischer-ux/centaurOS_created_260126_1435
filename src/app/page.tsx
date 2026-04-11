@@ -452,7 +452,7 @@ function HeroSection() {
             Activates Positive Emotional Attractor (PEA) — openness and willingness to act.
             Problem-first activates Task Positive Network (TPN) → narrowed attention, risk aversion. */}
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-3 sm:mb-4">
-          Imagine describing your product and receiving a complete engineering package — 3D CAD files, engineering drawings, material specs, and matched suppliers — in hours, not months.
+          Imagine describing your product idea and receiving a structured concept package — material recommendations, manufacturing approach, cost estimates, and matched suppliers — in hours, not months.
         </motion.p>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
@@ -610,7 +610,7 @@ function WhyNowStrip() {
 function HowItWorksStrip() {
   const steps = [
     { number: "1", title: "Describe Your Product", detail: "Tell us what you want to build. Upload CAD files, sketches, or just describe your idea in plain English." },
-    { number: "2", title: "Get Your Engineering Package", detail: "Receive STEP files, 7 engineering drawings, material specs, a bill of materials, DFM analysis, and cost estimates — grounded in 220+ ISO/DIN/BS standards and real supplier data." },
+    { number: "2", title: "Get Your Concept Package", detail: "Receive a structured concept package — material recommendations, manufacturing feasibility analysis, preliminary cost estimates, and a bill of materials — grounded in 220+ ISO/DIN/BS standards and real supplier data." },
     { number: "3", title: "Match With Manufacturers", detail: "Our 6-factor matching algorithm scores UK suppliers on capability, process, material, quality, and relevance — then generates RFQ packs ready to send." },
   ]
 
@@ -816,7 +816,7 @@ const AUDIENCES = [
     icon: Rocket,
     role: "I need to get a product manufactured",
     value: "Startups & product companies",
-    description: "Go from CAD to manufactured product without leasing a factory or hiring a full engineering team. AI handles the engineering package; vetted suppliers handle production.",
+    description: "Go from idea to manufacturing-ready concept without leasing a factory or hiring a full engineering team. AI builds your concept package; vetted suppliers handle production.",
     cta: "Start Building",
     href: "/join?role=founder",
   },
@@ -824,7 +824,7 @@ const AUDIENCES = [
     icon: Building2,
     role: "I have spare factory capacity",
     value: "Manufacturers & job shops",
-    description: "List your available capacity on the marketplace. We send you qualified RFQs from startups ready to manufacture — with complete engineering packages and material specs.",
+    description: "List your available capacity on the marketplace. We send you qualified RFQs from startups ready to manufacture — with structured concept packages and material recommendations.",
     cta: "List Your Capacity",
     href: "/join?role=executive",
   },

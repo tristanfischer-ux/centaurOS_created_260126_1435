@@ -167,6 +167,8 @@ function JoinPageInner() {
   const isDemoMode = searchParams.get("demo") === "true";
   const isFactorySignup = roleParam === "factory" || roleParam === "supplier" || isClaimFlow;
   const isFounderDeepLink = roleParam === "founder";
+  const stageParam = searchParams.get("stage");
+  const industryParam = searchParams.get("industry");
 
   const [demoData, setDemoData] = useState<Omit<DemoAccountData, 'password'> | null>(null);
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
@@ -650,7 +652,7 @@ function JoinPageInner() {
                         name="industry"
                         placeholder="Hardware, DeepTech..."
                         key={`industry-${state.values?.industry ?? ""}`}
-                        defaultValue={state.values?.industry || demoData?.industry || ""}
+                        defaultValue={state.values?.industry || demoData?.industry || industryParam || ""}
                         className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                       />
                     </div>
@@ -666,7 +668,7 @@ function JoinPageInner() {
                         name="stage"
                         placeholder="Pre-seed, Seed..."
                         key={`stage-${state.values?.stage ?? ""}`}
-                        defaultValue={state.values?.stage || demoData?.stage || ""}
+                        defaultValue={state.values?.stage || demoData?.stage || stageParam || ""}
                         className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                       />
                     </div>
