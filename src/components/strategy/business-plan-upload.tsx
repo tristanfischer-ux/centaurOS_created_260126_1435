@@ -118,6 +118,16 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
+
+    // INTENT: Support dragged text (e.g. from a browser or editor) in addition
+    // to file drops. We check for text first, then fall back to file handling.
+    const textData = e.dataTransfer.getData('text/plain')
+    if (textData && textData.trim().length > 10) {
+      const textFile = new File([textData], 'pasted-content.md', { type: 'text/markdown' })
+      handleFile(textFile)
+      return
+    }
+
     const file = e.dataTransfer.files[0]
     if (file) handleFile(file)
   }, [handleFile])

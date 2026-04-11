@@ -104,6 +104,42 @@ function stripFences(text: string): string {
 }
 
 /**
+ * Attempt to parse a JSON string with fallback extraction.
+ *
+ * @description Tries three strategies in order:
+ * 1. Direct JSON.parse on the stripped input
+ * 2. Regex extraction of the first JSON object or array from surrounding text
+ * 3. Returns null so the caller can continue with partial results
+ */
+function safeParseJSON(raw: string, sectionName: string): unknown | null {
+  // Attempt 1: parse as-is
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // fall through
+  }
+
+  // Attempt 2: extract JSON object or array from surrounding text
+  const objectMatch = raw.match(/\{[\s\S]*\}/)
+  const arrayMatch = raw.match(/\[[\s\S]*\]/)
+  const extracted = arrayMatch?.[0] ?? objectMatch?.[0]
+  if (extracted) {
+    try {
+      return JSON.parse(extracted)
+    } catch {
+      // fall through
+    }
+  }
+
+  // Attempt 3: give up on this section — log for debugging
+  console.error(`[analyze] Failed to extract valid JSON for section "${sectionName}":`, {
+    rawLength: raw.length,
+    rawPreview: raw.slice(0, 300),
+  })
+  return null
+}
+
+/**
  * Call Claude for a single section extraction.
  *
  * @description Each section gets its own focused prompt and runs as an
@@ -211,55 +247,91 @@ export async function analyzeBusinessPlan(
       ])
 
       // ── Parse and validate each section independently ──
-      try {
-        const objectivesParsed = z.array(analyzedObjectiveSchema).default([]).parse(
-          JSON.parse(objectivesRaw),
-        )
+      // DECISION: Partial success is better than total failure. If some sections
+      // fail to parse, we keep the ones that succeeded and fall back to empty
+      // arrays for the rest. Only fail entirely if ALL sections fail.
+      const failedSections: string[] = []
 
-        const hiringParsed = z.array(hiringRequirementSchema).default([]).parse(
-          JSON.parse(hiringRaw),
-        )
-
-        const capacityParsed = z.array(capacityRequirementSchema).default([]).parse(
-          JSON.parse(capacityRaw),
-        )
-
-        const fundingParsed = z.array(fundingRequirementSchema).default([]).parse(
-          JSON.parse(fundingRaw),
-        )
-
-        const productsParsed = z.array(analyzedProductSchema).default([]).parse(
-          JSON.parse(productsRaw),
-        )
-
-        // Summary is plain text, not JSON
-        const executiveSummary = summaryRaw.trim()
-
-        // Assemble full analysis and do final validation
-        const assembled = {
-          objectives: objectivesParsed,
-          hiringRequirements: hiringParsed,
-          capacityRequirements: capacityParsed,
-          fundingRequirements: fundingParsed,
-          products: productsParsed,
-          executiveSummary,
+      function parseSection<T>(
+        raw: string,
+        sectionName: string,
+        schema: z.ZodType<T>,
+        fallback: T,
+      ): T {
+        const parsed = safeParseJSON(raw, sectionName)
+        if (parsed === null) {
+          failedSections.push(sectionName)
+          return fallback
         }
-
-        const validated = businessPlanAnalysisSchema.safeParse(assembled)
-        if (!validated.success) {
-          console.error('[analyze] Assembled analysis failed final validation:', {
-            issues: validated.error.issues.slice(0, 5),
+        const result = schema.safeParse(parsed)
+        if (!result.success) {
+          console.error(`[analyze] Zod validation failed for "${sectionName}":`, {
+            issues: result.error.issues.slice(0, 3),
           })
-          return { error: 'AI response was malformed. Please try again.' }
+          failedSections.push(sectionName)
+          return fallback
         }
+        return result.data
+      }
 
-        return { analysis: validated.data }
-      } catch (parseError) {
-        console.error('[analyze] Failed to parse parallel section responses:', {
-          error: parseError instanceof Error ? parseError.message : 'Unknown',
-        })
+      const objectivesParsed = parseSection(
+        objectivesRaw, 'objectives',
+        z.array(analyzedObjectiveSchema).default([]), [],
+      )
+      const hiringParsed = parseSection(
+        hiringRaw, 'hiring',
+        z.array(hiringRequirementSchema).default([]), [],
+      )
+      const capacityParsed = parseSection(
+        capacityRaw, 'capacity',
+        z.array(capacityRequirementSchema).default([]), [],
+      )
+      const fundingParsed = parseSection(
+        fundingRaw, 'funding',
+        z.array(fundingRequirementSchema).default([]), [],
+      )
+      const productsParsed = parseSection(
+        productsRaw, 'products',
+        z.array(analyzedProductSchema).default([]), [],
+      )
+
+      // Summary is plain text, not JSON
+      const executiveSummary = summaryRaw.trim()
+
+      // INTENT: If every JSON section failed, there's nothing useful to save.
+      // But if at least one succeeded, partial results are valuable.
+      const jsonSectionCount = 5
+      if (failedSections.length === jsonSectionCount) {
+        console.error('[analyze] All sections failed to parse:', { failedSections })
         return { error: 'Failed to parse AI response. Please try again.' }
       }
+
+      if (failedSections.length > 0) {
+        console.warn('[analyze] Some sections failed to parse (continuing with partial results):', {
+          failedSections,
+          successCount: jsonSectionCount - failedSections.length,
+        })
+      }
+
+      // Assemble full analysis and do final validation
+      const assembled = {
+        objectives: objectivesParsed,
+        hiringRequirements: hiringParsed,
+        capacityRequirements: capacityParsed,
+        fundingRequirements: fundingParsed,
+        products: productsParsed,
+        executiveSummary,
+      }
+
+      const validated = businessPlanAnalysisSchema.safeParse(assembled)
+      if (!validated.success) {
+        console.error('[analyze] Assembled analysis failed final validation:', {
+          issues: validated.error.issues.slice(0, 5),
+        })
+        return { error: 'AI response was malformed. Please try again.' }
+      }
+
+      return { analysis: validated.data }
     } catch (error) {
       console.error('[analyze] Business plan analysis failed:', {
         error: error instanceof Error ? error.message : 'Unknown error',

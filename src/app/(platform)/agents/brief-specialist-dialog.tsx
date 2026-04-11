@@ -581,9 +581,29 @@ export function BriefSpecialistDialog({
         isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
     }, [])
 
+    // DECISION: When a NEW message arrives (messages array grows), scroll to show the
+    // start of the new message, not the very bottom. This prevents the "text dump at bottom"
+    // feeling when a long AI response completes. During streaming, only auto-scroll if
+    // user is already near the bottom (standard chat UX).
+    const prevMessageCountRef = useRef(messages.length)
     useEffect(() => {
-        if (scrollRef.current && isNearBottomRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        const el = scrollRef.current
+        if (!el) return
+
+        const isNewMessage = messages.length > prevMessageCountRef.current
+        prevMessageCountRef.current = messages.length
+
+        if (isNewMessage) {
+            // New message added — scroll to show it, but not to the very bottom
+            // Use a small delay so the DOM has rendered the new message
+            requestAnimationFrame(() => {
+                if (!el) return
+                // Scroll to bottom to show the new message start
+                el.scrollTop = el.scrollHeight
+            })
+        } else if (isNearBottomRef.current && streamingResponse) {
+            // During streaming, only auto-scroll if user was already near the bottom
+            el.scrollTop = el.scrollHeight
         }
     }, [messages, streamingResponse])
 
@@ -2301,21 +2321,25 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     </div>
                                 )}
 
-                                {/* Typing indicator */}
+                                {/* Typing indicator — visible while AI is processing before first token */}
                                 {(isExecuting && !isStreaming) && (
                                     <div className="flex gap-2.5 justify-start">
                                         <div className={cn("flex-shrink-0 mt-1", isUrgentMessage && "ring-2 ring-international-orange ring-offset-1 rounded-full")}>
                                             <SpecialistChatAvatar specialist={specialist} state="thinking" />
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3 transition-opacity duration-300">
+                                        <div className="rounded-lg px-3 py-2.5 bg-muted/50 border border-muted flex items-center gap-2.5">
                                             {deepThinkEnabled ? (
                                                 <Brain className="h-4 w-4 animate-pulse text-international-orange" />
                                             ) : isUrgentMessage ? (
                                                 <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
                                             ) : (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span className="flex gap-1">
+                                                    <span className="h-2 w-2 rounded-full bg-international-orange/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                    <span className="h-2 w-2 rounded-full bg-international-orange/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                    <span className="h-2 w-2 rounded-full bg-international-orange/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                </span>
                                             )}
-                                            <span key={`${thinkingPhaseIndex}-${isUrgentMessage}`} className="animate-in fade-in duration-300 text-xs">
+                                            <span key={`${thinkingPhaseIndex}-${isUrgentMessage}`} className="animate-in fade-in duration-300 text-sm text-muted-foreground">
                                                 {deepThinkEnabled
                                                     ? `${specialist.name} is analyzing deeply...`
                                                     : isUrgentMessage
