@@ -78,7 +78,7 @@ function StatCard({ icon, value, label }: StatCardProps) {
 // ---------------------------------------------------------------------------
 
 // Truncates long tick labels so they fit within the fixed Y-axis width.
-function truncate(s: string, max: number): string {
+function truncate(s: string, max = 20): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
@@ -184,7 +184,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Chart: Investors by Type */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide">
                 Investors by Type
               </p>
               <div className="h-[240px]">
@@ -209,9 +209,9 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
                     </Pie>
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
                       iconSize={8}
                       iconType="circle"
                       formatter={(value: string) => <span style={{ color: 'hsl(var(--foreground))', fontSize: 11 }}>{value}</span>}
@@ -223,7 +223,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
 
             {/* Chart: Top Sectors */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide">
                 Top Sectors
               </p>
               <div className="h-[240px]">
@@ -241,7 +241,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: string) => truncate(v, 14)}
+                      tickFormatter={(v: string) => truncate(v)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
@@ -255,7 +255,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Chart: Stage Focus */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide">
                 Stage Focus Distribution
               </p>
               <div className="h-[220px]">
@@ -273,7 +273,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: string) => truncate(v, 14)}
+                      tickFormatter={(v: string) => truncate(v)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Bar dataKey="count" fill={CHART_COLORS.green} radius={[0, 3, 3, 0]} />
@@ -284,7 +284,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
 
             {/* Chart: Data Quality Distribution */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide">
                 Data Quality Distribution
               </p>
               <div className="h-[220px]">
@@ -310,7 +310,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
 
           {/* Row 4: Geographic Distribution */}
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <p className="text-xs font-medium text-muted-foreground tracking-wide">
               Geographic Distribution
             </p>
             <div className="h-[220px]">
@@ -328,7 +328,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
                     tick={{ fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v: string) => truncate(v, 16)}
+                    tickFormatter={(v: string) => truncate(v)}
                   />
                   <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                   <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />

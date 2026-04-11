@@ -917,9 +917,16 @@ export const getInvestorStats = unstable_cache(
       const locationText = hqCity || location
 
       let region: string | null = null
+      // GOTCHA: geo_focus values are NOT normalized — "United Kingdom" and "UK" coexist.
+      // Normalize common variants to prevent duplicate chart entries.
+      const GEO_NORMALIZE: Record<string, string> = {
+        'united kingdom': 'UK', 'england': 'UK', 'scotland': 'UK', 'wales': 'UK',
+        'united states': 'US', 'usa': 'US', 'america': 'US',
+      }
       // Use geo_focus first if available (most reliable)
       if (gf.length > 0) {
-        region = gf[0] // First geo focus entry (e.g. "UK", "US", "Europe")
+        const raw = gf[0]
+        region = GEO_NORMALIZE[raw.toLowerCase()] ?? raw
       } else if (locationText) {
         // Extract country from location string
         const COUNTRY_PATTERNS: [RegExp, string][] = [
