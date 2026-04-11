@@ -46,6 +46,8 @@ interface SpecialistBriefingHeroProps {
   context: SpecialistContext
   /** Unique key for localStorage collapse state (defaults to specialistId) */
   storageKey?: string
+  /** When true, shows a disclaimer that the data being analyzed is demo/sample data */
+  isDemoData?: boolean
   className?: string
 }
 
@@ -107,6 +109,7 @@ export function SpecialistBriefingHero({
   severity,
   context,
   storageKey,
+  isDemoData,
   className,
 }: SpecialistBriefingHeroProps) {
   const key = storageKey ?? specialistId
@@ -195,6 +198,14 @@ export function SpecialistBriefingHero({
                   <p className="text-sm text-foreground leading-relaxed">
                     {fallbackMessage}
                   </p>
+                )}
+
+                {/* Demo data disclaimer */}
+                {isDemoData && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-warning/10 border border-warning/20 text-xs text-warning">
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+                    <span>This analysis is based on <strong>demo data</strong>. Replace it with your real numbers for accurate insights.</span>
+                  </div>
                 )}
 
                 {/* CTA */}
