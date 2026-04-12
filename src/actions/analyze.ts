@@ -254,9 +254,10 @@ export async function analyzeBusinessPlan(
       const Anthropic = (await import('@anthropic-ai/sdk')).default
       const client = new Anthropic({ apiKey })
 
-      // DECISION: Run all 6 section extractions in parallel using Sonnet.
-      // Each section is independent — no cross-section coherence needed.
-      // Total wall time = max(all 6) ≈ 10-20s instead of 30-60s for one Opus call.
+      // DECISION: Run all 6 Sonnet calls in parallel within the server action.
+      // Objectives extraction also runs via /api/analyze-objectives (Opus, 300s)
+      // from the client component — if Opus returns objectives and Sonnet doesn't,
+      // the client merges the Opus result. This server action stays under 60s.
       const [
         objectivesRaw,
         hiringRaw,
@@ -265,7 +266,7 @@ export async function analyzeBusinessPlan(
         productsRaw,
         summaryRaw,
       ] = await Promise.all([
-        extractSection(client, truncatedText, OBJECTIVES_PROMPT, OBJECTIVES_MODEL, OBJECTIVES_MAX_TOKENS),
+        extractSection(client, truncatedText, OBJECTIVES_PROMPT),
         extractSection(client, truncatedText, HIRING_PROMPT),
         extractSection(client, truncatedText, CAPACITY_PROMPT),
         extractSection(client, truncatedText, FUNDING_PROMPT),

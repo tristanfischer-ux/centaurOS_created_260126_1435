@@ -70,7 +70,48 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
     formData.append('file', file)
 
     setState('analyzing')
-    const result = await analyzeBusinessPlan(formData)
+
+    // DECISION: Run Sonnet sections (server action, <60s) and Opus objectives
+    // (API route, up to 300s) in parallel from the client. Server actions are
+    // capped at 60s on Vercel — Opus needs 60-150s so it MUST use an API route.
+    const [result, objectivesResult] = await Promise.all([
+      analyzeBusinessPlan(formData),
+      // Call the dedicated API route for Opus objectives extraction
+      (async () => {
+        try {
+          // Extract text from the file first (same as the server action does)
+          const extractForm = new FormData()
+          extractForm.append('file', file)
+          const { extractDocumentText } = await import('@/actions/extract-document-text')
+          const extracted = await extractDocumentText(extractForm)
+          if (!extracted.success || !extracted.text) return null
+
+          const res = await fetch('/api/analyze-objectives', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: extracted.text.slice(0, 100000) }),
+          })
+          if (!res.ok) return null
+          const data = await res.json()
+          return data.raw as string | null
+        } catch {
+          return null
+        }
+      })(),
+    ])
+
+    // Merge Opus objectives into the analysis result if the server action
+    // returned empty objectives but the API route succeeded
+    if (result.analysis && objectivesResult) {
+      try {
+        const parsed = JSON.parse(objectivesResult)
+        if (Array.isArray(parsed) && parsed.length > 0 && result.analysis.objectives.length === 0) {
+          result.analysis.objectives = parsed
+        }
+      } catch {
+        // Opus result wasn't valid JSON — use whatever the server action got
+      }
+    }
 
     if (result.error || !result.analysis) {
       setState('error')
