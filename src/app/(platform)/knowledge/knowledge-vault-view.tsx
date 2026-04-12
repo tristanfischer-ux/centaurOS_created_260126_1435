@@ -406,7 +406,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
         specialistName="Cal"
         specialistTitle="Chief of Staff"
         narrative={briefing.narrative}
-        fallbackMessage="Everything your team knows — documents, specialist insights, research — lives here instead of buried in Slack threads and Google Docs. Filter by domain or upload something new. The more you feed it, the less you'll repeat yourself explaining context to new hires or forgetful colleagues."
+        fallbackMessage="Every time you explain something twice, that's a knowledge gap. Documents, specialist insights, research notes — put them here and every specialist on the platform gets smarter about your business. Upload the document you find yourself re-sending most often. That's your starting point."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Knowledge', description: 'Cal on building institutional memory.', metadata: {} }}

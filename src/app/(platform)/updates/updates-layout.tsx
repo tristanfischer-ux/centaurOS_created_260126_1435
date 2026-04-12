@@ -513,7 +513,7 @@ export function UpdatesLayout({
             specialistName="Cal"
             specialistTitle="Chief of Staff"
             narrative={briefing.narrative}
-            fallbackMessage="Everything that happened while you weren't looking — task completions, comments, conversations, decisions. I surface what matters and bury the noise. Scan the feed, then star anything that needs your input today."
+            fallbackMessage="While you were away, things moved. I've sorted by what needs you versus what's just context — the items at the top are the ones someone's waiting on. Scan for anything flagged, respond to those first, and you're caught up in under two minutes."
             isLoading={briefing.isLoading}
             severity={briefing.severity}
             context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
@@ -569,7 +569,7 @@ export function UpdatesLayout({
             specialistName="Cal"
             specialistTitle="Chief of Staff"
             narrative={briefing.narrative}
-            fallbackMessage="Everything that happened while you weren't looking — task completions, comments, conversations, decisions. I surface what matters and bury the noise. Scan the feed, then star anything that needs your input today."
+            fallbackMessage="While you were away, things moved. I've sorted by what needs you versus what's just context — the items at the top are the ones someone's waiting on. Scan for anything flagged, respond to those first, and you're caught up in under two minutes."
             isLoading={briefing.isLoading}
             severity={briefing.severity}
             context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
@@ -655,7 +655,7 @@ export function UpdatesLayout({
               specialistName="Cal"
               specialistTitle="Chief of Staff"
               narrative={null}
-              fallbackMessage="Everything that happened while you weren't looking — task completions, comments, conversations, decisions. I surface what matters and bury the noise. Scan the feed, then star anything that needs your input today."
+              fallbackMessage="While you were away, things moved. I've sorted by what needs you versus what's just context — the items at the top are the ones someone's waiting on. Scan for anything flagged, respond to those first, and you're caught up in under two minutes."
               isLoading={false}
               severity="success"
               context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}

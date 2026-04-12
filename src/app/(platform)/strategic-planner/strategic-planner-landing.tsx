@@ -89,7 +89,7 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
         specialistName="Sage"
         specialistTitle="Strategist"
         narrative={briefing.narrative}
-        fallbackMessage="Two views, one strategy. The goals list gives you clarity. The timeline canvas gives you sequence — what unlocks what, what blocks what, and where you're trying to do too much at once. Drag a goal onto the canvas and connect it to what it depends on."
+        fallbackMessage="Strategy fails when everything is 'priority one.' The canvas shows you where goals depend on each other and — more importantly — where you're trying to do three things at once with the resources for one. Drag your goals onto the timeline and I'll show you where the collisions are."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Strategic Planner', description: 'Strategic goals and milestone tracking', metadata: {} }}

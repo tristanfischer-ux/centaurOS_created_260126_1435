@@ -215,7 +215,7 @@ export default function HelpCenterPage() {
         specialistName="Cal"
         specialistTitle="Chief of Staff"
         narrative={null}
-        fallbackMessage="If you're stuck, start here. Video walkthroughs for visual learners, feature guides for the thorough, keyboard shortcuts for the impatient. Most questions are answered in under 2 minutes. Try the search — it's faster than scrolling."
+        fallbackMessage="Most people land here looking for three things: how to connect accounts (90 seconds), how to invite team members (60 seconds), or how to export a report (30 seconds). If that's you, the video walkthroughs below will get you there fastest. For everything else, the search box finds answers quicker than scrolling."
         isLoading={false}
         severity="success"
         context={{ type: 'general', title: 'Help', description: 'Cal on getting help.', metadata: {} }}

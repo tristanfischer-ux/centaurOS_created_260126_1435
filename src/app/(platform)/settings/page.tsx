@@ -51,7 +51,7 @@ export default async function SettingsPage() {
                 specialistName="Cal"
                 specialistTitle="Chief of Staff"
                 narrative={null}
-                fallbackMessage="Profile, integrations, notifications, team permissions — everything that makes ForgeOS yours. If you haven't connected your core tools yet, start with integrations. If notifications are noisy, tune them now — you'll thank yourself in a week."
+                fallbackMessage="Two things to do here and then leave: connect your integrations (Google, Slack — unlocks half the automation) and turn off notification types you don't care about. Everything else can wait. If you've already done both, you're set."
                 isLoading={false}
                 severity="success"
                 context={{ type: 'general', title: 'Settings', description: 'Cal on settings.', metadata: {} }}

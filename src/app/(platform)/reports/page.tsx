@@ -974,7 +974,7 @@ export default function ReportsPage(): React.JSX.Element {
         specialistName="Cal"
         specialistTitle="Chief of Staff"
         narrative={briefing.narrative}
-        fallbackMessage="Three moves to a board-ready deliverable: pick a template, select live data sources, export. Documents for depth, presentations for persuasion, infographics for the time-poor. Choose a template and I'll draft the first version — you edit, not write from scratch."
+        fallbackMessage="The difference between a founder who gets funded and one who doesn't is often the quality of the document they put in front of investors. Pick a template, point it at your live data, and you'll have a board-ready deliverable in minutes — not the two days it usually takes. Start with whatever your next meeting needs."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Reports', description: 'Cal on reports.', metadata: {} }}

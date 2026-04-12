@@ -223,7 +223,7 @@ export function LearnPage({
         specialistName="Sage"
         specialistTitle="Strategy"
         narrative={null}
-        fallbackMessage="Manufacturing has a thousand techniques and knowing the right one saves months. I've curated tutorials from injection moulding to CNC tolerancing, with expert Q&A when the docs aren't enough. Pick the technique closest to your current build challenge."
+        fallbackMessage="Most founders over-specify tolerances by 2x, which doubles their unit cost — and they don't know it until the first invoice hits. I've mapped the decisions that actually matter: when to injection mould vs CNC, when tolerances are overkill, when a cheaper material performs better. Find the topic closest to your current build and I'll save you the expensive lesson."
         isLoading={false}
         severity="success"
         context={{ type: 'general', title: 'Learn', description: 'Sage on learning resources.', metadata: {} }}

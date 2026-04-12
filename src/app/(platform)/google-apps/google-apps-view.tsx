@@ -75,7 +75,7 @@ export function GoogleAppsView({ googleEmail, features }: GoogleAppsViewProps) {
                 specialistName="Cal"
                 specialistTitle="Chief of Staff"
                 narrative={null}
-                fallbackMessage="Your Drive, Docs, Calendar, and Email — connected, not copied. Changes sync both ways. No more switching tabs to find that doc someone mentioned in a meeting. Connect your Google account and your workflow just got 30% less fragmented."
+                fallbackMessage="Connect Google once and stop switching tabs. Your calendar, docs, and email flow into ForgeOS — find that doc someone mentioned in yesterday's meeting without leaving this window. Hit 'Connect Google Account' and it takes 30 seconds."
                 isLoading={false}
                 severity="success"
                 context={{ type: 'general', title: 'Google Apps', description: 'Cal on Google integration.', metadata: {} }}

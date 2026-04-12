@@ -177,7 +177,7 @@ export default function WhatsNewPage() {
                 specialistName="Cal"
                 specialistTitle="Chief of Staff"
                 narrative={null}
-                fallbackMessage="Here's what shipped recently — new features, improvements, fixes. I highlight what's relevant to how you use ForgeOS so you're not reading release notes about features you don't care about. Skim the latest and try anything that catches your eye."
+                fallbackMessage="New features ship weekly. I've flagged the ones that affect how you work — skip the rest. If something below looks useful, try it now while you're thinking about it. Features you ignore here tend to stay ignored."
                 isLoading={false}
                 severity="success"
                 context={{ type: 'general', title: "What's New", description: 'Cal on recent updates.', metadata: {} }}

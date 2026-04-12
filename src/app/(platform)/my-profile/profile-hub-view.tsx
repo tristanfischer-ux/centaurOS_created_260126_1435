@@ -148,7 +148,7 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
         specialistName="Cal"
         specialistTitle="Chief of Staff"
         narrative={briefing.narrative}
-        fallbackMessage="This is how you show up — to your team, on the marketplace, to anyone who looks you up. Fill it out properly once and it works everywhere. If your integrations aren't connected, do that first — it unlocks half the automation in ForgeOS."
+        fallbackMessage="Your profile follows you everywhere on the platform — team pages, marketplace, specialist conversations. Spend five minutes filling it in properly now and never think about it again. If your headline still says 'Founder' with no detail, fix that first — it's the first thing people read."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'My Profile', description: 'Cal on profile.', metadata: {} }}

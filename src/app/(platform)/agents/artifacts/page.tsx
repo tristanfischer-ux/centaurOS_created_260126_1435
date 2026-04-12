@@ -60,7 +60,7 @@ export default async function ArtifactsPage(): Promise<React.JSX.Element> {
         specialistName="Cal"
         specialistTitle="Chief of Staff"
         narrative={null}
-        fallbackMessage="Every deliverable the specialists generate lives here — versioned, exportable, findable. Pitch decks, financial models, strategy docs, CAD files. Nothing disappears into a chat thread. Browse by type or specialist, and export whatever you need for that meeting tomorrow."
+        fallbackMessage="Every deliverable your specialists have produced is here — pitch decks, financial models, strategy briefs, CAD exports. Need to send something for tomorrow's meeting? Find it by specialist or type, grab the latest version, and export. Nothing gets lost in a chat thread."
         isLoading={false}
         severity="success"
         context={{ type: 'general', title: 'Deliverables', description: 'Cal on deliverables.', metadata: {} }}
