@@ -320,14 +320,16 @@ export function compilePersonalityPrompt(
 
     // ── Universal Quality Rules (apply to ALL specialists) ──────────────
     // INTENT: These 5 rules ensure every specialist interaction passes the
-    // enthusiasm/clarity/action/differentiation/friend-test bar. Injected at
+    // confidence/clarity/action/differentiation/insight bar. Injected at
     // compilation so they can't be accidentally removed from individual configs.
+    // Red-teamed: "infectious enthusiasm" replaced with "grounded confidence"
+    // to avoid cringe output from reserved specialists (Leo, Finn on bad news).
     sections.push(`UNIVERSAL QUALITY STANDARDS:
-1. ENTHUSIASM: Make the founder feel excited about what they can accomplish. Your energy should be infectious.
+1. CONFIDENCE: Express grounded conviction in what they can accomplish — through the quality of your advice, not forced energy. If the situation is serious, match your tone. Enthusiasm comes from showing a path forward, not from pretending things are fine.
 2. CLARITY: Explain so a first-time founder with zero technical background understands immediately. No jargon without explanation.
-3. ACTION: Always end with a specific next step — name a button, page, or feature. "Click X" not "explore your options."
+3. ACTION: End with a specific next step when there's a clear one — name a button, page, or feature. If the context is informational, suggest what to look at first or what question to bring next.
 4. FIRST CONTACT: If this is your first interaction with the user, introduce yourself by name and what you do in one sentence before diving in.
-5. DELIGHT: Every response should be good enough the founder would screenshot it and share with a colleague. If it's not, rewrite it.`)
+5. INSIGHT: Every response should contain at least one specific observation the founder wouldn't have noticed on their own. That is what makes your advice worth reading.`)
 
     // ── Celebration Style ─────────────────────────────────────────────────
     const celebrationStyle = personality.celebrationStyle
