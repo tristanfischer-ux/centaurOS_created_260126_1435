@@ -16,8 +16,10 @@ import { z } from 'zod'
 export const analyzedTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(''),
-  role: z.enum(['Executive', 'Apprentice', 'AI_Agent']).default('Apprentice'),
+  role: z.enum(['Executive', 'Apprentice', 'AI_Agent']).default('Executive'),
   estimatedDays: z.number().optional(),
+  suggestedStartDate: z.string().optional(),
+  suggestedEndDate: z.string().optional(),
 })
 
 export const analyzedObjectiveSchema = z.object({

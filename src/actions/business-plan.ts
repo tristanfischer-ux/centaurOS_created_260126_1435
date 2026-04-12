@@ -219,7 +219,6 @@ export async function applyMergeReview(
           for (const task of suggestion.aiObjective.tasks) {
             // DECISION: Pass task-level dates to child objectives so the
             // Strategy River renders properly with staggered timelines.
-            const taskAny = task as Record<string, unknown>
             const { data: childObj } = await supabase
               .from('objectives')
               .insert({
@@ -229,8 +228,8 @@ export async function applyMergeReview(
                 description: task.description,
                 is_strategic_goal: false,
                 parent_objective_id: newObj.id,
-                start_date: (taskAny.suggestedStartDate as string) || suggestion.aiObjective.suggestedStartDate || null,
-                end_date: (taskAny.suggestedEndDate as string) || suggestion.aiObjective.suggestedEndDate || null,
+                start_date: task.suggestedStartDate || suggestion.aiObjective.suggestedStartDate || null,
+                end_date: task.suggestedEndDate || suggestion.aiObjective.suggestedEndDate || null,
                 status: 'Not Started',
               })
               .select('id')
