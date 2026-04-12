@@ -179,6 +179,9 @@ export async function applyMergeReview(
       if (suggestion.disposition === 'skip') continue
 
       if (suggestion.disposition === 'adopt') {
+        // DECISION: Imported objectives are strategic goals so they appear on
+        // the Strategy page. Previously set to false — objectives were invisible
+        // because Strategy only shows is_strategic_goal=true.
         const { data: newObj, error: objError } = await supabase
           .from('objectives')
           .insert({
@@ -186,7 +189,7 @@ export async function applyMergeReview(
             creator_id: user.id,
             title: suggestion.aiObjective.title,
             description: suggestion.aiObjective.description,
-            is_strategic_goal: false,
+            is_strategic_goal: true,
             start_date: suggestion.aiObjective.suggestedStartDate || null,
             end_date: suggestion.aiObjective.suggestedEndDate || null,
             status: 'Not Started',
@@ -242,6 +245,25 @@ export async function applyMergeReview(
         })
         warnings.push(`Failed to save ${hiringInserts.length} hiring requirement(s)`)
       }
+
+      // DECISION: Also create tasks for each hire so they appear as actionable
+      // items on the Tasks page. Hiring requirements table is a separate system
+      // that most users never see.
+      for (const hr of mergeState.hiringRequirements) {
+        const linkedObjId = objectiveIdMap[hr.linkedObjectiveTitle]
+        if (!linkedObjId) continue // Tasks require an objective_id
+        const roleLabel = hr.roleType === 'full_time' ? 'Full-time' : hr.roleType === 'fractional' ? 'Fractional' : 'Apprentice'
+        await supabase.from('tasks').insert({
+          foundry_id: foundryId,
+          creator_id: user.id,
+          title: `Hire: ${hr.roleTitle} (${roleLabel})`,
+          description: `${hr.reason}${hr.suggestedDate ? `. Target start: ${hr.suggestedDate}` : ''}`,
+          status: 'Pending',
+          objective_id: linkedObjId,
+        }).then(({ error: taskErr }) => {
+          if (taskErr) console.error('[business-plan] Failed to create hiring task:', taskErr.message)
+        })
+      }
     }
 
     if (mergeState.fundingRequirements.length > 0) {
@@ -266,6 +288,27 @@ export async function applyMergeReview(
           count: fundingInserts.length,
         })
         warnings.push(`Failed to save ${fundingInserts.length} funding requirement(s)`)
+      }
+
+      // DECISION: Also create tasks for each funding event so they appear as
+      // actionable items. Users expect "Seed Round" to show up as a task.
+      for (const fr of mergeState.fundingRequirements) {
+        // Link to first matching objective if possible
+        const linkedObjId = fr.linkedObjectiveTitles
+          .map(title => objectiveIdMap[title])
+          .find(Boolean)
+        if (!linkedObjId) continue // Tasks require an objective_id
+        const amountStr = fr.amountUsd ? ` ($${(fr.amountUsd / 1000).toFixed(0)}K)` : ''
+        await supabase.from('tasks').insert({
+          foundry_id: foundryId,
+          creator_id: user.id,
+          title: `Funding: ${fr.title}${amountStr}`,
+          description: `${fr.reason}${fr.fundingType ? `. Type: ${fr.fundingType}` : ''}${fr.neededByDate ? `. Needed by: ${fr.neededByDate}` : ''}`,
+          status: 'Pending',
+          objective_id: linkedObjId,
+        }).then(({ error: taskErr }) => {
+          if (taskErr) console.error('[business-plan] Failed to create funding task:', taskErr.message)
+        })
       }
     }
 
