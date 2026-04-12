@@ -31,11 +31,18 @@ interface DelegationResult {
 // ─── Helpers ────────────────────────────────────────────────────────
 
 // DECISION: Map task domain keywords to artifact content types.
-// Content tasks produce documents, research produces reports, etc.
-function inferContentType(title: string, description: string): 'document' | 'report' | 'checklist' {
+// Universal coverage — every task category maps to an appropriate artifact type.
+function inferContentType(title: string, description: string): 'document' | 'report' | 'checklist' | 'email' | 'presentation' {
   const combined = `${title} ${description}`.toLowerCase()
-  if (/research|prospect|search|find|mine|compile|list|directory/i.test(combined)) return 'report'
-  if (/checklist|audit|review|check|verify|test/i.test(combined)) return 'checklist'
+  // Research and data-heavy tasks → report (structured, tablular)
+  if (/research|prospect|search|find|mine|compile|list|directory|analys|survey|benchmark|competitor|market/i.test(combined)) return 'report'
+  // Compliance, QA, and verification tasks → checklist
+  if (/checklist|audit|review|check|verify|test|compliance|gdpr|security|standards/i.test(combined)) return 'checklist'
+  // Outreach, communications, and email tasks → email
+  if (/email|outreach|message|linkedin|send|batch|follow.up|sequence|campaign|cold/i.test(combined)) return 'email'
+  // Pitch, investor, and presentation tasks → presentation
+  if (/pitch|investor|deck|presentation|board.update|weekly.report|demo.script/i.test(combined)) return 'presentation'
+  // Everything else → document (blog posts, pages, case studies, specs, etc.)
   return 'document'
 }
 
@@ -199,6 +206,14 @@ INSTRUCTIONS:
 10. Close with your signature action format specific to YOU.
 ${feedback ? '11. The founder has reviewed a previous version and provided feedback. Address ALL feedback.' : ''}
 
+OUTPUT FORMAT:
+- If this is a web page or UI component: deliver as a single React/Next.js component with all CSS inline. Must render without modification.
+- If this is spreadsheet/research data: output as a markdown table with clear headers. Cap at 30 rows per generation.
+- If this is copy/content: include metadata at the top (word count, target page, distribution plan).
+- If this is a script or procedure: include exact word-for-word text, timed sections, and stage directions.
+
+SPECIFICITY CHECK: If your output contains "your product", "your company", "[insert X]", or any placeholder bracket — STOP and replace with the real name from the product data above. Every reference must use real names.
+
 Do NOT:
 - Ask clarifying questions (make reasonable assumptions and note them)
 - Provide multiple options (pick the best one and explain why)
@@ -223,11 +238,12 @@ Do NOT:
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          // DECISION: Opus for high-judgment specialists (legal, finance, fundraising,
-          // strategy). Testing showed Opus produces more proportionate, complete output
-          // on complex tasks — 25/25 on GDPR vs Sonnet's 14/25. Sonnet is faster/cheaper
-          // for content volume tasks (marketing, sales, operations).
-          model: ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist'].includes(specialistId)
+          // DECISION: Opus for high-judgment specialists AND data-heavy specialists.
+          // Round 3 testing: Opus scored 23-25/25 on strategy/legal tasks. Sal's prospect
+          // lists keep truncating with Sonnet (31KB+ incomplete). Opus produces more
+          // proportionate output that respects the 15KB scope cap.
+          // Sonnet is faster/cheaper for marketing content (Mia, Cal, Max, etc.).
+          model: ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist', 'sales-lead'].includes(specialistId)
             ? 'claude-opus-4-6'
             : 'claude-sonnet-4-6',
           max_tokens: 8192,
