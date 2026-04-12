@@ -19,6 +19,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { getStatusBadgeClass } from '@/lib/status-colors'
 import { completeTask, getTaskComments, addTaskComment, getSubtasks, createSubtask, toggleSubtaskComplete } from '@/actions/tasks'
+import { delegateTaskToSpecialist, approveDelegation, rejectDelegation } from '@/actions/task-delegation'
+import { getArtifact } from '@/actions/agent-artifacts'
 import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
 import { formatDistanceToNow } from 'date-fns'
@@ -160,6 +162,82 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
   const [isLoadingSubtasks, setIsLoadingSubtasks] = useState(true)
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false)
+
+  // ── Delegation state ──────────────────────────────────────────────
+  const [isDelegating, setIsDelegating] = useState(false)
+  const [delegationArtifact, setDelegationArtifact] = useState<{ id: string; content: string; specialistName: string } | null>(null)
+  const [revisionFeedback, setRevisionFeedback] = useState('')
+  const [showRevisionInput, setShowRevisionInput] = useState(false)
+  const taskMetadata = (task as Record<string, unknown>).metadata as Record<string, unknown> | null
+
+  // Load existing delegation artifact if task already has one
+  useEffect(() => {
+    const artifactId = taskMetadata?.delegation_artifact_id as string | undefined
+    if (artifactId && !delegationArtifact) {
+      getArtifact(artifactId).then(({ data }) => {
+        if (data) {
+          setDelegationArtifact({
+            id: data.id,
+            content: data.content,
+            specialistName: (data.metadata as Record<string, unknown>)?.specialistName as string || 'Specialist',
+          })
+        }
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskMetadata?.delegation_artifact_id])
+
+  const handleDelegate = async () => {
+    setIsDelegating(true)
+    const result = await delegateTaskToSpecialist(task.id, undefined, revisionFeedback || undefined)
+    setIsDelegating(false)
+
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
+
+    if (result.artifactId) {
+      const { data } = await getArtifact(result.artifactId)
+      if (data) {
+        setDelegationArtifact({
+          id: data.id,
+          content: data.content,
+          specialistName: result.specialistName || 'Specialist',
+        })
+        setShowRevisionInput(false)
+        setRevisionFeedback('')
+        toast.success(`${result.specialistName} has completed the task — review below`)
+        router.refresh()
+      }
+    }
+  }
+
+  const handleApprove = async () => {
+    startTransition(async () => {
+      const result = await approveDelegation(task.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        celebrateTaskComplete(task.title)
+        toast.success('Task approved and completed')
+        router.refresh()
+      }
+    })
+  }
+
+  const handleReject = async () => {
+    startTransition(async () => {
+      const result = await rejectDelegation(task.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        setDelegationArtifact(null)
+        toast.success('Deliverable rejected — task returned to Pending')
+        router.refresh()
+      }
+    })
+  }
 
   useEffect(() => {
     const fetchSubtasks = async () => {
@@ -653,6 +731,96 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                 label="Choose Specialist"
               />
             </div>
+          </div>
+
+          {/* ── Delegate to Specialist ─────────────────────────────── */}
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              <Flame className="h-3.5 w-3.5" />
+              Delegate to Specialist
+            </div>
+
+            {delegationArtifact ? (
+              /* ── Review deliverable ─────────────────────────────── */
+              <div className="space-y-3">
+                <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 p-3">
+                  <p className="text-xs font-medium text-international-orange mb-1">
+                    {delegationArtifact.specialistName} completed this task
+                  </p>
+                  <div className="text-sm text-foreground prose prose-sm max-w-none [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-medium [&_h3]:mt-2 [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5 max-h-[300px] overflow-y-auto">
+                    {delegationArtifact.content.split('\n').map((line, i) => {
+                      if (line.startsWith('## ')) return <h2 key={i}>{line.replace('## ', '')}</h2>
+                      if (line.startsWith('### ')) return <h3 key={i}>{line.replace('### ', '')}</h3>
+                      if (line.startsWith('- ')) return <li key={i}>{line.replace('- ', '')}</li>
+                      if (line.startsWith('**') && line.endsWith('**')) return <p key={i}><strong>{line.replace(/\*\*/g, '')}</strong></p>
+                      if (line.includes('[REVIEW NEEDED]')) return <p key={i} className="text-status-warning font-medium">{line}</p>
+                      if (line.trim() === '') return <br key={i} />
+                      return <p key={i}>{line}</p>
+                    })}
+                  </div>
+                </div>
+
+                {showRevisionInput ? (
+                  <div className="space-y-2">
+                    <TextareaWithSpeech
+                      value={revisionFeedback}
+                      onChange={(e) => setRevisionFeedback(e.target.value)}
+                      placeholder="What would you like changed?"
+                      className="min-h-[60px] text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleDelegate}
+                        disabled={isDelegating || !revisionFeedback.trim()}
+                      >
+                        {isDelegating ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+                        Send Revision
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setShowRevisionInput(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="default" onClick={handleApprove} disabled={isPending}>
+                      {isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowRevisionInput(true)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Revise
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={handleReject} disabled={isPending}>
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Delegate button ────────────────────────────────── */
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full border-international-orange/30 text-international-orange hover:bg-international-orange/5"
+                onClick={handleDelegate}
+                disabled={isDelegating || task.status === 'Completed'}
+              >
+                {isDelegating ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    {specialistName} is working on this...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    Delegate to {specialistName}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           {/* Attachments */}
