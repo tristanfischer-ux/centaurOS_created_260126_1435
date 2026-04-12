@@ -178,14 +178,16 @@ export async function applyMergeReview(
     const warnings: string[] = []
     const objectiveIdMap: Record<string, string> = {}
 
+    // DECISION: The AI now returns a 3-level hierarchy:
+    // Strategic Goal → Objectives → Tasks
+    // Each suggestion.aiObjective may have an "objectives" array (3-level)
+    // OR a "tasks" array (2-level fallback). Handle both.
     for (const suggestion of mergeState.objectiveSuggestions) {
       if (suggestion.disposition === 'skip') continue
 
       if (suggestion.disposition === 'adopt') {
-        // DECISION: Imported objectives are strategic goals so they appear on
-        // the Strategy page. Previously set to false — objectives were invisible
-        // because Strategy only shows is_strategic_goal=true.
-        const { data: newObj, error: objError } = await supabase
+        // Level 1: Create Strategic Goal
+        const { data: strategicGoal, error: sgError } = await supabase
           .from('objectives')
           .insert({
             foundry_id: foundryId,
@@ -200,25 +202,59 @@ export async function applyMergeReview(
           .select('id')
           .single()
 
-        if (objError) {
-          console.error('[business-plan] Failed to create objective:', {
-            title: suggestion.aiObjective.title,
-            error: objError.message,
-          })
-          warnings.push(`Failed to create objective "${suggestion.aiObjective.title}"`)
+        if (sgError) {
+          console.error('[business-plan] Failed to create strategic goal:', sgError.message)
+          warnings.push(`Failed to create "${suggestion.aiObjective.title}"`)
           continue
         }
 
-        if (newObj) {
-          objectiveIdMap[suggestion.aiObjective.title] = newObj.id
+        if (!strategicGoal) continue
+        objectiveIdMap[suggestion.aiObjective.title] = strategicGoal.id
 
-          // DECISION: Create each AI "task" as a child objective under the
-          // strategic goal, then create a task under that child objective.
-          // The Strategy River needs child objectives (not just tasks) to
-          // render the river visualization with tributaries.
+        // Check for 3-level structure (objectives array) vs 2-level (tasks array)
+        const aiObj = suggestion.aiObjective as Record<string, unknown>
+        const childObjectives = (aiObj.objectives as Array<Record<string, unknown>>) ?? []
+
+        if (childObjectives.length > 0) {
+          // 3-LEVEL: Strategic Goal → Objectives → Tasks
+          for (const childObjData of childObjectives) {
+            const { data: childObj } = await supabase
+              .from('objectives')
+              .insert({
+                foundry_id: foundryId,
+                creator_id: user.id,
+                title: (childObjData.title as string) || 'Untitled Objective',
+                description: (childObjData.description as string) || '',
+                is_strategic_goal: false,
+                parent_objective_id: strategicGoal.id,
+                start_date: (childObjData.suggestedStartDate as string) || null,
+                end_date: (childObjData.suggestedEndDate as string) || null,
+                status: 'Not Started',
+              })
+              .select('id')
+              .single()
+
+            if (childObj) {
+              objectiveIdMap[(childObjData.title as string) || ''] = childObj.id
+              const tasks = (childObjData.tasks as Array<Record<string, unknown>>) ?? []
+              for (const task of tasks) {
+                await supabase.from('tasks').insert({
+                  foundry_id: foundryId,
+                  creator_id: user.id,
+                  objective_id: childObj.id,
+                  title: (task.title as string) || 'Untitled Task',
+                  description: (task.description as string) || '',
+                  status: 'Pending',
+                  due_date: (task.dueDate as string) || (task.suggestedEndDate as string) || null,
+                  assignee_id: user.id,
+                })
+              }
+            }
+          }
+        } else {
+          // 2-LEVEL FALLBACK: Strategic Goal → Tasks (as direct child objectives)
           for (const task of suggestion.aiObjective.tasks) {
-            // DECISION: Pass task-level dates to child objectives so the
-            // Strategy River renders properly with staggered timelines.
+            const taskAny = task as Record<string, unknown>
             const { data: childObj } = await supabase
               .from('objectives')
               .insert({
@@ -227,9 +263,9 @@ export async function applyMergeReview(
                 title: task.title,
                 description: task.description,
                 is_strategic_goal: false,
-                parent_objective_id: newObj.id,
-                start_date: task.suggestedStartDate || suggestion.aiObjective.suggestedStartDate || null,
-                end_date: task.suggestedEndDate || suggestion.aiObjective.suggestedEndDate || null,
+                parent_objective_id: strategicGoal.id,
+                start_date: task.suggestedStartDate || null,
+                end_date: task.suggestedEndDate || null,
                 status: 'Not Started',
               })
               .select('id')
@@ -241,8 +277,10 @@ export async function applyMergeReview(
                 creator_id: user.id,
                 objective_id: childObj.id,
                 title: task.title,
-                description: task.description || `${task.role ?? 'Executive'} task`,
+                description: task.description || '',
                 status: 'Pending',
+                due_date: (taskAny.dueDate as string) || task.suggestedEndDate || null,
+                assignee_id: user.id,
               })
             }
           }

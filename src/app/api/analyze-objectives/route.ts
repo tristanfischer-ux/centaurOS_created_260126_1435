@@ -28,42 +28,40 @@ const OBJECTIVES_MODEL = 'claude-opus-4-6'
 // produces ~12K-16K tokens. 8192 was truncating the JSON mid-string.
 const OBJECTIVES_MAX_TOKENS = 16384
 
-const OBJECTIVES_PROMPT = `You are an expert business consultant and operations strategist. Extract ALL strategic objectives, goals, milestones, and action items from the document.
+const OBJECTIVES_PROMPT = `You are an expert business strategist. Extract a 3-LEVEL HIERARCHY from the document:
 
-IMPORTANT: The document may be a traditional business plan, BUT it could also be:
-- A go-to-market action plan with day-by-day or week-by-week tasks
-- A project tracker with checklists and deadlines
-- A commercial audit with recommended actions
-- A strategic roadmap with phases and milestones
+Level 1: STRATEGIC GOALS (3-4 maximum) — high-level pillars
+Level 2: OBJECTIVES (3-8 per goal) — concrete workstreams
+Level 3: TASKS (2-6 per objective) — specific actionable items
 
-Your job is to extract EVERY actionable objective — NOT the products/features described in the plan, but the ACTIONS the company needs to take.
-
-Group related tasks into objectives. If the document has explicit phases/weeks/days, use those as the grouping.
-
-CRITICAL — DATES: Every objective AND every task MUST have specific start and end dates (ISO format YYYY-MM-DD). If the document mentions "Day 1", "Week 2", "April 14" etc., convert those to actual ISO dates. Tasks within an objective should be SEQUENCED — not all starting on the same day. Stagger them logically: if objective runs April 11-13, task 1 might be April 11, task 2 April 11-12, task 3 April 12-13, etc.
-
-CRITICAL — ROLES: This is a solo founder with AI assistants. There are only TWO roles:
-- "Executive": the founder does this personally (demos, calls, outreach, decisions, recording videos, writing)
-- "AI_Agent": an AI specialist handles this (coding, content generation, data analysis, research, setup)
-Do NOT use "Apprentice" — there are no apprentices.
-
-For each objective:
-- title: action-oriented goal name
-- description: what it entails and why
-- phase: use the document's phasing (e.g. "Day 1", "Week 2", "Month 2-3")
-- suggestedStartDate: ISO date (REQUIRED)
-- suggestedEndDate: ISO date (REQUIRED)
-- tasks: 3-8 concrete tasks. Each has:
-  - title, description
-  - role: "Executive" or "AI_Agent" only
-  - estimatedDays: number (REQUIRED — how many days this task takes)
-  - suggestedStartDate: ISO date (REQUIRED — stagger within the objective's range)
-  - suggestedEndDate: ISO date (REQUIRED)
-
-Aim for 8-15 objectives with 3-8 tasks each.
+IMPORTANT RULES:
+- Extract ACTIONS, not product descriptions
+- Only 3-4 strategic goals maximum. Group the document's content into broad themes.
+- Each objective should have MULTIPLE tasks (not 1 task per objective)
+- ROLES: Only "Executive" (founder does it) or "AI_Agent" (AI specialist does it). NO "Apprentice".
+- DATES: Every level needs ISO dates (YYYY-MM-DD). Stagger tasks within objectives sequentially.
+- TASKS need a dueDate field (single date when it should be done)
 
 Return ONLY a raw JSON array (no markdown, no code fences):
-[{ "title": "...", "description": "...", "phase": "...", "suggestedStartDate": "2026-04-11", "suggestedEndDate": "2026-04-11", "tasks": [{"title":"...","description":"...","role":"Executive","estimatedDays":1,"suggestedStartDate":"2026-04-11","suggestedEndDate":"2026-04-11"}] }]`
+[{
+  "title": "Strategic Goal Name",
+  "description": "Why this matters",
+  "suggestedStartDate": "2026-04-11",
+  "suggestedEndDate": "2026-05-09",
+  "objectives": [{
+    "title": "Objective Name",
+    "description": "What this achieves",
+    "suggestedStartDate": "2026-04-11",
+    "suggestedEndDate": "2026-04-13",
+    "tasks": [{
+      "title": "Task name",
+      "description": "Specific action",
+      "role": "Executive",
+      "dueDate": "2026-04-11",
+      "estimatedDays": 1
+    }]
+  }]
+}]`
 
 export async function POST(request: NextRequest) {
   // AUTH: Verify user is authenticated
