@@ -212,15 +212,35 @@ export async function applyMergeReview(
         if (newObj) {
           objectiveIdMap[suggestion.aiObjective.title] = newObj.id
 
+          // DECISION: Create each AI "task" as a child objective under the
+          // strategic goal, then create a task under that child objective.
+          // The Strategy River needs child objectives (not just tasks) to
+          // render the river visualization with tributaries.
           for (const task of suggestion.aiObjective.tasks) {
-            await supabase.from('tasks').insert({
-              foundry_id: foundryId,
-              creator_id: user.id,
-              objective_id: newObj.id,
-              title: task.title,
-              description: task.description,
-              status: 'Pending',
-            })
+            const { data: childObj } = await supabase
+              .from('objectives')
+              .insert({
+                foundry_id: foundryId,
+                creator_id: user.id,
+                title: task.title,
+                description: task.description,
+                is_strategic_goal: false,
+                parent_objective_id: newObj.id,
+                status: 'Not Started',
+              })
+              .select('id')
+              .single()
+
+            if (childObj) {
+              await supabase.from('tasks').insert({
+                foundry_id: foundryId,
+                creator_id: user.id,
+                objective_id: childObj.id,
+                title: task.title,
+                description: task.description || `${task.role ?? 'Executive'} task`,
+                status: 'Pending',
+              })
+            }
           }
         }
       } else if (suggestion.disposition === 'merge' && suggestion.existingObjectiveId) {
