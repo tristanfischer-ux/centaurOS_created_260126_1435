@@ -179,22 +179,32 @@ ${disclaimer ? `IMPORTANT: ${disclaimer}\n` : ''}
 TASK CONTEXT:
 ${taskContext}
 
+REAL PRODUCT DATA (use these exact names and numbers, never placeholders):
+- Pricing: Explorer (free, 50 tasks), Starter (£49/mo, 100 tasks), Professional (£149/mo, 500 tasks), Enterprise (£399/mo, 10000 tasks)
+- Specialists: Sage (Strategy), Max (CTO), Jian (VP Engineering), Fang (VP Manufacturing), Chase (VP Supply Chain), Priya (Product), Mia (Marketing), Sal (Sales), Cal (Chief of Staff), Finn (Finance), Fiona (Fundraising), Harper (HR), Leo (Legal)
+- Key features: CAD Lab (concept → specify → source → assemble), The Forge marketplace, Strategy River, 13 specialist conversations
+- Stage: Pre-revenue, bootstrapped, UK-based, founder-only team. Scale deliverables to this stage.
+- Website: fractionalforge.app
+
 INSTRUCTIONS:
-1. Produce a COMPLETE, ready-to-use deliverable for this task. Nothing left for the founder to fill in.
-2. Start with a brief "## What I Did" summary (2-3 sentences max).
-3. Then produce the full deliverable content.
-4. Use the company context above to make EVERY detail specific to this business — real product names, real pricing, real positioning.
-5. Mark anything requiring the founder's judgment with [REVIEW NEEDED] and explain why.
-6. Format as clean markdown. Use headings, lists, and tables where appropriate.
-7. Include at least one non-obvious insight that demonstrates your deep expertise — something the founder wouldn't have thought of.
-8. The deliverable should be so good that the founder would screenshot it and share it with a colleague saying "look what my specialist did."
-${feedback ? '9. The founder has reviewed a previous version and provided feedback above. Address ALL of their feedback in this revision.' : ''}
+1. Produce a COMPLETE, ready-to-use deliverable. Nothing left for the founder to fill in — no placeholder brackets, no "[insert X here]".
+2. Start with "## What I Did" (2-3 sentences). Open with a bold, opinionated take that only YOU (${specialist.name}) would make.
+3. For web pages or UI: output a complete Next.js/React component using shadcn/ui and Tailwind. Include the metadata export. The founder does not write code.
+4. For content (emails, posts, copy): output the final, send-ready text. Include distribution instructions.
+5. For research (prospect lists, analysis): output structured data. Include a "Start with these 3" action section.
+6. Use REAL product data above — real names, real prices, real features. Never fabricate companies or people.
+7. Mark anything requiring the founder's judgment with [REVIEW NEEDED] and explain why.
+8. Include at least one non-obvious insight that demonstrates deep expertise.
+9. SCOPE CHECK: If your output will exceed 15KB, you are over-engineering. A complete 10KB deliverable beats a truncated 25KB one. Scale to a bootstrapped startup, not an enterprise.
+10. Close with your signature action format specific to YOU.
+${feedback ? '11. The founder has reviewed a previous version and provided feedback. Address ALL feedback.' : ''}
 
 Do NOT:
 - Ask clarifying questions (make reasonable assumptions and note them)
 - Provide multiple options (pick the best one and explain why)
 - Give generic advice (be specific to this company and task)
-- Pad with filler (every sentence should earn its place)
+- Use placeholder brackets like [your name here] or [insert metric]
+- Over-engineer — you are building for a team of one, not an enterprise
 - Sound like a generic assistant — sound like ${specialist.name}${voiceReminder}`
 
     // ── 5. Generate deliverable via AI ────────────────────────────
@@ -213,11 +223,13 @@ Do NOT:
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          // DECISION: Sonnet for task execution. Opus is 2-3x slower/costlier
-          // and testing shows Sonnet produces high-quality deliverables.
-          // GOTCHA: 4096 was too low — Leo (legal) and Sal (sales) hit the
-          // limit on complex deliverables (prospect lists, demo scripts).
-          model: "claude-sonnet-4-6",
+          // DECISION: Opus for high-judgment specialists (legal, finance, fundraising,
+          // strategy). Testing showed Opus produces more proportionate, complete output
+          // on complex tasks — 25/25 on GDPR vs Sonnet's 14/25. Sonnet is faster/cheaper
+          // for content volume tasks (marketing, sales, operations).
+          model: ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist'].includes(specialistId)
+            ? 'claude-opus-4-6'
+            : 'claude-sonnet-4-6',
           max_tokens: 8192,
           system: executionPrompt,
           messages: [
