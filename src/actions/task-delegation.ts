@@ -16,6 +16,8 @@ import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { compilePersonalityPrompt } from '@/lib/agents/personality'
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import { createArtifact } from '@/actions/agent-artifacts'
+import { buildContextLayers } from '@/lib/agents/prompt-builder'
+import { buildAIContextWithServiceClient } from '@/lib/agents/sweep-context'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -106,17 +108,44 @@ export async function delegateTaskToSpecialist(
     if (!specialist) return { error: `Specialist "${specialistId}" not found` }
     specialistName = specialist.name
 
-    // ── 3. Build context ──────────────────────────────────────────
-    const contextParts = [
+    // ── 3. Build RICH context (same depth as specialist chat) ──────
+    // DECISION: The chat system injects 10 context layers (company profile,
+    // knowledge vault, decision journal, founder preferences, etc.). Previous
+    // delegation only had 5 lines of context → deliverables were "OK" not
+    // "incredible." Now we inject the same rich context.
+    const taskContext = [
       `TASK: ${task.title}`,
       task.description ? `DESCRIPTION: ${task.description}` : null,
       objective ? `OBJECTIVE: ${objective.title}` : null,
       objective?.description ? `OBJECTIVE CONTEXT: ${objective.description}` : null,
       pillarTitle ? `STRATEGIC PILLAR: ${pillarTitle}` : null,
       `FOUNDER: ${profile.full_name}`,
-      `COMPANY: Fractional Forge`,
       feedback ? `\nREVISION FEEDBACK FROM FOUNDER:\n${feedback}` : null,
     ].filter(Boolean).join('\n')
+
+    // Fetch company intelligence (purpose, profile, products, team)
+    let companyContext = ''
+    try {
+      companyContext = await buildAIContextWithServiceClient(foundryId)
+    } catch {
+      companyContext = '\n--- Business Context ---\nFractional Forge — AI manufacturing platform for hardware startups\n--- End Business Context ---\n'
+    }
+
+    // Fetch specialist-specific context layers (knowledge, decisions, preferences)
+    let specialistContext = ''
+    try {
+      const { contextBlocks } = await buildContextLayers({
+        foundryId,
+        specialistId,
+        threadId: null,
+        input: `${task.title} ${task.description || ''}`,
+        finalPrompt: taskContext,
+        isConversationalFastPath: false,
+      })
+      specialistContext = contextBlocks
+    } catch {
+      // Non-critical — specialist operates without enrichment
+    }
 
     // ── 4. Compile personality + task execution prompt ─────────────
     const personalityPrompt = specialist.personality
@@ -135,24 +164,31 @@ export async function delegateTaskToSpecialist(
 
     const executionPrompt = `${personalityPrompt}
 
+${companyContext}
+
+${specialistContext}
+
 ---
 
 YOU ARE NOW IN EXECUTION MODE. The founder has delegated a task to you. Your job is to COMPLETE it — not discuss it, not ask questions, not outline options. Produce the actual deliverable.
 
+The founder's expectation is: "Oh my god, there's no way I could have done this on my own." Not "this is OK." You are a senior specialist, not a junior assistant. Your output should be genuinely impressive.
+
 ${disclaimer ? `IMPORTANT: ${disclaimer}\n` : ''}
 
 TASK CONTEXT:
-${contextParts}
+${taskContext}
 
 INSTRUCTIONS:
-1. Produce a COMPLETE, ready-to-use deliverable for this task.
+1. Produce a COMPLETE, ready-to-use deliverable for this task. Nothing left for the founder to fill in.
 2. Start with a brief "## What I Did" summary (2-3 sentences max).
 3. Then produce the full deliverable content.
-4. Mark anything requiring the founder's judgment with [REVIEW NEEDED] and explain why.
-5. Format as clean markdown. Use headings, lists, and tables where appropriate.
-6. Be thorough — this should be something the founder can approve and use immediately.
-7. Include at least one non-obvious insight or recommendation the founder wouldn't have thought of.
-${feedback ? '8. The founder has reviewed a previous version and provided feedback above. Address ALL of their feedback in this revision.' : ''}
+4. Use the company context above to make EVERY detail specific to this business — real product names, real pricing, real positioning.
+5. Mark anything requiring the founder's judgment with [REVIEW NEEDED] and explain why.
+6. Format as clean markdown. Use headings, lists, and tables where appropriate.
+7. Include at least one non-obvious insight that demonstrates your deep expertise — something the founder wouldn't have thought of.
+8. The deliverable should be so good that the founder would screenshot it and share it with a colleague saying "look what my specialist did."
+${feedback ? '9. The founder has reviewed a previous version and provided feedback above. Address ALL of their feedback in this revision.' : ''}
 
 Do NOT:
 - Ask clarifying questions (make reasonable assumptions and note them)
