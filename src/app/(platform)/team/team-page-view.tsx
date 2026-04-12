@@ -1025,7 +1025,7 @@ export function TeamPageView({
                     specialistName="Harper"
                     specialistTitle="Hiring"
                     narrative={harperBriefing.narrative}
-                    fallbackMessage="Your team at a glance. I'll help you identify gaps, plan hiring, and make sure everyone has what they need to be productive."
+                    fallbackMessage="I'm Harper. Good people are off the market in a week, so let's make sure yours aren't drowning. I track who's overloaded, who's underused, and where you've got gaps that'll hurt in 60 days. Check the workload view — if anyone's consistently red, we need to talk about hiring before they quit."
                     isLoading={harperBriefing.isLoading}
                     severity={harperBriefing.severity}
                     context={{ type: 'general', title: 'Team', description: harperBriefingContext, metadata: {} }}

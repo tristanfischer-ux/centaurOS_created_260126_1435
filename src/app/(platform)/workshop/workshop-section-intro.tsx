@@ -99,7 +99,7 @@ export function WorkshopSectionIntro(): React.ReactElement {
                     specialistName="Max"
                     specialistTitle="CTO"
                     narrative={null}
-                    fallbackMessage="The Forge takes your product idea from concept to manufacturing-ready. Start a project, and I'll guide you through design, specification, and supplier sourcing."
+                    fallbackMessage="This is your operational cockpit — Forge projects, team status, and specialists in one view. If you're wondering 'what should I work on right now,' start here. The answer is usually whatever's closest to shipping."
                     isLoading={false}
                     severity="success"
                     context={{ type: 'general', title: 'Workshop', description: 'Max introduces The Forge workshop.', metadata: {} }}

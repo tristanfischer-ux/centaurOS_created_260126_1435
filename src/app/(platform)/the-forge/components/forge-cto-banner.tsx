@@ -145,7 +145,7 @@ export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
       specialistName="Max"
       specialistTitle="CTO"
       narrative={briefing.narrative}
-      fallbackMessage={message}
+      fallbackMessage="Max here. This is where ideas become physical products. The pipeline is concept, specify, source, assemble — no magic, just first principles applied fast. CAD Lab generates parametric designs from your specs. Open a project and ship something — perfection is the enemy of prototypes."
       isLoading={briefing.isLoading}
       severity={briefing.severity}
       context={context}

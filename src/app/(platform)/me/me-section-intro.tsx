@@ -140,7 +140,7 @@ export function MeSectionIntro({ data }: MeSectionIntroProps): React.ReactElemen
                     specialistName="Cal"
                     specialistTitle="Chief of Staff"
                     narrative={null}
-                    fallbackMessage="Your command centre. Check in here each morning — I'll brief you on what needs attention, track your streak, and keep your priorities in focus."
+                    fallbackMessage="Morning. I've triaged your day: items that'll hurt if ignored, things worth 30 minutes, and quick wins to build momentum. Yesterday's wins are logged so you can see you're actually moving. Start with the red items — everything else can wait."
                     isLoading={false}
                     severity="success"
                     context={{ type: 'general', title: 'Me', description: 'Cal on your daily command centre.', metadata: {} }}

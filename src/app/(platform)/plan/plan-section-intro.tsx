@@ -169,7 +169,7 @@ export function PlanSectionIntro(): React.ReactElement {
                     specialistName="Sage"
                     specialistTitle="Strategy"
                     narrative={null}
-                    fallbackMessage="Start with your company purpose, then break it into strategic pillars. I'll help you cascade those into objectives and tasks your team can execute."
+                    fallbackMessage="I'm Sage, your strategist. Right now your business lives in your head — let's get it onto the board in three moves: define your purpose, set your pillars, and plot the timeline. Hit 'Define Purpose' and I'll sharpen it with you in under two minutes."
                     isLoading={false}
                     severity="success"
                     context={{ type: 'general', title: 'Plan', description: 'Sage on planning.', metadata: {} }}

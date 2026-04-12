@@ -208,12 +208,7 @@ export function ObjectivesBoard({
   )
 
   // Local fallback insight
-  const sageFallback = useMemo(() => {
-    if (stats.total === 0) return "No objectives defined yet. Setting clear objectives is the first step to a focused strategy."
-    if (stats.offTrack > 0) return `${stats.offTrack} objective${stats.offTrack > 1 ? 's are' : ' is'} off track.${totalOverdueTasks > 0 ? ` ${totalOverdueTasks} overdue tasks need attention.` : ''} Let's talk about what to reprioritize.`
-    if (stats.atRisk > 0) return `${stats.atRisk} objective${stats.atRisk > 1 ? 's are' : ' is'} at risk with ${avgProgress}% average progress. Worth a check-in to prevent slippage.`
-    return `${stats.total} objectives tracking at ${avgProgress}% average progress. Momentum looks solid.`
-  }, [stats, totalOverdueTasks, avgProgress])
+  const sageFallback = "Your strategy means nothing without objectives that have teeth. I've laid out three views — Board for the big picture, Tree to see how everything connects, Timeline to spot bottlenecks before they bite. Pick your first strategic pillar and let's break it into objectives that actually move."
 
   const sageSeverity = useMemo((): 'success' | 'warning' | 'error' => {
     if (stats.offTrack > 0) return 'error'

@@ -203,7 +203,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         specialistName="Finn"
         specialistTitle="Finance"
         narrative={briefing.narrative}
-        fallbackMessage="Your projected profit and loss — revenue, cost of goods, operating expenses, and EBITDA. I'll flag margins that need attention."
+        fallbackMessage="This is your projected P&L — not last quarter's history, but next quarter's trajectory. I pull live data into income statement and margin analysis so you see where profit actually comes from. If your gross margin is below 60%, click into the cost breakdown — there's always something hiding in there."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'P&L', description: 'Finn on P&L.', metadata: {} }}

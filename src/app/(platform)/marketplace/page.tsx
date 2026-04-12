@@ -159,7 +159,7 @@ export default async function MarketplacePage({
                 specialistName="Chase"
                 specialistTitle="Supply Chain"
                 narrative={briefing.narrative}
-                fallbackMessage="Find suppliers, services, and tools for your hardware venture. I'll help you compare options and match suppliers to your technical requirements."
+                fallbackMessage="Chase here. I've catalogued suppliers so you don't have to cold-email factories at 2am. Filter by category, capability, lead time, or just describe what you need and the search will surface matches you'd never find on Alibaba. Start typing what you're looking for."
                 isLoading={false}
                 severity={briefing.severity}
                 context={{ type: 'general', title: 'Marketplace', description: briefingContext, metadata: {} }}

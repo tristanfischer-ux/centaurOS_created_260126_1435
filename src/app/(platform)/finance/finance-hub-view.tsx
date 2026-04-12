@@ -101,7 +101,7 @@ export function FinanceHubView({
         specialistName="Finn"
         specialistTitle="Finance Lead"
         narrative={briefing.narrative}
-        fallbackMessage="Your finance dashboard brings together revenue, expenses, and cash flow. The more data you connect, the sharper my advice becomes."
+        fallbackMessage="Finn here. I don't do financial anxiety — I do financial clarity. Your revenue, expenses, and cash flow are all in one view, updated as transactions land. Connect your accounts and I'll stop you from ever being surprised by a bank balance again. Start with 'Connect Account' — takes 90 seconds."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Finance Hub', description: 'Financial overview and insights', metadata: {} }}

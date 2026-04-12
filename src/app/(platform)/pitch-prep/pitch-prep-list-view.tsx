@@ -80,7 +80,7 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
         specialistName="Fiona"
         specialistTitle="Fundraising Advisor"
         narrative={briefing.narrative}
-        fallbackMessage="Prepare your pitch with guided exercises. I'll help you craft a narrative that resonates with investors."
+        fallbackMessage="Investors ask the same 12 questions — but the ones who win practise until the answers feel effortless. I'll run you through guided exercises: your story arc, your numbers narrative, objection handling. Start a practice round — it's the highest-ROI hour you'll spend before any meeting."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Pitch Preparation', description: 'Investor pitch prep and coaching', metadata: {} }}

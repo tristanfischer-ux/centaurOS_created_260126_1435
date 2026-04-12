@@ -353,7 +353,7 @@ export function TimeTrackerView({
         specialistName="Cal"
         specialistTitle="Chief of Staff"
         narrative={briefing.narrative}
-        fallbackMessage="Log your time consistently and I'll help you spot patterns, track billable hours, and make sure nothing falls through the cracks."
+        fallbackMessage="Track where your hours actually go — not where you think they go. Weekly view, project allocation, billable vs. non-billable. Most founders discover 40% of their time is on work they should've delegated last month. Log this week and see what the data says."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Time Tracking', description: 'Cal on time tracking.', metadata: {} }}

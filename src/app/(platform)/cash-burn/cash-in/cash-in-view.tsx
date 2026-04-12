@@ -307,7 +307,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
         specialistName="Finn"
         specialistTitle="Finance"
         narrative={briefing.narrative}
-        fallbackMessage="Add your revenue streams, grants, and funding here. I'll show you how they stack up against your costs and what your income mix looks like."
+        fallbackMessage="Revenue isn't one number — it's streams, and some are more reliable than others. I break down every inflow: recurring revenue, grants, one-off wins, funding. You'll see your income mix and spot dangerous over-reliance on any single source. Add your revenue streams and I'll show you where you're exposed."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Cash In', description: 'Finn on cash in.', metadata: {} }}

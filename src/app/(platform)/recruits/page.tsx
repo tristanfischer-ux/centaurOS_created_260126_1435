@@ -165,7 +165,7 @@ Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
                 specialistName="Harper"
                 specialistTitle="Hiring"
                 narrative={briefing.narrative}
-                fallbackMessage="Find fractional executives and specialists ready to join your team. Filter by skills, availability, and experience to find the right match."
+                fallbackMessage="The best candidates aren't applying to job boards — they need to be found. I match against skills, availability, and culture fit so you're not wading through 200 irrelevant CVs. Set your filters for the role you need filled this month and let's see who's out there."
                 isLoading={false}
                 severity={briefing.severity}
                 context={{ type: 'general', title: 'Recruits', description: 'Harper on recruits.', metadata: {} }}

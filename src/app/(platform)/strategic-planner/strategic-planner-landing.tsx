@@ -89,7 +89,7 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
         specialistName="Sage"
         specialistTitle="Strategist"
         narrative={briefing.narrative}
-        fallbackMessage="Define strategic goals and break them into milestones. I'll track progress and flag when priorities need adjusting."
+        fallbackMessage="Two views, one strategy. The goals list gives you clarity. The timeline canvas gives you sequence — what unlocks what, what blocks what, and where you're trying to do too much at once. Drag a goal onto the canvas and connect it to what it depends on."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Strategic Planner', description: 'Strategic goals and milestone tracking', metadata: {} }}

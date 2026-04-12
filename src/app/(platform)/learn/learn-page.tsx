@@ -223,7 +223,7 @@ export function LearnPage({
         specialistName="Sage"
         specialistTitle="Strategy"
         narrative={null}
-        fallbackMessage="Explore manufacturing techniques, tutorials, and community Q&A. Understanding your options here helps you make better design and sourcing decisions."
+        fallbackMessage="Manufacturing has a thousand techniques and knowing the right one saves months. I've curated tutorials from injection moulding to CNC tolerancing, with expert Q&A when the docs aren't enough. Pick the technique closest to your current build challenge."
         isLoading={false}
         severity="success"
         context={{ type: 'general', title: 'Learn', description: 'Sage on learning resources.', metadata: {} }}

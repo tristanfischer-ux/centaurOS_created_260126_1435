@@ -215,7 +215,7 @@ export default function HelpCenterPage() {
         specialistName="Cal"
         specialistTitle="Chief of Staff"
         narrative={null}
-        fallbackMessage="Need help? Start with the video walkthroughs below, or ask any specialist directly — just click their avatar in the sidebar."
+        fallbackMessage="If you're stuck, start here. Video walkthroughs for visual learners, feature guides for the thorough, keyboard shortcuts for the impatient. Most questions are answered in under 2 minutes. Try the search — it's faster than scrolling."
         isLoading={false}
         severity="success"
         context={{ type: 'general', title: 'Help', description: 'Cal on getting help.', metadata: {} }}

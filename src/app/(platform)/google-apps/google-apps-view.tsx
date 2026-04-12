@@ -75,7 +75,7 @@ export function GoogleAppsView({ googleEmail, features }: GoogleAppsViewProps) {
                 specialistName="Cal"
                 specialistTitle="Chief of Staff"
                 narrative={null}
-                fallbackMessage="Connect Google Workspace to sync your calendar, documents, and email. This helps me coordinate your schedule and surface relevant files."
+                fallbackMessage="Your Drive, Docs, Calendar, and Email — connected, not copied. Changes sync both ways. No more switching tabs to find that doc someone mentioned in a meeting. Connect your Google account and your workflow just got 30% less fragmented."
                 isLoading={false}
                 severity="success"
                 context={{ type: 'general', title: 'Google Apps', description: 'Cal on Google integration.', metadata: {} }}

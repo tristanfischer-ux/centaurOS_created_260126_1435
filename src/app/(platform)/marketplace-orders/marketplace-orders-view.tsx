@@ -193,7 +193,7 @@ export function MarketplaceOrdersView({
                 specialistName="Chase"
                 specialistTitle="Supply Chain"
                 narrative={briefing.narrative}
-                fallbackMessage="Track your marketplace orders and supplier communications. I'll flag anything that needs follow-up."
+                fallbackMessage="Every order tracked from placement to delivery, with supplier comms in one thread. I flag delays before they become problems and prompt follow-ups when suppliers go quiet. Check any amber-flagged orders — those are the ones about to slip."
                 isLoading={briefing.isLoading}
                 severity={briefing.severity}
                 context={{ type: 'general', title: 'Orders', description: 'Chase on orders.', metadata: {} }}

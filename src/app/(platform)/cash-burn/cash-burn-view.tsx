@@ -301,7 +301,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         specialistName="Finn"
         specialistTitle="Finance"
         narrative={briefing.narrative}
-        fallbackMessage="I'll help you model your runway and cash projections. Start by adding your costs on Cash Out and revenue on Cash In — I'll calculate everything else."
+        fallbackMessage="Here's the number that matters: how many weeks until the money runs out. I model 52 weeks forward across three scenarios — optimistic, realistic, and 'what if that client leaves.' Adjust any assumption and watch the runway move in real time. Try the scenario slider — it's more useful than any spreadsheet you've built."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Cash Burn', description: 'Finn on cash burn.', metadata: {} }}

@@ -110,7 +110,7 @@ export function SpecialistsPageClient({
                     specialistName="Cal"
                     specialistTitle="Chief of Staff"
                     narrative={briefing.narrative}
-                    fallbackMessage="Your specialist team is ready to help. Each one brings deep expertise in their domain — just click to start a conversation."
+                    fallbackMessage="This is your bench — 13 specialists across Know, Grow, and Run. Each one thinks differently about your business. You can talk to any of them directly, or build workflows that chain their expertise together. Pick the specialist closest to today's problem and start a conversation."
                     isLoading={briefing.isLoading}
                     severity={briefing.severity}
                     context={{ type: 'general', title: 'AI Team', description: 'Cal on specialists.', metadata: {} }}

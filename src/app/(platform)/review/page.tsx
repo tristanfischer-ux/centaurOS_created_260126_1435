@@ -150,7 +150,7 @@ export default async function ReviewQueuePage() {
                 specialistName="Cal"
                 specialistTitle="Chief of Staff"
                 narrative={null}
-                fallbackMessage="Your review queue is where AI-generated content, draft tasks, and pending actions land before going live. Review, revise, or publish — nothing goes out without your approval."
+                fallbackMessage="Things waiting for your approval — draft tasks, content, decisions that can't move without you. I show pending items by urgency so the team isn't blocked longer than necessary. Clear the red items first — someone's waiting on each one."
                 isLoading={false}
                 severity="success"
                 context={{ type: 'general', title: 'Review Queue', description: 'Cal on the review queue.', metadata: {} }}

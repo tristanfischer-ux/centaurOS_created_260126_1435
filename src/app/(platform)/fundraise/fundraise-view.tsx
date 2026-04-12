@@ -221,7 +221,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
           specialistName="Fiona"
           specialistTitle="Fundraising"
           narrative={briefing.narrative}
-          fallbackMessage="You haven't started tracking investors yet. Head to the Investor Directory to research and shortlist your targets — I'll help you build a focused pipeline and time your outreach."
+          fallbackMessage="Every investor relationship is a deal — and deals need a pipeline. Research, Contacted, Meeting, Due Diligence, Won, Lost. Drag cards across stages and I'll track velocity, spot stalls, and tell you when to follow up or walk away. Add your first prospect to get the pipeline moving."
           isLoading={briefing.isLoading}
           severity={briefing.severity}
           context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
@@ -278,7 +278,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
         specialistName="Fiona"
         specialistTitle="Fundraising"
         narrative={briefing.narrative}
-        fallbackMessage="Your fundraising command centre. I'll help you track your pipeline, prepare materials, and time your outreach for maximum impact."
+        fallbackMessage="Your fundraising command centre. I track pipeline velocity, flag stalled conversations, and time your follow-ups. Drag cards across stages — every day a warm lead sits in 'Contacted' without a meeting, it's cooling."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}

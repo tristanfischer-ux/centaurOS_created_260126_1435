@@ -75,9 +75,7 @@ export function InvestorSpecialistBanner({
     'briefing-investors',
   )
 
-  const fallback = shortlistCount === 0
-    ? "You haven't shortlisted any investors yet. Tell me your target raise and I'll help you build a focused pipeline — the right 20 investors beat a list of 200."
-    : `You have ${shortlistCount} investor${shortlistCount !== 1 ? 's' : ''} shortlisted. Let me review your pipeline for gaps in stage coverage, sector fit, and geography.`
+  const fallback = "I'm Fiona. Investors decide in 90 seconds whether you're worth a meeting — so let's find the ones already primed to say yes. I've built matching that finds investors by thesis fit, not just sector tags. Try the search with your one-line pitch and see who lights up."
 
   return (
     <SpecialistBriefingHero

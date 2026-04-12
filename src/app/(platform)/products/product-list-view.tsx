@@ -170,11 +170,7 @@ export function ProductListView({ products }: ProductListViewProps) {
         specialistName="Priya"
         specialistTitle="Product Development"
         narrative={briefing.narrative}
-        fallbackMessage={
-          products.length === 0
-            ? "No products yet. Start with a market idea, promote a Forge design, or upload a business plan to extract products."
-            : `You have ${products.length} product${products.length === 1 ? '' : 's'}. Let me review your portfolio.`
-        }
+        fallbackMessage="I'm Priya. Every product here moves through a clear lifecycle: concept, validate, build, launch, grow. No guessing what stage you're at or what's next. I've set up market assessment and competitor tracking so you're never building blind. Add your first product — even if it's just a name and a problem it solves."
         isLoading={briefing.isLoading}
         loadingMessage="Reviewing your product portfolio..."
         severity={briefing.severity}

@@ -170,13 +170,7 @@ export function TasksCommandCenter({
     [tasks],
   )
 
-  const calFallback = useMemo(() => {
-    if (stats.totalTasks === 0) return "No tasks in the system yet. Once you start adding tasks, I'll keep an eye on what needs attention."
-    if (stats.overdue > 5) return `${stats.overdue} overdue tasks need attention. Let's triage what to tackle first and what to reschedule.`
-    if (stats.overdue > 0) return `${stats.overdue} overdue task${stats.overdue > 1 ? 's' : ''} and ${stats.dueToday} due today. ${stats.myActiveTasks} active on your plate.`
-    if (stats.dueToday > 0) return `${stats.dueToday} task${stats.dueToday > 1 ? 's' : ''} due today with ${stats.myActiveTasks} active. Looking manageable.`
-    return `${stats.myActiveTasks} active tasks, nothing overdue. Execution is clean.`
-  }, [stats])
+  const calFallback = "Cal here. You've got work scattered across objectives — I've pulled it all into one place. Focus view shows what matters today, Board shows the full battlefield, Timeline catches scheduling collisions. Drag anything that's slipping to a realistic date — I'd rather an honest plan than a pretty one."
 
   const calSeverity = useMemo((): 'success' | 'warning' | 'error' => {
     if (stats.overdue > 5 || blockerCount > 2) return 'error'

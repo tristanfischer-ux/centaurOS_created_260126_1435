@@ -157,7 +157,7 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
                 specialistName="Sal"
                 specialistTitle="Sales Lead"
                 narrative={briefing.narrative}
-                fallbackMessage="Build outreach campaigns to connect with potential customers. I'll help you craft sequences that convert."
+                fallbackMessage="Sal here. Cold outreach works when it's targeted, timed, and relentless in follow-up. I manage your prospect lists, sequence your emails, and track who opened what. Add your first 10 prospects and let's build a sequence — most deals close on the 4th touch, not the 1st."
                 isLoading={briefing.isLoading}
                 severity={briefing.severity}
                 context={{ type: 'general', title: 'Outreach', description: 'Campaign management and outreach', metadata: {} }}
