@@ -125,6 +125,14 @@ export async function delegateTaskToSpecialist(
 
     const disclaimer = needsReviewDisclaimer(specialist.id)
 
+    // INTENT: Voice reinforcement — extract signature phrases so they appear
+    // both in the compiled personality AND the execution instructions.
+    const voice = specialist.personality?.voice
+    const signaturePhrases = voice?.signaturePhrases?.slice(0, 3) ?? []
+    const voiceReminder = signaturePhrases.length > 0
+      ? `\nVOICE REMINDER: You are ${specialist.name}. Use phrases like "${signaturePhrases.join('", "')}" naturally. A reader should know it's you without seeing your name.`
+      : ''
+
     const executionPrompt = `${personalityPrompt}
 
 ---
@@ -143,13 +151,15 @@ INSTRUCTIONS:
 4. Mark anything requiring the founder's judgment with [REVIEW NEEDED] and explain why.
 5. Format as clean markdown. Use headings, lists, and tables where appropriate.
 6. Be thorough — this should be something the founder can approve and use immediately.
-${feedback ? '7. The founder has reviewed a previous version and provided feedback above. Address ALL of their feedback in this revision.' : ''}
+7. Include at least one non-obvious insight or recommendation the founder wouldn't have thought of.
+${feedback ? '8. The founder has reviewed a previous version and provided feedback above. Address ALL of their feedback in this revision.' : ''}
 
 Do NOT:
 - Ask clarifying questions (make reasonable assumptions and note them)
 - Provide multiple options (pick the best one and explain why)
 - Give generic advice (be specific to this company and task)
-- Pad with filler (every sentence should earn its place)`
+- Pad with filler (every sentence should earn its place)
+- Sound like a generic assistant — sound like ${specialist.name}${voiceReminder}`
 
     // ── 5. Generate deliverable via AI ────────────────────────────
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
