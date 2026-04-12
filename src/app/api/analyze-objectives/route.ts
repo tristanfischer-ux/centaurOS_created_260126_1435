@@ -24,7 +24,9 @@ export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
 const OBJECTIVES_MODEL = 'claude-opus-4-6'
-const OBJECTIVES_MAX_TOKENS = 8192
+// GOTCHA: With dates on every task, 15 objectives × 8 tasks × full fields
+// produces ~12K-16K tokens. 8192 was truncating the JSON mid-string.
+const OBJECTIVES_MAX_TOKENS = 16384
 
 const OBJECTIVES_PROMPT = `You are an expert business consultant and operations strategist. Extract ALL strategic objectives, goals, milestones, and action items from the document.
 
@@ -108,7 +110,18 @@ export async function POST(request: NextRequest) {
     const fenceMatch = raw.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/)
     if (fenceMatch) raw = fenceMatch[1].trim()
 
-    return NextResponse.json({ raw, usage: response.usage })
+    // GOTCHA: If Opus hit max_tokens, the JSON may be truncated mid-string.
+    // Try to recover by finding the last complete object in the array.
+    if (response.stop_reason === 'max_tokens') {
+      console.warn('[analyze-objectives] Opus hit max_tokens — attempting JSON repair')
+      // Find the last complete '}' that closes an array element
+      const lastCompleteObj = raw.lastIndexOf('}')
+      if (lastCompleteObj > 0) {
+        raw = raw.slice(0, lastCompleteObj + 1) + ']'
+      }
+    }
+
+    return NextResponse.json({ raw, usage: response.usage, stopReason: response.stop_reason })
   } catch (error) {
     console.error('[analyze-objectives] Opus extraction failed:', error instanceof Error ? error.message : error)
     return NextResponse.json({ error: 'Objectives extraction failed' }, { status: 500 })
