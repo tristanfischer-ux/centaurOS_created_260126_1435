@@ -73,7 +73,11 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const isAssignee = task.assignees?.some(a => a.id === currentUserId) || task.assignee_id === currentUserId
     const isCreator = currentUserId === task.creator_id
     const isAITask = task.assignees?.some(a => a.role === 'AI_Agent') || task.assignee?.role === 'AI_Agent'
-    const isOverdue = task.end_date ? new Date(task.end_date) < new Date() : false
+    // GOTCHA: A Pending task that was never started is NOT overdue — it's just not started yet.
+    // Only mark as overdue if someone has begun working on it (Accepted/In Progress/etc).
+    const isOverdue = task.end_date && task.status !== 'Pending' && task.status !== 'Completed'
+      ? new Date(task.end_date) < new Date()
+      : false
     const isExecutive = userRole === 'Executive' || userRole === 'Founder'
 
     // Check if task is due soon (within 24 hours)

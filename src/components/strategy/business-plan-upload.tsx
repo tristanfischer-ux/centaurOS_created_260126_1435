@@ -228,7 +228,7 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
         <>
           <Loader2 className="h-8 w-8 text-accent animate-spin" />
           <p className="text-sm font-medium text-foreground">{STEP_LABELS[state]}</p>
-          <p className="text-xs text-muted-foreground">This usually takes 30-60 seconds</p>
+          <p className="text-xs text-muted-foreground">This usually takes 2-3 minutes</p>
         </>
       ) : state === 'done' ? (
         <>

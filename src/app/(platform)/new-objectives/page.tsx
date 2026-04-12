@@ -177,10 +177,13 @@ export default async function NewObjectivesPage() {
     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
     // Calculate health: on-track, at-risk, off-track, completed
+    // GOTCHA: "Not Started" must come before overdue checks — freshly imported
+    // objectives with past dates are NOT overdue if nobody has started working yet.
+    const activeTasks = objTasks.filter(t => t.status !== 'Pending').length
     let health: 'on-track' | 'at-risk' | 'off-track' | 'completed' | 'not-started'
     if (progress === 100) {
       health = 'completed'
-    } else if (totalTasks === 0) {
+    } else if (totalTasks === 0 || activeTasks === 0) {
       health = 'not-started'
     } else if (overdueTasks > 0 || progress < 25) {
       health = 'off-track'
