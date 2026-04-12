@@ -34,28 +34,34 @@ IMPORTANT: The document may be a traditional business plan, BUT it could also be
 - A commercial audit with recommended actions
 - A strategic roadmap with phases and milestones
 
-Your job is to extract EVERY actionable objective — NOT the products/features described in the plan, but the ACTIONS the company needs to take. For example:
-- "Fix website SEO issues" is an objective (action to take)
-- "ForgeOS CAD Lab" is a product (NOT an objective — skip it)
-- "Reach out to 50 hardware founders" is an objective
-- "Record demo video" is a task under an objective
+Your job is to extract EVERY actionable objective — NOT the products/features described in the plan, but the ACTIONS the company needs to take.
 
 Group related tasks into objectives. If the document has explicit phases/weeks/days, use those as the grouping.
 
-For each objective:
-- title: the goal name (action-oriented, e.g. "Launch founder outreach campaign", NOT product names)
-- description: what it entails and why it matters
-- phase: business phase (e.g. "Week 1", "Day 1-2", "Launch", "Scale", "Month 1") — use the document's own phasing if available
-- suggestedStartDate, suggestedEndDate: ISO dates if timing is mentioned or inferable
-- tasks: 3-8 concrete, actionable tasks. Each task has:
-  - title, description
-  - role: "Executive" (decisions/hiring/strategy/outreach/demos), "Apprentice" (research/setup/data entry), or "AI_Agent" (data analysis/content generation/coding)
-  - estimatedDays (optional)
+CRITICAL — DATES: Every objective AND every task MUST have specific start and end dates (ISO format YYYY-MM-DD). If the document mentions "Day 1", "Week 2", "April 14" etc., convert those to actual ISO dates. Tasks within an objective should be SEQUENCED — not all starting on the same day. Stagger them logically: if objective runs April 11-13, task 1 might be April 11, task 2 April 11-12, task 3 April 12-13, etc.
 
-Aim for 5-15 objectives with 3-8 tasks each. Extract generously — it's better to have too many than too few.
+CRITICAL — ROLES: This is a solo founder with AI assistants. There are only TWO roles:
+- "Executive": the founder does this personally (demos, calls, outreach, decisions, recording videos, writing)
+- "AI_Agent": an AI specialist handles this (coding, content generation, data analysis, research, setup)
+Do NOT use "Apprentice" — there are no apprentices.
+
+For each objective:
+- title: action-oriented goal name
+- description: what it entails and why
+- phase: use the document's phasing (e.g. "Day 1", "Week 2", "Month 2-3")
+- suggestedStartDate: ISO date (REQUIRED)
+- suggestedEndDate: ISO date (REQUIRED)
+- tasks: 3-8 concrete tasks. Each has:
+  - title, description
+  - role: "Executive" or "AI_Agent" only
+  - estimatedDays: number (REQUIRED — how many days this task takes)
+  - suggestedStartDate: ISO date (REQUIRED — stagger within the objective's range)
+  - suggestedEndDate: ISO date (REQUIRED)
+
+Aim for 8-15 objectives with 3-8 tasks each.
 
 Return ONLY a raw JSON array (no markdown, no code fences):
-[{ "title": "...", "description": "...", "phase": "...", "suggestedStartDate": "...", "suggestedEndDate": "...", "tasks": [{"title":"...","description":"...","role":"Executive","estimatedDays":1}] }]`
+[{ "title": "...", "description": "...", "phase": "...", "suggestedStartDate": "2026-04-11", "suggestedEndDate": "2026-04-11", "tasks": [{"title":"...","description":"...","role":"Executive","estimatedDays":1,"suggestedStartDate":"2026-04-11","suggestedEndDate":"2026-04-11"}] }]`
 
 export async function POST(request: NextRequest) {
   // AUTH: Verify user is authenticated

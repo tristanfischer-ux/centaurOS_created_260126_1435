@@ -48,8 +48,8 @@ For each objective:
 - suggestedStartDate, suggestedEndDate: ISO dates if timing is mentioned or inferable
 - tasks: 3-8 concrete, actionable tasks. Each task has:
   - title, description
-  - role: "Executive" (decisions/hiring/strategy/outreach/demos), "Apprentice" (research/setup/data entry), or "AI_Agent" (data analysis/content generation/coding)
-  - estimatedDays (optional)
+  - role: "Executive" (founder does it personally) or "AI_Agent" (AI specialist handles it). NO "Apprentice".
+  - estimatedDays (required)
 
 Aim for 5-15 objectives with 3-8 tasks each. Extract generously — it's better to have too many than too few.
 
