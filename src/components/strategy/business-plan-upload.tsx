@@ -86,15 +86,24 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
           const extracted = await extractDocumentText(extractForm)
           if (!extracted.success || !extracted.text) return null
 
+          console.log('[BP Import] Calling Opus API route with', extracted.text.length, 'chars')
           const res = await fetch('/api/analyze-objectives', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ text: extracted.text.slice(0, 100000) }),
           })
-          if (!res.ok) return null
+          console.log('[BP Import] Opus API response:', res.status, res.headers.get('content-type'))
+          if (!res.ok) {
+            const errText = await res.text().catch(() => 'unknown')
+            console.error('[BP Import] Opus API error:', res.status, errText.slice(0, 200))
+            return null
+          }
           const data = await res.json()
+          console.log('[BP Import] Opus returned raw:', data.raw?.length ?? 'no raw field', 'chars')
           return data.raw as string | null
-        } catch {
+        } catch (e) {
+          console.error('[BP Import] Opus fetch failed:', e)
           return null
         }
       })(),
