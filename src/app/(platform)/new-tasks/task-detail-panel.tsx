@@ -46,6 +46,7 @@ interface TaskComment {
 
 /** Status options a user can move a task to */
 const STATUS_OPTIONS = [
+  { value: 'Pending', label: 'Pending' },
   { value: 'Accepted', label: 'In Progress' },
   { value: 'Completed', label: 'Completed' },
 ] as const
@@ -289,17 +290,24 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
     if (newStatus === task.status) return
 
     startTransition(async () => {
-      if (newStatus !== 'Completed') {
-        toast.error('This status transition is not supported from here')
+      if (newStatus === 'Completed') {
+        const result = await completeTask(task.id)
+        if (result.error) {
+          toast.error(result.error)
+        } else {
+          celebrateTaskComplete(task.title)
+          router.refresh()
+        }
         return
       }
 
-      const result = await completeTask(task.id)
-
+      // For non-completion transitions, update status directly via server action
+      const { updateTaskStatus } = await import('@/actions/tasks')
+      const result = await updateTaskStatus(task.id, newStatus)
       if (result.error) {
         toast.error(result.error)
       } else {
-        celebrateTaskComplete(task.title)
+        toast.success(`Status changed to ${newStatus.replace(/_/g, ' ')}`)
         router.refresh()
       }
     })
@@ -516,7 +524,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                 <Select
                   value={task.status}
                   onValueChange={handleStatusChange}
-                  disabled={isPending || task.status === 'Completed'}
+                  disabled={isPending}
                 >
                   <SelectTrigger className="h-8 text-sm w-full max-w-[180px]">
                     <SelectValue />
