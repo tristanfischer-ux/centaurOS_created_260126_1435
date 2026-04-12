@@ -55,13 +55,23 @@
 
 | # | Issue | Priority | Notes |
 |---|-------|----------|-------|
-| 36 | Custom SMTP for email sender address | DONE | Resend SMTP configured: smtp.resend.com:587, sender "Fractional Forge" <no-reply@fractionalforge.app> |
-| 37 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
-| 38 | Write first case study | HIGH | From FF's own usage |
-| 39 | Update mock URLs in product screenshots | LOW | .com -> .app |
+| 36 | Custom SMTP for email sender address | DONE | Resend SMTP configured |
+| 37 | Business plan import: API route for Opus | DONE | /api/analyze-objectives with maxDuration=300, client calls in parallel |
+| 38 | Business plan import: objectives as strategic goals | DONE | is_strategic_goal=true so they appear on Strategy page |
+| 39 | Business plan import: hires/funding → tasks | DONE | Creates tasks linked to parent objectives |
+
+## To Do
+
+| # | Issue | Priority | Notes |
+|---|-------|----------|-------|
+| 40 | Demo data cleanup system | HIGH | Button in Settings + prompt after onboarding completion |
+| 41 | Record 2-min demo video of The Forge | HIGH | Tristan to record |
+| 42 | Write first case study | HIGH | From FF's own usage |
+| 43 | Update mock URLs in product screenshots | LOW | .com -> .app |
+| 44 | Update commercial audit action plan in ForgeOS | MEDIUM | Import into Strategy page once pipeline works |
 
 ---
 
-**Session totals: 36 done, 3 remaining (2 are Tristan tasks, 1 is low-priority cosmetic)**
+**Session totals: 39 done, 5 remaining**
 
 *Updated as issues are found and resolved. Every item Tristan flags gets added here.*

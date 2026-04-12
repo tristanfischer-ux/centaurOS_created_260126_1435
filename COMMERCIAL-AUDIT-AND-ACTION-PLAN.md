@@ -1,7 +1,7 @@
 # Fractional Forge — Commercial Audit & Go-To-Market Action Plan
 
 **Date:** 2026-04-11
-**Last Updated:** 2026-04-11 (Session 1 — Day 1 fixes)
+**Last Updated:** 2026-04-12 (Session 2 — Day 1-2 complete, dogfooding fixes)
 **Objective:** Stop tweaking. Start selling. First paying customers by 2026-04-18.
 **Scope:** Marketing, sales, commercial strategy, red team analysis, week-by-week execution plan.
 
@@ -30,11 +30,42 @@
 | 15 | Write first case study | TODO |
 | 16 | Update mock URLs in screenshots | TODO |
 
+### Day 1 continued — Dogfooding Fixes (April 11-12, COMPLETED)
+
+| # | Task | Status |
+|---|------|--------|
+| 17 | Supabase email templates branded | DONE — All 13 templates with ForgeOS branding |
+| 18 | Custom SMTP configured | DONE — Resend via smtp.resend.com, sender "Fractional Forge" |
+| 19 | Account purged (Elena Vasquez demo data) | DONE — Fresh account, Founder, Enterprise tier |
+| 20 | Foundry renamed to "Fractional Forge" | DONE |
+| 21 | Fake team members removed | DONE — 20 profiles moved to demo-archive |
+| 22 | Test accounts hidden from Recruits | DONE — 7 provider_profiles deactivated |
+| 23 | Objectives prefixed with "Demo:" | DONE — 19 objectives |
+| 24 | Founding counter consistent | DONE — Both pages say "X spots left" |
+| 25 | AI chat UX: bouncing dots + scroll fix | DONE |
+| 26 | Business plan import: resilient parsing | DONE |
+| 27 | Business plan import: drag-drop text | DONE |
+| 28 | Review page: orange accent + Cal briefing | DONE |
+| 29 | Onboarding wizard: skip + examples | DONE |
+| 30 | Demo data disclaimer infrastructure | DONE — isDemoData prop |
+| 31 | Forge page copy: honest about capability | DONE — "concept packages" not "engineering packages" |
+| 32 | Investor overview: cleaner charts | DONE — Sentence case, wider labels, legend below |
+| 33 | Investor "For You": company profile data | DONE — stage/sector/company_profile populated |
+| 34 | Investor match pre-warming | DONE — Background fetch on app load |
+| 35 | Business plan import: Opus + API route | DONE — Separate route with 300s timeout |
+| 36 | Business plan import: objectives as strategic goals | DONE — is_strategic_goal=true |
+| 37 | Business plan import: hires/funding → tasks | DONE |
+| 38 | Demo cash data cleaned | DONE |
+| 39 | Deployment verification rule added to CLAUDE.md | DONE |
+| 40 | Geo normalization (UK vs United Kingdom) | DONE |
+
 ### Day 2-3 — April 12-13: Remaining tasks
 - [ ] Record 2-min Loom demo of The Forge (concept package generation)
 - [ ] Write 1 case study (from Fractional Forge's own usage)
 - [ ] Build 50-prospect LinkedIn list
-- [ ] **Dogfood: Sign up as Fractional Forge on the app, create tasks from this plan**
+- [ ] **Import this action plan into ForgeOS Strategy page (objectives + tasks)**
+- [ ] Build demo data cleanup system (button in Settings to clear demo content)
+- [ ] Update mock URLs in product screenshots (.com → .app)
 
 ---
 

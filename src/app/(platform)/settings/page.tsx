@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { SignOutCard } from './sign-out-card'
 import { RestartSetupWizardCard } from '@/components/onboarding/restart-setup-wizard-card'
+import { ClearDemoDataButton } from '@/components/settings/clear-demo-data-button'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import {
     User,
@@ -137,6 +138,7 @@ export default async function SettingsPage() {
             </div>
 
             {/* Setup wizard restart */}
+            <ClearDemoDataButton />
             <RestartSetupWizardCard />
 
             {/* Notification preferences teaser */}

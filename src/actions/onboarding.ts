@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import type { Database, Json } from '@/types/database.types'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { withAuth } from '@/lib/server-action-utils'
 
 type AccountType = Database['public']['Enums']['account_type']
 
@@ -286,6 +287,8 @@ export interface OnboardingData {
   selected_plan?: 'free' | 'starter' | 'professional'
   /** Intent selected during onboarding 3-way fork */
   intent_selection?: 'setup_company' | 'join_company' | 'exploring'
+  /** Whether demo/seed data has been cleared */
+  demo_data_cleared?: boolean
   /** Sandbox welcome banner dismissed on Today page */
   sandbox_banner_dismissed?: boolean
   /** Profile completion wizard (mandatory, post-company-name) */
@@ -782,4 +785,80 @@ export async function recordMarketplaceAction(
   }
 
   return { success: true, alreadyRecorded: false }
+}
+
+/**
+ * Clears all demo/seed data from the user's foundry.
+ * Called when user completes onboarding or clicks "Clear Demo Data" in Settings.
+ *
+ * @description Deletes demo tasks, objectives, marketplace listings, and activity
+ * events that were created during onboarding seed. Marks demo_data_cleared in the
+ * user's onboarding_data so it won't be re-seeded.
+ *
+ * @returns Object with success boolean, optional error, and counts of cleared items
+ *
+ * @security Requires authenticated user with valid foundry. Deletes only within
+ * the user's own foundry (foundry_id filter + RLS).
+ */
+export async function clearDemoData(): Promise<{
+  success: boolean
+  error?: string
+  cleared: { objectives: number; tasks: number; listings: number; events: number }
+}> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!foundryId) {
+      return {
+        success: false,
+        error: 'No foundry found',
+        cleared: { objectives: 0, tasks: 0, listings: 0, events: 0 },
+      }
+    }
+
+    // Delete demo tasks first (FK constraint: tasks reference objectives)
+    const { data: deletedTasks } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('foundry_id', foundryId)
+      .eq('is_demo', true)
+      .select('id')
+
+    // Delete demo objectives
+    const { data: deletedObjectives } = await supabase
+      .from('objectives')
+      .delete()
+      .eq('foundry_id', foundryId)
+      .eq('is_demo', true)
+      .select('id')
+
+    // Delete demo marketplace listings (is_demo in JSONB attributes)
+    const { data: deletedListings } = await supabase
+      .from('marketplace_listings')
+      .delete()
+      .eq('foundry_id', foundryId)
+      .contains('attributes', { is_demo: true })
+      .select('id')
+
+    // Delete demo activity events (is_demo in JSONB event_data)
+    const { data: deletedEvents } = await supabase
+      .from('activity_events')
+      .delete()
+      .eq('foundry_id', foundryId)
+      .contains('event_data', { is_demo: true })
+      .select('id')
+
+    // Mark demo data as cleared in onboarding
+    await updateOnboardingData({ demo_data_cleared: true })
+
+    revalidatePath('/', 'layout')
+
+    return {
+      success: true,
+      cleared: {
+        objectives: deletedObjectives?.length ?? 0,
+        tasks: deletedTasks?.length ?? 0,
+        listings: deletedListings?.length ?? 0,
+        events: deletedEvents?.length ?? 0,
+      },
+    }
+  })
 }
