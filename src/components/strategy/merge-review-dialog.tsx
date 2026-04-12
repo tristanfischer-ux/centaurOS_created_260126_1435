@@ -396,15 +396,52 @@ function SuggestionCard({
       {expanded && (
         <div className="mt-3 space-y-2 border-t pt-3">
           <p className="text-sm text-muted-foreground">{aiObjective.description}</p>
-          <p className="text-xs font-medium text-foreground">{aiObjective.tasks.length} tasks:</p>
-          <ul className="space-y-1">
-            {aiObjective.tasks.map((task, i) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                <Badge variant="secondary" className="text-[10px] shrink-0 mt-0.5">{task.role}</Badge>
-                <span>{task.title}</span>
-              </li>
-            ))}
-          </ul>
+          {/* 3-level: strategic goal has objectives array; 2-level: has tasks array */}
+          {(() => {
+            const aiObj = aiObjective as Record<string, unknown>
+            const childObjectives = (aiObj.objectives as Array<Record<string, unknown>>) ?? []
+            if (childObjectives.length > 0) {
+              const totalTasks = childObjectives.reduce((sum, o) => sum + ((o.tasks as unknown[]) ?? []).length, 0)
+              return (
+                <>
+                  <p className="text-xs font-medium text-foreground">{childObjectives.length} objectives, {totalTasks} tasks:</p>
+                  <div className="space-y-2">
+                    {childObjectives.map((obj, oi) => {
+                      const tasks = (obj.tasks as Array<Record<string, unknown>>) ?? []
+                      return (
+                        <div key={oi}>
+                          <p className="text-xs font-medium text-foreground">{obj.title as string}</p>
+                          <ul className="space-y-0.5 ml-3 mt-0.5">
+                            {tasks.map((task, ti) => (
+                              <li key={ti} className="flex items-start gap-2 text-xs text-muted-foreground">
+                                <Badge variant="secondary" className="text-[10px] shrink-0 mt-0.5">{task.role as string}</Badge>
+                                <span>{task.title as string}</span>
+                                {task.dueDate ? <span className="text-[10px] shrink-0 text-muted-foreground/60">{String(task.dueDate)}</span> : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )
+            }
+            // 2-level fallback
+            return (
+              <>
+                <p className="text-xs font-medium text-foreground">{aiObjective.tasks.length} tasks:</p>
+                <ul className="space-y-1">
+                  {aiObjective.tasks.map((task, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <Badge variant="secondary" className="text-[10px] shrink-0 mt-0.5">{task.role}</Badge>
+                      <span>{task.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )
+          })()}
         </div>
       )}
     </div>

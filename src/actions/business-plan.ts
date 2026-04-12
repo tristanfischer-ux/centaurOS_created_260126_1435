@@ -238,16 +238,19 @@ export async function applyMergeReview(
               objectiveIdMap[(childObjData.title as string) || ''] = childObj.id
               const tasks = (childObjData.tasks as Array<Record<string, unknown>>) ?? []
               for (const task of tasks) {
-                await supabase.from('tasks').insert({
+                const taskDate = (task.dueDate as string) || (task.suggestedEndDate as string) || null
+                const { error: taskErr } = await supabase.from('tasks').insert({
                   foundry_id: foundryId,
                   creator_id: user.id,
                   objective_id: childObj.id,
                   title: (task.title as string) || 'Untitled Task',
                   description: (task.description as string) || '',
                   status: 'Pending',
-                  due_date: (task.dueDate as string) || (task.suggestedEndDate as string) || null,
+                  end_date: taskDate,
+                  start_date: taskDate,
                   assignee_id: user.id,
                 })
+                if (taskErr) console.error('[business-plan] Failed to create task:', taskErr.message)
               }
             }
           }
@@ -272,16 +275,19 @@ export async function applyMergeReview(
               .single()
 
             if (childObj) {
-              await supabase.from('tasks').insert({
+              const taskDate = (taskAny.dueDate as string) || task.suggestedEndDate || null
+              const { error: taskErr } = await supabase.from('tasks').insert({
                 foundry_id: foundryId,
                 creator_id: user.id,
                 objective_id: childObj.id,
                 title: task.title,
                 description: task.description || '',
                 status: 'Pending',
-                due_date: (taskAny.dueDate as string) || task.suggestedEndDate || null,
+                end_date: taskDate,
+                start_date: taskDate,
                 assignee_id: user.id,
               })
+              if (taskErr) console.error('[business-plan] Failed to create fallback task:', taskErr.message)
             }
           }
         }
