@@ -113,6 +113,9 @@ export async function buildSmartMerge(
 
     const SIMILARITY_THRESHOLD = 0.35
 
+    console.log('[buildSmartMerge] analysis.objectives count:', analysis.objectives.length)
+    console.log('[buildSmartMerge] existing objectives count:', existing.length)
+
     const suggestions = analysis.objectives.map((aiObj, index) => {
       let bestMatch: { id: string; title: string; similarity: number } | null = null
 

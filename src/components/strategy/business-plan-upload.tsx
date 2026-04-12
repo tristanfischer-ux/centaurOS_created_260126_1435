@@ -102,16 +102,23 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
 
     // Merge Opus objectives into the analysis result if the server action
     // returned empty objectives but the API route succeeded
+    console.log('[BP Import] Sonnet objectives:', result.analysis?.objectives?.length ?? 'no analysis')
+    console.log('[BP Import] Opus raw result:', objectivesResult ? `${objectivesResult.length} chars` : 'null')
+
     if (result.analysis && objectivesResult) {
       try {
         const parsed = JSON.parse(objectivesResult)
+        console.log('[BP Import] Opus parsed objectives:', Array.isArray(parsed) ? parsed.length : 'not array')
         if (Array.isArray(parsed) && parsed.length > 0 && result.analysis.objectives.length === 0) {
           result.analysis.objectives = parsed
+          console.log('[BP Import] Merged Opus objectives into analysis')
         }
-      } catch {
-        // Opus result wasn't valid JSON — use whatever the server action got
+      } catch (e) {
+        console.error('[BP Import] Opus parse failed:', e)
       }
     }
+
+    console.log('[BP Import] Final objectives count:', result.analysis?.objectives?.length ?? 0)
 
     if (result.error || !result.analysis) {
       setState('error')
