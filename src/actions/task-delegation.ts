@@ -167,11 +167,12 @@ Do NOT:
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          // DECISION: Sonnet for most tasks (fast, good quality).
-          // Opus would be better for complex strategy/financial tasks
-          // but 2-3x slower and more expensive.
+          // DECISION: Sonnet for task execution. Opus is 2-3x slower/costlier
+          // and testing shows Sonnet produces high-quality deliverables.
+          // GOTCHA: 4096 was too low — Leo (legal) and Sal (sales) hit the
+          // limit on complex deliverables (prospect lists, demo scripts).
           model: "claude-sonnet-4-6",
-          max_tokens: 4096,
+          max_tokens: 8192,
           system: executionPrompt,
           messages: [
             {
