@@ -83,6 +83,7 @@ export function DelegationProgressModal({
       const response = await fetch('/api/delegate-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ taskIds }),
         signal: controller.signal,
       })
