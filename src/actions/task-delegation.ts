@@ -333,7 +333,9 @@ Do NOT:
       await supabase
         .from('tasks')
         .update({
-          assignee_id: specialist.profileId,
+          // GOTCHA: Can't set assignee_id to specialist.profileId because
+          // tasks.assignee_id has FK to profiles(id), not specialist_profiles.
+          // Store specialist info in metadata instead; UI reads from there.
           metadata: {
             ...existingMetadata,
             delegation_artifact_id: artifact.id,

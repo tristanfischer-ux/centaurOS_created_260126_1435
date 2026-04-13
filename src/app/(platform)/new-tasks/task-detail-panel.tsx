@@ -637,12 +637,18 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
 
             {/* Assignee + Auto-assign to AI */}
             <DetailRow icon={User} label="Assignee">
-              <div className="flex items-center gap-2">
-                {task.assignee?.full_name ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Show delegated specialist from metadata if available */}
+                {taskMetadata?.delegated_to ? (
+                  <span className="inline-flex items-center gap-1.5 text-sm">
+                    <UserAvatar name={delegationArtifact?.specialistName || String(taskMetadata.delegated_to)} role="AI_Agent" size="xs" />
+                    <span className="font-medium">{delegationArtifact?.specialistName || String(taskMetadata.delegated_to)}</span>
+                    <Badge variant="secondary" className="text-[9px]">AI</Badge>
+                  </span>
+                ) : task.assignee?.full_name ? (
                   <span className="inline-flex items-center gap-1.5 text-sm">
                     <UserAvatar name={task.assignee.full_name} role={task.assignee.role} size="xs" />
                     {task.assignee.full_name}
-                    {task.assignee.role === 'AI_Agent' && <Badge variant="secondary" className="text-[9px]">AI</Badge>}
                   </span>
                 ) : (
                   <span className="text-muted-foreground text-sm">Unassigned</span>

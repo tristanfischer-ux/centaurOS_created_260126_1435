@@ -20,7 +20,7 @@
  * - brief-specialist-dialog.tsx — 1:1 specialist conversation
  */
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion } from "framer-motion"
@@ -139,9 +139,14 @@ export function SpecialistsLanding({
         })
     }, [])
 
+    // GOTCHA: advisorPanel changes on every render (context value), causing
+    // infinite re-render if included in deps. Use a ref to run only once.
+    const specialistParamHandled = useRef(false)
     useEffect(() => {
+        if (specialistParamHandled.current) return
         const specialistParam = searchParams.get('specialist')
         if (specialistParam && SPECIALISTS.some(s => s.id === specialistParam)) {
+            specialistParamHandled.current = true
             if (isDesktop) {
                 advisorPanel.openPanel(specialistParam)
             } else {
@@ -149,7 +154,8 @@ export function SpecialistsLanding({
             }
             router.replace('/agents', { scroll: false })
         }
-    }, [searchParams, router, isDesktop, advisorPanel])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams])
 
     const orgHierarchy = useMemo(() => getOrgChartHierarchy(), [])
 
