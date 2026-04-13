@@ -21,7 +21,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import { compilePersonalityPrompt } from '@/lib/agents/personality'
-import { createArtifact } from '@/actions/agent-artifacts'
+// GOTCHA: Don't use createArtifact server action here — it uses getFoundryIdCached()
+// which relies on React cache that doesn't work in API routes. Insert directly via Supabase.
 import { buildContextLayers } from '@/lib/agents/prompt-builder'
 import { buildAIContextWithServiceClient } from '@/lib/agents/sweep-context'
 
@@ -77,11 +78,11 @@ async function delegateSingleTask(
 }> {
   const { supabase, foundryId, fullName, apiKey } = ctx
 
-  // 1. Fetch task
+  // 1. Fetch task (include metadata for merge)
   const { data: task } = await supabase
     .from('tasks')
     .select(`
-      id, title, description, status, objective_id,
+      id, title, description, status, objective_id, metadata,
       objectives!objective_id ( title, description, parent_objective_id,
         parent:objectives!parent_objective_id ( title )
       )
@@ -244,31 +245,40 @@ Do NOT:
       return { taskId, taskTitle: task.title, specialistName: specialist.name, status: 'error', error: 'Empty response from specialist' }
     }
 
-    // 6. Create artifact
+    // 6. Create artifact directly via Supabase (not via createArtifact server action,
+    // which uses getFoundryIdCached() — React cache doesn't work in API routes)
     const contentType = inferContentType(task.title, task.description || '')
-    const { data: artifact, error: artifactError } = await createArtifact({
-      title: `${specialist.name}: ${task.title}`,
-      content,
-      contentType,
-      metadata: {
-        taskId: task.id,
-        specialistId: specialist.id,
-        specialistName: specialist.name,
-        delegatedAt: new Date().toISOString(),
-        isRevision: false,
-      },
-    })
+    const { data: artifact, error: artifactError } = await supabase
+      .from('agent_artifacts')
+      .insert({
+        foundry_id: foundryId,
+        created_by: ctx.userId,
+        title: `${specialist.name}: ${task.title}`,
+        content,
+        content_type: contentType,
+        metadata: {
+          taskId: task.id,
+          specialistId: specialist.id,
+          specialistName: specialist.name,
+          delegatedAt: new Date().toISOString(),
+          isRevision: false,
+        },
+      })
+      .select('id')
+      .single()
 
     if (artifactError || !artifact) {
-      console.error('[delegate-batch] Artifact creation failed:', artifactError)
-      return { taskId, taskTitle: task.title, specialistName: specialist.name, status: 'error', error: artifactError || 'Failed to save deliverable' }
+      console.error('[delegate-batch] Artifact creation failed:', artifactError?.message)
+      return { taskId, taskTitle: task.title, specialistName: specialist.name, status: 'error', error: artifactError?.message || 'Failed to save deliverable' }
     }
 
-    // 7. Update task status + link artifact
+    // 7. Update task status + link artifact (MERGE metadata, don't overwrite)
+    const existingMetadata = (task.metadata ?? {}) as Record<string, unknown>
     await supabase
       .from('tasks')
       .update({
         metadata: {
+          ...existingMetadata,
           delegation_artifact_id: artifact.id,
           delegated_to: specialist.id,
           delegated_at: new Date().toISOString(),
