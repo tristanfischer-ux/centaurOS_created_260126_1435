@@ -12,8 +12,8 @@ import { ListingEditor } from './listing-editor'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-    title: 'My Listing | Fractional Forge',
-    description: 'Edit and manage your company listing on Fractional Forge',
+    title: 'My Listing',
+    description: 'Edit and manage your company listing on ForgeOS',
 }
 
 export default async function MyListingPage(): Promise<React.ReactNode> {

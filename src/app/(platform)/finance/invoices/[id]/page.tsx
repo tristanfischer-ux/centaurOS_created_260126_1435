@@ -12,7 +12,7 @@ import { getPaymentLinks } from '@/actions/finance-invoices'
 import { InvoiceDetailView } from './invoice-detail-view'
 
 export const metadata: Metadata = {
-  title: 'Invoice | Finance | ForgeOS',
+  title: 'Invoice | Finance',
   description: 'View invoice details and payment link',
 }
 

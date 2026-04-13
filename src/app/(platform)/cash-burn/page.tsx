@@ -9,7 +9,7 @@ import { getBurnPageData } from '@/actions/cash-burn-scenarios'
 import { CashBurnView } from './cash-burn-view'
 
 export const metadata = {
-  title: 'Cash Burn | ForgeOS',
+  title: 'Cash Burn',
   description: 'Scenario-based cash burn analysis with 52-week runway projections',
 }
 

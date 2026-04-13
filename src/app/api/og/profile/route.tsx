@@ -193,7 +193,7 @@ export async function GET(req: NextRequest): Promise<Response> {
                         </span>
                     </div>
                     <span style={{ fontSize: '18px', color: '#64748b' }}>
-                        Find experts like this → forgeos.com
+                        Find experts like this → fractionalforge.app
                     </span>
                 </div>
             </div>

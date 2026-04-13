@@ -21,7 +21,7 @@ import { typography } from '@/lib/design-system'
 import { PreviewContent } from './preview-content'
 
 export const metadata: Metadata = {
-    title: 'Preview Content | ForgeOS',
+    title: 'Preview Content',
     description: 'Preview content before publishing',
 }
 

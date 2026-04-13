@@ -19,7 +19,7 @@ import { ForgeProjectList } from "./components/forge-project-list"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "The Forge | ForgeOS",
+  title: "The Forge",
   description: "Turn product ideas into buildable engineering dossiers",
 }
 

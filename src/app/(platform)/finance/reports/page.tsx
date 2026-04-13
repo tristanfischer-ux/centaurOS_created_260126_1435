@@ -9,7 +9,7 @@ import type { Metadata } from 'next'
 import { ReportsView } from './reports-view'
 
 export const metadata: Metadata = {
-  title: 'Reports | Finance | ForgeOS',
+  title: 'Reports | Finance',
   description: 'Generate P&L, VAT, and Cash Flow Statement reports',
 }
 

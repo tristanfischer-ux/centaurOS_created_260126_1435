@@ -29,7 +29,7 @@ import { VIDEOS, VIDEO_LIBRARY_ORDER } from "@/lib/video-urls"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 
 export const metadata: Metadata = {
-  title: "Help Center | ForgeOS",
+  title: "Help Center",
   description:
     "Everything you need to get the most out of ForgeOS — quick start, video walkthroughs, feature guides, and support.",
 }

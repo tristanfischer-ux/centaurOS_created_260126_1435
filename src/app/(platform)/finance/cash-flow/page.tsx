@@ -10,7 +10,7 @@ import { getCashFlowData } from '@/actions/finance-forecast'
 import { CashFlowView } from './cash-flow-view'
 
 export const metadata: Metadata = {
-  title: 'Cash Flow | Finance | ForgeOS',
+  title: 'Cash Flow | Finance',
   description: 'Forward-looking cash flow projections with scenario modeling',
 }
 

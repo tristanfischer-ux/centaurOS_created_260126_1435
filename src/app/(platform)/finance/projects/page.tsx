@@ -10,7 +10,7 @@ import { getProjectsWithPnL } from '@/actions/finance-projects'
 import { ProjectsView } from './projects-view'
 
 export const metadata: Metadata = {
-  title: 'Projects | Finance | ForgeOS',
+  title: 'Projects | Finance',
   description: 'Track per-project profitability and P&L',
 }
 

@@ -10,7 +10,7 @@ import { getFundingOpportunities } from '@/actions/finance-funding'
 import { FundingView } from './funding-view'
 
 export const metadata: Metadata = {
-  title: 'Funding | Finance | ForgeOS',
+  title: 'Funding | Finance',
   description: 'Track funding opportunities and grant applications',
 }
 

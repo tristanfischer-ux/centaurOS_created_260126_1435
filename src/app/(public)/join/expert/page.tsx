@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-    title: 'Join ForgeOS as an Expert | ForgeOS',
+    title: 'Join as an Expert',
     description: 'Join the ForgeOS expert network. Connect with hardware startups looking for your skills.',
     openGraph: {
         title: 'Join ForgeOS as an Expert',

@@ -103,7 +103,7 @@ export function ProfileSetupRequired({ userRole }: ProfileSetupRequiredProps) {
                 {error}
                 <span className="block mt-1 text-xs">
                   If this persists, please contact{" "}
-                  <a href="mailto:support@forgeos.com" className="underline">support@forgeos.com</a>
+                  <a href="mailto:support@fractionalforge.app" className="underline">support@fractionalforge.app</a>
                 </span>
               </AlertDescription>
             </Alert>
@@ -128,7 +128,7 @@ export function ProfileSetupRequired({ userRole }: ProfileSetupRequiredProps) {
               )}
             </Button>
             <Button variant="outline" asChild>
-              <a href="mailto:support@forgeos.com">Contact Support</a>
+              <a href="mailto:support@fractionalforge.app">Contact Support</a>
             </Button>
           </div>
         </CardContent>

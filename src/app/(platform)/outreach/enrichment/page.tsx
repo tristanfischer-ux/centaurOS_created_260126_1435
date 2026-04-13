@@ -5,7 +5,7 @@ import { EnrichmentView } from './enrichment-view'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-    title: 'Contact Enrichment | ForgeOS',
+    title: 'Contact Enrichment',
     description: 'Enrich marketplace listing contacts for outreach campaigns',
 }
 

@@ -9,7 +9,7 @@ import type { Metadata } from "next"
 import { WorkshopSectionIntro } from "./workshop-section-intro"
 
 export const metadata: Metadata = {
-    title: "Workshop | ForgeOS",
+    title: "Workshop",
     description: "Where ideas become real — The Forge, your team, and prompt workflows",
 }
 

@@ -39,7 +39,7 @@ export function ContactForm() {
     const mailtoBody = encodeURIComponent(
       `Name: ${name}\nEmail: ${email}\n\n${message}`
     )
-    const mailtoHref = `mailto:hello@fractionalforge.com?subject=${mailtoSubject}&body=${mailtoBody}`
+    const mailtoHref = `mailto:hello@fractionalforge.app?subject=${mailtoSubject}&body=${mailtoBody}`
 
     window.location.href = mailtoHref
   }

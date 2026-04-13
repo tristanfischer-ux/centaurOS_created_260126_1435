@@ -23,7 +23,7 @@ import { getMyDashboardData } from '@/actions/me-dashboard'
 import { MeSectionIntro } from './me-section-intro'
 
 export const metadata: Metadata = {
-  title: 'Me | ForgeOS',
+  title: 'Me',
   description: 'Your personal command centre — focus, progress, and activity',
 }
 

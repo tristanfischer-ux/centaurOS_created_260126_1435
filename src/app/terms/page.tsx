@@ -10,8 +10,8 @@ import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | Fractional Forge',
-  description: 'Terms of Service for the Fractional Forge platform.',
+  title: 'Terms of Service',
+  description: 'Terms of Service for the ForgeOS platform by Fractional Forge.',
 }
 
 export default function TermsPage() {
@@ -184,8 +184,8 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold text-foreground">8. Contact</h2>
             <p className="text-muted-foreground leading-relaxed">
               For questions about these terms, please contact us at{' '}
-              <a href="mailto:legal@fractionalforge.com" className="text-electric-blue hover:underline">
-                legal@fractionalforge.com
+              <a href="mailto:legal@fractionalforge.app" className="text-electric-blue hover:underline">
+                legal@fractionalforge.app
               </a>
             </p>
           </section>

@@ -19,22 +19,22 @@ import { Skeleton } from '@/components/ui/skeleton'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
 
 export const metadata: Metadata = {
-    title: 'Blog | Fractional Forge',
+    title: 'Blog',
     description:
-        'Insights from fractional executives on strategy, operations, fundraising, and scaling hardware startups. Expert perspectives from the Fractional Forge team.',
+        'Insights on strategy, operations, fundraising, and scaling hardware startups. Expert perspectives from the Fractional Forge team.',
     openGraph: {
-        title: 'Blog | Fractional Forge',
+        title: 'Blog',
         description:
-            'Insights from fractional executives on strategy, operations, fundraising, and scaling hardware startups.',
+            'Insights on strategy, operations, fundraising, and scaling hardware startups.',
         type: 'website',
         url: `${APP_URL}/blog`,
-        siteName: 'Fractional Forge',
+        siteName: 'ForgeOS by Fractional Forge',
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'Blog | Fractional Forge',
+        title: 'Blog',
         description:
-            'Insights from fractional executives on strategy, operations, fundraising, and scaling hardware startups.',
+            'Insights on strategy, operations, fundraising, and scaling hardware startups.',
     },
     alternates: {
         canonical: `${APP_URL}/blog`,

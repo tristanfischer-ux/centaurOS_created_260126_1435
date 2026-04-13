@@ -9,7 +9,7 @@ import { getIntegrations } from '@/actions/finance-integrations'
 import { IntegrationsView } from './integrations-view'
 
 export const metadata: Metadata = {
-  title: 'Integrations | Finance | ForgeOS',
+  title: 'Integrations | Finance',
   description: 'Connect your accounting software',
 }
 

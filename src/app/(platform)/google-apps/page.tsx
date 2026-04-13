@@ -8,7 +8,7 @@ import { GoogleAppsNotConnected } from './google-apps-not-connected'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-    title: 'Google Apps | ForgeOS',
+    title: 'Google Apps',
     description: 'Access your Google Drive, Docs, Calendar, and Email',
 }
 

@@ -11,7 +11,7 @@ import type { Metadata } from "next"
 import { RedTeamView } from "./red-team-view"
 
 export const metadata: Metadata = {
-  title: "Red Team | ForgeOS",
+  title: "Red Team",
   description: "Stress-test any decision with multi-perspective debate",
 }
 

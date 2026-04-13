@@ -19,7 +19,7 @@ import {
 import Link from 'next/link'
 
 export const metadata = {
-    title: 'Availability | Provider Portal',
+    title: 'Availability',
     description: 'Manage your availability calendar'
 }
 

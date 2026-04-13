@@ -10,8 +10,8 @@ import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Fractional Forge',
-  description: 'Privacy Policy for the Fractional Forge platform.',
+  title: 'Privacy Policy',
+  description: 'Privacy Policy for the ForgeOS platform by Fractional Forge.',
 }
 
 export default function PrivacyPage() {
@@ -165,8 +165,8 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold text-foreground">8. Contact</h2>
             <p className="text-muted-foreground leading-relaxed">
               For privacy-related enquiries, please contact our Data Protection Officer at{' '}
-              <a href="mailto:privacy@fractionalforge.com" className="text-electric-blue hover:underline">
-                privacy@fractionalforge.com
+              <a href="mailto:privacy@fractionalforge.app" className="text-electric-blue hover:underline">
+                privacy@fractionalforge.app
               </a>
             </p>
           </section>

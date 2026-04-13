@@ -20,7 +20,7 @@ import { RetainerStatus } from '@/types/retainers'
 export const revalidate = 30
 
 export const metadata: Metadata = {
-  title: 'Retainers | ForgeOS',
+  title: 'Retainers',
   description: 'Manage your retainer agreements',
 }
 

@@ -25,7 +25,7 @@ interface PaymentLinkGeneratorProps {
 function getPaymentUrl(shortCode: string): string {
   const base = typeof window !== 'undefined'
     ? window.location.origin
-    : process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fractionalforge.com'
+    : process.env.NEXT_PUBLIC_APP_URL ?? 'https://fractionalforge.app'
   return `${base}/pay/${shortCode}`
 }
 

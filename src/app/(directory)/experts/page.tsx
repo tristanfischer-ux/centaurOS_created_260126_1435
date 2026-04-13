@@ -103,20 +103,20 @@ const fetchExperts = cache(async (search: string | null, limit: number, offset: 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-    title: 'Find Fractional Executives | Fractional Forge',
+    title: 'Find Fractional Executives',
     description:
         'Browse our directory of vetted fractional CMOs, CFOs, CTOs, and more. Find the right expert for your business — part-time executive talent, on demand.',
     openGraph: {
-        title: 'Find Fractional Executives | Fractional Forge',
+        title: 'Find Fractional Executives',
         description:
             'Browse vetted fractional CMOs, CFOs, CTOs, and more. Part-time executive talent, on demand.',
         type: 'website',
         url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'}/experts`,
-        siteName: 'Fractional Forge',
+        siteName: 'ForgeOS by Fractional Forge',
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'Find Fractional Executives | Fractional Forge',
+        title: 'Find Fractional Executives',
         description:
             'Browse vetted fractional CMOs, CFOs, CTOs, and more. Part-time executive talent, on demand.',
     },

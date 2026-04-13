@@ -7,7 +7,7 @@ import { getAllTechniqueEnrichments } from '@/actions/manufacturing-techniques'
 import type { TechniqueEnrichment } from '@/types/manufacturing-techniques'
 
 export const metadata = {
-  title: 'Inspiration | ForgeOS',
+  title: 'Inspiration',
   description:
     'Build knowledge with manufacturing techniques, tutorials, and expert Q&A.',
 }

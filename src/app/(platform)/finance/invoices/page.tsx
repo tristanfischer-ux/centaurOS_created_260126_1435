@@ -11,7 +11,7 @@ import { getStandaloneInvoices } from '@/actions/finance-invoices'
 import { InvoicesView } from './invoices-view'
 
 export const metadata: Metadata = {
-  title: 'Invoices | Finance | ForgeOS',
+  title: 'Invoices | Finance',
   description: 'View and manage your invoices and payment status',
 }
 

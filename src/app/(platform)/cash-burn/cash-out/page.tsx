@@ -8,7 +8,7 @@ import { getCashOutItems, getFoundryHumanProfiles, getCompanyContextForWizard } 
 import { CashOutView } from './cash-out-view'
 
 export const metadata = {
-  title: 'Cash Out | ForgeOS',
+  title: 'Cash Out',
   description: 'Manage fixed and variable cost items for cash burn modelling',
 }
 

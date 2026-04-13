@@ -16,14 +16,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     
     if (!profile) {
         return {
-            title: 'Profile Not Found | ForgeOS',
+            title: 'Profile Not Found',
         }
     }
     
     const name = profile.user_name || 'Executive'
     const headline = profile.headline || 'Fractional Executive'
     const description = profile.bio?.slice(0, 160) || `View ${name}'s profile on ForgeOS`
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://forgeos.com'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
     
     // Build dynamic OG image URL with profile data
     const ogParams = new URLSearchParams({
@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const ogImageUrl = `${appUrl}/api/og/profile?${ogParams.toString()}`
     
     return {
-        title: `${name} - ${headline} | ForgeOS`,
+        title: `${name} - ${headline}`,
         description,
         openGraph: {
             title: `${name} - ${headline}`,

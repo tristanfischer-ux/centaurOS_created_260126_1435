@@ -9,7 +9,7 @@ import type { Metadata } from 'next'
 import { FinanceSectionIntro } from './finance-section-intro'
 
 export const metadata: Metadata = {
-  title: 'Finance | ForgeOS',
+  title: 'Finance',
   description: 'Your complete financial command centre — revenue, expenses, cash flow, and more',
 }
 

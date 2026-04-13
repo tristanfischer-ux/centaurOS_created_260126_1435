@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params
   const result = await getProduct(id)
   return {
-    title: result.data ? `${result.data.name} | Products | ForgeOS` : 'Product | ForgeOS',
+    title: result.data ? `${result.data.name} | Products` : 'Product',
   }
 }
 

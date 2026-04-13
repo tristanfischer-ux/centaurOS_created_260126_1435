@@ -16,7 +16,7 @@ import { TimeTrackerView } from './time-tracker-view'
 import { toTimeEntryWithRelations, TIME_ENTRY_SELECT } from '@/lib/time-tracking-utils'
 
 export const metadata = {
-  title: 'Time | ForgeOS',
+  title: 'Time',
   description: 'Track hours across your projects and tasks',
 }
 

@@ -5,7 +5,7 @@ import { OutreachHub } from './outreach-hub'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-    title: 'Outreach | ForgeOS',
+    title: 'Outreach',
     description: 'Cold outreach campaigns — import prospects, generate email sequences, copy and send',
 }
 

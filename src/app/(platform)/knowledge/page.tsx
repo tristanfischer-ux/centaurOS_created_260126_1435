@@ -6,7 +6,7 @@ import { KnowledgeVaultView } from './knowledge-vault-view'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Knowledge | ForgeOS',
+  title: 'Knowledge',
   description: 'Your team\'s collective intelligence — the more you add, the smarter your specialists become',
 }
 

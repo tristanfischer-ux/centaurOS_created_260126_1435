@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const expert = await getDirectoryExpertBySlug(slug)
 
     if (!expert) {
-        return { title: 'Expert Not Found | Fractional Forge' }
+        return { title: 'Expert Not Found' }
     }
 
     const name = expert.user_name || 'Expert'
@@ -70,7 +70,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const ogImageUrl = `${APP_URL}/api/og/profile?${ogParams.toString()}`
 
     return {
-        title: `${name} - ${headline} | Fractional Forge`,
+        title: `${name} - ${headline}`,
         description,
         openGraph: {
             title: `${name} - ${headline}`,
@@ -85,7 +85,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
                     alt: `${name} - ${headline} on Fractional Forge`,
                 },
             ],
-            siteName: 'Fractional Forge',
+            siteName: 'ForgeOS by Fractional Forge',
         },
         twitter: {
             card: 'summary_large_image',

@@ -9,7 +9,7 @@ import { getDefaultScenario } from '@/actions/cash-burn-scenarios'
 import { CashInView } from './cash-in-view'
 
 export const metadata = {
-  title: 'Cash In | ForgeOS',
+  title: 'Cash In',
   description: 'Manage revenue, loans, equity, and grant inflows for burn modelling',
 }
 

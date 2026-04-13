@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 export const revalidate = 30
 
 export const metadata = {
-    title: 'Buyer Dashboard | Marketplace',
-    description: 'Your marketplace dashboard - orders, favorites, and recommendations'
+    title: 'Buyer Dashboard',
+    description: 'Your marketplace dashboard — orders, favourites, and recommendations'
 }
 
 function DashboardLoadingSkeleton() {

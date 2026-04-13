@@ -10,7 +10,7 @@ import { getProjectDetail } from '@/actions/finance-projects'
 import { ProjectDetailView } from './project-detail-view'
 
 export const metadata: Metadata = {
-  title: 'Project Detail | Finance | ForgeOS',
+  title: 'Project Detail | Finance',
   description: 'View project P&L and transaction history',
 }
 

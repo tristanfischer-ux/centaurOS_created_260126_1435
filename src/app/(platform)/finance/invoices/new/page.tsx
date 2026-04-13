@@ -9,7 +9,7 @@ import type { Metadata } from 'next'
 import { QuickInvoiceForm } from '@/components/finance/invoices/quick-invoice-form'
 
 export const metadata: Metadata = {
-  title: 'New Invoice | Finance | ForgeOS',
+  title: 'New Invoice | Finance',
   description: 'Create a standalone invoice and generate a payment link',
 }
 

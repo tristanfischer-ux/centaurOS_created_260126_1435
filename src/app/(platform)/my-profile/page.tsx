@@ -6,7 +6,7 @@ import { getUserFoundries } from '@/lib/supabase/foundry-context'
 import { ProfileHubView } from './profile-hub-view'
 
 export const metadata = {
-  title: 'My Profile | ForgeOS',
+  title: 'My Profile',
   description: 'Manage your profile and marketplace presence',
 }
 

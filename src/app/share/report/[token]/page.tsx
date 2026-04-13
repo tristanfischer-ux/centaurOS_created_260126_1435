@@ -32,13 +32,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!result.success || !result.document) {
     return {
-      title: 'Shared Report | ForgeOS',
+      title: 'Shared Report',
       description: 'This shared report is no longer available.',
     }
   }
 
   return {
-    title: `${result.document.title} — ${result.companyName} | ForgeOS`,
+    title: `${result.document.title} — ${result.companyName}`,
     description: `Shared report from ${result.companyName}: ${result.document.title}`,
   }
 }
@@ -114,7 +114,7 @@ function SharedReportFooter({ expiresAt }: { expiresAt?: string }) {
         <p className="text-xs text-muted-foreground">
           This report was shared via{' '}
           <a
-            href="https://forgeos.com"
+            href="https://fractionalforge.app"
             className="text-international-orange hover:underline font-medium"
             target="_blank"
             rel="noopener noreferrer"
@@ -173,7 +173,7 @@ function ExpiredOrNotFound({ message }: { message?: string }) {
 
         <div className="pt-4">
           <a
-            href="https://forgeos.com"
+            href="https://fractionalforge.app"
             className="inline-flex items-center gap-2 text-sm font-medium text-international-orange hover:underline"
           >
             Learn more about ForgeOS

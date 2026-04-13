@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { ContactForm } from "./contact-form"
 
 export const metadata: Metadata = {
-  title: "Contact | ForgeOS",
+  title: "Contact",
   description:
     "Get in touch with the Fractional Forge team. General enquiries, demo requests, and enterprise sales — we'd love to hear from you.",
 }
@@ -80,10 +80,10 @@ export default function ContactPage() {
                 </CardHeader>
                 <CardContent>
                   <a
-                    href="mailto:hello@fractionalforge.com"
+                    href="mailto:hello@fractionalforge.app"
                     className="text-sm font-medium text-international-orange hover:underline transition-colors"
                   >
-                    hello@fractionalforge.com
+                    hello@fractionalforge.app
                   </a>
                 </CardContent>
               </Card>
@@ -124,10 +124,10 @@ export default function ContactPage() {
                 </CardHeader>
                 <CardContent>
                   <a
-                    href="mailto:sales@fractionalforge.com"
+                    href="mailto:sales@fractionalforge.app"
                     className="text-sm font-medium text-international-orange hover:underline transition-colors"
                   >
-                    sales@fractionalforge.com
+                    sales@fractionalforge.app
                   </a>
                 </CardContent>
               </Card>
@@ -148,10 +148,10 @@ export default function ContactPage() {
                   <p className="text-sm text-muted-foreground">
                     Use the in-app help or email{" "}
                     <a
-                      href="mailto:support@fractionalforge.com"
+                      href="mailto:support@fractionalforge.app"
                       className="text-international-orange hover:underline"
                     >
-                      support@fractionalforge.com
+                      support@fractionalforge.app
                     </a>
                   </p>
                 </div>

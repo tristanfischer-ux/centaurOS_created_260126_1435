@@ -18,12 +18,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const result = await getPaymentLinkByCode(linkId)
 
   if (!result.data) {
-    return { title: 'Payment Link | ForgeOS' }
+    return { title: 'Payment Link' }
   }
 
   const amount = (result.data.amount / 100).toFixed(2)
   return {
-    title: `Pay £${amount} | ForgeOS`,
+    title: `Pay £${amount}`,
     description: result.data.description || `Payment of £${amount}`,
   }
 }

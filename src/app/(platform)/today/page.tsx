@@ -19,7 +19,7 @@ import { TodayView } from "./today-view"
 import { getOnboardingState } from "@/actions/onboarding"
 
 export const metadata: Metadata = {
-    title: "Today | ForgeOS",
+    title: "Today",
     description: "Your personalized daily focus — what needs attention, wins, and priorities",
 }
 

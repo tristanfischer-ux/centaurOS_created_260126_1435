@@ -9,7 +9,7 @@ import type { Metadata } from "next"
 import { PlanSectionIntro } from "./plan-section-intro"
 
 export const metadata: Metadata = {
-    title: "Plan | ForgeOS",
+    title: "Plan",
     description: "From vision to action — strategy, objectives, and tasks",
 }
 

@@ -21,21 +21,21 @@ const STEPS = [
     label: 'Run the meeting',
     description: 'Your specialist team debates the issue, pulls live data, and presents their analysis. You steer the conversation.',
     image: '/images/screenshots/specialists-huddles.png',
-    url: 'app.fractionalforge.com/specialists',
+    url: 'fractionalforge.app/specialists',
   },
   {
     number: '02',
     label: 'We extract the output',
     description: 'Transcript analysed. Key decisions identified. Objectives and tasks built automatically.',
     image: '/images/screenshots/meeting-outputs.png',
-    url: 'app.fractionalforge.com/specialists',
+    url: 'fractionalforge.app/specialists',
   },
   {
     number: '03',
     label: 'Ready to execute',
     description: 'Objectives with owners, deadlines, and linked tasks — created from the meeting, not after it.',
     image: '/images/screenshots/meeting-objectives.png',
-    url: 'app.fractionalforge.com/specialists',
+    url: 'fractionalforge.app/specialists',
   },
 ]
 

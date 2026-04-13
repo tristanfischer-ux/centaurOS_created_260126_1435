@@ -9,7 +9,7 @@ import type { Metadata } from 'next'
 import { AlertPreferences } from '@/components/finance/alert-preferences'
 
 export const metadata: Metadata = {
-  title: 'Alert Settings | Finance | ForgeOS',
+  title: 'Alert Settings | Finance',
   description: 'Configure financial alert thresholds and notification preferences',
 }
 

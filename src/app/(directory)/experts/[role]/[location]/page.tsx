@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const category = DIRECTORY_ROLE_CATEGORIES[role as DirectoryRoleSlug]
 
     if (!category) {
-        return { title: 'Not Found | Fractional Forge' }
+        return { title: 'Not Found' }
     }
 
     const locationName = locationSlugToSearchTerm(location)
@@ -50,14 +50,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const description = `Find experienced ${category.title.toLowerCase()} in ${capitalizedLocation}. ${category.description}`
 
     return {
-        title: `${title} | Fractional Forge`,
+        title,
         description,
         openGraph: {
             title,
             description,
             type: 'website',
             url: `${APP_URL}/experts/${role}/${location}`,
-            siteName: 'Fractional Forge',
+            siteName: 'ForgeOS by Fractional Forge',
         },
         twitter: {
             card: 'summary_large_image',

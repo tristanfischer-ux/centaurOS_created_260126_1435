@@ -13,7 +13,7 @@ import type { Metadata } from 'next'
 import { MoneyMapClient } from './money-map-client'
 
 export const metadata: Metadata = {
-  title: 'Money Map | Finance | ForgeOS',
+  title: 'Money Map | Finance',
   description: 'Visualise your revenue streams, costs, and profitability',
 }
 

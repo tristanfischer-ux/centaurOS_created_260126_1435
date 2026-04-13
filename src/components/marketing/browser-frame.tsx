@@ -22,7 +22,7 @@ interface BrowserFrameProps {
  * @param url - The URL to show in the address bar
  * @param children - The screenshot content (usually a Next.js Image)
  */
-export function BrowserFrame({ url = 'app.fractionalforge.com', children, className }: BrowserFrameProps) {
+export function BrowserFrame({ url = 'fractionalforge.app', children, className }: BrowserFrameProps) {
   return (
     <div className={cn('rounded-xl overflow-hidden border bg-card shadow-2xl', className)}>
       {/* Title bar */}

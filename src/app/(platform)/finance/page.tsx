@@ -17,7 +17,7 @@ import {
 import { FinanceHubView } from './finance-hub-view'
 
 export const metadata: Metadata = {
-  title: 'Finance | ForgeOS',
+  title: 'Finance',
   description: 'Your unified financial dashboard — revenue, expenses, cash flow, and invoices at a glance',
 }
 

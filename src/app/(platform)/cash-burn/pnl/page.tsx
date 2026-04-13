@@ -9,7 +9,7 @@ import { getPnlPageData } from '@/actions/cash-burn-pnl'
 import { PnlView } from './pnl-view'
 
 export const metadata = {
-  title: 'P&L | ForgeOS',
+  title: 'P&L',
   description: 'Projected Income Statement and Balance Sheet from cash flow data',
 }
 

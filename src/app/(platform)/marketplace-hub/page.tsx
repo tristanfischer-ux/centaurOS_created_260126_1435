@@ -10,7 +10,7 @@ import type { Metadata } from "next"
 import { MarketplaceSectionIntro } from "./marketplace-section-intro"
 
 export const metadata: Metadata = {
-    title: "Marketplace | ForgeOS",
+    title: "Marketplace",
     description: "Everything you need, everyone you need — find talent, products, and services",
 }
 

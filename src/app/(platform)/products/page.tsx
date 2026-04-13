@@ -17,7 +17,7 @@ import { getProducts } from '@/actions/products'
 import { ProductListView } from './product-list-view'
 
 export const metadata = {
-  title: 'Products | ForgeOS',
+  title: 'Products',
   description: 'Your hardware products — from concept to market',
 }
 

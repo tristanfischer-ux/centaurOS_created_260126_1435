@@ -9,7 +9,7 @@ import { getExpenses } from '@/actions/finance-expenses'
 import { ExpensesView } from './expenses-view'
 
 export const metadata: Metadata = {
-  title: 'Expenses | Finance | ForgeOS',
+  title: 'Expenses | Finance',
   description: 'Track and manage business expenses',
 }
 

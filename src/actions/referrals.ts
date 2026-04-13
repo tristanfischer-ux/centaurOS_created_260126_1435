@@ -51,7 +51,7 @@ export async function getMyReferralInfo(): Promise<ReferralInfo | { error: strin
       p_foundry_id: foundryId,
     })
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fractionalforge.com'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
 
     const code = profile.referral_code || ''
 

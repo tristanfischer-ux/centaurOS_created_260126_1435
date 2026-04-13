@@ -12,7 +12,7 @@ import { Metadata } from 'next'
 import { PricingContent } from './pricing-content'
 
 export const metadata: Metadata = {
-  title: 'Pricing | ForgeOS',
+  title: 'Pricing',
   description: 'Simple, transparent pricing for every stage of your business. Start free, upgrade as you grow.',
 }
 

@@ -25,7 +25,7 @@ import { SpecialistBriefingHero } from '@/components/specialists/specialist-brie
 import { ReviewQueueTabs } from './review-queue-tabs'
 
 export const metadata: Metadata = {
-    title: 'Review Queue | ForgeOS',
+    title: 'Review Queue',
     description: 'Items awaiting your approval',
 }
 

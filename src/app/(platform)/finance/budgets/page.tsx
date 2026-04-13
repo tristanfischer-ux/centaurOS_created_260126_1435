@@ -10,7 +10,7 @@ import { getBudgetsVsActual } from '@/actions/finance-budgets'
 import { BudgetsView } from './budgets-view'
 
 export const metadata: Metadata = {
-  title: 'Budgets | Finance | ForgeOS',
+  title: 'Budgets | Finance',
   description: 'Track budget allocations vs actual spend',
 }
 

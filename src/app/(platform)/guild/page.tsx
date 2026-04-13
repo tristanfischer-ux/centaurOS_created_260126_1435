@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { ComingSoon } from '@/components/coming-soon'
 
 export const metadata: Metadata = {
-  title: 'Guild | ForgeOS',
+  title: 'Guild',
   description: 'Community hub for events, networking, and apprentice pool',
 }
 

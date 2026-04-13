@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { WorkspacePickerView } from './workspace-picker-view'
 
 export const metadata = {
-  title: 'Choose Workspace | ForgeOS',
+  title: 'Choose Workspace',
+  description: 'Select the workspace you want to work in.',
 }
 
 export default async function WorkspacePickerPage() {

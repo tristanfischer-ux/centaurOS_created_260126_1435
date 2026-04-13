@@ -11,7 +11,7 @@ export async function generateMetadata(
     { params }: { params: Promise<{ campaignId: string }> }
 ): Promise<Metadata> {
     return {
-        title: 'Campaign | ForgeOS',
+        title: 'Campaign',
         description: 'Manage contacts and email sequences for this outreach campaign',
     }
 }

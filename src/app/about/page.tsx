@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 export const metadata: Metadata = {
-  title: "About | ForgeOS",
+  title: "About",
   description:
     "Fractional Forge is building ForgeOS — the operating system for hardware companies. Learn about our mission to make manufacturing as accessible as deploying software.",
 }

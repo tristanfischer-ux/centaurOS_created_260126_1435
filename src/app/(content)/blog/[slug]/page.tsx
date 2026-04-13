@@ -129,7 +129,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const post = await getPost(slug)
 
     if (!post) {
-        return { title: 'Post Not Found | Fractional Forge' }
+        return { title: 'Post Not Found' }
     }
 
     const meta = post.publish_metadata
@@ -137,14 +137,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const description = meta?.meta_description || post.content.slice(0, 160).replace(/\n/g, ' ')
 
     return {
-        title: `${title} | Fractional Forge`,
+        title,
         description,
         openGraph: {
             title,
             description,
             type: 'article',
             url: `${APP_URL}/blog/${slug}`,
-            siteName: 'Fractional Forge',
+            siteName: 'ForgeOS by Fractional Forge',
             ...(meta?.og_image_url ? { images: [{ url: meta.og_image_url }] } : {}),
             ...(meta?.published_at ? { publishedTime: meta.published_at } : {}),
         },
