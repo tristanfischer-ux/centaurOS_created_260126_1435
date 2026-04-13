@@ -393,7 +393,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
   }
 
   return (
-    <div className="h-full flex flex-col bg-background border-l border overflow-hidden">
+    <div className="h-full flex flex-col bg-background border-l border">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 px-5 py-4 border-b">
         <div className="min-w-0 flex-1 space-y-2">
@@ -423,7 +423,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                   <Waypoints className="h-3 w-3 text-international-orange flex-shrink-0" />
                   <Link
                     href="/strategy"
-                    className="font-medium text-international-orange hover:underline truncate max-w-[140px]"
+                    className="font-medium text-international-orange hover:underline "
                     title={task.strategy.title}
                   >
                     {task.strategy.title}
@@ -438,7 +438,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                   <Target className="h-3 w-3 flex-shrink-0" />
                   <Link
                     href={`/new-objectives?selected=${task.objective.id}`}
-                    className="hover:underline truncate max-w-[140px]"
+                    className="hover:underline "
                     title={task.objective.title}
                   >
                     {task.objective.title}
@@ -473,7 +473,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
       </div>
 
       <ScrollArea className="flex-1 w-full">
-        <div className="p-5 space-y-4 overflow-hidden">
+        <div className="p-5 space-y-4">
           {/* Description */}
           {task.description && (
             <div className="space-y-1.5">
@@ -535,7 +535,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                       <Link
                         href={`/new-tasks?taskId=${subtask.id}`}
                         className={cn(
-                          'flex-1 text-sm truncate',
+                          'flex-1 text-sm',
                           isComplete
                             ? 'line-through text-muted-foreground'
                             : 'text-foreground hover:underline'

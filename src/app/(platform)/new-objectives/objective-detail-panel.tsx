@@ -51,7 +51,7 @@ function TaskRow({ task, onClick }: { task: ObjectiveTask; onClick?: () => void 
       {/* Title */}
       <div className="flex-1 min-w-0">
         <p className={cn(
-          'text-sm truncate',
+          'text-sm',
           task.status === 'Completed' ? 'text-muted-foreground line-through' : 'text-foreground'
         )}>
           {task.title}
@@ -104,7 +104,7 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect, onEdit 
   }
 
   return (
-    <div className="h-full flex flex-col bg-background border-l border w-full max-w-full overflow-hidden">
+    <div className="h-full flex flex-col bg-background border-l border w-full max-w-full">
       {/* Header */}
       <div className="flex items-start justify-between px-5 py-4 border-b min-w-0">
         <div className="min-w-0 flex-1 space-y-1.5">
@@ -114,18 +114,18 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect, onEdit 
               <Waypoints className="h-3 w-3 text-international-orange flex-shrink-0" />
               <Link
                 href="/strategy"
-                className="font-medium text-international-orange hover:underline truncate max-w-[180px]"
+                className="font-medium text-international-orange hover:underline"
                 title={objective.strategy.title}
               >
                 {objective.strategy.title}
               </Link>
               <ChevronRight className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
-              <span className="text-muted-foreground truncate max-w-[120px]" title={objective.title}>
+              <span className="text-muted-foreground" title={objective.title}>
                 {objective.title}
               </span>
             </nav>
           )}
-          <h2 className="text-base font-semibold text-foreground truncate pr-4 min-w-0">
+          <h2 className="text-base font-semibold text-foreground pr-4 min-w-0">
             {objective.title}
           </h2>
           {objective.metadata?.source_thread_id && (
@@ -151,7 +151,7 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect, onEdit 
       </div>
 
       <ScrollArea className="flex-1 w-full max-w-full">
-        <div className="p-5 space-y-6 w-full max-w-full overflow-hidden">
+        <div className="p-5 space-y-6 w-full max-w-full">
           {/* Progress Section */}
           <div className="flex items-center gap-4">
             <ProgressRing progress={objective.progress} size={64} strokeWidth={5} variant={variant} />
