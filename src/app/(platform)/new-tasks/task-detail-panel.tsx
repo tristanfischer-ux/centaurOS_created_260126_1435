@@ -780,87 +780,67 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
             </div>
           </div>
 
-          {/* ── Delegate to Specialist ─────────────────────────────── */}
-          <Separator />
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              <Flame className="h-3.5 w-3.5" />
-              Delegate to Specialist
-            </div>
-
-            {delegationArtifact ? (
-              /* ── Review deliverable ─────────────────────────────── */
+          {/* ── Deliverable Review (shown only when a delegation artifact exists) ── */}
+          {delegationArtifact && (
+            <>
+              <Separator />
               <div className="space-y-3">
-                <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 p-3">
-                  <p className="text-xs font-medium text-international-orange mb-1">
-                    {delegationArtifact.specialistName} completed this task
-                  </p>
-                  <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
-                    <Markdown content={delegationArtifact.content} className="text-sm break-words [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full" />
-                  </div>
+                <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  <Flame className="h-3.5 w-3.5" />
+                  Deliverable Review
                 </div>
 
-                {showRevisionInput ? (
-                  <div className="space-y-2">
-                    <TextareaWithSpeech
-                      value={revisionFeedback}
-                      onChange={(e) => setRevisionFeedback(e.target.value)}
-                      placeholder="What would you like changed?"
-                      className="min-h-[60px] text-sm"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={handleDelegate}
-                        disabled={isDelegating || !revisionFeedback.trim()}
-                      >
-                        {isDelegating ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1" />}
-                        Send Revision
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setShowRevisionInput(false)}>
-                        Cancel
-                      </Button>
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 p-3">
+                    <p className="text-xs font-medium text-international-orange mb-1">
+                      {delegationArtifact.specialistName} completed this task
+                    </p>
+                    <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
+                      <Markdown content={delegationArtifact.content} className="text-sm break-words [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full" />
                     </div>
                   </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="default" onClick={handleApprove} disabled={isPending}>
-                      {isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
-                      Approve
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setShowRevisionInput(true)}>
-                      <Pencil className="h-3.5 w-3.5 mr-1" />
-                      Revise
-                    </Button>
-                    <Button size="sm" variant="ghost" className="text-destructive" onClick={handleReject} disabled={isPending}>
-                      Reject
-                    </Button>
-                  </div>
-                )}
+
+                  {showRevisionInput ? (
+                    <div className="space-y-2">
+                      <TextareaWithSpeech
+                        value={revisionFeedback}
+                        onChange={(e) => setRevisionFeedback(e.target.value)}
+                        placeholder="What would you like changed?"
+                        className="min-h-[60px] text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleDelegate}
+                          disabled={isDelegating || !revisionFeedback.trim()}
+                        >
+                          {isDelegating ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+                          Send Revision
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowRevisionInput(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="default" onClick={handleApprove} disabled={isPending}>
+                        {isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
+                        Approve
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowRevisionInput(true)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" />
+                        Revise
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-destructive" onClick={handleReject} disabled={isPending}>
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : (
-              /* ── Delegate button ────────────────────────────────── */
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full border-international-orange/30 text-international-orange hover:bg-international-orange/5"
-                onClick={handleDelegate}
-                disabled={isDelegating || task.status === 'Completed'}
-              >
-                {isDelegating ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    {specialistName} is working on this...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                    Delegate to {specialistName}
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
+            </>
+          )}
 
           {/* Attachments */}
           {task.task_files.length > 0 && (

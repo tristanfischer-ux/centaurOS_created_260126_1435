@@ -249,6 +249,24 @@ const DOMAIN_RULES: DomainRule[] = [
     ],
     negativeKeywords: [],
   },
+  {
+    specialistId: 'strategist',
+    specialistName: 'Sage',
+    primaryKeywords: [
+      'strategy', 'vision', 'mission', 'pivot', 'moat', 'positioning',
+      'competitive', 'market entry', 'go to market', 'gtm', 'business model',
+      'okr', 'north star', 'strategic', 'long term', 'differentiation',
+    ],
+    secondaryKeywords: [
+      'focus', 'tradeoff', 'priority', 'alignment', 'direction',
+      'competitive advantage', 'value proposition',
+    ],
+    bigrams: [
+      'go to market', 'business model', 'market entry', 'competitive advantage',
+      'value proposition', 'north star', 'strategic plan',
+    ],
+    negativeKeywords: ['manufacturing', 'engineering', 'legal', 'hire'],
+  },
 ]
 
 /** Default specialist when no domain keywords match */

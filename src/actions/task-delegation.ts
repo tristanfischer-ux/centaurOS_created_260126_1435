@@ -333,6 +333,7 @@ Do NOT:
       await supabase
         .from('tasks')
         .update({
+          assignee_id: specialist.profileId,
           metadata: {
             ...existingMetadata,
             delegation_artifact_id: artifact.id,
