@@ -795,8 +795,8 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                   <p className="text-xs font-medium text-international-orange mb-1">
                     {delegationArtifact.specialistName} completed this task
                   </p>
-                  <div className="max-h-[300px] overflow-y-auto">
-                    <Markdown content={delegationArtifact.content} className="text-sm" />
+                  <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
+                    <Markdown content={delegationArtifact.content} className="text-sm break-words [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full" />
                   </div>
                 </div>
 
