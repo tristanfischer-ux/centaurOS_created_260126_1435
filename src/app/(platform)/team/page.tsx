@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TeamPageView } from './team-page-view'
@@ -9,6 +10,16 @@ import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { getHiringRequirements } from '@/actions/business-plan'
 import { getMyRetainers, getRetainerStatisticsBatch } from '@/actions/retainers'
 import type { BusinessFunction, FunctionId } from './types'
+
+export const metadata: Metadata = {
+  title: 'Team',
+  description: 'Manage your team members, track capacity, and identify hiring gaps across business functions',
+  openGraph: {
+    title: 'Team | ForgeOS',
+    description: 'Manage your team members, track capacity, and identify hiring gaps across business functions',
+    type: 'website',
+  },
+}
 
 /**
  * Team page — server component that authenticates, fetches foundry data,

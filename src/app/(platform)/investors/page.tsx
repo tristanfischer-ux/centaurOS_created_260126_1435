@@ -12,6 +12,7 @@
  * Revalidates every 60 seconds (ISR) since investor data changes infrequently.
  */
 
+import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess } from '@/actions/investors'
@@ -28,6 +29,16 @@ import { InvestorMatchView } from './components/InvestorMatchView'
 import { ContactsDirectoryTab } from './components/ContactsDirectoryTab'
 import { GrantsDirectoryTab } from './components/GrantsDirectoryTab'
 import { PortfolioDirectoryTab } from './components/PortfolioDirectoryTab'
+
+export const metadata: Metadata = {
+  title: 'Investor Intelligence',
+  description: 'Discover, match, and track investors for your hardware startup with AI-powered recommendations',
+  openGraph: {
+    title: 'Investor Intelligence | ForgeOS',
+    description: 'Discover, match, and track investors for your hardware startup with AI-powered recommendations',
+    type: 'website',
+  },
+}
 
 export const dynamic = 'force-dynamic'
 

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
@@ -6,6 +7,16 @@ import { getBlueprintTemplates } from '@/actions/blueprints'
 import { getObjectivePacks, getSavedPackIds, getUsedPackIds } from '@/actions/packs'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getUniversalSubsystems } from '@/actions/universal-subsystems'
+
+export const metadata: Metadata = {
+  title: 'Objectives',
+  description: 'Set and track company objectives aligned with your strategic pillars',
+  openGraph: {
+    title: 'Objectives | ForgeOS',
+    description: 'Set and track company objectives aligned with your strategic pillars',
+    type: 'website',
+  },
+}
 
 export const revalidate = 30
 

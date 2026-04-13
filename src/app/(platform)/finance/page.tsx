@@ -19,6 +19,11 @@ import { FinanceHubView } from './finance-hub-view'
 export const metadata: Metadata = {
   title: 'Finance',
   description: 'Your unified financial dashboard — revenue, expenses, cash flow, and invoices at a glance',
+  openGraph: {
+    title: 'Finance | ForgeOS',
+    description: 'Your unified financial dashboard — revenue, expenses, cash flow, and invoices at a glance',
+    type: 'website',
+  },
 }
 
 export default async function FinancePage(): Promise<React.ReactNode> {

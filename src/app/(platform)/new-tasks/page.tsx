@@ -1,8 +1,19 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TasksCommandCenter } from './tasks-command-center'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { getAllSpecialistsAsMembers } from '@/lib/agents/specialists-config'
+
+export const metadata: Metadata = {
+  title: 'Tasks',
+  description: 'Manage, delegate, and track tasks across your team and specialists',
+  openGraph: {
+    title: 'Tasks | ForgeOS',
+    description: 'Manage, delegate, and track tasks across your team and specialists',
+    type: 'website',
+  },
+}
 
 export const revalidate = 60
 

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { searchMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
@@ -16,6 +17,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { typography } from '@/lib/design-system'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
+
+export const metadata: Metadata = {
+  title: 'Marketplace',
+  description: 'Find manufacturing partners, fractional experts, and playbooks for your hardware startup',
+  openGraph: {
+    title: 'Marketplace | ForgeOS',
+    description: 'Find manufacturing partners, fractional experts, and playbooks for your hardware startup',
+    type: 'website',
+  },
+}
 
 export const revalidate = 30
 

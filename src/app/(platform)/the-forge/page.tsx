@@ -21,6 +21,11 @@ import type { Metadata } from "next"
 export const metadata: Metadata = {
   title: "The Forge",
   description: "Turn product ideas into buildable engineering dossiers",
+  openGraph: {
+    title: "The Forge | ForgeOS",
+    description: "Turn product ideas into buildable engineering dossiers",
+    type: "website",
+  },
 }
 
 function LoadingSkeleton(): React.ReactNode {

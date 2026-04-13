@@ -10,15 +10,21 @@
  * - src/types/product.ts — Types
  */
 
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getProducts } from '@/actions/products'
 import { ProductListView } from './product-list-view'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Products',
   description: 'Your hardware products — from concept to market',
+  openGraph: {
+    title: 'Products | ForgeOS',
+    description: 'Your hardware products — from concept to market',
+    type: 'website',
+  },
 }
 
 export default async function ProductsPage() {

@@ -87,7 +87,7 @@ export async function delegateTaskToSpecialist(
     const { data: task } = await supabase
       .from('tasks')
       .select(`
-        id, title, description, status, objective_id,
+        id, title, description, status, objective_id, metadata,
         objectives!objective_id ( title, description, parent_objective_id,
           parent:objectives!parent_objective_id ( title )
         )
@@ -133,7 +133,7 @@ export async function delegateTaskToSpecialist(
     // Fetch company intelligence (purpose, profile, products, team)
     let companyContext = ''
     try {
-      companyContext = await buildAIContextWithServiceClient(foundryId)
+      companyContext = await buildAIContextWithServiceClient(profile.foundry_id)
     } catch {
       companyContext = '\n--- Business Context ---\nFractional Forge — AI manufacturing platform for hardware startups\n--- End Business Context ---\n'
     }
@@ -142,7 +142,7 @@ export async function delegateTaskToSpecialist(
     let specialistContext = ''
     try {
       const { contextBlocks } = await buildContextLayers({
-        foundryId,
+        foundryId: profile.foundry_id,
         specialistId,
         threadId: null,
         input: `${task.title} ${task.description || ''}`,
@@ -293,11 +293,14 @@ Do NOT:
       }
 
       // ── 7. Link artifact to task + update status ──────────────────
+      // GOTCHA: metadata must be MERGED, not overwritten, to preserve
+      // source_thread_id, rollout_id, and other fields set elsewhere.
+      const existingMetadata = (task.metadata ?? {}) as Record<string, unknown>
       await supabase
         .from('tasks')
         .update({
           metadata: {
-            ...(task as Record<string, unknown>).metadata as Record<string, unknown> | undefined,
+            ...existingMetadata,
             delegation_artifact_id: artifact.id,
             delegated_to: specialist.id,
             delegated_at: new Date().toISOString(),
@@ -346,11 +349,22 @@ export async function rejectDelegation(taskId: string): Promise<{ error?: string
   return withAuth(async () => {
     const supabase = await createClient()
 
+    // GOTCHA: Must MERGE metadata to preserve source_thread_id, rollout_id, etc.
+    // Only clear delegation-specific fields.
+    const { data: existing } = await supabase
+      .from('tasks')
+      .select('metadata')
+      .eq('id', taskId)
+      .single()
+
+    const existingMetadata = (existing?.metadata ?? {}) as Record<string, unknown>
+
     const { error } = await supabase
       .from('tasks')
       .update({
         status: 'Pending',
         metadata: {
+          ...existingMetadata,
           delegation_artifact_id: null,
           delegated_to: null,
           delegated_at: null,

@@ -17,6 +17,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 
 // ============================================================================
 // TYPES
@@ -185,6 +186,11 @@ export async function decomposePlanToTasks(
       const specialistName = specialistNameMap[task.specialistId] || 'Agent'
       const prefixedTitle = `[${specialistName}] ${task.title}`
 
+      // INTENT: Look up the specialist's stable profileId for task assignment.
+      // specialist_id is a slug like 'growth-marketer'; profileId is a UUID from specialist_profiles.
+      const specialist = getSpecialistById(task.specialistId)
+      const specialistProfileId = specialist?.profileId ?? null
+
       // GOTCHA: task_type and plan_id are new columns that may not be in generated
       // types yet. Use type assertion to bypass strict checking.
       const insertData = {
@@ -197,17 +203,37 @@ export async function decomposePlanToTasks(
           status: 'Pending' as const,
           creator_id: user.id,
           specialist_id: task.specialistId, // TEXT column — stores 'growth-marketer', 'sales-lead', etc.
+          assignee_id: specialistProfileId, // UUID — auto-assign task to the specialist
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: insertError } = await supabase
+      const { data: insertedTask, error: insertError } = await supabase
         .from('tasks')
         .insert(insertData as any)
+        .select('id')
+        .single()
 
       if (insertError) {
         console.error('[ExecutionPlans] Failed to create task:', sanitizeErrorMessage(insertError))
         errors.push(`Task "${task.title}": ${sanitizeErrorMessage(insertError)}`)
       } else {
         tasksCreated++
+
+        // INTENT: Also insert into task_assignees for multi-assignee compatibility.
+        // This mirrors the pattern used in canvas.ts for task creation.
+        if (specialistProfileId && insertedTask?.id) {
+          const { error: assigneeError } = await supabase
+            .from('task_assignees')
+            .insert({ task_id: insertedTask.id, profile_id: specialistProfileId })
+
+          if (assigneeError) {
+            console.error('[ExecutionPlans] Failed to create task_assignees record:', {
+              taskId: insertedTask.id,
+              specialistId: task.specialistId,
+              error: sanitizeErrorMessage(assigneeError),
+            })
+            // Non-fatal: task was created with assignee_id set, junction table is supplementary
+          }
+        }
       }
     }
 

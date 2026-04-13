@@ -16,7 +16,7 @@ import {
     Plus, Search, LayoutGrid, List, Users,
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
     AlertTriangle, Check, Store, Orbit, Settings, CalendarDays,
-    Handshake, Briefcase,
+    Handshake, Briefcase, Sparkles, Bot,
 } from 'lucide-react'
 import { ViewToggle } from '@/components/ui/view-toggle'
 import Link from 'next/link'
@@ -87,6 +87,8 @@ import { PageTour } from '@/components/guidance/page-tour'
 import { RetainerCard } from '@/components/retainers'
 import type { RetainerWithDetails, RetainerStats } from '@/types/retainers'
 import type { TeamViewMode, BusinessFunction } from './types'
+import { SPECIALISTS } from '@/lib/agents/specialists-config'
+import Image from 'next/image'
 
 // ─── Types ───────────────────────────────────────
 
@@ -971,6 +973,191 @@ export function TeamPageView({
         )
     }
 
+    // ─── AI Specialists Section ──────────────────
+
+    // INTENT: Compute task counts per specialist from allTasks by matching assignee_id to specialist profileIds
+    const specialistTaskCounts = useMemo(() => {
+        const counts: Record<string, { active: number; completed: number; pending: number }> = {}
+        for (const s of SPECIALISTS) {
+            counts[s.profileId] = { active: 0, completed: 0, pending: 0 }
+        }
+        for (const t of allTasks || []) {
+            if (!t.assignee_id || !counts[t.assignee_id]) continue
+            if (t.status === 'Accepted') counts[t.assignee_id].active++
+            else if (t.status === 'Completed') counts[t.assignee_id].completed++
+            else if (t.status === 'Pending') counts[t.assignee_id].pending++
+        }
+        return counts
+    }, [allTasks])
+
+    // Filter specialists by search query
+    const filteredSpecialists = useMemo(() => {
+        if (!searchQuery.trim()) return SPECIALISTS
+        const q = searchQuery.toLowerCase()
+        return SPECIALISTS.filter(s =>
+            s.name.toLowerCase().includes(q) ||
+            s.title.toLowerCase().includes(q) ||
+            s.department.toLowerCase().includes(q)
+        )
+    }, [searchQuery])
+
+    const AISpecialistsSection = () => {
+        if (filteredSpecialists.length === 0 && searchQuery) return null
+
+        return (
+            <section className="space-y-4">
+                <div className="flex items-center gap-3 border-b border-muted pb-3">
+                    <div className="w-1 h-6 rounded-full bg-violet-500" />
+                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    <h2 className="text-lg font-display font-semibold text-foreground">AI Specialists</h2>
+                    <Badge variant="secondary" className="text-xs font-normal">{filteredSpecialists.length}</Badge>
+                    <span className="text-sm text-muted-foreground">Your AI team</span>
+                </div>
+
+                {viewMode === 'list' ? (
+                    <div className="border border-muted rounded-xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left min-w-[480px]">
+                                <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-muted">
+                                    <tr>
+                                        <th className="px-4 py-2.5 pl-6 text-xs font-medium uppercase tracking-wider">Specialist</th>
+                                        <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">Department</th>
+                                        <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">Tasks</th>
+                                        <th className="px-4 py-2.5 w-12"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-background">
+                                    {filteredSpecialists.map(specialist => {
+                                        const counts = specialistTaskCounts[specialist.profileId]
+                                        const totalTasks = (counts?.active ?? 0) + (counts?.completed ?? 0) + (counts?.pending ?? 0)
+                                        return (
+                                            <tr
+                                                key={specialist.id}
+                                                className="group hover:bg-muted/50 transition-colors duration-150 border-b border-muted last:border-0"
+                                            >
+                                                <td className="px-4 py-3 pl-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="relative h-8 w-8 rounded-full overflow-hidden bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                                            <Image
+                                                                src={`/images/specialists/${specialist.id}.png`}
+                                                                alt={specialist.name}
+                                                                width={32}
+                                                                height={32}
+                                                                className="object-cover"
+                                                                onError={(e) => {
+                                                                    // INTENT: Fallback to Bot icon if specialist image not found
+                                                                    e.currentTarget.style.display = 'none'
+                                                                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                                                                }}
+                                                            />
+                                                            <Bot className="h-4 w-4 text-violet-500 hidden absolute" />
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-medium text-foreground">{specialist.name}</span>
+                                                            <span className="text-muted-foreground ml-1.5 text-xs">({specialist.title})</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Badge variant="secondary" className="text-[10px] font-normal">
+                                                        {specialist.department}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-4 py-3 text-muted-foreground">
+                                                    {totalTasks > 0 ? (
+                                                        <div className="flex gap-3 text-xs">
+                                                            <span className="text-status-success font-medium">{counts?.completed ?? 0} done</span>
+                                                            <span className="text-electric-blue font-medium">{counts?.active ?? 0} active</span>
+                                                            <span className="text-muted-foreground">{counts?.pending ?? 0} pending</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">No tasks yet</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right pr-6">
+                                                    <Link href={`/agents?specialist=${specialist.id}`}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                                        >
+                                                            Brief
+                                                        </Button>
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    /* Cards view */
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {filteredSpecialists.map(specialist => {
+                            const counts = specialistTaskCounts[specialist.profileId]
+                            const totalTasks = (counts?.active ?? 0) + (counts?.completed ?? 0) + (counts?.pending ?? 0)
+                            return (
+                                <div
+                                    key={specialist.id}
+                                    className="group bg-card border border-border rounded-xl p-4 hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all"
+                                >
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="relative h-10 w-10 rounded-full overflow-hidden bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                            <Image
+                                                src={`/images/specialists/${specialist.id}.png`}
+                                                alt={specialist.name}
+                                                width={40}
+                                                height={40}
+                                                className="object-cover"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none'
+                                                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                                                }}
+                                            />
+                                            <Bot className="h-5 w-5 text-violet-500 hidden absolute" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="text-sm font-semibold text-foreground truncate">{specialist.name}</h3>
+                                            <p className="text-xs text-muted-foreground truncate">{specialist.title}</p>
+                                        </div>
+                                        <Badge variant="secondary" className="text-[10px] font-normal flex-shrink-0">
+                                            {specialist.department}
+                                        </Badge>
+                                    </div>
+
+                                    {/* Task counts */}
+                                    {totalTasks > 0 ? (
+                                        <div className="flex gap-3 text-xs mb-3">
+                                            <span className="text-status-success font-medium">{counts?.completed ?? 0} done</span>
+                                            <span className="text-electric-blue font-medium">{counts?.active ?? 0} active</span>
+                                            <span className="text-muted-foreground">{counts?.pending ?? 0} pending</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground mb-3">No tasks assigned yet</p>
+                                    )}
+
+                                    {/* Brief button */}
+                                    <Link href={`/agents?specialist=${specialist.id}`} className="block">
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="w-full h-7 text-xs"
+                                        >
+                                            <Sparkles className="h-3 w-3 mr-1" />
+                                            Brief {specialist.name}
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </section>
+        )
+    }
+
     // ─── Render ─────────────────────────────────
 
     return (
@@ -1243,6 +1430,9 @@ export function TeamPageView({
                         members={filteredTeamMembers}
                     />
 
+                    {/* AI Specialists — separate section below human team */}
+                    <AISpecialistsSection />
+
                     {/* Marketplace Candidates — same set as orbit, ordered by function */}
                     {orbitVisibleCandidates.length > 0 && (
                         <MarketplaceCandidatesSection
@@ -1271,6 +1461,9 @@ export function TeamPageView({
                         accentColor="bg-muted-foreground"
                         members={filteredTeamMembers}
                     />
+
+                    {/* AI Specialists — separate section below human team */}
+                    <AISpecialistsSection />
 
                     {/* Marketplace Candidates — same set as orbit, ordered by function */}
                     {orbitVisibleCandidates.length > 0 && (

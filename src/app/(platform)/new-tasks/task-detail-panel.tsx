@@ -169,7 +169,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
   const [delegationArtifact, setDelegationArtifact] = useState<{ id: string; content: string; specialistName: string } | null>(null)
   const [revisionFeedback, setRevisionFeedback] = useState('')
   const [showRevisionInput, setShowRevisionInput] = useState(false)
-  const taskMetadata = (task as Record<string, unknown>).metadata as Record<string, unknown> | null
+  const taskMetadata = task.metadata as Record<string, unknown> | null
 
   // Load existing delegation artifact if task already has one
   useEffect(() => {

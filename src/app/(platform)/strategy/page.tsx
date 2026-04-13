@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getStrategicGoals, getGoalBundle } from '@/actions/canvas'
@@ -7,6 +8,16 @@ import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { StrategyError } from './strategy-error'
 import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 import type { FoundryPurposeData } from '@/types/foundry'
+
+export const metadata: Metadata = {
+  title: 'Strategy',
+  description: 'Define your company purpose, strategic pillars, and measure progress across your entire organisation',
+  openGraph: {
+    title: 'Strategy | ForgeOS',
+    description: 'Define your company purpose, strategic pillars, and measure progress across your entire organisation',
+    type: 'website',
+  },
+}
 
 export const revalidate = 30
 // DECISION: Business plan import uses Opus for objectives extraction, which can take
