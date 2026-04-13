@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TasksCommandCenter } from './tasks-command-center'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
+import { getAllSpecialistsAsMembers } from '@/lib/agents/specialists-config'
 
 export const revalidate = 60
 
@@ -41,7 +42,7 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
       creator:profiles!creator_id(id, full_name, role),
       objective:objectives!objective_id(id, title),
       task_files(id, file_name, file_size, created_at),
-      task_assignees(profile:profiles(id, full_name, role))
+      task_assignees(profile:profiles(id, full_name, role), specialist:specialist_profiles(id, display_name, title, role))
     `)
     .eq('foundry_id', foundry_id)
     .eq('is_ghost', false)
@@ -89,12 +90,14 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
   ])
 
   const objectivesList = objectives || []
-  const members = (membersData || []).map(p => ({
+  const humanMembers = (membersData || []).map(p => ({
     id: p.id,
     full_name: p.full_name || 'Unknown',
     role: p.role,
     email: p.email || '',
   }))
+  const specialists = getAllSpecialistsAsMembers()
+  const members = [...humanMembers, ...specialists]
   const teams = teamsData || []
 
   // Build strategic context lookup: objective_id -> { strategy id, title }
@@ -120,7 +123,11 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
       creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
       objective: objectiveData,
       strategy: strategyData,
-      assignees: task.task_assignees?.map((ta: { profile: unknown }) => ta.profile).filter(Boolean) || [],
+      assignees: task.task_assignees?.map((ta: { profile: { id: string; full_name: string | null; role: string | null } | null; specialist: { id: string; display_name: string; title: string; role: string } | null }) => {
+        if (ta.profile) return ta.profile
+        if (ta.specialist) return { id: ta.specialist.id, full_name: `${ta.specialist.display_name} (${ta.specialist.title})`, role: ta.specialist.role }
+        return null
+      }).filter(Boolean) || [],
       task_files: task.task_files || [],
     }
   }) as unknown as import('./types').TaskWithData[]

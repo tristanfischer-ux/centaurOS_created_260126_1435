@@ -15,6 +15,8 @@ import { syncTaskCommentToMessages } from '@/lib/messaging/comment-sync'
 import { syncTaskToCalendar } from '@/actions/google-calendar'
 import { withAuth } from '@/lib/server-action-utils'
 import { logAudit } from '@/actions/audit'
+import { getSpecialistByProfileId } from '@/lib/agents/specialists-config'
+import { delegateTaskToSpecialist } from '@/actions/task-delegation'
 
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
@@ -1813,11 +1815,16 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
             return { error: 'Failed to update task assignees' }
         }
 
-        // 2. Insert new
-        const records = assigneeIds.map(id => ({
-            task_id: taskId,
-            profile_id: id
-        }))
+        // 2. Insert new — detect specialists vs human profiles
+        // DECISION: specialist_profiles uses specialist_id column (not profile_id)
+        // due to CHECK constraint enforcing mutual exclusivity.
+        const records = assigneeIds.map(id => {
+            const specialist = getSpecialistByProfileId(id)
+            if (specialist) {
+                return { task_id: taskId, profile_id: null, specialist_id: id }
+            }
+            return { task_id: taskId, profile_id: id, specialist_id: null }
+        })
         const { error: assignError } = await supabase.from('task_assignees').insert(records)
 
         if (assignError) {
@@ -1852,6 +1859,21 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
         } catch (workerError) {
             console.error('[TaskService] Failed to trigger AI worker:', { error: workerError instanceof Error ? workerError.message : 'Unknown error' })
             // Continue - AI worker failure shouldn't fail assignee update
+        }
+
+        // FLOW: Auto-trigger specialist delegation when assigned to an AI specialist
+        // Runs in background (fire-and-forget) so it doesn't block the assignee update response
+        for (const assigneeId of assigneeIds) {
+            const specialist = getSpecialistByProfileId(assigneeId)
+            if (specialist) {
+                delegateTaskToSpecialist(taskId, specialist.id).catch((delegationError) => {
+                    console.error('[TaskService] Failed to auto-delegate to specialist:', {
+                        specialistId: specialist.id,
+                        taskId,
+                        error: delegationError instanceof Error ? delegationError.message : 'Unknown error',
+                    })
+                })
+            }
         }
 
         revalidatePath('/tasks')

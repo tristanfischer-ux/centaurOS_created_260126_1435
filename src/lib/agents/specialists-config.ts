@@ -101,6 +101,8 @@ export interface Specialist {
     /** Enable speculative dual-stream: fast model responds instantly while deep model works in parallel.
      *  Default: true for claude-tier (high latency), false for already-fast tiers. */
     speculativeEnabled?: boolean
+    /** Stable UUID from specialist_profiles table — used for task assignment */
+    profileId: string
 }
 
 export const SPECIALISTS: Specialist[] = [
@@ -109,6 +111,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "strategist",
+        profileId: "a1000000-0000-4000-8000-000000000001",
         name: "Sage",
         title: "Strategy",
         tagline: "Day 1 thinking. Long-term conviction, short-term urgency. Let's move.",
@@ -218,6 +221,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "cto",
+        profileId: "a1000000-0000-4000-8000-000000000002",
         name: "Max",
         title: "CTO",
         tagline: "First principles. Delete before you optimize. The best part is no part.",
@@ -320,6 +324,7 @@ export const SPECIALISTS: Specialist[] = [
     },
     {
         id: "vp-engineering",
+        profileId: "a1000000-0000-4000-8000-000000000003",
         name: "Jian",
         title: "VP Engineering",
         tagline: "If you can't calculate the load path, you don't understand your product. Let's fix that.",
@@ -419,6 +424,7 @@ export const SPECIALISTS: Specialist[] = [
     },
     {
         id: "vp-manufacturing",
+        profileId: "a1000000-0000-4000-8000-000000000004",
         name: "Fang",
         title: "VP Manufacturing",
         tagline: "Production is where companies die. Let's make sure it doesn't happen here.",
@@ -518,6 +524,7 @@ export const SPECIALISTS: Specialist[] = [
     },
     {
         id: "vp-supply-chain",
+        profileId: "a1000000-0000-4000-8000-000000000005",
         name: "Chase",
         title: "VP Supply Chain",
         tagline: "Nobody notices supply chain until it breaks. My job is to make sure it never breaks.",
@@ -619,6 +626,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "product-lead",
+        profileId: "a1000000-0000-4000-8000-000000000006",
         name: "Priya",
         title: "Product Development",
         tagline: "Simplicity is the ultimate sophistication. Ship what's necessary, nothing more.",
@@ -723,6 +731,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "growth-marketer",
+        profileId: "a1000000-0000-4000-8000-000000000007",
         name: "Mia",
         title: "Marketing",
         tagline: "If it's not remarkable, it's invisible. Let's be remarkable.",
@@ -833,6 +842,7 @@ export const SPECIALISTS: Specialist[] = [
     },
     {
         id: "sales-lead",
+        profileId: "a1000000-0000-4000-8000-000000000008",
         name: "Sal",
         title: "Sales",
         tagline: "Pipeline doesn't fill itself. Let's build a machine that closes.",
@@ -946,6 +956,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "chief-of-staff",
+        profileId: "a1000000-0000-4000-8000-000000000009",
         name: "Cal",
         title: "Chief of Staff",
         tagline: "I keep the wheels turning while you change the world. Every conversation flows through me.",
@@ -1050,6 +1061,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "finance-lead",
+        profileId: "a1000000-0000-4000-8000-00000000000a",
         name: "Finn",
         title: "Finance",
         tagline: "You're building a rocket. I'll make sure it has enough fuel. And I'll tell you when it's running low.",
@@ -1152,6 +1164,7 @@ export const SPECIALISTS: Specialist[] = [
     },
     {
         id: "fundraising-advisor",
+        profileId: "a1000000-0000-4000-8000-00000000000b",
         name: "Fiona",
         title: "Fundraising",
         tagline: "Investors don't fund decks. They fund conviction. Let's build yours — fast.",
@@ -1262,6 +1275,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "hiring-team",
+        profileId: "a1000000-0000-4000-8000-00000000000c",
         name: "Harper",
         title: "HR",
         tagline: "Your first ten hires will make or break the company. Let's get them right, fast.",
@@ -1366,6 +1380,7 @@ export const SPECIALISTS: Specialist[] = [
     // ═════════════════════════════════════════════════════════════════════════════
     {
         id: "legal-counsel",
+        profileId: "a1000000-0000-4000-8000-00000000000d",
         name: "Leo",
         title: "Legal",
         tagline: "The expensive stuff you keep putting off? That's my Tuesday. Let's get it done fast.",
@@ -1520,4 +1535,77 @@ export function getSpecialists(): Specialist[] {
     const overrides = loadSpecialistOverrides()
     if (Object.keys(overrides).length === 0) return SPECIALISTS
     return applyOverrides(SPECIALISTS, overrides)
+}
+
+// ─── Specialist ↔ Member Bridging ──────────────────────────────────────────────
+
+/**
+ * Shape compatible with the Member type used in task assignment UIs.
+ * @see src/app/(platform)/new-tasks/types.ts
+ */
+export interface SpecialistAsMember {
+    id: string
+    full_name: string
+    role: "AI_Agent"
+    email: string
+    /** Discriminator — true for specialist members, absent/false for human profiles */
+    isSpecialist: true
+    /** Original specialist ID for reverse lookups */
+    specialistId: SpecialistId
+}
+
+/**
+ * Convert a specialist to a Member-compatible object for task assignment UIs.
+ *
+ * @description Uses the specialist's stable profileId (from specialist_profiles table)
+ * as the member ID, so it can be used directly in assignment flows. The email is a
+ * non-routable placeholder since specialists don't have real emails.
+ *
+ * @param specialistId - The specialist key (e.g. "strategist")
+ * @returns A Member-compatible object, or undefined if the specialist ID is invalid
+ */
+export function getSpecialistAsMember(specialistId: SpecialistId | string): SpecialistAsMember | undefined {
+    const specialist = getSpecialistById(specialistId)
+    if (!specialist) return undefined
+
+    return {
+        id: specialist.profileId,
+        full_name: `${specialist.name} (${specialist.title})`,
+        role: "AI_Agent",
+        email: `${specialist.id}@ai.forgeos.internal`,
+        isSpecialist: true,
+        specialistId: specialist.id,
+    }
+}
+
+/**
+ * Get all 13 specialists as Member-compatible objects.
+ *
+ * @description Useful for populating assignee pickers that need to show both
+ * human team members and AI specialists in a unified list.
+ *
+ * @returns Array of Member-compatible objects for all active specialists
+ */
+export function getAllSpecialistsAsMembers(): SpecialistAsMember[] {
+    return SPECIALISTS.map((s) => ({
+        id: s.profileId,
+        full_name: `${s.name} (${s.title})`,
+        role: "AI_Agent" as const,
+        email: `${s.id}@ai.forgeos.internal`,
+        isSpecialist: true as const,
+        specialistId: s.id,
+    }))
+}
+
+/**
+ * Look up a specialist by their profileId (UUID from specialist_profiles table).
+ *
+ * @description Reverse lookup — given a UUID from a task_assignees.specialist_id,
+ * find the corresponding specialist config. Useful when rendering task cards.
+ *
+ * @param profileId - The specialist profile UUID
+ * @returns The specialist, or undefined if not found
+ */
+export function getSpecialistByProfileId(profileId: string): Specialist | undefined {
+    return SPECIALISTS.find((s) => s.profileId === profileId)
 }

@@ -16114,6 +16114,42 @@ export type Database = {
           },
         ]
       }
+      specialist_profiles: {
+        Row: {
+          bio: string | null
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          role: string
+          specialist_key: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          role?: string
+          specialist_key: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          role?: string
+          specialist_key?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       standard_hardware: {
         Row: {
           created_at: string | null
@@ -16664,21 +16700,24 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          profile_id: string
+          profile_id: string | null
+          specialist_id: string | null
           task_id: string
           team_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
-          profile_id: string
+          profile_id?: string | null
+          specialist_id?: string | null
           task_id: string
           team_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
-          profile_id?: string
+          profile_id?: string | null
+          specialist_id?: string | null
           task_id?: string
           team_id?: string | null
         }
@@ -16695,6 +16734,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_specialist_id_fkey"
+            columns: ["specialist_id"]
+            isOneToOne: false
+            referencedRelation: "specialist_profiles"
             referencedColumns: ["id"]
           },
           {
