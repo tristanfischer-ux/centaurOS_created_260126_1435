@@ -62,8 +62,20 @@ export function DashboardMatchCards({
     return firms
       .map(firm => {
         const breakdown = calculateMatchScore(firm, p)
-        const composite = compositePillarScore(breakdown.pillars)
-        return { firm, breakdown, composite }
+        // DECISION: When the server ran a semantic search, each firm carries
+        // `_similarity` (pgvector cosine, 0-1) on its attributes. That value is
+        // the dashboard's "thesis" pillar — it reflects how close the firm's
+        // thesis text is to the user's typed description. Use it directly when
+        // present; fall back to the generic pillar mapping otherwise.
+        const similarity = (firm.attributes as Record<string, unknown>)._similarity
+        const thesisFromSim = typeof similarity === 'number'
+          ? Math.round(Math.max(0, Math.min(1, similarity)) * 100)
+          : null
+        const pillars = thesisFromSim != null
+          ? { ...breakdown.pillars, thesis: thesisFromSim }
+          : breakdown.pillars
+        const composite = compositePillarScore(pillars)
+        return { firm, breakdown: { ...breakdown, pillars }, composite }
       })
       .sort((a, b) => b.composite - a.composite)
       .slice(0, limit)

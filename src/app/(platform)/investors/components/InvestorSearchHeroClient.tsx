@@ -1,20 +1,21 @@
 /**
  * @file InvestorSearchHeroClient.tsx
  *
- * @description Client wrapper that orchestrates semantic search for investors.
- * When user submits a search query from the hero, this passes it to InvestorBrowser
- * which handles the actual filtering/pagination. Above the browser, it also
- * renders the DashboardMatchCards — a fast, client-side ranked preview of the
- * top matches styled after Forge-Capital-Dashboard.html.
+ * @description Single-surface semantic search for the For You tab. Owns the
+ * query state, calls searchInvestors (pgvector cosine similarity), and renders
+ * the ranked results as DashboardMatchCards. Deliberately does NOT mount the
+ * InvestorBrowser here — that lived on the For You tab previously and produced
+ * a confusing "second search section" below the ranked cards. The full directory
+ * remains available on the Investors tab.
  */
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useTransition } from 'react'
+import { toast } from 'sonner'
 import { InvestorSearchHero } from './InvestorSearchHero'
-import { InvestorBrowser } from './InvestorBrowser'
 import { DashboardMatchCards } from './DashboardMatchCards'
-import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
+import { searchInvestors, type InvestorFirm, type ShortlistStage, type InvestorTierAccess } from '@/actions/investors'
 
 interface InvestorSearchHeroClientProps {
   initialFirms: InvestorFirm[]
@@ -29,56 +30,68 @@ interface InvestorSearchHeroClientProps {
 
 export function InvestorSearchHeroClient({
   initialFirms,
-  initialTotal,
-  initialHasMore,
-  initialMatchScores = {},
-  initialShortlistIds = {},
-  access,
-  productSectors = [],
   companyContext,
 }: InvestorSearchHeroClientProps) {
-  const [heroSearchQuery, setHeroSearchQuery] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
+  // firms currently shown. Defaults to the alphabetical initial slice until the
+  // user actively searches, at which point semantic-search results replace them.
+  const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
+  const [lastQuery, setLastQuery] = useState<string>('')
+  const [hasSearched, setHasSearched] = useState<boolean>(false)
+  const [isPending, startTransition] = useTransition()
 
-  const handleHeroSearch = useCallback((query: string) => {
-    setHeroSearchQuery(query)
-    setIsSearching(true)
+  const runSearch = useCallback((query: string) => {
+    const trimmed = query.trim()
+    if (trimmed.length < 6) {
+      toast.error('Please describe your startup in a little more detail (6+ characters).')
+      return
+    }
+    setLastQuery(trimmed)
+    setHasSearched(true)
+    startTransition(async () => {
+      try {
+        const result = await searchInvestors({
+          query: trimmed,
+          sortBy: 'name', // server ranks by similarity when query > 5 chars
+          page: 1,
+          pageSize: 50,
+        })
+        setFirms(result.firms)
+        if (result.firms.length === 0) {
+          toast.info('No matching investors found. Try a broader description.')
+        }
+      } catch (err) {
+        console.error('[investor-search] failed:', err)
+        toast.error('Search failed — please try again.')
+      }
+    })
   }, [])
 
-  const handleHeroCancel = useCallback(() => {
-    setHeroSearchQuery('')
-    setIsSearching(false)
-  }, [])
+  const handleCancel = useCallback(() => {
+    setLastQuery('')
+    setHasSearched(false)
+    setFirms(initialFirms)
+  }, [initialFirms])
+
+  const cardsTitle = hasSearched ? 'Top Matches for your search' : 'Top Matches'
+  const cardsSubtitle = hasSearched
+    ? `Ranked by thesis similarity against "${lastQuery.length > 60 ? lastQuery.slice(0, 60) + '…' : lastQuery}"`
+    : 'Type a description or drop your pitch deck above to find your strongest investor matches.'
 
   return (
     <div className="space-y-8">
       <InvestorSearchHero
-        onSearch={handleHeroSearch}
-        onCancel={handleHeroCancel}
-        isSearching={isSearching}
+        onSearch={runSearch}
+        onCancel={handleCancel}
+        isSearching={isPending}
         companyContext={companyContext}
       />
 
-      {/* Dashboard-style ranked match cards. Client-side scoring using the
-          shared calculateMatchScore — no SSE, no LLM, renders instantly. */}
       <DashboardMatchCards
-        firms={initialFirms}
+        firms={firms}
         companyContext={companyContext}
-        limit={10}
-        title="Top Matches"
-        subtitle="Ranked by thesis fit, stage, geography, cheque size, activity, and data confidence."
-      />
-
-      <InvestorBrowser
-        initialFirms={initialFirms}
-        initialTotal={initialTotal}
-        initialHasMore={initialHasMore}
-        initialMatchScores={initialMatchScores}
-        initialShortlistIds={initialShortlistIds}
-        access={access}
-        productSectors={productSectors}
-        initialSearchQuery={heroSearchQuery}
-        onSearchStateChange={(isLoading) => setIsSearching(isLoading)}
+        limit={hasSearched ? 50 : 10}
+        title={cardsTitle}
+        subtitle={cardsSubtitle}
       />
     </div>
   )
