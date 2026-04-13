@@ -138,6 +138,23 @@ function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<
   )
 }
 
+/**
+ * Detect raw code/data in artifact content and wrap in a fenced code block
+ * so the Markdown renderer displays it properly instead of stripping tags.
+ */
+function formatArtifactContent(content: string): string {
+  const trimmed = content.trimStart()
+  // JSON
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    return '```json\n' + content + '\n```'
+  }
+  // XML / HTML (sitemaps, SVGs, etc.)
+  if (trimmed.startsWith('<?xml') || trimmed.startsWith('<!DOCTYPE') || (trimmed.startsWith('<') && trimmed.includes('</') && !trimmed.startsWith('<http'))) {
+    return '```xml\n' + content + '\n```'
+  }
+  return content
+}
+
 export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDetailPanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -826,18 +843,13 @@ export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDet
                 </div>
 
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 p-3">
+                  <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 p-3 overflow-hidden">
                     <p className="text-xs font-medium text-international-orange mb-1">
                       {delegationArtifact.specialistName} completed this task
                     </p>
-                    <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
+                    <div className="max-h-[400px] overflow-y-auto overflow-x-auto max-w-full">
                       <Markdown
-                        content={
-                          // If content looks like raw JSON, wrap in a code block for formatting
-                          delegationArtifact.content.trimStart().startsWith('{') || delegationArtifact.content.trimStart().startsWith('[')
-                            ? '```json\n' + delegationArtifact.content + '\n```'
-                            : delegationArtifact.content
-                        }
+                        content={formatArtifactContent(delegationArtifact.content)}
                         className="text-sm break-words [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full"
                       />
                     </div>
