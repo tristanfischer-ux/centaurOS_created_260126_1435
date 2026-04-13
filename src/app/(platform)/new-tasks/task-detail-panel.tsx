@@ -21,6 +21,8 @@ import { getStatusBadgeClass } from '@/lib/status-colors'
 import { completeTask, getTaskComments, addTaskComment, getSubtasks, createSubtask, toggleSubtaskComplete } from '@/actions/tasks'
 import { delegateTaskToSpecialist, approveDelegation, rejectDelegation } from '@/actions/task-delegation'
 import { getArtifact } from '@/actions/agent-artifacts'
+import { getAllSpecialistsAsMembers, getSpecialistByProfileId } from '@/lib/agents/specialists-config'
+import { updateTaskAssignees } from '@/actions/tasks'
 import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
 import { formatDistanceToNow } from 'date-fns'
@@ -619,26 +621,56 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
               </div>
             </div>
 
-            {/* Assignee */}
-            <DetailRow icon={User} label="Assignee">
-              {task.assignees && task.assignees.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {task.assignees.map(a => (
-                    <span key={a.id} className="inline-flex items-center gap-1.5 text-sm">
-                      <UserAvatar name={a.full_name} role={a.role} size="xs" />
-                      {a.full_name}
-                    </span>
-                  ))}
+            {/* Assignee (editable — includes AI specialists) */}
+            <div className="flex items-start gap-3 py-2">
+              <User className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
+                  Assignee
                 </div>
-              ) : task.assignee?.full_name ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <UserAvatar name={task.assignee.full_name} role={task.assignee.role} size="xs" />
-                  {task.assignee.full_name}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Unassigned</span>
-              )}
-            </DetailRow>
+                <Select
+                  value={task.assignee_id ?? 'unassigned'}
+                  onValueChange={(newAssigneeId) => {
+                    if (newAssigneeId === 'unassigned' || newAssigneeId === task.assignee_id) return
+                    startTransition(async () => {
+                      const result = await updateTaskAssignees(task.id, [newAssigneeId])
+                      if (result.error) {
+                        toast.error(result.error)
+                      } else {
+                        // Check if this is a specialist — auto-trigger delegation
+                        const spec = getSpecialistByProfileId(newAssigneeId)
+                        if (spec) {
+                          toast.success(`Assigned to ${spec.name} — generating deliverable...`)
+                        } else {
+                          toast.success('Assignee updated')
+                        }
+                        router.refresh()
+                      }
+                    })
+                  }}
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="h-8 text-sm w-full max-w-[240px]">
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Current assignee */}
+                    {task.assignee?.full_name && (
+                      <SelectItem value={task.assignee_id ?? 'current'}>
+                        {task.assignee.full_name} {task.assignee.role === 'AI_Agent' ? '(AI)' : ''}
+                      </SelectItem>
+                    )}
+                    {/* AI Specialists */}
+                    <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">AI Specialists</div>
+                    {getAllSpecialistsAsMembers().map(spec => (
+                      <SelectItem key={spec.id} value={spec.id}>
+                        {spec.full_name} ({(spec as Record<string, unknown>).title as string ?? 'Specialist'})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
             {/* Creator */}
             {task.creator?.full_name && (
