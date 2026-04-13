@@ -53,7 +53,7 @@ export function InvestorSearchHeroClient({
           query: trimmed,
           sortBy: 'name', // server ranks by similarity when query > 5 chars
           page: 1,
-          pageSize: 50,
+          pageSize: 500, // dashboard-parity — show every firm that cleared the RPC
         })
         setFirms(result.firms)
         if (result.firms.length === 0) {
@@ -89,9 +89,8 @@ export function InvestorSearchHeroClient({
       {hasSearched ? (
         <DashboardMatchCards
           firms={firms}
-          companyContext={companyContext}
           queryText={lastQuery}
-          limit={50}
+          limit={500}
           title={cardsTitle}
           subtitle={cardsSubtitle}
         />

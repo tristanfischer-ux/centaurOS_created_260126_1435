@@ -374,7 +374,10 @@ export async function searchInvestors(
 
   // SECURITY: Bound pagination to prevent DoS
   const safePage = Math.max(1, page)
-  const safePageSize = Math.min(Math.max(1, pageSize), 100)
+  // DECISION: Raised from 100 to 500 so the For You tab can show dashboard-parity
+  // match counts (Forge Capital Dashboard returns hundreds of matches per query).
+  // Still bounded to prevent DoS.
+  const safePageSize = Math.min(Math.max(1, pageSize), 500)
   const from = (safePage - 1) * safePageSize
 
   const supabase = await createClient()
