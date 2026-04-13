@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { getStatusBadgeClass } from '@/lib/status-colors'
-import { completeTask, getTaskComments, addTaskComment, getSubtasks, createSubtask, toggleSubtaskComplete } from '@/actions/tasks'
+import { completeTask, getTaskComments, addTaskComment, getSubtasks, createSubtask, toggleSubtaskComplete, updateTaskAssignees } from '@/actions/tasks'
 import { delegateTaskToSpecialist, approveDelegation, rejectDelegation } from '@/actions/task-delegation'
 import { getArtifact } from '@/actions/agent-artifacts'
 import { toast } from 'sonner'
@@ -35,7 +35,7 @@ import { useRelevantSpecialist, getRelevantSpecialist } from '@/hooks/use-releva
 import type { SpecialistContext } from '@/components/specialists/types'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Markdown } from '@/components/ui/markdown'
-import type { TaskWithData, Member } from './types'
+import type { TaskWithData } from './types'
 
 /** Shape of a task comment from getTaskComments */
 interface TaskComment {
@@ -59,6 +59,8 @@ interface TaskDetailPanelProps {
   onClose: () => void
   /** Callback to open the edit dialog for this task */
   onEdit?: (task: TaskWithData) => void
+  /** Team members for the assignee dropdown */
+  members?: { id: string; full_name: string; role: string | null }[]
 }
 
 /** Self-loading time display for a specific task. */
@@ -136,7 +138,7 @@ function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<
   )
 }
 
-export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDetailPanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const { celebrateTaskComplete } = useCelebration()
@@ -409,7 +411,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
   }
 
   return (
-    <div className="h-full flex flex-col bg-background border-l border">
+    <div className="h-full flex flex-col bg-background border-l border overflow-hidden">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 px-5 py-4 border-b">
         <div className="min-w-0 flex-1 space-y-2">
@@ -439,7 +441,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                   <Waypoints className="h-3 w-3 text-international-orange flex-shrink-0" />
                   <Link
                     href="/strategy"
-                    className="font-medium text-international-orange hover:underline "
+                    className="font-medium text-international-orange hover:underline truncate max-w-[180px] inline-block"
                     title={task.strategy.title}
                   >
                     {task.strategy.title}
@@ -454,7 +456,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                   <Target className="h-3 w-3 flex-shrink-0" />
                   <Link
                     href={`/new-objectives?selected=${task.objective.id}`}
-                    className="hover:underline "
+                    className="hover:underline truncate max-w-[180px] inline-block"
                     title={task.objective.title}
                   >
                     {task.objective.title}
@@ -497,7 +499,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                 <FileText className="h-3.5 w-3.5" />
                 Description
               </div>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
                 {task.description}
               </p>
             </div>
@@ -636,61 +638,88 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
             </div>
 
             {/* Assignee + Auto-assign to AI */}
-            <DetailRow icon={User} label="Assignee">
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Show delegated specialist from metadata if available */}
-                {taskMetadata?.delegated_to ? (
-                  <span className="inline-flex items-center gap-1.5 text-sm">
-                    <UserAvatar name={delegationArtifact?.specialistName || String(taskMetadata.delegated_to)} role="AI_Agent" size="xs" />
-                    <span className="font-medium">{delegationArtifact?.specialistName || String(taskMetadata.delegated_to)}</span>
-                    <Badge variant="secondary" className="text-[9px]">AI</Badge>
-                  </span>
-                ) : task.assignee?.full_name ? (
-                  <span className="inline-flex items-center gap-1.5 text-sm">
-                    <UserAvatar name={task.assignee.full_name} role={task.assignee.role} size="xs" />
-                    {task.assignee.full_name}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground text-sm">Unassigned</span>
-                )}
-                {/* Auto-assign: picks the most relevant specialist automatically */}
-                {task.status !== 'Completed' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-international-orange hover:text-international-orange/80"
-                    disabled={isPending}
-                    onClick={async () => {
-                      const routed = getRelevantSpecialist(task.title, task.description, task.strategy?.title)
-                      toast.success(`Assigning to ${routed.specialistName}...`)
-                      try {
-                        // DECISION: Use API route instead of server action — Opus takes
-                        // 60-150s which exceeds the 60s server action timeout on Vercel.
-                        // The API route has maxDuration=300.
-                        const res = await fetch('/api/delegate-single', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({ taskId: task.id }),
-                        })
-                        const result = await res.json()
-                        if (result.error) {
-                          toast.error(result.error)
-                        } else {
-                          toast.success(`${result.specialistName || routed.specialistName} completed — review the deliverable below`)
-                          router.refresh()
-                        }
-                      } catch {
-                        toast.error('Delegation failed — try again')
+            <div className="flex items-start gap-3 py-2">
+              <User className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
+                  Assignee
+                </div>
+                <div className="space-y-2">
+                  {/* AI delegated indicator */}
+                  {taskMetadata && taskMetadata.delegated_to ? (
+                    <span className="inline-flex items-center gap-1.5 text-sm max-w-full">
+                      <UserAvatar name={delegationArtifact?.specialistName || String(taskMetadata.delegated_to)} role="AI_Agent" size="xs" />
+                      <span className="font-medium truncate">{delegationArtifact?.specialistName || String(taskMetadata.delegated_to)}</span>
+                      <Badge variant="secondary" className="text-[9px] shrink-0">AI</Badge>
+                    </span>
+                  ) : null}
+                  {/* Human assignee dropdown */}
+                  <Select
+                    value={task.assignee_id || 'unassigned'}
+                    onValueChange={async (value) => {
+                      const newAssigneeId = value === 'unassigned' ? null : value
+                      const assigneeIds = newAssigneeId ? [newAssigneeId] : []
+                      const result = await updateTaskAssignees(task.id, assigneeIds)
+                      if (result.error) {
+                        toast.error(result.error)
+                      } else {
+                        toast.success('Assignee updated')
+                        router.refresh()
                       }
                     }}
+                    disabled={isPending}
                   >
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    {isPending ? 'Assigning...' : 'Auto-assign AI'}
-                  </Button>
-                )}
+                    <SelectTrigger className="h-8 text-sm w-full max-w-[220px]">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* Auto-assign: picks the most relevant specialist automatically */}
+                  {task.status !== 'Completed' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-international-orange hover:text-international-orange/80 px-0"
+                      disabled={isPending}
+                      onClick={async () => {
+                        const routed = getRelevantSpecialist(task.title, task.description, task.strategy?.title)
+                        toast.success(`Assigning to ${routed.specialistName}...`)
+                        try {
+                          // DECISION: Use API route instead of server action — Opus takes
+                          // 60-150s which exceeds the 60s server action timeout on Vercel.
+                          // The API route has maxDuration=300.
+                          const res = await fetch('/api/delegate-single', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ taskId: task.id }),
+                          })
+                          const result = await res.json()
+                          if (result.error) {
+                            toast.error(result.error)
+                          } else {
+                            toast.success(`${result.specialistName || routed.specialistName} completed — review the deliverable below`)
+                            router.refresh()
+                          }
+                        } catch {
+                          toast.error('Delegation failed — try again')
+                        }
+                      }}
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      {isPending ? 'Assigning...' : 'Auto-assign AI'}
+                    </Button>
+                  )}
+                </div>
               </div>
-            </DetailRow>
+            </div>
 
             {/* Creator */}
             {task.creator?.full_name && (
@@ -802,7 +831,15 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                       {delegationArtifact.specialistName} completed this task
                     </p>
                     <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
-                      <Markdown content={delegationArtifact.content} className="text-sm break-words [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full" />
+                      <Markdown
+                        content={
+                          // If content looks like raw JSON, wrap in a code block for formatting
+                          delegationArtifact.content.trimStart().startsWith('{') || delegationArtifact.content.trimStart().startsWith('[')
+                            ? '```json\n' + delegationArtifact.content + '\n```'
+                            : delegationArtifact.content
+                        }
+                        className="text-sm break-words [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full"
+                      />
                     </div>
                   </div>
 

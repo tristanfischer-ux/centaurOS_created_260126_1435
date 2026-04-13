@@ -614,6 +614,7 @@ export function TasksCommandCenter({
               task={selectedTask}
               onClose={() => setSelectedId(null)}
               onEdit={setEditingTask}
+              members={members}
             />
           </div>
         )}
@@ -626,6 +627,7 @@ export function TasksCommandCenter({
             task={selectedTask}
             onClose={() => setSelectedId(null)}
             onEdit={setEditingTask}
+            members={members}
           />
         </div>
       )}
