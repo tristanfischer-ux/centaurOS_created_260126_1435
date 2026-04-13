@@ -617,7 +617,7 @@ export function ObjectivesBoard({
       {/* Main Content Area */}
       <div className="flex gap-6" data-tour="objectives-board">
         {/* Left: View content */}
-        <div className={cn('flex-1 min-w-0', hasDetailPanel && 'max-w-[calc(100%-380px)]')}>
+        <div className={cn('flex-1 min-w-0', hasDetailPanel && 'max-w-[calc(100%-560px)]')}>
           {viewMode === 'board' && (
             <BoardView
               objectives={filteredObjectives}
@@ -654,7 +654,7 @@ export function ObjectivesBoard({
 
         {/* Right: Detail panel */}
         {hasDetailPanel && (
-          <div className="hidden lg:block w-[420px] min-w-0 max-w-[420px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-300px)] sticky top-8">
+          <div className="hidden lg:block w-[540px] min-w-0 max-w-[540px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-300px)] sticky top-8">
             {selectedTaskData ? (
               <TaskDetailPanel
                 task={selectedTaskData}

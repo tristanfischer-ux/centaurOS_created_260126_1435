@@ -34,6 +34,7 @@ import { AskSpecialistButton } from '@/components/specialists/ask-specialist-but
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import type { SpecialistContext } from '@/components/specialists/types'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { Markdown } from '@/components/ui/markdown'
 import type { TaskWithData, Member } from './types'
 
 /** Shape of a task comment from getTaskComments */
@@ -748,16 +749,8 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                   <p className="text-xs font-medium text-international-orange mb-1">
                     {delegationArtifact.specialistName} completed this task
                   </p>
-                  <div className="text-sm text-foreground prose prose-sm max-w-none [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-medium [&_h3]:mt-2 [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5 max-h-[300px] overflow-y-auto">
-                    {delegationArtifact.content.split('\n').map((line, i) => {
-                      if (line.startsWith('## ')) return <h2 key={i}>{line.replace('## ', '')}</h2>
-                      if (line.startsWith('### ')) return <h3 key={i}>{line.replace('### ', '')}</h3>
-                      if (line.startsWith('- ')) return <li key={i}>{line.replace('- ', '')}</li>
-                      if (line.startsWith('**') && line.endsWith('**')) return <p key={i}><strong>{line.replace(/\*\*/g, '')}</strong></p>
-                      if (line.includes('[REVIEW NEEDED]')) return <p key={i} className="text-status-warning font-medium">{line}</p>
-                      if (line.trim() === '') return <br key={i} />
-                      return <p key={i}>{line}</p>
-                    })}
+                  <div className="max-h-[300px] overflow-y-auto">
+                    <Markdown content={delegationArtifact.content} className="text-sm" />
                   </div>
                 </div>
 

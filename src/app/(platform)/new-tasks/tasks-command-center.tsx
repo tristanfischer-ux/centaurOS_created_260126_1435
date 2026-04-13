@@ -573,7 +573,7 @@ export function TasksCommandCenter({
       {/* Main Content Area */}
       <div className="flex gap-6">
         {/* Left: View content */}
-        <div className={cn('flex-1 min-w-0', showDetailPanel && 'max-w-[calc(100%-380px)]')}>
+        <div className={cn('flex-1 min-w-0', showDetailPanel && 'max-w-[calc(100%-560px)]')}>
           {viewMode === 'focus' && (
             <FocusView
               tasks={filteredTasks}
@@ -609,7 +609,7 @@ export function TasksCommandCenter({
 
         {/* Right: Detail panel */}
         {showDetailPanel && (
-          <div className="hidden lg:block w-[360px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-340px)] sticky top-8">
+          <div className="hidden lg:block w-[540px] max-w-[540px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-340px)] sticky top-8">
             <TaskDetailPanel
               task={selectedTask}
               onClose={() => setSelectedId(null)}
