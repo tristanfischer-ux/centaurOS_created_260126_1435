@@ -28,7 +28,7 @@ import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
 import type { FoundryProfile } from '@/lib/investor-match'
-import { embedQuery } from '@/lib/embeddings'
+import { nomicEmbedQuery } from '@/lib/search/nomic-embed'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -387,20 +387,23 @@ export async function searchInvestors(
   // category filter, eliminating the 200-row re-fetch and client-side filtering.
   if (query && query.trim().length > 5) {
     try {
-      const queryEmbedding = await embedQuery(query.trim())
+      // DECISION: Use nomic-embed-text-v1.5 (768-dim), the same model the
+      // Forge Capital pipeline uses locally. Document embeddings in
+      // marketplace_listings.embedding are synced from Forge Capital DB,
+      // so queries MUST be embedded with the matching model.
+      const queryEmbedding = await nomicEmbedQuery(query.trim())
       // DECISION: v2 RPC returns attributes + filters by category at DB level,
       // eliminating the re-fetch + client-side filter pattern.
-      // DECISION: threshold=0.2 (was 0.5). 1536-dim OpenAI embeddings are much
-      // more discriminative than dashboard's 768-dim nomic-embed-text; a 0.5
-      // cutoff eliminated ~99% of real matches (Panatere critical-raw-materials
-      // query returned 1 firm). 0.2 preserves breadth while still filtering
-      // pure noise. match_count raised 200→500 for the same reason.
+      // DECISION: threshold=0.5 matches Forge Capital Dashboard's "strong
+      // matches (50%+)" badge. Both sides now use nomic-embed-text-v1.5
+      // (768-dim), so similarity distributions align. match_count=500 keeps
+      // candidate breadth generous.
       const { data: semanticData, error: semanticError } = await supabase.rpc(
         'match_marketplace_listings_v2',
         {
           query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
           filter_category: 'Finance',
-          match_threshold: 0.2,
+          match_threshold: 0.5,
           match_count: 500,
         }
       )
