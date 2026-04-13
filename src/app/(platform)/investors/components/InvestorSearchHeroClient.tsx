@@ -86,13 +86,31 @@ export function InvestorSearchHeroClient({
         companyContext={companyContext}
       />
 
-      <DashboardMatchCards
-        firms={firms}
-        companyContext={companyContext}
-        limit={hasSearched ? 50 : 10}
-        title={cardsTitle}
-        subtitle={cardsSubtitle}
-      />
+      {hasSearched ? (
+        <DashboardMatchCards
+          firms={firms}
+          companyContext={companyContext}
+          limit={50}
+          title={cardsTitle}
+          subtitle={cardsSubtitle}
+        />
+      ) : (
+        <EmptyMatchState />
+      )}
+    </div>
+  )
+}
+
+function EmptyMatchState() {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-muted/30 p-10 text-center">
+      <p className="text-sm font-medium text-foreground">
+        Describe your startup to see your top investor matches
+      </p>
+      <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
+        Paste your pitch, drop a pitch deck, or click one of the example chips above.
+        We rank investors by thesis fit, stage, geography, cheque size, activity and data confidence.
+      </p>
     </div>
   )
 }

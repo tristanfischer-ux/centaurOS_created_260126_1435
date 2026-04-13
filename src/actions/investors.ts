@@ -390,13 +390,18 @@ export async function searchInvestors(
       const queryEmbedding = await embedQuery(query.trim())
       // DECISION: v2 RPC returns attributes + filters by category at DB level,
       // eliminating the re-fetch + client-side filter pattern.
+      // DECISION: threshold=0.2 (was 0.5). 1536-dim OpenAI embeddings are much
+      // more discriminative than dashboard's 768-dim nomic-embed-text; a 0.5
+      // cutoff eliminated ~99% of real matches (Panatere critical-raw-materials
+      // query returned 1 firm). 0.2 preserves breadth while still filtering
+      // pure noise. match_count raised 200→500 for the same reason.
       const { data: semanticData, error: semanticError } = await supabase.rpc(
         'match_marketplace_listings_v2',
         {
           query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
           filter_category: 'Finance',
-          match_threshold: 0.5,
-          match_count: 200,
+          match_threshold: 0.2,
+          match_count: 500,
         }
       )
 
