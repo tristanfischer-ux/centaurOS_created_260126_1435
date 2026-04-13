@@ -24,7 +24,7 @@ async function verifyMobileKnowledge() {
   
   if (await emailInput.isVisible()) {
     console.log('✅ Login form found - filling credentials...')
-    await emailInput.fill('tristan@fractionalforge.com')
+    await emailInput.fill('tristan@fractionalforge.app')
     await passwordInput.fill('TriFi2025!')
     await page.screenshot({ path: 'mobile-verification/02-credentials-filled.png', fullPage: true })
     console.log('✅ Credentials filled - screenshot saved')

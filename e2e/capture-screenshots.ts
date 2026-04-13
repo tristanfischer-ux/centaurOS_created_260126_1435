@@ -14,7 +14,7 @@
 import { test } from '@playwright/test'
 import path from 'path'
 
-const BASE_URL = process.env.E2E_BASE_URL || 'https://app.fractionalforge.com'
+const BASE_URL = process.env.E2E_BASE_URL || 'https://fractionalforge.app'
 const SCREENSHOT_DIR = path.join(__dirname, '..', 'public', 'images', 'screenshots')
 
 const PAGES = [

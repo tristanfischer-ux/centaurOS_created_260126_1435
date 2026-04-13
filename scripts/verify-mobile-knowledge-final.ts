@@ -22,7 +22,7 @@ async function verifyMobileKnowledge() {
   const emailInput = await page.locator('input[type="email"]').first()
   if (await emailInput.isVisible()) {
     console.log('\n📱 Step 2: Logging in...')
-    await emailInput.fill('tristan@fractionalforge.com')
+    await emailInput.fill('tristan@fractionalforge.app')
     await page.locator('input[type="password"]').first().fill('TriFi2025!')
     await page.screenshot({ path: 'mobile-verification/02-credentials-filled.png' })
     console.log('   Screenshot: 02-credentials-filled.png')
