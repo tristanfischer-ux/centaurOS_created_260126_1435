@@ -61,14 +61,18 @@ function parseProfile(text: string): ExtractedProfile {
   const t = text.slice(0, MAX)
   const low = t.toLowerCase()
 
-  // Description: first meaningful sentence ≥ 30 chars (prefer "We are/We build/... is a")
+  // Description: first complete sentence ≥ 40 chars that looks like prose,
+  // not a heading. Walk paragraph by paragraph so the regex never spans
+  // a line break (which produced "er Stops\n\nMarch…" garbage in v1).
   let description = ''
-  const sentenceMatch = t.match(/(?:we are|we build|we('|')?re|our (?:company|mission)|[A-Z][\w\s&.,'-]{3,80}\s+is a)[^.!?]{20,250}[.!?]/i)
-  if (sentenceMatch) {
-    description = sentenceMatch[0].trim()
-  } else {
-    const firstPara = t.split(/\n\s*\n/).find(p => p.trim().length >= 40) ?? ''
-    description = firstPara.replace(/\s+/g, ' ').trim().slice(0, 250)
+  const paragraphs = t.split(/\n\s*\n/).map(p => p.replace(/\s+/g, ' ').trim()).filter(p => p.length >= 30)
+  for (const para of paragraphs) {
+    // Prefer "X is a", "We are", "We build" sentences within the paragraph
+    const m = para.match(/(?:[A-Z][\w&'.-]+(?:\s+[A-Z][\w&'.-]+){0,5}\s+is\s+(?:a|an)\s+[^.!?]{20,220}[.!?]|(?:we\s+(?:are|build|make|develop|provide|design|create)|our\s+(?:company|mission|platform))\s+[^.!?]{20,220}[.!?])/i)
+    if (m) { description = m[0].trim(); break }
+  }
+  if (!description && paragraphs.length > 0) {
+    description = paragraphs[0].slice(0, 250)
   }
 
   // Stage
@@ -103,7 +107,9 @@ function parseProfile(text: string): ExtractedProfile {
     ?? t.match(/([£$€]\s?\d[\d,.]*\s?[kKmMbB])\s+(?:round|raise|seed|series)/i)
   if (raiseMatch) raiseAmount = raiseMatch[1].replace(/\s+/g, '')
 
-  // Sectors — scan a vocabulary of common hardware/tech sectors
+  // Sectors — scan a vocabulary of common hardware/tech sectors. Use word-boundary
+  // matching for short tokens so "ai" doesn't match inside "raising"/"Britain"
+  // and "iot" doesn't match inside "pilot"/"patriot" (real bug from v1).
   const SECTOR_VOCAB = [
     'climate tech', 'clean energy', 'renewable energy', 'battery', 'solar', 'wind',
     'robotics', 'drones', 'aerospace', 'space', 'satellite',
@@ -119,7 +125,12 @@ function parseProfile(text: string): ExtractedProfile {
   ]
   const foundSectors: string[] = []
   for (const s of SECTOR_VOCAB) {
-    if (low.includes(s) && !foundSectors.includes(s)) foundSectors.push(s)
+    // Build a word-boundary regex; multi-word phrases keep substring matching since
+    // they're already specific enough not to false-match.
+    const pattern = s.includes(' ')
+      ? new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      : new RegExp(`\\b${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+    if (pattern.test(low) && !foundSectors.includes(s)) foundSectors.push(s)
     if (foundSectors.length >= 6) break
   }
 
