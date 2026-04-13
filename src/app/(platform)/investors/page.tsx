@@ -234,7 +234,7 @@ export default async function InvestorDirectoryPage() {
         portfolioCount={portfolioCount}
         grantsCount={grantsCount}
         overviewContent={
-          stats && <InvestorInsightsPanel stats={stats} grantsCount={grantsCount} />
+          stats && <InvestorInsightsPanel stats={stats} grantsCount={grantsCount} portfolioCompanyCount={portfolioCount} />
         }
         forYouContent={
           <div className="space-y-8">

@@ -1806,7 +1806,7 @@ export async function getFundraiseDashboardStats(): Promise<FundraiseDashboardSt
       : null
     if (stageConfig) {
       const hasMatchingStage = shortlistedFirms.some(f =>
-        (f.attributes.stage_focus ?? []).some(s =>
+        (Array.isArray(f.attributes.stage_focus) ? f.attributes.stage_focus : []).some(s =>
           stageConfig.includes(s)
         )
       )
@@ -1819,7 +1819,7 @@ export async function getFundraiseDashboardStats(): Promise<FundraiseDashboardSt
     if (profile.sector) {
       const sectorLower = profile.sector.toLowerCase()
       const hasSector = shortlistedFirms.some(f =>
-        (f.attributes.sectors ?? []).some(s => s.toLowerCase().includes(sectorLower))
+        (Array.isArray(f.attributes.sectors) ? f.attributes.sectors : []).some(s => s.toLowerCase().includes(sectorLower))
       )
       if (!hasSector) {
         coverageGaps.push(`No investors covering your sector (${profile.sector})`)

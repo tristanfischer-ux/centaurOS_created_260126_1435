@@ -80,10 +80,13 @@ export async function extractDocumentText(
       let rawText = ""
 
       if (fileType === "pdf") {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require("pdf-parse")
-        const data = await extractWithTimeout(pdfParse(buffer) as Promise<{ text: string }>)
-        rawText = data.text || ""
+        // GOTCHA: pdf-parse pulls in pdfjs-dist which references browser-only
+        // DOMMatrix at module load and crashes in Node server actions. unpdf is
+        // a Node-safe wrapper around pdfjs that ships its own polyfill.
+        const { extractText, getDocumentProxy } = await import("unpdf")
+        const pdf = await extractWithTimeout(getDocumentProxy(new Uint8Array(buffer)))
+        const { text } = await extractWithTimeout(extractText(pdf, { mergePages: true }))
+        rawText = Array.isArray(text) ? text.join("\n\n") : (text || "")
       } else if (fileType === "docx") {
         const mammoth = await import("mammoth")
         const result = await extractWithTimeout(mammoth.extractRawText({ buffer }))

@@ -60,18 +60,18 @@ function truncate(text: string | undefined | null, max: number): string {
 // ---------------------------------------------------------------------------
 
 const COLUMN_HEADERS: { label: string; className?: string }[] = [
-  { label: '' },                           // shortlist heart (LEFT)
-  { label: '' },                           // quality dot
-  { label: 'Firm' },
-  { label: 'Type' },
-  { label: 'Location' },
-  { label: 'Sectors' },
-  { label: 'Stage' },
-  { label: 'Fund Size', className: 'hidden lg:table-cell' },
-  { label: 'Intel Preview', className: 'hidden xl:table-cell' },
-  { label: 'Quality' },
-  { label: 'Contacts', className: 'hidden md:table-cell' },
-  { label: 'Portfolio', className: 'hidden lg:table-cell' },
+  { label: '', className: 'w-8' },                           // shortlist heart (LEFT)
+  { label: '', className: 'w-6' },                           // quality dot
+  { label: 'Firm', className: 'w-[180px]' },
+  { label: 'Type', className: 'w-[72px]' },
+  { label: 'Location', className: 'w-[120px]' },
+  { label: 'Sectors', className: 'w-[180px]' },
+  { label: 'Stage', className: 'w-[140px]' },
+  { label: 'Fund Size', className: 'hidden lg:table-cell w-[90px]' },
+  { label: 'Intel Preview', className: 'hidden lg:table-cell' },
+  { label: 'Quality', className: 'w-[120px]' },
+  { label: 'Contacts', className: 'hidden md:table-cell w-[80px]' },
+  { label: 'Portfolio', className: 'hidden lg:table-cell w-[80px]' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ export function InvestorTableView({
                 </td>
 
                 {/* 4. Location */}
-                <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                <td className="px-3 py-2 text-muted-foreground truncate max-w-[120px]" title={location}>
                   {location}
                 </td>
 
@@ -236,11 +236,11 @@ export function InvestorTableView({
                 </td>
 
                 {/* 8. Intel Preview — prefer live news intel over static thesis */}
-                <td className="hidden xl:table-cell px-3 py-2 text-muted-foreground max-w-[260px]">
+                <td className="hidden lg:table-cell px-3 py-2 text-muted-foreground min-w-[280px] max-w-[480px]">
                   {intelMap[firm.id] ? (
                     <div className="space-y-0.5">
                       <span className="line-clamp-2 text-xs leading-snug text-foreground">
-                        {truncate(intelMap[firm.id].intel_summary, 120)}
+                        {truncate(intelMap[firm.id].intel_summary, 200)}
                       </span>
                       {intelMap[firm.id].key_signals.length > 0 && (
                         <span className={cn(
@@ -255,7 +255,7 @@ export function InvestorTableView({
                     </div>
                   ) : (
                     <span className="line-clamp-2 text-xs leading-snug">
-                      {truncate(attrs.investment_pattern || attrs.connection_brief || attrs.investment_thesis, 120)}
+                      {truncate(attrs.investment_pattern || attrs.connection_brief || attrs.investment_thesis, 200)}
                     </span>
                   )}
                 </td>

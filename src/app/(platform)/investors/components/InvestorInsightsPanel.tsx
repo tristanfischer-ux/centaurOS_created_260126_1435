@@ -43,6 +43,9 @@ interface InvestorInsightsPanelProps {
   filteredCount?: number
   /** Grants count from investor_grants table */
   grantsCount?: number
+  /** Deduplicated portfolio company count (from RPC). Overrides stats.portfolioCompanyCount
+   * which is a raw row count of the join table and inflates the displayed value. */
+  portfolioCompanyCount?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +88,7 @@ function truncate(s: string, max = 20): string {
 /**
  * Collapsible panel showing investor directory statistics and charts.
  */
-export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, grantsCount = 0 }: InvestorInsightsPanelProps) {
+export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, grantsCount = 0, portfolioCompanyCount }: InvestorInsightsPanelProps) {
   // DECISION: Persist collapse state to localStorage so the user's preference
   // survives navigation and page refreshes.
   // GOTCHA: Read localStorage in useEffect (not useState initialiser) to avoid
@@ -165,7 +168,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
             />
             <StatCard
               icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
-              value={stats.portfolioCompanyCount}
+              value={portfolioCompanyCount ?? stats.portfolioCompanyCount}
               label="Portfolio Cos"
             />
             <StatCard
@@ -180,162 +183,117 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
             />
           </div>
 
-          {/* Row 2: Type distribution pie chart and Top sectors bar chart */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Chart: Investors by Type */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground tracking-wide">
-                Investors by Type
-              </p>
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stats.typeBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={70}
-                      paddingAngle={1}
-                      dataKey="count"
-                      strokeWidth={0}
-                    >
-                      {stats.typeBreakdown.map((_, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={PALETTE[index % PALETTE.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Legend
-                      layout="horizontal"
-                      align="center"
-                      verticalAlign="bottom"
-                      iconSize={8}
-                      iconType="circle"
-                      formatter={(value: string) => <span style={{ color: 'hsl(var(--foreground))', fontSize: 11 }}>{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+          {/* Charts: uniform 320px-tall cards in a 2-up grid; geographic spans full width */}
+          {(() => {
+            const CHART_HEIGHT = 'h-[320px]'
+            const BAR_MARGIN = { top: 8, right: 16, bottom: 8, left: 8 }
+            const Y_AXIS_WIDTH = 110
+            const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+              <div className="rounded-lg border border-border bg-background/40 p-4 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground tracking-wide">{title}</p>
+                <div className={CHART_HEIGHT}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    {children as React.ReactElement}
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
+            )
+            return (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ChartCard title="Investors by Type">
+                    <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                      <Pie
+                        data={stats.typeBreakdown}
+                        cx="50%"
+                        cy="45%"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={1}
+                        dataKey="count"
+                        strokeWidth={0}
+                      >
+                        {stats.typeBreakdown.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                      <Legend
+                        layout="horizontal"
+                        align="center"
+                        verticalAlign="bottom"
+                        iconSize={8}
+                        iconType="circle"
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                      />
+                    </PieChart>
+                  </ChartCard>
 
-            {/* Chart: Top Sectors */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground tracking-wide">
-                Top Sectors
-              </p>
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    layout="vertical"
-                    data={stats.topSectors}
-                    margin={{ top: 0, right: 16, bottom: 0, left: 100 }}
-                  >
+                  <ChartCard title="Top Sectors">
+                    <BarChart layout="vertical" data={stats.topSectors} margin={BAR_MARGIN}>
+                      <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={Y_AXIS_WIDTH}
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v: string) => truncate(v, 16)}
+                      />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                      <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
+                    </BarChart>
+                  </ChartCard>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ChartCard title="Stage Focus Distribution">
+                    <BarChart layout="vertical" data={stats.stageFocusBreakdown} margin={BAR_MARGIN}>
+                      <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={Y_AXIS_WIDTH}
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v: string) => truncate(v, 16)}
+                      />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                      <Bar dataKey="count" fill={CHART_COLORS.green} radius={[0, 3, 3, 0]} />
+                    </BarChart>
+                  </ChartCard>
+
+                  <ChartCard title="Data Quality Distribution">
+                    <BarChart data={stats.qualityDistribution} margin={BAR_MARGIN}>
+                      <XAxis dataKey="range" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                      <Bar dataKey="count" fill={CHART_COLORS.amber} radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ChartCard>
+                </div>
+
+                <ChartCard title="Geographic Distribution">
+                  <BarChart layout="vertical" data={stats.regionBreakdown} margin={BAR_MARGIN}>
                     <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={100}
+                      width={Y_AXIS_WIDTH}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: string) => truncate(v)}
+                      tickFormatter={(v: string) => truncate(v, 16)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
                   </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* Row 3: Stage Focus and Data Quality Distribution */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Chart: Stage Focus */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground tracking-wide">
-                Stage Focus Distribution
-              </p>
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    layout="vertical"
-                    data={stats.stageFocusBreakdown}
-                    margin={{ top: 0, right: 16, bottom: 0, left: 100 }}
-                  >
-                    <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={100}
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: string) => truncate(v)}
-                    />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill={CHART_COLORS.green} radius={[0, 3, 3, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Chart: Data Quality Distribution */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground tracking-wide">
-                Data Quality Distribution
-              </p>
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={stats.qualityDistribution}
-                    margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
-                  >
-                    <XAxis
-                      dataKey="range"
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill={CHART_COLORS.amber} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* Row 4: Geographic Distribution */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground tracking-wide">
-              Geographic Distribution
-            </p>
-            <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={stats.regionBreakdown}
-                  margin={{ top: 0, right: 16, bottom: 0, left: 10 }}
-                >
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={110}
-                    tick={{ fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v: string) => truncate(v)}
-                  />
-                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                  <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+                </ChartCard>
+              </>
+            )
+          })()}
         </div>
       )}
     </div>

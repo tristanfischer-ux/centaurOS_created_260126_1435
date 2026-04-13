@@ -94,12 +94,16 @@ export function calculateMatchScore(
   let stageScore = 0
   const userStage = profile.stage?.toLowerCase().replace(/\s+/g, '_') ?? ''
   const stageConfig = STAGE_MAP[userStage]
-  if (stageConfig && attrs.stage_focus && attrs.stage_focus.length > 0) {
+  // GOTCHA: stage_focus can be string | string[] | null in legacy rows. Coerce to array.
+  const stageFocusArr = Array.isArray(attrs.stage_focus)
+    ? attrs.stage_focus
+    : attrs.stage_focus ? [attrs.stage_focus as unknown as string] : []
+  if (stageConfig && stageFocusArr.length > 0) {
     const hasExact = stageConfig.exact.some(s =>
-      attrs.stage_focus!.some(sf => sf.toLowerCase() === s.toLowerCase())
+      stageFocusArr.some(sf => sf.toLowerCase() === s.toLowerCase())
     )
     const hasAdjacent = stageConfig.adjacent.some(s =>
-      attrs.stage_focus!.some(sf => sf.toLowerCase() === s.toLowerCase())
+      stageFocusArr.some(sf => sf.toLowerCase() === s.toLowerCase())
     )
     if (hasExact) {
       stageScore = 25
@@ -231,16 +235,16 @@ export function findSimilarInvestors(
   limit = 5
 ): { firm: InvestorFirm; similarity: number }[] {
   const targetSectors = new Set((Array.isArray(target.attributes.sectors) ? target.attributes.sectors : []).map(s => s.toLowerCase()))
-  const targetStages = new Set((target.attributes.stage_focus ?? []).map(s => s.toLowerCase()))
-  const targetGeo = new Set((target.attributes.geo_focus ?? []).map(g => g.toLowerCase()))
+  const targetStages = new Set((Array.isArray(target.attributes.stage_focus) ? target.attributes.stage_focus : []).map(s => s.toLowerCase()))
+  const targetGeo = new Set((Array.isArray(target.attributes.geo_focus) ? target.attributes.geo_focus : []).map(g => g.toLowerCase()))
   const targetFundSize = target.attributes.fund_size_gbp ?? 0
 
   const scored = candidates
     .filter(c => c.id !== target.id)
     .map(c => {
       const cSectors = new Set((Array.isArray(c.attributes.sectors) ? c.attributes.sectors : []).map(s => s.toLowerCase()))
-      const cStages = new Set((c.attributes.stage_focus ?? []).map(s => s.toLowerCase()))
-      const cGeo = new Set((c.attributes.geo_focus ?? []).map(g => g.toLowerCase()))
+      const cStages = new Set((Array.isArray(c.attributes.stage_focus) ? c.attributes.stage_focus : []).map(s => s.toLowerCase()))
+      const cGeo = new Set((Array.isArray(c.attributes.geo_focus) ? c.attributes.geo_focus : []).map(g => g.toLowerCase()))
 
       // Jaccard similarity per dimension
       const sectorSim = jaccard(targetSectors, cSectors)
