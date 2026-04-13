@@ -1,11 +1,12 @@
-import { DirectoryNav } from '@/components/directory/DirectoryNav'
-import { DirectoryFooter } from '@/components/directory/DirectoryFooter'
+import { MarketingNav } from '@/components/marketing/marketing-nav'
+import { MarketingFooter } from '@/components/marketing/marketing-footer'
 
 /**
  * Layout for the public expert directory.
  *
- * @description Wraps all /experts/* and /expert/* pages with the public
- * navigation bar and footer. No authentication required.
+ * @description Wraps all /experts/* and /expert/* pages with the shared
+ * marketing navigation bar and footer for brand consistency across
+ * all public pages. No authentication required.
  *
  * @security This layout is accessible without login. All data displayed
  * comes from SECURITY DEFINER RPC functions that only return public fields.
@@ -17,9 +18,9 @@ export default function DirectoryLayout({
 }) {
     return (
         <div className="flex min-h-screen flex-col bg-background">
-            <DirectoryNav />
+            <MarketingNav />
             <main className="flex-1">{children}</main>
-            <DirectoryFooter />
+            <MarketingFooter />
         </div>
     )
 }

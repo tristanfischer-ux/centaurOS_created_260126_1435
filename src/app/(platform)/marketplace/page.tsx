@@ -7,7 +7,6 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
-import { ProcessDiscoveryGrid } from '@/components/marketplace/process-discovery-grid'
 import { ProjectContextBanner } from '@/components/marketplace/project-context-banner'
 import { getProcessCategoryCounts } from '@/actions/marketplace-process-discovery'
 import { getActiveProjectContext } from '@/actions/marketplace-project-context'
@@ -182,12 +181,7 @@ export default async function MarketplacePage({
                 <ProjectContextBanner context={projectContext} />
             )}
 
-            {/* Process-based discovery grid — hidden when user is actively searching */}
-            {processGroups.length > 0 && !params?.q && (
-                <ProcessDiscoveryGrid groups={processGroups} totalCount={totalCount} />
-            )}
-
-            {/* Supplier browse */}
+            {/* Supplier browse — ProcessDiscoveryGrid rendered inside, reactive to client search state */}
             <Suspense fallback={<MarketplaceLoading />}>
                 <MarketplaceBrowse
                     initialListings={listings}
@@ -203,6 +197,7 @@ export default async function MarketplacePage({
                     stats={stats || undefined}
                     hidePageHeader
                     hideSpecialistBriefing
+                    processGroups={processGroups}
                 />
             </Suspense>
         </div>

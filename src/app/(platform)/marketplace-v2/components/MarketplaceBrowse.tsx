@@ -34,6 +34,8 @@ import { PageTour } from '@/components/guidance/page-tour'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { ProcessDiscoveryGrid } from '@/components/marketplace/process-discovery-grid'
+import type { ProcessGroup } from '@/actions/marketplace-process-discovery'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { FoundryContext } from '@/actions/foundry-context'
 
@@ -69,6 +71,8 @@ interface MarketplaceBrowseProps {
     hideSpecialistBriefing?: boolean
     /** Hide the page header (title + subtitle) when a parent page provides its own. */
     hidePageHeader?: boolean
+    /** Process discovery groups — rendered above the toolbar when there's no active search. */
+    processGroups?: ProcessGroup[]
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -102,6 +106,7 @@ export function MarketplaceBrowse({
     postFetchTransform,
     hideSpecialistBriefing = false,
     hidePageHeader = false,
+    processGroups,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({
         initialListings,
@@ -417,6 +422,11 @@ export function MarketplaceBrowse({
             {/* Browse tab content */}
             {activeTab === 'browse' && (
                 <>
+                    {/* Process-based discovery grid — hidden when user is actively searching */}
+                    {processGroups && processGroups.length > 0 && !state.debouncedQuery && (
+                        <ProcessDiscoveryGrid groups={processGroups} totalCount={state.totalCount} />
+                    )}
+
                     {/* Analytics section */}
                     {stats ? (
                         <MarketplaceStatsSection

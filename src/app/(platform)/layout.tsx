@@ -23,6 +23,7 @@ import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
 import { BackgroundOpsProvider } from "@/contexts/background-ops-context"
 import { CadLabProvider } from "@/app/(platform)/the-forge/cad-lab/cad-lab-context";
 
+import { PostHogProvider } from "@/components/PostHogProvider";
 import { BrowseContextProvider } from "@/contexts/browse-context";
 import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
@@ -102,6 +103,7 @@ export default async function PlatformLayout({
     const needsProfileRepair = !profile?.foundry_id
 
     return (
+        <PostHogProvider>
         <TooltipProvider>
             <PresenceProvider>
                 <ZoomProvider>
@@ -168,5 +170,6 @@ export default async function PlatformLayout({
                 </ZoomProvider>
             </PresenceProvider>
         </TooltipProvider>
+        </PostHogProvider>
     );
 }

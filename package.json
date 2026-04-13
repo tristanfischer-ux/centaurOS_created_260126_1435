@@ -94,6 +94,7 @@
     "officeparser": "^6.0.4",
     "openai": "^6.16.0",
     "pdf-parse": "^2.4.5",
+    "posthog-js": "^1.368.0",
     "pptxgenjs": "^4.0.1",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",

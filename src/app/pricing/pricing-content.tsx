@@ -27,7 +27,6 @@ import {
 import {
   CheckCircle2,
   ArrowRight,
-  ArrowLeft,
   Zap,
   Users,
   ShoppingBag,
@@ -36,17 +35,25 @@ import {
   Info,
   ChevronDown,
 } from 'lucide-react'
+import { MarketingNav } from '@/components/marketing/marketing-nav'
+import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { cn } from '@/lib/utils'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 
 type BillingPeriod = 'monthly' | 'annual'
+
+/** Tooltip explanation for what an "Assist" / "AI task" is */
+const AI_TASK_TOOLTIP =
+  'Each message to an AI specialist counts as 1 assist. Generating a CAD Lab engineering package uses 3–5 assists depending on complexity. Marketplace searches and browsing are free.'
 
 /** Tooltip explanations for complex/jargon features */
 const FEATURE_TOOLTIPS: Record<string, string> = {
   'Comparison assistant': 'Analyses and compares marketplace providers side-by-side so you can choose with confidence.',
   'Voice-to-task': 'Speak your tasks out loud and they are converted into structured action items instantly.',
   'Supplier matching': '6-factor matching that scores UK suppliers on capability, process, material, quality, and relevance.',
-  'Assists': 'Actions across ForgeOS — engineering analysis, specialist conversations, document generation, and more.',
+  'Assists': AI_TASK_TOOLTIP,
+  'AI tasks': AI_TASK_TOOLTIP,
+  'Assists per month': AI_TASK_TOOLTIP,
 }
 
 /** FAQ items addressing common pricing objections */
@@ -112,41 +119,10 @@ export function PricingContent() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="min-h-screen bg-background">
-        {/* Navigation bar */}
-        <nav className="sticky top-0 z-40 border-b border-muted bg-background py-3 px-4 sm:px-6">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <Link
-                href="/"
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
-                aria-label="Back to home"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Home</span>
-              </Link>
-              <span className="text-muted-foreground/30">|</span>
-              <Link href="/" className="text-lg font-display font-semibold text-foreground">
-                ForgeOS
-              </Link>
-            </div>
-            <div className="flex items-center gap-3 sm:gap-6">
-              <span className="text-sm font-medium text-international-orange">
-                Pricing
-              </span>
-              <Link
-                href="/login"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
-              >
-                Sign In
-              </Link>
-              <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange-hover">
-                <Link href="/join">Get Started Free</Link>
-              </Button>
-            </div>
-          </div>
-        </nav>
+      <div className="flex min-h-screen flex-col bg-background">
+        <MarketingNav />
 
+        <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           {/* Header */}
           <div className="text-center space-y-4 mb-8">
@@ -268,6 +244,7 @@ export function PricingContent() {
                           ? 'Unlimited'
                           : plan.limits.maxAiTasksPerMonth.toLocaleString()
                         }
+                        tooltip={AI_TASK_TOOLTIP}
                       />
                       <LimitRow
                         icon={ShoppingBag}
@@ -449,16 +426,9 @@ export function PricingContent() {
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="border-t border-muted py-6 px-4 sm:px-6">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-            <p>&copy; 2026 Fractional Forge Ltd. All rights reserved.</p>
-            <div className="flex items-center gap-4">
-              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-            </div>
-          </div>
-        </footer>
+        </main>
+
+        <MarketingFooter />
       </div>
     </TooltipProvider>
   )
@@ -509,16 +479,29 @@ function LimitRow({
   icon: Icon,
   label,
   value,
+  tooltip,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   value: string
+  /** Optional tooltip text shown via info icon next to the label */
+  tooltip?: string
 }) {
   return (
     <div className="flex items-center justify-between text-sm">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className="h-4 w-4" />
         <span>{label}</span>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help shrink-0" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[250px]">
+              <p>{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
       <span className="font-medium text-foreground">{value}</span>
     </div>

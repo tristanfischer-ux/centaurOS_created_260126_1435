@@ -52,6 +52,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
 const APP_DOMAIN =
   process.env.NEXT_PUBLIC_APP_DOMAIN || "https://fractionalforge.app"
@@ -291,45 +292,7 @@ export default function MarketingPage() {
         )}
       </AnimatePresence>
 
-      <footer className="py-10 sm:py-12 md:py-16 border-t border-muted bg-muted pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-12 md:pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8">
-            <div className="col-span-2">
-              <p className="text-base sm:text-lg font-bold tracking-tight mb-2 sm:mb-3">
-                FRACTIONAL FORGE
-              </p>
-              <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-                Expert teams, AI-enabled execution, and manufacturing capacity — without owning a factory.
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">Platform</p>
-              <div className="flex flex-col gap-1 sm:gap-2">
-                <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Pricing</Link>
-                <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Login</a>
-                <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Get Started Free</Link>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">Join As</p>
-              <div className="flex flex-col gap-1 sm:gap-2">
-                <Link href="/join?role=founder" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Founder</Link>
-                <Link href="/join?role=executive" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Expert / Factory</Link>
-                <Link href="/join?role=apprentice" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Apprentice</Link>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-muted pt-6 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              &copy; 2026 Fractional Forge Ltd. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <Link href="/terms" className="hover:text-foreground transition-colors min-h-[44px] flex items-center">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors min-h-[44px] flex items-center">Privacy</Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   )
 }

@@ -1582,14 +1582,36 @@ export async function getSimilarInvestors(
   // Fetch full candidate pool for unbiased Jaccard similarity ranking
   // DECISION: Previous limit(200) + ORDER BY title created alphabetical bias.
   // Investor directory is typically < 2000 firms, and we only select 5 columns,
-  // so fetching all is manageable. Limit at 2000 as safety cap.
-  const { data: candidateRows } = await supabase
-    .from('marketplace_listings')
-    .select('id, title, description, subcategory, attributes')
-    .eq('category', 'Finance')
-    .limit(2000)
+  // so fetching all is manageable.
+  // GOTCHA: PostgREST silently caps .limit() at server-side max_rows (default 1000).
+  // Must paginate with .range() to get all rows. See getInvestorStats() for pattern.
+  const PAGE_SIZE = 500
+  let candidateRows: Record<string, unknown>[] = []
+  let page = 0
+  let hasMorePages = true
+  // SECURITY: Hard cap at 10 pages (5K rows) to prevent OOM on serverless
+  const MAX_PAGES = 10
+  while (hasMorePages && page < MAX_PAGES) {
+    const rangeFrom = page * PAGE_SIZE
+    const rangeTo = rangeFrom + PAGE_SIZE - 1
+    const { data: pageData, error: pageError } = await supabase
+      .from('marketplace_listings')
+      .select('id, title, description, subcategory, attributes')
+      .eq('category', 'Finance')
+      .range(rangeFrom, rangeTo)
 
-  if (!candidateRows) return { firms: [], similarityScores: {} }
+    if (pageError) {
+      console.error('[getSimilarInvestors] Pagination error:', pageError)
+      break
+    }
+
+    const rows = (pageData ?? []) as Record<string, unknown>[]
+    candidateRows = candidateRows.concat(rows)
+    hasMorePages = rows.length === PAGE_SIZE
+    page++
+  }
+
+  if (candidateRows.length === 0) return { firms: [], similarityScores: {} }
 
   const candidates = candidateRows.map(r => rowToFirm(r as Record<string, unknown>))
   const similar = findSimilarInvestors(target, candidates, limit)

@@ -31,6 +31,7 @@ import {
     GraduationCap,
     BookOpen,
     ShoppingBag,
+    MessageSquarePlus,
     Flame,
     Hammer,
     CalendarDays,
@@ -78,7 +79,7 @@ const allNavHrefs = new Set([
     "/strategy", "/new-objectives", "/time", "/reports",
     "/cash-burn", "/cash-burn/cash-out", "/cash-burn/cash-in", "/cash-burn/pnl", "/investors", "/fundraise",
     "/the-forge", "/team", "/retainers", "/agents", "/agents/artifacts", "/browse", "/learn",
-    "/recruits", "/guild", "/apprenticeship", "/marketplace", "/marketplace-orders",
+    "/recruits", "/guild", "/apprenticeship", "/marketplace", "/marketplace/quotes", "/marketplace-orders",
     "/settings",
 ])
 
@@ -151,6 +152,7 @@ const marketplaceMoreNavigation = [
     { name: "Guild", href: "/guild", icon: GraduationCap },
     { name: "Apprenticeship", href: "/apprenticeship", icon: ScrollText },
     { name: "Marketplace", href: "/marketplace", icon: Store },
+    { name: "Quotes", href: "/marketplace/quotes", icon: MessageSquarePlus },
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]
 

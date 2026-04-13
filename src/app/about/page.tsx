@@ -9,7 +9,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import {
-  ArrowLeft,
   ArrowRight,
   Linkedin,
   MapPin,
@@ -17,6 +16,8 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { MarketingNav } from "@/components/marketing/marketing-nav"
+import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
 export const metadata: Metadata = {
   title: "About",
@@ -26,27 +27,10 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Navigation */}
-      <nav className="px-4 sm:px-6 py-4 sm:py-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-muted-foreground hover:text-foreground text-sm font-mono uppercase tracking-widest flex items-center gap-2 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Link>
-          <Link
-            href="/login"
-            className="text-muted-foreground hover:text-international-orange text-sm font-mono uppercase tracking-widest transition-colors"
-          >
-            Sign in
-          </Link>
-        </div>
-      </nav>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <MarketingNav />
 
-      <main className="px-4 sm:px-6 pb-16 sm:pb-24">
+      <main className="flex-1 px-4 sm:px-6 pb-16 sm:pb-24">
         <div className="max-w-5xl mx-auto space-y-16 sm:space-y-24">
           {/* Hero */}
           <section className="pt-8 sm:pt-12 space-y-4">
@@ -172,6 +156,8 @@ export default function AboutPage() {
           </section>
         </div>
       </main>
+
+      <MarketingFooter />
     </div>
   )
 }

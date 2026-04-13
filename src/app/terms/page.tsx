@@ -5,9 +5,9 @@
  * This needs real legal review before launch.
  */
 
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
+import { MarketingNav } from '@/components/marketing/marketing-nav'
+import { MarketingFooter } from '@/components/marketing/marketing-footer'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
@@ -16,25 +16,10 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 border-b border-muted bg-background py-3 px-4 sm:px-6">
-        <div className="max-w-3xl mx-auto flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
-            aria-label="Back to home"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Home</span>
-          </Link>
-          <span className="text-muted-foreground/30">|</span>
-          <Link href="/" className="text-lg font-display font-semibold text-foreground">
-            ForgeOS
-          </Link>
-        </div>
-      </nav>
+    <div className="flex min-h-screen flex-col bg-background">
+      <MarketingNav />
 
+      <main className="flex-1">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
         <h1 className="text-3xl sm:text-4xl font-display font-bold text-foreground mb-2">
           Terms of Service
@@ -217,15 +202,10 @@ export default function TermsPage() {
           </section>
         </div>
 
-        {/* Footer */}
-        <div className="mt-12 pt-6 border-t border-muted flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link href="/terms" className="text-foreground font-medium">Terms</Link>
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-          </div>
-        </div>
       </div>
+      </main>
+
+      <MarketingFooter />
     </div>
   )
 }
