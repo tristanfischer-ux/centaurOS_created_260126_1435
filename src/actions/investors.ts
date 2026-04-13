@@ -410,7 +410,7 @@ export async function searchInvestors(
           query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
           filter_category: 'Finance',
           match_threshold: 0.0,
-          match_count: 1000, // HNSW ef_search max = 1000 in this pgvector version
+          match_count: 10000, // seq scan — return every embedded firm, dashboard parity
         }
       )
 
