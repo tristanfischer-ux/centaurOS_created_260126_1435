@@ -11,7 +11,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
-import { delegateTaskToSpecialist } from '@/actions/task-delegation'
+import { delegateTaskToSpecialistDirect } from '@/actions/task-delegation'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
                 // DECISION: Use the existing server action — it's already tested,
                 // handles auth, rich context, model routing, artifact creation,
                 // and metadata merging. Don't duplicate 200 lines of logic.
-                const result = await delegateTaskToSpecialist(taskId)
+                const result = await delegateTaskToSpecialistDirect(taskId)
 
                 if (result.error) {
                   return { taskId, taskTitle: title, specialistName: routed.specialistName, status: 'error' as const, error: result.error }

@@ -67,6 +67,19 @@ function needsReviewDisclaimer(specialistId: string): string | null {
  * @param feedback - Optional: revision feedback from a previous attempt
  * @returns The artifact ID and specialist info, or an error
  */
+// INTENT: Inner delegation logic exposed for batch API route which
+// handles its own auth. The public server action wraps this with withAuth.
+export async function delegateTaskToSpecialistDirect(
+  taskId: string,
+  specialistIdOverride?: string,
+  feedback?: string,
+): Promise<DelegationResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  return _delegateInner(taskId, user, supabase, specialistIdOverride, feedback)
+}
+
 export async function delegateTaskToSpecialist(
   taskId: string,
   specialistIdOverride?: string,
@@ -74,6 +87,17 @@ export async function delegateTaskToSpecialist(
 ): Promise<DelegationResult> {
   return withAuth(async ({ user }) => {
     const supabase = await createClient()
+    return _delegateInner(taskId, user, supabase, specialistIdOverride, feedback)
+  })
+}
+
+async function _delegateInner(
+  taskId: string,
+  user: { id: string },
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  specialistIdOverride?: string,
+  feedback?: string,
+): Promise<DelegationResult> {
 
     // ── 1. Get task details + context ──────────────────────────────
     const { data: profile } = await supabase
@@ -322,7 +346,6 @@ Do NOT:
       console.error('[task-delegation] Unexpected error:', err)
       return { error: 'Failed to generate deliverable' }
     }
-  })
 }
 
 /**
