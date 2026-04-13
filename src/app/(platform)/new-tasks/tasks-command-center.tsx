@@ -180,7 +180,7 @@ export function TasksCommandCenter({
     [tasks],
   )
 
-  const calFallback = "Cal here. You've got work scattered across objectives — I've pulled it all into one place. Focus view shows what matters today, Board shows the full battlefield, Timeline catches scheduling collisions. Drag anything that's slipping to a realistic date — I'd rather an honest plan than a pretty one."
+  const calFallback = "Cal here. You've got work scattered across objectives — I've pulled it all into one place. Focus view shows what matters today, Board shows the full battlefield, Timeline catches scheduling collisions. See that 'Delegate to Specialists' button? Click it and your team of specialists will work through your pending tasks — each one produces a deliverable you review and approve. I'd rather get 8 tasks done in 5 minutes than have them sitting overdue."
 
   const calSeverity = useMemo((): 'success' | 'warning' | 'error' => {
     if (stats.overdue > 5 || blockerCount > 2) return 'error'
