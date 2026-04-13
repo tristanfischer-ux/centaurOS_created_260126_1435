@@ -15,7 +15,9 @@ import { withAuth } from '@/lib/server-action-utils'
 import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { compilePersonalityPrompt } from '@/lib/agents/personality'
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
-import { createArtifact } from '@/actions/agent-artifacts'
+// GOTCHA: Do NOT import createArtifact here. It uses getFoundryIdCached()
+// which relies on React.cache — doesn't work in API route context.
+// Artifacts are created via direct supabase insert in _delegateInner.
 import { buildContextLayers } from '@/lib/agents/prompt-builder'
 import { buildAIContextWithServiceClient } from '@/lib/agents/sweep-context'
 
@@ -295,24 +297,33 @@ Do NOT:
 
       if (!content) return { error: 'Specialist returned empty response' }
 
-      // ── 6. Create artifact ────────────────────────────────────────
+      // ── 6. Create artifact DIRECTLY via supabase (not createArtifact server action) ──
+      // CRITICAL: createArtifact() uses getFoundryIdCached() → React.cache which
+      // doesn't work in API routes. This caused EVERY delegation to fail silently
+      // with "No active foundry". Insert directly using the passed-in supabase client.
       const contentType = inferContentType(task.title, task.description || '')
-      const { data: artifact, error: artifactError } = await createArtifact({
-        title: `${specialist.name}: ${task.title}`,
-        content,
-        contentType,
-        metadata: {
-          taskId: task.id,
-          specialistId: specialist.id,
-          specialistName: specialist.name,
-          delegatedAt: new Date().toISOString(),
-          isRevision: !!feedback,
-        },
-      })
+      const { data: artifact, error: artifactError } = await supabase
+        .from('agent_artifacts')
+        .insert({
+          foundry_id: profile.foundry_id,
+          created_by: user.id,
+          title: `${specialist.name}: ${task.title}`,
+          content,
+          content_type: contentType,
+          metadata: {
+            taskId: task.id,
+            specialistId: specialist.id,
+            specialistName: specialist.name,
+            delegatedAt: new Date().toISOString(),
+            isRevision: !!feedback,
+          },
+        })
+        .select('id')
+        .single()
 
       if (artifactError || !artifact) {
-        console.error('[task-delegation] Artifact creation failed:', artifactError)
-        return { error: artifactError || 'Failed to save deliverable' }
+        console.error('[task-delegation] Artifact creation failed:', artifactError?.message)
+        return { error: artifactError?.message || 'Failed to save deliverable' }
       }
 
       // ── 7. Link artifact to task + update status ──────────────────
