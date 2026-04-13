@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,47 +30,27 @@ const EXAMPLE_QUERIES = [
 interface InvestorSearchHeroProps {
   /** Called when user submits a search query */
   onSearch: (query: string) => void
+  /** Called when user cancels an in-flight search */
+  onCancel?: () => void
   /** Whether search is currently in progress */
   isSearching?: boolean
-  /** Company profile data for auto-filling the search textarea */
+  /** Company profile data — kept for potential future use. NOT used to auto-fill
+   * the search input: user feedback confirmed that the sticky auto-populated
+   * "Seed, manufacturing, Bootstrapped / Pre-seed" string was unwanted. */
   companyContext?: { sector?: string | null; stage?: string | null; fundingStatus?: string | null; seekingFunding?: boolean }
 }
 
-export function InvestorSearchHero({ onSearch, isSearching = false, companyContext }: InvestorSearchHeroProps) {
-  // INTENT: Build a description from company profile to pre-fill the search textarea
-  const initialDescription = useMemo(() => {
-    if (!companyContext) return ''
-    // INTENT: Convert snake_case DB values to human-readable labels
-    const STAGE_LABELS: Record<string, string> = {
-      pre_seed: 'Pre-Seed', seed: 'Seed', series_a: 'Series A',
-      series_b: 'Series B', series_c: 'Series C', growth: 'Growth',
-      late_stage: 'Late Stage',
-    }
-    const parts: string[] = []
-    if (companyContext.stage) {
-      parts.push(STAGE_LABELS[companyContext.stage] ?? companyContext.stage.replace(/_/g, ' '))
-    }
-    if (companyContext.sector) parts.push(companyContext.sector)
-    if (companyContext.fundingStatus) parts.push(companyContext.fundingStatus)
-    if (companyContext.seekingFunding) parts.push('seeking funding')
-    return parts.join(', ')
-  }, [companyContext])
-
-  const [searchQuery, setSearchQuery] = useState(initialDescription)
+export function InvestorSearchHero({ onSearch, onCancel, isSearching = false }: InvestorSearchHeroProps) {
+  // INTENT: Default empty search. Previously we auto-populated from companyContext
+  // and auto-searched on mount, but it was impossible to clear — the memo re-fired
+  // and the sticky value persisted as a filter chip. Starting empty gives the user
+  // a clean blank slate matching the Forge Capital Dashboard behaviour.
+  const [searchQuery, setSearchQuery] = useState('')
   const [uploadedText, setUploadedText] = useState<string | null>(null)
   const [uploadedProfile, setUploadedProfile] = useState<ExtractedProfile | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragOverRef = useRef(false)
-  const hasAutoSearched = useRef(false)
-
-  // INTENT: Auto-trigger semantic search on mount if company context provides a meaningful query
-  useEffect(() => {
-    if (initialDescription && initialDescription.length > 5 && !hasAutoSearched.current) {
-      hasAutoSearched.current = true
-      onSearch(initialDescription)
-    }
-  }, [initialDescription, onSearch])
 
   // INTENT: Allow users to click example chips to populate search
   const handleExampleClick = useCallback((example: string) => {
@@ -300,25 +280,41 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
             </div>
           )}
 
-          {/* Search button */}
-          <Button
-            onClick={handleSearch}
-            disabled={isSearching || (!searchQuery.trim() && !uploadedText)}
-            className="w-full bg-international-orange hover:bg-international-orange/90"
-            size="lg"
-          >
-            {isSearching ? (
-              <>
+          {/* Search / Cancel button — cancel takes over while a search is in flight */}
+          {isSearching ? (
+            <div className="flex gap-2">
+              <Button
+                disabled
+                className="flex-1 bg-international-orange/70"
+                size="lg"
+              >
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Searching...
-              </>
-            ) : (
-              <>
-                <Search className="h-4 w-4 mr-2" />
-                Search investors
-              </>
-            )}
-          </Button>
+                Searching…
+              </Button>
+              <Button
+                onClick={() => {
+                  setSearchQuery('')
+                  onCancel?.()
+                }}
+                variant="outline"
+                size="lg"
+                aria-label="Cancel search"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={handleSearch}
+              disabled={!searchQuery.trim() && !uploadedText}
+              className="w-full bg-international-orange hover:bg-international-orange/90"
+              size="lg"
+            >
+              <Search className="h-4 w-4 mr-2" />
+              Search investors
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

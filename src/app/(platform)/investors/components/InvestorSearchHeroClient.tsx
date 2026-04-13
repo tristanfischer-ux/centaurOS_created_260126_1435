@@ -3,14 +3,9 @@
  *
  * @description Client wrapper that orchestrates semantic search for investors.
  * When user submits a search query from the hero, this passes it to InvestorBrowser
- * which handles the actual filtering/pagination.
- *
- * FLOW:
- * 1. User types/uploads text in InvestorSearchHero
- * 2. Clicks "Search investors"
- * 3. We store the query and signal InvestorBrowser to use it
- * 4. Tab auto-switches to "Browse All"
- * 5. InvestorBrowser applies the semantic search and displays results
+ * which handles the actual filtering/pagination. Above the browser, it also
+ * renders the DashboardMatchCards — a fast, client-side ranked preview of the
+ * top matches styled after Forge-Capital-Dashboard.html.
  */
 
 'use client'
@@ -18,6 +13,7 @@
 import { useState, useCallback } from 'react'
 import { InvestorSearchHero } from './InvestorSearchHero'
 import { InvestorBrowser } from './InvestorBrowser'
+import { DashboardMatchCards } from './DashboardMatchCards'
 import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 
 interface InvestorSearchHeroClientProps {
@@ -47,16 +43,32 @@ export function InvestorSearchHeroClient({
   const handleHeroSearch = useCallback((query: string) => {
     setHeroSearchQuery(query)
     setIsSearching(true)
-    // INTENT: InvestorBrowser will handle the actual search via its internal state
-    // We just need to trigger it to use this query. The browser will call searchInvestors.
-    // Set a flag that browser can see to trigger its own search action.
   }, [])
 
-  // INTENT: When hero search completes (or starts), browser takes over.
-  // We wrap browser and pass the initial search query.
+  const handleHeroCancel = useCallback(() => {
+    setHeroSearchQuery('')
+    setIsSearching(false)
+  }, [])
+
   return (
     <div className="space-y-8">
-      <InvestorSearchHero onSearch={handleHeroSearch} isSearching={isSearching} companyContext={companyContext} />
+      <InvestorSearchHero
+        onSearch={handleHeroSearch}
+        onCancel={handleHeroCancel}
+        isSearching={isSearching}
+        companyContext={companyContext}
+      />
+
+      {/* Dashboard-style ranked match cards. Client-side scoring using the
+          shared calculateMatchScore — no SSE, no LLM, renders instantly. */}
+      <DashboardMatchCards
+        firms={initialFirms}
+        companyContext={companyContext}
+        limit={10}
+        title="Top Matches"
+        subtitle="Ranked by thesis fit, stage, geography, cheque size, activity, and data confidence."
+      />
+
       <InvestorBrowser
         initialFirms={initialFirms}
         initialTotal={initialTotal}

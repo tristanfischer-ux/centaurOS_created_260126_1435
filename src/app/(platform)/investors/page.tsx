@@ -25,7 +25,6 @@ import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 import { InvestorPageTabs } from './components/InvestorPageTabs'
 import { InvestorSpecialistBanner } from './components/InvestorSpecialistBanner'
 import { InvestorSearchHeroClient } from './components/InvestorSearchHeroClient'
-import { InvestorMatchView } from './components/InvestorMatchView'
 import { ContactsDirectoryTab } from './components/ContactsDirectoryTab'
 import { GrantsDirectoryTab } from './components/GrantsDirectoryTab'
 import { PortfolioDirectoryTab } from './components/PortfolioDirectoryTab'
@@ -251,8 +250,6 @@ export default async function InvestorDirectoryPage() {
                 companyContext={companyContext}
               />
             </Suspense>
-            {/* AI-matched investors */}
-            <InvestorMatchView />
           </div>
         }
         investorsContent={
