@@ -23,13 +23,19 @@ import type { TeamDataResult } from '../hooks/use-team-data'
 // ── Primary specialist per function (one per slice for clean orbital ring) ───
 // Only these 7 specialists appear on the diagram; others remain on /agents.
 const PRIMARY_SPECIALIST_MAP: Record<string, FunctionId> = {
-  'strategist':       'product',     // Sage — most senior for Product
-  'chief-of-staff':   'operations',  // Cal — most senior for Operations
-  'finance-lead':     'finance',     // Finn — most senior for Finance
-  'legal-counsel':    'legal',       // Leo — most senior for Legal
-  'sales-lead':       'sales',       // Sal — sole Sales specialist
-  'growth-marketer':  'marketing',   // Mia — sole Marketing specialist
-  'hiring-team':      'hr',          // Harper — sole HR specialist
+  'strategist':         'product',     // Sage — Strategy
+  'cto':                'product',     // Max — CTO
+  'vp-engineering':     'product',     // Jian — VP Engineering
+  'vp-manufacturing':   'operations',  // Fang — VP Manufacturing
+  'vp-supply-chain':    'operations',  // Chase — VP Supply Chain
+  'product-lead':       'product',     // Priya — Product
+  'chief-of-staff':     'operations',  // Cal — Chief of Staff
+  'finance-lead':       'finance',     // Finn — Finance
+  'fundraising-advisor':'finance',     // Fiona — Fundraising
+  'legal-counsel':      'legal',       // Leo — Legal
+  'sales-lead':         'sales',       // Sal — Sales
+  'growth-marketer':    'marketing',   // Mia — Marketing
+  'hiring-team':        'hr',          // Harper — HR
 }
 
 interface OrbitalViewProps {
