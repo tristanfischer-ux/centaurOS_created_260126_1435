@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Crosshair, LayoutGrid, List, GanttChartSquare, Search,
-  X, Group, Filter, Waypoints, ChevronRight,
+  X, Group, Filter, Waypoints, ChevronRight, Sparkles,
 } from 'lucide-react'
 import { SmartSummary } from './smart-summary'
 import { FocusView } from './focus-view'
@@ -30,6 +31,7 @@ import { SpecialistBriefingHero } from '@/components/specialists/specialist-brie
 import { generateTasksBriefing, type SpecialistBriefingResult } from '@/actions/specialist-page-insights'
 import type { SpecialistContext } from '@/components/specialists/types'
 import { PageTour } from '@/components/guidance/page-tour'
+import { DelegationProgressModal } from '@/components/tasks/delegation-progress-modal'
 
 const TasksGanttView = dynamic(
   () => import('./gantt-view').then((m) => ({ default: m.TasksGanttView })),
@@ -74,6 +76,14 @@ export function TasksCommandCenter({
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
   const [editingTask, setEditingTask] = useState<TaskWithData | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [delegationOpen, setDelegationOpen] = useState(false)
+  const router = useRouter()
+
+  // Pending task IDs for batch delegation
+  const pendingTaskIds = useMemo(
+    () => tasks.filter((t) => t.status === 'Pending').map((t) => t.id),
+    [tasks],
+  )
 
   // Track window width
   useEffect(() => {
@@ -362,6 +372,17 @@ export function TasksCommandCenter({
               Strategy River
             </Link>
           )}
+          {pendingTaskIds.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setDelegationOpen(true)}
+              className="gap-1.5"
+            >
+              <Sparkles className="h-4 w-4" />
+              Delegate to Specialists
+            </Button>
+          )}
           <div data-tour="tasks-create">
             <CreateTaskDialog
               objectives={objectives}
@@ -620,6 +641,14 @@ export function TasksCommandCenter({
       )}
 
       <PageTour page="tasks" />
+
+      {/* Batch Delegation Modal */}
+      <DelegationProgressModal
+        open={delegationOpen}
+        taskIds={pendingTaskIds}
+        onClose={() => setDelegationOpen(false)}
+        onComplete={() => router.refresh()}
+      />
     </div>
   )
 }
