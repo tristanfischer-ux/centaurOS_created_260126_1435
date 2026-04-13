@@ -56,6 +56,8 @@ const eslintConfig = defineConfig([
     // Vendored third-party data files
     "data/**",
     "data/",
+    // Agent worktrees (temporary isolated copies of the repo)
+    ".claude/worktrees/**",
   ]),
   ...nextVitals,
   ...nextTs,
