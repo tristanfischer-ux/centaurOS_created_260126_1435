@@ -508,7 +508,7 @@ export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDet
       </div>
 
       <ScrollArea className="flex-1 w-full overflow-hidden">
-        <div className="p-5 space-y-4 max-w-[500px]">
+        <div className="p-5 space-y-4" style={{ width: 0, minWidth: '100%', boxSizing: 'border-box' }}>
           {/* Description */}
           {task.description && (
             <div className="space-y-1.5">
