@@ -33,6 +33,10 @@ interface DashboardMatchCardsProps {
   /** If provided, overrides companyContext — lets a caller build a profile from
    * a PDF upload or from the search query. */
   profile?: FoundryProfile
+  /** Raw search text. When present, stage/geo/sector signals are parsed out
+   * and used as the scoring profile — mirrors Forge-Capital-Dashboard.html
+   * where stageFit/geoFit read from the query text, not from user DB state. */
+  queryText?: string
   /** How many cards to show. Default 10 (matches dashboard's initial render). */
   limit?: number
   /** Heading shown above the cards. */
@@ -49,16 +53,82 @@ function buildProfileFromContext(ctx: DashboardMatchCardsProps['companyContext']
   }
 }
 
+/**
+ * Extract a scoring profile from free-text search input. Mirrors Forge-Capital-
+ * Dashboard.html's stageFit/geoFit which read directly from the query string
+ * instead of a stored user profile. Critical for anonymous or profile-less users
+ * — without this, stage/sector/geo pillars all collapse to zero and composite
+ * scores land ~30 points below the dashboard's.
+ */
+function parseQueryProfile(text: string): FoundryProfile {
+  const low = text.toLowerCase()
+  const STAGE_PATTERNS: Array<[RegExp, string]> = [
+    [/\bpre[- ]?seed\b/i, 'pre_seed'],
+    [/\bseries\s*a\b/i, 'series_a'],
+    [/\bseries\s*b\b/i, 'series_b'],
+    [/\bseries\s*c\b/i, 'series_c'],
+    [/\b(late[- ]stage|growth)\b/i, 'growth'],
+    [/\bseed\b/i, 'seed'],
+  ]
+  let stage: string | null = null
+  for (const [p, label] of STAGE_PATTERNS) { if (p.test(low)) { stage = label; break } }
+
+  // Sector: pull the most salient domain keyword. Investor-match treats this
+  // as a substring check against each firm's sectors, so even a broad term
+  // like "manufacturing" produces a useful signal.
+  const SECTOR_VOCAB = [
+    'critical raw materials', 'critical minerals', 'rare earth',
+    'advanced manufacturing', 'manufacturing', 'hardware', 'deep tech',
+    'climate tech', 'clean energy', 'renewable', 'battery', 'solar',
+    'biotech', 'medtech', 'aerospace', 'defense', 'defence',
+    'ai', 'robotics', 'mobility', 'fintech', 'semiconductors',
+    'recycling', 'materials', 'mining',
+  ]
+  let sector: string | null = null
+  for (const s of SECTOR_VOCAB) {
+    const pattern = s.includes(' ')
+      ? new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      : new RegExp(`\\b${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+    if (pattern.test(low)) { sector = s; break }
+  }
+
+  // Additional keywords boost the thesisBonus pillar inside calculateMatchScore.
+  // We lift every noun-like token > 5 chars — the scorer does its own
+  // intersection against investor thesis text.
+  const businessKeywords = Array.from(
+    new Set(
+      low
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length >= 6 && !STOP_WORDS.has(w)),
+    ),
+  ).slice(0, 20)
+
+  return { stage, sector, industry: null, businessKeywords }
+}
+
+const STOP_WORDS = new Set([
+  'company', 'companies', 'startup', 'startups', 'raising', 'currently',
+  'building', 'platform', 'offering', 'significant', 'through', 'currently',
+  'business', 'industries', 'industry', 'technology', 'technologies',
+  'strategic', 'proprietary', 'flexible', 'advantages', 'autonomy',
+])
+
 export function DashboardMatchCards({
   firms,
   companyContext,
   profile,
+  queryText,
   limit = 10,
   title = 'Top Matches',
   subtitle,
 }: DashboardMatchCardsProps) {
   const ranked = useMemo(() => {
-    const p = profile ?? buildProfileFromContext(companyContext)
+    // Precedence: explicit profile > parsed-from-query > companyContext.
+    // queryText usually wins because the user just typed what they want NOW.
+    const p = profile
+      ?? (queryText && queryText.trim().length >= 6 ? parseQueryProfile(queryText) : null)
+      ?? buildProfileFromContext(companyContext)
     return firms
       .map(firm => {
         const breakdown = calculateMatchScore(firm, p)
@@ -79,7 +149,7 @@ export function DashboardMatchCards({
       })
       .sort((a, b) => b.composite - a.composite)
       .slice(0, limit)
-  }, [firms, companyContext, profile, limit])
+  }, [firms, companyContext, profile, queryText, limit])
 
   if (ranked.length === 0) return null
 

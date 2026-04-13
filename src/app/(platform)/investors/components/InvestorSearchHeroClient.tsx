@@ -90,6 +90,7 @@ export function InvestorSearchHeroClient({
         <DashboardMatchCards
           firms={firms}
           companyContext={companyContext}
+          queryText={lastQuery}
           limit={50}
           title={cardsTitle}
           subtitle={cardsSubtitle}

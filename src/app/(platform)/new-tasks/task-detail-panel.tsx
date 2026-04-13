@@ -847,10 +847,10 @@ export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDet
                     <p className="text-xs font-medium text-international-orange mb-1">
                       {delegationArtifact.specialistName} completed this task
                     </p>
-                    <div className="max-h-[400px] overflow-y-auto overflow-x-auto w-full min-w-0">
+                    <div className="max-h-[400px] overflow-y-auto overflow-x-hidden" style={{ width: 0, minWidth: '100%', boxSizing: 'border-box' }}>
                       <Markdown
                         content={formatArtifactContent(delegationArtifact.content)}
-                        className="text-sm break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-all [&_table]:text-xs [&_table]:w-full"
+                        className="text-sm break-words overflow-hidden [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full"
                       />
                     </div>
                   </div>
