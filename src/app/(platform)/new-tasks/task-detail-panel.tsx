@@ -507,8 +507,8 @@ export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDet
         </div>
       </div>
 
-      <ScrollArea className="flex-1 w-full overflow-hidden [&>[data-radix-scroll-area-viewport]]:!overflow-x-hidden">
-        <div className="p-5 space-y-4 min-w-0 w-full overflow-hidden">
+      <ScrollArea className="flex-1 w-full overflow-hidden">
+        <div className="p-5 space-y-4 max-w-[500px]">
           {/* Description */}
           {task.description && (
             <div className="space-y-1.5">
@@ -850,7 +850,7 @@ export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDet
                     <div className="max-h-[400px] overflow-y-auto overflow-x-auto w-full min-w-0">
                       <Markdown
                         content={formatArtifactContent(delegationArtifact.content)}
-                        className="text-sm break-words overflow-hidden [&_*]:max-w-full [&_p]:overflow-hidden [&_p]:text-ellipsis [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all [&_table]:text-xs [&_table]:w-full [&_h1]:overflow-hidden [&_h2]:overflow-hidden [&_h3]:overflow-hidden"
+                        className="text-sm break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-all [&_table]:text-xs [&_table]:w-full"
                       />
                     </div>
                   </div>
