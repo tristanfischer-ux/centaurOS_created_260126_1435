@@ -258,16 +258,19 @@ export function calculateMatchScore(
  * Composite match % using the Forge-Capital-Dashboard.html weighting
  * (thesis 55%, geo 15%, stage 10%, cheque 10%, activity 3%, confidence 2%).
  * Returned as 0-100 integer, separate from the 8-factor `total`.
+ *
+ * Mirrors the dashboard's behaviour: if a pillar is "inapplicable" (zero with
+ * no signal present, e.g. the firm's geo_focus isn't known) we skip it AND
+ * reduce the total weight, then renormalise. This prevents missing data from
+ * dragging the composite down. Thesis and confidence always apply.
  */
 export function compositePillarScore(pillars: MatchBreakdown['pillars']): number {
-  const composite =
-    pillars.thesis * 0.55 +
-    pillars.geo * 0.15 +
-    pillars.stage * 0.10 +
-    pillars.cheque * 0.10 +
-    pillars.activity * 0.03 +
-    pillars.confidence * 0.02
-  return Math.round(composite)
+  let score = pillars.thesis * 0.55 + pillars.confidence * 0.02 + pillars.activity * 0.03
+  let weight = 0.55 + 0.02 + 0.03
+  if (pillars.geo > 0) { score += pillars.geo * 0.15; weight += 0.15 }
+  if (pillars.stage > 0) { score += pillars.stage * 0.10; weight += 0.10 }
+  if (pillars.cheque > 0) { score += pillars.cheque * 0.10; weight += 0.10 }
+  return Math.round(score / weight)
 }
 
 // ---------------------------------------------------------------------------

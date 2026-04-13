@@ -394,16 +394,19 @@ export async function searchInvestors(
       const queryEmbedding = await nomicEmbedQuery(query.trim())
       // DECISION: v2 RPC returns attributes + filters by category at DB level,
       // eliminating the re-fetch + client-side filter pattern.
-      // DECISION: threshold=0.5 matches Forge Capital Dashboard's "strong
-      // matches (50%+)" badge. Both sides now use nomic-embed-text-v1.5
-      // (768-dim), so similarity distributions align. match_count=500 keeps
-      // candidate breadth generous.
+      // DECISION: threshold=0.0 mirrors the Forge Capital Dashboard behaviour:
+      // return all firms with an embedding, rank by composite score client-side.
+      // Previously we set 0.5 to match the dashboard's "strong matches (50%+)"
+      // BADGE, but that badge is computed AFTER ranking — the dashboard itself
+      // retrieves every investor. Applying 0.5 at the pgvector level clipped
+      // 99% of real candidates. match_count=500 caps the candidate pool to
+      // the 500 most-similar rows; UI shows top 50.
       const { data: semanticData, error: semanticError } = await supabase.rpc(
         'match_marketplace_listings_v2',
         {
           query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
           filter_category: 'Finance',
-          match_threshold: 0.5,
+          match_threshold: 0.0,
           match_count: 500,
         }
       )
