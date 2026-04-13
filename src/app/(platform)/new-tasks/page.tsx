@@ -3,6 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TasksCommandCenter } from './tasks-command-center'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
+
+// DECISION: 300s maxDuration for task delegation. When a user clicks
+// "Auto-assign AI" or "Delegate to Specialist", the server action calls
+// Opus which takes 60-150s — beyond the default 60s server action timeout.
+// This affects ALL server actions called from this page.
+export const maxDuration = 300
 import { getAllSpecialistsAsMembers } from '@/lib/agents/specialists-config'
 
 export const metadata: Metadata = {

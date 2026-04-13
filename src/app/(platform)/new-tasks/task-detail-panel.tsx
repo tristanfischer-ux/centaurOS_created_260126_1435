@@ -190,27 +190,43 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
 
   const handleDelegate = async () => {
     setIsDelegating(true)
-    const result = await delegateTaskToSpecialist(task.id, undefined, revisionFeedback || undefined)
-    setIsDelegating(false)
+    try {
+      // DECISION: Use API route with maxDuration=300 instead of server action
+      // (60s timeout). Opus delegation takes 60-150s.
+      const res = await fetch('/api/delegate-single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          taskId: task.id,
+          ...(revisionFeedback ? { feedback: revisionFeedback } : {}),
+        }),
+      })
+      const result = await res.json()
+      setIsDelegating(false)
 
-    if (result.error) {
-      toast.error(result.error)
-      return
-    }
-
-    if (result.artifactId) {
-      const { data } = await getArtifact(result.artifactId)
-      if (data) {
-        setDelegationArtifact({
-          id: data.id,
-          content: data.content,
-          specialistName: result.specialistName || 'Specialist',
-        })
-        setShowRevisionInput(false)
-        setRevisionFeedback('')
-        toast.success(`${result.specialistName} has completed the task — review below`)
-        router.refresh()
+      if (result.error) {
+        toast.error(result.error)
+        return
       }
+
+      if (result.artifactId) {
+        const { data } = await getArtifact(result.artifactId)
+        if (data) {
+          setDelegationArtifact({
+            id: data.id,
+            content: data.content,
+            specialistName: result.specialistName || 'Specialist',
+          })
+          setShowRevisionInput(false)
+          setRevisionFeedback('')
+          toast.success(`${result.specialistName} has completed the task — review below`)
+          router.refresh()
+        }
+      }
+    } catch {
+      setIsDelegating(false)
+      toast.error('Delegation failed — try again')
     }
   }
 
@@ -638,19 +654,29 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                     size="sm"
                     className="h-7 text-xs text-international-orange hover:text-international-orange/80"
                     disabled={isPending}
-                    onClick={() => {
-                      startTransition(async () => {
-                        // Auto-route to the best specialist for this task
-                        const routed = getRelevantSpecialist(task.title, task.description, task.strategy?.title)
-                        toast.success(`Assigning to ${routed.specialistName}...`)
-                        const result = await delegateTaskToSpecialist(task.id)
+                    onClick={async () => {
+                      const routed = getRelevantSpecialist(task.title, task.description, task.strategy?.title)
+                      toast.success(`Assigning to ${routed.specialistName}...`)
+                      try {
+                        // DECISION: Use API route instead of server action — Opus takes
+                        // 60-150s which exceeds the 60s server action timeout on Vercel.
+                        // The API route has maxDuration=300.
+                        const res = await fetch('/api/delegate-single', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ taskId: task.id }),
+                        })
+                        const result = await res.json()
                         if (result.error) {
                           toast.error(result.error)
                         } else {
-                          toast.success(`${result.specialistName} is working on it — deliverable coming soon`)
+                          toast.success(`${result.specialistName || routed.specialistName} completed — review the deliverable below`)
                           router.refresh()
                         }
-                      })
+                      } catch {
+                        toast.error('Delegation failed — try again')
+                      }
                     }}
                   >
                     <Sparkles className="h-3 w-3 mr-1" />
