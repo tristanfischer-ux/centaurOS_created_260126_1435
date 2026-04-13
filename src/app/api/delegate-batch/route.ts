@@ -11,7 +11,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
-import { delegateTaskToSpecialistDirect } from '@/actions/task-delegation'
+import { delegateTaskWithContext } from '@/actions/task-delegation'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -80,7 +80,9 @@ export async function POST(request: NextRequest) {
                 // DECISION: Use the existing server action — it's already tested,
                 // handles auth, rich context, model routing, artifact creation,
                 // and metadata merging. Don't duplicate 200 lines of logic.
-                const result = await delegateTaskToSpecialistDirect(taskId)
+                // DECISION: Pass pre-authenticated supabase + user from the
+                // API route context — avoids nested createClient() calls.
+                const result = await delegateTaskWithContext(taskId, user, supabase)
 
                 if (result.error) {
                   return { taskId, taskTitle: title, specialistName: routed.specialistName, status: 'error' as const, error: result.error }

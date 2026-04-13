@@ -67,16 +67,15 @@ function needsReviewDisclaimer(specialistId: string): string | null {
  * @param feedback - Optional: revision feedback from a previous attempt
  * @returns The artifact ID and specialist info, or an error
  */
-// INTENT: Inner delegation logic exposed for batch API route which
-// handles its own auth. The public server action wraps this with withAuth.
-export async function delegateTaskToSpecialistDirect(
+// INTENT: Inner delegation logic exposed for API routes which handle
+// their own auth. Accepts pre-authenticated supabase client + user.
+export async function delegateTaskWithContext(
   taskId: string,
+  user: { id: string },
+  supabase: Awaited<ReturnType<typeof createClient>>,
   specialistIdOverride?: string,
   feedback?: string,
 ): Promise<DelegationResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
   return _delegateInner(taskId, user, supabase, specialistIdOverride, feedback)
 }
 

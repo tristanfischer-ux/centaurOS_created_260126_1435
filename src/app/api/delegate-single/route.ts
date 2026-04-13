@@ -10,13 +10,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { delegateTaskToSpecialistDirect } from '@/actions/task-delegation'
+import { delegateTaskWithContext } from '@/actions/task-delegation'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
-  // AUTH
+  // AUTH: Create client once, pass to delegation function
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await delegateTaskToSpecialistDirect(taskId, specialistId, feedback)
+    // DECISION: Pass pre-authenticated supabase + user to avoid nested
+    // createClient() calls which can fail in API route streaming context.
+    const result = await delegateTaskWithContext(taskId, user, supabase, specialistId, feedback)
     return NextResponse.json(result)
   } catch (err) {
     console.error('[delegate-single] Error:', err)
