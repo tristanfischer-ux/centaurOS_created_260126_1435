@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Loader2, CheckCircle2, XCircle, Sparkles } from 'lucide-react'
 import { getSpecialistById } from '@/lib/agents/specialists-config'
+import { toast } from 'sonner'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,9 @@ export function DelegationProgressModal({
       })
 
       if (!response.ok || !response.body) {
-        console.error('[delegation-modal] Failed to start batch:', response.status)
+        const errText = await response.text().catch(() => 'unknown')
+        console.error('[delegation-modal] Failed to start batch:', response.status, errText)
+        toast.error(`Delegation failed: ${response.status} — ${errText.slice(0, 100)}`)
         setIsDone(true)
         return
       }

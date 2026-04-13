@@ -10,6 +10,7 @@
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import { delegateTaskWithContext } from '@/actions/task-delegation'
 
@@ -19,9 +20,9 @@ export const dynamic = 'force-dynamic'
 const BATCH_SIZE = 3
 
 export async function POST(request: NextRequest) {
-  // AUTH
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  // AUTH: Verify via cookie client, then use admin client for DB ops
+  const authClient = await createClient()
+  const { data: { user }, error: authError } = await authClient.auth.getUser()
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
@@ -37,7 +38,10 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({ error: 'Maximum 50 tasks per batch' }), { status: 400 })
   }
 
-  // Pre-fetch task titles + specialist routing for display
+  // DECISION: Admin client for all DB operations. Cookie-based client has
+  // persistent auth context issues in Vercel API route streaming.
+  const supabase = createAdminClient()
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('foundry_id')
