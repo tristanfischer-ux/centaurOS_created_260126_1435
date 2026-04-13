@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({ error: 'taskIds array required' }), { status: 400 })
   }
 
-  if (taskIds.length > 50) {
-    return new Response(JSON.stringify({ error: 'Maximum 50 tasks per batch' }), { status: 400 })
+  if (taskIds.length > 100) {
+    return new Response(JSON.stringify({ error: 'Maximum 100 tasks per batch' }), { status: 400 })
   }
 
   // DECISION: Admin client for all DB operations. Cookie-based client has
