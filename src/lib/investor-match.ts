@@ -49,6 +49,21 @@ export interface MatchBreakdown {
   activeScore: number
   productReadinessScore: number
   topFactors: string[]
+  /**
+   * 6-pillar breakdown ported from Forge-Capital-Dashboard.html:1172-1237.
+   * Each pillar is 0-100. The `composite` total weights them as:
+   *   thesis 55% · geo 15% · stage 10% · cheque 10% · activity 3% · confidence 2%
+   * Used by MatchPillarBars component — gives a consistent visual rationale
+   * across the table and matches views.
+   */
+  pillars: {
+    thesis: number
+    stage: number
+    geo: number
+    cheque: number
+    activity: number
+    confidence: number
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +223,16 @@ export function calculateMatchScore(
 
   const total = Math.min(100, stageScore + sectorScore + hardwareScore + chequeScore + geoScore + activeScore + productReadinessScore + thesisBonus)
 
+  // ── 6-pillar breakdown (dashboard parity, Forge-Capital-Dashboard.html:1172-1237)
+  //    Each pillar is 0-100. Map internal 8-factor points to the pillar scale.
+  const thesisPillar = Math.min(100, (sectorScore / 25) * 70 + (thesisBonus / 10) * 30)
+  const stagePillar = (stageScore / 25) * 100
+  const geoPillar = (geoScore / 5) * 100
+  const chequePillar = (chequeScore / 15) * 100
+  const activityPillar = attrs.is_active_deploying ? 100 : 50
+  const dataQuality = typeof attrs.data_quality_score === 'number' ? attrs.data_quality_score : 0
+  const confidencePillar = Math.min(100, Math.max(0, dataQuality * 10))
+
   return {
     total,
     stageScore,
@@ -218,7 +243,31 @@ export function calculateMatchScore(
     activeScore,
     productReadinessScore,
     topFactors: topFactors.slice(0, 3),
+    pillars: {
+      thesis: Math.round(thesisPillar),
+      stage: Math.round(stagePillar),
+      geo: Math.round(geoPillar),
+      cheque: Math.round(chequePillar),
+      activity: Math.round(activityPillar),
+      confidence: Math.round(confidencePillar),
+    },
   }
+}
+
+/**
+ * Composite match % using the Forge-Capital-Dashboard.html weighting
+ * (thesis 55%, geo 15%, stage 10%, cheque 10%, activity 3%, confidence 2%).
+ * Returned as 0-100 integer, separate from the 8-factor `total`.
+ */
+export function compositePillarScore(pillars: MatchBreakdown['pillars']): number {
+  const composite =
+    pillars.thesis * 0.55 +
+    pillars.geo * 0.15 +
+    pillars.stage * 0.10 +
+    pillars.cheque * 0.10 +
+    pillars.activity * 0.03 +
+    pillars.confidence * 0.02
+  return Math.round(composite)
 }
 
 // ---------------------------------------------------------------------------

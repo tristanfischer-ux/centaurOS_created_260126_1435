@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Upload, Search, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { extractDocumentText } from '@/actions/extract-document-text'
+import { extractDocumentText, type ExtractedProfile } from '@/actions/extract-document-text'
 
 /**
  * Example search queries to inspire users.
@@ -58,6 +58,7 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
 
   const [searchQuery, setSearchQuery] = useState(initialDescription)
   const [uploadedText, setUploadedText] = useState<string | null>(null)
+  const [uploadedProfile, setUploadedProfile] = useState<ExtractedProfile | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragOverRef = useRef(false)
@@ -99,6 +100,7 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
 
       if (result.success) {
         setUploadedText(result.text.slice(0, 2000)) // Cap for search context
+        setUploadedProfile(result.profile)
         toast.success(`Text extracted from ${result.fileName}`)
       } else {
         toast.error(result.error)
@@ -141,6 +143,7 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
   // INTENT: Clear uploaded text to go back to manual input
   const handleClearUpload = useCallback(() => {
     setUploadedText(null)
+    setUploadedProfile(null)
     setSearchQuery('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -159,12 +162,49 @@ export function InvestorSearchHero({ onSearch, isSearching = false, companyConte
             </p>
           </div>
 
-          {/* Search input or uploaded text display */}
-          {uploadedText ? (
-            // INTENT: Show uploaded text with option to clear and try again
+          {/* Search input or extracted profile display */}
+          {uploadedText && uploadedProfile ? (
+            // INTENT: Show the structured profile extracted from the pitch deck
+            // as editable chips (ported from Forge-Capital-Dashboard.html:2054-2069),
+            // instead of a wall of concatenated raw text which is unreadable.
             <div className="space-y-3">
-              <div className="rounded-lg border border-border bg-muted p-4">
-                <p className="text-sm text-foreground line-clamp-4">{uploadedText}</p>
+              <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+                {uploadedProfile.description && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</p>
+                    <p className="text-sm text-foreground leading-snug">{uploadedProfile.description}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {uploadedProfile.stage && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Stage</p>
+                      <Badge variant="outline" className="text-xs">{uploadedProfile.stage}</Badge>
+                    </div>
+                  )}
+                  {uploadedProfile.geo && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Geo</p>
+                      <Badge variant="outline" className="text-xs">{uploadedProfile.geo}</Badge>
+                    </div>
+                  )}
+                  {uploadedProfile.raiseAmount && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Raise</p>
+                      <Badge variant="outline" className="text-xs">{uploadedProfile.raiseAmount}</Badge>
+                    </div>
+                  )}
+                  {uploadedProfile.sectors.length > 0 && (
+                    <div className="col-span-2 md:col-span-4">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Sectors</p>
+                      <div className="flex flex-wrap gap-1">
+                        {uploadedProfile.sectors.map(s => (
+                          <Badge key={s} variant="secondary" className="text-[10px]">{s}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <Button
                 variant="secondary"

@@ -37,6 +37,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { MatchScoreBadge } from './MatchScoreBadge'
+import { MatchPillarBars } from './MatchPillarBars'
 import { LockedSection } from './LockedSection'
 import { addToShortlist, removeFromShortlist } from '@/actions/investors'
 
@@ -60,6 +61,15 @@ interface EnrichedMatch {
   }
   matchScore: number
   topFactors: string[]
+  /** 6-pillar breakdown from calculateMatchScore — populated by SSE route. */
+  pillars?: {
+    thesis: number
+    stage: number
+    geo: number
+    cheque: number
+    activity: number
+    confidence: number
+  }
   rationale: string
   partner?: {
     name: string
@@ -274,6 +284,11 @@ function MatchRow({
               </span>
             )}
           </div>
+
+          {/* 6-pillar breakdown — ported from Forge-Capital-Dashboard.html:1446 */}
+          {match.pillars && (
+            <MatchPillarBars pillars={match.pillars} className="pt-1" />
+          )}
         </div>
 
         {/* Shortlist button */}

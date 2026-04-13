@@ -557,6 +557,7 @@ Only return the JSON array, no markdown.`
               },
               matchScore: item.breakdown.total,
               topFactors: item.breakdown.topFactors,
+              pillars: item.breakdown.pillars,
               rationale: rationales[i]?.rationale || `Strong ${item.breakdown.total}/100 match based on ${item.breakdown.topFactors.join(", ")}.`,
               partner: contact ? {
                 name: contact.name,

@@ -41,9 +41,97 @@ function getFileTypeFromName(name: string): string | null {
  * @param formData - FormData containing a single "file" entry
  * @returns Extracted text content, or error message
  */
+/**
+ * Structured profile parsed from pitch deck text.
+ * Ported from Forge-Capital-Dashboard.html:2054-2069 (setProfileFromText).
+ */
+export interface ExtractedProfile {
+  description: string
+  stage: string | null
+  geo: string | null
+  raiseAmount: string | null
+  sectors: string[]
+}
+
+// Regex-based extractor — deterministic, fast, no LLM call. Covers the
+// common-case for most pitch decks. Run after text extraction so the
+// InvestorSearchHero can render editable chips instead of a raw text blob.
+function parseProfile(text: string): ExtractedProfile {
+  const MAX = 20_000
+  const t = text.slice(0, MAX)
+  const low = t.toLowerCase()
+
+  // Description: first meaningful sentence ≥ 30 chars (prefer "We are/We build/... is a")
+  let description = ''
+  const sentenceMatch = t.match(/(?:we are|we build|we('|')?re|our (?:company|mission)|[A-Z][\w\s&.,'-]{3,80}\s+is a)[^.!?]{20,250}[.!?]/i)
+  if (sentenceMatch) {
+    description = sentenceMatch[0].trim()
+  } else {
+    const firstPara = t.split(/\n\s*\n/).find(p => p.trim().length >= 40) ?? ''
+    description = firstPara.replace(/\s+/g, ' ').trim().slice(0, 250)
+  }
+
+  // Stage
+  let stage: string | null = null
+  const stagePatterns: Array<[RegExp, string]> = [
+    [/\bpre[- ]?seed\b/i, 'Pre-Seed'],
+    [/\bseries\s*a\b/i, 'Series A'],
+    [/\bseries\s*b\b/i, 'Series B'],
+    [/\bseries\s*c\b/i, 'Series C'],
+    [/\b(growth|late[- ]stage)\b/i, 'Growth'],
+    [/\bseed\s*(?:round|stage|capital)?\b/i, 'Seed'],
+  ]
+  for (const [pattern, label] of stagePatterns) {
+    if (pattern.test(low)) { stage = label; break }
+  }
+
+  // Geography
+  let geo: string | null = null
+  const geoPatterns: Array<[RegExp, string]> = [
+    [/\b(london|manchester|cambridge|oxford|edinburgh|bristol|birmingham|uk-based|united kingdom|\buk\b|britain)\b/i, 'UK'],
+    [/\b(berlin|paris|amsterdam|munich|stockholm|copenhagen|europe|european|emea|eu-based)\b/i, 'Europe'],
+    [/\b(san francisco|new york|boston|silicon valley|\bus\b|usa|united states|america)\b/i, 'US'],
+    [/\b(global|worldwide|international)\b/i, 'Global'],
+  ]
+  for (const [pattern, label] of geoPatterns) {
+    if (pattern.test(low)) { geo = label; break }
+  }
+
+  // Raise amount — first currency figure that looks like a raise
+  let raiseAmount: string | null = null
+  const raiseMatch = t.match(/(?:raising|raise|seeking|looking for|target(?:ing)?)\s*(?:a|up to)?\s*([£$€]\s?\d[\d,.]*\s?[kKmMbB]?)/i)
+    ?? t.match(/([£$€]\s?\d[\d,.]*\s?[kKmMbB])\s+(?:round|raise|seed|series)/i)
+  if (raiseMatch) raiseAmount = raiseMatch[1].replace(/\s+/g, '')
+
+  // Sectors — scan a vocabulary of common hardware/tech sectors
+  const SECTOR_VOCAB = [
+    'climate tech', 'clean energy', 'renewable energy', 'battery', 'solar', 'wind',
+    'robotics', 'drones', 'aerospace', 'space', 'satellite',
+    'ai', 'machine learning', 'computer vision', 'nlp',
+    'biotech', 'medtech', 'healthtech', 'diagnostics', 'life sciences',
+    'fintech', 'insurtech', 'payments',
+    'hardware', 'deep tech', 'advanced manufacturing', 'industrial', 'iot', 'sensors',
+    'materials', 'nanotechnology', 'quantum',
+    'mobility', 'automotive', 'ev', 'logistics',
+    'agritech', 'foodtech', 'supply chain',
+    'cybersecurity', 'saas', 'b2b software',
+    'semiconductors', 'photonics',
+  ]
+  const foundSectors: string[] = []
+  for (const s of SECTOR_VOCAB) {
+    if (low.includes(s) && !foundSectors.includes(s)) foundSectors.push(s)
+    if (foundSectors.length >= 6) break
+  }
+
+  return { description, stage, geo, raiseAmount, sectors: foundSectors }
+}
+
 export async function extractDocumentText(
   formData: FormData,
-): Promise<{ success: true; text: string; fileName: string } | { success: false; error: string }> {
+): Promise<
+  | { success: true; text: string; fileName: string; profile: ExtractedProfile }
+  | { success: false; error: string }
+> {
   return withUser(async () => {
     const file = formData.get("file") as File | null
     if (!file) return { success: false, error: "No file provided" }
@@ -60,7 +148,8 @@ export async function extractDocumentText(
     // Plain text files — read directly
     if (fileType === "txt") {
       const text = await file.text()
-      return { success: true, text: text.slice(0, MAX_TEXT_CHARS), fileName: file.name }
+      const clipped = text.slice(0, MAX_TEXT_CHARS)
+      return { success: true, text: clipped, fileName: file.name, profile: parseProfile(clipped) }
     }
 
     // Binary files — extract with timeout
@@ -101,7 +190,8 @@ export async function extractDocumentText(
         return { success: false, error: "Could not extract text from this file — it may be image-based or empty" }
       }
 
-      return { success: true, text: rawText.slice(0, MAX_TEXT_CHARS), fileName: file.name }
+      const clipped = rawText.slice(0, MAX_TEXT_CHARS)
+      return { success: true, text: clipped, fileName: file.name, profile: parseProfile(clipped) }
     } catch (err) {
       console.error("[extractDocumentText] Extraction failed:", err)
       const message = err instanceof Error ? err.message : "Extraction failed"
