@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { CookieConsent } from "@/components/cookie-consent";
+import { Analytics } from "@vercel/analytics/next";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -107,6 +108,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <CookieConsent />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
