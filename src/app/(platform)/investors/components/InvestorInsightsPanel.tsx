@@ -85,10 +85,26 @@ function truncate(s: string, max = 20): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+// User-preferred chronological sort for the stage-focus chart. Order:
+// Pre-Seed → Seed → Series A → Series B → Growth → Series C → Series D → Late Stage.
+// Unknown stages fall to the end preserving original order.
+const STAGE_ORDER: string[] = [
+  'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Growth', 'Series C', 'Series D', 'Late Stage',
+]
+function sortStageChronologically<T extends { name: string }>(rows: T[]): T[] {
+  const idx = (n: string) => {
+    const i = STAGE_ORDER.findIndex(s => s.toLowerCase() === n.toLowerCase())
+    return i === -1 ? STAGE_ORDER.length : i
+  }
+  // Reverse so that on a layout="vertical" BarChart the earliest stage sits
+  // at the TOP (Recharts renders categories bottom-up from the data array).
+  return [...rows].sort((a, b) => idx(b.name) - idx(a.name))
+}
+
 /**
  * Collapsible panel showing investor directory statistics and charts.
  */
-export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, grantsCount = 0, portfolioCompanyCount }: InvestorInsightsPanelProps) {
+export function InvestorInsightsPanel({ stats, filteredCount, grantsCount = 0, portfolioCompanyCount }: InvestorInsightsPanelProps) {
   // DECISION: Persist collapse state to localStorage so the user's preference
   // survives navigation and page refreshes.
   // GOTCHA: Read localStorage in useEffect (not useState initialiser) to avoid
@@ -109,11 +125,6 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
       return next
     })
   }, [])
-
-  const activeDeployingData = [
-    { name: 'Active', value: stats.activeDeployingCount },
-    { name: 'Other', value: Math.max(0, stats.total - stats.activeDeployingCount) },
-  ]
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -249,7 +260,7 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <ChartCard title="Stage Focus Distribution">
-                    <BarChart layout="vertical" data={stats.stageFocusBreakdown} margin={BAR_MARGIN}>
+                    <BarChart layout="vertical" data={sortStageChronologically(stats.stageFocusBreakdown)} margin={BAR_MARGIN}>
                       <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                       <YAxis
                         type="category"
@@ -265,32 +276,23 @@ export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount, gra
                     </BarChart>
                   </ChartCard>
 
-                  <ChartCard title="Data Quality Distribution">
-                    <BarChart data={stats.qualityDistribution} margin={BAR_MARGIN}>
-                      <XAxis dataKey="range" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                  <ChartCard title="Geographic Distribution">
+                    <BarChart layout="vertical" data={stats.regionBreakdown} margin={BAR_MARGIN}>
+                      <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={Y_AXIS_WIDTH}
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v: string) => truncate(v, 16)}
+                      />
                       <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                      <Bar dataKey="count" fill={CHART_COLORS.amber} radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
                     </BarChart>
                   </ChartCard>
                 </div>
-
-                <ChartCard title="Geographic Distribution">
-                  <BarChart layout="vertical" data={stats.regionBreakdown} margin={BAR_MARGIN}>
-                    <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={Y_AXIS_WIDTH}
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: string) => truncate(v, 16)}
-                    />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                    <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[0, 3, 3, 0]} />
-                  </BarChart>
-                </ChartCard>
               </>
             )
           })()}
