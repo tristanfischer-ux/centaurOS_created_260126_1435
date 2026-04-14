@@ -26,6 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { AnimatedSection, StaggerContainer } from '@/components/marketing/animations'
+import { MatchPillarBars } from '@/app/(platform)/investors/components/MatchPillarBars'
 import { getPublicInvestorPreview, searchPublicInvestors } from '@/actions/public-investor-preview'
 import type {
   PublicInvestorPreview,
@@ -163,8 +164,8 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
           </div>
         </div>
 
-        {/* 6 pillar bars — same component the For You tab uses */}
-        <PillarStrip pillars={result.pillars} />
+        {/* 6 pillar bars — exact same component the authenticated For You tab uses */}
+        <MatchPillarBars pillars={result.pillars} />
 
         {/* Thesis excerpt — single anonymous-flavour sentence */}
         {result.thesis_excerpt && (
@@ -209,36 +210,6 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
   )
 }
 
-/** 6 mini bars matching MatchPillarBars layout but inline (no extra borders). */
-function PillarStrip({ pillars }: { pillars: AnonymizedInvestorResult['pillars'] }) {
-  const PILLAR_ORDER: Array<{ key: keyof AnonymizedInvestorResult['pillars']; label: string }> = [
-    { key: 'thesis', label: 'THESIS' },
-    { key: 'stage', label: 'STAGE' },
-    { key: 'geo', label: 'GEO' },
-    { key: 'cheque', label: 'CHEQUE' },
-    { key: 'activity', label: 'ACTIVITY' },
-    { key: 'confidence', label: 'CONFIDENCE' },
-  ]
-  const fillColor = (v: number) => v >= 70 ? 'bg-success' : v >= 40 ? 'bg-warning' : 'bg-muted-foreground'
-  return (
-    <div className="grid grid-cols-6 gap-2">
-      {PILLAR_ORDER.map(({ key, label }) => {
-        const value = pillars[key] ?? 0
-        return (
-          <div key={key} className="space-y-1">
-            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div className={`h-full rounded-full ${fillColor(value)}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
-              <span className="text-[9px] font-medium text-foreground tabular-nums">{value}</span>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 // ─── Main Section ────────────────────────────────────────────────────────────
 
@@ -433,9 +404,9 @@ export function InvestorPreviewSection() {
                 </StaggerContainer>
 
                 {/* Below cards CTA */}
-                {searchResult.totalMatches > 5 && (
+                {searchResult.totalMatches > searchResult.results.length && (
                   <p className="text-sm text-muted-foreground mt-6 text-center">
-                    Showing 5 of {searchResult.totalMatches} results.{' '}
+                    Showing {searchResult.results.length} of {searchResult.totalMatches} results.{' '}
                     <Link
                       href={signupUrl}
                       className="text-international-orange font-medium hover:underline"

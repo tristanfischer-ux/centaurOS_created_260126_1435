@@ -113,15 +113,33 @@ function geoSummary(geoFocus: string[], hqCity: string | null): string | null {
   return null
 }
 
-/** First sentence of the investor's thesis, capped to ~80 chars. Strips
- * any leading firm name to reduce identification risk. */
-function thesisExcerpt(thesis: string | null | undefined): string | null {
-  if (!thesis) return null
-  const cleaned = thesis.replace(/\s+/g, ' ').trim()
-  // Drop sentences that start with a proper-noun name like "Acme Capital is …"
+/** Anonymized flavour sentence. Prefers ideal_company_profile / investment_pattern
+ * (these describe target founders, not the firm), falls back to value_add, then
+ * aggressively redacts any firm-name proper-noun at the start of investment_thesis.
+ * Goal: real signal about what they back, zero identifying name leakage. */
+function thesisExcerpt(attrs: Record<string, unknown>): string | null {
+  const pick = (k: string): string | null => {
+    const v = attrs[k]
+    return typeof v === 'string' && v.trim().length >= 20 ? v.trim() : null
+  }
+  const source = pick('ideal_company_profile') ?? pick('investment_pattern') ?? pick('value_add') ?? pick('investment_thesis')
+  if (!source) return null
+
+  let cleaned = source.replace(/\s+/g, ' ').trim()
+
+  // Strip leading "Firm Name [...] is/are/invests/focuses/targets/backs/makes/does ..."
+  // up to (and including) the verb — replaces with "They " to keep the sentence readable.
+  cleaned = cleaned.replace(
+    /^[A-Z][\w&'\-.]*(?:\s+[A-Z][\w&'\-.]*){0,6}\s+(is|are|invests|focuses|targets|backs|makes|specialises|specializes|partners|supports|funds|seeks|looks)\b/,
+    'They $1',
+  )
+  // Also strip any "At Firm Name," prefix.
+  cleaned = cleaned.replace(/^At\s+[A-Z][\w&'\-.\s]{1,40}?,\s*/i, '')
+  // Strip a lingering " — Firm Name" or "(Firm Name)" anywhere.
+  cleaned = cleaned.replace(/\s?\((?:at\s+)?[A-Z][\w&'\-.\s]{1,40}\)/g, '')
+
   const firstSentence = cleaned.split(/[.!?]\s/)[0] ?? cleaned
-  const trimmed = firstSentence.length > 90 ? firstSentence.slice(0, 88).trimEnd() + '…' : firstSentence
-  return trimmed
+  return firstSentence.length > 140 ? firstSentence.slice(0, 138).trimEnd() + '…' : firstSentence
 }
 
 /** Generate a stable placeholder name from an index. A..Z, then "Investor #27" etc. */
@@ -278,8 +296,8 @@ export const searchPublicInvestors = unstable_cache(
     }).sort((a, b) => b.composite - a.composite)
 
     const strongMatches = scored.filter(s => s.composite >= 50)
-    // 5. Anonymize. Show only top 25 to discourage scraping; CTA drives signup.
-    const top = scored.slice(0, 25)
+    // 5. Anonymize. Show only top 10 to discourage scraping; CTA drives signup.
+    const top = scored.slice(0, 10)
     const anonymized: AnonymizedInvestorResult[] = top.map((entry, idx) => {
       const attrs = (entry.row.attributes as Record<string, unknown>) ?? {}
       const cheque = (attrs.cheque_range_gbp as { min?: number; max?: number } | undefined) ?? null
@@ -299,7 +317,7 @@ export const searchPublicInvestors = unstable_cache(
         is_active_deploying: (attrs.is_active_deploying as boolean) ?? false,
         fund_tier: (attrs.fund_tier as string) ?? null,
         cheque_range_label: formatChequeRange(cheque?.min, cheque?.max),
-        thesis_excerpt: thesisExcerpt(attrs.investment_thesis as string | null | undefined),
+        thesis_excerpt: thesisExcerpt(attrs),
       }
     })
 
