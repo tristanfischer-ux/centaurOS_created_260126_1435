@@ -85,21 +85,27 @@ function truncate(s: string, max = 20): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
-// User-preferred chronological sort for the stage-focus chart. Order:
-// Pre-Seed → Seed → Series A → Series B → Growth → Series C → Series D → Late Stage.
-// Unknown stages fall to the end preserving original order.
-const STAGE_ORDER: string[] = [
-  'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Growth', 'Series C', 'Series D', 'Late Stage',
-]
-function sortStageChronologically<T extends { name: string }>(rows: T[]): T[] {
+// User-preferred chronological bucketing for the stage-focus chart.
+// Series C, Series D, Growth, and Late Stage all collapse into a single
+// "Growth & Late Stage" bucket (per 2026-04-14 feedback — individual late
+// series have tiny counts and muddy the early-stage signal).
+// Final order (top-down): Pre-Seed → Seed → Series A → Series B → Growth & Late Stage.
+const STAGE_ORDER: string[] = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Growth & Late Stage']
+const LATE_STAGE_SOURCES = new Set(['series c', 'series d', 'growth', 'late stage'])
+const GROWTH_BUCKET = 'Growth & Late Stage'
+
+function normaliseStageAndBucket<T extends { name: string; count: number }>(rows: T[]): Array<{ name: string; count: number }> {
+  const merged = new Map<string, number>()
+  for (const r of rows) {
+    const key = LATE_STAGE_SOURCES.has(r.name.toLowerCase()) ? GROWTH_BUCKET : r.name
+    merged.set(key, (merged.get(key) ?? 0) + r.count)
+  }
+  const out = Array.from(merged, ([name, count]) => ({ name, count }))
   const idx = (n: string) => {
     const i = STAGE_ORDER.findIndex(s => s.toLowerCase() === n.toLowerCase())
     return i === -1 ? STAGE_ORDER.length : i
   }
-  // Ascending sort: Pre-Seed first in array. Recharts vertical BarChart
-  // renders the FIRST data item at the TOP of the Y axis, so earliest stage
-  // sits on top and Late Stage on bottom, matching user's mental model.
-  return [...rows].sort((a, b) => idx(a.name) - idx(b.name))
+  return out.sort((a, b) => idx(a.name) - idx(b.name))
 }
 
 /**
@@ -246,7 +252,7 @@ export function InvestorInsightsPanel({ stats, filteredCount, grantsCount = 0, p
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <ChartCard title="Stage Focus Distribution">
-                    <BarChart layout="vertical" data={sortStageChronologically(stats.stageFocusBreakdown)} margin={BAR_MARGIN}>
+                    <BarChart layout="vertical" data={normaliseStageAndBucket(stats.stageFocusBreakdown)} margin={BAR_MARGIN}>
                       <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                       <YAxis
                         type="category"
