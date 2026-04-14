@@ -22,7 +22,6 @@ import { useState, useEffect } from 'react'
 
 const NAV_LINKS = [
     { href: '/pricing', label: 'Pricing' },
-    { href: '/experts', label: 'Experts' },
     { href: '/about', label: 'About' },
     { href: '/contact', label: 'Contact' },
 ] as const
@@ -44,13 +43,6 @@ export function MarketingNav() {
     }, [mobileMenuOpen])
 
     function isActive(href: string): boolean {
-        if (href === '/experts') {
-            return (
-                pathname === '/experts' ||
-                pathname.startsWith('/experts/') ||
-                pathname.startsWith('/expert/')
-            )
-        }
         return pathname === href || pathname.startsWith(href + '/')
     }
 

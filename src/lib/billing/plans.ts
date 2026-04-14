@@ -119,7 +119,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: 'starter',
     name: 'Startup Team',
     description: 'For growing businesses',
-    bestFor: 'Go from idea to first purchase order. Full supplier matching, team workspace, and 0% fee on your first £10K of orders.',
+    bestFor: 'Go from idea to first purchase order. Full supplier matching, team workspace, and 0% fee on your first 3 orders.',
     priceMonthlyGBP: 4900, // £49/month
     priceAnnualGBP: 47000, // £470/year (save ~20%)
     features: [

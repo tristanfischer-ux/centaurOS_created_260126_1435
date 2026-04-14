@@ -3,16 +3,17 @@
 /**
  * @file Contact Form (Client Component)
  *
- * @description Simple contact form that generates a mailto link on submit.
- * No backend wiring required — the form opens the user's email client
- * with subject and body pre-filled.
+ * @description Contact form that submits via server action and sends
+ * an email through Resend. Shows toast notifications for success/failure.
  */
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Send } from "lucide-react"
+import { Send, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { submitContactForm } from "@/actions/contact"
 
 const SUBJECTS = [
   "General",
@@ -29,19 +30,29 @@ export function ContactForm() {
   const [email, setEmail] = useState("")
   const [subject, setSubject] = useState<Subject>("General")
   const [message, setMessage] = useState("")
+  const [sending, setSending] = useState(false)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    setSending(true)
 
-    const mailtoSubject = encodeURIComponent(
-      `[${subject}] Contact from ${name || "Website Visitor"}`
-    )
-    const mailtoBody = encodeURIComponent(
-      `Name: ${name}\nEmail: ${email}\n\n${message}`
-    )
-    const mailtoHref = `mailto:hello@fractionalforge.app?subject=${mailtoSubject}&body=${mailtoBody}`
+    try {
+      const result = await submitContactForm({ name, email, subject, message })
 
-    window.location.href = mailtoHref
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success("Message sent! We'll get back to you soon.")
+        setName("")
+        setEmail("")
+        setSubject("General")
+        setMessage("")
+      }
+    } catch {
+      toast.error("Something went wrong. Please try again.")
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -110,9 +121,13 @@ export function ContactForm() {
       </div>
 
       {/* Submit */}
-      <Button type="submit" className="w-full sm:w-auto">
-        <Send className="w-4 h-4 mr-2" />
-        Send message
+      <Button type="submit" className="w-full sm:w-auto" disabled={sending}>
+        {sending ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Send className="w-4 h-4 mr-2" />
+        )}
+        {sending ? "Sending..." : "Send message"}
       </Button>
     </form>
   )

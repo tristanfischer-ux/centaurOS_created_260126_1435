@@ -148,7 +148,7 @@ export function PricingContent() {
                   Transparent marketplace fees — 0% on your first 3 orders
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  After your intro orders, a 10% platform fee applies to marketplace transactions. This covers payment processing, escrow, and dispute resolution. Paid plans get reduced rates.
+                  Every new account gets 0% marketplace fees on their first 3 orders. After that, Explorer and Startup Team plans pay 10%, Professional plans pay 5%. This covers payment processing, escrow, and dispute resolution.
                 </p>
               </div>
             </div>
@@ -531,6 +531,8 @@ function ComparisonCell({ value }: { value: boolean | string }) {
 /** Feature comparison data — only features that are actually implemented */
 const COMPARISON_FEATURES = [
   { name: 'Assists per month', free: '50', starter: '100', professional: '500' },
+  { name: 'Orders/month', free: '5', starter: '25', professional: 'Unlimited' },
+  { name: 'Team members', free: '1', starter: '3', professional: '10' },
   { name: 'Voice-to-task', free: true, starter: true, professional: true },
   { name: 'Comparison assistant', free: false as boolean | string, starter: true, professional: true },
   { name: 'Supplier matching', free: false, starter: true, professional: true },
@@ -543,5 +545,5 @@ const COMPARISON_FEATURES = [
   { name: 'Fund performance & hardware fit', free: false, starter: false, professional: true },
   { name: 'Engineering reports (PDF, DOCX, PPTX)', free: true, starter: true, professional: true },
   { name: 'Priority support', free: false, starter: false, professional: true },
-  { name: 'Platform fee', free: '10%', starter: '10% (0% first £10K)', professional: '5%' },
+  { name: 'Platform fee', free: '10%', starter: '10% (0% first 3 orders)', professional: '5%' },
 ]
