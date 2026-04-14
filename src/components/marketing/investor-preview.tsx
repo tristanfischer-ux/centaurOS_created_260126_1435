@@ -20,8 +20,6 @@ import {
   Users,
   Zap,
   X,
-  MapPin,
-  Building2,
   CheckCircle2,
   TrendingUp,
 } from 'lucide-react'
@@ -132,58 +130,51 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
   return (
     <Card className="transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99]">
       <CardContent className="p-4 space-y-3">
-        {/* Redacted firm name */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex gap-0.5" aria-label="Firm name redacted">
-              <span className="inline-block h-3.5 w-16 bg-muted rounded-sm" />
-              <span className="inline-block h-3.5 w-10 bg-muted rounded-sm" />
+        {/* Header: placeholder name + composite % */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-foreground">{result.placeholder}</span>
+              {result.firm_type && (
+                <Badge variant="outline" size="sm" className="text-[10px]">
+                  {result.firm_type}
+                </Badge>
+              )}
+              <Badge variant="secondary" size="sm" className="text-[10px]">
+                {result.subcategory}
+              </Badge>
             </div>
+            <p className="text-xs text-muted-foreground">
+              {[
+                result.geo_summary,
+                result.cheque_range_label,
+                result.stage_focus.slice(0, 3).join(', '),
+              ].filter(Boolean).join(' · ')}
+            </p>
           </div>
-          {result.is_active_deploying && (
-            <span className="flex items-center gap-0.5 text-success shrink-0">
-              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-              <span className="text-[9px] font-semibold uppercase tracking-wide">Active</span>
+
+          <div className="flex items-baseline gap-1 shrink-0">
+            <span className="text-xl font-bold text-international-orange tabular-nums">
+              {result.composite}%
             </span>
-          )}
+            <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
+              match
+            </span>
+          </div>
         </div>
 
-        {/* Subcategory + firm type */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Badge variant="secondary" size="sm">
-            {result.subcategory}
-          </Badge>
-          {result.firm_type && (
-            <Badge variant="outline" size="sm">
-              {result.firm_type}
-            </Badge>
-          )}
-        </div>
+        {/* 6 pillar bars — same component the For You tab uses */}
+        <PillarStrip pillars={result.pillars} />
 
-        {/* City */}
-        {result.hq_city && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin className="h-3 w-3 shrink-0" />
-            <span>{result.hq_city}</span>
-          </div>
+        {/* Thesis excerpt — single anonymous-flavour sentence */}
+        {result.thesis_excerpt && (
+          <p className="text-sm text-foreground/80 leading-snug line-clamp-2">
+            {result.thesis_excerpt}
+          </p>
         )}
 
-        {/* Stage focus pills */}
-        {result.stage_focus.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {result.stage_focus.map((stage) => (
-              <span
-                key={stage}
-                className="text-[10px] px-1.5 py-0.5 rounded-full bg-international-orange/10 text-international-orange font-medium"
-              >
-                {stage}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Sectors */}
-        {result.sectors.length > 0 && (
+        {/* Sectors + active flag */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {result.sectors.map((sector) => (
               <span
@@ -194,19 +185,10 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
               </span>
             ))}
           </div>
-        )}
-
-        {/* Fund tier + cheque */}
-        <div className="flex items-center justify-between">
-          {result.fund_tier && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Building2 className="h-3 w-3 shrink-0" />
-              <span>{result.fund_tier}</span>
-            </div>
-          )}
-          {result.has_cheque_range && result.cheque_min_redacted && (
-            <span className="text-xs text-muted-foreground">
-              {result.cheque_min_redacted} – <span className="inline-block h-3 w-8 bg-muted rounded-sm align-middle" />
+          {result.is_active_deploying && (
+            <span className="flex items-center gap-0.5 text-success shrink-0">
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+              <span className="text-[9px] font-semibold uppercase tracking-wide">Active</span>
             </span>
           )}
         </div>
@@ -224,6 +206,37 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+/** 6 mini bars matching MatchPillarBars layout but inline (no extra borders). */
+function PillarStrip({ pillars }: { pillars: AnonymizedInvestorResult['pillars'] }) {
+  const PILLAR_ORDER: Array<{ key: keyof AnonymizedInvestorResult['pillars']; label: string }> = [
+    { key: 'thesis', label: 'THESIS' },
+    { key: 'stage', label: 'STAGE' },
+    { key: 'geo', label: 'GEO' },
+    { key: 'cheque', label: 'CHEQUE' },
+    { key: 'activity', label: 'ACTIVITY' },
+    { key: 'confidence', label: 'CONFIDENCE' },
+  ]
+  const fillColor = (v: number) => v >= 70 ? 'bg-success' : v >= 40 ? 'bg-warning' : 'bg-muted-foreground'
+  return (
+    <div className="grid grid-cols-6 gap-2">
+      {PILLAR_ORDER.map(({ key, label }) => {
+        const value = pillars[key] ?? 0
+        return (
+          <div key={key} className="space-y-1">
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <div className={`h-full rounded-full ${fillColor(value)}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+              <span className="text-[9px] font-medium text-foreground tabular-nums">{value}</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -415,7 +428,7 @@ export function InvestorPreviewSection() {
                 {/* Result cards */}
                 <StaggerContainer className="space-y-4">
                   {searchResult.results.map((result) => (
-                    <AnonymizedCard key={result.index} result={result} signupUrl={signupUrl} />
+                    <AnonymizedCard key={result.placeholder} result={result} signupUrl={signupUrl} />
                   ))}
                 </StaggerContainer>
 

@@ -16,6 +16,9 @@
 
 import { unstable_cache } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { nomicEmbedQuery } from '@/lib/search/nomic-embed'
+import { scoreFirmDashboard } from '@/lib/investor-match-dashboard'
+import type { InvestorFirm } from '@/actions/investors'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,16 +40,24 @@ export type PublicInvestorPreview = {
 }
 
 export type AnonymizedInvestorResult = {
-  index: number
+  /** "Investor A", "Investor B", … assigned by composite-score rank. */
+  placeholder: string
+  /** 0-100 dashboard composite score. */
+  composite: number
+  /** Six pillar values (0-100 each) — fed straight into MatchPillarBars. */
+  pillars: { thesis: number; stage: number; geo: number; cheque: number; activity: number; confidence: number }
   subcategory: string
   firm_type: string | null
-  hq_city: string | null
+  /** Country-level only — never specific city/address. */
+  geo_summary: string | null
   stage_focus: string[]
   sectors: string[]
   is_active_deploying: boolean
   fund_tier: string | null
-  has_cheque_range: boolean
-  cheque_min_redacted: string | null
+  /** Cheque range like "£500K – £5M" or null. */
+  cheque_range_label: string | null
+  /** First sentence (max ~80 chars) of the investor's thesis — flavour without identification. */
+  thesis_excerpt: string | null
 }
 
 export type InvestorSearchResult = {
@@ -57,50 +68,6 @@ export type InvestorSearchResult = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * SECURITY: Sanitize a string for use in PostgREST filter expressions.
- */
-function sanitizeFilterValue(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_')
-    .replace(/[\n\r\t]/g, ' ')
-    .replace(/[,()\."*:!'[\]{}]/g, '')
-}
-
-/**
- * Maps common user search terms to stage_focus values in the DB.
- */
-const STAGE_KEYWORDS: Record<string, string> = {
-  'pre-seed': 'Pre-Seed',
-  'preseed': 'Pre-Seed',
-  'seed': 'Seed',
-  'series-a': 'Series A',
-  'series a': 'Series A',
-  'series-b': 'Series B',
-  'series b': 'Series B',
-  'series-c': 'Series C',
-  'series c': 'Series C',
-  'growth': 'Growth',
-  'early': 'Early Stage',
-  'early-stage': 'Early Stage',
-  'late': 'Late Stage',
-  'late-stage': 'Late Stage',
-}
-
-/**
- * Common sector keywords that map to DB values.
- */
-const SECTOR_KEYWORDS: string[] = [
-  'hardware', 'software', 'saas', 'fintech', 'healthtech', 'medtech',
-  'biotech', 'cleantech', 'climate', 'energy', 'deeptech', 'deep tech',
-  'robotics', 'ai', 'machine learning', 'consumer', 'electronics',
-  'manufacturing', 'defence', 'defense', 'aerospace', 'space',
-  'medical', 'devices', 'iot', 'semiconductor', 'automotive',
-  'agriculture', 'agtech', 'foodtech', 'proptech', 'edtech',
-]
-
-/**
  * Formats a cheque value for partial display (e.g. 250000 -> "£250K")
  */
 function formatChequeMin(value: number | null | undefined): string | null {
@@ -108,6 +75,59 @@ function formatChequeMin(value: number | null | undefined): string | null {
   if (value >= 1_000_000) return `£${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
   if (value >= 1_000) return `£${Math.round(value / 1_000)}K`
   return `£${value}`
+}
+
+function formatChequeRange(min: number | null | undefined, max: number | null | undefined): string | null {
+  const lo = formatChequeMin(min ?? undefined)
+  const hi = formatChequeMin(max ?? undefined)
+  if (!lo && !hi) return null
+  return `${lo ?? '—'} – ${hi ?? '—'}`
+}
+
+/** Bucket a city / region string to a country-level label. Falls back to the
+ * raw value if no rule matches. Never returns specific addresses. */
+function geoSummary(geoFocus: string[], hqCity: string | null): string | null {
+  const text = [...geoFocus, hqCity].filter(Boolean).join(' ').toLowerCase()
+  if (!text) return null
+  const RULES: Array<[RegExp, string]> = [
+    [/\b(uk|united kingdom|britain|england|scotland|wales|london|manchester|cambridge|oxford|edinburgh|bristol)\b/, 'United Kingdom'],
+    [/\b(germany|berlin|munich|hamburg)\b/, 'Germany'],
+    [/\b(france|paris)\b/, 'France'],
+    [/\b(switzerland|swiss|zurich|geneva)\b/, 'Switzerland'],
+    [/\b(netherlands|amsterdam)\b/, 'Netherlands'],
+    [/\b(spain|madrid|barcelona)\b/, 'Spain'],
+    [/\b(italy|milan|rome)\b/, 'Italy'],
+    [/\b(sweden|stockholm|nordics)\b/, 'Nordics'],
+    [/\b(europe|european|eu|emea)\b/, 'Europe'],
+    [/\b(israel|tel aviv)\b/, 'Israel'],
+    [/\b(canada|toronto|vancouver|montreal)\b/, 'Canada'],
+    [/\b(us|usa|united states|america|san francisco|new york|boston|chicago|los angeles|seattle|austin|miami|silicon valley)\b/, 'United States'],
+    [/\b(india|mumbai|bangalore)\b/, 'India'],
+    [/\b(china|beijing|shanghai)\b/, 'China'],
+    [/\b(japan|tokyo)\b/, 'Japan'],
+    [/\b(singapore)\b/, 'Singapore'],
+    [/\b(australia|sydney|melbourne)\b/, 'Australia'],
+    [/\b(global|worldwide|international)\b/, 'Global'],
+  ]
+  for (const [re, label] of RULES) if (re.test(text)) return label
+  return null
+}
+
+/** First sentence of the investor's thesis, capped to ~80 chars. Strips
+ * any leading firm name to reduce identification risk. */
+function thesisExcerpt(thesis: string | null | undefined): string | null {
+  if (!thesis) return null
+  const cleaned = thesis.replace(/\s+/g, ' ').trim()
+  // Drop sentences that start with a proper-noun name like "Acme Capital is …"
+  const firstSentence = cleaned.split(/[.!?]\s/)[0] ?? cleaned
+  const trimmed = firstSentence.length > 90 ? firstSentence.slice(0, 88).trimEnd() + '…' : firstSentence
+  return trimmed
+}
+
+/** Generate a stable placeholder name from an index. A..Z, then "Investor #27" etc. */
+function placeholderName(index: number): string {
+  if (index < 26) return `Investor ${String.fromCharCode(65 + index)}`
+  return `Investor #${index + 1}`
 }
 
 // ─── Default Preview (no search) ────────────────────────────────────────────
@@ -200,137 +220,94 @@ export const getPublicInvestorPreview = unstable_cache(
  */
 export const searchPublicInvestors = unstable_cache(
   async (query: string): Promise<InvestorSearchResult> => {
-    if (!query || query.trim().length < 2) {
+    if (!query || query.trim().length < 6) {
       return { results: [], totalMatches: 0 }
     }
-
-    const cleanQuery = query.trim().slice(0, 200).toLowerCase()
-    const words = cleanQuery.split(/\s+/).filter(Boolean)
-
-    // SECURITY: admin client — anonymized search results only
+    const cleanQuery = query.trim().slice(0, 500)
     const supabase = createAdminClient()
 
-    // Identify stage and sector keywords from the query
-    const matchedStages: string[] = []
-    const matchedSectors: string[] = []
-    const searchTerms: string[] = []
-
-    // Check multi-word stage matches first
-    for (const [keyword, stage] of Object.entries(STAGE_KEYWORDS)) {
-      if (cleanQuery.includes(keyword)) {
-        matchedStages.push(stage)
-      }
-    }
-
-    // Check sector keywords
-    for (const sector of SECTOR_KEYWORDS) {
-      if (cleanQuery.includes(sector)) {
-        matchedSectors.push(sector)
-      }
-    }
-
-    // Remaining words become general search terms
-    for (const word of words) {
-      if (word.length >= 3 && !Object.keys(STAGE_KEYWORDS).some(k => k.includes(word))) {
-        searchTerms.push(sanitizeFilterValue(word))
-      }
-    }
-
-    // Build the query — start with Finance category
-    let dbQuery = supabase
-      .from('marketplace_listings')
-      .select('id, subcategory, attributes', { count: 'exact' })
-      .eq('category', 'Finance')
-
-    // Build OR filter conditions
-    const orConditions: string[] = []
-
-    // Add text search on description for general terms
-    for (const term of searchTerms.slice(0, 3)) {
-      orConditions.push(`description.ilike.%${term}%`)
-      orConditions.push(`title.ilike.%${term}%`)
-    }
-
-    // If we have sector keywords, also search description
-    for (const sector of matchedSectors.slice(0, 3)) {
-      const sanitized = sanitizeFilterValue(sector)
-      orConditions.push(`description.ilike.%${sanitized}%`)
-    }
-
-    // Apply OR conditions if we have general search terms
-    if (orConditions.length > 0) {
-      dbQuery = dbQuery.or(orConditions.join(','))
-    }
-
-    // Execute query
-    const { data, count } = await dbQuery
-      .order('created_at', { ascending: false })
-      .limit(200)
-
-    if (!data || data.length === 0) {
+    // 1. Embed the query with the same Nomic model the For You tab uses.
+    let queryEmbedding: number[]
+    try {
+      queryEmbedding = await nomicEmbedQuery(cleanQuery)
+    } catch (err) {
+      console.error('[publicSearch] Nomic embed failed:', err)
       return { results: [], totalMatches: 0 }
     }
 
-    // Post-filter by stage and sector in JSONB attributes
-    let filtered = data
-
-    if (matchedStages.length > 0) {
-      filtered = filtered.filter((row) => {
-        const attrs = row.attributes as Record<string, unknown> | null
-        if (!attrs) return false
-        const stages = (attrs.stage_focus as string[]) ?? []
-        return matchedStages.some(s =>
-          stages.some(dbStage => dbStage.toLowerCase().includes(s.toLowerCase()))
-        )
-      })
-    }
-
-    if (matchedSectors.length > 0 && filtered.length > 5) {
-      // Only apply sector filter if we still have enough results
-      const sectorFiltered = filtered.filter((row) => {
-        const attrs = row.attributes as Record<string, unknown> | null
-        if (!attrs) return false
-        const sectors = (attrs.sectors as string[]) ?? []
-        const description = ((attrs as Record<string, unknown>).description as string) ?? ''
-        return matchedSectors.some(s =>
-          sectors.some(dbSector => dbSector.toLowerCase().includes(s)) ||
-          description.toLowerCase().includes(s)
-        )
-      })
-      if (sectorFiltered.length >= 3) {
-        filtered = sectorFiltered
+    // 2. Paginated RPC fetch — same pattern as src/actions/investors.ts
+    //    (8 × 1000 covers the full 7,800-row Finance set).
+    const PAGE = 1000
+    const PAGES = 8
+    const embJson = JSON.stringify(queryEmbedding) as unknown as string
+    const pageResults = await Promise.all(
+      Array.from({ length: PAGES }, (_, i) =>
+        supabase.rpc('match_marketplace_listings_v2', {
+          query_embedding: embJson,
+          filter_category: 'Finance',
+          match_threshold: -1.0,
+          match_count: PAGE,
+          p_offset: i * PAGE,
+        }),
+      ),
+    )
+    const seen = new Set<string>()
+    const rows: Array<Record<string, unknown>> = []
+    for (const r of pageResults) {
+      for (const row of (r.data ?? []) as Array<Record<string, unknown>>) {
+        const id = String(row.id)
+        if (seen.has(id)) continue
+        seen.add(id)
+        rows.push(row)
       }
     }
+    if (rows.length === 0) return { results: [], totalMatches: 0 }
 
-    const totalMatches = filtered.length > 0
-      ? Math.max(filtered.length, count ?? filtered.length)
-      : 0
+    // 3. Restrict scope to forge_capital-synced rows (canonical master).
+    const fcRows = rows.filter((r) => {
+      const a = (r.attributes as Record<string, unknown>) || {}
+      return a.data_source === 'forge_capital'
+    })
 
-    // SECURITY: Anonymize — strip all identifying information
-    const anonymized: AnonymizedInvestorResult[] = filtered.slice(0, 5).map((row, idx) => {
-      const attrs = (row.attributes as Record<string, unknown>) ?? {}
-      const chequeMin = attrs.cheque_size_min as number | null | undefined
-      const chequeMax = attrs.cheque_size_max as number | null | undefined
+    // 4. Score every row with the same dashboard algorithm the For You tab uses.
+    const scored = fcRows.map((row) => {
+      const sim = typeof row.similarity === 'number' ? row.similarity : null
+      const firm = { id: String(row.id), title: '', attributes: row.attributes } as unknown as InvestorFirm
+      const { composite, pillars } = scoreFirmDashboard(firm, cleanQuery, sim)
+      return { row, composite, pillars }
+    }).sort((a, b) => b.composite - a.composite)
+
+    const strongMatches = scored.filter(s => s.composite >= 50)
+    // 5. Anonymize. Show only top 25 to discourage scraping; CTA drives signup.
+    const top = scored.slice(0, 25)
+    const anonymized: AnonymizedInvestorResult[] = top.map((entry, idx) => {
+      const attrs = (entry.row.attributes as Record<string, unknown>) ?? {}
+      const cheque = (attrs.cheque_range_gbp as { min?: number; max?: number } | undefined) ?? null
+      const stages = Array.isArray(attrs.stage_focus) ? (attrs.stage_focus as string[]) : []
+      const sectors = Array.isArray(attrs.sectors) ? (attrs.sectors as string[]) : []
+      const geos = Array.isArray(attrs.geo_focus) ? (attrs.geo_focus as string[]) : []
 
       return {
-        index: idx + 1,
-        subcategory: row.subcategory ?? 'Investor',
+        placeholder: placeholderName(idx),
+        composite: entry.composite,
+        pillars: entry.pillars,
+        subcategory: (entry.row.subcategory as string) ?? 'Investor',
         firm_type: (attrs.firm_type as string) ?? null,
-        hq_city: (attrs.hq_city as string) ?? null,
-        stage_focus: ((attrs.stage_focus as string[]) ?? []).slice(0, 2),
-        sectors: ((attrs.sectors as string[]) ?? []).slice(0, 3),
+        geo_summary: geoSummary(geos, (attrs.hq_city as string) ?? null),
+        stage_focus: stages.slice(0, 4),
+        sectors: sectors.slice(0, 4),
         is_active_deploying: (attrs.is_active_deploying as boolean) ?? false,
         fund_tier: (attrs.fund_tier as string) ?? null,
-        has_cheque_range: !!(chequeMin || chequeMax),
-        cheque_min_redacted: formatChequeMin(chequeMin),
+        cheque_range_label: formatChequeRange(cheque?.min, cheque?.max),
+        thesis_excerpt: thesisExcerpt(attrs.investment_thesis as string | null | undefined),
       }
     })
 
     return {
       results: anonymized,
-      totalMatches,
+      totalMatches: strongMatches.length,
     }
   },
-  ['public-investor-search'],
-  { revalidate: 1800 } // Cache for 30 minutes
+  ['public-investor-search-v2'],
+  { revalidate: 1800 }, // 30 min cache; identical queries reuse the same anon ranking
 )
