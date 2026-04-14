@@ -4,13 +4,13 @@
  * @file InvestorPageTabs.tsx
  *
  * @description Tab wrapper for the Investors page with 6 tabs:
- * Overview, For You, Investors, Grants, Contacts, Portfolio.
+ * Overview, For You, Investors, Grants, Contacts.
  * Overview tab shows KPI stats + charts matching Forge Capital dashboard.
  */
 
 import { useState, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
-import { BarChart3, Sparkles, Grid3X3, Award, Users, Briefcase } from "lucide-react"
+import { BarChart3, Sparkles, Grid3X3, Award, Users } from "lucide-react"
 
 type TabId = "overview" | "for-you" | "investors" | "grants" | "contacts" | "portfolio"
 
@@ -39,7 +39,8 @@ const TAB_CONFIG: {
   { id: "investors", label: "Investors", icon: Grid3X3, countKey: "investorCount" },
   { id: "grants", label: "Grants", icon: Award, countKey: "grantsCount" },
   { id: "contacts", label: "Contacts", icon: Users, countKey: "contactCount" },
-  { id: "portfolio", label: "Portfolio", icon: Briefcase, countKey: "portfolioCount" },
+  // Portfolio tab removed per user preference — portfolio data remains available
+  // via individual investor detail pages (InvestorDetailDialog + /investors/[id]).
 ]
 
 export function InvestorPageTabs({
