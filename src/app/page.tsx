@@ -21,10 +21,6 @@ import {
 import {
   ChevronDown,
   ArrowRight,
-  Workflow,
-  Target,
-  LineChart,
-  Building2,
   ExternalLink,
   Check,
 } from "lucide-react"
@@ -76,33 +72,6 @@ const SPECIALISTS = [
   { name: "Fiona", role: "Fundraising", description: "Navigates the investor landscape", color: "bg-destructive", avatar: "/images/specialists/fundraising-advisor.png" },
   { name: "Harper", role: "People", description: "Builds your team and culture", color: "bg-info", avatar: "/images/specialists/hiring-team.png" },
   { name: "Leo", role: "Legal", description: "Protects your IP and contracts", color: "bg-muted-foreground", avatar: "/images/specialists/legal-counsel.png" },
-] as const
-
-const FEATURE_PILLARS = [
-  {
-    icon: Workflow,
-    title: "Engineering",
-    description: "Concept packages with BOM, DFM analysis, and manufacturing specs from a product description.",
-    link: "/join?role=founder",
-  },
-  {
-    icon: Target,
-    title: "Strategy",
-    description: "Company objectives, task execution, board packs, and red team debate — all generated from your context.",
-    link: "/join?role=founder",
-  },
-  {
-    icon: LineChart,
-    title: "Finance",
-    description: "52-week runway analysis, P&L projections, cash burn scenarios with real numbers.",
-    link: "/join?role=founder",
-  },
-  {
-    icon: Building2,
-    title: "Investors",
-    description: "7,800+ UK investors with AI matching, 49K contacts, grant discovery, and portfolio analysis.",
-    link: "/join?role=founder",
-  },
 ] as const
 
 const ARTICLES = [
@@ -168,7 +137,7 @@ const FAQS = [
 /**
  * Marketing landing page — 7-section blueprint.
  *
- * INTENT: Tells one story: Your AI team -> Meet them -> What they build ->
+ * INTENT: Tells one story: Hero -> How it works -> Meet the team ->
  * Investor intelligence -> Thought leadership -> Pricing -> FAQ.
  */
 export default function MarketingPage() {
@@ -286,18 +255,18 @@ export default function MarketingPage() {
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
+            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              How It Works
+            </a>
             <a href="#the-team" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The Team
-            </a>
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              Features
             </a>
             <a href="#investors" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Investors
             </a>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Pricing
-            </Link>
+            </a>
             <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               FAQ
             </a>
@@ -361,9 +330,10 @@ export default function MarketingPage() {
                     Start Free
                   </Link>
                   {[
+                    { href: "#how-it-works", label: "How It Works" },
                     { href: "#the-team", label: "The Team" },
-                    { href: "#features", label: "Features" },
                     { href: "#investors", label: "Investors" },
+                    { href: "#pricing", label: "Pricing" },
                     { href: "#faq", label: "FAQ" },
                   ].map((item) => (
                     <a
@@ -393,14 +363,11 @@ export default function MarketingPage() {
         {/* ═══ Section 1: Hero ═══ */}
         <HeroSection />
 
-        {/* ═══ Section 2: Meet Your Team ═══ */}
-        <MeetYourTeamSection />
-
-        {/* ═══ Section 3: What They Build For You ═══ */}
-        <FeaturePillarsSection />
-
-        {/* ═══ Section 3.5: How It Works (3 Pillars) ═══ */}
+        {/* ═══ Section 2: How It Works (3 Pillars) ═══ */}
         <HowItWorksSection />
+
+        {/* ═══ Section 3: Meet Your Team ═══ */}
+        <MeetYourTeamSection />
 
         {/* ═══ Section 4: Investor Intelligence ═══ */}
         <InvestorIntelligenceSection />
@@ -502,7 +469,7 @@ function HeroSection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * SECTION 2: MEET YOUR TEAM (13 Specialists)
+ * SECTION 3: MEET YOUR TEAM (13 Specialists)
  * ═══════════════════════════════════════════════════════════════════════ */
 
 function MeetYourTeamSection() {
@@ -558,55 +525,7 @@ function MeetYourTeamSection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * SECTION 3: WHAT THEY BUILD FOR YOU (4 Pillars)
- * ═══════════════════════════════════════════════════════════════════════ */
-
-function FeaturePillarsSection() {
-  return (
-    <section id="features" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Capabilities
-          </span>
-          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            What they build <span className="text-international-orange">for you</span>
-          </h2>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {FEATURE_PILLARS.map((pillar) => {
-            const Icon = pillar.icon
-            return (
-              <AnimatedCard key={pillar.title}>
-                <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
-                  <CardContent className="p-6 sm:p-8 flex flex-col gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-international-orange/10 flex items-center justify-center">
-                      <Icon className="h-6 w-6 text-international-orange" />
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-black text-foreground">{pillar.title}</h3>
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed flex-1">
-                      {pillar.description}
-                    </p>
-                    <Link
-                      href={pillar.link}
-                      className="text-sm text-international-orange hover:text-international-orange-hover font-semibold inline-flex items-center gap-1.5 transition-colors"
-                    >
-                      Learn more <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </CardContent>
-                </Card>
-              </AnimatedCard>
-            )
-          })}
-        </StaggerContainer>
-      </div>
-    </section>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * SECTION 3.5: HOW IT WORKS (3 Pillars)
+ * SECTION 2: HOW IT WORKS (3 Pillars)
  * ═══════════════════════════════════════════════════════════════════════ */
 
 const HOW_IT_WORKS_PILLARS = [
@@ -825,7 +744,7 @@ function FounderArticlesSection() {
 
 function PricingTeaserSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
+    <section id="pricing" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
           <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
