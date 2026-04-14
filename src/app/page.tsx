@@ -1,14 +1,9 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
-import { ProductShowcase } from "@/components/marketing/product-showcase"
-import { MeetingFlowSection } from "@/components/marketing/meeting-flow"
 import { useState, useEffect } from "react"
 import {
   motion,
-  useScroll,
-  useTransform,
   AnimatePresence,
 } from "framer-motion"
 import {
@@ -24,26 +19,11 @@ import {
 import {
   ChevronDown,
   ArrowRight,
-  Clock,
-  Banknote,
-  TrendingDown,
-  Zap,
-  Check,
-  Briefcase,
-  Brain,
-  Factory,
   Workflow,
-  Shield,
-  UserCheck,
-  DollarSign,
-  CheckCircle2,
-  Rocket,
-  GraduationCap,
+  Target,
   LineChart,
   Building2,
-  Beaker,
-  Lock,
-  Scale,
+  ExternalLink,
 } from "lucide-react"
 import { InvestorPreviewSection } from "@/components/marketing/investor-preview"
 import {
@@ -75,11 +55,118 @@ function useIsMobile(): boolean {
   return isMobile
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DATA — Specialists, Features, Articles, Pricing, FAQs
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const SPECIALISTS = [
+  { name: "Sage", role: "Strategy", description: "Aligns your vision into executable strategy", color: "bg-international-orange" },
+  { name: "Max", role: "CTO", description: "Designs your product architecture", color: "bg-info" },
+  { name: "Jian", role: "VP Engineering", description: "Turns designs into buildable systems", color: "bg-info" },
+  { name: "Fang", role: "VP Manufacturing", description: "Optimises for real-world production", color: "bg-warning" },
+  { name: "Chase", role: "VP Supply Chain", description: "Finds and manages your suppliers", color: "bg-warning" },
+  { name: "Priya", role: "Product", description: "Shapes what to build and why", color: "bg-success" },
+  { name: "Mia", role: "Marketing", description: "Positions your product in the market", color: "bg-success" },
+  { name: "Sal", role: "Sales", description: "Builds your pipeline and closes deals", color: "bg-success" },
+  { name: "Cal", role: "Chief of Staff", description: "Keeps everything and everyone aligned", color: "bg-muted-foreground" },
+  { name: "Finn", role: "Finance", description: "Models your runway and unit economics", color: "bg-destructive" },
+  { name: "Fiona", role: "Fundraising", description: "Navigates the investor landscape", color: "bg-destructive" },
+  { name: "Harper", role: "People", description: "Builds your team and culture", color: "bg-info" },
+  { name: "Leo", role: "Legal", description: "Protects your IP and contracts", color: "bg-muted-foreground" },
+] as const
+
+const FEATURE_PILLARS = [
+  {
+    icon: Workflow,
+    title: "Engineering",
+    description: "Concept packages with BOM, DFM analysis, and manufacturing specs from a product description.",
+    link: "/join?role=founder",
+  },
+  {
+    icon: Target,
+    title: "Strategy",
+    description: "Company objectives, task execution, board packs, and red team debate — all generated from your context.",
+    link: "/join?role=founder",
+  },
+  {
+    icon: LineChart,
+    title: "Finance",
+    description: "52-week runway analysis, P&L projections, cash burn scenarios with real numbers.",
+    link: "/join?role=founder",
+  },
+  {
+    icon: Building2,
+    title: "Investors",
+    description: "600+ UK VCs with AI matching, 49K contacts, grant discovery, and portfolio analysis.",
+    link: "/join?role=founder",
+  },
+] as const
+
+const ARTICLES = [
+  {
+    title: "The Eighteen-Month Trap",
+    summary: "Why hardware startups take 12\u201318 months before first revenue",
+    url: "https://www.historyfuturenow.com/articles/the-eighteen-month-trap-why-hardware-startups-are-structurally-slow",
+  },
+  {
+    title: "Hardware Needs Its AWS Moment",
+    summary: "What software learned that hardware hasn\u2019t",
+    url: "https://www.historyfuturenow.com/articles/from-basement-servers-to-billion-users-what-software-learned-that-hardware-hasnt",
+  },
+  {
+    title: "The Platform Phase of Manufacturing",
+    summary: "How shared infrastructure always wins",
+    url: "https://www.historyfuturenow.com/articles/the-arsenal-and-the-container-how-shared-infrastructure-always-wins",
+  },
+  {
+    title: "The 20x Iteration Gap",
+    summary: "Why Shenzhen teams iterate 20x faster",
+    url: "https://www.historyfuturenow.com/articles/the-fifteen-minute-factory-why-proximity-still-wins",
+  },
+] as const
+
+const PRICING_TIERS = [
+  { name: "Explorer", price: "Free", detail: "50 AI assists, basic access" },
+  { name: "Startup Team", price: "\u00a349/mo", detail: "100 assists, full marketplace" },
+  { name: "Professional", price: "\u00a3149/mo", detail: "500 assists, priority support" },
+] as const
+
+const FAQS = [
+  {
+    question: "Who owns the IP I create?",
+    answer: "You do. 100%. Fractional Forge provides the team and infrastructure, but all intellectual property, designs, prototypes, and products belong entirely to you. This is baked into our contracts.",
+  },
+  {
+    question: "How is my data protected?",
+    answer: "Designs are visible only to team members you choose. Factory partners see only what\u2019s needed to quote and manufacture. All parties sign confidentiality agreements before accessing any of your data. We use row-level security and encryption at rest to ensure your information stays private.",
+  },
+  {
+    question: "What if something goes wrong?",
+    answer: "Responsibility is clearly allocated in writing. Factory partners are responsible for manufacturing defects and spec conformance. You are responsible for your design specifications. Fractional Forge facilitates the relationship but does not guarantee manufacturing outcomes. Written terms govern every engagement.",
+  },
+  {
+    question: "How does the fractional model actually work?",
+    answer: "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. They direct AI-enabled apprentices who execute at speed, then verify the output based on decades of real-world experience. You only pay for the hours and outcomes you need.",
+  },
+  {
+    question: "How quickly can I go from idea to prototype?",
+    answer: "It depends on complexity, but the key advantage is eliminating the months of hiring, onboarding, and infrastructure setup that typically precede any actual engineering work. Because you\u2019re plugging into existing experts and factory capacity from day one, you can start building immediately.",
+  },
+  {
+    question: "How much does it cost?",
+    answer: "ForgeOS is free to start with a 14-day full-access trial. After that, plans start at \u00a349/month for startups. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+  },
+] as const
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PAGE COMPONENT
+ * ═══════════════════════════════════════════════════════════════════════ */
+
 /**
- * Marketing landing page — unified narrative arc.
+ * Marketing landing page — 7-section blueprint.
  *
- * INTENT: Tells one story: Problem -> Solution (with photos and personality
- * woven in) -> Who It's For (compact, equal) -> Trust -> FAQ -> CTA.
+ * INTENT: Tells one story: Your AI team -> Meet them -> What they build ->
+ * Investor intelligence -> Thought leadership -> Pricing -> FAQ.
  */
 export default function MarketingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -151,7 +238,7 @@ export default function MarketingPage() {
     url: "https://fractionalforge.app",
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
-      "AI-enabled manufacturing platform for hardware startups. Access expert teams, factory capacity, and AI-powered execution without owning any of it.",
+      "The AI team that runs your hardware startup. 13 specialists handle strategy, engineering, finance, investors, and manufacturing.",
     sameAs: [],
   }
 
@@ -178,7 +265,7 @@ export default function MarketingPage() {
         Skip to main content
       </a>
 
-      {/* Sticky Navigation */}
+      {/* ═══ Sticky Navigation ═══ */}
       <nav
         className={`sticky top-0 left-0 right-0 z-40 transition-all duration-300 ${
           navScrolled
@@ -196,14 +283,14 @@ export default function MarketingPage() {
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
-            <a href="#solution" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              The Solution
+            <a href="#the-team" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              The Team
             </a>
-            <a href="#the-gap" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              The Problem
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              Features
             </a>
-            <a href="#for-you" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              Who It&apos;s For
+            <a href="#investors" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              Investors
             </a>
             <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Pricing
@@ -216,10 +303,10 @@ export default function MarketingPage() {
             </a>
             <motion.div whileHover={buttonHover} whileTap={buttonTap}>
               <Link
-                href="/join"
+                href="/join?role=founder"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
-                Get Started Free
+                Start Free
               </Link>
             </motion.div>
           </div>
@@ -264,16 +351,16 @@ export default function MarketingPage() {
               >
                 <div className="px-4 sm:px-6 py-4 pb-safe flex flex-col gap-1">
                   <Link
-                    href="/join"
+                    href="/join?role=founder"
                     className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Get Started Free
+                    Start Free
                   </Link>
                   {[
-                    { href: "#solution", label: "The Solution" },
-                    { href: "#the-gap", label: "The Problem" },
-                    { href: "#for-you", label: "Who It's For" },
+                    { href: "#the-team", label: "The Team" },
+                    { href: "#features", label: "Features" },
+                    { href: "#investors", label: "Investors" },
                     { href: "#faq", label: "FAQ" },
                   ].map((item) => (
                     <a
@@ -300,18 +387,25 @@ export default function MarketingPage() {
       </nav>
 
       <main id="main-content">
+        {/* ═══ Section 1: Hero ═══ */}
         <HeroSection />
-        <HowItWorksStrip />
-        <ProductShowcase />
-        <FeaturedStorySection />
-        <MeetingFlowSection />
-        <SolutionSection />
-        <WhyNowStrip />
-        <ProblemSection />
-        <WhoItsForSection />
-        <InvestorPreviewSection />
-        <TrustStrip />
-        <FinalCTASection />
+
+        {/* ═══ Section 2: Meet Your Team ═══ */}
+        <MeetYourTeamSection />
+
+        {/* ═══ Section 3: What They Build For You ═══ */}
+        <FeaturePillarsSection />
+
+        {/* ═══ Section 4: Investor Intelligence ═══ */}
+        <InvestorIntelligenceSection />
+
+        {/* ═══ Section 5: From the Founder ═══ */}
+        <FounderArticlesSection />
+
+        {/* ═══ Section 6: Pricing Teaser ═══ */}
+        <PricingTeaserSection />
+
+        {/* ═══ Section 7: FAQ ═══ */}
         <FAQSection />
       </main>
 
@@ -326,10 +420,10 @@ export default function MarketingPage() {
             className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
           >
             <Link
-              href="/join"
+              href="/join?role=founder"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
-              Get Started Free
+              Start Free
               <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -342,141 +436,54 @@ export default function MarketingPage() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * HERO
+ * SECTION 1: HERO
  * ═══════════════════════════════════════════════════════════════════════ */
 
 function HeroSection() {
-  const isMobile = useIsMobile()
-  const { scrollY } = useScroll()
-  const parallaxY = useTransform(scrollY, [0, 500], [0, isMobile ? 0 : 150])
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [memberCount, setMemberCount] = useState<number | null>(null)
-
-  const heroImages = [
-    { src: "/images/hero-robotic-steel.png", alt: "Robotic arm 3D printing steel structure" },
-    { src: "/images/hero-titanium-printing.png", alt: "Titanium 3D printing system" },
-    { src: "/images/hero-plastic-printing.png", alt: "Advanced polymer 3D printing farm" },
-    { src: "/images/hero-injection-moulding.png", alt: "Clean injection moulding manufacturing" },
-  ]
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [heroImages.length])
-
-  useEffect(() => {
-    async function fetchStats(): Promise<void> {
-      try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000)
-        const res = await fetch("/api/marketing/stats", { signal: controller.signal })
-        clearTimeout(timeoutId)
-        if (res.ok) {
-          const data = await res.json()
-          setMemberCount(data.foundingMembers ?? null)
-        }
-      } catch {
-        // Graceful fallback
-      }
-    }
-    fetchStats()
-  }, [])
-
   return (
     <section className="relative min-h-[85vh] sm:min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background">
-      <motion.div style={{ y: parallaxY }} className="absolute inset-0 will-change-transform">
-        <AnimatePresence>
-          <motion.div
-            key={currentImageIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.3 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
-            className="absolute inset-0"
-          >
-            <Image
-              src={heroImages[currentImageIndex].src}
-              alt={heroImages[currentImageIndex].alt}
-              fill
-              className="object-cover object-center"
-              priority
-              sizes="100vw"
-            />
-          </motion.div>
-        </AnimatePresence>
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-background/60 to-background/80" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background/50 via-transparent to-background/50" />
-      </motion.div>
-
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center">
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            The Operating System for Hardware Companies
+            13 Specialists. One Platform.
           </span>
         </motion.div>
 
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15, duration: 0.4 }} className="text-xs sm:text-sm font-mono uppercase tracking-widest text-muted-foreground mb-4 sm:mb-5">
-          Plan. Engineer. Source. Manufacture. All in one workspace.
-        </motion.p>
-
-        {memberCount !== null && memberCount > 0 ? (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
-            <div className="inline-flex flex-col items-center gap-2">
-              <p className="text-sm text-muted-foreground font-mono">
-                <span className="text-2xl font-black text-international-orange">{100 - memberCount}</span>{" "}
-                of 100 founding spots left
-              </p>
-              <div className="w-36 sm:w-48 h-1.5 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
-                  transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
-                  className="h-full bg-international-orange rounded-full"
-                />
-              </div>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
-            <p className="text-sm text-muted-foreground font-mono">
-              <span className="text-2xl font-black text-international-orange">Be the first</span>{" "}founding member
-            </p>
-          </motion.div>
-        )}
-
-        <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
-          We build atoms at the{" "}
+        <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="font-playfair text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
+          The AI team that runs your{" "}
           <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
-            speed of bits.
+            hardware startup.
           </motion.span>
         </motion.h1>
 
-        {/* INTENT: Vision-first, not problem-first (Adrian's feedback + Patrick Winston's
-            "empowerment promise"). Lead with what the world looks like WITH Fractional Forge.
-            Activates Positive Emotional Attractor (PEA) — openness and willingness to act.
-            Problem-first activates Task Positive Network (TPN) → narrowed attention, risk aversion. */}
-        <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-3 sm:mb-4">
-          Imagine describing your product idea and receiving a structured concept package — material recommendations, manufacturing approach, cost estimates, and matched suppliers — in hours, not months.
+        <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
+          13 specialists handle strategy, engineering, finance, investors, and manufacturing — so you can focus on the product.
         </motion.p>
 
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Stop stitching together 7 tools. ForgeOS combines project management, AI engineering, team coordination, and supplier matching — so you can ship hardware at software speed.
-        </motion.p>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
             <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
-              <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
-                Get Started Free <ArrowRight className="h-4 w-4" />
+              <Link href="/join?role=founder" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
+                Start Free <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
-            <a href="#solution" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
+            <a href="#how-it-works" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
               See How It Works <ChevronDown className="h-4 w-4" />
             </a>
           </div>
+
+          {/* Product screenshot placeholder */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9, duration: 0.8, ease: "easeOut" }}
+            className="w-full max-w-4xl mt-4"
+          >
+            <div className="aspect-[16/9] rounded-xl border bg-muted/50 flex items-center justify-center">
+              <span className="text-sm text-muted-foreground font-mono">Product screenshot</span>
+            </div>
+          </motion.div>
         </motion.div>
       </div>
 
@@ -491,618 +498,93 @@ function HeroSection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * THE PROBLEM — Software vs Hardware mismatch
+ * SECTION 2: MEET YOUR TEAM (13 Specialists)
  * ═══════════════════════════════════════════════════════════════════════ */
 
-const PAIN_STATS = [
-  { icon: Clock, stat: "12–18 months", label: "To first prototype", detail: "Leases, equipment, hiring — all before a single part is made" },
-  { icon: Banknote, stat: "£50–100k", label: "Monthly burn rate", detail: "Salaries for staff you hired in advance, waiting for work" },
-  { icon: TrendingDown, stat: "30–40%", label: "Equity given away", detail: "Raising millions just to fund infrastructure, not innovation" },
-] as const
-
-const BRIDGE_ITEMS = [
-  { pain: "Lease a factory, buy equipment", solution: "Use cloud factories with spare capacity" },
-  { pain: "Hire full-time teams in advance", solution: "Fractional experts on demand" },
-  { pain: "18-month timelines", solution: "Start building from day one" },
-  { pain: "Raise millions before building", solution: "Start lean. Keep your equity." },
-] as const
-
-function ProblemSection() {
+function MeetYourTeamSection() {
   return (
-    <section id="the-gap" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">The Old Way</span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            This Is What We&apos;re <span className="text-international-orange">Replacing.</span>
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
-            Hardware companies have always had to lease premises, buy equipment, and hire full teams before building the first prototype. By the time your physical infrastructure catches up, your ideas have moved on.
-          </p>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
-          {PAIN_STATS.map((item) => {
-            const Icon = item.icon
-            return (
-              <AnimatedCard key={item.label} className="text-center p-4 sm:p-6 rounded-xl border bg-card">
-                <div className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-destructive/10 mb-3">
-                  <Icon className="h-5 w-5 text-destructive" />
-                </div>
-                <p className="text-lg sm:text-2xl md:text-3xl font-black text-destructive mb-1">{item.stat}</p>
-                <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-muted-foreground mb-1">{item.label}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
-              </AnimatedCard>
-            )
-          })}
-        </StaggerContainer>
-
-        <AnimatedSection>
-          <div className="relative border-2 border-international-orange rounded-xl overflow-hidden bg-card">
-            <div className="bg-international-orange/5 px-5 sm:px-8 py-5 sm:py-6 text-center border-b border-international-orange/20">
-              <div className="inline-flex items-center gap-2 mb-2">
-                <Zap className="h-5 w-5 text-international-orange" />
-                <span className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange">The Fractional Forge Way</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-foreground leading-tight">
-                Move as Fast as <span className="text-international-orange">Your Ideas.</span>
-              </h3>
-            </div>
-            <div className="p-5 sm:p-8">
-              <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mb-6 sm:mb-8">
-                {BRIDGE_ITEMS.map((item) => (
-                  <AnimatedCard key={item.pain} className="rounded-lg border bg-muted/30 p-4 flex flex-col">
-                    <p className="text-xs text-destructive line-through mb-2">{item.pain}</p>
-                    <p className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <Check className="h-4 w-4 text-status-success flex-shrink-0" />
-                      {item.solution}
-                    </p>
-                  </AnimatedCard>
-                ))}
-              </StaggerContainer>
-              <div className="text-center">
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
-                  <a href="#solution" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-                    See How We Solve It <ArrowRight className="h-4 w-4" />
-                  </a>
-                </motion.div>
-              </div>
-            </div>
-          </div>
-        </AnimatedSection>
-      </div>
-    </section>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * WHY NOW — Evidence strip backing the supply-side thesis
- * ═══════════════════════════════════════════════════════════════════════ */
-
-const WHY_NOW_STATS = [
-  { value: "72%", label: "Average UK manufacturing capacity utilisation", source: "ONS, 2024" },
-  { value: "140,000+", label: "SME manufacturers in the UK alone", source: "Make UK" },
-  { value: "28%", label: "Of UK factory capacity sits idle on average", source: "ONS capacity utilisation survey" },
-] as const
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * FEATURED STORY — Case study highlight card
- *
- * INTENT: Social proof via a concrete case study showing speed + cost
- * advantage. Links to full case study page for detail.
- * ═══════════════════════════════════════════════════════════════════════ */
-
-function FeaturedStorySection() {
-  const stats = [
-    {
-      label: "Time to Engineering Package",
-      traditional: "4-8 weeks",
-      forgeos: "3 hours",
-    },
-    {
-      label: "Cost",
-      traditional: "$5K-$15K",
-      forgeos: "$49/mo",
-    },
-    {
-      label: "Suppliers Matched",
-      traditional: "Manual outreach",
-      forgeos: "47 matched instantly",
-    },
-  ]
-
-  return (
-    <section className="py-12 sm:py-16 md:py-24 border-t border-muted scroll-mt-20">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12">
-          <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4">
-            See It In Action
-          </h2>
-          <p className="text-2xl sm:text-3xl md:text-4xl font-black mb-4 leading-tight">
-            From Product Idea to Engineering Package{" "}
-            <span className="text-international-orange">in 3 Hours.</span>
-          </p>
-          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
-            A solar-powered IoT irrigation system for smallholder farms in East
-            Africa — from concept to manufacturing-ready specs using the CAD Lab.
-          </p>
-        </AnimatedSection>
-
-        <AnimatedCard>
-          <Card className="overflow-hidden hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all">
-            <CardContent className="p-0">
-              {/* Stat comparison strip */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-                {stats.map((stat) => (
-                  <div key={stat.label} className="p-5 sm:p-6 text-center">
-                    <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
-                      {stat.label}
-                    </p>
-                    <p className="text-xs sm:text-sm text-muted-foreground line-through mb-1">
-                      {stat.traditional}
-                    </p>
-                    <p className="text-xl sm:text-2xl font-black text-international-orange">
-                      {stat.forgeos}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              {/* What was delivered */}
-              <div className="border-t border-border px-5 sm:px-8 py-6 sm:py-8 space-y-4">
-                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                  What ForgeOS Delivered
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    "Complete product architecture with modular design",
-                    "Bill of materials with cost modelling at 3 volume tiers",
-                    "DFM analysis optimised for local assembly",
-                    "Competitive benchmarking against 3 market players",
-                    "Full certification roadmap (CE, IP65, FCC)",
-                    "47 UK suppliers matched and RFQ-ready",
-                  ].map((item) => (
-                    <div
-                      key={item}
-                      className="flex items-start gap-2.5"
-                    >
-                      <CheckCircle2 className="h-4 w-4 text-international-orange mt-0.5 shrink-0" />
-                      <p className="text-sm text-foreground leading-snug">
-                        {item}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Result callout + CTA */}
-              <div className="border-t border-border bg-international-orange/5 px-5 sm:px-8 py-5 sm:py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
-                  <span className="text-foreground font-semibold">
-                    The result:
-                  </span>{" "}
-                  The founder used this engineering package to secure a{" "}
-                  <span className="text-foreground font-semibold">
-                    $150,000 grant
-                  </span>{" "}
-                  from Innovate UK&apos;s Smart Grant programme.
-                </p>
-                <Link
-                  href="/case-study"
-                  className="inline-flex items-center gap-2 text-international-orange hover:text-international-orange-hover text-sm font-semibold transition-colors shrink-0"
-                >
-                  Read the full case study
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-      </div>
-    </section>
-  )
-}
-
-function WhyNowStrip() {
-  return (
-    <section className="py-8 sm:py-12 bg-international-orange/5 border-y border-international-orange/10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-6 sm:mb-8">
-          <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest mb-2">Why Now</h2>
-          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
-            Factories already have the capacity. They just need the work. We connect companies who need manufacturing with suppliers who have machines sitting idle.
-          </p>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-          {WHY_NOW_STATS.map((stat) => (
-            <AnimatedCard key={stat.label} className="text-center p-4 sm:p-5 rounded-xl border bg-card">
-              <p className="text-2xl sm:text-3xl font-black text-international-orange mb-1">{stat.value}</p>
-              <p className="text-xs sm:text-sm text-foreground font-medium mb-1">{stat.label}</p>
-              <p className="text-[10px] text-muted-foreground font-mono">{stat.source}</p>
-            </AnimatedCard>
-          ))}
-        </StaggerContainer>
-      </div>
-    </section>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * HOW IT WORKS — 3-step process walkthrough
- * ═══════════════════════════════════════════════════════════════════════ */
-
-function HowItWorksStrip() {
-  const steps = [
-    { number: "1", title: "Describe Your Product", detail: "Tell us what you want to build. Upload CAD files, sketches, or just describe your idea in plain English." },
-    { number: "2", title: "Get Your Concept Package", detail: "Receive a structured concept package — material recommendations, manufacturing feasibility analysis, preliminary cost estimates, and a bill of materials — grounded in 220+ ISO/DIN/BS standards and real supplier data." },
-    { number: "3", title: "Match With Manufacturers", detail: "Our 6-factor matching algorithm scores UK suppliers on capability, process, material, quality, and relevance — then generates RFQ packs ready to send." },
-  ]
-
-  return (
-    <section className="py-12 sm:py-16 md:py-24 border-t border-muted scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12">
-          <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4">How It Works</h2>
-          <p className="text-2xl sm:text-3xl md:text-4xl font-black mb-4 leading-tight">
-            Three Steps to <span className="text-international-orange">Manufactured Parts.</span>
-          </p>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
-          {steps.map((step) => (
-            <AnimatedCard key={step.number} className="text-center">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-white text-xl font-black mb-4">
-                {step.number}
-              </div>
-              <h3 className="text-base sm:text-lg font-black text-foreground mb-2">{step.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{step.detail}</p>
-            </AnimatedCard>
-          ))}
-        </StaggerContainer>
-      </div>
-    </section>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * THE SOLUTION — Unified pillars with photos and founder voice
- *
- * DECISION: Each pillar has an image, a headline, and a founder-voice quote —
- * telling the story once with personality rather than abstract cards.
- * ═══════════════════════════════════════════════════════════════════════ */
-
-const SOLUTION_PILLARS = [
-  {
-    icon: Briefcase,
-    label: "Fractional Experts",
-    headline: "Senior Expertise, On Demand",
-    image: "/images/marketing/role-executive.png",
-    imageAlt: "Experienced engineering executive",
-    quote: "Don't burn seed capital on a standing army. Launch with a fractional team — seasoned engineers, marketers, and operators with decades of experience. No full-time hires, no six-figure salaries before your first prototype.",
-    highlights: [
-      "Manufacturing, design, supply chain, and commercial specialists",
-      "Downloadable engineering reports in PPTX, Word, and PDF",
-      "Cost estimation with parts-level breakdown and buy/make classification",
-    ],
-  },
-  {
-    icon: Brain,
-    label: "AI-Enabled Execution",
-    headline: "AI Speed. Human Judgement.",
-    image: "/images/marketing/role-apprentice.png",
-    imageAlt: "Young engineers working with AI tools",
-    quote: "Ambitious apprentices — digital natives fresh from university — execute tasks using AI tools at remarkable speed. Senior experts review and verify every output. You aren't hiring juniors. You're deploying Founders-in-Training.",
-    highlights: [
-      "13 specialists with engineering calculation tools",
-      "4-stage design review: manufacturability, engineering, integration, supply chain",
-      "Every output grounded in 220+ design standards and real supplier data",
-    ],
-  },
-  {
-    icon: Factory,
-    label: "Cloud Manufacturing",
-    headline: "Factories Without the Factory",
-    image: "/images/marketing/factory-partner.png",
-    imageAlt: "Factory floor with manufacturing equipment",
-    quote: "Across the UK, factories have spare capacity waiting to be filled. We identify the right facilities, generate automated RFQ packs, and get your products built — without you leasing a single square metre.",
-    highlights: [
-      "9,900+ UK manufacturers and suppliers on the marketplace",
-      "Automated RFQ packs with engineering specs, materials, and tolerances",
-      "6-factor supplier matching: capability, process, material, quality, and more",
-    ],
-  },
-] as const
-
-function SolutionSection() {
-  return (
-    <section id="solution" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            The Cloud Factory Ecosystem
-          </span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            You Wouldn&apos;t Build Server Racks
-            <br className="hidden sm:block" />{" "}to Launch an App.{" "}
-            <br className="hidden sm:block" />
-            <span className="text-international-orange">So Why Build a Factory?</span>
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Modern software companies use AWS instead of buying servers.
-            Fractional Forge gives hardware companies the same model —
-            expert teams, AI-enabled execution, and manufacturing capacity, all on demand.
-          </p>
-        </AnimatedSection>
-
-        <StaggerContainer className="space-y-6 sm:space-y-8 md:space-y-12 mb-10 sm:mb-12 md:mb-16">
-          {SOLUTION_PILLARS.map((pillar, index) => {
-            const Icon = pillar.icon
-            const isEven = index % 2 === 1
-            return (
-              <AnimatedCard
-                key={pillar.label}
-                className="border bg-card rounded-xl overflow-hidden"
-              >
-                <div className={`grid grid-cols-1 lg:grid-cols-2 ${isEven ? "lg:direction-rtl" : ""}`}>
-                  {/* Image */}
-                  <div className={`relative h-64 sm:h-72 lg:h-auto lg:min-h-[360px] ${isEven ? "lg:order-2" : ""}`}>
-                    <Image
-                      src={pillar.image}
-                      alt={pillar.imageAlt}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 1024px) 100vw, 50vw"
-                    />
-                  </div>
-
-                  {/* Content */}
-                  <div className={`p-6 sm:p-8 md:p-10 flex flex-col justify-center ${isEven ? "lg:order-1" : ""}`}>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-international-orange/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-international-orange" />
-                      </div>
-                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange">
-                        {pillar.label}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl sm:text-2xl md:text-3xl font-black mb-4 text-foreground leading-tight">
-                      {pillar.headline}
-                    </h3>
-
-                    <p className="text-muted-foreground text-sm sm:text-base leading-relaxed mb-6 italic">
-                      &ldquo;{pillar.quote}&rdquo;
-                    </p>
-
-                    <ul className="space-y-2.5">
-                      {pillar.highlights.map((highlight) => (
-                        <li key={highlight} className="flex items-start gap-2.5 text-sm text-muted-foreground">
-                          <div className="mt-1 h-1.5 w-1.5 rounded-full bg-international-orange flex-shrink-0" />
-                          {highlight}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </AnimatedCard>
-            )
-          })}
-        </StaggerContainer>
-
-        {/* ForgeOS coordinator strip */}
-        <AnimatedSection>
-          <div className="relative border-2 border-international-orange rounded-xl overflow-hidden bg-card">
-            <div className="bg-international-orange/5 px-5 sm:px-8 py-5 sm:py-6 text-center border-b border-international-orange/20">
-              <div className="inline-flex items-center gap-2 mb-2">
-                <Workflow className="h-5 w-5 text-international-orange" />
-                <span className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange">
-                  Powered by ForgeOS
-                </span>
-              </div>
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-foreground leading-tight">
-                One Operating System. <span className="text-international-orange">Everything Coordinated.</span>
-              </h3>
-            </div>
-            <div className="p-5 sm:p-8">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-center">
-                {[
-                  { stat: "Objectives & Tasks", description: "Everyone knows what they're doing and where the blockages are" },
-                  { stat: "Guided Manufacturing", description: "Understand the systems required to make your product before you commit" },
-                  { stat: "Automated RFQs", description: "Full request-for-quote packs sent to factories that match your needs" },
-                ].map((item) => (
-                  <div key={item.stat} className="p-3 sm:p-4">
-                    <p className="text-sm sm:text-base font-bold text-foreground mb-1">{item.stat}</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{item.description}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 sm:mt-8 text-center">
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
-                  <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-                    Get Started Free <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </motion.div>
-              </div>
-            </div>
-          </div>
-        </AnimatedSection>
-      </div>
-    </section>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * WHO IT'S FOR — Compact grid, all audiences equal
- * ═══════════════════════════════════════════════════════════════════════ */
-
-const AUDIENCES = [
-  {
-    icon: Rocket,
-    role: "I need to get a product manufactured",
-    value: "Startups & product companies",
-    description: "Go from idea to manufacturing-ready concept without leasing a factory or hiring a full engineering team. AI builds your concept package; vetted suppliers handle production.",
-    cta: "Start Building",
-    href: "/join?role=founder",
-  },
-  {
-    icon: Building2,
-    role: "I have spare factory capacity",
-    value: "Manufacturers & job shops",
-    description: "List your available capacity on the marketplace. We send you qualified RFQs from startups ready to manufacture — with structured concept packages and material recommendations.",
-    cta: "List Your Capacity",
-    href: "/join?role=executive",
-  },
-  {
-    icon: Briefcase,
-    role: "I have engineering expertise to offer",
-    value: "Fractional executives & specialists",
-    description: "Join as a fractional expert to accelerate deep-tech startups. Share your manufacturing, design, or supply chain knowledge — on your schedule.",
-    cta: "Join as Expert",
-    href: "/join?role=executive",
-  },
-  {
-    icon: LineChart,
-    role: "I invest in hardware startups",
-    value: "VCs & accelerators",
-    description: "Compressed validation cycles mean portfolio companies can validate cheaper, kill failures faster, and get to market with less capital.",
-    cta: "Partner With Us",
-    href: "/join",
-  },
-  {
-    icon: GraduationCap,
-    role: "I want to learn hardware",
-    value: "Apprentices & graduates",
-    description: "Pair with a seasoned executive, learn modern engineering workflows, and build real products — not just prototypes.",
-    cta: "Start Apprenticeship",
-    href: "/join?role=apprentice",
-  },
-  {
-    icon: Beaker,
-    role: "I want to commercialise research",
-    value: "Universities & research labs",
-    description: "Turn IP-rich research into venture-backed products. Your researchers get access to manufacturing infrastructure without leaving the lab.",
-    cta: "Partner",
-    href: "/join",
-  },
-] as const
-
-function WhoItsForSection() {
-  return (
-    <section id="for-you" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
+    <section id="the-team" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Find Your Role
+            Your Leadership Team
           </span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            What Do You <span className="text-international-orange">Need?</span>
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            Meet Your <span className="text-international-orange">Team</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Startups needing manufacturing. Factories with spare capacity. Experts wanting to help. Each side of the marketplace makes the other stronger.
+            13 specialists who already know your business.
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {AUDIENCES.map((audience) => {
-            const Icon = audience.icon
-            return (
-              <AnimatedCard key={audience.role} className="border bg-card rounded-xl p-5 sm:p-6 flex flex-col">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-10 w-10 rounded-lg bg-international-orange/10 flex items-center justify-center flex-shrink-0">
-                    <Icon className="h-5 w-5 text-international-orange" />
+        <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-10 sm:mb-12">
+          {SPECIALISTS.map((specialist) => (
+            <AnimatedCard key={specialist.name}>
+              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
+                <CardContent className="p-4 sm:p-5 flex flex-col items-center text-center gap-3">
+                  <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full ${specialist.color} flex items-center justify-center text-white text-sm sm:text-base font-bold`}>
+                    {specialist.name.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-foreground uppercase tracking-wide">{audience.role}</h3>
-                    <p className="text-xs text-international-orange font-mono">{audience.value}</p>
+                    <p className="text-sm sm:text-base font-bold text-foreground">{specialist.name}</p>
+                    <p className="text-xs text-international-orange font-mono uppercase tracking-wider">{specialist.role}</p>
                   </div>
-                </div>
-
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">
-                  {audience.description}
-                </p>
-
-                <Link
-                  href={audience.href}
-                  className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange hover:text-international-orange-hover transition-colors inline-flex items-center gap-1.5"
-                >
-                  {audience.cta} <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </AnimatedCard>
-            )
-          })}
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{specialist.description}</p>
+                </CardContent>
+              </Card>
+            </AnimatedCard>
+          ))}
         </StaggerContainer>
+
+        <AnimatedSection className="text-center">
+          <p className="text-sm sm:text-base md:text-lg text-muted-foreground italic max-w-3xl mx-auto leading-relaxed">
+            &ldquo;They collaborate. They challenge each other. They produce work you&apos;d expect from a senior leadership team.&rdquo;
+          </p>
+        </AnimatedSection>
       </div>
     </section>
   )
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * TRUST STRIP
+ * SECTION 3: WHAT THEY BUILD FOR YOU (4 Pillars)
  * ═══════════════════════════════════════════════════════════════════════ */
 
-const TRUST_CARDS = [
-  {
-    icon: Shield,
-    title: "Your IP Stays Yours",
-    description:
-      "Every design, prototype, and product you create belongs entirely to you. Contractually guaranteed.",
-    link: { href: "/terms#ip", label: "Learn more" },
-  },
-  {
-    icon: Lock,
-    title: "Confidentiality Built In",
-    description:
-      "Designs visible only to team members you choose. Factory partners see only what\u2019s needed to quote and manufacture. All parties sign confidentiality agreements.",
-    link: null,
-  },
-  {
-    icon: Scale,
-    title: "Clear Risk Allocation",
-    description:
-      "Manufacturing defects are the factory\u2019s responsibility. Design intent is yours. Written terms for every engagement.",
-    link: { href: "/terms#risk", label: "Learn more" },
-  },
-] as const
-
-function TrustStrip() {
+function FeaturePillarsSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-24 bg-background border-t border-muted">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12">
-          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 block">
-            Protection &amp; Trust
+    <section id="features" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            Capabilities
           </span>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black">
-            How We Protect You
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            What they build <span className="text-international-orange">for you</span>
           </h2>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TRUST_CARDS.map((card) => {
-            const Icon = card.icon
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          {FEATURE_PILLARS.map((pillar) => {
+            const Icon = pillar.icon
             return (
-              <AnimatedCard key={card.title}>
-                <div className="bg-card border rounded-xl p-6 sm:p-8 h-full flex flex-col">
-                  <div className="w-12 h-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-5">
-                    <Icon className="h-6 w-6 text-international-orange" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    {card.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-                    {card.description}
-                  </p>
-                  {card.link && (
+              <AnimatedCard key={pillar.title}>
+                <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
+                  <CardContent className="p-6 sm:p-8 flex flex-col gap-4">
+                    <div className="h-12 w-12 rounded-lg bg-international-orange/10 flex items-center justify-center">
+                      <Icon className="h-6 w-6 text-international-orange" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-black text-foreground">{pillar.title}</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed flex-1">
+                      {pillar.description}
+                    </p>
                     <Link
-                      href={card.link.href}
-                      className="text-sm text-international-orange hover:underline mt-4 inline-flex items-center gap-1"
+                      href={pillar.link}
+                      className="text-sm text-international-orange hover:text-international-orange-hover font-semibold inline-flex items-center gap-1.5 transition-colors"
                     >
-                      {card.link.label}
-                      <ArrowRight className="h-3 w-3" />
+                      Learn more <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
-                  )}
-                </div>
+                  </CardContent>
+                </Card>
               </AnimatedCard>
             )
           })}
@@ -1113,23 +595,50 @@ function TrustStrip() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * FINAL CTA
+ * SECTION 4: INVESTOR INTELLIGENCE
  * ═══════════════════════════════════════════════════════════════════════ */
 
-function FinalCTASection() {
+function InvestorIntelligenceSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-24 bg-muted/30 border-t border-muted">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
-        <AnimatedSection>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Move as Fast as <span className="text-international-orange">Your Ideas.</span>
+    <section id="investors" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            Investor Intelligence
+          </span>
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            Find the investors who actually{" "}
+            <span className="text-international-orange">fund hardware</span>
           </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed mb-6 sm:mb-8">
-            Stop burning cash on infrastructure you don&apos;t need. Join the founders, experts, and factories building hardware at software speed.
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
+            Search 600+ UK venture capital and private equity firms. AI-powered matching scores how well each investor fits your stage, sector, and geography.
           </p>
+        </AnimatedSection>
+
+        {/* Stats row */}
+        <StaggerContainer className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
+          {[
+            { value: "600+", label: "Firms" },
+            { value: "49,000+", label: "Contacts" },
+            { value: "92,000+", label: "Portfolio Companies" },
+            { value: "3,000+", label: "Grants" },
+          ].map((stat) => (
+            <AnimatedCard key={stat.label}>
+              <div className="text-center p-4 sm:p-6 rounded-xl border bg-card">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">{stat.value}</p>
+                <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+              </div>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+
+        {/* Interactive investor search preview */}
+        <InvestorPreviewSection />
+
+        <AnimatedSection className="text-center mt-10 sm:mt-12">
           <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
-            <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-10 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-              Get Started Free <ArrowRight className="h-4 w-4" />
+            <Link href="/join?role=founder" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+              Explore Investors <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
         </AnimatedSection>
@@ -1139,49 +648,112 @@ function FinalCTASection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * FAQ
+ * SECTION 5: FROM THE FOUNDER (Blog / Thought Leadership)
  * ═══════════════════════════════════════════════════════════════════════ */
 
-const FAQS = [
-  {
-    question: "What is a Cloud Factory?",
-    answer: "Think of it like AWS for manufacturing. Just as modern software companies use cloud compute instead of building their own server racks, Fractional Forge lets you build hardware products using existing factory capacity, expert teams, and AI-enabled execution — without owning any of it. You get the same results, at a fraction of the cost and time.",
-  },
-  {
-    question: "Who owns the IP I create on the platform?",
-    answer: "You do. 100%. Fractional Forge provides the team and infrastructure, but all intellectual property, designs, prototypes, and products belong entirely to you. This is baked into our contracts.",
-  },
-  {
-    question: "How does the fractional model actually work?",
-    answer: "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. They direct AI-enabled apprentices who execute at speed, then verify the output based on decades of real-world experience. You only pay for the hours and outcomes you need.",
-  },
-  {
-    question: "How quickly can I go from idea to prototype?",
-    answer: "It depends on complexity, but the key advantage is eliminating the months of hiring, onboarding, and infrastructure setup that typically precede any actual engineering work. Because you're plugging into existing experts and factory capacity from day one, you can start building immediately instead of spending months assembling the team first.",
-  },
-  {
-    question: "How much does it cost?",
-    answer: "ForgeOS is free to start with a 14-day full-access trial. After that, plans start at £49/month for startups. All new accounts get 0% marketplace fees on their first 3 orders. No equity required — check our pricing page for full details.",
-  },
-  {
-    question: "Can factory partners steal my idea?",
-    answer: "No. All factory partners are bound by confidentiality agreements before they see any of your data. They only receive the manufacturing specifications needed to quote and produce — never your full designs, strategy, or broader project context. You control exactly what each collaborator sees.",
-  },
-  {
-    question: "Who is liable if something goes wrong?",
-    answer: "Responsibility is clearly allocated in writing. Factory partners are responsible for manufacturing defects and spec conformance. You are responsible for your design specifications. Fractional Forge facilitates the relationship but does not guarantee manufacturing outcomes. Written terms govern every engagement.",
-  },
-] as const
+function FounderArticlesSection() {
+  return (
+    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            Thought Leadership
+          </span>
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            From the <span className="text-international-orange">Founder</span>
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Understanding why hardware is hard — and what to do about it.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {ARTICLES.map((article) => (
+            <AnimatedCard key={article.title}>
+              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
+                <CardContent className="p-5 sm:p-6 flex flex-col gap-3 h-full">
+                  <h3 className="text-base sm:text-lg font-bold text-foreground leading-snug">{article.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{article.summary}</p>
+                  <a
+                    href={article.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-international-orange hover:text-international-orange-hover font-semibold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    Read on History Future Now <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </CardContent>
+              </Card>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SECTION 6: PRICING TEASER
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function PricingTeaserSection() {
+  return (
+    <section className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            Start free. Scale <span className="text-international-orange">when ready.</span>
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed">
+            14-day full-access trial. No credit card required.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-10 sm:mb-12">
+          {PRICING_TIERS.map((tier) => (
+            <AnimatedCard key={tier.name}>
+              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
+                <CardContent className="p-6 sm:p-8 text-center flex flex-col gap-3">
+                  <p className="text-xs font-mono uppercase tracking-widest text-international-orange">{tier.name}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-foreground">{tier.price}</p>
+                  <p className="text-sm text-muted-foreground">{tier.detail}</p>
+                </CardContent>
+              </Card>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+
+        <AnimatedSection className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+            <Link href="/join?role=founder" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+              Start Free Trial <ArrowRight className="h-4 w-4" />
+            </Link>
+          </motion.div>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
+          >
+            See Full Pricing <ArrowRight className="h-4 w-4" />
+          </Link>
+        </AnimatedSection>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SECTION 7: FAQ
+ * ═══════════════════════════════════════════════════════════════════════ */
 
 function FAQSection() {
   return (
     <section id="faq" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
-          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Questions &amp; Answers
           </span>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-4 sm:mb-6">
+          <h2 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-black mb-4 sm:mb-6">
             Frequently Asked Questions
           </h2>
         </AnimatedSection>
