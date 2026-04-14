@@ -404,18 +404,39 @@ export async function searchInvestors(
       // retrieves every investor. Applying 0.5 at the pgvector level clipped
       // 99% of real candidates. match_count=500 caps the candidate pool to
       // the 500 most-similar rows; UI shows top 50.
-      const { data: semanticData, error: semanticError } = await supabase.rpc(
-        'match_marketplace_listings_v2',
-        {
-          query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
-          filter_category: 'Finance',
-          match_threshold: 0.0,
-          match_count: 10000, // seq scan — return every embedded firm, dashboard parity
-        }
+      // GOTCHA: Supabase PostgREST caps every response body at 1000 rows
+      // (project-level db_max_rows setting, not accessible via SQL). To match
+      // the Forge Capital Dashboard's 5,961 matches we paginate the RPC:
+      // 6 parallel calls of 1000 each, covers the ~5,565 embedded Finance
+      // rows. Seq scan is ~50ms per call so parallel latency is acceptable.
+      const PAGE = 1000
+      const PAGES = 6 // 6 × 1000 = 6000, safely covers current 5,565 rows
+      const embJson = JSON.stringify(queryEmbedding) as unknown as string
+      const pageResults = await Promise.all(
+        Array.from({ length: PAGES }, (_, i) =>
+          supabase.rpc('match_marketplace_listings_v2', {
+            query_embedding: embJson,
+            filter_category: 'Finance',
+            match_threshold: 0.0,
+            match_count: PAGE,
+            p_offset: i * PAGE,
+          }),
+        ),
       )
-
-      if (semanticError) throw semanticError
-
+      const firstError = pageResults.find(r => r.error)?.error
+      if (firstError) throw firstError
+      // Concatenate + dedupe by id (overlaps shouldn't happen with LIMIT/OFFSET
+      // but guard anyway).
+      const seen = new Set<string>()
+      const semanticData: Array<Record<string, unknown>> = []
+      for (const r of pageResults) {
+        for (const row of (r.data ?? []) as Array<Record<string, unknown>>) {
+          const id = String(row.id)
+          if (seen.has(id)) continue
+          seen.add(id)
+          semanticData.push(row)
+        }
+      }
       if (!semanticData || semanticData.length === 0) {
         return { firms: [], total: 0, hasMore: false }
       }
