@@ -26,9 +26,7 @@ import {
   LineChart,
   Building2,
   ExternalLink,
-  Brain,
-  Zap,
-  Factory,
+  Check,
 } from "lucide-react"
 import { InvestorPreviewSection } from "@/components/marketing/investor-preview"
 import {
@@ -243,7 +241,7 @@ export default function MarketingPage() {
     url: "https://fractionalforge.app",
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
-      "The AI team that runs your hardware startup. 13 specialists support you across strategy, engineering, finance, investors, and manufacturing.",
+      "The Operating System for Hardware Startups. Expert knowledge, smart tools, and manufacturing connections — everything you need to build hardware, in one platform.",
     sameAs: [],
   }
 
@@ -454,19 +452,19 @@ function HeroSection() {
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            13 Specialists. One Platform.
+            Everything You Need to Build Hardware.
           </span>
         </motion.div>
 
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="font-playfair text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
-          The AI team that runs your{" "}
+          The Operating System for{" "}
           <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
-            hardware startup.
+            Hardware Startups.
           </motion.span>
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          13 specialists support you across strategy, engineering, finance, investors, and manufacturing — so you can focus on the product.
+          Expert knowledge, smart tools, and manufacturing connections — everything you need to build hardware, in one platform.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -513,13 +511,13 @@ function MeetYourTeamSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Your Leadership Team
+            Your Specialist Team
           </span>
           <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             Meet Your <span className="text-international-orange">Team</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            13 specialists who already know your business.
+            Domain specialists across engineering, strategy, finance, and more — ready when you need them.
           </p>
         </AnimatedSection>
 
@@ -613,22 +611,40 @@ function FeaturePillarsSection() {
 
 const HOW_IT_WORKS_PILLARS = [
   {
-    icon: Brain,
+    label: "Fractional Expertise",
     title: "Expert Knowledge, On Demand",
-    description:
-      "Access deep expertise in manufacturing, engineering, supply chain, finance, and legal — without full-time hires or six-figure salaries.",
+    image: "/images/marketing/role-executive.png",
+    imageAlt: "Experienced executive reviewing engineering plans",
+    body: "Don\u2019t burn seed capital on a standing army. Launch with a fractional team \u2014 seasoned engineers, marketers, and operators with decades of experience. No full-time hires, no six-figure salaries before your first prototype.",
+    highlights: [
+      "Manufacturing, design, supply chain, and commercial specialists",
+      "Downloadable engineering reports in PPTX, Word, and PDF",
+      "Cost estimation with parts-level breakdown",
+    ],
   },
   {
-    icon: Zap,
-    title: "AI-Powered Execution",
-    description:
-      "Every specialist draws on 220+ engineering standards, real supplier data, and your company context to produce actionable deliverables.",
+    label: "Smart Tools",
+    title: "Smart Tools. Human Judgement.",
+    image: "/images/marketing/role-apprentice.png",
+    imageAlt: "Young engineers collaborating on product design",
+    body: "13 domain specialists help you think through every decision \u2014 from product architecture to fundraising strategy. They draw on 220+ engineering standards and real supplier data. You make the calls.",
+    highlights: [
+      "Strategy, engineering, finance, legal, and 9 more domains",
+      "Every recommendation grounded in real data and standards",
+      "Your context, your decisions \u2014 amplified",
+    ],
   },
   {
-    icon: Factory,
-    title: "Connected to Real Suppliers",
-    description:
-      "13,700+ UK manufacturers indexed with capabilities, certifications, and capacity. Generate RFQ packs and get quotes directly.",
+    label: "Cloud Factory",
+    title: "Factories Without the Factory",
+    image: "/images/marketing/factory-partner.png",
+    imageAlt: "Factory floor with manufacturing equipment",
+    body: "Across the UK, factories have spare capacity waiting to be filled. We connect you with the right facilities, generate RFQ packs, and help get your products built \u2014 without leasing a single square metre.",
+    highlights: [
+      "13,700+ UK manufacturers and suppliers indexed",
+      "Automated RFQ packs with engineering specs and tolerances",
+      "6-factor supplier matching: capability, quality, location, and more",
+    ],
   },
 ] as const
 
@@ -648,28 +664,66 @@ function HowItWorksSection() {
           </h2>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-          {HOW_IT_WORKS_PILLARS.map((pillar) => {
-            const Icon = pillar.icon
+        <div className="flex flex-col gap-6 sm:gap-8">
+          {HOW_IT_WORKS_PILLARS.map((pillar, index) => {
+            const imageFirst = index % 2 === 0
             return (
               <AnimatedCard key={pillar.title}>
-                <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
-                  <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center gap-4">
-                    <div className="h-14 w-14 rounded-full bg-international-orange/10 flex items-center justify-center">
-                      <Icon className="h-7 w-7 text-international-orange" />
+                <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all overflow-hidden">
+                  <div
+                    className={`grid grid-cols-1 lg:grid-cols-2 ${
+                      imageFirst ? "" : "lg:direction-rtl"
+                    }`}
+                  >
+                    {/* Image side */}
+                    <div
+                      className={`relative min-h-[280px] sm:min-h-[320px] lg:min-h-[360px] bg-muted ${
+                        imageFirst ? "" : "lg:order-2"
+                      }`}
+                    >
+                      <Image
+                        src={pillar.image}
+                        alt={pillar.imageAlt}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                      />
                     </div>
-                    <h3 className="text-lg sm:text-xl font-black text-foreground">
-                      {pillar.title}
-                    </h3>
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                      {pillar.description}
-                    </p>
-                  </CardContent>
+
+                    {/* Text side */}
+                    <CardContent
+                      className={`p-6 sm:p-8 lg:p-10 flex flex-col justify-center gap-4 sm:gap-5 ${
+                        imageFirst ? "" : "lg:order-1"
+                      }`}
+                      style={{ direction: "ltr" }}
+                    >
+                      <span className="inline-flex self-start px-3 py-1 text-xs font-mono uppercase tracking-widest text-international-orange bg-international-orange/10 rounded-full">
+                        {pillar.label}
+                      </span>
+                      <h3 className="font-playfair text-xl sm:text-2xl lg:text-3xl font-black text-foreground leading-tight">
+                        {pillar.title}
+                      </h3>
+                      <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                        {pillar.body}
+                      </p>
+                      <ul className="flex flex-col gap-2.5 mt-1">
+                        {pillar.highlights.map((highlight) => (
+                          <li
+                            key={highlight}
+                            className="flex items-start gap-2.5 text-sm text-foreground"
+                          >
+                            <Check className="h-4 w-4 mt-0.5 shrink-0 text-international-orange" />
+                            <span>{highlight}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </div>
                 </Card>
               </AnimatedCard>
             )
           })}
-        </StaggerContainer>
+        </div>
       </div>
     </section>
   )
