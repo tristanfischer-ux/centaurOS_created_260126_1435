@@ -53,6 +53,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card"
 
 const APP_DOMAIN =
   process.env.NEXT_PUBLIC_APP_DOMAIN || "https://fractionalforge.app"
@@ -126,8 +130,47 @@ export default function MarketingPage() {
     }
   }, [])
 
+  // SEO structured data — FAQPage + Organization (JSON-LD)
+  const faqStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQS.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.answer,
+      },
+    })),
+  }
+
+  const organizationStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Fractional Forge Ltd",
+    url: "https://fractionalforge.app",
+    logo: "https://fractionalforge.app/icons/icon-192x192.png",
+    description:
+      "AI-enabled manufacturing platform for hardware startups. Access expert teams, factory capacity, and AI-powered execution without owning any of it.",
+    sameAs: [],
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* SEO: Structured data for rich results */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(faqStructuredData),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(organizationStructuredData),
+        }}
+      />
+
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-accent focus:text-accent-foreground focus:rounded-md"
@@ -260,6 +303,7 @@ export default function MarketingPage() {
         <HeroSection />
         <HowItWorksStrip />
         <ProductShowcase />
+        <FeaturedStorySection />
         <MeetingFlowSection />
         <SolutionSection />
         <WhyNowStrip />
@@ -540,6 +584,124 @@ const WHY_NOW_STATS = [
   { value: "140,000+", label: "SME manufacturers in the UK alone", source: "Make UK" },
   { value: "28%", label: "Of UK factory capacity sits idle on average", source: "ONS capacity utilisation survey" },
 ] as const
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FEATURED STORY — Case study highlight card
+ *
+ * INTENT: Social proof via a concrete case study showing speed + cost
+ * advantage. Links to full case study page for detail.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function FeaturedStorySection() {
+  const stats = [
+    {
+      label: "Time to Engineering Package",
+      traditional: "4-8 weeks",
+      forgeos: "3 hours",
+    },
+    {
+      label: "Cost",
+      traditional: "$5K-$15K",
+      forgeos: "$49/mo",
+    },
+    {
+      label: "Suppliers Matched",
+      traditional: "Manual outreach",
+      forgeos: "47 matched instantly",
+    },
+  ]
+
+  return (
+    <section className="py-12 sm:py-16 md:py-24 border-t border-muted scroll-mt-20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12">
+          <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4">
+            See It In Action
+          </h2>
+          <p className="text-2xl sm:text-3xl md:text-4xl font-black mb-4 leading-tight">
+            From Product Idea to Engineering Package{" "}
+            <span className="text-international-orange">in 3 Hours.</span>
+          </p>
+          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
+            A solar-powered IoT irrigation system for smallholder farms in East
+            Africa — from concept to manufacturing-ready specs using the CAD Lab.
+          </p>
+        </AnimatedSection>
+
+        <AnimatedCard>
+          <Card className="overflow-hidden hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all">
+            <CardContent className="p-0">
+              {/* Stat comparison strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                {stats.map((stat) => (
+                  <div key={stat.label} className="p-5 sm:p-6 text-center">
+                    <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                      {stat.label}
+                    </p>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-through mb-1">
+                      {stat.traditional}
+                    </p>
+                    <p className="text-xl sm:text-2xl font-black text-international-orange">
+                      {stat.forgeos}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* What was delivered */}
+              <div className="border-t border-border px-5 sm:px-8 py-6 sm:py-8 space-y-4">
+                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                  What ForgeOS Delivered
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    "Complete product architecture with modular design",
+                    "Bill of materials with cost modelling at 3 volume tiers",
+                    "DFM analysis optimised for local assembly",
+                    "Competitive benchmarking against 3 market players",
+                    "Full certification roadmap (CE, IP65, FCC)",
+                    "47 UK suppliers matched and RFQ-ready",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-start gap-2.5"
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-international-orange mt-0.5 shrink-0" />
+                      <p className="text-sm text-foreground leading-snug">
+                        {item}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Result callout + CTA */}
+              <div className="border-t border-border bg-international-orange/5 px-5 sm:px-8 py-5 sm:py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
+                  <span className="text-foreground font-semibold">
+                    The result:
+                  </span>{" "}
+                  The founder used this engineering package to secure a{" "}
+                  <span className="text-foreground font-semibold">
+                    $150,000 grant
+                  </span>{" "}
+                  from Innovate UK&apos;s Smart Grant programme.
+                </p>
+                <Link
+                  href="/case-study"
+                  className="inline-flex items-center gap-2 text-international-orange hover:text-international-orange-hover text-sm font-semibold transition-colors shrink-0"
+                >
+                  Read the full case study
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+      </div>
+    </section>
+  )
+}
 
 function WhyNowStrip() {
   return (

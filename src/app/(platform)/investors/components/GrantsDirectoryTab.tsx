@@ -139,10 +139,11 @@ function GrantDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg">
-        <DialogHeader>
-          <DialogTitle className="text-xl pr-8">{grant.grant_name}</DialogTitle>
-          <DialogDescription className="flex items-center gap-2 pt-1">
+      <DialogContent size="lg" className="flex flex-col overflow-hidden">
+        {/* INTENT: Header stays pinned at top — never scrolls away */}
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="text-xl pr-10 break-words">{grant.grant_name}</DialogTitle>
+          <DialogDescription className="flex flex-wrap items-center gap-2 pt-1">
             {grant.managing_body && (
               <span className="text-muted-foreground">{grant.managing_body}</span>
             )}
@@ -153,22 +154,23 @@ function GrantDetailDialog({
               </>
             )}
           </DialogDescription>
-          <div className="pt-2">
+          <div className="flex flex-wrap gap-2 pt-2">
             {grant.actively_accepting ? (
               <Badge variant="success" size="sm">Accepting Applications</Badge>
             ) : (
               <Badge variant="secondary" size="sm">Closed</Badge>
             )}
             {grant.equity_free && (
-              <Badge variant="info" size="sm" className="ml-2">Equity-Free</Badge>
+              <Badge variant="info" size="sm">Equity-Free</Badge>
             )}
           </div>
         </DialogHeader>
 
-        <div className="space-y-6 pt-2">
+        {/* INTENT: Scrollable body — only this section scrolls when content overflows */}
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6 space-y-6 py-2">
           {/* Description */}
           {grant.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed break-words">
               {grant.description}
             </p>
           )}
@@ -176,7 +178,7 @@ function GrantDetailDialog({
           {/* Grant Details */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-international-orange" />
+              <DollarSign className="h-4 w-4 shrink-0 text-international-orange" />
               Grant Details
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -227,14 +229,14 @@ function GrantDetailDialog({
           {(grant.eligibility_summary || grant.company_size_max || grant.company_age_max_years || grant.cofunding_pct != null) && (
             <div className="space-y-3">
               <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Users className="h-4 w-4 text-international-orange" />
+                <Users className="h-4 w-4 shrink-0 text-international-orange" />
                 Eligibility
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 {grant.eligibility_summary && (
                   <div className="sm:col-span-2">
                     <span className="text-muted-foreground">Summary:</span>
-                    <p className="text-foreground mt-1">{grant.eligibility_summary}</p>
+                    <p className="text-foreground mt-1 break-words">{grant.eligibility_summary}</p>
                   </div>
                 )}
                 {grant.company_size_max != null && (
@@ -253,7 +255,7 @@ function GrantDetailDialog({
           {/* Deadline */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-international-orange" />
+              <Calendar className="h-4 w-4 shrink-0 text-international-orange" />
               Deadline
             </h4>
             <div className="text-sm">
@@ -274,7 +276,7 @@ function GrantDetailDialog({
           {grant.deep_profile && (
             <div className="space-y-3">
               <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <FileText className="h-4 w-4 text-international-orange" />
+                <FileText className="h-4 w-4 shrink-0 text-international-orange" />
                 Deep Profile
               </h4>
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
@@ -300,8 +302,8 @@ function GrantDetailDialog({
           </div>
         </div>
 
-        {/* Footer links */}
-        <DialogFooter className="pt-2 gap-2 sm:gap-2">
+        {/* INTENT: Footer stays pinned at bottom — never scrolls away */}
+        <DialogFooter className="shrink-0 pt-4 border-t border-border gap-2 sm:gap-2">
           {grant.website && (
             <Button variant="secondary" size="sm" asChild>
               <a href={grant.website} target="_blank" rel="noopener noreferrer">
