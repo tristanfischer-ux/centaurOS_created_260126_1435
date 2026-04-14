@@ -1,6 +1,8 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
+import { ProductShowcase } from "@/components/marketing/product-showcase"
 import { useState, useEffect } from "react"
 import {
   motion,
@@ -24,6 +26,9 @@ import {
   LineChart,
   Building2,
   ExternalLink,
+  Brain,
+  Zap,
+  Factory,
 } from "lucide-react"
 import { InvestorPreviewSection } from "@/components/marketing/investor-preview"
 import {
@@ -60,19 +65,19 @@ function useIsMobile(): boolean {
  * ═══════════════════════════════════════════════════════════════════════ */
 
 const SPECIALISTS = [
-  { name: "Sage", role: "Strategy", description: "Aligns your vision into executable strategy", color: "bg-international-orange" },
-  { name: "Max", role: "CTO", description: "Designs your product architecture", color: "bg-info" },
-  { name: "Jian", role: "VP Engineering", description: "Turns designs into buildable systems", color: "bg-info" },
-  { name: "Fang", role: "VP Manufacturing", description: "Optimises for real-world production", color: "bg-warning" },
-  { name: "Chase", role: "VP Supply Chain", description: "Finds and manages your suppliers", color: "bg-warning" },
-  { name: "Priya", role: "Product", description: "Shapes what to build and why", color: "bg-success" },
-  { name: "Mia", role: "Marketing", description: "Positions your product in the market", color: "bg-success" },
-  { name: "Sal", role: "Sales", description: "Builds your pipeline and closes deals", color: "bg-success" },
-  { name: "Cal", role: "Chief of Staff", description: "Keeps everything and everyone aligned", color: "bg-muted-foreground" },
-  { name: "Finn", role: "Finance", description: "Models your runway and unit economics", color: "bg-destructive" },
-  { name: "Fiona", role: "Fundraising", description: "Navigates the investor landscape", color: "bg-destructive" },
-  { name: "Harper", role: "People", description: "Builds your team and culture", color: "bg-info" },
-  { name: "Leo", role: "Legal", description: "Protects your IP and contracts", color: "bg-muted-foreground" },
+  { name: "Sage", role: "Strategy", description: "Aligns your vision into executable strategy", color: "bg-international-orange", avatar: "/images/specialists/strategist.png" },
+  { name: "Max", role: "CTO", description: "Designs your product architecture", color: "bg-info", avatar: "/images/specialists/cto.png" },
+  { name: "Jian", role: "VP Engineering", description: "Turns designs into buildable systems", color: "bg-info", avatar: "/images/specialists/vp-engineering.png" },
+  { name: "Fang", role: "VP Manufacturing", description: "Optimises for real-world production", color: "bg-warning", avatar: "/images/specialists/vp-manufacturing.png" },
+  { name: "Chase", role: "VP Supply Chain", description: "Finds and manages your suppliers", color: "bg-warning", avatar: "/images/specialists/vp-supply-chain.png" },
+  { name: "Priya", role: "Product", description: "Shapes what to build and why", color: "bg-success", avatar: "/images/specialists/product-lead.png" },
+  { name: "Mia", role: "Marketing", description: "Positions your product in the market", color: "bg-success", avatar: "/images/specialists/growth-marketer.png" },
+  { name: "Sal", role: "Sales", description: "Builds your pipeline and closes deals", color: "bg-success", avatar: "/images/specialists/sales-lead.png" },
+  { name: "Cal", role: "Chief of Staff", description: "Keeps everything and everyone aligned", color: "bg-muted-foreground", avatar: "/images/specialists/chief-of-staff.png" },
+  { name: "Finn", role: "Finance", description: "Models your runway and unit economics", color: "bg-destructive", avatar: "/images/specialists/finance-lead.png" },
+  { name: "Fiona", role: "Fundraising", description: "Navigates the investor landscape", color: "bg-destructive", avatar: "/images/specialists/fundraising-advisor.png" },
+  { name: "Harper", role: "People", description: "Builds your team and culture", color: "bg-info", avatar: "/images/specialists/hiring-team.png" },
+  { name: "Leo", role: "Legal", description: "Protects your IP and contracts", color: "bg-muted-foreground", avatar: "/images/specialists/legal-counsel.png" },
 ] as const
 
 const FEATURE_PILLARS = [
@@ -97,7 +102,7 @@ const FEATURE_PILLARS = [
   {
     icon: Building2,
     title: "Investors",
-    description: "600+ UK VCs with AI matching, 49K contacts, grant discovery, and portfolio analysis.",
+    description: "7,800+ UK investors with AI matching, 49K contacts, grant discovery, and portfolio analysis.",
     link: "/join?role=founder",
   },
 ] as const
@@ -238,7 +243,7 @@ export default function MarketingPage() {
     url: "https://fractionalforge.app",
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
-      "The AI team that runs your hardware startup. 13 specialists handle strategy, engineering, finance, investors, and manufacturing.",
+      "The AI team that runs your hardware startup. 13 specialists support you across strategy, engineering, finance, investors, and manufacturing.",
     sameAs: [],
   }
 
@@ -396,6 +401,9 @@ export default function MarketingPage() {
         {/* ═══ Section 3: What They Build For You ═══ */}
         <FeaturePillarsSection />
 
+        {/* ═══ Section 3.5: How It Works (3 Pillars) ═══ */}
+        <HowItWorksSection />
+
         {/* ═══ Section 4: Investor Intelligence ═══ */}
         <InvestorIntelligenceSection />
 
@@ -458,7 +466,7 @@ function HeroSection() {
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          13 specialists handle strategy, engineering, finance, investors, and manufacturing — so you can focus on the product.
+          13 specialists support you across strategy, engineering, finance, investors, and manufacturing — so you can focus on the product.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -473,16 +481,14 @@ function HeroSection() {
             </a>
           </div>
 
-          {/* Product screenshot placeholder */}
+          {/* Product showcase — rotating screenshots of key features */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9, duration: 0.8, ease: "easeOut" }}
-            className="w-full max-w-4xl mt-4"
+            className="w-full max-w-5xl mt-4"
           >
-            <div className="aspect-[16/9] rounded-xl border bg-muted/50 flex items-center justify-center">
-              <span className="text-sm text-muted-foreground font-mono">Product screenshot</span>
-            </div>
+            <ProductShowcase />
           </motion.div>
         </motion.div>
       </div>
@@ -522,8 +528,15 @@ function MeetYourTeamSection() {
             <AnimatedCard key={specialist.name}>
               <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
                 <CardContent className="p-4 sm:p-5 flex flex-col items-center text-center gap-3">
-                  <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full ${specialist.color} flex items-center justify-center text-white text-sm sm:text-base font-bold`}>
-                    {specialist.name.charAt(0)}
+                  <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden relative border-2 border-muted">
+                    <Image
+                      src={specialist.avatar}
+                      alt={specialist.name}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                      sizes="56px"
+                    />
                   </div>
                   <div>
                     <p className="text-sm sm:text-base font-bold text-foreground">{specialist.name}</p>
@@ -538,7 +551,7 @@ function MeetYourTeamSection() {
 
         <AnimatedSection className="text-center">
           <p className="text-sm sm:text-base md:text-lg text-muted-foreground italic max-w-3xl mx-auto leading-relaxed">
-            &ldquo;They collaborate. They challenge each other. They produce work you&apos;d expect from a senior leadership team.&rdquo;
+            &ldquo;Your ideas, amplified. Each specialist brings deep domain knowledge so you can make better decisions, faster.&rdquo;
           </p>
         </AnimatedSection>
       </div>
@@ -595,6 +608,74 @@ function FeaturePillarsSection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * SECTION 3.5: HOW IT WORKS (3 Pillars)
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const HOW_IT_WORKS_PILLARS = [
+  {
+    icon: Brain,
+    title: "Expert Knowledge, On Demand",
+    description:
+      "Access deep expertise in manufacturing, engineering, supply chain, finance, and legal — without full-time hires or six-figure salaries.",
+  },
+  {
+    icon: Zap,
+    title: "AI-Powered Execution",
+    description:
+      "Every specialist draws on 220+ engineering standards, real supplier data, and your company context to produce actionable deliverables.",
+  },
+  {
+    icon: Factory,
+    title: "Connected to Real Suppliers",
+    description:
+      "13,700+ UK manufacturers indexed with capabilities, certifications, and capacity. Generate RFQ packs and get quotes directly.",
+  },
+] as const
+
+function HowItWorksSection() {
+  return (
+    <section
+      id="how-it-works"
+      className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            The Platform
+          </span>
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            How It <span className="text-international-orange">Works</span>
+          </h2>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          {HOW_IT_WORKS_PILLARS.map((pillar) => {
+            const Icon = pillar.icon
+            return (
+              <AnimatedCard key={pillar.title}>
+                <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
+                  <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center gap-4">
+                    <div className="h-14 w-14 rounded-full bg-international-orange/10 flex items-center justify-center">
+                      <Icon className="h-7 w-7 text-international-orange" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-black text-foreground">
+                      {pillar.title}
+                    </h3>
+                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                      {pillar.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              </AnimatedCard>
+            )
+          })}
+        </StaggerContainer>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * SECTION 4: INVESTOR INTELLIGENCE
  * ═══════════════════════════════════════════════════════════════════════ */
 
@@ -611,14 +692,14 @@ function InvestorIntelligenceSection() {
             <span className="text-international-orange">fund hardware</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
-            Search 600+ UK venture capital and private equity firms. AI-powered matching scores how well each investor fits your stage, sector, and geography.
+            Search 7,800+ UK investors — venture capital, private equity, and angels. AI-powered matching scores how well each investor fits your stage, sector, and geography.
           </p>
         </AnimatedSection>
 
         {/* Stats row */}
         <StaggerContainer className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
           {[
-            { value: "600+", label: "Firms" },
+            { value: "7,800+", label: "Investors" },
             { value: "49,000+", label: "Contacts" },
             { value: "92,000+", label: "Portfolio Companies" },
             { value: "3,000+", label: "Grants" },
@@ -634,14 +715,6 @@ function InvestorIntelligenceSection() {
 
         {/* Interactive investor search preview */}
         <InvestorPreviewSection />
-
-        <AnimatedSection className="text-center mt-10 sm:mt-12">
-          <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
-            <Link href="/join?role=founder" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-              Explore Investors <ArrowRight className="h-4 w-4" />
-            </Link>
-          </motion.div>
-        </AnimatedSection>
       </div>
     </section>
   )
