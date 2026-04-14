@@ -18,11 +18,6 @@
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import {
-  extractPostcode,
-  deriveRegionFromPostcode,
-  deriveRegionFromKeywords,
-} from '@/lib/postcode-utils'
 import { getUserSubscription } from '@/lib/billing/subscriptions'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
@@ -960,46 +955,36 @@ export const getInvestorStats = unstable_cache(
       const gf = toStringArray(attrs.geo_focus)
       const locationText = hqCity || location
 
-      let region: string | null = null
-      // GOTCHA: geo_focus values are NOT normalized — "United Kingdom" and "UK" coexist.
-      // Normalize common variants to prevent duplicate chart entries.
-      const GEO_NORMALIZE: Record<string, string> = {
-        'united kingdom': 'UK', 'england': 'UK', 'scotland': 'UK', 'wales': 'UK',
-        'united states': 'US', 'usa': 'US', 'america': 'US',
-      }
-      // Use geo_focus first if available (most reliable)
-      if (gf.length > 0) {
-        const raw = gf[0]
-        region = GEO_NORMALIZE[raw.toLowerCase()] ?? raw
-      } else if (locationText) {
-        // Extract country from location string
-        const COUNTRY_PATTERNS: [RegExp, string][] = [
-          [/\bUK\b|\bUnited Kingdom\b|\bEngland\b|\bScotland\b|\bWales\b/i, 'UK'],
-          [/\bUS\b|\bUSA\b|\bUnited States\b|\bAmerica\b/i, 'US'],
-          [/\bFrance\b|\bParis\b/i, 'France'],
-          [/\bGermany\b|\bBerlin\b|\bMunich\b/i, 'Germany'],
-          [/\bIsrael\b|\bTel Aviv\b/i, 'Israel'],
-          [/\bIndia\b|\bMumbai\b|\bBangalore\b/i, 'India'],
-          [/\bChina\b|\bBeijing\b|\bShanghai\b/i, 'China'],
-          [/\bCanada\b|\bToronto\b|\bVancouver\b/i, 'Canada'],
-          [/\bSingapore\b/i, 'Singapore'],
-          [/\bJapan\b|\bTokyo\b/i, 'Japan'],
-          [/\bSwitzerland\b|\bZurich\b/i, 'Switzerland'],
-          [/\bNetherlands\b|\bAmsterdam\b/i, 'Netherlands'],
-          [/\bSweden\b|\bStockholm\b/i, 'Sweden'],
-          [/\bItaly\b|\bMilan\b/i, 'Italy'],
-          [/\bSpain\b|\bMadrid\b|\bBarcelona\b/i, 'Spain'],
-          [/\bLondon\b|\bManchester\b|\bBirmingham\b|\bEdinburgh\b|\bBristol\b|\bCambridge\b|\bOxford\b/i, 'UK'],
-          [/\bNew York\b|\bSan Francisco\b|\bBoston\b|\bChicago\b|\bLos Angeles\b|\bSeattle\b|\bAustin\b|\bMiami\b/i, 'US'],
-          [/\bEurope\b/i, 'Europe'],
-          [/\bGlobal\b/i, 'Global'],
-        ]
-        for (const [pattern, country] of COUNTRY_PATTERNS) {
-          if (pattern.test(locationText)) { region = country; break }
-        }
+      // DECISION: Collapse every geo signal into 6 clean buckets. Previous code
+      // produced 15+ entries (UK / US / Germany / San Francisco / Canada / Israel
+      // / Not specified …) which cluttered the chart. User-mandated buckets:
+      //   UK            — UK, England, Scotland, Wales, London…
+      //   Europe        — France, Germany, Italy, Spain, Netherlands, Sweden,
+      //                   Switzerland, Nordics, Israel (per user preference)…
+      //   North America — US, USA, any US city, Canada
+      //   Latin America — Latam, Brazil, Mexico, Argentina…
+      //   Asia-Pacific  — India, China, Japan, Singapore, APAC…
+      //   Global        — "Global", "worldwide", "international", unspecified
+      // Precedence: checked in order; first match wins.
+      const GEO_BUCKETS: Array<[RegExp, string]> = [
+        [/\b(uk|united kingdom|britain|england|scotland|wales|london|manchester|birmingham|edinburgh|bristol|cambridge|oxford|leeds|glasgow|liverpool)\b/i, 'UK'],
+        [/\b(us|usa|united states|america|american|san francisco|new york|boston|chicago|los angeles|seattle|austin|miami|silicon valley|denver|canada|toronto|vancouver|montreal|ottawa)\b/i, 'North America'],
+        [/\b(latin america|latam|brazil|mexico|argentina|colombia|chile|peru|uruguay|sao paulo|buenos aires|mexico city)\b/i, 'Latin America'],
+        [/\b(asia|apac|asia-pacific|india|china|japan|singapore|korea|taiwan|hong kong|mumbai|bangalore|beijing|shanghai|tokyo|seoul|jakarta|sydney|melbourne|australia|new zealand)\b/i, 'Asia-Pacific'],
+        // Europe AFTER North America so "Canada" isn't captured by a loose "europe" rule; Israel bucketed here per user's explicit choice.
+        [/\b(europe|european|eu|emea|france|paris|germany|berlin|munich|spain|madrid|barcelona|italy|milan|rome|netherlands|amsterdam|sweden|stockholm|switzerland|zurich|geneva|austria|vienna|belgium|brussels|denmark|copenhagen|norway|oslo|finland|helsinki|ireland|dublin|portugal|lisbon|poland|warsaw|nordics|israel|tel aviv)\b/i, 'Europe'],
+        [/\b(global|worldwide|international)\b/i, 'Global'],
+      ]
+      const bucketOf = (text: string): string | null => {
+        if (!text) return null
+        for (const [re, label] of GEO_BUCKETS) if (re.test(text)) return label
+        return null
       }
 
-      if (region) regionCounts[region] = (regionCounts[region] ?? 0) + 1
+      // Prefer geo_focus (authoritative) then hq_city/location text.
+      let region = bucketOf(gf.join(' ')) ?? bucketOf(locationText)
+      if (!region) region = 'Global' // unclassifiable → Global (user's rule: "not specified could be global")
+      regionCounts[region] = (regionCounts[region] ?? 0) + 1
     }
 
     const avgQuality = qualityScoreCount > 0 ? totalQualityScore / qualityScoreCount : 0

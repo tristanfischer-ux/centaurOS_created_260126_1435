@@ -11,7 +11,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Building2, TrendingUp, Globe, CheckCircle2, ChevronDown, ChevronUp, Award } from 'lucide-react'
+import { Building2, TrendingUp, Globe, ChevronDown, ChevronUp, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
@@ -156,22 +156,12 @@ export function InvestorInsightsPanel({ stats, filteredCount, grantsCount = 0, p
 
       {!collapsed && (
         <div className="p-5 space-y-6">
-          {/* Row 1: Key stat cards — matching Forge Capital overview */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+          {/* Row 1: Key stat cards — four core metrics only, per user preference */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard
               icon={<Building2 className="h-4 w-4 text-international-orange" />}
               value={stats.total}
               label="Total Investors"
-            />
-            <StatCard
-              icon={<Globe className="h-4 w-4 text-international-orange" />}
-              value={stats.withWebsiteCount}
-              label="With Websites"
-            />
-            <StatCard
-              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
-              value={stats.forgeCapitalCount}
-              label="Deep Profiles"
             />
             <StatCard
               icon={<Globe className="h-4 w-4 text-international-orange" />}
@@ -187,11 +177,6 @@ export function InvestorInsightsPanel({ stats, filteredCount, grantsCount = 0, p
               icon={<Award className="h-4 w-4 text-international-orange" />}
               value={grantsCount}
               label="Grants"
-            />
-            <StatCard
-              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
-              value={stats.avgQuality.toFixed(1)}
-              label="Avg Quality"
             />
           </div>
 
