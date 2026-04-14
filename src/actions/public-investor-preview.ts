@@ -113,10 +113,63 @@ function geoSummary(geoFocus: string[], hqCity: string | null): string | null {
   return null
 }
 
-/** Anonymized flavour sentence. Prefers ideal_company_profile / investment_pattern
- * (these describe target founders, not the firm), falls back to value_add, then
- * aggressively redacts any firm-name proper-noun at the start of investment_thesis.
- * Goal: real signal about what they back, zero identifying name leakage. */
+/** Firm-type suffixes that identify a proper-noun run as an investor firm name. */
+const FIRM_SUFFIX = '(?:Capital|Ventures|Venture|Partners|Fund|Funds|House|Group|Holdings|Investments|Advisors|Advisers|Equity|Bank|Labs|Studio|Foundry|Accelerator|Trust|Management|Council|Corporation)'
+
+/** Redact firm names from free text. Covers:
+ *  - leading "NAME is/are/invests/…" patterns
+ *  - "An ideal company for NAME is" / "The ideal NAME portfolio company" templates from Forge Capital's synthesiser
+ *  - mid-sentence "at NAME", "by NAME", "with NAME", "for NAME"
+ *  - possessives "NAME's" / "NAME's portfolio"
+ *  - any capitalised run ending in Capital/Ventures/Partners/Fund/etc.
+ *  Result may be rougher than the source, but keeps all the DOMAIN signal
+ *  (sectors, stages, cheque size) while stripping identification. */
+function redactFirmNames(s: string): string {
+  // 1. Common Forge Capital template prefixes
+  s = s.replace(
+    /^An ideal\s+(?:company|investment|candidate|target)\s+(?:for|with|at)\s+[A-Z][\w&'\-.]+(?:\s+[A-Z][\w&'\-.]+){0,5}\s+is\b/i,
+    'An ideal target is',
+  )
+  s = s.replace(
+    /^The ideal\s+[A-Z][\w&'\-.]+(?:\s+[A-Z][\w&'\-.]+){0,5}\s+(portfolio|target)\s+(company|business|startup|investment)\b/i,
+    'The ideal $1 $2',
+  )
+
+  // 2. "At NAME, we …" → "We …"
+  s = s.replace(/^At\s+[A-Z][\w&'\-.]+(?:\s+[A-Z][\w&'\-.]+){0,5},?\s+(we|our)\b/i, '$1')
+  s = s.replace(/^At\s+[A-Z][\w&'\-.]+(?:\s+[A-Z][\w&'\-.]+){0,5},\s*/i, '')
+
+  // 3. Any capitalised run ending in a firm-type suffix → "this firm"
+  const firmRe = new RegExp(
+    `\\b[A-Z][\\w&'\\-.]+(?:\\s+[A-Z][\\w&'\\-.]+){0,5}\\s+${FIRM_SUFFIX}\\b`,
+    'g',
+  )
+  s = s.replace(firmRe, 'this firm')
+
+  // 4. Possessives like "Gresham House's portfolio" (missed by step 3 if Name already
+  //    lacks suffix, e.g. "Octopus's")
+  s = s.replace(/\b[A-Z][\w&'\-.]+(?:\s+[A-Z][\w&'\-.]+){0,3}(?:'s|'s)/g, 'their')
+
+  // 5. Leading single/double-word firm name (no suffix) at start of sentence
+  s = s.replace(
+    /^[A-Z][\w&'\-.]+(?:\s+[A-Z][\w&'\-.]+){0,3}\s+(is|are|invests|focuses|targets|backs|makes|specialises|specializes|partners|supports|funds|seeks|looks)\b/,
+    'They $1',
+  )
+
+  // 6. "by/for/with/at NAME" mid-sentence when NAME is 2+ capitalised words
+  s = s.replace(
+    /\b(by|for|with|at)\s+([A-Z][\w&'\-.]+\s+[A-Z][\w&'\-.]+(?:\s+[A-Z][\w&'\-.]+)*)/g,
+    '$1 this firm',
+  )
+
+  // 7. Parentheticals "(at NAME)" / "(NAME)"
+  s = s.replace(/\s?\((?:at\s+)?[A-Z][\w&'\-.\s]{1,60}\)/g, '')
+
+  return s.replace(/\s+/g, ' ').trim()
+}
+
+/** Anonymised flavour sentence. Prefers fields that describe target founders over
+ * the firm's own thesis, then aggressively redacts any firm-name leakage. */
 function thesisExcerpt(attrs: Record<string, unknown>): string | null {
   const pick = (k: string): string | null => {
     const v = attrs[k]
@@ -125,19 +178,7 @@ function thesisExcerpt(attrs: Record<string, unknown>): string | null {
   const source = pick('ideal_company_profile') ?? pick('investment_pattern') ?? pick('value_add') ?? pick('investment_thesis')
   if (!source) return null
 
-  let cleaned = source.replace(/\s+/g, ' ').trim()
-
-  // Strip leading "Firm Name [...] is/are/invests/focuses/targets/backs/makes/does ..."
-  // up to (and including) the verb — replaces with "They " to keep the sentence readable.
-  cleaned = cleaned.replace(
-    /^[A-Z][\w&'\-.]*(?:\s+[A-Z][\w&'\-.]*){0,6}\s+(is|are|invests|focuses|targets|backs|makes|specialises|specializes|partners|supports|funds|seeks|looks)\b/,
-    'They $1',
-  )
-  // Also strip any "At Firm Name," prefix.
-  cleaned = cleaned.replace(/^At\s+[A-Z][\w&'\-.\s]{1,40}?,\s*/i, '')
-  // Strip a lingering " — Firm Name" or "(Firm Name)" anywhere.
-  cleaned = cleaned.replace(/\s?\((?:at\s+)?[A-Z][\w&'\-.\s]{1,40}\)/g, '')
-
+  const cleaned = redactFirmNames(source)
   const firstSentence = cleaned.split(/[.!?]\s/)[0] ?? cleaned
   return firstSentence.length > 140 ? firstSentence.slice(0, 138).trimEnd() + '…' : firstSentence
 }
