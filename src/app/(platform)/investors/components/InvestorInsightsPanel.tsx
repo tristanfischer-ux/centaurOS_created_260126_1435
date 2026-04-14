@@ -96,9 +96,10 @@ function sortStageChronologically<T extends { name: string }>(rows: T[]): T[] {
     const i = STAGE_ORDER.findIndex(s => s.toLowerCase() === n.toLowerCase())
     return i === -1 ? STAGE_ORDER.length : i
   }
-  // Reverse so that on a layout="vertical" BarChart the earliest stage sits
-  // at the TOP (Recharts renders categories bottom-up from the data array).
-  return [...rows].sort((a, b) => idx(b.name) - idx(a.name))
+  // Ascending sort: Pre-Seed first in array. Recharts vertical BarChart
+  // renders the FIRST data item at the TOP of the Y axis, so earliest stage
+  // sits on top and Late Stage on bottom, matching user's mental model.
+  return [...rows].sort((a, b) => idx(a.name) - idx(b.name))
 }
 
 /**
