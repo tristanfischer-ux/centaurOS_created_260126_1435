@@ -417,7 +417,7 @@ export async function searchInvestors(
           supabase.rpc('match_marketplace_listings_v2', {
             query_embedding: embJson,
             filter_category: 'Finance',
-            match_threshold: 0.0,
+            match_threshold: -1.0, // include every embedded firm, regardless of hemisphere
             match_count: PAGE,
             p_offset: i * PAGE,
           }),
@@ -444,6 +444,15 @@ export async function searchInvestors(
       // INTENT: Apply JSONB filters on semantic results. The v2 RPC already returned
       // attributes, so we can filter without a second round-trip.
       let results = semanticData as Array<Record<string, unknown>>
+
+      // INTENT: User mandate 2026-04-13 — Forge Capital SQLite is the canonical
+      // source of investor data. ForgeOS includes ~245 older Finance rows from
+      // non-Forge-Capital imports that inflate match counts without matching
+      // the dashboard's scope. Scope search to Forge-Capital-synced rows only.
+      results = results.filter((r) => {
+        const attrs = (r.attributes as Record<string, unknown>) || {}
+        return attrs.data_source === 'forge_capital'
+      })
 
       if (firmType && firmType.length > 0) {
         const safeFirmTypes = firmType.filter((t: string) => VALID_FIRM_TYPES.has(t))
