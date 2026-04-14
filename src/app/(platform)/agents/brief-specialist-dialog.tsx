@@ -80,6 +80,8 @@ import { createArtifact, exportArtifactToGoogleDocs, updateArtifactContent } fro
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
 import { detectWorkflowTrigger } from "@/lib/agents/specialist-workflows"
 import type { SpecialistId } from "@/lib/agents/specialists-config"
+import { SpecialistSkillsPanel } from "@/components/specialists/specialist-skills-panel"
+import type { SpecialistSkill } from "@/lib/agents/specialist-skills"
 import { persistSpecialistHandoff } from "@/actions/agent-handoffs"
 import { recordSpecialistFeedback } from "@/actions/specialist-feedback"
 import { findRelatedPendingDecisions } from "@/actions/decision-outcomes"
@@ -2593,6 +2595,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 </div>
+                                {/* Skills panel — shown above conversation starters */}
+                                <SpecialistSkillsPanel
+                                    specialistId={specialist.id}
+                                    onSkillSelect={(skill: SpecialistSkill) => {
+                                        const triggerMessage = skill.triggerPhrase
+                                            || `Create a ${skill.name.toLowerCase()} based on our conversation and my company context.`
+                                        setBriefText(triggerMessage)
+                                        setError(null)
+                                        textareaRef.current?.focus()
+                                    }}
+                                />
                                 {(structuredStarters || dynamicStarters || specialist.highlights.length > 0 || pageGuidanceStarter) && (
                                     <>
                                         <p className="text-[10px] font-medium text-muted-foreground">
@@ -3496,6 +3509,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 </div>
+                                {/* Skills panel — shown above conversation starters in panel mode */}
+                                <SpecialistSkillsPanel
+                                    specialistId={specialist.id}
+                                    onSkillSelect={(skill: SpecialistSkill) => {
+                                        const triggerMessage = skill.triggerPhrase
+                                            || `Create a ${skill.name.toLowerCase()} based on our conversation and my company context.`
+                                        setBriefText(triggerMessage)
+                                        setError(null)
+                                        textareaRef.current?.focus()
+                                    }}
+                                />
                                 {(dynamicStarters || specialist.highlights.length > 0 || pageGuidanceStarter) && (
                                     <>
                                         <p className="text-xs font-medium text-muted-foreground">
