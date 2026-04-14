@@ -210,7 +210,7 @@ export default function MarketingPage() {
     url: "https://fractionalforge.app",
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
-      "The Operating System for Hardware Startups. Expert knowledge, smart tools, and manufacturing connections — everything you need to build hardware, in one platform.",
+      "The Operating System for Hardware Startups. Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform.",
     sameAs: [],
   }
 
@@ -431,7 +431,7 @@ function HeroSection() {
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Expert knowledge, smart tools, and manufacturing connections — everything you need to build hardware, in one platform.
+          Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -674,7 +674,6 @@ function InvestorIntelligenceSection() {
           {[
             { value: "7,800+", label: "Investors" },
             { value: "49,000+", label: "Contacts" },
-            { value: "92,000+", label: "Portfolio Companies" },
             { value: "3,000+", label: "Grants" },
           ].map((stat) => (
             <AnimatedCard key={stat.label}>
