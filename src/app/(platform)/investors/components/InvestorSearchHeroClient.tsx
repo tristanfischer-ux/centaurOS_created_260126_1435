@@ -53,7 +53,7 @@ export function InvestorSearchHeroClient({
           query: trimmed,
           sortBy: 'name', // server ranks by similarity when query > 5 chars
           page: 1,
-          pageSize: 500, // dashboard-parity — show every firm that cleared the RPC
+          pageSize: 10000, // dashboard-parity — show every firm that cleared the RPC
         })
         setFirms(result.firms)
         if (result.firms.length === 0) {
