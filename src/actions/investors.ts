@@ -410,7 +410,7 @@ export async function searchInvestors(
       // 6 parallel calls of 1000 each, covers the ~5,565 embedded Finance
       // rows. Seq scan is ~50ms per call so parallel latency is acceptable.
       const PAGE = 1000
-      const PAGES = 6 // 6 × 1000 = 6000, safely covers current 5,565 rows
+      const PAGES = 8 // 8 × 1000 = 8000, safely covers current 7,792 embedded rows
       const embJson = JSON.stringify(queryEmbedding) as unknown as string
       const pageResults = await Promise.all(
         Array.from({ length: PAGES }, (_, i) =>
