@@ -43,17 +43,22 @@ export async function reportOverageToStripe(
   userId: string,
 ): Promise<boolean> {
   // INTENT: Convert USD cost to Stripe units. Each unit = $0.01 of compute.
-  // Stripe charges per unit at the metered price rate ($0.025/unit = 2.5x markup).
+  // With $0.01/unit pricing, 250 units per $1 compute = $2.50 billed = 2.5x markup.
   const units = Math.max(1, Math.round(computeCostUsd * ENTERPRISE_OVERAGE_CONFIG.stripeUnitsPerComputeDollar))
 
   try {
-    await stripe.subscriptionItems.createUsageRecord(subscriptionItemId, {
-      quantity: units,
-      action: 'increment',
-      timestamp: Math.floor(Date.now() / 1000),
+    // DECISION: Use Stripe Billing Meter events API (required for Stripe API ≥ 2025-03-31).
+    // The older subscriptionItems.createUsageRecord() requires non-meter-backed prices.
+    // Meter events are aggregated by Stripe and invoiced at period end.
+    await stripe.billing.meterEvents.create({
+      event_name: ENTERPRISE_OVERAGE_CONFIG.stripeMeterEventName,
+      payload: {
+        stripe_customer_id: await getStripeCustomerIdForFoundry(foundryId),
+        value: String(units),
+      },
     })
 
-    console.log('[Overage] Reported to Stripe:', {
+    console.log('[Overage] Reported to Stripe via meter event:', {
       subscriptionItemId,
       computeCostUsd,
       units,
@@ -80,6 +85,37 @@ export async function reportOverageToStripe(
 
     return false
   }
+}
+
+/**
+ * Get the Stripe customer ID for a foundry's owner.
+ * Required by the Billing Meter events API to associate usage with a customer.
+ */
+async function getStripeCustomerIdForFoundry(foundryId: string): Promise<string> {
+  const supabase = createAdminClient()
+
+  const { data: foundry } = await supabase
+    .from('foundries')
+    .select('owner_id')
+    .eq('id', foundryId)
+    .maybeSingle()
+
+  if (!foundry?.owner_id) {
+    throw new Error(`[Overage] Foundry ${foundryId} has no owner`)
+  }
+
+  const { data: subscription } = await supabase
+    .from('user_subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', foundry.owner_id)
+    .in('status', ['active', 'trialing'])
+    .maybeSingle()
+
+  if (!subscription?.stripe_customer_id) {
+    throw new Error(`[Overage] No active subscription for foundry owner ${foundry.owner_id}`)
+  }
+
+  return subscription.stripe_customer_id
 }
 
 // ==========================================
@@ -167,16 +203,27 @@ export async function flushPendingOverageReports(foundryId: string): Promise<boo
 
     let allFlushed = true
 
+    // Look up Stripe customer ID once for all pending reports
+    let stripeCustomerId: string
+    try {
+      stripeCustomerId = await getStripeCustomerIdForFoundry(foundryId)
+    } catch (err) {
+      console.error('[Overage] Cannot flush — no customer ID:', err)
+      return false
+    }
+
     for (const report of pendingReports) {
       try {
         const units = Math.max(1, Math.round(
           (report.compute_cost_cents / 100) * ENTERPRISE_OVERAGE_CONFIG.stripeUnitsPerComputeDollar
         ))
 
-        await stripe.subscriptionItems.createUsageRecord(report.stripe_subscription_item_id, {
-          quantity: units,
-          action: 'increment',
-          timestamp: Math.floor(Date.now() / 1000),
+        await stripe.billing.meterEvents.create({
+          event_name: ENTERPRISE_OVERAGE_CONFIG.stripeMeterEventName,
+          payload: {
+            stripe_customer_id: stripeCustomerId,
+            value: String(units),
+          },
         })
 
         // Mark as reported

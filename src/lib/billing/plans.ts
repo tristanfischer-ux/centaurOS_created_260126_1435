@@ -100,11 +100,16 @@ export const ENTERPRISE_OVERAGE_CONFIG = {
   /** Stripe price ID for the metered overage component (env var) */
   stripePriceIdOverage: process.env.STRIPE_PRICE_ENTERPRISE_OVERAGE,
   /**
-   * Number of cents per unit reported to Stripe.
-   * With $0.025/unit pricing in Stripe, 1 unit = $0.01 of compute cost.
-   * So $1 of compute = 100 units → billed at 100 × $0.025 = $2.50.
+   * Number of units reported to Stripe per $1 of compute cost.
+   * With $0.01/unit pricing in Stripe, 250 units × $0.01 = $2.50 billed.
+   * So $1 of compute = 250 units → billed at $2.50 = 2.5x markup.
    */
-  stripeUnitsPerComputeDollar: 100,
+  stripeUnitsPerComputeDollar: 250,
+  /**
+   * Stripe Billing Meter event name.
+   * Usage is reported via meter events (required for Stripe API ≥ 2025-03-31).
+   */
+  stripeMeterEventName: 'ai_compute_overage',
 } as const
 
 // ==========================================
