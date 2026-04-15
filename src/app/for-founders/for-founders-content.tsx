@@ -98,7 +98,7 @@ function HeroSection() {
             <Link href="/join?role=founder">
               <motion.div whileHover={buttonHover} whileTap={buttonTap}>
                 <Button size="lg" className="gap-2 text-base">
-                  Start Free Trial
+                  Get Started Free
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </motion.div>
@@ -363,7 +363,7 @@ function SocialProofSection() {
                       </div>
                       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <Banknote className="h-4 w-4 text-international-orange" />
-                        $49/month subscription
+                        From £19.99/month
                       </div>
                     </div>
                   </div>
@@ -450,11 +450,14 @@ function PricingComparisonSection() {
                   ForgeOS
                 </p>
                 <CardTitle className="text-2xl">
-                  $49
+                  From £19.99
                   <span className="ml-1 text-base font-normal text-muted-foreground">
                     /month
                   </span>
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Free tier available — 50 tasks, all 13 specialists
+                </p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
@@ -473,7 +476,7 @@ function PricingComparisonSection() {
                   <Link href="/join?role=founder">
                     <motion.div whileHover={buttonHover} whileTap={buttonTap}>
                       <Button className="w-full gap-2">
-                        Start Free Trial
+                        Get Started Free
                         <ArrowRight className="h-4 w-4" />
                       </Button>
                     </motion.div>

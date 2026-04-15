@@ -13,7 +13,7 @@ import { ForFoundersContent } from "./for-founders-content"
 export const metadata: Metadata = {
   title: "For Founders — Stop Hiring Engineers. Start Building Products.",
   description:
-    "ForgeOS turns your product idea into a complete engineering package — STEP files, BOM, DFM analysis, matched UK suppliers — in hours, not months. Start your free trial.",
+    "ForgeOS turns your product idea into a complete engineering package — STEP files, BOM, DFM analysis, matched UK suppliers — in hours, not months. Get started free.",
   openGraph: {
     title: "ForgeOS for Hardware Founders",
     description:
