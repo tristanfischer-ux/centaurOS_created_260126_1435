@@ -14,7 +14,7 @@ import { rateLimit } from '@/lib/security/rate-limit'
 
 // VALIDATION: Zod schema prevents invalid tier and billing period values
 const checkoutSchema = z.object({
-  tier: z.enum(['starter', 'professional', 'enterprise']),
+  tier: z.enum(['seed', 'starter', 'professional', 'enterprise']),
   billingPeriod: z.enum(['monthly', 'annual']).default('monthly'),
 })
 
