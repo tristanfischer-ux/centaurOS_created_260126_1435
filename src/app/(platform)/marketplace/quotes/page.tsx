@@ -8,6 +8,8 @@
 import { getMyQuoteRequests } from '@/actions/marketplace-rfq'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+
+export const dynamic = 'force-dynamic'
 import { EmptyState } from '@/components/ui/empty-state'
 import { typography } from '@/lib/design-system'
 import { Send } from 'lucide-react'

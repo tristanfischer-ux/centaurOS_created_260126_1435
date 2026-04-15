@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { PrivacySettings } from '@/components/gdpr/PrivacySettings'
 import type { DataRequest } from '@/types/gdpr'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Privacy & Data Settings Page
  *
