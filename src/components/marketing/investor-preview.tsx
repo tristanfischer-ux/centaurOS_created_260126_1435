@@ -17,7 +17,6 @@ import {
   Search,
   Lock,
   ArrowRight,
-  Users,
   Zap,
   X,
   CheckCircle2,
@@ -274,20 +273,34 @@ export function InvestorPreviewSection() {
   const hasSearched = !!activeQuery && !!searchResult
 
   return (
-    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
+    <section id="investors" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <AnimatedSection className="text-center mb-8 sm:mb-10">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Investor Intelligence
           </span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            {formatNumber(totalCount)} Investors.{' '}
-            <span className="text-international-orange">Find Yours.</span>
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            Find the investors who actually{' '}
+            <span className="text-international-orange">fund hardware</span>
           </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Search our investor directory to see who funds startups like yours.
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
+            Search UK investors — venture capital, private equity, and angels. Matching scores show how well each investor fits your stage, sector, and geography.
           </p>
+        </AnimatedSection>
+
+        {/* Stats row */}
+        <AnimatedSection className="grid grid-cols-3 gap-3 sm:gap-6 max-w-3xl mx-auto mb-10 sm:mb-12 md:mb-16">
+          {[
+            { value: formatNumber(totalCount), label: 'Investors' },
+            { value: '49,000+', label: 'Contacts' },
+            { value: '3,000+', label: 'Grants' },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center p-4 sm:p-6 rounded-xl border bg-card">
+              <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">{stat.value}</p>
+              <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+            </div>
+          ))}
         </AnimatedSection>
 
         {/* Search box */}
@@ -340,15 +353,9 @@ export function InvestorPreviewSection() {
           )}
         </AnimatedSection>
 
-        {/* Stats bar (default state) */}
+        {/* Trust bar (default state) */}
         {!hasSearched && preview && (
           <AnimatedSection className="flex flex-wrap justify-center gap-6 sm:gap-10 mb-10 sm:mb-14">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="h-4 w-4 text-international-orange" />
-              <span>
-                <strong className="text-foreground">{formatNumber(totalCount)}</strong> investors
-              </span>
-            </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Zap className="h-4 w-4 text-success" />
               <span>

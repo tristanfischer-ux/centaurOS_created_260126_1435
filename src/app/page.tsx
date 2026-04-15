@@ -55,24 +55,8 @@ function useIsMobile(): boolean {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * DATA — Specialists, Features, Articles, Pricing, FAQs
+ * DATA — Articles, Pricing, FAQs
  * ═══════════════════════════════════════════════════════════════════════ */
-
-const SPECIALISTS = [
-  { name: "Sage", role: "Strategy", description: "Aligns your vision into executable strategy", color: "bg-international-orange", avatar: "/images/specialists/strategist.png" },
-  { name: "Max", role: "CTO", description: "Designs your product architecture", color: "bg-info", avatar: "/images/specialists/cto.png" },
-  { name: "Jian", role: "VP Engineering", description: "Turns designs into buildable systems", color: "bg-info", avatar: "/images/specialists/vp-engineering.png" },
-  { name: "Fang", role: "VP Manufacturing", description: "Optimises for real-world production", color: "bg-warning", avatar: "/images/specialists/vp-manufacturing.png" },
-  { name: "Chase", role: "VP Supply Chain", description: "Finds and manages your suppliers", color: "bg-warning", avatar: "/images/specialists/vp-supply-chain.png" },
-  { name: "Priya", role: "Product", description: "Shapes what to build and why", color: "bg-success", avatar: "/images/specialists/product-lead.png" },
-  { name: "Mia", role: "Marketing", description: "Positions your product in the market", color: "bg-success", avatar: "/images/specialists/growth-marketer.png" },
-  { name: "Sal", role: "Sales", description: "Builds your pipeline and closes deals", color: "bg-success", avatar: "/images/specialists/sales-lead.png" },
-  { name: "Cal", role: "Chief of Staff", description: "Keeps everything and everyone aligned", color: "bg-muted-foreground", avatar: "/images/specialists/chief-of-staff.png" },
-  { name: "Finn", role: "Finance", description: "Models your runway and unit economics", color: "bg-destructive", avatar: "/images/specialists/finance-lead.png" },
-  { name: "Fiona", role: "Fundraising", description: "Navigates the investor landscape", color: "bg-destructive", avatar: "/images/specialists/fundraising-advisor.png" },
-  { name: "Harper", role: "People", description: "Builds your team and culture", color: "bg-info", avatar: "/images/specialists/hiring-team.png" },
-  { name: "Leo", role: "Legal", description: "Protects your IP and contracts", color: "bg-muted-foreground", avatar: "/images/specialists/legal-counsel.png" },
-] as const
 
 const ARTICLES = [
   {
@@ -136,10 +120,10 @@ const FAQS = [
  * ═══════════════════════════════════════════════════════════════════════ */
 
 /**
- * Marketing landing page — 7-section blueprint.
+ * Marketing landing page — 6-section blueprint.
  *
- * INTENT: Tells one story: Hero -> How it works -> Meet the team ->
- * Investor intelligence -> Thought leadership -> Pricing -> FAQ.
+ * INTENT: Tells one story: Hero -> How it works ->
+ * Investor intelligence -> Pricing -> Thought leadership -> FAQ.
  */
 export default function MarketingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -302,9 +286,6 @@ export default function MarketingPage() {
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               How It Works
             </a>
-            <a href="#the-team" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              The Team
-            </a>
             <a href="#investors" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Investors
             </a>
@@ -375,7 +356,6 @@ export default function MarketingPage() {
                   </Link>
                   {[
                     { href: "#how-it-works", label: "How It Works" },
-                    { href: "#the-team", label: "The Team" },
                     { href: "#investors", label: "Investors" },
                     { href: "#pricing", label: "Pricing" },
                     { href: "#faq", label: "FAQ" },
@@ -410,19 +390,16 @@ export default function MarketingPage() {
         {/* ═══ Section 2: How It Works (3 Pillars) ═══ */}
         <HowItWorksSection />
 
-        {/* ═══ Section 3: Meet Your Team ═══ */}
-        <MeetYourTeamSection />
-
-        {/* ═══ Section 4: Investor Intelligence ═══ */}
+        {/* ═══ Section 3: Investor Intelligence ═══ */}
         <InvestorIntelligenceSection />
+
+        {/* ═══ Section 4: Pricing Teaser ═══ */}
+        <PricingTeaserSection />
 
         {/* ═══ Section 5: From the Founder ═══ */}
         <FounderArticlesSection />
 
-        {/* ═══ Section 6: Pricing Teaser ═══ */}
-        <PricingTeaserSection />
-
-        {/* ═══ Section 7: FAQ ═══ */}
+        {/* ═══ Section 6: FAQ ═══ */}
         <FAQSection />
       </main>
 
@@ -512,61 +489,6 @@ function HeroSection() {
   )
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * SECTION 3: MEET YOUR TEAM (13 Specialists)
- * ═══════════════════════════════════════════════════════════════════════ */
-
-function MeetYourTeamSection() {
-  return (
-    <section id="the-team" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Your Specialist Team
-          </span>
-          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Meet Your <span className="text-international-orange">Team</span>
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Domain specialists across engineering, strategy, finance, and more — ready when you need them.
-          </p>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-10 sm:mb-12">
-          {SPECIALISTS.map((specialist) => (
-            <AnimatedCard key={specialist.name}>
-              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
-                <CardContent className="p-4 sm:p-5 flex flex-col items-center text-center gap-3">
-                  <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden relative border-2 border-muted">
-                    <Image
-                      src={specialist.avatar}
-                      alt={specialist.name}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                      sizes="56px"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm sm:text-base font-bold text-foreground">{specialist.name}</p>
-                    <p className="text-xs text-international-orange font-mono uppercase tracking-wider">{specialist.role}</p>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{specialist.description}</p>
-                </CardContent>
-              </Card>
-            </AnimatedCard>
-          ))}
-        </StaggerContainer>
-
-        <AnimatedSection className="text-center">
-          <p className="text-sm sm:text-base md:text-lg text-muted-foreground italic max-w-3xl mx-auto leading-relaxed">
-            &ldquo;Your ideas, amplified. Each specialist brings deep domain knowledge so you can make better decisions, faster.&rdquo;
-          </p>
-        </AnimatedSection>
-      </div>
-    </section>
-  )
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * SECTION 2: HOW IT WORKS (3 Pillars)
@@ -697,43 +619,7 @@ function HowItWorksSection() {
  * ═══════════════════════════════════════════════════════════════════════ */
 
 function InvestorIntelligenceSection() {
-  return (
-    <section id="investors" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Investor Intelligence
-          </span>
-          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Find the investors who actually{" "}
-            <span className="text-international-orange">fund hardware</span>
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
-            Search 7,800+ UK investors — venture capital, private equity, and angels. Matching scores show how well each investor fits your stage, sector, and geography.
-          </p>
-        </AnimatedSection>
-
-        {/* Stats row */}
-        <StaggerContainer className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
-          {[
-            { value: "7,800+", label: "Investors" },
-            { value: "49,000+", label: "Contacts" },
-            { value: "3,000+", label: "Grants" },
-          ].map((stat) => (
-            <AnimatedCard key={stat.label}>
-              <div className="text-center p-4 sm:p-6 rounded-xl border bg-card">
-                <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">{stat.value}</p>
-                <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-muted-foreground">{stat.label}</p>
-              </div>
-            </AnimatedCard>
-          ))}
-        </StaggerContainer>
-
-        {/* Interactive investor search preview */}
-        <InvestorPreviewSection />
-      </div>
-    </section>
-  )
+  return <InvestorPreviewSection />
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -798,7 +684,7 @@ function PricingTeaserSection() {
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-10 sm:mb-12">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10 sm:mb-12">
           {PRICING_TIERS.map((tier) => (
             <AnimatedCard key={tier.name}>
               <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
