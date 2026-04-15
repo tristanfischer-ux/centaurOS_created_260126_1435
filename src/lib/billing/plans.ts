@@ -98,7 +98,7 @@ export const ENTERPRISE_OVERAGE_CONFIG = {
   /** Maximum overage compute cost in USD per month before hard block */
   maxOverageComputeUsd: 600,
   /** Stripe price ID for the metered overage component (env var) */
-  stripePriceIdOverage: process.env.STRIPE_PRICE_ENTERPRISE_OVERAGE,
+  stripePriceIdOverage: process.env.STRIPE_PRICE_ENTERPRISE_OVERAGE?.trim(),
   /**
    * Number of units reported to Stripe per $1 of compute cost.
    * With $0.01/unit pricing in Stripe, 250 units × $0.01 = $2.50 billed.
@@ -183,8 +183,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxStorageMB: 1_000,
       maxComputeBudgetUsd: 18,
     },
-    stripePriceIdMonthly: process.env.STRIPE_PRICE_SEED_MONTHLY,
-    stripePriceIdAnnual: process.env.STRIPE_PRICE_SEED_ANNUAL,
+    stripePriceIdMonthly: process.env.STRIPE_PRICE_SEED_MONTHLY?.trim(),
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_SEED_ANNUAL?.trim(),
   },
   starter: {
     tier: 'starter',
@@ -219,8 +219,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxStorageMB: 5_000,
       maxComputeBudgetUsd: 25,
     },
-    stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
-    stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL,
+    stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY?.trim(),
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL?.trim(),
   },
   professional: {
     tier: 'professional',
@@ -255,8 +255,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxStorageMB: 50_000,
       maxComputeBudgetUsd: 100,
     },
-    stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY,
-    stripePriceIdAnnual: process.env.STRIPE_PRICE_PROFESSIONAL_ANNUAL,
+    stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY?.trim(),
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_PROFESSIONAL_ANNUAL?.trim(),
   },
   enterprise: {
     tier: 'enterprise',
@@ -289,7 +289,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorIntelligenceAccess: true,
       maxComputeBudgetUsd: 400,
     },
-    stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
-    stripePriceIdAnnual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL,
+    stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY?.trim(),
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL?.trim(),
   },
 }
