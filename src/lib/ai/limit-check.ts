@@ -26,38 +26,22 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
- * Specialist IDs available on the free tier.
- * Free users get 5 of 13 specialists — the ones that use cheap model tiers.
- * Exported so both the execute route and Telegram specialist chat can enforce.
+ * DECISION: All 13 specialists available on every tier.
+ * Compute budget (not feature gating) controls cost. The "delight first"
+ * philosophy means users experience the full product; they upgrade for
+ * more usage, not to unlock features.
+ *
+ * These sets are kept for backward compatibility with the execute route
+ * but now contain ALL specialist IDs so no one is blocked.
  */
-export const FREE_TIER_SPECIALISTS = new Set([
-  'strategist',       // Sage — Google/Gemini (cheap)
-  'finance-lead',     // Finn — DeepSeek (cheapest)
-  'growth-marketer',  // Mia — Google/Gemini (cheap)
-  'product-lead',     // Priya — Sonnet (mid-cost)
-  'hiring-team',      // Harper — Sonnet (mid-cost)
+const ALL_SPECIALISTS = new Set([
+  'strategist', 'finance-lead', 'growth-marketer', 'product-lead',
+  'hiring-team', 'chief-of-staff', 'sales-lead', 'legal-counsel',
+  'fundraising-advisor', 'vp-supply-chain', 'cto', 'vp-engineering',
+  'vp-manufacturing',
 ])
-
-/**
- * Specialist IDs available on the Seed tier.
- * Seed users get 10 of 13 specialists — free tier + 5 mid-cost ones.
- * The 3 most expensive (Max CTO, Jian VP Eng, Fang VP Mfg) require Starter+.
- * This creates a clear upgrade hook: "Unlock all 13 specialists with Startup Team."
- */
-export const SEED_TIER_SPECIALISTS = new Set([
-  // Free tier (5)
-  'strategist',       // Sage — Google/Gemini
-  'finance-lead',     // Finn — DeepSeek
-  'growth-marketer',  // Mia — Google/Gemini
-  'product-lead',     // Priya — Sonnet
-  'hiring-team',      // Harper — Sonnet
-  // Seed additions (5)
-  'chief-of-staff',   // Cal — Sonnet
-  'sales-lead',       // Sal — Sonnet
-  'legal-counsel',    // Leo — Sonnet
-  'fundraising-advisor', // Fiona — Sonnet
-  'vp-supply-chain',  // Chase — DeepSeek
-])
+export const FREE_TIER_SPECIALISTS = ALL_SPECIALISTS
+export const SEED_TIER_SPECIALISTS = ALL_SPECIALISTS
 
 /** Result of an AI limit check */
 export interface AILimitCheckResult {

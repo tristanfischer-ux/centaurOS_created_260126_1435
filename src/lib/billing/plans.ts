@@ -125,14 +125,15 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     priceAnnualGBP: 0,
     features: [
       '50 AI tasks per month',
-      'Marketplace browse',
-      'Voice-to-task',
+      'All 13 AI specialists',
       '15 investor profiles per month',
+      'Partner names, titles & LinkedIn',
+      'Marketplace browse + orders',
       'Email support',
     ],
     limits: {
       maxOrders: 5,
-      maxTeamMembers: 1,
+      maxTeamMembers: undefined, // no team limit — each person pays individually
       maxRetainers: 0,
       maxAiTasksPerMonth: 50,
       apiAccess: false,
@@ -141,9 +142,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxConversationMode: 'text',
       voiceMinutesPerMonth: 0,
       avatarMinutesPerMonth: 0,
-      investorDetailAccess: false,
-      investorContactsVisible: false,
-      investorDeepAccess: false,
+      investorDetailAccess: true,
+      investorContactsVisible: true, // names, titles, LinkedIn — on all tiers
+      investorDeepAccess: false, // verified emails — Seed+ only
       investorIntelligenceAccess: false,
       maxStorageMB: 500,
       maxComputeBudgetUsd: 9,
@@ -153,20 +154,20 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: 'seed',
     name: 'Seed',
     description: 'For solo founders getting serious',
-    bestFor: 'Unlock 10 AI specialists and investor profiles. The serious starting point for solo founders.',
+    bestFor: 'More AI power and investor access. The serious starting point for solo founders.',
     priceMonthlyGBP: 1999, // £19.99/month
     priceAnnualGBP: 19190, // £191.90/year (save ~20%)
     features: [
       '250 AI tasks per month',
-      '10 AI specialists (of 13)',
+      'All 13 AI specialists',
       '50 investor profiles per month',
+      'Verified investor emails',
       'Marketplace browse + orders',
-      'Voice-to-task',
       'Email support',
     ],
     limits: {
-      maxOrders: 5,
-      maxTeamMembers: 1,
+      maxOrders: 10,
+      maxTeamMembers: undefined,
       maxRetainers: 0,
       maxAiTasksPerMonth: 250,
       apiAccess: false,
@@ -176,11 +177,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       voiceMinutesPerMonth: 0,
       avatarMinutesPerMonth: 0,
       investorDetailAccess: true,
-      investorContactsVisible: false,
-      investorDeepAccess: false,
-      investorIntelligenceAccess: false,
-      maxStorageMB: 1_000,
-      maxComputeBudgetUsd: 18,
+      investorContactsVisible: true,
+      investorDeepAccess: true, // verified emails — Seed+ only
+      investorIntelligenceAccess: true,
+      maxStorageMB: 2_000,
+      maxComputeBudgetUsd: 20,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_SEED_MONTHLY?.trim(),
     stripePriceIdAnnual: process.env.STRIPE_PRICE_SEED_ANNUAL?.trim(),
@@ -194,16 +195,16 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     priceAnnualGBP: 47000, // £470/year (save ~20%)
     features: [
       '750 AI tasks per month',
-      'Full marketplace access',
+      '150 investor profiles per month',
+      'Full marketplace + supplier matching',
       'AI comparison assistant',
-      'Investor detail pages + contacts',
-      'Supplier matching',
+      'Pay-as-you-go beyond limits',
       'Email support',
     ],
     limits: {
-      maxOrders: 25,
-      maxTeamMembers: 3,
-      maxRetainers: 1,
+      maxOrders: 50,
+      maxTeamMembers: undefined,
+      maxRetainers: undefined,
       maxAiTasksPerMonth: 750,
       apiAccess: false,
       prioritySupport: false,
@@ -213,10 +214,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       avatarMinutesPerMonth: 0,
       investorDetailAccess: true,
       investorContactsVisible: true,
-      investorDeepAccess: false,
-      investorIntelligenceAccess: false,
-      maxStorageMB: 5_000,
-      maxComputeBudgetUsd: 25,
+      investorDeepAccess: true,
+      investorIntelligenceAccess: true,
+      maxStorageMB: 10_000,
+      maxComputeBudgetUsd: 50,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY?.trim(),
     stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL?.trim(),
@@ -230,15 +231,15 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     priceAnnualGBP: 142800, // £1,428/year (save ~20%)
     features: [
       '2,500 AI tasks per month',
-      'Everything in Startup Team',
-      'Verified investor emails + deep profiles',
+      'Unlimited investor profiles',
       'Fund performance + hardware fit scores',
       'Reduced 5% marketplace fee',
+      'API access',
       'Priority support',
     ],
     limits: {
       maxOrders: undefined, // unlimited
-      maxTeamMembers: 10,
+      maxTeamMembers: undefined, // each person pays individually
       maxRetainers: undefined, // unlimited
       maxAiTasksPerMonth: 2500,
       apiAccess: true,
