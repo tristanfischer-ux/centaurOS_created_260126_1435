@@ -111,7 +111,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "ForgeOS is free to start with a 14-day full-access trial. After that, plans start at \u00a349/month for startups. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "ForgeOS is free to start \u2014 50 AI tasks per month with all 13 specialists. Paid plans start at \u00a319.99/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
   },
 ] as const
 
@@ -680,7 +680,7 @@ function PricingTeaserSection() {
             Start free. Scale <span className="text-international-orange">when ready.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-            14-day full-access trial. No credit card required.
+            Free forever with 50 AI tasks. No credit card required.
           </p>
         </AnimatedSection>
 
@@ -701,7 +701,7 @@ function PricingTeaserSection() {
         <AnimatedSection className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <motion.div whileHover={buttonHover} whileTap={buttonTap}>
             <Link href="/join?role=founder" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-              Start Free Trial <ArrowRight className="h-4 w-4" />
+              Get Started Free <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
           <Link

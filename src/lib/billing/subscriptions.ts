@@ -184,7 +184,7 @@ export async function createSubscriptionCheckout(
           user_id: userId,
           tier,
         },
-        trial_period_days: tier === 'starter' ? 14 : undefined, // 14-day trial for starter
+        // No trials — free tier IS the trial. Paid tiers charge immediately.
       },
     })
     

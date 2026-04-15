@@ -64,7 +64,7 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Do I need a credit card to start?',
-    answer: 'No. Every new account starts with a 14-day full-access trial — no credit card required. After 14 days, you can continue on the free Explorer plan or upgrade to keep full features.',
+    answer: 'No. The Explorer plan is free forever — 50 AI tasks per month with all 13 specialists. No credit card required. Upgrade anytime for more capacity.',
   },
   {
     question: 'Can I upgrade or downgrade later?',
@@ -134,7 +134,7 @@ export function PricingContent() {
               From Idea to First Prototype, Faster
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Start free with a 14-day full-access trial. Upgrade when your team grows. No hidden fees, no contracts.
+              Start free with all 13 specialists. Upgrade when you need more. No hidden fees, no contracts.
             </p>
           </div>
 
@@ -295,17 +295,14 @@ export function PricingContent() {
                             ? 'Get Started Free'
                             : plan.tier === 'seed'
                               ? 'Start with Seed'
-                              : 'Start Free Trial'}
+                              : `Upgrade to ${plan.name}`}
                           <ArrowRight className="h-4 w-4 ml-2" />
                         </Link>
                       </Button>
-                      {/* CTA subtext to reduce commitment anxiety */}
                       <p className="text-xs text-muted-foreground text-center">
                         {plan.tier === 'free'
-                          ? '14-day full-access trial · No credit card required'
-                          : plan.tier === 'seed'
-                            ? 'No trial needed · Cancel anytime'
-                            : 'Start with 14-day free trial · Cancel anytime'
+                          ? 'Free forever · No credit card required'
+                          : 'Cancel anytime · Pay-as-you-go beyond limits'
                         }
                       </p>
                     </div>
