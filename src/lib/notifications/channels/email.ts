@@ -528,7 +528,7 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
         html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                 <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
-                <p style="color: #333; line-height: 1.6;">Your 14-day full-access trial of ForgeOS ends tomorrow. After that, your workspace drops to the free Explorer tier (1 user, 50 assists/month, no supplier matching).</p>
+                <p style="color: #333; line-height: 1.6;">Your 14-day full-access trial of ForgeOS ends tomorrow. After that, your workspace drops to the free Explorer tier (50 tasks/month, 15 investor profiles/month, no supplier matching).</p>
                 <div style="background: #fff5f0; border: 2px solid #ff4500; padding: 20px; border-radius: 8px; margin: 16px 0;">
                     <p style="margin: 0 0 8px 0; color: #ff4500; font-weight: 700; font-size: 16px;">Keep everything you&rsquo;ve built</p>
                     <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.6;">Upgrade to Startup Team (£49/mo) to keep your team workspace, supplier matching, and get 0% marketplace fees on your first £10K of orders.</p>

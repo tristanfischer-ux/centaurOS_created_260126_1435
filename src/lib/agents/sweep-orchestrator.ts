@@ -314,6 +314,7 @@ export async function runSweepOrchestration(): Promise<OrchestrationResult> {
 
     // SECURITY: Gate sweeps by subscription tier to prevent unmetered background costs.
     // Free tier: no sweeps (no revenue to cover compute costs).
+    // Seed tier: no sweeps (£19.99/month doesn't justify background AI spend).
     // Starter tier: no sweeps (£49/month doesn't justify background AI spend).
     // Professional+ tiers: full sweep access.
     let tier = tierCache.get(foundry.id)
@@ -327,7 +328,7 @@ export async function runSweepOrchestration(): Promise<OrchestrationResult> {
         continue
       }
     }
-    if (tier === 'free' || tier === 'starter') continue
+    if (tier === 'free' || tier === 'seed' || tier === 'starter') continue
 
     const budget = prefs?.monthly_budget_usd ?? DEFAULT_MONTHLY_BUDGET_USD
     const currentSpend = monthlySpendMap.get(foundry.id) ?? 0

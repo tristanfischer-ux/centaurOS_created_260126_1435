@@ -255,11 +255,11 @@ export async function checkAILimit(
       }
 
       const upgradeHint = tier === 'free'
-        ? 'Upgrade to Seed (£19.99/mo) for 75 tasks'
+        ? 'Upgrade to Seed (£19.99/mo) for 250 tasks'
         : tier === 'seed'
-          ? 'Upgrade to Startup Team (£49/mo) for 100 tasks'
+          ? 'Upgrade to Startup Team (£49/mo) for 750 tasks'
           : tier === 'starter'
-            ? 'Upgrade to Professional (£149/mo) for 500 tasks'
+            ? 'Upgrade to Professional (£149/mo) for 2,500 tasks'
             : tier === 'professional'
               ? 'Upgrade to Enterprise (£499/mo) for 10,000 tasks'
               : 'Contact sales'

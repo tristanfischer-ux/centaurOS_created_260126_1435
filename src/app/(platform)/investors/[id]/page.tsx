@@ -155,11 +155,11 @@ function FreeUpgradeOverlay({ firmName, firmType, hqCity }: {
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Get full access to investor profiles, partner contacts, portfolio data,
-              and investment thesis details. Start with the Startup Team plan.
+              and investment thesis details.
             </p>
             <div className="flex flex-col gap-2 pt-2">
               <Button asChild className="bg-international-orange hover:bg-international-orange-hover">
-                <Link href="/pricing">View Plans — from £49/mo</Link>
+                <Link href="/pricing">View Plans — from £19.99/mo</Link>
               </Button>
               <p className="text-xs text-muted-foreground">No contracts. Cancel anytime.</p>
             </div>

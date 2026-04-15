@@ -467,7 +467,7 @@ export async function checkInvestorViewCap(
       const upgradeHint = tier === 'free'
         ? 'Upgrade to Seed (£19.99/mo) for 50 profiles/month'
         : tier === 'seed'
-          ? 'Upgrade to Startup Team (£49/mo) for 200 profiles/month'
+          ? 'Upgrade to Startup Team (£49/mo) for 150 profiles/month'
           : 'Upgrade to Professional for unlimited profiles'
       return {
         allowed: false,

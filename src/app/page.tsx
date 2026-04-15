@@ -98,9 +98,10 @@ const ARTICLES = [
 ] as const
 
 const PRICING_TIERS = [
-  { name: "Explorer", price: "Free", detail: "50 AI assists, basic access" },
-  { name: "Startup Team", price: "\u00a349/mo", detail: "100 assists, full marketplace" },
-  { name: "Professional", price: "\u00a3149/mo", detail: "500 assists, priority support" },
+  { name: "Explorer", price: "Free", detail: "50 AI assists, all 13 specialists" },
+  { name: "Seed", price: "\u00a319.99/mo", detail: "250 assists, verified emails" },
+  { name: "Startup Team", price: "\u00a349/mo", detail: "750 assists, supplier matching" },
+  { name: "Professional", price: "\u00a3149/mo", detail: "2,500 assists, priority support" },
 ] as const
 
 const FAQS = [
