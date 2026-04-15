@@ -21,7 +21,6 @@ export async function GET() {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       responseTime: `${responseTime}ms`,
-      version: process.env.npm_package_version || '1.0.0'
     }, {
       headers: { 'Cache-Control': 'public, max-age=30, s-maxage=30' }
     })

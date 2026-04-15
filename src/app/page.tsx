@@ -755,10 +755,10 @@ function FounderArticlesSection() {
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {ARTICLES.map((article) => (
-            <AnimatedCard key={article.title}>
-              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
+        <AnimatedSection delay={0.1}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {ARTICLES.map((article) => (
+              <Card key={article.title} className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
                 <CardContent className="p-5 sm:p-6 flex flex-col gap-3 h-full">
                   <h3 className="text-base sm:text-lg font-bold text-foreground leading-snug">{article.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1">{article.summary}</p>
@@ -772,9 +772,9 @@ function FounderArticlesSection() {
                   </a>
                 </CardContent>
               </Card>
-            </AnimatedCard>
-          ))}
-        </StaggerContainer>
+            ))}
+          </div>
+        </AnimatedSection>
       </div>
     </section>
   )
@@ -854,7 +854,7 @@ function FAQSection() {
                 value={`faq-${i}`}
                 className="border rounded-xl bg-card px-4 sm:px-6 data-[state=open]:shadow-sm transition-shadow"
               >
-                <AccordionTrigger className="text-left text-sm sm:text-base font-semibold py-4 sm:py-5 hover:no-underline">
+                <AccordionTrigger className="text-left text-sm sm:text-base font-semibold text-foreground py-4 sm:py-5 hover:no-underline">
                   {faq.question}
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4 sm:pb-5">
