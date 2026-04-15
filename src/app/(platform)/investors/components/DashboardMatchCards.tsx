@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { MatchPillarBars } from './MatchPillarBars'
+import { ContactStatusPill } from './ContactStatusPill'
 import { scoreFirmDashboard } from '@/lib/investor-match-dashboard'
 import type { InvestorFirm } from '@/actions/investors'
 import { formatFundSize } from '@/lib/format'
@@ -50,7 +51,15 @@ export function DashboardMatchCards({
         const { composite, pillars } = scoreFirmDashboard(firm, q, similarity)
         return { firm, pillars, composite }
       })
-      .sort((a, b) => b.composite - a.composite)
+      .sort((a, b) => {
+        const scoreDiff = b.composite - a.composite
+        if (Math.abs(scoreDiff) > 3) return scoreDiff
+        // Within 3 points: prefer verified > inferred > none to surface actionable firms
+        const rank = (s?: string) => s === 'verified' ? 2 : s === 'inferred' ? 1 : 0
+        const rankDiff = rank(b.firm.contact_status) - rank(a.firm.contact_status)
+        if (rankDiff !== 0) return rankDiff
+        return scoreDiff
+      })
       .slice(0, limit)
   }, [firms, queryText, limit])
 
@@ -94,6 +103,9 @@ export function DashboardMatchCards({
                       </Link>
                       {attrs.firm_type && (
                         <Badge variant="outline" className="text-[10px]">{attrs.firm_type}</Badge>
+                      )}
+                      {firm.contact_status && (
+                        <ContactStatusPill status={firm.contact_status} />
                       )}
                     </div>
                     {(geoFocus.length > 0 || cheque || stages.length > 0) && (

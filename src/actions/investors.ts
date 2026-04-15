@@ -95,6 +95,9 @@ export type InvestorFirm = {
     _hybridScore?: number
     _similarity?: number
   }
+  // Contact availability status (aggregated from vc_pe_contacts). Attached
+  // post-rowToFirm via attachContactStatuses.
+  contact_status?: 'verified' | 'inferred' | 'none'
 }
 
 /**
@@ -548,7 +551,7 @@ export async function searchInvestors(
       }
 
       const total = firms.length
-      const paginatedFirms = firms.slice(from, from + safePageSize)
+      const paginatedFirms = await attachContactStatuses(firms.slice(from, from + safePageSize))
       const hasMore = from + paginatedFirms.length < total
 
       return { firms: paginatedFirms, total, hasMore }
@@ -608,7 +611,7 @@ export async function searchInvestors(
       firms = firms.map(f => stripTierGatedFields(f, access))
 
       const hasMore = from + firms.length < total
-      return { firms, total, hasMore }
+      return { firms: await attachContactStatuses(firms), total, hasMore }
     }
   }
 
@@ -717,7 +720,7 @@ export async function searchInvestors(
   const total = count ?? 0
   const hasMore = from + (data ?? []).length < total
 
-  return { firms, total, hasMore }
+  return { firms: await attachContactStatuses(firms), total, hasMore }
 }
 
 /**
@@ -774,7 +777,8 @@ export async function getInvestorById(id: string): Promise<{
   }
 
   // Strip deep fields based on tier
-  return { firm: stripTierGatedFields(firm, access), access, gated: false }
+  const [withStatus] = await attachContactStatuses([stripTierGatedFields(firm, access)])
+  return { firm: withStatus, access, gated: false }
 }
 
 // DECISION: firm_type is the reliable discriminator for investor vs service provider.
@@ -1236,6 +1240,50 @@ export async function computeMatchScores(
 }
 
 /**
+ * Batch-fetch contact availability status per listing. Derivation:
+ *   any partner with email_verified=true → 'verified'
+ *   else any partner with email present  → 'inferred'
+ *   else                                 → 'none'
+ */
+export async function getContactStatuses(
+  listingIds: string[]
+): Promise<Record<string, 'verified' | 'inferred' | 'none'>> {
+  if (listingIds.length === 0) return {}
+  const safeIds = listingIds.filter(id => UUID_RE.test(id)).slice(0, 500)
+  if (safeIds.length === 0) return {}
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('vc_pe_contacts')
+    .select('listing_id, email, email_verified')
+    .in('listing_id', safeIds)
+
+  if (error || !data) return {}
+
+  const agg = new Map<string, { anyVerified: boolean; anyEmail: boolean }>()
+  for (const row of data as Array<Record<string, unknown>>) {
+    const lid = row.listing_id as string
+    const entry = agg.get(lid) ?? { anyVerified: false, anyEmail: false }
+    if (row.email_verified === true) entry.anyVerified = true
+    if (row.email) entry.anyEmail = true
+    agg.set(lid, entry)
+  }
+
+  const result: Record<string, 'verified' | 'inferred' | 'none'> = {}
+  for (const id of safeIds) {
+    const e = agg.get(id)
+    result[id] = e?.anyVerified ? 'verified' : e?.anyEmail ? 'inferred' : 'none'
+  }
+  return result
+}
+
+async function attachContactStatuses(firms: InvestorFirm[]): Promise<InvestorFirm[]> {
+  if (firms.length === 0) return firms
+  const statuses = await getContactStatuses(firms.map(f => f.id))
+  return firms.map(f => ({ ...f, contact_status: statuses[f.id] ?? 'none' }))
+}
+
+/**
  * Batch-fetch contact counts per investor listing.
  * Used by InvestorTableView to show the "Contacts" column.
  */
@@ -1411,11 +1459,12 @@ export async function getShortlist(): Promise<{
   if (lError || !listings) return { items: [] }
 
   const access = await getInvestorTierAccess()
+  const baseFirms = listings.map(row =>
+    stripTierGatedFields(rowToFirm(row as Record<string, unknown>), access),
+  )
+  const withStatuses = await attachContactStatuses(baseFirms)
   const firmMap = new Map<string, InvestorFirm>()
-  for (const row of listings) {
-    const firm = stripTierGatedFields(rowToFirm(row as Record<string, unknown>), access)
-    firmMap.set(firm.id, firm)
-  }
+  for (const firm of withStatuses) firmMap.set(firm.id, firm)
 
   const items = shortlistRows
     .map(sl => {
@@ -1641,7 +1690,8 @@ export async function getSimilarInvestors(
   const access = precomputedAccess ?? await getInvestorTierAccess()
   const similarityScores: Record<string, number> = {}
   for (const s of similar) similarityScores[s.firm.id] = s.similarity
-  return { firms: similar.map(s => stripTierGatedFields(s.firm, access)), similarityScores }
+  const firms = await attachContactStatuses(similar.map(s => stripTierGatedFields(s.firm, access)))
+  return { firms, similarityScores }
 }
 
 // ---------------------------------------------------------------------------

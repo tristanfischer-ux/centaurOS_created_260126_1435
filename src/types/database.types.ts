@@ -18538,6 +18538,67 @@ export type Database = {
         }
         Relationships: []
       }
+      warm_intro_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          firm_name: string
+          foundry_id: string
+          id: string
+          listing_id: string
+          message: string
+          requested_by: string
+          resolved_at: string | null
+          status: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          firm_name: string
+          foundry_id: string
+          id?: string
+          listing_id: string
+          message: string
+          requested_by: string
+          resolved_at?: string | null
+          status?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          firm_name?: string
+          foundry_id?: string
+          id?: string
+          listing_id?: string
+          message?: string
+          requested_by?: string
+          resolved_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warm_intro_requests_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warm_intro_requests_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warm_intro_requests_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       whiteboards: {
         Row: {
           created_at: string

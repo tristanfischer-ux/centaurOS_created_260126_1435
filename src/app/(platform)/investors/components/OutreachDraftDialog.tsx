@@ -18,12 +18,15 @@ import { generateOutreachDraft } from '@/actions/investor-outreach'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { OutreachDraft } from '@/actions/investor-outreach'
+import { WarmIntroDialog } from './WarmIntroDialog'
 
 interface OutreachDraftDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   listingId: string
   firmName: string
+  contactStatus?: 'verified' | 'inferred' | 'none'
+  linkedinCompanyUrl?: string
 }
 
 export function OutreachDraftDialog({
@@ -31,7 +34,10 @@ export function OutreachDraftDialog({
   onOpenChange,
   listingId,
   firmName,
+  contactStatus,
+  linkedinCompanyUrl,
 }: OutreachDraftDialogProps) {
+  const [warmIntroOpen, setWarmIntroOpen] = useState(false)
   const [draft, setDraft] = useState<OutreachDraft | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -75,8 +81,34 @@ export function OutreachDraftDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {!draft && !isPending && !error && (
+        {!draft && !isPending && !error && contactStatus === 'none' && (
+          <div className="py-6 space-y-4">
+            <p className="text-sm text-muted-foreground text-center">
+              No direct email on file for {firmName}. Fractional Forge will help you find a path.
+            </p>
+            <div className="flex flex-col gap-2">
+              {linkedinCompanyUrl && (
+                <Button asChild variant="default" className="bg-international-orange hover:bg-international-orange-hover">
+                  <a href={linkedinCompanyUrl} target="_blank" rel="noopener noreferrer">
+                    <Linkedin className="h-4 w-4 mr-2" />
+                    Find on LinkedIn
+                  </a>
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => setWarmIntroOpen(true)}>
+                Request warm intro
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!draft && !isPending && !error && contactStatus !== 'none' && (
           <div className="text-center py-8 space-y-4">
+            {contactStatus === 'inferred' && (
+              <div className="bg-status-warning-light/30 border border-status-warning-dark/20 rounded-lg p-3 text-sm text-status-warning-dark text-left">
+                Email address is pattern-inferred and unverified — it may bounce. Consider sending a LinkedIn message as well.
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">
               Generate a personalized cold email and LinkedIn message for {firmName}.
             </p>
@@ -192,6 +224,12 @@ export function OutreachDraftDialog({
           </div>
         )}
       </DialogContent>
+      <WarmIntroDialog
+        open={warmIntroOpen}
+        onOpenChange={setWarmIntroOpen}
+        listingId={listingId}
+        firmName={firmName}
+      />
     </Dialog>
   )
 }

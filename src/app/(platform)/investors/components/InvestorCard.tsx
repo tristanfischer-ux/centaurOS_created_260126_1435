@@ -14,6 +14,7 @@ import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Briefcase, Heart, GitCompare, Clock } from 'lucide-react'
 import { MatchScoreBadge } from './MatchScoreBadge'
+import { ContactStatusPill } from './ContactStatusPill'
 import { cn } from '@/lib/utils'
 import { formatFundSize } from '@/lib/format'
 import type { InvestorFirm } from '@/actions/investors'
@@ -241,6 +242,9 @@ export function InvestorCard({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+              )}
+              {firm.contact_status && (
+                <ContactStatusPill status={firm.contact_status} />
               )}
             </div>
           </div>

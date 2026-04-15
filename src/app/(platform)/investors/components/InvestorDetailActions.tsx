@@ -27,9 +27,11 @@ interface InvestorDetailActionsProps {
   listingId: string
   access: InvestorTierAccess
   firmName?: string
+  contactStatus?: 'verified' | 'inferred' | 'none'
+  linkedinCompanyUrl?: string
 }
 
-export function InvestorDetailActions({ listingId, access, firmName }: InvestorDetailActionsProps) {
+export function InvestorDetailActions({ listingId, access, firmName, contactStatus, linkedinCompanyUrl }: InvestorDetailActionsProps) {
   const [isShortlisted, setIsShortlisted] = useState(false)
   const [isAlerted, setIsAlerted] = useState(false)
   const [showOutreach, setShowOutreach] = useState(false)
@@ -156,6 +158,8 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
         onOpenChange={setShowOutreach}
         listingId={listingId}
         firmName={firmName ?? 'this investor'}
+        contactStatus={contactStatus}
+        linkedinCompanyUrl={linkedinCompanyUrl}
       />
     </div>
   )

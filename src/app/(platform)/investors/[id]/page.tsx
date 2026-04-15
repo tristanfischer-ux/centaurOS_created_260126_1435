@@ -276,7 +276,13 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 </Tooltip>
               )}
               {/* Alert, shortlist, and outreach action buttons */}
-              <InvestorDetailActions listingId={id} access={access} firmName={firm.title} />
+              <InvestorDetailActions
+                listingId={id}
+                access={access}
+                firmName={firm.title}
+                contactStatus={firm.contact_status}
+                linkedinCompanyUrl={firm.attributes.linkedin_company_url}
+              />
             </div>
           </div>
         </div>
