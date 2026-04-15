@@ -6,7 +6,7 @@
  * safely imported by client components (no server-only deps).
  */
 
-import { stripe } from '@/lib/stripe/client'
+import { getStripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBaseUrl } from '@/lib/domains'
@@ -141,7 +141,7 @@ export async function createSubscriptionCheckout(
     let customerId = profile?.stripe_customer_id
     
     if (!customerId) {
-      const customer = await stripe.customers.create({
+      const customer = await getStripe().customers.create({
         email: profile?.email || undefined,
         name: profile?.full_name || undefined,
         metadata: { user_id: userId },
@@ -168,7 +168,7 @@ export async function createSubscriptionCheckout(
     // Create checkout session
     // DECISION: Use automatic_payment_methods instead of payment_method_types
     // to support the widest range of payment methods and avoid deprecation warnings.
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       line_items: lineItems,
@@ -226,7 +226,7 @@ export async function createBillingPortalSession(
       return { url: null, error: 'No billing account found' }
     }
     
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
       return_url: `${getBaseUrl()}/settings/billing`,
     })
@@ -251,7 +251,7 @@ export async function cancelSubscription(
       return { success: false, error: fetchError || 'No subscription found' }
     }
     
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+    await getStripe().subscriptions.update(subscription.stripeSubscriptionId, {
       cancel_at_period_end: true,
     })
     
@@ -284,7 +284,7 @@ export async function resumeSubscription(
       return { success: false, error: fetchError || 'No subscription found' }
     }
     
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+    await getStripe().subscriptions.update(subscription.stripeSubscriptionId, {
       cancel_at_period_end: false,
     })
     

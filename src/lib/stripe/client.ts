@@ -1,26 +1,33 @@
 import Stripe from 'stripe'
 
-// Lazy initialization of Stripe client to avoid build-time errors
+// DECISION: Simple lazy singleton instead of Proxy pattern.
+// The Proxy approach caused StripeConnectionError on Vercel serverless
+// because Proxy forwarding doesn't preserve the Stripe SDK's internal
+// HTTP agent and connection pooling correctly in bundled environments.
 let stripeInstance: Stripe | null = null
 
-function getStripeClient(): Stripe {
+/**
+ * Get the Stripe client. Lazily initializes on first call.
+ * Use this function instead of the `stripe` export if you need
+ * guaranteed direct access to the Stripe instance.
+ */
+export function getStripe(): Stripe {
   if (!stripeInstance) {
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
     if (!stripeSecretKey) {
       throw new Error('Missing STRIPE_SECRET_KEY environment variable')
     }
     stripeInstance = new Stripe(stripeSecretKey, {
-      apiVersion: '2025-02-24.acacia',
       typescript: true,
     })
   }
   return stripeInstance
 }
 
-// Export a proxy that lazily initializes the Stripe client
+// Backward-compatible export — calls getStripe() on first property access
 export const stripe = new Proxy({} as Stripe, {
   get(_target, prop) {
-    return getStripeClient()[prop as keyof Stripe]
+    return getStripe()[prop as keyof Stripe]
   }
 })
 
