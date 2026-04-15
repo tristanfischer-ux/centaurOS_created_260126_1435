@@ -16,11 +16,14 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { determineFunctionCategory } from '@/lib/recruit-match'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { enrichLinkedInProfile } from '@/actions/enrich-linkedin-profile'
 import type { OnboardingData } from '@/actions/onboarding'
 
 export interface ProfileWizardInput {
   /** Direct role selection (e.g. "CFO", "CTO", "VP Engineering"). Overrides auto-detected subcategory. */
   executive_role?: string
+  /** LinkedIn profile URL — saved to profiles + provider_profiles, used for enrichment */
+  linkedin_url?: string
   headline: string
   bio: string
   skills: string[]
@@ -87,6 +90,12 @@ export async function completeProfileWizard(
     ? Math.max(0, Math.min(10000, Math.round(input.day_rate)))
     : null
 
+  // SECURITY: Validate LinkedIn URL format — only allow linkedin.com/in/ URLs
+  const rawLinkedinUrl = input.linkedin_url?.trim() || ''
+  const linkedinUrl = rawLinkedinUrl && /^https?:\/\/(www\.)?linkedin\.com\/in\//i.test(rawLinkedinUrl)
+    ? rawLinkedinUrl.slice(0, 200) // Cap length
+    : null
+
   // DECISION: Allow empty headline/bio/skills/industries — users can skip the
   // identity and expertise steps and complete later from My Profile. Only
   // validate length limits when values are provided.
@@ -149,6 +158,7 @@ export async function completeProfileWizard(
         expertise_areas: expertiseAreas,
         availability_type: availabilityType,
         availability_hours_per_week: hoursPerWeek,
+        ...(linkedinUrl && { linkedin_url: linkedinUrl }),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onboarding_data: updatedOnboarding as any,
         updated_at: new Date().toISOString(),
@@ -179,6 +189,7 @@ export async function completeProfileWizard(
       availability_hours_per_week: hoursPerWeek,
       expertise_areas: expertiseAreas,
       ...(dayRate != null && { day_rate: dayRate }),
+      ...(linkedinUrl && { linkedin_url: linkedinUrl }),
     }
 
     if (providerProfile?.listing_id) {
@@ -198,7 +209,7 @@ export async function completeProfileWizard(
         console.error('[ProfileWizard] Listing update failed:', listingError.message)
       }
 
-      // Sync day_rate and headline to provider_profiles for booking system
+      // Sync day_rate, headline, and linkedin_url to provider_profiles for booking system
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any)
         .from('provider_profiles')
@@ -206,6 +217,7 @@ export async function completeProfileWizard(
           headline: headline || undefined,
           bio: bio || undefined,
           ...(dayRate != null && { day_rate: dayRate }),
+          ...(linkedinUrl && { linkedin_url: linkedinUrl }),
         })
         .eq('id', providerProfile.id)
     } else {
@@ -231,7 +243,7 @@ export async function completeProfileWizard(
       if (insertError) {
         console.error('[ProfileWizard] Listing insert failed:', insertError.message)
       } else if (newListing?.id && providerProfile?.id) {
-        // Link listing back to provider profile + sync day_rate for booking
+        // Link listing back to provider profile + sync day_rate, linkedin for booking
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
           .from('provider_profiles')
@@ -240,9 +252,20 @@ export async function completeProfileWizard(
             headline: headline || undefined,
             bio: bio || undefined,
             ...(dayRate != null && { day_rate: dayRate }),
+            ...(linkedinUrl && { linkedin_url: linkedinUrl }),
           })
           .eq('id', providerProfile.id)
       }
+    }
+
+    // ── LinkedIn enrichment (fire-and-forget) ─────────────────────────
+    // FLOW: If the user provided a LinkedIn URL, kick off async enrichment
+    // to pull experience, education, and companies into the listing.
+    // Non-blocking — wizard returns immediately, enrichment runs in background.
+    if (linkedinUrl) {
+      enrichLinkedInProfile().catch((e: unknown) =>
+        console.warn('[ProfileWizard] LinkedIn enrichment failed (non-blocking):', e)
+      )
     }
 
     // ── Revalidate ────────────────────────────────────────────────────

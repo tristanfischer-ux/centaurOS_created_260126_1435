@@ -276,6 +276,7 @@ export function ProfileCompletionWizard({
 
   // ── Form State ────────────────────────────────────────────────────
   const [executiveRole, setExecutiveRole] = useState('')
+  const [linkedinUrl, setLinkedinUrl] = useState('')
   const [headline, setHeadline] = useState('')
   const [bio, setBio] = useState('')
   const [skills, setSkills] = useState<string[]>([])
@@ -293,6 +294,8 @@ export function ProfileCompletionWizard({
     if (draft) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((draft as any).executive_role) setExecutiveRole((draft as any).executive_role)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((draft as any).linkedin_url) setLinkedinUrl((draft as any).linkedin_url)
       if (draft.headline) setHeadline(draft.headline)
       if (draft.bio) setBio(draft.bio)
       if (draft.skills) setSkills(draft.skills)
@@ -314,6 +317,7 @@ export function ProfileCompletionWizard({
       profile_wizard_draft: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         executive_role: executiveRole || undefined,
+        linkedin_url: linkedinUrl || undefined,
         headline, bio, skills, industries,
         years_experience: yearsExperience ?? undefined,
         expertise_areas: expertiseAreas,
@@ -324,7 +328,7 @@ export function ProfileCompletionWizard({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any,
     }).catch(() => {}) // Non-blocking
-  }, [executiveRole, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, dayRate])
+  }, [executiveRole, linkedinUrl, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, dayRate])
 
   // ── Navigation ────────────────────────────────────────────────────
   const currentStep = STEPS[stepIndex]
@@ -337,6 +341,10 @@ export function ProfileCompletionWizard({
       // DECISION: Allow empty — users can skip and fill later. Only validate max length.
       if (headline.trim().length > 120) newErrors.headline = 'Headline must be under 120 characters'
       if (bio.trim().length > 500) newErrors.bio = 'Bio must be under 500 characters'
+      // Validate LinkedIn URL format if provided
+      if (linkedinUrl.trim() && !linkedinUrl.trim().match(/^https?:\/\/(www\.)?linkedin\.com\/in\//i)) {
+        newErrors.linkedinUrl = 'Please enter a valid LinkedIn profile URL (linkedin.com/in/...)'
+      }
     }
     if (currentStep === 'expertise') {
       // DECISION: Allow empty — users can add skills later from My Profile.
@@ -350,7 +358,7 @@ export function ProfileCompletionWizard({
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [currentStep, headline, bio, skills, industries, yearsExperience, availabilityType])
+  }, [currentStep, headline, bio, linkedinUrl, skills, industries, yearsExperience, availabilityType])
 
   const goNext = useCallback(async () => {
     // INTENT: Auto-add any typed-but-not-entered text in tag inputs before validating.
@@ -375,6 +383,7 @@ export function ProfileCompletionWizard({
       setIsSubmitting(true)
       const result = await completeProfileWizard({
         executive_role: executiveRole || undefined,
+        linkedin_url: linkedinUrl.trim() || undefined,
         headline: headline.trim(),
         bio: bio.trim(),
         skills,
@@ -396,7 +405,7 @@ export function ProfileCompletionWizard({
       toast.success('Profile complete! You\'re now visible to companies looking for talent.')
       router.refresh()
     }
-  }, [stepIndex, validateStep, saveDraft, executiveRole, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, dayRate, router])
+  }, [stepIndex, validateStep, saveDraft, executiveRole, linkedinUrl, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, dayRate, router])
 
   const goBack = useCallback(() => {
     if (stepIndex > 0) {
@@ -604,6 +613,26 @@ export function ProfileCompletionWizard({
                       ) : <span />}
                       <span className="text-xs text-muted-foreground">{bio.length}/500</span>
                     </div>
+                  </div>
+                  <div>
+                    <label htmlFor="linkedinUrl" className="block text-sm font-medium text-foreground mb-1.5">
+                      LinkedIn profile
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Founders are 3x more likely to reach out when they can see your background. We&apos;ll pull your experience and education to fill out your profile automatically.
+                    </p>
+                    <Input
+                      id="linkedinUrl"
+                      value={linkedinUrl}
+                      onChange={(e) => { setLinkedinUrl(e.target.value); setErrors(prev => ({ ...prev, linkedinUrl: '' })) }}
+                      placeholder="https://linkedin.com/in/your-name"
+                      className={cn("bg-card", errors.linkedinUrl && "border-destructive")}
+                      aria-invalid={!!errors.linkedinUrl}
+                      aria-describedby={errors.linkedinUrl ? 'linkedin-error' : undefined}
+                    />
+                    {errors.linkedinUrl && (
+                      <p id="linkedin-error" className="text-sm text-destructive mt-1" role="alert">{errors.linkedinUrl}</p>
+                    )}
                   </div>
                 </>
               )}
