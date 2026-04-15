@@ -202,7 +202,8 @@ export async function createSubscriptionCheckout(
       tier,
       billingPeriod,
     })
-    return { url: null, error: 'Failed to create checkout session' }
+    // TEMPORARY: Return actual error for debugging — remove after checkout is working
+    return { url: null, error: `Checkout failed: ${stripeError.message || 'Unknown'} [type=${stripeError.type}, code=${stripeError.code}, param=${stripeError.param}]` }
   }
 }
 
