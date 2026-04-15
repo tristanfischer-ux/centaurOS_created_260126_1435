@@ -22,6 +22,7 @@ const INTRO_FREE_ORDERS = 3
 /** Fee percentage by subscription tier (after intro orders are used) */
 const TIER_FEE_PERCENT: Record<SubscriptionTier, number> = {
   free: 10,
+  seed: 10,
   starter: 10,
   professional: 5,
   enterprise: 5, // Enterprise may be overridden by DB config

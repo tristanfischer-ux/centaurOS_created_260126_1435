@@ -3505,6 +3505,64 @@ export type Database = {
           },
         ]
       }
+      bonus_feature_credits: {
+        Row: {
+          amount: number
+          consumed: number
+          created_at: string
+          expires_at: string
+          feature: string
+          foundry_id: string
+          granted_to: string
+          id: string
+          reason: string
+        }
+        Insert: {
+          amount?: number
+          consumed?: number
+          created_at?: string
+          expires_at?: string
+          feature: string
+          foundry_id: string
+          granted_to: string
+          id?: string
+          reason: string
+        }
+        Update: {
+          amount?: number
+          consumed?: number
+          created_at?: string
+          expires_at?: string
+          feature?: string
+          foundry_id?: string
+          granted_to?: string
+          id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bonus_feature_credits_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bonus_feature_credits_granted_to_fkey"
+            columns: ["granted_to"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "bonus_feature_credits_granted_to_fkey"
+            columns: ["granted_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       burn_scenarios: {
         Row: {
           cost_delay_weeks: number
@@ -14482,6 +14540,87 @@ export type Database = {
           },
         ]
       }
+      referral_rewards_pending: {
+        Row: {
+          created_at: string
+          forfeited: boolean
+          id: string
+          investor_view_reward: number
+          referred_tier: string
+          referred_user_id: string
+          referrer_foundry_id: string
+          referrer_user_id: string
+          task_reward: number
+          vested: boolean
+          vested_at: string | null
+          vests_at: string
+        }
+        Insert: {
+          created_at?: string
+          forfeited?: boolean
+          id?: string
+          investor_view_reward?: number
+          referred_tier: string
+          referred_user_id: string
+          referrer_foundry_id: string
+          referrer_user_id: string
+          task_reward?: number
+          vested?: boolean
+          vested_at?: string | null
+          vests_at: string
+        }
+        Update: {
+          created_at?: string
+          forfeited?: boolean
+          id?: string
+          investor_view_reward?: number
+          referred_tier?: string
+          referred_user_id?: string
+          referrer_foundry_id?: string
+          referrer_user_id?: string
+          task_reward?: number
+          vested?: boolean
+          vested_at?: string | null
+          vests_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_rewards_pending_referred_user_id_fkey"
+            columns: ["referred_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "referral_rewards_pending_referred_user_id_fkey"
+            columns: ["referred_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_rewards_pending_referrer_foundry_id_fkey"
+            columns: ["referrer_foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_rewards_pending_referrer_user_id_fkey"
+            columns: ["referrer_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "referral_rewards_pending_referrer_user_id_fkey"
+            columns: ["referrer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report_downloads: {
         Row: {
           created_at: string | null
@@ -19208,8 +19347,16 @@ export type Database = {
         Returns: number
       }
       consume_bonus_credit: { Args: { p_foundry_id: string }; Returns: boolean }
+      consume_bonus_feature_credit: {
+        Args: { p_feature: string; p_foundry_id: string }
+        Returns: boolean
+      }
       count_active_founders: {
         Args: { target_foundry_id: string }
+        Returns: number
+      }
+      count_recent_referral_rewards: {
+        Args: { p_foundry_id: string }
         Returns: number
       }
       count_unique_portfolio_companies: { Args: never; Returns: number }
@@ -19525,6 +19672,10 @@ export type Database = {
         }
       }
       get_bonus_credits: { Args: { p_foundry_id: string }; Returns: number }
+      get_bonus_feature_credits: {
+        Args: { p_feature: string; p_foundry_id: string }
+        Returns: number
+      }
       get_buyer_spend: {
         Args: { p_buyer_id: string; p_end_date: string; p_start_date: string }
         Returns: {

@@ -42,7 +42,7 @@ const PRICE_ID_TO_TIER: Record<string, SubscriptionTier> = Object.fromEntries(
   })
 )
 
-const VALID_TIERS: Set<string> = new Set(['free', 'starter', 'professional', 'enterprise'])
+const VALID_TIERS: Set<string> = new Set(['free', 'seed', 'starter', 'professional', 'enterprise'])
 
 // ==========================================
 // SUBSCRIPTION MANAGEMENT

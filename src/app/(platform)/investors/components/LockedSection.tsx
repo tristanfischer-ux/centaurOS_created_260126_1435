@@ -31,9 +31,10 @@ const TIER_NAMES: Record<string, string> = {
 
 const TIER_RANK: Record<string, number> = {
   free: 0,
-  starter: 1,
-  professional: 2,
-  enterprise: 3,
+  seed: 1,
+  starter: 2,
+  professional: 3,
+  enterprise: 4,
 }
 
 /**

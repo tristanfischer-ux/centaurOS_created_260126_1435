@@ -14,7 +14,7 @@
 // SUBSCRIPTION TYPES
 // ==========================================
 
-export type SubscriptionTier = 'free' | 'starter' | 'professional' | 'enterprise'
+export type SubscriptionTier = 'free' | 'seed' | 'starter' | 'professional' | 'enterprise'
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'incomplete'
 
 export interface SubscriptionPlan {
@@ -149,6 +149,42 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxStorageMB: 500,
       maxComputeBudgetUsd: 9,
     },
+  },
+  seed: {
+    tier: 'seed',
+    name: 'Seed',
+    description: 'For solo founders getting serious',
+    bestFor: 'Unlock 10 AI specialists and investor profiles. The serious starting point for solo founders.',
+    priceMonthlyGBP: 1999, // £19.99/month
+    priceAnnualGBP: 19190, // £191.90/year (save ~20%)
+    features: [
+      '75 AI tasks per month',
+      '10 AI specialists (of 13)',
+      '3 investor detail views per day',
+      'Marketplace browse + orders',
+      'Voice-to-task',
+      'Email support',
+    ],
+    limits: {
+      maxOrders: 5,
+      maxTeamMembers: 1,
+      maxRetainers: 0,
+      maxAiTasksPerMonth: 75,
+      apiAccess: false,
+      prioritySupport: false,
+      dedicatedAccount: false,
+      maxConversationMode: 'text' as const,
+      voiceMinutesPerMonth: 0,
+      avatarMinutesPerMonth: 0,
+      investorDetailAccess: true,
+      investorContactsVisible: false,
+      investorDeepAccess: false,
+      investorIntelligenceAccess: false,
+      maxStorageMB: 1_000,
+      maxComputeBudgetUsd: 18,
+    },
+    stripePriceIdMonthly: process.env.STRIPE_PRICE_SEED_MONTHLY,
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_SEED_ANNUAL,
   },
   starter: {
     tier: 'starter',

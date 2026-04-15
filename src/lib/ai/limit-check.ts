@@ -38,6 +38,27 @@ export const FREE_TIER_SPECIALISTS = new Set([
   'hiring-team',      // Harper — Sonnet (mid-cost)
 ])
 
+/**
+ * Specialist IDs available on the Seed tier.
+ * Seed users get 10 of 13 specialists — free tier + 5 mid-cost ones.
+ * The 3 most expensive (Max CTO, Jian VP Eng, Fang VP Mfg) require Starter+.
+ * This creates a clear upgrade hook: "Unlock all 13 specialists with Startup Team."
+ */
+export const SEED_TIER_SPECIALISTS = new Set([
+  // Free tier (5)
+  'strategist',       // Sage — Google/Gemini
+  'finance-lead',     // Finn — DeepSeek
+  'growth-marketer',  // Mia — Google/Gemini
+  'product-lead',     // Priya — Sonnet
+  'hiring-team',      // Harper — Sonnet
+  // Seed additions (5)
+  'chief-of-staff',   // Cal — Sonnet
+  'sales-lead',       // Sal — Sonnet
+  'legal-counsel',    // Leo — Sonnet
+  'fundraising-advisor', // Fiona — Sonnet
+  'vp-supply-chain',  // Chase — DeepSeek
+])
+
 /** Result of an AI limit check */
 export interface AILimitCheckResult {
   allowed: boolean
@@ -402,13 +423,26 @@ export async function getFoundryTier(foundryId: string): Promise<SubscriptionTie
  * fall through to the monthly task limit instead.
  */
 const DAILY_FEATURE_CAPS: Record<string, Partial<Record<SubscriptionTier, number>>> = {
-  specialist_text:        { free: 5, starter: 15 },
-  cad_lab_generate:       { free: 1, starter: 5 },
-  cad_lab_generate_module:{ free: 1, starter: 5 },
+  specialist_text:        { free: 5, seed: 10, starter: 15 },
+  cad_lab_generate:       { free: 1, seed: 3, starter: 5 },
+  cad_lab_generate_module:{ free: 1, seed: 3, starter: 5 },
   // Red team debates are not available on free tier (no daily cap needed — handled by specialist gating)
-  business_plan_analysis: { free: 1, starter: 3 },
-  xray:                   { free: 1, starter: 3 },
-  strategic_briefing:     { free: 1, starter: 2 },
+  business_plan_analysis: { free: 1, seed: 2, starter: 3 },
+  xray:                   { free: 1, seed: 2, starter: 3 },
+  strategic_briefing:     { free: 1, seed: 2, starter: 2 },
+  // Investor detail views — gated per tier to drive upgrades.
+  // Free tier uses weekly cap (handled separately), not daily.
+  investor_detail_view:   { seed: 3, starter: 10 },
+}
+
+/**
+ * Weekly feature caps for the free tier.
+ * Some features are too valuable to give daily access on free,
+ * but giving zero access kills conversion. 1/week creates the
+ * "I saw one and it was amazing" trigger.
+ */
+const WEEKLY_FEATURE_CAPS: Record<string, number> = {
+  investor_detail_view: 1,
 }
 
 /** Result of a daily feature cap check */
@@ -486,5 +520,84 @@ export async function checkDailyFeatureCap(
     console.warn('[DailyCapCheck] Error:', error)
     // Fail open — daily caps are UX smoothing, not a security control
     return { allowed: true, todayUsage: 0, dailyCap: cap }
+  }
+}
+
+// ==========================================
+// WEEKLY FEATURE CAPS (Free Tier)
+// ==========================================
+
+/** Result of a weekly feature cap check */
+export interface WeeklyCapCheckResult {
+  allowed: boolean
+  weekUsage: number
+  weeklyCap: number | null
+  message?: string
+}
+
+/**
+ * Check whether a free-tier foundry has remaining weekly capacity for a feature.
+ *
+ * @description Some features give free users a taste of value on a weekly
+ * (not daily) basis. E.g., 1 investor detail view per week creates the
+ * "I saw one and it was amazing" conversion trigger without being useful
+ * enough to avoid upgrading.
+ *
+ * @param foundryId - The foundry making the call
+ * @param feature - The feature being used
+ * @param tier - The foundry's subscription tier
+ * @returns Check result with allowed/denied status
+ */
+export async function checkWeeklyFeatureCap(
+  foundryId: string,
+  feature: string,
+  tier: SubscriptionTier,
+): Promise<WeeklyCapCheckResult> {
+  // Only free tier has weekly caps — paid tiers use daily caps instead
+  if (tier !== 'free') {
+    return { allowed: true, weekUsage: 0, weeklyCap: null }
+  }
+
+  const cap = WEEKLY_FEATURE_CAPS[feature]
+  if (cap === undefined) {
+    return { allowed: true, weekUsage: 0, weeklyCap: null }
+  }
+
+  try {
+    const adminSupabase = createAdminClient()
+    // INTENT: Week starts on Monday UTC. Using ISO week calculation.
+    const now = new Date()
+    const dayOfWeek = now.getUTCDay() // 0=Sun, 1=Mon, ...
+    const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+    const weekStart = new Date(now)
+    weekStart.setUTCDate(weekStart.getUTCDate() - mondayOffset)
+    weekStart.setUTCHours(0, 0, 0, 0)
+
+    const { count, error } = await adminSupabase
+      .from('ai_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .eq('feature', feature)
+      .gte('created_at', weekStart.toISOString())
+
+    if (error) {
+      console.warn('[WeeklyCapCheck] Query error, allowing:', error.message)
+      return { allowed: true, weekUsage: 0, weeklyCap: cap }
+    }
+
+    const weekUsage = count ?? 0
+    if (weekUsage >= cap) {
+      return {
+        allowed: false,
+        weekUsage,
+        weeklyCap: cap,
+        message: `You've used your weekly allowance for this feature. Upgrade to Seed (£19.99/mo) for daily access.`,
+      }
+    }
+
+    return { allowed: true, weekUsage, weeklyCap: cap }
+  } catch (error) {
+    console.warn('[WeeklyCapCheck] Error:', error)
+    return { allowed: true, weekUsage: 0, weeklyCap: cap }
   }
 }

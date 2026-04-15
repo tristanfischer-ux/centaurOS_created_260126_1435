@@ -428,9 +428,10 @@ export function BillingContent({
 function getPlanOrder(tier: SubscriptionTier): number {
   const order: Record<SubscriptionTier, number> = {
     free: 0,
-    starter: 1,
-    professional: 2,
-    enterprise: 3,
+    seed: 1,
+    starter: 2,
+    professional: 3,
+    enterprise: 4,
   }
   return order[tier]
 }
