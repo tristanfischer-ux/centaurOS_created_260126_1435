@@ -55,6 +55,27 @@ const STEP_LABELS: Record<WizardStep, { title: string; subtitle: string; icon: t
 
 // ── Suggestion Lists ───────────────────────────────────────────────────
 
+// ── Executive Role Options ─────────────────────────────────────────────
+// INTENT: Structured role selection for marketplace subcategory. Users pick
+// their functional area so founders can filter by "I need a fractional CFO"
+// rather than browsing generic "Fractional Executive" listings.
+
+const EXECUTIVE_ROLE_OPTIONS = [
+  { value: 'CFO', label: 'CFO / Finance Director' },
+  { value: 'CTO', label: 'CTO / Technical Director' },
+  { value: 'COO', label: 'COO / Operations Director' },
+  { value: 'CMO', label: 'CMO / Marketing Director' },
+  { value: 'VP Engineering', label: 'VP Engineering' },
+  { value: 'VP Manufacturing', label: 'VP Manufacturing' },
+  { value: 'VP Supply Chain', label: 'VP Supply Chain' },
+  { value: 'VP Sales', label: 'VP Sales / Commercial Director' },
+  { value: 'VP Product', label: 'VP Product' },
+  { value: 'VP HR', label: 'VP HR / People Director' },
+  { value: 'General Counsel', label: 'General Counsel / Legal Director' },
+  { value: 'Board Advisor', label: 'Board Advisor / NED' },
+  { value: 'Other', label: 'Other' },
+]
+
 const SKILL_SUGGESTIONS = [
   'Financial Planning', 'Fundraising', 'FP&A', 'Treasury',
   'Operations', 'Supply Chain', 'Manufacturing', 'Lean',
@@ -254,6 +275,7 @@ export function ProfileCompletionWizard({
   const hydrated = useRef(false)
 
   // ── Form State ────────────────────────────────────────────────────
+  const [executiveRole, setExecutiveRole] = useState('')
   const [headline, setHeadline] = useState('')
   const [bio, setBio] = useState('')
   const [skills, setSkills] = useState<string[]>([])
@@ -262,12 +284,15 @@ export function ProfileCompletionWizard({
   const [expertiseAreas, setExpertiseAreas] = useState<string[]>([])
   const [availabilityType, setAvailabilityType] = useState('')
   const [hoursPerWeek, setHoursPerWeek] = useState<number | null>(null)
+  const [dayRate, setDayRate] = useState<number | null>(null)
 
   // ── Hydrate from draft ────────────────────────────────────────────
   useEffect(() => {
     if (hydrated.current) return
     const draft = onboardingData?.profile_wizard_draft
     if (draft) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((draft as any).executive_role) setExecutiveRole((draft as any).executive_role)
       if (draft.headline) setHeadline(draft.headline)
       if (draft.bio) setBio(draft.bio)
       if (draft.skills) setSkills(draft.skills)
@@ -276,6 +301,8 @@ export function ProfileCompletionWizard({
       if (draft.expertise_areas) setExpertiseAreas(draft.expertise_areas)
       if (draft.availability_type) setAvailabilityType(draft.availability_type)
       if (draft.availability_hours_per_week != null) setHoursPerWeek(draft.availability_hours_per_week)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((draft as any).day_rate != null) setDayRate((draft as any).day_rate)
       if (draft.current_step != null) setStepIndex(draft.current_step)
     }
     hydrated.current = true
@@ -285,15 +312,19 @@ export function ProfileCompletionWizard({
   const saveDraft = useCallback(async (nextStep: number) => {
     updateOnboardingData({
       profile_wizard_draft: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        executive_role: executiveRole || undefined,
         headline, bio, skills, industries,
         years_experience: yearsExperience ?? undefined,
         expertise_areas: expertiseAreas,
         availability_type: availabilityType,
         availability_hours_per_week: hoursPerWeek ?? undefined,
+        day_rate: dayRate ?? undefined,
         current_step: nextStep,
-      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
     }).catch(() => {}) // Non-blocking
-  }, [headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek])
+  }, [executiveRole, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, dayRate])
 
   // ── Navigation ────────────────────────────────────────────────────
   const currentStep = STEPS[stepIndex]
@@ -343,6 +374,7 @@ export function ProfileCompletionWizard({
       // Final submit
       setIsSubmitting(true)
       const result = await completeProfileWizard({
+        executive_role: executiveRole || undefined,
         headline: headline.trim(),
         bio: bio.trim(),
         skills,
@@ -351,6 +383,7 @@ export function ProfileCompletionWizard({
         expertise_areas: expertiseAreas,
         availability_type: availabilityType,
         availability_hours_per_week: hoursPerWeek,
+        day_rate: dayRate,
       })
 
       if (result.error) {
@@ -363,7 +396,7 @@ export function ProfileCompletionWizard({
       toast.success('Profile complete! You\'re now visible to companies looking for talent.')
       router.refresh()
     }
-  }, [stepIndex, validateStep, saveDraft, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, router])
+  }, [stepIndex, validateStep, saveDraft, executiveRole, headline, bio, skills, industries, yearsExperience, expertiseAreas, availabilityType, hoursPerWeek, dayRate, router])
 
   const goBack = useCallback(() => {
     if (stepIndex > 0) {
@@ -466,6 +499,44 @@ export function ProfileCompletionWizard({
             <div className="space-y-5">
               {currentStep === 'identity' && (
                 <>
+                  {/* Executive role selector — primary differentiator for marketplace discovery */}
+                  {(userRole === 'Executive' || !userRole) && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        What best describes your role?
+                      </label>
+                      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Executive role">
+                        {EXECUTIVE_ROLE_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={executiveRole === opt.value}
+                            onClick={() => {
+                              setExecutiveRole(opt.value)
+                              // INTENT: Auto-populate headline from role selection as a starting point.
+                              // Users can edit it afterwards. Only set if headline is empty or was
+                              // previously auto-set from another role selection.
+                              const autoHeadlines = EXECUTIVE_ROLE_OPTIONS.map(o => `Fractional ${o.value}`)
+                              if (!headline || autoHeadlines.includes(headline)) {
+                                setHeadline(opt.value === 'Other' ? '' : `Fractional ${opt.value}`)
+                              }
+                            }}
+                            className={cn(
+                              "px-3 py-2.5 rounded-lg border text-sm font-medium transition-all text-left",
+                              executiveRole === opt.value
+                                ? "border-international-orange bg-international-orange/10 text-international-orange"
+                                : "border-border bg-card text-foreground hover:border-international-orange/50"
+                            )}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      {errors.executiveRole && <p className="text-sm text-destructive mt-1" role="alert">{errors.executiveRole}</p>}
+                    </div>
+                  )}
+
                   <div>
                     <label htmlFor="headline" className="block text-sm font-medium text-foreground mb-1.5">
                       Your headline
@@ -655,6 +726,24 @@ export function ProfileCompletionWizard({
                       />
                     </div>
                   )}
+                  <div>
+                    <label htmlFor="dayRate" className="block text-sm font-medium text-foreground mb-1.5">
+                      Day rate <span className="text-muted-foreground font-normal">(optional, £)</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Setting a rate lets companies book you directly from the marketplace.
+                    </p>
+                    <Input
+                      id="dayRate"
+                      type="number"
+                      min={0}
+                      max={10000}
+                      value={dayRate ?? ''}
+                      onChange={(e) => setDayRate(e.target.value ? parseInt(e.target.value) : null)}
+                      placeholder="e.g. 750"
+                      className="bg-card w-40"
+                    />
+                  </div>
                 </>
               )}
             </div>

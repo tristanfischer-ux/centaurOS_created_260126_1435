@@ -369,13 +369,14 @@ export async function setupNewUser({
         category: "People",
         subcategory: "Executive",
         title: fullName,
-        description: "Fractional Executive available for engagements.",
+        description: "Fractional executive on ForgeOS — complete profile for full details.",
         attributes: {
           role: "Fractional Executive",
           availability: "Available",
           profile_id: userId,
         },
         is_verified: false,
+        approval_status: "approved",
       }).select("id").single();
       if (listingError) {
         console.warn("[setupNewUser] Marketplace listing failed:", listingError);

@@ -19,6 +19,8 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { OnboardingData } from '@/actions/onboarding'
 
 export interface ProfileWizardInput {
+  /** Direct role selection (e.g. "CFO", "CTO", "VP Engineering"). Overrides auto-detected subcategory. */
+  executive_role?: string
   headline: string
   bio: string
   skills: string[]
@@ -27,9 +29,17 @@ export interface ProfileWizardInput {
   expertise_areas: string[]
   availability_type: string
   availability_hours_per_week: number | null
+  /** Optional day rate (£) — enables direct booking from marketplace */
+  day_rate: number | null
 }
 
 const VALID_AVAILABILITY_TYPES = ['full-time', 'part-time', 'advisory', 'project-based']
+const VALID_EXECUTIVE_ROLES = [
+  'CFO', 'CTO', 'COO', 'CMO',
+  'VP Engineering', 'VP Manufacturing', 'VP Supply Chain',
+  'VP Sales', 'VP Product', 'VP HR',
+  'General Counsel', 'Board Advisor', 'Other',
+]
 const MAX_ARRAY_LENGTH = 20
 const MAX_TAG_LENGTH = 100
 
@@ -73,18 +83,18 @@ export async function completeProfileWizard(
   const hoursPerWeek = typeof input.availability_hours_per_week === 'number'
     ? Math.max(0, Math.min(80, Math.round(input.availability_hours_per_week)))
     : null
+  const dayRate = typeof input.day_rate === 'number'
+    ? Math.max(0, Math.min(10000, Math.round(input.day_rate)))
+    : null
 
-  if (!headline || headline.length < 3 || headline.length > 120) {
-    return { error: 'Headline must be 3-120 characters' }
+  // DECISION: Allow empty headline/bio/skills/industries — users can skip the
+  // identity and expertise steps and complete later from My Profile. Only
+  // validate length limits when values are provided.
+  if (headline && headline.length > 120) {
+    return { error: 'Headline must be under 120 characters' }
   }
-  if (!bio || bio.length < 10 || bio.length > 500) {
-    return { error: 'Bio must be 10-500 characters' }
-  }
-  if (skills.length < 2) {
-    return { error: 'Please add at least 2 skills' }
-  }
-  if (industries.length < 1) {
-    return { error: 'Please add at least 1 industry' }
+  if (bio && bio.length > 500) {
+    return { error: 'Bio must be under 500 characters' }
   }
   if (yearsExperience < 0 || yearsExperience > 50) {
     return { error: 'Please select your years of experience' }
@@ -111,11 +121,13 @@ export async function completeProfileWizard(
       return { success: true }
     }
 
-    const subcategory = determineFunctionCategory(
-      profile.role || '',
-      headline,
-      skills
-    )
+    // INTENT: If user explicitly selected a role (e.g. "CFO"), use it as subcategory
+    // for marketplace discovery. Fall back to auto-detection from skills/headline.
+    const executiveRole = input.executive_role?.trim() || ''
+    const validRole = VALID_EXECUTIVE_ROLES.includes(executiveRole) && executiveRole !== 'Other'
+    const subcategory = validRole
+      ? executiveRole
+      : determineFunctionCategory(profile.role || '', headline, skills)
 
     // ── Update profiles table ─────────────────────────────────────────
     const updatedOnboarding: OnboardingData = {
@@ -158,6 +170,7 @@ export async function completeProfileWizard(
       .maybeSingle()
 
     const listingAttributes = {
+      role: validRole ? executiveRole : (executiveRole || 'Fractional Executive'),
       skills,
       industries,
       years_experience: yearsExperience,
@@ -165,6 +178,7 @@ export async function completeProfileWizard(
       availability: availabilityType,
       availability_hours_per_week: hoursPerWeek,
       expertise_areas: expertiseAreas,
+      ...(dayRate != null && { day_rate: dayRate }),
     }
 
     if (providerProfile?.listing_id) {
@@ -173,7 +187,7 @@ export async function completeProfileWizard(
       const { error: listingError } = await (supabase as any)
         .from('marketplace_listings')
         .update({
-          description: bio,
+          description: bio || 'Fractional executive on ForgeOS — view profile for details.',
           subcategory,
           attributes: listingAttributes,
           updated_at: new Date().toISOString(),
@@ -183,6 +197,17 @@ export async function completeProfileWizard(
       if (listingError) {
         console.error('[ProfileWizard] Listing update failed:', listingError.message)
       }
+
+      // Sync day_rate and headline to provider_profiles for booking system
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('provider_profiles')
+        .update({
+          headline: headline || undefined,
+          bio: bio || undefined,
+          ...(dayRate != null && { day_rate: dayRate }),
+        })
+        .eq('id', providerProfile.id)
     } else {
       // Create listing if none exists (Founders don't get one during signup)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -206,11 +231,16 @@ export async function completeProfileWizard(
       if (insertError) {
         console.error('[ProfileWizard] Listing insert failed:', insertError.message)
       } else if (newListing?.id && providerProfile?.id) {
-        // Link listing back to provider profile
+        // Link listing back to provider profile + sync day_rate for booking
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
           .from('provider_profiles')
-          .update({ listing_id: newListing.id, headline, bio })
+          .update({
+            listing_id: newListing.id,
+            headline: headline || undefined,
+            bio: bio || undefined,
+            ...(dayRate != null && { day_rate: dayRate }),
+          })
           .eq('id', providerProfile.id)
       }
     }
