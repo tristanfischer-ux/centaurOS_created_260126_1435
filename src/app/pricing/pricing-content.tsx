@@ -563,7 +563,7 @@ const COMPARISON_FEATURES: Array<{
   { name: 'AI specialists', free: '5 of 13', seed: '10 of 13', starter: '13', professional: '13', enterprise: '13' },
   { name: 'Marketplace browse', free: true, seed: true, starter: true, professional: true, enterprise: true },
   { name: 'Investor directory browse', free: true, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Investor detail pages', free: false, seed: '3/day', starter: '10/day', professional: true, enterprise: 'Unlimited' },
+  { name: 'Investor detail pages', free: '15/month', seed: '50/month', starter: '200/month', professional: 'Unlimited', enterprise: 'Unlimited' },
   { name: 'Partner contacts & LinkedIn', free: false, seed: false, starter: true, professional: true, enterprise: true },
   { name: 'Verified emails & deep profiles', free: false, seed: false, starter: false, professional: true, enterprise: true },
   { name: 'Fund performance & hardware fit', free: false, seed: false, starter: false, professional: true, enterprise: true },

@@ -128,7 +128,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       '50 AI tasks per month',
       'Marketplace browse',
       'Voice-to-task',
-      'Investor directory browse',
+      '15 investor profiles per month',
       'Email support',
     ],
     limits: {
@@ -160,7 +160,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     features: [
       '75 AI tasks per month',
       '10 AI specialists (of 13)',
-      '3 investor detail views per day',
+      '50 investor profiles per month',
       'Marketplace browse + orders',
       'Voice-to-task',
       'Email support',
