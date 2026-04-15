@@ -78,6 +78,36 @@ export interface UserSubscription {
 }
 
 // ==========================================
+// ENTERPRISE OVERAGE CONFIGURATION
+// ==========================================
+
+/**
+ * Overage billing config for Enterprise tier.
+ *
+ * When Enterprise users exceed their included compute budget ($400/mo),
+ * they can continue using AI features at a premium rate. Usage is reported
+ * to Stripe via metered billing and invoiced at period end.
+ *
+ * Economics: $1 compute → $2.50 billed (2.5x markup, 60% gross margin).
+ * Max overage: $600 compute → $1,500 billed.
+ * Total worst case: $1,000 compute vs ~$2,130 revenue = always net positive.
+ */
+export const ENTERPRISE_OVERAGE_CONFIG = {
+  /** Markup multiplier on compute cost (2.5x = $1 compute costs customer $2.50) */
+  markupMultiplier: 2.5,
+  /** Maximum overage compute cost in USD per month before hard block */
+  maxOverageComputeUsd: 600,
+  /** Stripe price ID for the metered overage component (env var) */
+  stripePriceIdOverage: process.env.STRIPE_PRICE_ENTERPRISE_OVERAGE,
+  /**
+   * Number of cents per unit reported to Stripe.
+   * With $0.025/unit pricing in Stripe, 1 unit = $0.01 of compute cost.
+   * So $1 of compute = 100 units → billed at 100 × $0.025 = $2.50.
+   */
+  stripeUnitsPerComputeDollar: 100,
+} as const
+
+// ==========================================
 // SUBSCRIPTION PLANS CONFIGURATION
 // ==========================================
 

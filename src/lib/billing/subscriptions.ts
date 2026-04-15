@@ -28,7 +28,7 @@ import type {
   SubscriptionStatus,
   UserSubscription,
 } from './plans'
-import { SUBSCRIPTION_PLANS } from './plans'
+import { SUBSCRIPTION_PLANS, ENTERPRISE_OVERAGE_CONFIG } from './plans'
 
 // SECURITY: Reverse lookup from Stripe price ID to tier.
 // Prevents tier escalation via metadata tampering — the actual price paid
@@ -153,17 +153,23 @@ export async function createSubscriptionCheckout(
         .eq('id', userId)
     }
     
+    // DECISION: Enterprise subscriptions get a second metered line item for overage billing.
+    // This metered price is usage-based — Stripe only charges if we report usage records.
+    // No usage reported = no overage charge. The metered item has zero base cost.
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      { price: priceId, quantity: 1 },
+    ]
+
+    if (tier === 'enterprise' && ENTERPRISE_OVERAGE_CONFIG.stripePriceIdOverage) {
+      lineItems.push({ price: ENTERPRISE_OVERAGE_CONFIG.stripePriceIdOverage })
+    }
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       success_url: `${getBaseUrl()}/settings/billing?success=true`,
       cancel_url: `${getBaseUrl()}/settings/billing?canceled=true`,
       metadata: {
@@ -306,7 +312,13 @@ export async function handleSubscriptionEvent(
 
       // SECURITY: Derive tier from the actual Stripe price ID, not metadata.
       // Metadata is user-controllable; the price they paid is not.
-      const priceId = subscription.items.data[0]?.price?.id
+      // DECISION: Skip metered subscription items when deriving tier — the metered
+      // overage component is not a tier indicator, it's a usage-based add-on.
+      const overagePriceId = ENTERPRISE_OVERAGE_CONFIG.stripePriceIdOverage
+      const fixedPriceItem = subscription.items.data.find(
+        item => item.price?.id !== overagePriceId
+      )
+      const priceId = fixedPriceItem?.price?.id ?? subscription.items.data[0]?.price?.id
       const metadataTier = subscription.metadata?.tier
       const priceDerivedTier = priceId ? PRICE_ID_TO_TIER[priceId] : undefined
 
@@ -323,6 +335,13 @@ export async function handleSubscriptionEvent(
         console.warn('[Subscriptions] Could not derive tier from price ID, defaulting to starter. metadata tier ignored:', metadataTier)
       }
 
+      // FLOW: Extract metered overage subscription item ID for Enterprise tier.
+      // This is the item we report usage records against for overage billing.
+      const overageItem = overagePriceId
+        ? subscription.items.data.find(item => item.price?.id === overagePriceId)
+        : undefined
+      const stripeOverageItemId = overageItem?.id ?? null
+
       const { error: upsertError } = await supabase.from('user_subscriptions').upsert({
         user_id: userId,
         stripe_subscription_id: subscription.id,
@@ -335,6 +354,7 @@ export async function handleSubscriptionEvent(
         trial_end: subscription.trial_end
           ? new Date(subscription.trial_end * 1000).toISOString()
           : null,
+        stripe_overage_item_id: stripeOverageItemId,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',

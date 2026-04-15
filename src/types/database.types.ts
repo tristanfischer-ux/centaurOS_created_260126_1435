@@ -2035,6 +2035,7 @@ export type Database = {
           foundry_id: string
           id: string
           month_year: string
+          overage_cost_usd: number
           total_ai_tasks: number
           total_cost_usd: number
           total_tokens: number
@@ -2045,6 +2046,7 @@ export type Database = {
           foundry_id: string
           id?: string
           month_year: string
+          overage_cost_usd?: number
           total_ai_tasks?: number
           total_cost_usd?: number
           total_tokens?: number
@@ -2055,6 +2057,7 @@ export type Database = {
           foundry_id?: string
           id?: string
           month_year?: string
+          overage_cost_usd?: number
           total_ai_tasks?: number
           total_cost_usd?: number
           total_tokens?: number
@@ -11962,6 +11965,67 @@ export type Database = {
           },
         ]
       }
+      overage_report_queue: {
+        Row: {
+          attempts: number
+          compute_cost_cents: number
+          created_at: string
+          foundry_id: string
+          id: string
+          last_error: string | null
+          reported_at: string | null
+          status: string
+          stripe_subscription_item_id: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          compute_cost_cents: number
+          created_at?: string
+          foundry_id: string
+          id?: string
+          last_error?: string | null
+          reported_at?: string | null
+          status?: string
+          stripe_subscription_item_id: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          compute_cost_cents?: number
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          last_error?: string | null
+          reported_at?: string | null
+          status?: string
+          stripe_subscription_item_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overage_report_queue_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "overage_report_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "overage_report_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pack_items: {
         Row: {
           created_at: string | null
@@ -18310,6 +18374,7 @@ export type Database = {
           source: string
           status: string
           stripe_customer_id: string | null
+          stripe_overage_item_id: string | null
           stripe_subscription_id: string | null
           tier: string
           trial_end: string | null
@@ -18325,6 +18390,7 @@ export type Database = {
           source?: string
           status: string
           stripe_customer_id?: string | null
+          stripe_overage_item_id?: string | null
           stripe_subscription_id?: string | null
           tier: string
           trial_end?: string | null
@@ -18340,6 +18406,7 @@ export type Database = {
           source?: string
           status?: string
           stripe_customer_id?: string | null
+          stripe_overage_item_id?: string | null
           stripe_subscription_id?: string | null
           tier?: string
           trial_end?: string | null
@@ -19767,6 +19834,15 @@ export type Database = {
           title: string
         }[]
       }
+      get_pending_overage_reports: {
+        Args: { p_foundry_id: string }
+        Returns: {
+          attempts: number
+          compute_cost_cents: number
+          id: string
+          stripe_subscription_item_id: string
+        }[]
+      }
       get_plan_progress: { Args: { p_plan_id: string }; Returns: Json }
       get_platform_fee_percent: {
         Args: { p_order_type?: string; p_role?: string }
@@ -19963,6 +20039,14 @@ export type Database = {
       longtransactionsenabled: { Args: never; Returns: boolean }
       mark_conversation_read: {
         Args: { conv_id: string; user_id: string }
+        Returns: undefined
+      }
+      mark_overage_failed: {
+        Args: { p_error: string; p_report_id: string }
+        Returns: undefined
+      }
+      mark_overage_reported: {
+        Args: { p_report_id: string }
         Returns: undefined
       }
       match_component_compatibility: {

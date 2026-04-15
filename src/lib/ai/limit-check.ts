@@ -15,7 +15,13 @@
 
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/subscriptions'
 import type { SubscriptionTier } from '@/lib/billing/subscriptions'
+import { ENTERPRISE_OVERAGE_CONFIG } from '@/lib/billing/plans'
 import { getCurrentMonthUsage } from '@/lib/ai/usage-tracking'
+import {
+  hasPendingOverageReports,
+  flushPendingOverageReports,
+  getOverageSubscriptionItemId,
+} from '@/lib/billing/overage'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -48,6 +54,16 @@ export interface AILimitCheckResult {
   currentCostUsd?: number
   /** Monthly cost budget ceiling in USD */
   costBudgetUsd?: number
+  /** True if this call is in overage territory (Enterprise only) */
+  overageActive?: boolean
+  /** Compute cost in USD used beyond the base budget this month */
+  overageComputeUsed?: number
+  /** Remaining overage compute in USD before hard cap */
+  overageComputeRemaining?: number
+  /** True if the overage cap has been reached (hard block) */
+  overageCapHit?: boolean
+  /** Stripe subscription item ID for metered overage reporting */
+  stripeOverageItemId?: string
 }
 
 /**
@@ -94,18 +110,107 @@ export async function checkAILimit(
     const costLimitHit = currentCost >= costBudget
 
     if (taskLimitHit || costLimitHit) {
+      // DECISION: Enterprise tier gets overage billing instead of hard block on cost limit.
+      // When cost budget is exceeded but task limit is not, Enterprise users can continue
+      // at a premium rate (2.5x markup) up to a monthly overage cap ($600 compute).
+      if (costLimitHit && !taskLimitHit && tier === 'enterprise') {
+        const overageUsed = Math.max(0, currentCost - costBudget)
+        const overageCap = ENTERPRISE_OVERAGE_CONFIG.maxOverageComputeUsd
+
+        // Check if overage cap has been reached
+        if (overageUsed >= overageCap) {
+          return {
+            allowed: false,
+            currentUsage,
+            limit,
+            remaining: 0,
+            tier,
+            message: 'You\'ve reached your monthly overage cap. Contact sales for custom capacity.',
+            currentCostUsd: currentCost,
+            costBudgetUsd: costBudget,
+            overageCapHit: true,
+            overageComputeUsed: overageUsed,
+            overageComputeRemaining: 0,
+          }
+        }
+
+        // SECURITY: Fail-closed — check for un-reported overage charges.
+        // If prior Stripe reporting failed, we must flush the queue before
+        // allowing more overage compute to prevent giving away free resources.
+        const hasPending = await hasPendingOverageReports(foundryId)
+        if (hasPending) {
+          const flushed = await flushPendingOverageReports(foundryId)
+          if (!flushed) {
+            return {
+              allowed: false,
+              currentUsage,
+              limit,
+              remaining: 0,
+              tier,
+              message: 'Unable to process overage billing. Please try again shortly.',
+              currentCostUsd: currentCost,
+              costBudgetUsd: costBudget,
+              overageActive: true,
+              overageComputeUsed: overageUsed,
+              overageComputeRemaining: overageCap - overageUsed,
+            }
+          }
+        }
+
+        // Look up metered subscription item for Stripe reporting
+        const overageItemId = await getOverageSubscriptionItemId(foundryId)
+        if (!overageItemId) {
+          // GOTCHA: Enterprise user without metered component — shouldn't happen
+          // in normal flow, but possible for Enterprise users who subscribed before
+          // the overage feature was added. Fall through to standard hard block.
+          console.warn('[AILimitCheck] Enterprise user missing overage item, hard-blocking:', { foundryId })
+          return {
+            allowed: false,
+            currentUsage,
+            limit,
+            remaining: 0,
+            tier,
+            message: 'You\'ve reached your monthly AI compute budget. Please contact support to enable overage billing.',
+            currentCostUsd: currentCost,
+            costBudgetUsd: costBudget,
+          }
+        }
+
+        // ALLOW with overage — caller must report usage to Stripe after the AI call
+        return {
+          allowed: true,
+          currentUsage,
+          limit,
+          remaining: 0,
+          tier,
+          currentCostUsd: currentCost,
+          costBudgetUsd: costBudget,
+          overageActive: true,
+          overageComputeUsed: overageUsed,
+          overageComputeRemaining: overageCap - overageUsed,
+          stripeOverageItemId: overageItemId,
+        }
+      }
+
       // SECURITY: Cost budget is a hard ceiling — bonus credits cannot bypass it.
       // Bonus credits only help with task count limits, not cost overruns.
       // Without this guard, a user could use bonus credits to make unlimited
       // expensive calls (one credit per call regardless of cost).
       if (costLimitHit) {
+        const upgradeHint = tier === 'free'
+          ? 'Upgrade to Starter'
+          : tier === 'starter'
+            ? 'Upgrade to Professional'
+            : tier === 'professional'
+              ? 'Upgrade to Enterprise'
+              : 'Contact sales for custom capacity'
         return {
           allowed: false,
           currentUsage,
           limit,
           remaining: 0,
           tier,
-          message: `You've reached your monthly AI compute budget. Upgrade your plan for more capacity.`,
+          message: `You've reached your monthly AI compute budget. ${upgradeHint} for more capacity.`,
           currentCostUsd: currentCost,
           costBudgetUsd: costBudget,
         }
@@ -142,16 +247,20 @@ export async function checkAILimit(
         console.warn('[AILimitCheck] Bonus credit check failed:', bonusError)
       }
 
-      const denyMessage = costLimitHit && !taskLimitHit
-        ? `You've reached your monthly AI compute budget. Upgrade your plan for more capacity.`
-        : `You've reached your monthly AI limit of ${limit} tasks. Invite a friend to get 10 more, or upgrade your plan.`
+      const upgradeHint = tier === 'free'
+        ? 'Upgrade to Starter'
+        : tier === 'starter'
+          ? 'Upgrade to Professional'
+          : tier === 'professional'
+            ? 'Upgrade to Enterprise'
+            : 'Contact sales'
       return {
         allowed: false,
         currentUsage,
         limit,
         remaining: 0,
         tier,
-        message: denyMessage,
+        message: `You've reached your monthly AI limit of ${limit} tasks. Invite a friend to get 10 more, or ${upgradeHint.toLowerCase()}.`,
         currentCostUsd: currentCost,
         costBudgetUsd: costBudget,
       }

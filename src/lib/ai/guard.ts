@@ -23,6 +23,8 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { checkAILimit } from '@/lib/ai/limit-check'
 import { trackAIUsage } from '@/lib/ai/usage-tracking'
 import type { AIFeature } from '@/lib/ai/usage-tracking'
+import { reportOverageToStripe } from '@/lib/billing/overage'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 
 /** Shared params for trackUsage callback */
 interface TrackUsageParams {
@@ -51,6 +53,10 @@ type AIGuardResult =
       /** Guaranteed non-null when denied=false */
       foundryId: string
       trackUsage: (params: TrackUsageParams) => Promise<void>
+      /** True if this call is in overage territory (Enterprise only) */
+      overageActive: boolean
+      /** Remaining overage compute in USD before hard cap */
+      overageComputeRemaining?: number
     }
 
 /**
@@ -126,10 +132,17 @@ export async function aiGuard(
     }
   }
 
+  // DECISION: Capture overage state from limit check for use in tracking callback.
+  // If overageActive=true, the tracking callback will report compute cost to Stripe
+  // after logging usage — this happens AFTER the AI call succeeds, so we only bill
+  // for compute that was actually consumed.
+  const overageActive = limitCheck.overageActive ?? false
+  const overageItemId = limitCheck.stripeOverageItemId
+
   // Create tracking callback
   const trackUsageFn = async (params: TrackUsageParams) => {
     // AUDIT: Log AI usage for cost tracking
-    await trackAIUsage({
+    const result = await trackAIUsage({
       foundryId,
       userId: user.id,
       feature,
@@ -139,6 +152,35 @@ export async function aiGuard(
       estimatedCostUsd: params.estimatedCostUsd,
       metadata: params.metadata,
     })
+
+    // FLOW: If in overage, report the overage portion of this call's cost to Stripe.
+    // Only the cost that exceeds the base budget gets billed as overage.
+    if (overageActive && overageItemId && result) {
+      const costBudget = SUBSCRIPTION_PLANS[limitCheck.tier].limits.maxComputeBudgetUsd
+      const previousCost = (limitCheck.currentCostUsd ?? 0)
+      const currentCost = result.monthlyCostUsd
+      const estimatedCallCost = params.estimatedCostUsd ?? (currentCost - previousCost)
+
+      // INTENT: Calculate what portion of THIS call is overage.
+      // If the user was already $10 over budget before this call, the entire call is overage.
+      // If the user was $5 under and this call costs $8, only $3 is overage.
+      let overagePortion: number
+      if (previousCost >= costBudget) {
+        // Already fully in overage — entire call cost is overage
+        overagePortion = estimatedCallCost
+      } else {
+        // Partially in overage — only the portion above budget
+        overagePortion = Math.max(0, (previousCost + estimatedCallCost) - costBudget)
+      }
+
+      if (overagePortion > 0) {
+        // Fire-and-forget with logging — don't block the response.
+        // If reporting fails, it's queued and the next call will flush.
+        reportOverageToStripe(overageItemId, overagePortion, foundryId, user.id).catch(err => {
+          console.error('[aiGuard] Overage reporting error (non-blocking):', err)
+        })
+      }
+    }
   }
 
   return {
@@ -146,5 +188,7 @@ export async function aiGuard(
     userId: user.id,
     foundryId,
     trackUsage: trackUsageFn,
+    overageActive,
+    overageComputeRemaining: limitCheck.overageComputeRemaining,
   }
 }
