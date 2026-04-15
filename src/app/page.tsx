@@ -23,6 +23,9 @@ import {
   ArrowRight,
   ExternalLink,
   Check,
+  Briefcase,
+  Users,
+  Banknote,
 } from "lucide-react"
 import { InvestorPreviewSection } from "@/components/marketing/investor-preview"
 import {
@@ -390,16 +393,19 @@ export default function MarketingPage() {
         {/* ═══ Section 2: How It Works (3 Pillars) ═══ */}
         <HowItWorksSection />
 
-        {/* ═══ Section 3: Investor Intelligence ═══ */}
+        {/* ═══ Section 3: Fractional Executives ═══ */}
+        <FractionalExecutiveSection />
+
+        {/* ═══ Section 4: Investor Intelligence ═══ */}
         <InvestorIntelligenceSection />
 
-        {/* ═══ Section 4: Pricing Teaser ═══ */}
+        {/* ═══ Section 5: Pricing Teaser ═══ */}
         <PricingTeaserSection />
 
-        {/* ═══ Section 5: From the Founder ═══ */}
+        {/* ═══ Section 6: From the Founder ═══ */}
         <FounderArticlesSection />
 
-        {/* ═══ Section 6: FAQ ═══ */}
+        {/* ═══ Section 7: FAQ ═══ */}
         <FAQSection />
       </main>
 
@@ -609,6 +615,91 @@ function HowItWorksSection() {
             )
           })}
         </div>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SECTION 3: FRACTIONAL EXECUTIVES
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const EXECUTIVE_BENEFITS = [
+  {
+    icon: Banknote,
+    title: "Set Your Rate",
+    description:
+      "You decide what you charge. No bidding wars, no race to the bottom.",
+  },
+  {
+    icon: Users,
+    title: "Clients Come to You",
+    description:
+      "Get discovered by funded hardware startups who need your expertise.",
+  },
+  {
+    icon: Briefcase,
+    title: "Get Paid on Delivery",
+    description:
+      "Secure payments via escrow. Complete the engagement, get paid automatically.",
+  },
+] as const
+
+function FractionalExecutiveSection() {
+  return (
+    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            For Executives
+          </span>
+          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            Fractional Experts.{" "}
+            <span className="text-international-orange">Real Results.</span>
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Hardware startups need experienced leaders — without the full-time
+            overhead. Join ForgeOS as a fractional executive and get matched with
+            funded companies.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-10 sm:mb-12">
+          {EXECUTIVE_BENEFITS.map((benefit) => (
+            <AnimatedCard key={benefit.title}>
+              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
+                <CardContent className="p-6 sm:p-8 text-center flex flex-col items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-international-orange/10">
+                    <benefit.icon className="h-6 w-6 text-international-orange" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-foreground">
+                    {benefit.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {benefit.description}
+                  </p>
+                </CardContent>
+              </Card>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+
+        <AnimatedSection className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+            <Link
+              href="/join?role=executive"
+              className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
+            >
+              Join as an Executive <ArrowRight className="h-4 w-4" />
+            </Link>
+          </motion.div>
+          <Link
+            href="/for-executives"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
+          >
+            Learn more <ArrowRight className="h-4 w-4" />
+          </Link>
+        </AnimatedSection>
       </div>
     </section>
   )
