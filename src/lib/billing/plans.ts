@@ -82,29 +82,28 @@ export interface UserSubscription {
 // ==========================================
 
 /**
- * Overage billing config for Enterprise tier.
+ * Overage billing config for all paid tiers.
  *
- * When Enterprise users exceed their included compute budget ($400/mo),
- * they can continue using AI features at a premium rate. Usage is reported
+ * When users exceed their included compute budget, they can continue
+ * using AI features at a premium rate (10x markup). Usage is reported
  * to Stripe via metered billing and invoiced at period end.
  *
- * Economics: $1 compute → $2.50 billed (2.5x markup, 60% gross margin).
- * Max overage: $600 compute → $1,500 billed.
- * Total worst case: $1,000 compute vs ~$2,130 revenue = always net positive.
+ * Economics: $1 compute → $10 billed (10x markup, 90% gross margin).
+ * This strongly incentivises upgrading to the next tier for better value.
  */
 export const ENTERPRISE_OVERAGE_CONFIG = {
-  /** Markup multiplier on compute cost (2.5x = $1 compute costs customer $2.50) */
-  markupMultiplier: 2.5,
+  /** Markup multiplier on compute cost (10x = $1 compute costs customer $10) */
+  markupMultiplier: 10,
   /** Maximum overage compute cost in USD per month before hard block */
   maxOverageComputeUsd: 600,
   /** Stripe price ID for the metered overage component (env var) */
   stripePriceIdOverage: process.env.STRIPE_PRICE_ENTERPRISE_OVERAGE?.trim(),
   /**
    * Number of units reported to Stripe per $1 of compute cost.
-   * With $0.01/unit pricing in Stripe, 250 units × $0.01 = $2.50 billed.
-   * So $1 of compute = 250 units → billed at $2.50 = 2.5x markup.
+   * With £0.01/unit pricing in Stripe, 1000 units × £0.01 = £10 billed.
+   * So $1 of compute = 1000 units → billed at £10 = 10x markup.
    */
-  stripeUnitsPerComputeDollar: 250,
+  stripeUnitsPerComputeDollar: 1000,
   /**
    * Stripe Billing Meter event name.
    * Usage is reported via meter events (required for Stripe API ≥ 2025-03-31).
@@ -158,7 +157,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     priceMonthlyGBP: 1999, // £19.99/month
     priceAnnualGBP: 19190, // £191.90/year (save ~20%)
     features: [
-      '75 AI tasks per month',
+      '250 AI tasks per month',
       '10 AI specialists (of 13)',
       '50 investor profiles per month',
       'Marketplace browse + orders',
@@ -169,7 +168,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxOrders: 5,
       maxTeamMembers: 1,
       maxRetainers: 0,
-      maxAiTasksPerMonth: 75,
+      maxAiTasksPerMonth: 250,
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
@@ -194,7 +193,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     priceMonthlyGBP: 4900, // £49/month
     priceAnnualGBP: 47000, // £470/year (save ~20%)
     features: [
-      '100 AI tasks per month',
+      '750 AI tasks per month',
       'Full marketplace access',
       'AI comparison assistant',
       'Investor detail pages + contacts',
@@ -205,7 +204,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxOrders: 25,
       maxTeamMembers: 3,
       maxRetainers: 1,
-      maxAiTasksPerMonth: 100,
+      maxAiTasksPerMonth: 750,
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
@@ -230,7 +229,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     priceMonthlyGBP: 14900, // £149/month
     priceAnnualGBP: 142800, // £1,428/year (save ~20%)
     features: [
-      '500 AI tasks per month',
+      '2,500 AI tasks per month',
       'Everything in Startup Team',
       'Verified investor emails + deep profiles',
       'Fund performance + hardware fit scores',
@@ -241,7 +240,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxOrders: undefined, // unlimited
       maxTeamMembers: 10,
       maxRetainers: undefined, // unlimited
-      maxAiTasksPerMonth: 500,
+      maxAiTasksPerMonth: 2500,
       apiAccess: true,
       prioritySupport: true,
       dedicatedAccount: false,

@@ -554,7 +554,7 @@ const COMPARISON_FEATURES: Array<{
   professional: boolean | string
   enterprise: boolean | string
 }> = [
-  { name: 'Assists per month', free: '50', seed: '75', starter: '100', professional: '500', enterprise: 'Unlimited' },
+  { name: 'Assists per month', free: '50', seed: '250', starter: '750', professional: '2,500', enterprise: 'Unlimited' },
   { name: 'Orders/month', free: '5', seed: '5', starter: '25', professional: 'Unlimited', enterprise: 'Unlimited' },
   { name: 'Team members', free: '1', seed: '1', starter: '3', professional: '10', enterprise: 'Unlimited' },
   { name: 'Voice-to-task', free: true, seed: true, starter: true, professional: true, enterprise: true },
