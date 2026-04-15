@@ -30,12 +30,12 @@ interface ViewCapOverlayProps {
 const UPGRADE_CTA: Record<string, { label: string; description: string; price: string }> = {
   free: {
     label: 'Upgrade to Seed',
-    description: '3 investor profiles per day',
+    description: '50 investor profiles per month',
     price: '£19.99/mo',
   },
   seed: {
-    label: 'Upgrade to Starter',
-    description: '10 investor profiles per day',
+    label: 'Upgrade to Startup Team',
+    description: '200 investor profiles per month',
     price: '£49/mo',
   },
   starter: {
@@ -53,7 +53,6 @@ export function ViewCapOverlay({
   viewCap,
 }: ViewCapOverlayProps) {
   const cta = UPGRADE_CTA[tier] ?? UPGRADE_CTA.free
-  const periodLabel = viewCap.period === 'weekly' ? 'this week' : 'today'
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -90,17 +89,14 @@ export function ViewCapOverlay({
               <Eye className="h-6 w-6 text-international-orange" />
             </div>
             <h2 className="text-xl font-semibold text-foreground">
-              You&apos;ve used your profile views
+              You&apos;ve explored {viewCap.viewsUsedThisMonth} of 7,800+ investors this month
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              You&apos;ve reached your limit of{' '}
+              Your library has{' '}
               <span className="font-medium text-foreground">
-                {viewCap.cap} {viewCap.cap === 1 ? 'view' : 'views'}
-              </span>{' '}
-              {periodLabel}.{' '}
-              {viewCap.period === 'weekly'
-                ? 'Views reset every Monday.'
-                : 'Views reset at midnight UTC.'}
+                {viewCap.librarySize} investor {viewCap.librarySize === 1 ? 'profile' : 'profiles'}
+              </span>
+              {' '}&mdash; revisit them anytime.
             </p>
 
             <div className="flex flex-col gap-2 pt-2">
@@ -123,18 +119,14 @@ export function ViewCapOverlay({
                 <Link href="/settings/referrals" className="text-international-orange hover:underline">
                   Invite a friend
                 </Link>{' '}
-                to earn bonus views
+                for +5 profiles/month
               </span>
             </div>
 
             {/* Reset timer hint */}
             <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span>
-                {viewCap.period === 'weekly'
-                  ? 'Next reset: Monday 00:00 UTC'
-                  : 'Next reset: midnight UTC'}
-              </span>
+              <span>Views reset on the 1st of each month</span>
             </div>
           </CardContent>
         </Card>

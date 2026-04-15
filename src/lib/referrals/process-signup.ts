@@ -19,8 +19,8 @@ const REFERRAL_CREDIT_AMOUNT = 10
 const FOUNDING_MEMBER_CREDIT_AMOUNT = 25
 const FOUNDING_MEMBER_LIMIT = 100
 
-/** Maximum signup referral rewards a referrer can receive in a 30-day window */
-const MAX_SIGNUP_REWARDS_PER_30_DAYS = 5
+/** Bonus investor monthly views granted per referral signup */
+const REFERRAL_INVESTOR_VIEW_BONUS = 5
 
 /**
  * Track a referral signup: grant credits to both referrer and referee.
@@ -91,31 +91,8 @@ async function trackReferralSignup(
       reason: 'referral_received',
     })
 
-    // SECURITY: Rate limit referrer's signup rewards (max 5 per 30 days).
-    // The referee still gets their reward — don't punish them for the referrer's activity.
-    let referrerCapped = false
+    // Grant +10 credits to referrer (uncapped — referrals are the primary growth lever)
     if (referrer.foundry_id) {
-      const { data: recentCount, error: countError } = await admin.rpc(
-        'count_recent_referral_rewards' as never,
-        { p_foundry_id: referrer.foundry_id } as never
-      )
-
-      if (countError) {
-        console.warn('[Referral] Failed to check referrer rate limit:', countError.message)
-        // DECISION: Fail open — grant the reward if we can't check the count.
-        // Better to occasionally over-grant than to block legitimate referrals.
-      } else if (typeof recentCount === 'number' && recentCount >= MAX_SIGNUP_REWARDS_PER_30_DAYS) {
-        referrerCapped = true
-        console.info('[Referral] Referrer hit signup reward cap:', {
-          referrer: referrer.id,
-          recentCount,
-          cap: MAX_SIGNUP_REWARDS_PER_30_DAYS,
-        })
-      }
-    }
-
-    // Grant +10 credits to referrer (unless capped)
-    if (referrer.foundry_id && !referrerCapped) {
       await admin.from('referral_credits').insert({
         foundry_id: referrer.foundry_id,
         granted_to: referrer.id,
@@ -123,7 +100,27 @@ async function trackReferralSignup(
         amount: REFERRAL_CREDIT_AMOUNT,
         reason: 'referral_made',
       })
+
+      // FLOW: Grant +5 investor monthly views to referrer via bonus_feature_credits
+      try {
+        await admin.from('bonus_feature_credits').insert({
+          foundry_id: referrer.foundry_id,
+          granted_to: referrer.id,
+          feature: 'investor_monthly_views',
+          amount: REFERRAL_INVESTOR_VIEW_BONUS,
+          reason: 'referral_signup',
+        })
+      } catch (bonusError) {
+        // Non-critical — AI task credits were still granted
+        console.warn('[Referral] Failed to grant investor view bonus:', bonusError)
+      }
     }
+
+    // TODO: Activation gate — consider requiring profile completion before
+    // granting referral rewards. This prevents gaming via empty signups.
+    // Implementation requires checking profile completeness which is complex
+    // (multiple fields across profiles + foundries tables). Defer to a
+    // dedicated feature sprint.
 
     // SECURITY: Atomic increment via SQL to avoid read-then-write race
     await admin.rpc('increment_referral_count' as never, { p_user_id: referrer.id } as never)

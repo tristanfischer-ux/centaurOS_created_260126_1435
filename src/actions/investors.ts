@@ -26,9 +26,9 @@ import type { FoundryProfile } from '@/lib/investor-match'
 import { nomicEmbedQuery } from '@/lib/search/nomic-embed'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import {
-  checkDailyFeatureCap,
-  checkWeeklyFeatureCap,
   getFoundryTier,
+  MONTHLY_INVESTOR_VIEW_CAPS,
+  MAX_DAILY_INVESTOR_VIEWS,
 } from '@/lib/ai/limit-check'
 
 // ---------------------------------------------------------------------------
@@ -173,13 +173,21 @@ export interface InvestorTierAccess {
 /**
  * Result of an investor view cap check.
  * Used to gate detail page access and show remaining views in the UI.
+ *
+ * Monthly caps apply to NEW investor views only. Previously-viewed investors
+ * ("library") can be revisited unlimited times for free.
  */
 export interface InvestorViewCapResult {
   allowed: boolean
-  remaining: number
-  cap: number | null
-  period: 'daily' | 'weekly' | null
+  viewsUsedThisMonth: number
+  viewsRemaining: number | null  // null = unlimited
+  librarySize: number
+  cap: number | null  // null = unlimited
+  isRevisit: boolean
+  period: 'monthly'
   message?: string
+  /** @deprecated Alias for viewsRemaining — kept for backward compat during migration */
+  remaining: number | null
 }
 
 // ---------------------------------------------------------------------------
@@ -340,15 +348,16 @@ export async function getInvestorTierAccess(): Promise<InvestorTierAccess> {
 // ---------------------------------------------------------------------------
 
 /**
- * Check whether a foundry can view another investor detail page.
+ * Check if a user can view an investor detail page.
  *
- * @description Enforces per-tier view caps:
+ * @description Monthly caps with "once viewed, always yours" library:
+ * - Free: 15 new views/month
+ * - Seed: 50 new views/month
+ * - Starter: 200 new views/month
  * - Professional/Enterprise: unlimited
- * - Seed/Starter: daily cap (3/10 respectively) via checkDailyFeatureCap
- * - Free: weekly cap (1/week) via checkWeeklyFeatureCap
  *
- * Deduplication: re-viewing the same investor within the cap window
- * does not count against the quota.
+ * Library: Previously-viewed investors can be revisited unlimited times.
+ * Anti-scraping: MAX_DAILY_INVESTOR_VIEWS hard ceiling regardless of tier.
  *
  * @param foundryId - The foundry viewing the investor
  * @param tier - The foundry's subscription tier
@@ -360,185 +369,208 @@ export async function checkInvestorViewCap(
   tier: SubscriptionTier,
   investorId: string,
 ): Promise<InvestorViewCapResult> {
-  const FEATURE = 'investor_detail_view'
-
   // Professional/Enterprise: always allowed, no cap
   if (tier === 'professional' || tier === 'enterprise') {
-    return { allowed: true, remaining: 999, cap: null, period: null }
+    return {
+      allowed: true,
+      viewsUsedThisMonth: 0,
+      viewsRemaining: null,
+      librarySize: 0,
+      cap: null,
+      isRevisit: false,
+      period: 'monthly',
+      remaining: null,
+    }
   }
 
   try {
     const adminSupabase = createAdminClient()
 
-    // DEDUPLICATION: Check if this specific investor was already viewed
-    // in the current cap window (today for daily, this week for weekly).
-    // If so, the view is "free" — don't count against quota.
-    const isWeekly = tier === 'free'
-    const windowStart = new Date()
+    // FLOW: Check if investor is already in the user's library (free re-visit)
+    const { data: inLibrary } = await adminSupabase.rpc('is_investor_in_library', {
+      p_foundry_id: foundryId,
+      p_investor_id: investorId,
+    })
 
-    if (isWeekly) {
-      // Week starts Monday UTC (same as checkWeeklyFeatureCap)
-      const dayOfWeek = windowStart.getUTCDay()
-      const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-      windowStart.setUTCDate(windowStart.getUTCDate() - mondayOffset)
-    }
-    windowStart.setUTCHours(0, 0, 0, 0)
+    // Get current stats regardless of library status (needed for UI)
+    const { data: stats } = await adminSupabase.rpc('get_investor_view_stats', {
+      p_foundry_id: foundryId,
+    })
 
-    const { data: existingView } = await adminSupabase
-      .from('ai_usage_log')
-      .select('id')
-      .eq('foundry_id', foundryId)
-      .eq('feature', FEATURE)
-      .gte('created_at', windowStart.toISOString())
-      .contains('metadata', { investorId })
-      .limit(1)
-      .maybeSingle()
+    const row = Array.isArray(stats) ? stats[0] : stats
+    const librarySize = Number(row?.library_size ?? 0)
+    const newViewsThisMonth = Number(row?.new_views_this_month ?? 0)
+    const viewsToday = Number(row?.views_today ?? 0)
 
-    if (existingView) {
-      // Already viewed this investor in the current window — free re-view
-      // Still need to compute remaining for the UI
-      if (isWeekly) {
-        const weekCheck = await checkWeeklyFeatureCap(foundryId, FEATURE, tier)
-        return {
-          allowed: true,
-          remaining: Math.max(0, (weekCheck.weeklyCap ?? 1) - weekCheck.weekUsage),
-          cap: weekCheck.weeklyCap,
-          period: 'weekly',
-        }
-      } else {
-        const dayCheck = await checkDailyFeatureCap(foundryId, FEATURE, tier)
-        return {
-          allowed: true,
-          remaining: Math.max(0, (dayCheck.dailyCap ?? 0) - dayCheck.todayUsage),
-          cap: dayCheck.dailyCap,
-          period: 'daily',
-        }
+    // INTENT: "Once viewed, always yours" — library investors are free to revisit
+    if (inLibrary === true) {
+      const monthlyCap = MONTHLY_INVESTOR_VIEW_CAPS[tier] ?? null
+      return {
+        allowed: true,
+        viewsUsedThisMonth: newViewsThisMonth,
+        viewsRemaining: monthlyCap !== null ? Math.max(0, monthlyCap - newViewsThisMonth) : null,
+        librarySize,
+        cap: monthlyCap,
+        isRevisit: true,
+        period: 'monthly',
+        remaining: monthlyCap !== null ? Math.max(0, monthlyCap - newViewsThisMonth) : null,
       }
     }
 
-    // New investor view — check the cap
-    if (isWeekly) {
-      const weekCheck = await checkWeeklyFeatureCap(foundryId, FEATURE, tier)
-      if (!weekCheck.allowed) {
-        // FLOW: Check bonus feature credits before denying
-        const bonusUsed = await tryConsumeBonusFeatureCredit(foundryId, FEATURE)
-        if (bonusUsed) {
-          return {
-            allowed: true,
-            remaining: 0,
-            cap: weekCheck.weeklyCap,
-            period: 'weekly',
-            message: 'Used a bonus credit for this view.',
-          }
-        }
-        return {
-          allowed: false,
-          remaining: 0,
-          cap: weekCheck.weeklyCap,
-          period: 'weekly',
-          message: weekCheck.message ?? 'Weekly investor view limit reached. Upgrade to Seed for 3 views per day.',
-        }
+    // New investor — check anti-scraping daily burst ceiling
+    if (viewsToday >= MAX_DAILY_INVESTOR_VIEWS) {
+      return {
+        allowed: false,
+        viewsUsedThisMonth: newViewsThisMonth,
+        viewsRemaining: 0,
+        librarySize,
+        cap: MONTHLY_INVESTOR_VIEW_CAPS[tier] ?? null,
+        isRevisit: false,
+        period: 'monthly',
+        remaining: 0,
+        message: 'You\'ve reached the daily viewing limit. Please try again tomorrow.',
       }
+    }
+
+    // New investor — check monthly cap
+    const monthlyCap = MONTHLY_INVESTOR_VIEW_CAPS[tier] ?? null
+    if (monthlyCap === null) {
+      // No cap for this tier (shouldn't reach here since pro/ent return early, but safety)
       return {
         allowed: true,
-        remaining: Math.max(0, (weekCheck.weeklyCap ?? 1) - weekCheck.weekUsage - 1),
-        cap: weekCheck.weeklyCap,
-        period: 'weekly',
+        viewsUsedThisMonth: newViewsThisMonth,
+        viewsRemaining: null,
+        librarySize,
+        cap: null,
+        isRevisit: false,
+        period: 'monthly',
+        remaining: null,
       }
-    } else {
-      // Seed or Starter — daily cap
-      const dayCheck = await checkDailyFeatureCap(foundryId, FEATURE, tier)
-      if (!dayCheck.allowed) {
-        // FLOW: Check bonus feature credits before denying
-        const bonusUsed = await tryConsumeBonusFeatureCredit(foundryId, FEATURE)
-        if (bonusUsed) {
-          return {
-            allowed: true,
-            remaining: 0,
-            cap: dayCheck.dailyCap,
-            period: 'daily',
-            message: 'Used a bonus credit for this view.',
-          }
-        }
-        return {
-          allowed: false,
-          remaining: 0,
-          cap: dayCheck.dailyCap,
-          period: 'daily',
-          message: dayCheck.message ?? 'Daily investor view limit reached. Limits reset at midnight UTC.',
-        }
-      }
+    }
+
+    // FLOW: Check bonus feature credits to extend the monthly cap
+    let bonusCredits = 0
+    try {
+      const { data: bonus } = await adminSupabase.rpc('get_bonus_feature_credits', {
+        p_foundry_id: foundryId,
+        p_feature: 'investor_monthly_views',
+      })
+      bonusCredits = typeof bonus === 'number' ? bonus : 0
+    } catch {
+      // Non-critical — just use base cap
+    }
+
+    const effectiveCap = monthlyCap + bonusCredits
+    const viewsRemaining = Math.max(0, effectiveCap - newViewsThisMonth)
+
+    if (newViewsThisMonth >= effectiveCap) {
+      const upgradeHint = tier === 'free'
+        ? 'Upgrade to Seed (£19.99/mo) for 50 profiles/month'
+        : tier === 'seed'
+          ? 'Upgrade to Startup Team (£49/mo) for 200 profiles/month'
+          : 'Upgrade to Professional for unlimited profiles'
       return {
-        allowed: true,
-        remaining: Math.max(0, (dayCheck.dailyCap ?? 0) - dayCheck.todayUsage - 1),
-        cap: dayCheck.dailyCap,
-        period: 'daily',
+        allowed: false,
+        viewsUsedThisMonth: newViewsThisMonth,
+        viewsRemaining: 0,
+        librarySize,
+        cap: effectiveCap,
+        isRevisit: false,
+        period: 'monthly',
+        remaining: 0,
+        message: `You've used all ${effectiveCap} new investor views this month. ${librarySize > 0 ? `${librarySize} profiles in your library are always accessible. ` : ''}${upgradeHint}.`,
       }
+    }
+
+    return {
+      allowed: true,
+      viewsUsedThisMonth: newViewsThisMonth,
+      viewsRemaining: viewsRemaining - 1, // Account for this view about to be consumed
+      librarySize,
+      cap: effectiveCap,
+      isRevisit: false,
+      period: 'monthly',
+      remaining: viewsRemaining - 1,
     }
   } catch (error) {
     console.warn('[checkInvestorViewCap] Error, allowing:', error)
     // DECISION: Fail open — view caps are UX smoothing for conversions, not a security control.
-    return { allowed: true, remaining: 0, cap: null, period: null }
+    return {
+      allowed: true,
+      viewsUsedThisMonth: 0,
+      viewsRemaining: null,
+      librarySize: 0,
+      cap: null,
+      isRevisit: false,
+      period: 'monthly',
+      remaining: null,
+    }
   }
 }
 
 /**
- * Try to consume a bonus feature credit for the investor_detail_view feature.
+ * Record an investor detail view in both the new investor_views library
+ * and the legacy ai_usage_log (audit trail).
  *
- * @param foundryId - The foundry to check
- * @param feature - The feature name
- * @returns true if a bonus credit was consumed, false otherwise
- */
-async function tryConsumeBonusFeatureCredit(foundryId: string, feature: string): Promise<boolean> {
-  try {
-    const adminSupabase = createAdminClient()
-    const { data } = await adminSupabase.rpc('consume_bonus_feature_credit', {
-      p_foundry_id: foundryId,
-      p_feature: feature,
-    })
-    return data === true
-  } catch {
-    return false
-  }
-}
-
-/**
- * Record an investor detail view in ai_usage_log for cap tracking.
+ * @description Uses the record_investor_view RPC to upsert into investor_views.
+ * Also keeps a row in ai_usage_log as an audit log.
  *
- * @description Inserts a zero-cost row into ai_usage_log with the investor ID
- * in metadata for deduplication. Called after the view cap check passes.
- *
+ * @param investorId - The investor listing being viewed
  * @param foundryId - The foundry making the view
  * @param userId - The user making the view
- * @param investorId - The investor listing being viewed
+ * @returns Stats from the recorded view
  */
 export async function recordInvestorDetailView(
+  investorId: string,
   foundryId: string,
   userId: string,
-  investorId: string,
-): Promise<void> {
+): Promise<{ isNewView: boolean; librarySize: number; newViewsThisMonth: number }> {
+  const adminSupabase = createAdminClient()
+
   try {
-    const adminSupabase = createAdminClient()
-    await adminSupabase.from('ai_usage_log').insert({
-      foundry_id: foundryId,
-      user_id: userId,
-      feature: 'investor_detail_view',
-      model: 'none',
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      estimated_cost_usd: 0,
-      metadata: { investorId },
+    // FLOW: Record in the new investor_views library table
+    const { data: viewResult, error: viewError } = await adminSupabase.rpc('record_investor_view', {
+      p_foundry_id: foundryId,
+      p_user_id: userId,
+      p_investor_id: investorId,
     })
+
+    if (viewError) {
+      console.error('[recordInvestorDetailView] RPC error:', viewError.message)
+    }
+
+    const row = Array.isArray(viewResult) ? viewResult[0] : viewResult
+    const isNewView = row?.is_new_view ?? true
+    const librarySize = Number(row?.library_size ?? 0)
+    const newViewsThisMonth = Number(row?.new_views_this_month ?? 0)
+
+    // FLOW: Also log to ai_usage_log as an audit trail (don't break existing tracking)
+    try {
+      await adminSupabase.from('ai_usage_log').insert({
+        foundry_id: foundryId,
+        user_id: userId,
+        feature: 'investor_detail_view',
+        model: 'none',
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        estimated_cost_usd: 0,
+        metadata: { investorId, isNewView },
+      })
+    } catch (auditError) {
+      // Non-critical — audit log miss doesn't affect user experience
+      console.warn('[recordInvestorDetailView] Audit log failed:', auditError)
+    }
+
+    return { isNewView, librarySize, newViewsThisMonth }
   } catch (error) {
-    // Non-critical — a missed log entry means the user might see one fewer view
-    // but won't break the experience. The cap is a soft limit, not a security control.
-    console.warn('[recordInvestorDetailView] Failed to log view:', error)
+    console.warn('[recordInvestorDetailView] Failed to record view:', error)
+    return { isNewView: true, librarySize: 0, newViewsThisMonth: 0 }
   }
 }
 
 /**
  * Get the current view cap status for the logged-in user.
- * Used by the directory page to show "X views remaining" banner.
+ * Used by the directory page to show "X views remaining this month" banner.
  *
  * @returns View cap info or null if user is not logged in
  */
@@ -560,30 +592,56 @@ export async function getInvestorViewCapStatus(): Promise<InvestorViewCapResult 
 
     // Professional/Enterprise: unlimited, no banner needed
     if (tier === 'professional' || tier === 'enterprise') {
-      return { allowed: true, remaining: 999, cap: null, period: null }
+      return {
+        allowed: true,
+        viewsUsedThisMonth: 0,
+        viewsRemaining: null,
+        librarySize: 0,
+        cap: null,
+        isRevisit: false,
+        period: 'monthly',
+        remaining: null,
+      }
     }
 
-    const FEATURE = 'investor_detail_view'
-    const isWeekly = tier === 'free'
+    const adminSupabase = createAdminClient()
+    const { data: stats } = await adminSupabase.rpc('get_investor_view_stats', {
+      p_foundry_id: profile.foundry_id,
+    })
 
-    if (isWeekly) {
-      const check = await checkWeeklyFeatureCap(profile.foundry_id, FEATURE, tier)
-      return {
-        allowed: check.allowed,
-        remaining: Math.max(0, (check.weeklyCap ?? 1) - check.weekUsage),
-        cap: check.weeklyCap,
-        period: 'weekly',
-        message: check.message,
-      }
-    } else {
-      const check = await checkDailyFeatureCap(profile.foundry_id, FEATURE, tier)
-      return {
-        allowed: check.allowed,
-        remaining: Math.max(0, (check.dailyCap ?? 0) - check.todayUsage),
-        cap: check.dailyCap,
-        period: 'daily',
-        message: check.message,
-      }
+    const row = Array.isArray(stats) ? stats[0] : stats
+    const librarySize = Number(row?.library_size ?? 0)
+    const newViewsThisMonth = Number(row?.new_views_this_month ?? 0)
+
+    const monthlyCap = MONTHLY_INVESTOR_VIEW_CAPS[tier] ?? null
+
+    // Check bonus credits
+    let bonusCredits = 0
+    try {
+      const { data: bonus } = await adminSupabase.rpc('get_bonus_feature_credits', {
+        p_foundry_id: profile.foundry_id,
+        p_feature: 'investor_monthly_views',
+      })
+      bonusCredits = typeof bonus === 'number' ? bonus : 0
+    } catch {
+      // Non-critical
+    }
+
+    const effectiveCap = monthlyCap !== null ? monthlyCap + bonusCredits : null
+    const viewsRemaining = effectiveCap !== null ? Math.max(0, effectiveCap - newViewsThisMonth) : null
+
+    return {
+      allowed: viewsRemaining === null || viewsRemaining > 0,
+      viewsUsedThisMonth: newViewsThisMonth,
+      viewsRemaining,
+      librarySize,
+      cap: effectiveCap,
+      isRevisit: false,
+      period: 'monthly',
+      remaining: viewsRemaining,
+      message: viewsRemaining === 0
+        ? `You've used all ${effectiveCap} new views this month. ${librarySize > 0 ? `${librarySize} profiles in your library are always accessible.` : ''}`
+        : undefined,
     }
   } catch (error) {
     console.warn('[getInvestorViewCapStatus] Error:', error)
@@ -1034,8 +1092,8 @@ export async function getInvestorById(id: string): Promise<{
 
   const firm = rowToFirm(data as Record<string, unknown>)
 
-  // FLOW: View cap gating for all tiers (free gets weekly, seed/starter get daily, pro/ent unlimited).
-  // Free users previously saw a hard gate; now they get 1 view/week via the cap system.
+  // FLOW: Monthly view cap with "once viewed, always yours" library.
+  // Free: 15/mo, Seed: 50/mo, Starter: 200/mo, Pro/Ent: unlimited.
   // We need the user's foundry to check caps.
   let foundryId: string | null = null
   if (user) {
@@ -1093,7 +1151,7 @@ export async function getInvestorById(id: string): Promise<{
   }
 
   // FLOW: View allowed — record it for cap tracking, then return full data
-  await recordInvestorDetailView(foundryId, user.id, id)
+  await recordInvestorDetailView(id, foundryId, user.id)
 
   // Strip deep fields based on tier
   const [withStatus] = await attachContactStatuses([stripTierGatedFields(firm, access)])

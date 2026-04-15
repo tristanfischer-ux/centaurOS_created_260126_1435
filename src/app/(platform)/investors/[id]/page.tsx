@@ -240,15 +240,27 @@ export default async function InvestorDetailPage({ params }: PageProps) {
         <InvestorBreadcrumb investorId={id} investorName={firm.title} />
 
         {/* Views remaining banner — soft nudge for capped tiers */}
-        {viewCap && viewCap.cap !== null && (
+        {viewCap && viewCap.isRevisit && (
+          <div className="flex items-center gap-2 rounded-lg bg-success/10 border border-success/20 px-4 py-2.5 text-sm">
+            <Eye className="h-4 w-4 text-success shrink-0" />
+            <span className="text-muted-foreground">
+              <span className="font-medium text-foreground">In your library</span>
+              {' '}&mdash; free to revisit
+            </span>
+          </div>
+        )}
+        {viewCap && !viewCap.isRevisit && viewCap.cap !== null && (
           <div className="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-4 py-2.5 text-sm">
             <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-muted-foreground">
               <span className="font-medium text-foreground">
-                {viewCap.remaining} {viewCap.remaining === 1 ? 'view' : 'views'}
+                {viewCap.viewsRemaining ?? 0} new investor {(viewCap.viewsRemaining ?? 0) === 1 ? 'view' : 'views'}
               </span>
-              {' '}remaining {viewCap.period === 'weekly' ? 'this week' : 'today'}
-              {viewCap.remaining <= 1 && (
+              {' '}remaining this month
+              {viewCap.librarySize > 0 && (
+                <>{' · Library: '}<span className="font-medium text-foreground">{viewCap.librarySize}</span>{' profiles'}</>
+              )}
+              {(viewCap.viewsRemaining ?? 0) <= 3 && (
                 <>{' · '}<Link href="/pricing" className="text-international-orange hover:underline">Upgrade for more</Link></>
               )}
             </span>

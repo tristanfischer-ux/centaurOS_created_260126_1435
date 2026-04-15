@@ -221,17 +221,34 @@ export default async function InvestorDirectoryPage() {
       </div>
 
       {/* Views remaining banner — soft nudge for capped tiers */}
-      {viewCapStatus && viewCapStatus.cap !== null && (
+      {viewCapStatus && viewCapStatus.cap !== null && viewCapStatus.viewsRemaining !== null && viewCapStatus.viewsRemaining > 0 && (
         <div className="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-4 py-2.5 text-sm">
           <svg className="h-4 w-4 text-muted-foreground shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
           <span className="text-muted-foreground">
             <span className="font-medium text-foreground">
-              {viewCapStatus.remaining} investor profile {viewCapStatus.remaining === 1 ? 'view' : 'views'}
+              {viewCapStatus.viewsRemaining} new investor {viewCapStatus.viewsRemaining === 1 ? 'view' : 'views'}
             </span>
-            {' '}remaining {viewCapStatus.period === 'weekly' ? 'this week' : 'today'}
-            {viewCapStatus.remaining <= 1 && (
+            {' '}remaining this month
+            {viewCapStatus.librarySize > 0 && (
+              <>{' · '}<span className="font-medium text-foreground">{viewCapStatus.librarySize}</span>{' in your library'}</>
+            )}
+            {viewCapStatus.viewsRemaining <= 3 && (
               <>{' · '}<a href="/pricing" className="text-international-orange hover:underline">Upgrade for more</a></>
             )}
+          </span>
+        </div>
+      )}
+      {viewCapStatus && viewCapStatus.cap !== null && viewCapStatus.viewsRemaining !== null && viewCapStatus.viewsRemaining <= 0 && (
+        <div className="flex items-center gap-2 rounded-lg bg-warning/10 border border-warning/20 px-4 py-2.5 text-sm">
+          <svg className="h-4 w-4 text-warning shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+          <span className="text-muted-foreground">
+            You&apos;ve used all{' '}
+            <span className="font-medium text-foreground">{viewCapStatus.cap}</span>
+            {' '}new views this month.
+            {viewCapStatus.librarySize > 0 && (
+              <>{' '}<span className="font-medium text-foreground">{viewCapStatus.librarySize}</span>{' profiles in your library are always accessible.'}</>
+            )}
+            {' · '}<a href="/pricing" className="text-international-orange hover:underline">Upgrade for more</a>
           </span>
         </div>
       )}

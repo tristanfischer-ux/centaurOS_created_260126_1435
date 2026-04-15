@@ -8631,6 +8631,58 @@ export type Database = {
           },
         ]
       }
+      investor_views: {
+        Row: {
+          first_viewed_at: string
+          foundry_id: string
+          id: string
+          investor_id: string
+          last_viewed_at: string
+          user_id: string
+          view_count: number
+        }
+        Insert: {
+          first_viewed_at?: string
+          foundry_id: string
+          id?: string
+          investor_id: string
+          last_viewed_at?: string
+          user_id: string
+          view_count?: number
+        }
+        Update: {
+          first_viewed_at?: string
+          foundry_id?: string
+          id?: string
+          investor_id?: string
+          last_viewed_at?: string
+          user_id?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_views_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "investor_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_domains: {
         Row: {
           ai_summary: string | null
@@ -19872,6 +19924,14 @@ export type Database = {
       get_founding_member_count: { Args: never; Returns: number }
       get_investor_overview_stats: { Args: never; Returns: Json }
       get_investor_stats: { Args: never; Returns: Json }
+      get_investor_view_stats: {
+        Args: { p_foundry_id: string }
+        Returns: {
+          library_size: number
+          new_views_this_month: number
+          views_today: number
+        }[]
+      }
       get_invitation_by_token: {
         Args: { invitation_token: string }
         Returns: {
@@ -20206,6 +20266,10 @@ export type Database = {
       }
       is_foundry_admin: {
         Args: { p_foundry_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_investor_in_library: {
+        Args: { p_foundry_id: string; p_investor_id: string }
         Returns: boolean
       }
       is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
@@ -20559,6 +20623,14 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      record_investor_view: {
+        Args: { p_foundry_id: string; p_investor_id: string; p_user_id: string }
+        Returns: {
+          is_new_view: boolean
+          library_size: number
+          new_views_this_month: number
+        }[]
       }
       redeem_listing_claim: { Args: { p_token: string }; Returns: boolean }
       refresh_all_analytics: { Args: never; Returns: undefined }
