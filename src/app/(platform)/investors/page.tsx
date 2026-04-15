@@ -31,10 +31,10 @@ import { PortfolioDirectoryTab } from './components/PortfolioDirectoryTab'
 
 export const metadata: Metadata = {
   title: 'Investor Intelligence',
-  description: 'Discover, match, and track investors for your hardware startup with AI-powered recommendations',
+  description: 'Discover, match, and track investors for your hardware startup with personalised recommendations',
   openGraph: {
-    title: 'Investor Intelligence | ForgeOS',
-    description: 'Discover, match, and track investors for your hardware startup with AI-powered recommendations',
+    title: 'Investor Intelligence',
+    description: 'Discover, match, and track investors for your hardware startup with personalised recommendations',
     type: 'website',
   },
 }

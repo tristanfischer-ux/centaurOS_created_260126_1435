@@ -1,0 +1,39 @@
+# ForgeOS by Fractional Forge
+> The operating system for hardware startups. Expert knowledge, smart tools, investor intelligence, and manufacturing connections in one platform.
+
+ForgeOS helps pre-revenue hardware startup founders (pre-seed to Series A) go from product idea to manufactured prototype without hiring a full engineering team.
+
+## Core Capabilities
+- 13 domain specialist advisors (strategy, engineering, manufacturing, finance, legal, sales, marketing, fundraising, product, HR, operations, supply chain, chief of staff)
+- CAD Lab: generates STEP files, BOMs, DFM analysis, and engineering packages from product descriptions
+- UK Supplier Marketplace: 13,700+ manufacturers and suppliers with automated RFQ generation
+- Investor Intelligence: 7,800+ UK investors (VC, PE, angel) with matching scores and 49,000+ contacts
+- 3,000+ grants database
+- Business tools: objectives, tasks, cash burn projections, P&L, team management, board packs
+
+## Key Pages
+- Homepage: https://fractionalforge.app
+- For Hardware Founders: https://fractionalforge.app/for-founders
+- For Manufacturers: https://fractionalforge.app/for-manufacturers
+- Pricing: https://fractionalforge.app/pricing
+- About: https://fractionalforge.app/about
+- Case Study: https://fractionalforge.app/case-study
+- Sample Engineering Package: https://fractionalforge.app/sample-package
+- Blog: https://fractionalforge.app/blog
+- Sign Up: https://fractionalforge.app/join
+
+## Pricing
+- Explorer: Free (50 AI assists/month, basic marketplace access)
+- Startup Team: GBP 49/month (100 assists, full marketplace, 13,700+ suppliers)
+- Professional: GBP 149/month (500 assists, priority support, full investor intelligence)
+- 14-day full-access trial, no credit card required
+
+## Company
+- Company: Fractional Forge Ltd
+- Product: ForgeOS
+- Location: United Kingdom
+- Website: https://fractionalforge.app
+- Contact: hello@fractionalforge.app
+
+## API Access
+No public API is available. ForgeOS is a web application accessed through the browser.

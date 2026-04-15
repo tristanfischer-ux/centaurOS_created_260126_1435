@@ -85,12 +85,10 @@ export default function ContactPage() {
                 </CardHeader>
                 <CardContent>
                   <a
-                    href="https://calendly.com/fractionalforge"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="mailto:hello@fractionalforge.app?subject=ForgeOS%20Demo%20Request"
                     className="text-sm font-medium text-international-orange hover:underline transition-colors"
                   >
-                    Schedule on Calendly
+                    Email us to schedule a demo
                   </a>
                 </CardContent>
               </Card>

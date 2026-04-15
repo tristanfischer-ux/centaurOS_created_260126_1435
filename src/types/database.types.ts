@@ -20066,6 +20066,7 @@ export type Database = {
           filter_category?: string
           match_count?: number
           match_threshold?: number
+          p_offset?: number
           query_embedding: string
         }
         Returns: {

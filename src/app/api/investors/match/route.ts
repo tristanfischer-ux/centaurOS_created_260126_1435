@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { aiGuard } from "@/lib/ai/guard"
 import { calculateMatchScore } from "@/lib/investor-match"
 import type { FoundryProfile } from "@/lib/investor-match"
 import type { InvestorFirm } from "@/actions/investors"
@@ -152,6 +153,10 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  // SECURITY: AI cost gate — prevents free-tier users from running unlimited matching
+  const guard = await aiGuard(supabase, 'investor_match')
+  if (guard.denied) return guard.response
 
   // ── Check for cached results ──────────────
   // INTENT: Use active_foundry_id (current workspace) not foundry_id (primary)

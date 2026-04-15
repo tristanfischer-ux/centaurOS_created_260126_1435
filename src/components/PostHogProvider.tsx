@@ -67,6 +67,11 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     // This prevents errors in local dev and preview deployments.
     if (!POSTHOG_KEY || initialized.current) return;
 
+    // GDPR: Only initialize PostHog if the user has accepted cookies.
+    // This ensures we don't track users before they consent (ePrivacy/GDPR).
+    const hasConsent = document.cookie.includes("cookie_consent=accepted");
+    if (!hasConsent) return;
+
     posthog.init(POSTHOG_KEY, {
       api_host: POSTHOG_HOST,
       // DECISION: Disable automatic pageview capture because we handle it

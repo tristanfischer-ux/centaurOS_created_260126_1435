@@ -89,6 +89,14 @@ export type AIFeature =
   | 'fundability_score'
   // Page-level specialist insights
   | 'page_insights'
+  // Matching endpoints
+  | 'investor_match'
+  | 'recruit_match'
+  | 'supplier_match'
+  // Red team
+  | 'red_team_debate'
+  // Objectives extraction
+  | 'objectives_analysis'
   // System
   | 'background_sweep'
   | 'other'

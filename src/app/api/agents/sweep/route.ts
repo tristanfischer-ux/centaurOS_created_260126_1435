@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120 // Sweeps can take a while with multiple AI calls
@@ -80,6 +81,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
             if (!membership) {
                 return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+            }
+
+            // SECURITY: Rate limit user-triggered sweeps — expensive AI operation
+            const { success: rateLimitOk } = await rateLimit('aiWorker', user.id, { limit: 3, window: 60000 })
+            if (!rateLimitOk) {
+                return NextResponse.json({ error: 'Rate limit exceeded. Please try again later.' }, { status: 429 })
             }
 
             foundryId = body.foundryId

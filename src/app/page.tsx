@@ -211,7 +211,44 @@ export default function MarketingPage() {
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
       "The Operating System for Hardware Startups. Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform.",
-    sameAs: [],
+    sameAs: [
+      "https://www.linkedin.com/company/fractional-forge",
+    ],
+  }
+
+  const softwareApplicationStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "ForgeOS",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: "https://fractionalforge.app",
+    description:
+      "The operating system for hardware startups. Expert knowledge, smart tools, investor intelligence, and manufacturing connections.",
+    offers: [
+      {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "GBP",
+        name: "Explorer (Free)",
+      },
+      {
+        "@type": "Offer",
+        price: "49",
+        priceCurrency: "GBP",
+        name: "Startup Team",
+      },
+      {
+        "@type": "Offer",
+        price: "149",
+        priceCurrency: "GBP",
+        name: "Professional",
+      },
+    ],
+    provider: {
+      "@type": "Organization",
+      name: "Fractional Forge Ltd",
+    },
   }
 
   return (
@@ -227,6 +264,12 @@ export default function MarketingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(organizationStructuredData),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(softwareApplicationStructuredData),
         }}
       />
 
@@ -665,7 +708,7 @@ function InvestorIntelligenceSection() {
             <span className="text-international-orange">fund hardware</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
-            Search 7,800+ UK investors — venture capital, private equity, and angels. AI-powered matching scores how well each investor fits your stage, sector, and geography.
+            Search 7,800+ UK investors — venture capital, private equity, and angels. Matching scores show how well each investor fits your stage, sector, and geography.
           </p>
         </AnimatedSection>
 

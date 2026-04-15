@@ -8,9 +8,9 @@
  * with the submitter's email set as reply-to.
  */
 
+import { headers } from 'next/headers'
 import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 /**
  * Submit a contact form and send the message via email.
@@ -28,6 +28,21 @@ export async function submitContactForm(data: {
   if (!data.name || !data.email || !data.message) {
     return { error: 'Please fill in all required fields.' }
   }
+
+  // SECURITY: Rate limit contact form submissions by IP
+  const headersList = await headers()
+  const ip = getClientIP(headersList)
+  const { success: rateLimitOk } = await rateLimit('contactForm', ip, { limit: 5, window: 300000 })
+  if (!rateLimitOk) {
+    return { error: 'Rate limit exceeded. Please try again later.' }
+  }
+
+  // SECURITY: Ensure email service is configured
+  if (!process.env.RESEND_API_KEY) {
+    return { error: 'Email service not configured' }
+  }
+
+  const resend = new Resend(process.env.RESEND_API_KEY)
 
   try {
     await resend.emails.send({

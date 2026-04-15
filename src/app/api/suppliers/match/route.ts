@@ -14,6 +14,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { aiGuard } from "@/lib/ai/guard"
 import { calculateSupplierMatchScore } from "@/lib/supplier-match"
 import type { CompanyMatchProfile, SupplierListing } from "@/lib/supplier-match"
 
@@ -109,6 +110,10 @@ export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  // SECURITY: AI cost gate — prevents free-tier users from running unlimited matching
+  const guard = await aiGuard(supabase, 'supplier_match')
+  if (guard.denied) return guard.response
 
   const encoder = new TextEncoder()
 

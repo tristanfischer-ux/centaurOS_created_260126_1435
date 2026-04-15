@@ -75,6 +75,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             changeFrequency: 'yearly',
             priority: 0.3,
         },
+        {
+            url: `${appUrl}/for-founders`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.9,
+        },
+        {
+            url: `${appUrl}/for-manufacturers`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.9,
+        },
+        {
+            url: `${appUrl}/case-study`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.8,
+        },
+        {
+            url: `${appUrl}/sample-package`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.8,
+        },
+        {
+            url: `${appUrl}/join`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.7,
+        },
     ]
 
     // Role category pages (known set)

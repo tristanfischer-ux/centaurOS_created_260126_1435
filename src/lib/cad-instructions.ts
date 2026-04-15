@@ -12,7 +12,7 @@
 export const CAD_INSTRUCTIONS = `# CLAUDE.md — CadQuery Parametric CAD Pipeline
 
 ## For: Claude Code (Opus 4.6)
-## Project: ForgeOS The Forge at https://centauros.io/the-forge/cad-lab
+## Project: ForgeOS The Forge at https://fractionalforge.app/the-forge/cad-lab
 ## Stack: CadQuery + Python, executed server-side, results displayed at the URL above
 
 ---
@@ -21,7 +21,7 @@ export const CAD_INSTRUCTIONS = `# CLAUDE.md — CadQuery Parametric CAD Pipelin
 
 This is battle-tested methodology from building 8 working parametric CAD models: racing drone, smartphone, exploded assembly drawing, vertical farming tower (×2), Nespresso capsule reloader, and industrial brine processing system. Every rule here was learned by failing first and fixing second. Follow it exactly and you will produce correct geometry on the first attempt.
 
-The output files (STEP, STL, PNG renders) should be generated server-side and made available for viewing/download at https://centauros.io/the-forge/cad-lab.
+The output files (STEP, STL, PNG renders) should be generated server-side and made available for viewing/download at https://fractionalforge.app/the-forge/cad-lab.
 
 ---
 

@@ -24,6 +24,7 @@ export const metadata: Metadata = {
       "ForgeOS connects UK manufacturers with hardware startups who need parts made. Qualified buyers, no bidding wars. You set your prices.",
     type: "website",
     url: "https://fractionalforge.app/for-manufacturers",
+    siteName: "ForgeOS by Fractional Forge",
   },
   twitter: {
     card: "summary_large_image",

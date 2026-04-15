@@ -83,7 +83,7 @@ export default function HelpPage() {
                         />
                         <TipCard
                             title="Smart Assists"
-                            description="AI-powered features use your plan's smart assist allowance. Track usage in Billing & Usage."
+                            description="Smart assist features use your plan's allowance. Track usage in Billing & Usage."
                         />
                     </div>
                 </CardContent>

@@ -317,8 +317,8 @@ export function PricingContent() {
                     </p>
                   </div>
                 </div>
-                <Button variant="outline" size="lg">
-                  Contact Sales
+                <Button variant="outline" size="lg" asChild>
+                  <a href="/contact">Contact Sales</a>
                 </Button>
               </div>
             </CardContent>

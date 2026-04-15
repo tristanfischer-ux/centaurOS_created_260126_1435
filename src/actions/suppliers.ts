@@ -13,6 +13,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { embedQuery } from '@/lib/embeddings'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,6 +120,13 @@ export async function searchSuppliers(
   const supabase = await createClient()
   const limit = Math.min(filters.limit || 24, 100)
   const offset = filters.offset || 0
+
+  // SECURITY: Rate limit supplier search to prevent bulk data extraction
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const rl = await checkRateLimit('supplierSearch', user.id, { limit: 30, window: 60000 })
+    if (rl) return { results: [], total: 0, searchMode: 'browse' }
+  }
 
   // ── Semantic search path ──
   if (filters.query && filters.query.trim().length > 5) {

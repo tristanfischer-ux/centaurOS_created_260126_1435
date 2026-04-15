@@ -8,6 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/types/database.types";
 import { embedMarketplaceListing } from "@/lib/search/semantic-search";
+import { scheduleOnboardingDrip } from "@/actions/onboarding-drip";
 
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
 
@@ -415,6 +416,14 @@ export async function setupNewUser({
     await processSignupReferral(referralCode, userId, foundryId)
   } catch (e) {
     console.warn('[setupNewUser] Referral/founding member processing failed (non-blocking):', e)
+  }
+
+  // --- Schedule onboarding drip emails (non-blocking) ---
+  try {
+    const firstName = fullName.split(' ')[0] || fullName
+    await scheduleOnboardingDrip(userId, email, firstName)
+  } catch (e) {
+    console.warn('[setupNewUser] Onboarding drip scheduling failed (non-blocking):', e)
   }
 
   // --- Determine redirect ---

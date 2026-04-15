@@ -120,7 +120,7 @@ export default function AboutPage() {
                       Fractional Forge Ltd
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Company number: [Company Number]
+                      Company number: 17031671
                     </p>
                   </div>
                 </div>

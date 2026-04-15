@@ -24,6 +24,7 @@ import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
 import type { FoundryProfile } from '@/lib/investor-match'
 import { nomicEmbedQuery } from '@/lib/search/nomic-embed'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -369,13 +370,19 @@ export async function searchInvestors(
 
   // SECURITY: Bound pagination to prevent DoS
   const safePage = Math.max(1, page)
-  // DECISION: Raised to 10000 for dashboard-parity on the For You tab — the
-  // semantic-search path now fetches every embedded Finance row (~5,900) and
-  // the UI renders all ≥50% matches. 10k is still DoS-bounded.
-  const safePageSize = Math.min(Math.max(1, pageSize), 10000)
+  // SECURITY: Cap at 100 to prevent bulk data extraction. The "For You" match
+  // view uses a separate internal path via the match API route.
+  const safePageSize = Math.min(Math.max(1, pageSize), 100)
   const from = (safePage - 1) * safePageSize
 
   const supabase = await createClient()
+
+  // SECURITY: Rate limit investor search to prevent bulk data extraction
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const rl = await checkRateLimit('investorSearch', user.id, { limit: 30, window: 60000 })
+    if (rl) return { firms: [], total: 0, hasMore: false }
+  }
 
   // ── Semantic search path ──
   // INTENT: When the user types a meaningful query (> 5 chars), use pgvector cosine
@@ -1972,6 +1979,14 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
   // VALIDATION: clamp page size between 1 and 100
   const pageSize = Math.max(1, Math.min(100, rawPageSize))
   const offset = (Math.max(1, page) - 1) * pageSize
+
+  // SECURITY: Rate limit contact search to prevent bulk data extraction
+  const authClient = await createClient()
+  const { data: { user: authUser } } = await authClient.auth.getUser()
+  if (authUser) {
+    const rl = await checkRateLimit('contactSearch', authUser.id, { limit: 20, window: 60000 })
+    if (rl) return { contacts: [], total: 0, hasMore: false }
+  }
 
   // GOTCHA: Must use admin client — createClient() in server context lacks auth
   // cookies, causing RLS to deny access and return 0 rows.

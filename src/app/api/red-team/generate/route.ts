@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { aiGuard } from "@/lib/ai/guard"
 import { v4 as uuidv4 } from "uuid"
 import { getTextProvider } from "@/lib/ai-providers/registry"
 import type { AIProviderId } from "@/lib/ai-providers/types"
@@ -106,6 +107,10 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  // SECURITY: AI cost gate — red team debates use 16-24 LLM calls each
+  const guard = await aiGuard(supabase, 'red_team_debate')
+  if (guard.denied) return guard.response
 
   const body = await request.json() as {
     topic: string

@@ -22,17 +22,15 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEmail } from '@/lib/notifications/channels/email'
+import { verifyCronSecret } from '@/lib/security/cron-auth'
 import type { EmailTemplate } from '@/lib/notifications/types'
 
-const CRON_SECRET = process.env.CRON_SECRET || ''
 const MAX_EMAILS_PER_RUN = 50
 
 export async function GET(request: Request): Promise<NextResponse> {
-  // SECURITY: Verify cron secret to prevent unauthorized invocations
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // SECURITY: Verify cron secret using shared timing-safe utility
+  const authFailure = verifyCronSecret(request)
+  if (authFailure) return authFailure
 
   let sent = 0
   let errors = 0

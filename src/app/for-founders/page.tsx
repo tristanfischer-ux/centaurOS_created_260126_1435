@@ -20,6 +20,7 @@ export const metadata: Metadata = {
       "Turn your product idea into a complete engineering package in hours, not months. STEP files, BOM, DFM analysis, and 13,700+ matched UK suppliers.",
     type: "website",
     url: "https://fractionalforge.app/for-founders",
+    siteName: "ForgeOS by Fractional Forge",
   },
   twitter: {
     card: "summary_large_image",

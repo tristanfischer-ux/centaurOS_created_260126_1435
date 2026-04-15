@@ -178,7 +178,7 @@ export function ManufacturersContent() {
 
             <AnimatedSection delay={0.3}>
               <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-                <Link href="/join?role=manufacturer">
+                <Link href="/join?role=supplier">
                   <Button size="lg" className="gap-2">
                     List Your Capacity
                     <ArrowRight className="h-4 w-4" />
@@ -360,7 +360,7 @@ export function ManufacturersContent() {
                   commitment.
                 </p>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <Link href="/join?role=manufacturer">
+                  <Link href="/join?role=supplier">
                     <Button size="lg" className="gap-2">
                       Join the Marketplace
                       <ArrowRight className="h-4 w-4" />

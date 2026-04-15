@@ -15,9 +15,19 @@ import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
 export const metadata: Metadata = {
-  title: "Case Study: Agricultural IoT Irrigation System | ForgeOS",
+  title: "Case Study: Agricultural IoT Irrigation System",
   description:
     "How a solar-powered IoT irrigation system went from concept to full engineering package in 3 hours using ForgeOS CAD Lab. Traditional approach: 4-8 weeks and $5K-$15K.",
+  openGraph: {
+    title: "Case Study: Agricultural IoT Irrigation System | ForgeOS",
+    description: "From concept to full engineering package in 3 hours. See what ForgeOS CAD Lab produces.",
+    type: "website",
+    url: "https://fractionalforge.app/case-study",
+    siteName: "ForgeOS by Fractional Forge",
+  },
+  alternates: {
+    canonical: "https://fractionalforge.app/case-study",
+  },
 }
 
 const DELIVERABLES = [

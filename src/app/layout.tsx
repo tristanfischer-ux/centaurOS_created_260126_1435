@@ -42,10 +42,10 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
+    default: "ForgeOS — The Operating System for Hardware Startups",
     template: "%s | ForgeOS",
   },
-  description: "Explore materials, manufacturing approaches, cost estimates, and matched UK suppliers for your product ideas. Free to start.",
+  description: "Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform. Free to start.",
   metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
@@ -65,22 +65,14 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_GB",
     siteName: "ForgeOS by Fractional Forge",
-    title: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
-    description: "Explore materials, manufacturing approaches, cost estimates, and matched UK suppliers for your product ideas. Free to start.",
-    images: [
-      {
-        url: "/images/og-default.png",
-        width: 1200,
-        height: 630,
-        alt: "ForgeOS — The Operating System for Hardware Companies",
-      },
-    ],
+    title: "ForgeOS — The Operating System for Hardware Startups",
+    description: "Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform. Free to start.",
+    url: "https://fractionalforge.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ForgeOS — AI Manufacturing Platform for Hardware Startups",
-    description: "Explore materials, manufacturing approaches, cost estimates, and matched UK suppliers for your product ideas. Free to start.",
-    images: ["/images/og-default.png"],
+    title: "ForgeOS — The Operating System for Hardware Startups",
+    description: "Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform. Free to start.",
   },
   robots: {
     index: true,

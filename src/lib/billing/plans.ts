@@ -112,7 +112,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorDeepAccess: false,
       investorIntelligenceAccess: false,
       maxStorageMB: 500,
-      maxComputeBudgetUsd: 2,
+      maxComputeBudgetUsd: 9,
     },
   },
   starter: {

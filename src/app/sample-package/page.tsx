@@ -28,7 +28,7 @@ import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
 export const metadata: Metadata = {
-  title: "Sample Engineering Package | ForgeOS",
+  title: "Sample Engineering Package",
   description:
     "See what ForgeOS generates from a product description. Explore a complete engineering package for an Agricultural IoT Irrigation System — created in 3 hours.",
   openGraph: {
@@ -36,6 +36,11 @@ export const metadata: Metadata = {
     description:
       "Product architecture, bill of materials, DFM analysis, competitive benchmarking, and matched suppliers — all generated from a plain-English product description.",
     type: "website",
+    url: "https://fractionalforge.app/sample-package",
+    siteName: "ForgeOS by Fractional Forge",
+  },
+  alternates: {
+    canonical: "https://fractionalforge.app/sample-package",
   },
 }
 

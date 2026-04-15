@@ -8,7 +8,8 @@
  * Does NOT expose API keys — only reports provider name + status.
  */
 
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit"
 
 interface ProviderStatus {
   provider: string
@@ -21,7 +22,14 @@ interface ProviderStatus {
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // SECURITY: Rate limit health check endpoint to prevent abuse
+  const ip = getClientIP(request.headers)
+  const { success: rateLimitOk } = await rateLimit('healthCheck', ip, { limit: 5, window: 60000 })
+  if (!rateLimitOk) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
+
   const results: ProviderStatus[] = []
   const timeout = 10_000
 

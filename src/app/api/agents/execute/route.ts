@@ -1592,18 +1592,17 @@ async function handleTextStreaming(
                 }
             }
 
-            // All providers skipped (no streamFn or no API key) — should be very rare
+            // All providers exhausted — no viable provider left in the fallback chain
             clearInterval(heartbeatInterval)
             console.error("[agents/execute] No viable provider in fallback chain:", {
                 chain: chain.map(t => t.providerId),
                 lastError,
             })
-            const classified = classifyStreamError(lastError)
             controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({
-                    error: classified.message,
-                    errorCategory: classified.category,
-                    rawHint: classified.rawHint,
+                    error: "All AI providers are temporarily unavailable. Please try again in a few minutes.",
+                    errorCategory: "overloaded",
+                    rawHint: lastError?.substring(0, 120) ?? "",
                 })}\n\n`)
             )
             controller.close()

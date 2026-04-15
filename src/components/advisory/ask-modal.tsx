@@ -166,7 +166,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                         Ask the Advisory Forum
                     </DialogTitle>
                     <DialogDescription>
-                        Get instant AI-powered insights, verified by human experts through our democratic workflow.
+                        Get instant insights from your advisory forum, verified through our democratic workflow.
                     </DialogDescription>
                 </DialogHeader>
 

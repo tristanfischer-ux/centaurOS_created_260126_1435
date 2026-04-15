@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
 
 const COOKIE_NAME = "cookie_consent";
-const COOKIE_VALUE = "accepted";
+const COOKIE_VALUE_ACCEPTED = "accepted";
+const COOKIE_VALUE_REJECTED = "rejected";
 const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
 
 function getCookie(name: string): string | null {
@@ -24,13 +25,19 @@ export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (getCookie(COOKIE_NAME) !== COOKIE_VALUE) {
+    const consent = getCookie(COOKIE_NAME);
+    if (consent !== COOKIE_VALUE_ACCEPTED && consent !== COOKIE_VALUE_REJECTED) {
       setVisible(true);
     }
   }, []);
 
   function handleAccept() {
-    setCookie(COOKIE_NAME, COOKIE_VALUE, ONE_YEAR_SECONDS);
+    setCookie(COOKIE_NAME, COOKIE_VALUE_ACCEPTED, ONE_YEAR_SECONDS);
+    setVisible(false);
+  }
+
+  function handleReject() {
+    setCookie(COOKIE_NAME, COOKIE_VALUE_REJECTED, ONE_YEAR_SECONDS);
     setVisible(false);
   }
 
@@ -59,10 +66,16 @@ export function CookieConsent() {
               <div className="flex items-center gap-2 shrink-0">
                 <Link
                   href="/privacy"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors px-2 py-2"
+                >
+                  Privacy Policy
+                </Link>
+                <button
+                  onClick={handleReject}
                   className="inline-flex items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
                 >
-                  Manage
-                </Link>
+                  Decline
+                </button>
                 <button
                   onClick={handleAccept}
                   className="inline-flex items-center justify-center rounded-md bg-international-orange px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"

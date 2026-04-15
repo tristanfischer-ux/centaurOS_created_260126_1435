@@ -520,7 +520,7 @@ export function LearnPage({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Get AI-powered insights verified by human experts.
+              Get insights verified by human experts.
             </p>
             <AskModal onSubmit={handleAskQuestion} />
           </div>
@@ -555,7 +555,7 @@ export function LearnPage({
                   description={
                     qaSearchQuery
                       ? "Try adjusting your search terms."
-                      : "Ask your first question to get AI-powered insights verified by experts."
+                      : "Ask your first question to get insights verified by experts."
                   }
                   action={
                     qaSearchQuery ? (

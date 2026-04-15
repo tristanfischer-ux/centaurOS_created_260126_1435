@@ -242,7 +242,7 @@ export function CommandPalette() {
           <CommandItem onSelect={() => { setOpen(false); setTranscriptImportOpen(true) }}>
             <FileUp className="mr-2 h-4 w-4" />
             Import Transcript
-            <span className="ml-auto text-xs text-muted-foreground">AI-powered</span>
+            <span className="ml-auto text-xs text-muted-foreground">Auto-extract</span>
           </CommandItem>
           <CommandItem onSelect={() => { toggleFocusMode(); setOpen(false) }}>
             <Focus className="mr-2 h-4 w-4" />
