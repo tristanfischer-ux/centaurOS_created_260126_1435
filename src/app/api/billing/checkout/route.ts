@@ -60,8 +60,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (error || !url) {
       console.error('[BillingCheckout] Failed:', { userId: user.id, tier, billingPeriod, error })
+      // TEMPORARY: Expose actual error for debugging — remove after launch testing
       return NextResponse.json(
-        { error: error || 'Failed to create checkout session' },
+        { error: error || 'Failed to create checkout session', debug: error },
         { status: 500 }
       )
     }
