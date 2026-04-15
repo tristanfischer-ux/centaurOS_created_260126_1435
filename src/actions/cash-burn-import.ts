@@ -326,9 +326,11 @@ export async function commitImport(
   try {
     if (!Array.isArray(rows)) {
       console.error('[cash-burn-import] rows is not an array:', typeof rows, rows)
-      return { data: null, error: `rows parameter is not an array (got ${typeof rows})` }
+      return { data: null, error: `DEBUG: rows is ${typeof rows} not array (kind=${kind})` }
     }
-    if (rows.length === 0) return { data: null, error: 'No rows to import' }
+    if (rows.length === 0) {
+      return { data: null, error: `DEBUG: commitImport received empty rows array (kind=${kind})` }
+    }
     if (rows.length > MAX_ROWS) return { data: null, error: `Too many rows — max ${MAX_ROWS}` }
 
     if (kind === 'out') {
