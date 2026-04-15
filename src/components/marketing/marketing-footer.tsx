@@ -53,22 +53,6 @@ export function MarketingFooter() {
                             </li>
                             <li>
                                 <Link
-                                    href="/about"
-                                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                                >
-                                    About
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/contact"
-                                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                                >
-                                    Contact
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
                                     href="/login"
                                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                                 >

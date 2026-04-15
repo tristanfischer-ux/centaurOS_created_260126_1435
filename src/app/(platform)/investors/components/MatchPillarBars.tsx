@@ -18,6 +18,8 @@ interface MatchPillarBarsProps {
   compositeScore?: number
   /** Compact = small bars with tiny labels; suitable for table cells. */
   compact?: boolean
+  /** When true, pillars with value 0 show "N/A" instead of 0. Useful for marketing previews where 0 means "no data". */
+  hideZeroValues?: boolean
   className?: string
 }
 
@@ -41,25 +43,28 @@ function fillHex(value: number): string {
   return '#94a3b8'                   // slate-400
 }
 
-export function MatchPillarBars({ pillars, compositeScore, compact = false, className }: MatchPillarBarsProps) {
+export function MatchPillarBars({ pillars, compositeScore, compact = false, hideZeroValues = false, className }: MatchPillarBarsProps) {
   if (compact) {
     return (
       <div className={cn('grid grid-cols-6 gap-1.5', className)}>
         {PILLAR_ORDER.map(({ key, label }) => {
           const value = pillars[key] ?? 0
+          const isNA = hideZeroValues && value === 0
           return (
-            <div key={key} className="flex flex-col items-center gap-0.5" title={`${label}: ${value}%`}>
+            <div key={key} className="flex flex-col items-center gap-0.5" title={isNA ? `${label}: N/A` : `${label}: ${value}%`}>
               <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, value))}%`,
-                    backgroundColor: fillHex(value),
-                  }}
-                />
+                {!isNA && (
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, value))}%`,
+                      backgroundColor: fillHex(value),
+                    }}
+                  />
+                )}
               </div>
               <span className="text-[9px] font-medium text-muted-foreground leading-none tabular-nums">
-                {value}
+                {isNA ? 'N/A' : value}
               </span>
             </div>
           )
@@ -79,23 +84,26 @@ export function MatchPillarBars({ pillars, compositeScore, compact = false, clas
       <div className="grid grid-cols-6 gap-2">
         {PILLAR_ORDER.map(({ key, label }) => {
           const value = pillars[key] ?? 0
+          const isNA = hideZeroValues && value === 0
           return (
             <div key={key} className="space-y-1">
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, value))}%`,
-                    backgroundColor: fillHex(value),
-                  }}
-                />
+                {!isNA && (
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, value))}%`,
+                      backgroundColor: fillHex(value),
+                    }}
+                  />
+                )}
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   {label}
                 </span>
                 <span className="text-[10px] font-medium text-foreground tabular-nums">
-                  {value}
+                  {isNA ? 'N/A' : value}
                 </span>
               </div>
             </div>

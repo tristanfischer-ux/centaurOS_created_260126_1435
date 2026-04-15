@@ -135,7 +135,7 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-foreground">{result.placeholder}</span>
-              {result.firm_type && (
+              {result.firm_type && result.firm_type !== result.subcategory && (
                 <Badge variant="outline" size="sm" className="text-[10px]">
                   {result.firm_type}
                 </Badge>
@@ -164,7 +164,7 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
         </div>
 
         {/* 6 pillar bars — exact same component the authenticated For You tab uses */}
-        <MatchPillarBars pillars={result.pillars} />
+        <MatchPillarBars pillars={result.pillars} hideZeroValues />
 
         {/* Thesis excerpt — single anonymous-flavour sentence */}
         {result.thesis_excerpt && (
@@ -285,7 +285,7 @@ export function InvestorPreviewSection() {
             <span className="text-international-orange">fund hardware</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
-            Search UK investors — venture capital, private equity, and angels. Matching scores show how well each investor fits your stage, sector, and geography.
+            Search investors — venture capital, private equity, and angels. Matching scores show how well each investor fits your stage, sector, and geography.
           </p>
         </AnimatedSection>
 

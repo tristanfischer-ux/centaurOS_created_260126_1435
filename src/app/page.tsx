@@ -26,6 +26,7 @@ import {
   Briefcase,
   Users,
   Banknote,
+  Flame,
 } from "lucide-react"
 import { InvestorPreviewSection } from "@/components/marketing/investor-preview"
 import {
@@ -78,8 +79,8 @@ const ARTICLES = [
     url: "https://www.historyfuturenow.com/articles/the-arsenal-and-the-container-how-shared-infrastructure-always-wins",
   },
   {
-    title: "The 20x Iteration Gap",
-    summary: "Why Shenzhen teams iterate 20x faster",
+    title: "The Fifteen-Minute Factory",
+    summary: "Why proximity still wins in manufacturing",
     url: "https://www.historyfuturenow.com/articles/the-fifteen-minute-factory-why-proximity-still-wins",
   },
 ] as const
@@ -114,7 +115,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "ForgeOS is free to start \u2014 50 AI tasks per month with all 13 specialists. Paid plans start at \u00a319.99/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "ForgeOS is free to start \u2014 50 AI assists per month with all 13 specialists. Paid plans start at \u00a319.99/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
   },
 ] as const
 
@@ -280,8 +281,11 @@ export default function MarketingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <Link
             href="/"
-            className="text-base sm:text-lg md:text-xl font-bold tracking-tight"
+            className="flex items-center gap-2 text-base sm:text-lg md:text-xl font-bold tracking-tight"
           >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-international-orange">
+              <Flame className="h-3.5 w-3.5 text-primary-foreground" />
+            </div>
             FRACTIONAL FORGE
           </Link>
 
@@ -480,7 +484,7 @@ function HeroSection() {
         </motion.div>
       </div>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 0.6 }} className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 0.6 }} className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1 pointer-events-none">
         <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">Scroll</span>
         <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -766,7 +770,7 @@ function PricingTeaserSection() {
             Start free. Scale <span className="text-international-orange">when ready.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-            Free forever with 50 AI tasks. No credit card required.
+            Free forever with 50 AI assists. No credit card required.
           </p>
         </AnimatedSection>
 
