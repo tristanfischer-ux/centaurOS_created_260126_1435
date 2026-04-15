@@ -29,6 +29,7 @@ import type {
   UserSubscription,
 } from './plans'
 import { SUBSCRIPTION_PLANS, ENTERPRISE_OVERAGE_CONFIG } from './plans'
+import { grantReferralUpgradeReward } from '@/lib/referrals/process-upgrade'
 
 // SECURITY: Reverse lookup from Stripe price ID to tier.
 // Prevents tier escalation via metadata tampering — the actual price paid
@@ -377,6 +378,15 @@ export async function handleSubscriptionEvent(
           userId,
           tier,
           error: upsertError.message,
+        })
+      }
+
+      // FLOW: Grant referral upgrade reward (fire-and-forget).
+      // Only on subscription creation, not updates. Non-blocking — referral reward
+      // failures must never fail the webhook handler.
+      if (event.type === 'customer.subscription.created' && tier !== 'free') {
+        grantReferralUpgradeReward(userId, tier).catch((err) => {
+          console.error('[Subscriptions] Referral upgrade reward failed (non-blocking):', err)
         })
       }
       break

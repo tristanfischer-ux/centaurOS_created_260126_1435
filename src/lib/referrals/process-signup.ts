@@ -19,6 +19,9 @@ const REFERRAL_CREDIT_AMOUNT = 10
 const FOUNDING_MEMBER_CREDIT_AMOUNT = 25
 const FOUNDING_MEMBER_LIMIT = 100
 
+/** Maximum signup referral rewards a referrer can receive in a 30-day window */
+const MAX_SIGNUP_REWARDS_PER_30_DAYS = 5
+
 /**
  * Track a referral signup: grant credits to both referrer and referee.
  *
@@ -88,8 +91,31 @@ async function trackReferralSignup(
       reason: 'referral_received',
     })
 
-    // Grant +10 credits to referrer
+    // SECURITY: Rate limit referrer's signup rewards (max 5 per 30 days).
+    // The referee still gets their reward — don't punish them for the referrer's activity.
+    let referrerCapped = false
     if (referrer.foundry_id) {
+      const { data: recentCount, error: countError } = await admin.rpc(
+        'count_recent_referral_rewards' as never,
+        { p_foundry_id: referrer.foundry_id } as never
+      )
+
+      if (countError) {
+        console.warn('[Referral] Failed to check referrer rate limit:', countError.message)
+        // DECISION: Fail open — grant the reward if we can't check the count.
+        // Better to occasionally over-grant than to block legitimate referrals.
+      } else if (typeof recentCount === 'number' && recentCount >= MAX_SIGNUP_REWARDS_PER_30_DAYS) {
+        referrerCapped = true
+        console.info('[Referral] Referrer hit signup reward cap:', {
+          referrer: referrer.id,
+          recentCount,
+          cap: MAX_SIGNUP_REWARDS_PER_30_DAYS,
+        })
+      }
+    }
+
+    // Grant +10 credits to referrer (unless capped)
+    if (referrer.foundry_id && !referrerCapped) {
       await admin.from('referral_credits').insert({
         foundry_id: referrer.foundry_id,
         granted_to: referrer.id,
