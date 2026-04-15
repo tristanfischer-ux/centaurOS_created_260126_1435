@@ -143,7 +143,7 @@ const nextConfig: NextConfig = {
               //   - Strict form-action, base-uri, and object-src restrictions below
               //
               // TODO: Migrate to nonce-based CSP when Next.js App Router supports it
-              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.stripe.com https://*.sentry.io",
+              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.stripe.com https://*.sentry.io https://*.posthog.com https://eu-assets.i.posthog.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
