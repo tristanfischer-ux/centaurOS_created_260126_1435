@@ -50,6 +50,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const { tier, billingPeriod } = parsed.data
 
+    console.log('[BillingCheckout] Creating session:', { userId: user.id, tier, billingPeriod })
+
     const { url, error } = await createSubscriptionCheckout(
       user.id,
       tier,
@@ -57,16 +59,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
 
     if (error || !url) {
-      console.error('[BillingCheckout] Failed:', { userId: user.id, tier, error })
+      console.error('[BillingCheckout] Failed:', { userId: user.id, tier, billingPeriod, error })
       return NextResponse.json(
         { error: error || 'Failed to create checkout session' },
         { status: 500 }
       )
     }
 
+    console.log('[BillingCheckout] Session created, redirecting to Stripe')
     return NextResponse.json({ url })
   } catch (error) {
-    console.error('[BillingCheckout] Unexpected error:', error)
+    const err = error as { message?: string; type?: string; code?: string }
+    console.error('[BillingCheckout] Unexpected error:', {
+      message: err.message,
+      type: err.type,
+      code: err.code,
+      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3).join('\n') : undefined,
+    })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

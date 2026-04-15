@@ -165,10 +165,11 @@ export async function createSubscriptionCheckout(
     }
 
     // Create checkout session
+    // DECISION: Use automatic_payment_methods instead of payment_method_types
+    // to support the widest range of payment methods and avoid deprecation warnings.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      payment_method_types: ['card'],
       line_items: lineItems,
       success_url: `${getBaseUrl()}/settings/billing?success=true`,
       cancel_url: `${getBaseUrl()}/settings/billing?canceled=true`,
@@ -188,7 +189,18 @@ export async function createSubscriptionCheckout(
     
     return { url: session.url, error: null }
   } catch (error) {
-    console.error('[Subscriptions] Error creating subscription checkout:', { error: error instanceof Error ? error.message : 'Unknown error' })
+    // INTENT: Log full Stripe error details for debugging — the generic user-facing
+    // message hides the actual cause. Stripe errors have type, code, and param fields.
+    const stripeError = error as { type?: string; code?: string; param?: string; message?: string }
+    console.error('[Subscriptions] Error creating subscription checkout:', {
+      message: stripeError.message || 'Unknown error',
+      type: stripeError.type,
+      code: stripeError.code,
+      param: stripeError.param,
+      userId,
+      tier,
+      billingPeriod,
+    })
     return { url: null, error: 'Failed to create checkout session' }
   }
 }
