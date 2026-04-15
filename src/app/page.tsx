@@ -402,10 +402,13 @@ export default function MarketingPage() {
         {/* ═══ Section 5: Pricing Teaser ═══ */}
         <PricingTeaserSection />
 
-        {/* ═══ Section 6: From the Founder ═══ */}
+        {/* ═══ Section 6: Product Showcase (ForgeOS platform) ═══ */}
+        <ProductShowcaseSection />
+
+        {/* ═══ Section 7: From the Founder ═══ */}
         <FounderArticlesSection />
 
-        {/* ═══ Section 7: FAQ ═══ */}
+        {/* ═══ Section 8: FAQ ═══ */}
         <FAQSection />
       </main>
 
@@ -473,15 +476,7 @@ function HeroSection() {
             </a>
           </div>
 
-          {/* Product showcase — rotating screenshots of key features */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9, duration: 0.8, ease: "easeOut" }}
-            className="w-full max-w-5xl mt-4"
-          >
-            <ProductShowcase />
-          </motion.div>
+          {/* Product showcase moved to its own section below pricing */}
         </motion.div>
       </div>
 
@@ -694,10 +689,10 @@ function FractionalExecutiveSection() {
             </Link>
           </motion.div>
           <Link
-            href="/for-executives"
+            href="/contact"
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
           >
-            Learn more <ArrowRight className="h-4 w-4" />
+            Questions? Get in touch <ArrowRight className="h-4 w-4" />
           </Link>
         </AnimatedSection>
       </div>
@@ -810,6 +805,27 @@ function PricingTeaserSection() {
 /* ═══════════════════════════════════════════════════════════════════════════
  * SECTION 7: FAQ
  * ═══════════════════════════════════════════════════════════════════════ */
+
+function ProductShowcaseSection() {
+  return (
+    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            The Platform
+          </span>
+          <h2 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-black mb-4 sm:mb-6">
+            ForgeOS. Everything you need to build,{" "}
+            <span className="text-international-orange">in one place.</span>
+          </h2>
+        </AnimatedSection>
+        <AnimatedSection delay={0.2}>
+          <ProductShowcase />
+        </AnimatedSection>
+      </div>
+    </section>
+  )
+}
 
 function FAQSection() {
   return (

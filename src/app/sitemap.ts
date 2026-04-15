@@ -75,18 +75,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             changeFrequency: 'yearly',
             priority: 0.3,
         },
-        {
-            url: `${appUrl}/for-founders`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.9,
-        },
-        {
-            url: `${appUrl}/for-manufacturers`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.9,
-        },
+        // Audience-specific pages removed for launch — may return later
         {
             url: `${appUrl}/case-study`,
             lastModified: now,
