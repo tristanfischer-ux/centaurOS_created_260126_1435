@@ -8,7 +8,17 @@
 
 import OpenAI from 'openai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let _openai: OpenAI | null = null
+
+function getOpenAI(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY not configured')
+  }
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  return _openai
+}
 
 /**
  * Embeds a query string into a 1536-dimension vector using OpenAI text-embedding-3-small.
@@ -18,9 +28,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
  * @throws Error if OpenAI API call fails or OPENAI_API_KEY is missing
  */
 export async function embedQuery(text: string): Promise<number[]> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY not configured')
-  }
+  const openai = getOpenAI()
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-small',
     input: text,
