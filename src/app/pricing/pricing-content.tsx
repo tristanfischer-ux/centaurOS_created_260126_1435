@@ -355,20 +355,21 @@ export function PricingContent() {
               Compare Plans
             </h2>
             <div className="overflow-x-auto">
-              <div className="min-w-[700px]">
+              <div className="min-w-[850px]">
                 {/* Header row */}
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 pb-4 border-b border-muted">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 pb-4 border-b border-muted">
                   <div className="text-sm font-medium text-muted-foreground">Feature</div>
                   <div className="text-sm font-medium text-center">Explorer</div>
                   <div className="text-sm font-medium text-center">Seed</div>
                   <div className="text-sm font-medium text-center">Startup Team</div>
                   <div className="text-sm font-medium text-center text-international-orange">Professional</div>
+                  <div className="text-sm font-medium text-center">Enterprise</div>
                 </div>
 
                 {COMPARISON_FEATURES.map((feature) => (
                   <div
                     key={feature.name}
-                    className="grid grid-cols-3 sm:grid-cols-5 gap-4 py-3 border-b border-muted/50"
+                    className="grid grid-cols-3 sm:grid-cols-6 gap-4 py-3 border-b border-muted/50"
                   >
                     <div className="text-sm text-foreground flex items-center gap-1.5">
                       {feature.name}
@@ -387,6 +388,7 @@ export function PricingContent() {
                     <ComparisonCell value={feature.seed} />
                     <ComparisonCell value={feature.starter} />
                     <ComparisonCell value={feature.professional} />
+                    <ComparisonCell value={feature.enterprise} />
                   </div>
                 ))}
               </div>
@@ -550,21 +552,23 @@ const COMPARISON_FEATURES: Array<{
   seed: boolean | string
   starter: boolean | string
   professional: boolean | string
+  enterprise: boolean | string
 }> = [
-  { name: 'Assists per month', free: '50', seed: '75', starter: '100', professional: '500' },
-  { name: 'Orders/month', free: '5', seed: '5', starter: '25', professional: 'Unlimited' },
-  { name: 'Team members', free: '1', seed: '1', starter: '3', professional: '10' },
-  { name: 'Voice-to-task', free: true, seed: true, starter: true, professional: true },
-  { name: 'Comparison assistant', free: false, seed: false, starter: true, professional: true },
-  { name: 'Supplier matching', free: false, seed: false, starter: true, professional: true },
-  { name: 'AI specialists', free: '5 of 13', seed: '10 of 13', starter: '13', professional: '13' },
-  { name: 'Marketplace browse', free: true, seed: true, starter: true, professional: true },
-  { name: 'Investor directory browse', free: true, seed: true, starter: true, professional: true },
-  { name: 'Investor detail pages', free: false, seed: '3/day', starter: '10/day', professional: true },
-  { name: 'Partner contacts & LinkedIn', free: false, seed: false, starter: true, professional: true },
-  { name: 'Verified emails & deep profiles', free: false, seed: false, starter: false, professional: true },
-  { name: 'Fund performance & hardware fit', free: false, seed: false, starter: false, professional: true },
-  { name: 'Engineering reports (PDF, DOCX, PPTX)', free: true, seed: true, starter: true, professional: true },
-  { name: 'Priority support', free: false, seed: false, starter: false, professional: true },
-  { name: 'Platform fee', free: '10%', seed: '10%', starter: '10% (0% first 3 orders)', professional: '5%' },
+  { name: 'Assists per month', free: '50', seed: '75', starter: '100', professional: '500', enterprise: 'Unlimited' },
+  { name: 'Orders/month', free: '5', seed: '5', starter: '25', professional: 'Unlimited', enterprise: 'Unlimited' },
+  { name: 'Team members', free: '1', seed: '1', starter: '3', professional: '10', enterprise: 'Unlimited' },
+  { name: 'Voice-to-task', free: true, seed: true, starter: true, professional: true, enterprise: true },
+  { name: 'Comparison assistant', free: false, seed: false, starter: true, professional: true, enterprise: true },
+  { name: 'Supplier matching', free: false, seed: false, starter: true, professional: true, enterprise: true },
+  { name: 'AI specialists', free: '5 of 13', seed: '10 of 13', starter: '13', professional: '13', enterprise: '13' },
+  { name: 'Marketplace browse', free: true, seed: true, starter: true, professional: true, enterprise: true },
+  { name: 'Investor directory browse', free: true, seed: true, starter: true, professional: true, enterprise: true },
+  { name: 'Investor detail pages', free: false, seed: '3/day', starter: '10/day', professional: true, enterprise: 'Unlimited' },
+  { name: 'Partner contacts & LinkedIn', free: false, seed: false, starter: true, professional: true, enterprise: true },
+  { name: 'Verified emails & deep profiles', free: false, seed: false, starter: false, professional: true, enterprise: true },
+  { name: 'Fund performance & hardware fit', free: false, seed: false, starter: false, professional: true, enterprise: true },
+  { name: 'Engineering reports (PDF, DOCX, PPTX)', free: true, seed: true, starter: true, professional: true, enterprise: true },
+  { name: 'Priority support', free: false, seed: false, starter: false, professional: true, enterprise: true },
+  { name: 'Dedicated account manager', free: false, seed: false, starter: false, professional: false, enterprise: true },
+  { name: 'Platform fee', free: '10%', seed: '10%', starter: '10% (0% first 3 orders)', professional: '5%', enterprise: '5%' },
 ]
