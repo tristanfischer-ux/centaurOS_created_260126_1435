@@ -34,6 +34,7 @@ import { SimilarInvestorsSection } from '../components/SimilarInvestorsSection'
 import { CoInvestmentNetworkSection } from '../components/CoInvestmentNetworkSection'
 import { InvestorBreadcrumb } from '../components/InvestorBreadcrumb'
 import { InvestorDetailActions } from '../components/InvestorDetailActions'
+import { ViewCapOverlay } from '../components/ViewCapOverlay'
 import {
   ArrowLeft,
   BarChart3,
@@ -43,6 +44,7 @@ import {
   CheckCircle2,
   Circle,
   Database,
+  Eye,
   Globe,
   Lightbulb,
   Link2,
@@ -178,19 +180,32 @@ interface PageProps {
 
 export default async function InvestorDetailPage({ params }: PageProps) {
   const { id } = await params
-  const { firm, access, gated } = await getInvestorById(id)
+  const { firm, access, gated, viewCapHit, viewCap } = await getInvestorById(id)
 
   if (!firm) {
     notFound()
   }
 
-  // Free tier: show upgrade prompt
+  // Not logged in / no foundry: show generic upgrade prompt
   if (gated) {
     return (
       <FreeUpgradeOverlay
         firmName={firm.title}
         firmType={firm.attributes.firm_type}
         hqCity={firm.attributes.hq_city}
+      />
+    )
+  }
+
+  // View cap exceeded: show teaser with cap-specific upgrade CTA
+  if (viewCapHit && viewCap) {
+    return (
+      <ViewCapOverlay
+        firmName={firm.title}
+        firmType={firm.attributes.firm_type}
+        hqCity={firm.attributes.hq_city}
+        tier={access.tier}
+        viewCap={viewCap}
       />
     )
   }
@@ -223,6 +238,22 @@ export default async function InvestorDetailPage({ params }: PageProps) {
       <div className="space-y-8 max-w-5xl">
         {/* Breadcrumb trail — tracks navigation through investor network */}
         <InvestorBreadcrumb investorId={id} investorName={firm.title} />
+
+        {/* Views remaining banner — soft nudge for capped tiers */}
+        {viewCap && viewCap.cap !== null && (
+          <div className="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-4 py-2.5 text-sm">
+            <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {viewCap.remaining} {viewCap.remaining === 1 ? 'view' : 'views'}
+              </span>
+              {' '}remaining {viewCap.period === 'weekly' ? 'this week' : 'today'}
+              {viewCap.remaining <= 1 && (
+                <>{' · '}<Link href="/pricing" className="text-international-orange hover:underline">Upgrade for more</Link></>
+              )}
+            </span>
+          </div>
+        )}
 
         {/* Header */}
         <div className="space-y-3">

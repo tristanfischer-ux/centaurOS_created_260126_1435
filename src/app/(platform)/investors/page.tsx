@@ -15,11 +15,11 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess } from '@/actions/investors'
+import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus } from '@/actions/investors'
 import { getProducts } from '@/actions/products'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { InvestorStats, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
+import type { InvestorStats, ShortlistStage, InvestorTierAccess, InvestorViewCapResult } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 import { InvestorPageTabs } from './components/InvestorPageTabs'
@@ -84,11 +84,12 @@ export default async function InvestorDirectoryPage() {
     intelligenceAccess: false,
   }
 
-  const [searchResult, statsResult, shortlistResult, accessResult] = await Promise.allSettled([
+  const [searchResult, statsResult, shortlistResult, accessResult, viewCapResult] = await Promise.allSettled([
     searchInvestors({ page: 1, pageSize: 24 }),
     getInvestorStats(),
     getShortlistIds(),
     getInvestorTierAccess(),
+    getInvestorViewCapStatus(),
   ])
 
   if (searchResult.status === 'fulfilled') {
@@ -113,6 +114,11 @@ export default async function InvestorDirectoryPage() {
 
   if (accessResult.status === 'fulfilled') {
     access = accessResult.value
+  }
+
+  let viewCapStatus: InvestorViewCapResult | null = null
+  if (viewCapResult.status === 'fulfilled') {
+    viewCapStatus = viewCapResult.value
   }
 
   // Compute match scores for initial firms
@@ -213,6 +219,22 @@ export default async function InvestorDirectoryPage() {
             : 'Find the right investors for your company'}
         </p>
       </div>
+
+      {/* Views remaining banner — soft nudge for capped tiers */}
+      {viewCapStatus && viewCapStatus.cap !== null && (
+        <div className="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-4 py-2.5 text-sm">
+          <svg className="h-4 w-4 text-muted-foreground shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+          <span className="text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {viewCapStatus.remaining} investor profile {viewCapStatus.remaining === 1 ? 'view' : 'views'}
+            </span>
+            {' '}remaining {viewCapStatus.period === 'weekly' ? 'this week' : 'today'}
+            {viewCapStatus.remaining <= 1 && (
+              <>{' · '}<a href="/pricing" className="text-international-orange hover:underline">Upgrade for more</a></>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Specialist banner — right after header, like all other pages */}
       <InvestorSpecialistBanner
