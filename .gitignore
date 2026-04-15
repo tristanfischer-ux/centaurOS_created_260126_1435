@@ -90,3 +90,4 @@ data/extra-step-staging/
 
 # Build cache
 tsconfig.tsbuildinfo
+.aider*

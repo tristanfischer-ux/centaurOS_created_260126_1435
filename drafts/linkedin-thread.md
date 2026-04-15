@@ -6,13 +6,11 @@
 
 **Post 1 (Hook)**
 
-I spent 3 months building something that shouldn't exist.
+I built an operating system for hardware startups.
 
-An AI that generates complete engineering packages for hardware startups — STEP files, BOM, DFM analysis, matched UK suppliers.
+13 domain specialists. 7,800+ investors. 13,700+ manufacturers. Strategy, engineering, finance, legal, fundraising — everything a pre-revenue founder needs, in one platform.
 
-From a text description. In hours, not months.
-
-Here's what happened when I put it to the test. 🧵
+Here's why, and what it actually does. 🧵
 
 ---
 
@@ -22,74 +20,83 @@ Hardware founders have a structural problem.
 
 They spend 12-18 months before first revenue. ~70% of seed funding goes to infrastructure — not the product.
 
-A software startup can ship an MVP in a weekend. A hardware startup needs: engineering, prototyping, supplier sourcing, DFM, compliance, tooling...
+But the real killer? You need expertise across a dozen domains simultaneously — engineering, manufacturing, fundraising, finance, legal, strategy, sales, marketing — and you can't afford any of it pre-revenue.
 
-The "lean startup" methodology doesn't work when iteration takes 57 days instead of 3.
+A software startup needs a laptop and a weekend. A hardware startup needs a CTO, a VP Manufacturing, a finance lead, a lawyer, a fundraising advisor, and 6 months of runway before anything ships.
+
+The "lean startup" methodology doesn't work when you need a 12-person team to get to MVP.
 
 ---
 
-**Post 3 (The Demo — attach CAD Lab screenshot)**
+**Post 3 (The Platform — attach platform screenshot)**
 
-So I typed this into ForgeOS:
+So I built ForgeOS. Here's what's inside:
 
-"Solar-powered IoT irrigation controller for smallholder farms in East Africa. Under $100 at scale. IP65 rated. SMS connectivity."
+→ **13 domain specialists** — strategy, CTO, VP engineering, VP manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, chief of staff
+→ **7,800+ investors** with AI matching by stage, sector, and cheque size — plus 49,000+ contacts and 3,000+ grants
+→ **Concept packages** — describe your product, get architecture, BOM at 3 volumes, DFM analysis, certification roadmap, matched suppliers
+→ **13,700+ UK manufacturers** indexed with capability data and one-click RFQs
+→ **Business tools** — strategy, objectives, tasks, cash burn projections, P&L, team management, board packs
 
-3 minutes later, I had:
+One platform. Everything a hardware startup needs to go from idea to investable, manufacturing-ready company.
 
-→ Full product architecture (modular design, 48 components)
-→ Bill of materials with costs at 1K, 10K, and 100K units
-→ DFM analysis (flagged 3 components needing redesign)
-→ Competitive benchmarking against 3 existing products
-→ Certification roadmap (CE, IP65, FCC)
-→ 47 matched UK suppliers
-
-[SCREENSHOT: CAD Lab output]
+[SCREENSHOT: Platform overview]
 
 ---
 
 **Post 4 (The Cost Comparison)**
 
-Traditional approach:
-• 4-8 weeks
-• £5,000-£15,000 in freelance engineering
-• Multiple contractors to coordinate
-• Static deliverables that don't update
+What it costs to run a hardware startup properly:
+
+• Fractional CTO: £1,500/month
+• VP Manufacturing consultant: £1,500/month
+• Finance advisor: £1,000/month
+• Legal counsel: £500/hour
+• Fundraising advisor: £2,000/month
+• Strategy consultant: £1,500/month
+• Total: £8,000+/month before you've built anything
 
 ForgeOS:
-• 3 hours
 • £49/month
-• One platform
-• Living package that iterates with your design
+• All 13 specialists
+• 7,800+ investors with matching
+• Concept packages
+• 13,700+ manufacturers
+• Full business operations tools
 
-That's not a marginal improvement. That's a category change.
+That's not a marginal improvement. That's the difference between a pre-revenue founder having no support team and having a full one.
 
 ---
 
 **Post 5 (What's Under the Hood)**
 
-ForgeOS isn't one AI. It's 13 specialist agents working together:
+ForgeOS runs on 13 specialists across every domain a hardware startup needs:
 
-• A CTO designing architecture
-• A VP Manufacturing checking DFM
-• A supply chain lead matching suppliers
-• A finance lead modelling unit economics
-• A legal counsel flagging certification requirements
+• Sage — strategy and business planning
+• Max — CTO, architecture and technical decisions
+• Jian — VP engineering, detailed design
+• Fang — VP manufacturing, DFM and production
+• Chase — supply chain and procurement
+• Priya — product management
+• Mia — marketing and growth
+• Sal — sales and partnerships
+• Cal — chief of staff, operations
+• Finn — finance, unit economics, P&L
+• Fiona — fundraising and investor relations
+• Harper — HR and team building
+• Leo — legal counsel and compliance
 
-Each has distinct expertise, personality, and domain knowledge.
+Each has distinct expertise and domain knowledge. They challenge each other's assumptions. They know your project context.
 
-They argue with each other. They challenge assumptions. They produce work you'd expect from a team of senior engineers.
+But here's the key: they SUPPORT you. They don't replace your judgment. They augment what you can do as a founder — so you can operate like a well-funded team while you're still pre-revenue.
 
 ---
 
 **Post 6 (The CTA)**
 
-I'm onboarding the first 100 founding members personally.
+If you're building a physical product and feel like you need to be an expert in 12 things simultaneously — that's exactly why I built this.
 
-If you're building a physical product and spending too long getting from idea to manufacturing-ready specs — DM me.
-
-I'll walk you through your first engineering package in 20 minutes.
-
-32 of 100 founding spots taken.
+DM me if you're building hardware and want to see what 13 specialists can do for your startup. I'll walk you through the platform in 20 minutes.
 
 → fractionalforge.app
 

@@ -111,4 +111,25 @@ Only move to next round after all issues from current round are resolved.
 ---
 
 ## Summary
-(filled after all 5 rounds)
+
+**5 rounds completed. 30 issues found. All HIGH and MEDIUM fixed.**
+
+| Round | Focus | Issues Found | Fixed |
+|-------|-------|-------------|-------|
+| 1 | Security & Data Isolation | 6 | 6 |
+| 2 | Error Handling & Edge Cases | 5 | 5 |
+| 3 | Integration & Flow Integrity | 5 | 5 |
+| 4 | Performance & Scalability | 7 | 5 (2 LOW deferred) |
+| 5 | User Experience & Polish | 7 | 5 (2 LOW deferred) |
+| **Total** | | **30** | **26 fixed, 4 LOW deferred** |
+
+**Deferred LOW items:**
+- Blog pagination (20 post limit adequate for launch, add when >20 posts exist)
+- Second admin client instance per blog page (minor, accepted)
+- Verify group-hover:text-international-orange in Tailwind config
+- Pending actions tab action buttons (no server action exists yet for action approval)
+
+**Commits:**
+- `4861d1a6` — Initial specialist execution layer (all 4 phases)
+- `abab25f1` — Newsletter FK fix
+- `0047c1cc` — 16 red team fixes (security, errors, performance, UX)

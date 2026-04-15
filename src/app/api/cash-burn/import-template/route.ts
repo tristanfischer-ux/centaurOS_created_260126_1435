@@ -10,9 +10,16 @@ import { buildCsv } from '@/lib/cash-burn/csv-parser'
 const OUT_HEADER = ['name', 'category', 'cost_type', 'amount', 'frequency', 'effective_from', 'notes']
 const IN_HEADER = ['name', 'source_type', 'amount', 'frequency', 'effective_from', 'probability_pct', 'notes']
 
+// Category values must match the CHECK constraint in migration
+// 20260226150000_cash_burn_planning.sql (public.cash_out_items.category).
+// Valid options: rent, salaries, benefits_insurance, phone_internet, ai_llm,
+// saas_subscriptions, insurance, accounting, legal_retainer, bank_fees,
+// contractors, hardware_components, prototyping, manufacturing, shipping,
+// marketing, travel, events, cloud_infrastructure, r_and_d,
+// equipment_purchase, other.
 const OUT_EXAMPLES: (string | number)[][] = [
   ['Office rent', 'rent', 'fixed', 1500, 'monthly', '2026-01-01', 'Serviced office'],
-  ['AWS hosting', 'hosting', 'fixed', 120, 'monthly', '2026-01-01', ''],
+  ['AWS hosting', 'cloud_infrastructure', 'fixed', 120, 'monthly', '2026-01-01', ''],
   ['Prototype parts', 'prototyping', 'variable', 3500, 'one_time', '2026-02-15', 'Batch 2'],
 ]
 

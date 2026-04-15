@@ -4,27 +4,28 @@
 
 ## 1. Reddit r/hwstartups
 
-**Title:** I built an AI that generates engineering packages for hardware startups — here's what it actually produces
+**Title:** I built an operating system for hardware startups — 13 specialists, 7,800+ investors, 13,700+ manufacturers in one platform
 
 **Body:**
 
 Hey r/hwstartups — I've been lurking here for a while and finally have something worth sharing.
 
-I'm a hardware founder myself and got frustrated with the 12-18 month gap between "I have a product idea" and "I have something a manufacturer can quote on." So I built a tool that does it in hours.
+I'm a hardware founder myself and got frustrated with the sheer number of things you need to get right simultaneously: strategy, engineering, fundraising, supplier sourcing, finance, legal, manufacturing... every one of those requires expensive expertise, and pre-revenue founders can't afford any of it.
 
-**What it does:** You describe your product in plain English. The AI generates:
-- Product architecture and modular design
-- Full BOM with cost modelling at 1K/10K/100K volumes  
-- DFM analysis with manufacturing recommendations
-- Competitive benchmarking
-- Certification roadmap
-- Matched UK suppliers (from a database of 13,700+)
+So I built ForgeOS — an operating system for hardware startups that puts everything you need in one place.
 
-**What it doesn't do:** It doesn't replace your engineering team. It gives you a comprehensive starting point so you spend your engineering budget refining, not starting from scratch.
+**What's in the platform:**
+- **13 domain specialists** — strategy, CTO, VP manufacturing, finance, legal, sales, marketing, supply chain, product, HR, fundraising, and more. They support your decisions across every discipline.
+- **7,800+ investors** with AI matching by stage, sector, and cheque size — plus 49,000+ contacts and 3,000+ grants
+- **Concept packages** — describe your product, get architecture, BOM with cost modelling at 1K/10K/100K volumes, DFM analysis, certification roadmap
+- **13,700+ UK manufacturers** indexed with capability data and one-click RFQs
+- **Business tools** — objectives, tasks, cash burn projections, P&L, team management, board packs
 
-**Real example:** I put through a solar-powered IoT irrigation controller for East African farms. In 3 hours I had a 48-component modular design, BOM with costs at three volumes, 3 flagged DFM issues, and 47 matched UK suppliers. A freelance engineer quoted me 6 weeks and £8,000 for the same scope.
+**What it doesn't do:** It doesn't replace your team. The specialists support your thinking and accelerate your work — they don't make decisions for you. Think of it as having a full C-suite available on demand while you're still pre-revenue.
 
-It's called ForgeOS. Free tier available. Happy to answer questions about the tech or the approach.
+**Real example:** I put through a solar-powered IoT irrigation controller for East African farms. In 3 hours I had a 48-component modular design, BOM with costs at three volumes, 3 flagged DFM issues, and 47 matched UK suppliers. Then I searched for investors matching "climate-tech, pre-seed, hardware" and got 23 relevant matches with contact details. A freelance engineer quoted me 6 weeks and £8,000 for just the engineering scope — and that's before fundraising prep.
+
+It's called ForgeOS. Free tier available. Happy to answer questions about the platform or the approach.
 
 [Link: fractionalforge.app]
 
@@ -32,27 +33,28 @@ It's called ForgeOS. Free tier available. Happy to answer questions about the te
 
 ## 2. Hacker News — Show HN
 
-**Title:** Show HN: ForgeOS — AI generates engineering packages for hardware startups (STEP, BOM, DFM, suppliers)
+**Title:** Show HN: ForgeOS — Operating system for hardware startups (13 specialists, investors, manufacturers, strategy)
 
 **Body:**
 
-Hi HN. I built ForgeOS because hardware startups have a structural problem that software startups don't: you have to build both the product AND the manufacturing infrastructure simultaneously.
+Hi HN. I built ForgeOS because hardware startups have a structural problem that software startups don't: you need expertise across a dozen domains simultaneously — engineering, manufacturing, finance, legal, fundraising, strategy — and you can't afford any of it pre-revenue.
 
-ForgeOS uses 13 specialised AI agents (CTO, VP Manufacturing, Supply Chain, Finance, Legal, etc.) that collaborate to generate a complete engineering package from a product description:
+ForgeOS is a multi-domain specialist system. 13 AI specialists collaborate across strategy, engineering, finance, legal, manufacturing, sales, marketing, supply chain, product, HR, fundraising, and operations:
 
-- Product architecture with modular design
-- Bill of materials with cost modelling at multiple volumes
-- DFM analysis and manufacturing recommendations  
-- Certification roadmap
-- Matched suppliers from 13,700+ UK manufacturers
+- **Concept packages** from product descriptions: architecture, BOM, DFM, certification roadmap
+- **Investor intelligence**: 7,800+ investors with AI matching, 49,000+ contacts, 3,000+ grants
+- **Manufacturing connections**: 13,700+ UK manufacturers indexed with capability data
+- **Business operations**: strategy, objectives, tasks, cash burn, P&L, team management
 
-The agents have distinct expertise and actually challenge each other's assumptions — the VP Manufacturing will flag DFM issues the CTO's architecture creates, and the Finance lead will call out cost assumptions.
+The specialists have distinct expertise and challenge each other's assumptions — the VP Manufacturing flags DFM issues the CTO's architecture creates, the Finance lead calls out cost assumptions, and the Fundraising advisor pressure-tests your pitch based on what investors in your sector actually fund.
 
-Stack: Next.js, TypeScript, Supabase, multi-LLM (Anthropic Claude + DeepSeek + OpenAI for embeddings). The specialist agents use a personality system with benchmarked quality scores.
+The key design principle: augmentation, not automation. The specialists support founder decisions — they don't replace human judgment.
+
+Stack: Next.js, TypeScript, Supabase, multi-LLM (Anthropic Claude + DeepSeek + OpenAI for embeddings). The specialist agents use a personality system with benchmarked quality scores across actionability, specificity, strategic depth, and voice consistency.
 
 Try it: fractionalforge.app (free tier, no credit card)
 
-Happy to answer technical questions about the multi-agent architecture or the engineering package generation pipeline.
+Happy to answer technical questions about the multi-domain specialist architecture or how we handle cross-specialist collaboration.
 
 ---
 
@@ -60,12 +62,14 @@ Happy to answer technical questions about the multi-agent architecture or the en
 
 **Shorter, more conversational:**
 
-Hey everyone — I've been building something for the past 3 months that I think this community would find useful.
+Hey everyone — I've been building something for the past few months that I think this community would find useful.
 
-It's an AI platform that generates engineering packages from product descriptions. You type in what you're building, and it produces: architecture, BOM with costing, DFM analysis, certification roadmap, and matched UK suppliers. Takes about 3 hours instead of 4-8 weeks.
+It's called ForgeOS — basically an operating system for hardware startups. Instead of juggling freelancers, spreadsheets, and cold emails across every discipline, you get one platform with everything: 13 specialists (strategy, engineering, finance, legal, manufacturing, sales, etc.), 7,800+ investors with AI matching, concept packages from product descriptions, 13,700+ UK manufacturers, and business tools like cash burn projections and board packs.
 
-I'm personally onboarding the first 100 users. If anyone wants to try it with their own product, DM me and I'll walk you through it.
+The idea is: everything a pre-revenue hardware founder needs to get from idea to investable company, without hiring a full team.
+
+If anyone wants to try it with their own startup, DM me and I'll walk you through it.
 
 fractionalforge.app — free tier available.
 
-Not trying to spam — genuinely want feedback from people building hardware. What would make this useful for YOUR product?
+Not trying to spam — genuinely want feedback from people building hardware. What would make this most useful for YOUR startup?

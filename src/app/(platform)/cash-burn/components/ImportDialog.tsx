@@ -56,12 +56,9 @@ export function ImportDialog({ open, onOpenChange, kind, onImported }: ImportDia
       toast.error('No valid rows to import — fix the errors and try again.')
       return
     }
-    // DEBUG: visible client-side trace to confirm rows are present at call site
-    toast.message(`DEBUG: calling commitImport with ${validRows.length} rows`)
     startCommit(async () => {
       try {
         const res = await commitImport(kind, validRows)
-        toast.message(`DEBUG: server returned data=${JSON.stringify(res.data)} err=${res.error}`)
         if (res.error || !res.data) {
           toast.error(res.error ?? 'Import failed')
           return
@@ -71,7 +68,7 @@ export function ImportDialog({ open, onOpenChange, kind, onImported }: ImportDia
         onOpenChange(false)
         onImported?.()
       } catch (err) {
-        toast.error(`DEBUG client catch: ${err instanceof Error ? err.message : String(err)}`)
+        toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`)
       }
     })
   }

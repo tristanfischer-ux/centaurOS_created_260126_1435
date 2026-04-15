@@ -54,6 +54,17 @@ const COST_TYPES: ReadonlySet<string> = new Set(['fixed', 'variable'])
 const SOURCE_TYPES: ReadonlySet<string> = new Set([
   'revenue', 'loan', 'equity', 'government_grant', 'other',
 ])
+// GOTCHA: Must match the CHECK constraint on cash_out_items.category in
+// migration 20260226150000_cash_burn_planning.sql. One bad row fails the
+// whole batch insert — validate here so users get row-level errors instead.
+const VALID_CATEGORIES: ReadonlySet<string> = new Set([
+  'rent', 'salaries', 'benefits_insurance', 'phone_internet',
+  'ai_llm', 'saas_subscriptions', 'insurance', 'accounting',
+  'legal_retainer', 'bank_fees',
+  'contractors', 'hardware_components', 'prototyping', 'manufacturing',
+  'shipping', 'marketing', 'travel', 'events', 'cloud_infrastructure',
+  'r_and_d', 'equipment_purchase', 'other',
+])
 
 const FREQUENCY_ALIASES: Record<string, Frequency> = {
   weekly: 'weekly', week: 'weekly', wk: 'weekly',
@@ -151,7 +162,11 @@ function validateOutRow(r: Record<string, string>): ValidatedOutRow {
   if (!name) errors.push('name is required')
   if (name.length > 200) errors.push('name is too long (max 200)')
 
-  const category = (r.category ?? '').trim() || 'other'
+  const categoryRaw = (r.category ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_') || 'other'
+  const category = VALID_CATEGORIES.has(categoryRaw) ? categoryRaw : null
+  if (!category) {
+    errors.push(`category "${categoryRaw}" is not valid — see template for allowed values`)
+  }
 
   const costTypeRaw = (r.cost_type ?? '').trim().toLowerCase()
   if (!COST_TYPES.has(costTypeRaw)) errors.push('cost_type must be fixed or variable')
@@ -164,7 +179,7 @@ function validateOutRow(r: Record<string, string>): ValidatedOutRow {
 
   const effectiveFrom = parseDate(r.effective_from ?? '') ?? new Date().toISOString().slice(0, 10)
 
-  if (errors.length > 0 || amount === null || !frequency) {
+  if (errors.length > 0 || amount === null || !frequency || !category) {
     return { input: null, errors }
   }
 
@@ -322,14 +337,9 @@ export async function commitImport(
   kind: ImportKind,
   rows: Array<Record<string, string | number | null>>,
 ): Promise<ActionResult<{ inserted: number }>> {
-  console.log('[cash-burn-import] commitImport called:', { kind, rowCount: rows?.length, firstRow: rows?.[0] })
   try {
-    if (!Array.isArray(rows)) {
-      console.error('[cash-burn-import] rows is not an array:', typeof rows, rows)
-      return { data: null, error: `DEBUG: rows is ${typeof rows} not array (kind=${kind})` }
-    }
-    if (rows.length === 0) {
-      return { data: null, error: `DEBUG: commitImport received empty rows array (kind=${kind})` }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return { data: null, error: 'No rows to import' }
     }
     if (rows.length > MAX_ROWS) return { data: null, error: `Too many rows — max ${MAX_ROWS}` }
 
