@@ -219,19 +219,21 @@ export async function checkAILimit(
       // expensive calls (one credit per call regardless of cost).
       if (costLimitHit) {
         const upgradeHint = tier === 'free'
-          ? 'Upgrade to Starter'
-          : tier === 'starter'
-            ? 'Upgrade to Professional'
-            : tier === 'professional'
-              ? 'Upgrade to Enterprise'
-              : 'Contact sales for custom capacity'
+          ? 'Upgrade to Seed (£19.99/mo) for more capacity'
+          : tier === 'seed'
+            ? 'Upgrade to Startup Team (£49/mo) for more capacity'
+            : tier === 'starter'
+              ? 'Upgrade to Professional (£149/mo) for more capacity'
+              : tier === 'professional'
+                ? 'Upgrade to Enterprise (£499/mo) for more capacity'
+                : 'Contact sales for custom capacity'
         return {
           allowed: false,
           currentUsage,
           limit,
           remaining: 0,
           tier,
-          message: `You've reached your monthly AI compute budget. ${upgradeHint} for more capacity.`,
+          message: `You've reached your monthly AI compute budget. ${upgradeHint}.`,
           currentCostUsd: currentCost,
           costBudgetUsd: costBudget,
         }
@@ -269,12 +271,14 @@ export async function checkAILimit(
       }
 
       const upgradeHint = tier === 'free'
-        ? 'Upgrade to Starter'
-        : tier === 'starter'
-          ? 'Upgrade to Professional'
-          : tier === 'professional'
-            ? 'Upgrade to Enterprise'
-            : 'Contact sales'
+        ? 'Upgrade to Seed (£19.99/mo) for 75 tasks'
+        : tier === 'seed'
+          ? 'Upgrade to Startup Team (£49/mo) for 100 tasks'
+          : tier === 'starter'
+            ? 'Upgrade to Professional (£149/mo) for 500 tasks'
+            : tier === 'professional'
+              ? 'Upgrade to Enterprise (£499/mo) for 10,000 tasks'
+              : 'Contact sales'
       return {
         allowed: false,
         currentUsage,

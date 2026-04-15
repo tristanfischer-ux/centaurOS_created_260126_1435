@@ -105,6 +105,7 @@ export function PricingContent() {
 
   const plans = [
     SUBSCRIPTION_PLANS.free,
+    SUBSCRIPTION_PLANS.seed,
     SUBSCRIPTION_PLANS.starter,
     SUBSCRIPTION_PLANS.professional,
   ]
@@ -191,7 +192,7 @@ export function PricingContent() {
           </div>
 
           {/* Pricing cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
             {plans.map((plan) => {
               const isProfessional = plan.tier === 'professional'
               const monthlyPrice = billingPeriod === 'monthly'
@@ -221,7 +222,10 @@ export function PricingContent() {
                       <span className="text-4xl font-bold text-foreground">
                         {monthlyPrice === 0
                           ? 'Free'
-                          : `£${(monthlyPrice / 100).toFixed(0)}`
+                          : `£${monthlyPrice % 100 === 0
+                              ? (monthlyPrice / 100).toFixed(0)
+                              : (monthlyPrice / 100).toFixed(2)
+                            }`
                         }
                       </span>
                       {monthlyPrice > 0 && (
@@ -229,7 +233,10 @@ export function PricingContent() {
                       )}
                       {billingPeriod === 'annual' && monthlyPrice > 0 && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          £{(plan.priceAnnualGBP / 100).toFixed(0)} billed annually
+                          £{plan.priceAnnualGBP % 100 === 0
+                            ? (plan.priceAnnualGBP / 100).toFixed(0)
+                            : (plan.priceAnnualGBP / 100).toFixed(2)
+                          } billed annually
                         </p>
                       )}
                     </div>
@@ -284,15 +291,21 @@ export function PricingContent() {
                         variant={isProfessional ? 'default' : 'outline'}
                       >
                         <Link href="/join">
-                          {plan.priceMonthlyGBP === 0 ? 'Get Started Free' : 'Start Free Trial'}
+                          {plan.tier === 'free'
+                            ? 'Get Started Free'
+                            : plan.tier === 'seed'
+                              ? 'Start with Seed'
+                              : 'Start Free Trial'}
                           <ArrowRight className="h-4 w-4 ml-2" />
                         </Link>
                       </Button>
                       {/* CTA subtext to reduce commitment anxiety */}
                       <p className="text-xs text-muted-foreground text-center">
-                        {plan.priceMonthlyGBP === 0
+                        {plan.tier === 'free'
                           ? '14-day full-access trial · No credit card required'
-                          : 'Start with 14-day free trial · Cancel anytime'
+                          : plan.tier === 'seed'
+                            ? 'No trial needed · Cancel anytime'
+                            : 'Start with 14-day free trial · Cancel anytime'
                         }
                       </p>
                     </div>
@@ -342,11 +355,12 @@ export function PricingContent() {
               Compare Plans
             </h2>
             <div className="overflow-x-auto">
-              <div className="min-w-[600px]">
+              <div className="min-w-[700px]">
                 {/* Header row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4 border-b border-muted">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 pb-4 border-b border-muted">
                   <div className="text-sm font-medium text-muted-foreground">Feature</div>
                   <div className="text-sm font-medium text-center">Explorer</div>
+                  <div className="text-sm font-medium text-center">Seed</div>
                   <div className="text-sm font-medium text-center">Startup Team</div>
                   <div className="text-sm font-medium text-center text-international-orange">Professional</div>
                 </div>
@@ -354,7 +368,7 @@ export function PricingContent() {
                 {COMPARISON_FEATURES.map((feature) => (
                   <div
                     key={feature.name}
-                    className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3 border-b border-muted/50"
+                    className="grid grid-cols-3 sm:grid-cols-5 gap-4 py-3 border-b border-muted/50"
                   >
                     <div className="text-sm text-foreground flex items-center gap-1.5">
                       {feature.name}
@@ -370,6 +384,7 @@ export function PricingContent() {
                       )}
                     </div>
                     <ComparisonCell value={feature.free} />
+                    <ComparisonCell value={feature.seed} />
                     <ComparisonCell value={feature.starter} />
                     <ComparisonCell value={feature.professional} />
                   </div>
@@ -529,21 +544,27 @@ function ComparisonCell({ value }: { value: boolean | string }) {
 }
 
 /** Feature comparison data — only features that are actually implemented */
-const COMPARISON_FEATURES = [
-  { name: 'Assists per month', free: '50', starter: '100', professional: '500' },
-  { name: 'Orders/month', free: '5', starter: '25', professional: 'Unlimited' },
-  { name: 'Team members', free: '1', starter: '3', professional: '10' },
-  { name: 'Voice-to-task', free: true, starter: true, professional: true },
-  { name: 'Comparison assistant', free: false as boolean | string, starter: true, professional: true },
-  { name: 'Supplier matching', free: false, starter: true, professional: true },
-  { name: '13 specialist conversations', free: true, starter: true, professional: true },
-  { name: 'Marketplace browse', free: true, starter: true, professional: true },
-  { name: 'Investor directory browse', free: true, starter: true, professional: true },
-  { name: 'Investor detail pages', free: false, starter: true, professional: true },
-  { name: 'Partner contacts & LinkedIn', free: false, starter: true, professional: true },
-  { name: 'Verified emails & deep profiles', free: false, starter: false, professional: true },
-  { name: 'Fund performance & hardware fit', free: false, starter: false, professional: true },
-  { name: 'Engineering reports (PDF, DOCX, PPTX)', free: true, starter: true, professional: true },
-  { name: 'Priority support', free: false, starter: false, professional: true },
-  { name: 'Platform fee', free: '10%', starter: '10% (0% first 3 orders)', professional: '5%' },
+const COMPARISON_FEATURES: Array<{
+  name: string
+  free: boolean | string
+  seed: boolean | string
+  starter: boolean | string
+  professional: boolean | string
+}> = [
+  { name: 'Assists per month', free: '50', seed: '75', starter: '100', professional: '500' },
+  { name: 'Orders/month', free: '5', seed: '5', starter: '25', professional: 'Unlimited' },
+  { name: 'Team members', free: '1', seed: '1', starter: '3', professional: '10' },
+  { name: 'Voice-to-task', free: true, seed: true, starter: true, professional: true },
+  { name: 'Comparison assistant', free: false, seed: false, starter: true, professional: true },
+  { name: 'Supplier matching', free: false, seed: false, starter: true, professional: true },
+  { name: 'AI specialists', free: '5 of 13', seed: '10 of 13', starter: '13', professional: '13' },
+  { name: 'Marketplace browse', free: true, seed: true, starter: true, professional: true },
+  { name: 'Investor directory browse', free: true, seed: true, starter: true, professional: true },
+  { name: 'Investor detail pages', free: false, seed: '3/day', starter: '10/day', professional: true },
+  { name: 'Partner contacts & LinkedIn', free: false, seed: false, starter: true, professional: true },
+  { name: 'Verified emails & deep profiles', free: false, seed: false, starter: false, professional: true },
+  { name: 'Fund performance & hardware fit', free: false, seed: false, starter: false, professional: true },
+  { name: 'Engineering reports (PDF, DOCX, PPTX)', free: true, seed: true, starter: true, professional: true },
+  { name: 'Priority support', free: false, seed: false, starter: false, professional: true },
+  { name: 'Platform fee', free: '10%', seed: '10%', starter: '10% (0% first 3 orders)', professional: '5%' },
 ]
