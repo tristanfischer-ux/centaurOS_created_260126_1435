@@ -322,7 +322,12 @@ export async function commitImport(
   kind: ImportKind,
   rows: Array<Record<string, string | number | null>>,
 ): Promise<ActionResult<{ inserted: number }>> {
+  console.log('[cash-burn-import] commitImport called:', { kind, rowCount: rows?.length, firstRow: rows?.[0] })
   try {
+    if (!Array.isArray(rows)) {
+      console.error('[cash-burn-import] rows is not an array:', typeof rows, rows)
+      return { data: null, error: `rows parameter is not an array (got ${typeof rows})` }
+    }
     if (rows.length === 0) return { data: null, error: 'No rows to import' }
     if (rows.length > MAX_ROWS) return { data: null, error: `Too many rows — max ${MAX_ROWS}` }
 
