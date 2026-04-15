@@ -351,24 +351,28 @@ export function PricingContent() {
             <h2 className="text-2xl font-display font-semibold text-foreground text-center mb-8">
               Compare Plans
             </h2>
-            <div className="overflow-x-auto">
-              <div className="min-w-[850px]">
+            <p className="text-xs text-muted-foreground text-center sm:hidden mb-2">
+              ← Swipe to compare all plans →
+            </p>
+            <div className="relative">
+              <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
                 {/* Header row */}
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 pb-4 border-b border-muted">
-                  <div className="text-sm font-medium text-muted-foreground">Feature</div>
-                  <div className="text-sm font-medium text-center">Explorer</div>
-                  <div className="text-sm font-medium text-center">Seed</div>
-                  <div className="text-sm font-medium text-center">Startup Team</div>
-                  <div className="text-sm font-medium text-center text-international-orange">Professional</div>
-                  <div className="text-sm font-medium text-center">Enterprise</div>
+                <div className="grid grid-cols-6 gap-2 sm:gap-4 pb-4 border-b border-muted">
+                  <div className="text-xs sm:text-sm font-medium text-muted-foreground">Feature</div>
+                  <div className="text-xs sm:text-sm font-medium text-center">Explorer</div>
+                  <div className="text-xs sm:text-sm font-medium text-center">Seed</div>
+                  <div className="text-xs sm:text-sm font-medium text-center">Startup Team</div>
+                  <div className="text-xs sm:text-sm font-medium text-center text-international-orange">Professional</div>
+                  <div className="text-xs sm:text-sm font-medium text-center">Enterprise</div>
                 </div>
 
                 {COMPARISON_FEATURES.map((feature) => (
                   <div
                     key={feature.name}
-                    className="grid grid-cols-3 sm:grid-cols-6 gap-4 py-3 border-b border-muted/50"
+                    className="grid grid-cols-6 gap-2 sm:gap-4 py-3 border-b border-muted/50"
                   >
-                    <div className="text-sm text-foreground flex items-center gap-1.5">
+                    <div className="text-xs sm:text-sm text-foreground flex items-center gap-1.5">
                       {feature.name}
                       {FEATURE_TOOLTIPS[feature.name] && (
                         <Tooltip>
@@ -389,6 +393,9 @@ export function PricingContent() {
                   </div>
                 ))}
               </div>
+            </div>
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden" />
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none sm:hidden" />
             </div>
           </div>
 

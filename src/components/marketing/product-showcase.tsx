@@ -178,23 +178,26 @@ export function ProductShowcase() {
         </div>
 
         {/* Tab strip */}
-        <div className="flex items-center justify-center gap-1 sm:gap-2 mb-8 overflow-x-auto scrollbar-none px-2">
-          {TABS.map((t, i) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => handleTabClick(i)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all min-h-[44px]',
-                i === activeTab
-                  ? 'bg-international-orange text-white shadow-md'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              {t.icon}
-              <span className="hidden xs:inline">{t.label}</span>
-            </button>
-          ))}
+        <div className="relative mb-8">
+          <div className="flex items-center justify-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none px-2">
+            {TABS.map((t, i) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => handleTabClick(i)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all min-h-[44px]',
+                  i === activeTab
+                    ? 'bg-international-orange text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                )}
+              >
+                {t.icon}
+                <span className="hidden xs:inline">{t.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden" />
         </div>
 
         {/* Progress bar */}
@@ -236,7 +239,7 @@ export function ProductShowcase() {
                       sizes="(max-width: 1024px) 100vw, 60vw"
                       priority
                     />
-                    {/* Callout badges */}
+                    {/* Callout badges — hidden on mobile to prevent overflow */}
                     {tab.callouts.map((callout, ci) => (
                       <motion.div
                         key={callout.text}
@@ -244,7 +247,7 @@ export function ProductShowcase() {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 + ci * 0.15, duration: 0.4 }}
                         className={cn(
-                          'absolute px-3 py-1.5 rounded-full bg-international-orange text-white text-xs font-semibold shadow-lg',
+                          'absolute px-3 py-1.5 rounded-full bg-international-orange text-white text-xs font-semibold shadow-lg hidden sm:block',
                           callout.position,
                         )}
                       >

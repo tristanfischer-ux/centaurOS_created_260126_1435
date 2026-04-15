@@ -65,7 +65,7 @@ export default function ContactPage() {
                 <CardContent>
                   <a
                     href="mailto:hello@fractionalforge.app"
-                    className="text-sm font-medium text-international-orange hover:underline transition-colors"
+                    className="text-sm font-medium text-international-orange hover:underline transition-colors break-all"
                   >
                     hello@fractionalforge.app
                   </a>
@@ -107,7 +107,7 @@ export default function ContactPage() {
                 <CardContent>
                   <a
                     href="mailto:sales@fractionalforge.app"
-                    className="text-sm font-medium text-international-orange hover:underline transition-colors"
+                    className="text-sm font-medium text-international-orange hover:underline transition-colors break-all"
                   >
                     sales@fractionalforge.app
                   </a>
@@ -131,7 +131,7 @@ export default function ContactPage() {
                     Use the in-app help or email{" "}
                     <a
                       href="mailto:support@fractionalforge.app"
-                      className="text-international-orange hover:underline"
+                      className="text-international-orange hover:underline break-all"
                     >
                       support@fractionalforge.app
                     </a>

@@ -704,7 +704,7 @@ function JoinPageInner() {
           <FoundingMemberCounter spotsClaimed={foundingCount} />
 
           {/* Trust signals */}
-          <div className="flex justify-center gap-6 text-xs text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Shield className="h-3.5 w-3.5 text-international-orange" />
               <span>Your IP, always</span>
