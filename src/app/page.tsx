@@ -809,20 +809,7 @@ function PricingTeaserSection() {
 function ProductShowcaseSection() {
   return (
     <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            The Platform
-          </span>
-          <h2 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-black mb-4 sm:mb-6">
-            ForgeOS. Everything you need to build,{" "}
-            <span className="text-international-orange">in one place.</span>
-          </h2>
-        </AnimatedSection>
-        <AnimatedSection delay={0.2}>
-          <ProductShowcase />
-        </AnimatedSection>
-      </div>
+      <ProductShowcase />
     </section>
   )
 }
