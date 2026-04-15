@@ -560,7 +560,7 @@ const COMPARISON_FEATURES: Array<{
   { name: 'Partner names & LinkedIn', free: true, seed: true, starter: true, professional: true, enterprise: true },
   { name: 'Verified investor emails', free: false, seed: true, starter: true, professional: true, enterprise: true },
   { name: 'Fund performance & hardware fit', free: true, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Orders/month', free: '5', seed: '10', starter: '50', professional: 'Unlimited', enterprise: 'Unlimited' },
+  { name: 'Marketplace orders', free: 'Unlimited', seed: 'Unlimited', starter: 'Unlimited', professional: 'Unlimited', enterprise: 'Unlimited' },
   { name: 'Marketplace + supplier matching', free: true, seed: true, starter: true, professional: true, enterprise: true },
   { name: 'Voice-to-task', free: true, seed: true, starter: true, professional: true, enterprise: true },
   { name: 'Engineering reports', free: true, seed: true, starter: true, professional: true, enterprise: true },

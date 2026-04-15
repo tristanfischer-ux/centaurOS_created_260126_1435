@@ -132,7 +132,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Email support',
     ],
     limits: {
-      maxOrders: 5,
+      maxOrders: undefined, // unlimited — we earn commission on every order
       maxTeamMembers: undefined, // no team limit — each person pays individually
       maxRetainers: 0,
       maxAiTasksPerMonth: 50,
@@ -166,7 +166,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Email support',
     ],
     limits: {
-      maxOrders: 10,
+      maxOrders: undefined,
       maxTeamMembers: undefined,
       maxRetainers: 0,
       maxAiTasksPerMonth: 250,
@@ -202,7 +202,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Email support',
     ],
     limits: {
-      maxOrders: 50,
+      maxOrders: undefined,
       maxTeamMembers: undefined,
       maxRetainers: undefined,
       maxAiTasksPerMonth: 750,
