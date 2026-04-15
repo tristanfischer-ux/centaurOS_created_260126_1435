@@ -26,7 +26,13 @@ import {
   AlertCircle,
   Loader2,
   FlaskConical,
+  Info,
 } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/plans'
@@ -254,7 +260,17 @@ export function BillingContent({
               <Sparkles className="h-5 w-5 text-electric-blue" />
             </div>
             <div>
-              <CardTitle className="text-lg">Smart Assists This Month</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-1.5">
+                Smart Assists This Month
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[280px]">
+                    <p className="text-sm">Each specialist chat message, CAD Lab generation, voice-to-task, comparison, or investor match counts as one smart assist.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {aiUsage.totalAiTasks} of {aiLimit} smart assists used
               </p>
@@ -346,7 +362,10 @@ export function BillingContent({
                     <span className="text-3xl font-bold text-foreground">
                       {plan.priceMonthlyGBP === 0
                         ? 'Free'
-                        : `£${(plan.priceMonthlyGBP / 100).toFixed(0)}`
+                        : `£${plan.priceMonthlyGBP % 100 === 0
+                            ? (plan.priceMonthlyGBP / 100).toFixed(0)
+                            : (plan.priceMonthlyGBP / 100).toFixed(2)
+                          }`
                       }
                     </span>
                     {plan.priceMonthlyGBP > 0 && (
@@ -381,6 +400,20 @@ export function BillingContent({
                           Upgrade to {plan.name}
                         </>
                       )}
+                    </Button>
+                  )}
+
+                  {/* DECISION: Downgrade via Stripe billing portal. Users on paid tiers can
+                      switch to lower tiers through Stripe's built-in plan switching UI, which
+                      handles proration automatically. */}
+                  {!isCurrent && !isUpgrade && currentTier !== 'free' && plan.tier !== 'free' && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleManageBilling()}
+                      disabled={isLoading === 'manage'}
+                    >
+                      Switch to {plan.name}
                     </Button>
                   )}
 
