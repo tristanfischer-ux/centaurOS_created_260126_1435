@@ -355,6 +355,7 @@ export async function commitImport(
     return { data: { inserted: res.data?.length ?? 0 }, error: null }
   } catch (err) {
     console.error('[cash-burn-import] commit failed:', err)
-    return { data: null, error: 'Import failed' }
+    const detail = err instanceof Error ? err.message : String(err)
+    return { data: null, error: `Import failed: ${detail}` }
   }
 }
