@@ -64,9 +64,9 @@ const COLUMN_HEADERS: { label: string; className?: string }[] = [
   { label: '', className: 'w-6' },                           // quality dot
   { label: 'Firm', className: 'w-[180px]' },
   { label: 'Type', className: 'w-[72px]' },
-  { label: 'Location', className: 'w-[120px]' },
-  { label: 'Sectors', className: 'w-[180px]' },
-  { label: 'Stage', className: 'w-[140px]' },
+  { label: 'Location', className: 'hidden md:table-cell w-[120px]' },
+  { label: 'Sectors', className: 'hidden md:table-cell w-[180px]' },
+  { label: 'Stage', className: 'hidden md:table-cell w-[140px]' },
   { label: 'Fund Size', className: 'hidden lg:table-cell w-[90px]' },
   { label: 'Intel Preview', className: 'hidden lg:table-cell' },
   { label: 'Quality', className: 'w-[120px]' },
@@ -188,12 +188,12 @@ export function InvestorTableView({
                 </td>
 
                 {/* 4. Location */}
-                <td className="px-3 py-2 text-muted-foreground truncate max-w-[120px]" title={location}>
+                <td className="hidden md:table-cell px-3 py-2 text-muted-foreground truncate max-w-[120px]" title={location}>
                   {location}
                 </td>
 
                 {/* 5. Sectors (first 2 + overflow) */}
-                <td className="px-3 py-2">
+                <td className="hidden md:table-cell px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     {sectors.slice(0, 2).map((s) => (
                       <Badge key={s} variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -212,7 +212,7 @@ export function InvestorTableView({
                 </td>
 
                 {/* 6. Stage focus (first 2) */}
-                <td className="px-3 py-2">
+                <td className="hidden md:table-cell px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     {stages.slice(0, 2).map((s) => (
                       <Badge key={s} variant="outline" className="text-[10px] px-1.5 py-0">

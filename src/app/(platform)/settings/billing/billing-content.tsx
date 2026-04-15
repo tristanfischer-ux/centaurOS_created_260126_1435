@@ -195,7 +195,7 @@ export function BillingContent({
       {/* Current Plan Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-international-orange/10 flex items-center justify-center">
                 <CreditCard className="h-5 w-5 text-international-orange" />
@@ -260,7 +260,7 @@ export function BillingContent({
               <Sparkles className="h-5 w-5 text-electric-blue" />
             </div>
             <div>
-              <CardTitle className="text-lg flex items-center gap-1.5">
+              <CardTitle className="text-base sm:text-lg flex items-center gap-1.5">
                 Smart Assists This Month
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -432,7 +432,7 @@ export function BillingContent({
         {/* Enterprise CTA */}
         <Card className="bg-muted/30">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-international-orange/10 flex items-center justify-center">
                   <Zap className="h-5 w-5 text-international-orange" />

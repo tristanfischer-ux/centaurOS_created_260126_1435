@@ -397,7 +397,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Fund Size and Cheque Range */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {attrs.fund_size_gbp && (
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Fund Size</p>

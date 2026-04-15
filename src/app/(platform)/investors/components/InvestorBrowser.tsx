@@ -541,7 +541,7 @@ export function InvestorBrowser({
         </div>
 
         {/* Sort + Export + View toggle */}
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto sm:ml-auto">
           {access && <InvestorExportMenu firms={displayFirms} matchScores={matchScores} access={access} />}
           <InvestorSortSelect value={sortBy} onChange={setSortBy} />
           <div className="flex items-center border border-border rounded-lg overflow-hidden">
