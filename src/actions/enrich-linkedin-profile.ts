@@ -125,28 +125,46 @@ export async function enrichLinkedInProfile(): Promise<{ success?: boolean; erro
     return { success: true, enriched: false } // No listing to enrich
   }
 
-  // Fetch LinkedIn page content
+  // Fetch LinkedIn page content — fallback chain: TinyFish → direct fetch → give up
   let pageContent: string | null = null
-  try {
-    // INTENT: Use a simple fetch first. LinkedIn public profiles are often
-    // accessible without login. If this fails (403/redirect), the data
-    // stays as-is — the user already entered their info manually.
-    const response = await fetch(linkedinUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-GB,en;q=0.9',
-      },
-      signal: AbortSignal.timeout(10000),
-    })
 
-    if (response.ok) {
-      pageContent = await response.text()
-    } else {
-      console.warn(`[LinkedInEnrich] Fetch returned ${response.status} for ${linkedinUrl}`)
+  // INTENT: TinyFish CLI has anti-bot mechanisms (28 evasion techniques) and returns
+  // clean markdown. LinkedIn blocks direct fetch() but TinyFish can often get through.
+  // Only runs server-side (Vercel functions won't have tinyfish installed — this is
+  // a local dev enrichment path that fires during profile wizard completion).
+  try {
+    const { execSync } = await import('child_process')
+    const result = execSync(
+      `tinyfish fetch content get "${linkedinUrl.replace(/"/g, '')}"`,
+      { timeout: 30000, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    )
+    if (result && result.length > 100) {
+      pageContent = result
+      console.info('[LinkedInEnrich] TinyFish succeeded for:', linkedinUrl)
     }
-  } catch (err) {
-    console.warn('[LinkedInEnrich] Fetch failed (non-blocking):', err)
+  } catch {
+    console.warn('[LinkedInEnrich] TinyFish unavailable or failed, trying direct fetch')
+  }
+
+  // Fallback: direct fetch (will fail on most LinkedIn profiles but worth trying)
+  if (!pageContent) {
+    try {
+      const response = await fetch(linkedinUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-GB,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (response.ok) {
+        pageContent = await response.text()
+      } else {
+        console.warn(`[LinkedInEnrich] Fetch returned ${response.status} for ${linkedinUrl}`)
+      }
+    } catch (err) {
+      console.warn('[LinkedInEnrich] Direct fetch failed:', err)
+    }
   }
 
   if (!pageContent) {

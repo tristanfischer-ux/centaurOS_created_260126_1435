@@ -57,6 +57,7 @@ import type { PublicExecutive } from "@/actions/listing-executives"
 import type { MarketplaceReview } from "@/actions/marketplace-reviews"
 import { ListingReviewsSection, ListingRatingSummary } from "@/components/marketplace/listing-reviews"
 import { toast } from "sonner"
+import { AvailabilityMiniCalendar } from "@/components/marketplace/availability-mini-calendar"
 
 interface TrustSignalsData {
     portfolio: PortfolioItem[]
@@ -228,6 +229,13 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
 
                     {/* Category-specific sections */}
                     {category === 'People' && <PeopleSection attrs={attrs} />}
+                    {category === 'People' && attrs.provider_id && (
+                        <AvailabilityMiniCalendar providerId={attrs.provider_id as string} />
+                    )}
+                    {/* Featured Work — surface portfolio items prominently for People */}
+                    {category === 'People' && trustSignals?.portfolio && trustSignals.portfolio.length > 0 && (
+                        <FeaturedWorkPreview portfolio={trustSignals.portfolio} />
+                    )}
                     {category === 'Products' && <ProductsSection attrs={attrs} />}
                     {category === 'Services' && <ServicesSection attrs={attrs} />}
 
@@ -905,5 +913,51 @@ function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
                 ))}
             </CardContent>
         </Card>
+    )
+}
+
+// Featured Work preview for People listings — shows first 3 portfolio items
+function FeaturedWorkPreview({ portfolio }: { portfolio: PortfolioItem[] }) {
+    const featured = portfolio.filter(p => p.is_featured).slice(0, 3)
+    const items = featured.length > 0 ? featured : portfolio.slice(0, 3)
+    if (items.length === 0) return null
+
+    return (
+        <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Featured Work
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((item) => (
+                    <Card key={item.id} className="overflow-hidden">
+                        {item.image_urls?.[0] && (
+                            <div className="h-32 bg-muted">
+                                <img
+                                    src={item.image_urls[0]}
+                                    alt={item.title}
+                                    className="h-full w-full object-cover"
+                                />
+                            </div>
+                        )}
+                        <CardContent className="p-3 space-y-1">
+                            <p className="text-sm font-medium text-foreground line-clamp-1">
+                                {item.title}
+                            </p>
+                            {item.client_name && (
+                                <p className="text-xs text-muted-foreground">
+                                    {item.client_name}
+                                </p>
+                            )}
+                            {item.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                    {item.description}
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+        </section>
     )
 }

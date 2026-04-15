@@ -376,10 +376,15 @@ export async function searchMarketplaceListings(
             query = query.ilike('attributes->>availability', `%${escapeLike(af.availability)}%`)
         }
         if (af.skills && af.skills.length > 0) {
-            // INTENT: Filter by overlap with attributes.expertise array using JSONB containment.
+            // INTENT: Filter by overlap with attributes.expertise OR attributes.skills arrays.
+            // The profile wizard stores skills in attributes.skills and expertise_areas in
+            // attributes.expertise_areas. We query both plus the legacy 'expertise' key.
             // SECURITY: Sanitize to prevent PostgREST filter injection via crafted skill strings.
-            const skillFilters = af.skills.map(
-                (skill) => `attributes->expertise.cs.["${sanitize(skill)}"]`
+            const skillFilters = af.skills.flatMap(
+                (skill) => [
+                    `attributes->expertise.cs.["${sanitize(skill)}"]`,
+                    `attributes->skills.cs.["${sanitize(skill)}"]`,
+                ]
             ).join(',')
             query = query.or(skillFilters)
         }

@@ -17,6 +17,7 @@ import { revalidatePath } from 'next/cache'
 import { determineFunctionCategory } from '@/lib/recruit-match'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { enrichLinkedInProfile } from '@/actions/enrich-linkedin-profile'
+import { embedMarketplaceListing } from '@/lib/search/semantic-search'
 import type { OnboardingData } from '@/actions/onboarding'
 
 export interface ProfileWizardInput {
@@ -188,6 +189,9 @@ export async function completeProfileWizard(
       availability: availabilityType,
       availability_hours_per_week: hoursPerWeek,
       expertise_areas: expertiseAreas,
+      // INTENT: Store expertise areas under both keys — 'expertise_areas' for the canonical
+      // field and 'expertise' for the marketplace skill filter which queries this key.
+      expertise: expertiseAreas,
       ...(dayRate != null && { day_rate: dayRate }),
       ...(linkedinUrl && { linkedin_url: linkedinUrl }),
     }
@@ -201,12 +205,21 @@ export async function completeProfileWizard(
           description: bio || 'Fractional executive on ForgeOS — view profile for details.',
           subcategory,
           attributes: listingAttributes,
+          // INTENT: LinkedIn URL = lightweight identity verification ("claimed" tier).
+          // Founders can filter by "Verified Only" to see executives who've linked their profile.
+          ...(linkedinUrl && { is_verified: true, verification_tier: 'claimed' }),
           updated_at: new Date().toISOString(),
         })
         .eq('id', providerProfile.listing_id)
 
       if (listingError) {
         console.error('[ProfileWizard] Listing update failed:', listingError.message)
+      } else {
+        // FLOW: Re-embed with updated bio/skills/industries — the initial embedding
+        // from signup only had sparse "Fractional executive on ForgeOS" text.
+        embedMarketplaceListing(providerProfile.listing_id).catch((e: unknown) =>
+          console.warn('[ProfileWizard] Re-embed failed (non-blocking):', e)
+        )
       }
 
       // Sync day_rate, headline, and linkedin_url to provider_profiles for booking system
@@ -231,7 +244,8 @@ export async function completeProfileWizard(
           title: profile.full_name || headline,
           description: bio,
           attributes: listingAttributes,
-          is_verified: false,
+          is_verified: !!linkedinUrl,
+          ...(linkedinUrl && { verification_tier: 'claimed' }),
           is_demo: false,
           is_self_created: true,
           created_by_provider_id: providerProfile?.id || null,
@@ -255,6 +269,11 @@ export async function completeProfileWizard(
             ...(linkedinUrl && { linkedin_url: linkedinUrl }),
           })
           .eq('id', providerProfile.id)
+
+        // Embed the new listing for semantic search
+        embedMarketplaceListing(newListing.id).catch((e: unknown) =>
+          console.warn('[ProfileWizard] Embed failed (non-blocking):', e)
+        )
       }
     }
 
