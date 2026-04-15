@@ -546,12 +546,32 @@ export function ProfileCompletionWizard({
                     </div>
                   )}
 
+                  {/* INTENT: If LinkedIn URL is provided, show a persistent reference banner
+                      prompting them to open LinkedIn in a separate tab for reference */}
+                  {linkedinUrl.trim() && /linkedin\.com\/in\//i.test(linkedinUrl) && (
+                    <div className="flex items-center gap-3 rounded-lg border border-international-orange/20 bg-international-orange/5 px-4 py-2.5">
+                      <span className="text-xs text-foreground">
+                        Use your LinkedIn profile as a reference for the fields below.
+                      </span>
+                      <a
+                        href={linkedinUrl.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-xs font-medium text-international-orange hover:underline"
+                      >
+                        Open LinkedIn ↗
+                      </a>
+                    </div>
+                  )}
+
                   <div>
                     <label htmlFor="headline" className="block text-sm font-medium text-foreground mb-1.5">
                       Your headline
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Not sure what to write? Click an example to get started:
+                      {linkedinUrl.trim()
+                        ? 'Your LinkedIn headline is a good starting point. Click an example or write your own:'
+                        : 'Click an example to get started, or write your own:'}
                     </p>
                     <div className="flex flex-wrap gap-1.5 mb-3">
                       {[
@@ -590,11 +610,16 @@ export function ProfileCompletionWizard({
                     <label htmlFor="bio" className="block text-sm font-medium text-foreground mb-1.5">
                       About you
                     </label>
+                    {linkedinUrl.trim() && (
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Your LinkedIn About section is a good starting point — copy and adapt it here.
+                      </p>
+                    )}
                     <textarea
                       id="bio"
                       value={bio}
                       onChange={(e) => { setBio(e.target.value); setErrors(prev => ({ ...prev, bio: '' })) }}
-                      placeholder="Tell companies what you bring to the table in 2-3 sentences..."
+                      placeholder="Describe your professional background and what you bring to companies you work with..."
                       maxLength={500}
                       rows={4}
                       className={cn(
@@ -619,17 +644,29 @@ export function ProfileCompletionWizard({
                       LinkedIn profile
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Founders are 3x more likely to reach out when they can see your background. We&apos;ll pull your experience and education to fill out your profile automatically.
+                      Add your LinkedIn URL so founders can view your full background. You can use your LinkedIn profile as a reference when completing the fields below.
                     </p>
-                    <Input
-                      id="linkedinUrl"
-                      value={linkedinUrl}
-                      onChange={(e) => { setLinkedinUrl(e.target.value); setErrors(prev => ({ ...prev, linkedinUrl: '' })) }}
-                      placeholder="https://linkedin.com/in/your-name"
-                      className={cn("bg-card", errors.linkedinUrl && "border-destructive")}
-                      aria-invalid={!!errors.linkedinUrl}
-                      aria-describedby={errors.linkedinUrl ? 'linkedin-error' : undefined}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="linkedinUrl"
+                        value={linkedinUrl}
+                        onChange={(e) => { setLinkedinUrl(e.target.value); setErrors(prev => ({ ...prev, linkedinUrl: '' })) }}
+                        placeholder="https://linkedin.com/in/your-name"
+                        className={cn("bg-card flex-1", errors.linkedinUrl && "border-destructive")}
+                        aria-invalid={!!errors.linkedinUrl}
+                        aria-describedby={errors.linkedinUrl ? 'linkedin-error' : undefined}
+                      />
+                      {linkedinUrl.trim() && /linkedin\.com\/in\//i.test(linkedinUrl) && (
+                        <a
+                          href={linkedinUrl.trim()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center shrink-0 h-10 px-3 rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                        >
+                          Open LinkedIn ↗
+                        </a>
+                      )}
+                    </div>
                     {errors.linkedinUrl && (
                       <p id="linkedin-error" className="text-sm text-destructive mt-1" role="alert">{errors.linkedinUrl}</p>
                     )}
@@ -639,6 +676,21 @@ export function ProfileCompletionWizard({
 
               {currentStep === 'expertise' && (
                 <>
+                  {linkedinUrl.trim() && /linkedin\.com\/in\//i.test(linkedinUrl) && (
+                    <div className="flex items-center gap-3 rounded-lg border border-international-orange/20 bg-international-orange/5 px-4 py-2.5">
+                      <span className="text-xs text-foreground">
+                        Your LinkedIn Skills section is a useful reference here.
+                      </span>
+                      <a
+                        href={linkedinUrl.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-xs font-medium text-international-orange hover:underline"
+                      >
+                        Open LinkedIn ↗
+                      </a>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
                       Your skills
