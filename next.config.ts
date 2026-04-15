@@ -148,7 +148,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
               "worker-src 'self' blob:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io https://*.posthog.com",
               // SECURITY: Allow iframes from any origin for the in-app browser (/browse).
               // The iframe uses sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               // to restrict embedded page capabilities (no top-navigation, no pointer-lock).
