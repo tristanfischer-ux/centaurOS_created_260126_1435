@@ -10,7 +10,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { TrendingDown, AlertTriangle, Zap } from 'lucide-react'
+import { TrendingDown, AlertTriangle, Zap, Upload } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { ItemsSection } from '@/components/cash-burn/items-section'
 import { ItemDialog } from '@/components/cash-burn/item-dialog'
 import { CashOutSetupWizard } from '@/components/cash-burn/cash-out-setup-wizard'
+import { ImportDialog } from '../components/ImportDialog'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
@@ -44,6 +45,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   const [items, setItems] = useState<CashOutItem[]>(initialItems)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashOutItem | null>(null)
   const [defaultCostType, setDefaultCostType] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
@@ -210,6 +212,14 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             Quick Setup
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="h-3.5 w-3.5 mr-1.5" />
+            Import
+          </Button>
           <Badge variant="secondary" size="sm">{formatCurrency(weeklyTotal)}/wk</Badge>
           <Badge variant="secondary" size="sm">{formatCurrency(monthlyTotal)}/mo</Badge>
           <Badge variant="secondary" size="sm">{formatCurrency(annualTotal)}/yr</Badge>
@@ -354,6 +364,14 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
         existingItemCount={items.length}
         humanProfiles={humanProfiles}
         companyContext={companyContext}
+      />
+
+      {/* Spreadsheet Import */}
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        kind="out"
+        onImported={() => { window.location.reload() }}
       />
     </div>
   )
