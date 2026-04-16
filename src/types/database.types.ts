@@ -13384,6 +13384,8 @@ export type Database = {
           industries: string[] | null
           is_active: boolean
           is_founding_member: boolean | null
+          is_fractional_executive: boolean
+          is_supplier: boolean
           linkedin_url: string | null
           looking_for: string[] | null
           onboarding_data: Json
@@ -13427,6 +13429,8 @@ export type Database = {
           industries?: string[] | null
           is_active?: boolean
           is_founding_member?: boolean | null
+          is_fractional_executive?: boolean
+          is_supplier?: boolean
           linkedin_url?: string | null
           looking_for?: string[] | null
           onboarding_data?: Json
@@ -13470,6 +13474,8 @@ export type Database = {
           industries?: string[] | null
           is_active?: boolean
           is_founding_member?: boolean | null
+          is_fractional_executive?: boolean
+          is_supplier?: boolean
           linkedin_url?: string | null
           looking_for?: string[] | null
           onboarding_data?: Json
