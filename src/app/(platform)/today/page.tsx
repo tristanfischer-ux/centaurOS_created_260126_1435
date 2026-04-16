@@ -17,6 +17,7 @@ import { getStrategyHealthSummary } from "@/actions/canvas"
 import { getUnreadCount } from "@/actions/messaging"
 import { TodayView } from "./today-view"
 import { getOnboardingState } from "@/actions/onboarding"
+import { createClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = {
     title: "Today",
@@ -24,13 +25,32 @@ export const metadata: Metadata = {
 }
 
 export default async function TodayPage(): Promise<React.ReactNode> {
-    const [briefingResult, pulseResult, strategyResult, unreadResult, onboardingState] = await Promise.all([
+    const supabase = await createClient()
+    const [{ data: authData }, briefingResult, pulseResult, strategyResult, unreadResult, onboardingState] = await Promise.all([
+        supabase.auth.getUser(),
         getMorningBriefing().catch(() => ({ data: null, error: "Failed" })),
         getMyDailyPulse().catch(() => ({ success: false, data: undefined, error: "Failed" }) as DailyPulseResult),
         getStrategyHealthSummary().catch(() => ({ error: "Failed" }) as { error: string }),
         getUnreadCount().catch(() => ({ count: 0 })),
         getOnboardingState().catch(() => undefined),
     ])
+
+    // Show the "List yourself as a fractional executive" promo card to users who
+    // are past onboarding but have is_fractional_executive=false (Phase 5).
+    let showFractionalExecPrompt = false
+    if (authData?.user && onboardingState) {
+        const onboardingComplete = onboardingState.onboarding_modal_completed === true ||
+            onboardingState.has_completed_onboarding === true
+        if (onboardingComplete) {
+            const { data: flagRow } = await supabase
+                .from('profiles')
+                .select('is_fractional_executive')
+                .eq('id', authData.user.id)
+                .single()
+            const flag = (flagRow as unknown as { is_fractional_executive?: boolean } | null)?.is_fractional_executive
+            showFractionalExecPrompt = flag !== true
+        }
+    }
 
     return (
         <>
@@ -42,6 +62,7 @@ export default async function TodayPage(): Promise<React.ReactNode> {
                 initialBriefingError={!briefingResult.data}
                 initialPulseError={!pulseResult.success || !pulseResult.data}
                 initialOnboardingData={onboardingState}
+                showFractionalExecPrompt={showFractionalExecPrompt}
             />
         </>
     )

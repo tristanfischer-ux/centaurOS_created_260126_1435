@@ -151,7 +151,7 @@ export default async function PlatformLayout({
                             <>
                                 <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} foundryName={foundryName} foundryIsSandbox={foundryIsSandbox} />
                                 <ProfileCompletionWizard
-                                    open={!!(profile?.account_type !== 'supplier' && profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed && !(profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)}
+                                    open={!!((profile as unknown as Record<string, unknown>)?.is_fractional_executive && profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed && !(profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)}
                                     userRole={profile?.role ?? undefined}
                                     onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null}
                                 />

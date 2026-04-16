@@ -59,6 +59,7 @@ import { InsightFeed } from "@/components/insights/insight-feed"
 import { WeeklyBrief } from "@/components/insights/weekly-brief"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { GettingStartedHero } from "@/components/onboarding/getting-started-hero"
+import { FractionalExecPromoCard } from "@/components/today/fractional-exec-promo"
 import { PageTour } from "@/components/guidance/page-tour"
 import { CreateCompanyDialog } from "@/components/create-company-dialog"
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
@@ -82,6 +83,9 @@ interface TodayViewProps {
     initialBriefingError: boolean
     initialPulseError: boolean
     initialOnboardingData?: OnboardingData & { _userRole?: string; _isSandbox?: boolean }
+    /** Render the "List yourself as a fractional executive" promo card.
+     *  True when the user is past onboarding but has is_fractional_executive=false. */
+    showFractionalExecPrompt?: boolean
 }
 
 // ─── Constants ────────────────────────────────────────────────────
@@ -130,6 +134,7 @@ export function TodayView({
     initialBriefingError,
     initialPulseError,
     initialOnboardingData,
+    showFractionalExecPrompt = false,
 }: TodayViewProps): React.ReactElement {
     const [briefing, setBriefing] = useState<MorningBriefing | null>(initialBriefing)
     const [pulse, setPulse] = useState<FormattedReport | null>(initialPulse)
@@ -317,6 +322,10 @@ export function TodayView({
         return (
             <div className="max-w-5xl space-y-8">
                 <PageHeader />
+
+                {/* Retroactive opt-in card for users past onboarding who haven't
+                    listed themselves as fractional executives (Phase 5). */}
+                <FractionalExecPromoCard visible={showFractionalExecPrompt} />
 
                 {/* Getting Started Hero — shown for new users even in empty state */}
                 {initialOnboardingData && (
