@@ -143,8 +143,11 @@ Stop and re-plan if:
 
 ## Score card
 
-- [ ] Phase 1 — routing divert removed (commit: TBD)
-- [ ] Phase 2 — schema + opt-in questions (commit: TBD)
-- [ ] Phase 3 — rehome supplier pages (commit: TBD)
-- [ ] Phase 4 — retire supplier entry points (commit: TBD)
-- [ ] Phase 5 — fractional-executive opt-in wiring (commit: TBD)
+- [x] Phase 1 — routing divert removed — commit `71760374`
+- [x] Phase 2A — schema + backfill — commit `f669557c`
+- [x] Phase 2B — onboarding opt-in questions — commit `b8f8893c`
+- [x] Phase 3 — rehome supplier pages + sidebar section — commit `44415f41`
+- [x] Phase 4 — retire account_type='supplier' creation — commit `1f382d2e`
+- [x] Phase 5 — fractional-executive wiring + promo card — commit `3ee13b60`
+
+All five phases shipped 2026-04-16. Vercel deploys green throughout.
