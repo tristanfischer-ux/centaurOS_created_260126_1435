@@ -23,6 +23,50 @@ type AccountType = Database['public']['Enums']['account_type']
  *
  * @security Requires authenticated user. Only updates own profile via RLS.
  */
+/**
+ * Flip the two founder-first opt-in flags on the current user's profile.
+ *
+ * Every ForgeOS user is a founder of their own foundry. These flags express
+ * two independent additional roles they can take on:
+ *   - is_fractional_executive: "Yes, list me on the marketplace as available
+ *     to other companies." When set true, Phase 5 wiring triggers the provider
+ *     profile wizard to collect headline/bio/day rate/etc.
+ *   - is_supplier: "Yes, I also supply goods or services." When set true, the
+ *     sidebar reveals the Supplier Portal section (Phase 3).
+ *
+ * Pass `null` for a flag to leave it unchanged.
+ */
+export async function setOptInFlags(input: {
+  is_fractional_executive?: boolean | null
+  is_supplier?: boolean | null
+}): Promise<{ success: true } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const patch: Record<string, boolean> = {}
+  if (typeof input.is_fractional_executive === 'boolean') {
+    patch.is_fractional_executive = input.is_fractional_executive
+  }
+  if (typeof input.is_supplier === 'boolean') {
+    patch.is_supplier = input.is_supplier
+  }
+  if (Object.keys(patch).length === 0) return { success: true }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('[Onboarding] setOptInFlags failed:', { userId: user.id, error: error.message })
+    return { error: sanitizeErrorMessage(error) }
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
 export async function setAccountType(accountType: AccountType): Promise<{ success: true } | { error: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

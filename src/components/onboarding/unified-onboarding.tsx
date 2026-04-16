@@ -3,10 +3,17 @@
 /**
  * @file unified-onboarding.tsx
  *
- * @description 3-step unified onboarding modal (Welcome → How It Works → Company Name).
- * Every executive enters their company name, which converts their sandbox foundry
- * into a real company. They are auto-opted-in as visible fractional executives.
- * Suppliers redirect to /supplier-portal.
+ * @description Five-step onboarding modal for the founder-first architecture:
+ *   Welcome → How It Works → Company Name → Fractional Executive opt-in → Supplier opt-in.
+ *
+ * Every user is a founder of their own foundry. On top of that, they are asked
+ * two opt-in questions:
+ *   - Fractional executive: recommended. Flips profiles.is_fractional_executive and
+ *     triggers the provider profile wizard afterwards (Phase 5).
+ *   - Supplier: optional. Flips profiles.is_supplier, which reveals the Supplier
+ *     Portal section in the sidebar (Phase 3).
+ *
+ * Both opt-ins default to deferred ("Not now") — neither blocks completion.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -20,9 +27,11 @@ import {
   Hammer,
   Shield,
   Scale,
+  Users,
+  Package,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { setAccountType, updateOnboardingData } from '@/actions/onboarding'
+import { setAccountType, setOptInFlags, updateOnboardingData } from '@/actions/onboarding'
 import { convertSandboxToCompany } from '@/actions/create-company'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -32,10 +41,10 @@ import { GuidedTour } from './guided-tour'
 import type { OnboardingData } from '@/actions/onboarding'
 
 type AccountType = 'team_builder' | 'supplier'
-type OnboardingStep = 'welcome' | 'how-it-works' | 'company-name'
+type OnboardingStep = 'welcome' | 'how-it-works' | 'company-name' | 'fractional-executive' | 'supplier-opt-in'
 
-const ALL_STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'company-name']
-const STEPS_WITHOUT_COMPANY: OnboardingStep[] = ['welcome', 'how-it-works']
+const ALL_STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'company-name', 'fractional-executive', 'supplier-opt-in']
+const STEPS_WITHOUT_COMPANY: OnboardingStep[] = ['welcome', 'how-it-works', 'fractional-executive', 'supplier-opt-in']
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -148,35 +157,11 @@ export function UnifiedOnboarding({
       setDirection(newIndex > oldIndex ? 1 : -1)
       setCurrentStep(step)
     },
-    [currentStep],
+    [currentStep, STEPS],
   )
 
-  // Supplier selection handler (kept for the small link at bottom)
-  const handleSupplierSelection = async () => {
-    setIsSaving(true)
-    try {
-      const result = await setAccountType('supplier')
-      if ('success' in result) {
-        await updateOnboardingData({
-          onboarding_modal_completed: true,
-          has_completed_onboarding: true,
-          onboarding_completed_at: new Date().toISOString(),
-        })
-        toast.success('Welcome! Redirecting to your Supplier Portal...')
-        setOpen(false)
-        router.push('/supplier-portal')
-      } else {
-        toast.error('Failed to save your selection. Please try again.')
-      }
-    } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to set supplier account type:', error)
-      toast.error('Something went wrong. Please try again.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Company name submission — converts sandbox to real company
+  // Company name submission — converts sandbox to real company, then advances
+  // to the fractional-executive opt-in step (not straight to completion).
   const handleCreateCompany = async () => {
     const trimmed = companyName.trim()
     if (trimmed.length < 2) {
@@ -188,41 +173,53 @@ export function UnifiedOnboarding({
     setCompanyError(null)
 
     try {
-      // Set account type first
       await setAccountType('team_builder')
-
-      // Convert sandbox to real company
       const result = await convertSandboxToCompany({ companyName: trimmed })
-
       if (!result.success) {
         setCompanyError(result.error)
         setIsSaving(false)
         return
       }
+      setIsSaving(false)
+      goToStep('fractional-executive')
+    } catch (error) {
+      console.error('[UnifiedOnboarding] Failed to create company:', error)
+      toast.error('Something went wrong. Please try again.')
+      setIsSaving(false)
+    }
+  }
 
-      // Mark onboarding as complete
+  // Fractional executive opt-in — "Yes, list me" or "Not now". Either path
+  // advances to the supplier opt-in step.
+  const handleFractionalExecutiveChoice = async (optIn: boolean) => {
+    setIsSaving(true)
+    try {
+      await setOptInFlags({ is_fractional_executive: optIn })
+      setIsSaving(false)
+      goToStep('supplier-opt-in')
+    } catch (error) {
+      console.error('[UnifiedOnboarding] Failed to set fractional executive flag:', error)
+      toast.error('Something went wrong. Please try again.')
+      setIsSaving(false)
+    }
+  }
+
+  // Supplier opt-in — "Yes" or "Not now". Either path completes onboarding.
+  const handleSupplierChoice = async (optIn: boolean) => {
+    setIsSaving(true)
+    try {
+      await setOptInFlags({ is_supplier: optIn })
       await updateOnboardingData({
         onboarding_modal_completed: true,
         has_completed_onboarding: true,
         onboarding_completed_at: new Date().toISOString(),
         intent_selection: 'setup_company',
       })
-
-      // Inform about marketplace visibility
-      toast.success(
-        "You're now visible to companies looking for fractional executives. Set your rates on your profile. You can opt out anytime.",
-        { duration: 8000 },
-      )
-
       setOpen(false)
       router.refresh()
-
-      // INTENT: Guided tour now launches after the profile completion wizard,
-      // not here. The profile wizard fires immediately after this modal closes.
     } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to create company:', error)
+      console.error('[UnifiedOnboarding] Failed to complete onboarding:', error)
       toast.error('Something went wrong. Please try again.')
-    } finally {
       setIsSaving(false)
     }
   }
@@ -424,22 +421,11 @@ export function UnifiedOnboarding({
                       setIsSaving(true)
                       try {
                         await setAccountType('team_builder')
-                        await updateOnboardingData({
-                          onboarding_modal_completed: true,
-                          has_completed_onboarding: true,
-                          onboarding_completed_at: new Date().toISOString(),
-                          intent_selection: 'setup_company',
-                        })
-                        toast.success(
-                          "You're now visible to companies looking for fractional executives. Set your rates on your profile. You can opt out anytime.",
-                          { duration: 8000 },
-                        )
-                        setOpen(false)
-                        router.refresh()
+                        setIsSaving(false)
+                        goToStep('fractional-executive')
                       } catch (error) {
-                        console.error('[UnifiedOnboarding] Failed to complete onboarding:', error)
+                        console.error('[UnifiedOnboarding] Failed to set account type:', error)
                         toast.error('Something went wrong. Please try again.')
-                      } finally {
                         setIsSaving(false)
                       }
                     } : () => goToStep('company-name')}
@@ -516,43 +502,140 @@ export function UnifiedOnboarding({
                       disabled={isSaving || companyName.trim().length < 2}
                       className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg w-full"
                     >
-                      {isSaving ? 'Setting up...' : 'Create my workspace'}
+                      {isSaving ? 'Setting up...' : 'Continue'}
                       {!isSaving && <ArrowRight className="w-4 h-4 ml-2" />}
                     </Button>
                   </motion.div>
-
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.6 }}
-                    className="text-xs text-muted-foreground/70 leading-relaxed"
-                  >
-                    You&apos;ll be listed as a fractional executive so companies can find you.
-                    You can opt out anytime from your profile.
-                  </motion.p>
                 </div>
-
-                {/* Supplier link — secondary */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7 }}
-                  className="text-center pt-2"
-                >
-                  <button
-                    onClick={handleSupplierSelection}
-                    disabled={isSaving}
-                    className="text-sm text-muted-foreground hover:text-international-orange transition-colors underline underline-offset-4"
-                  >
-                    I&apos;m a supplier looking to list my capabilities
-                  </button>
-                </motion.div>
 
                 {isSaving && (
                   <p className="text-sm text-muted-foreground animate-pulse">
                     Setting up your workspace...
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* STEP 4: Fractional Executive opt-in */}
+            {currentStep === 'fractional-executive' && (
+              <div className="space-y-8">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.4 }}
+                  className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-international-orange/10 border border-international-orange/20"
+                >
+                  <Users className="w-8 h-8 text-international-orange" />
+                </motion.div>
+
+                <div className="space-y-4">
+                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
+                    Would you like to be listed as a fractional executive?
+                  </h2>
+                  <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                    This is the same workspace, plus a public profile that lets other
+                    companies on the platform find and engage you. You set your day rate.
+                    You can opt out at any time from your profile.
+                  </p>
+                  <p className="text-sm text-international-orange max-w-lg mx-auto">
+                    Recommended — it is how most people on ForgeOS make the platform pay
+                    for itself.
+                  </p>
+                </div>
+
+                <div className="max-w-sm mx-auto space-y-3">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      onClick={() => handleFractionalExecutiveChoice(true)}
+                      disabled={isSaving}
+                      className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg w-full"
+                    >
+                      {isSaving ? 'Saving...' : 'Yes, list me'}
+                      {!isSaving && <ArrowRight className="w-4 h-4 ml-2" />}
+                    </Button>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleFractionalExecutiveChoice(false)}
+                      disabled={isSaving}
+                      className="text-sm text-muted-foreground hover:text-foreground w-full"
+                    >
+                      Not now
+                    </Button>
+                  </motion.div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 5: Supplier opt-in */}
+            {currentStep === 'supplier-opt-in' && (
+              <div className="space-y-8">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.4 }}
+                  className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-electric-blue/10 border border-electric-blue/20"
+                >
+                  <Package className="w-8 h-8 text-electric-blue" />
+                </motion.div>
+
+                <div className="space-y-4">
+                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
+                    Are you also a supplier?
+                  </h2>
+                  <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                    If your company makes or sells goods or services that other founders
+                    on ForgeOS might buy, you can turn on the Supplier Portal section.
+                    It adds a sidebar area for managing your listing, orders, RFQs and
+                    settings. You can switch it on later from Settings.
+                  </p>
+                </div>
+
+                <div className="max-w-sm mx-auto space-y-3">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      onClick={() => handleSupplierChoice(true)}
+                      disabled={isSaving}
+                      className="bg-electric-blue hover:bg-electric-blue/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg w-full"
+                    >
+                      {isSaving ? 'Saving...' : 'Yes, I am a supplier'}
+                      {!isSaving && <ArrowRight className="w-4 h-4 ml-2" />}
+                    </Button>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleSupplierChoice(false)}
+                      disabled={isSaving}
+                      className="text-sm text-muted-foreground hover:text-foreground w-full"
+                    >
+                      Not now
+                    </Button>
+                  </motion.div>
+                </div>
               </div>
             )}
 
