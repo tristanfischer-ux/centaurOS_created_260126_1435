@@ -286,7 +286,7 @@ export function InvestorPreviewSection() {
             <span className="text-international-orange">fund hardware</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
-            Search investors — venture capital, private equity, and angels. Matching scores show how well each investor fits your stage, sector, and geography.
+            Raising money for a hardware startup is its own full-time job. This is what I built because I wish I had it. Search venture capital, private equity, and angels — matching scores show how well each investor fits your stage, sector, and geography.
           </p>
         </AnimatedSection>
 

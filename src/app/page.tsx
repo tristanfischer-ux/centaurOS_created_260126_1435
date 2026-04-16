@@ -394,6 +394,9 @@ export default function MarketingPage() {
         {/* ═══ Section 1: Hero ═══ */}
         <HeroSection />
 
+        {/* ═══ Section 1b: Personal intro from Tristan ═══ */}
+        <TristanIntroSection />
+
         {/* ═══ Section 2: How It Works (3 Pillars) ═══ */}
         <HowItWorksSection />
 
@@ -496,6 +499,35 @@ function HeroSection() {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * SECTION 1B: PERSONAL INTRO FROM TRISTAN
+ * A short personal opener below the hero so visitors encounter a human
+ * voice within seconds of landing. Teases the full letter further down.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function TristanIntroSection() {
+  return (
+    <section className="py-10 sm:py-14 md:py-16 bg-background border-t border-muted">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+        <AnimatedSection>
+          <p className="text-international-orange text-xs font-mono uppercase tracking-widest mb-4">
+            From Tristan
+          </p>
+          <p className="text-foreground text-lg sm:text-xl md:text-2xl font-playfair leading-snug mb-4">
+            I have spent 26 years building hardware startups. Fractional Forge is the wish list of everything I could have had along the way.
+          </p>
+          <a
+            href="#why-i-built"
+            className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:text-international-orange-hover font-semibold transition-colors"
+          >
+            Read the full story <ArrowRight className="h-3.5 w-3.5" />
+          </a>
+        </AnimatedSection>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * SECTION 2: HOW IT WORKS (3 Pillars)
  * ═══════════════════════════════════════════════════════════════════════ */
 
@@ -536,6 +568,18 @@ const HOW_IT_WORKS_PILLARS = [
       "Search by capability, location, and specialism to find the right match",
     ],
   },
+  {
+    label: "Team Coordination",
+    title: "Keep a distributed team aligned.",
+    image: "/images/marketing/human-ai-workshop.png",
+    imageAlt: "Team coordinating across multiple locations",
+    body: "Hardware startups end up with people in different places — a fractional engineer in Manchester, a manufacturer in Poland, a finance person working evenings, investors in Cambridge. Fractional Forge has strategy, objectives, and tasks built in, so the whole team knows what they are doing and why.",
+    highlights: [
+      "Strategic objectives broken down into weekly tasks",
+      "Assign work to teammates or directly to the 13 specialist AI agents",
+      "Track progress across a distributed team from one dashboard",
+    ],
+  },
 ] as const
 
 function HowItWorksSection() {
@@ -552,6 +596,9 @@ function HowItWorksSection() {
           <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             How It <span className="text-international-orange">Works</span>
           </h2>
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Hardware founders end up reinventing the same wheels — finding engineers, finding manufacturers, finding investors, sorting out IP. Fractional Forge brings it all together.
+          </p>
         </AnimatedSection>
 
         <div className="flex flex-col gap-6 sm:gap-8">
@@ -657,7 +704,7 @@ function FractionalExecutiveSection() {
             <span className="text-international-orange">your terms.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            ForgeOS has a free tier for people who want to list themselves as available for fractional engagements. Set your own day rate, decide how many hours a week you take on, and founders on the platform find you directly by specialism.
+            I know so many people with decades of real domain expertise in manufacturing, engineering, finance, and operations who would be great for startup companies to have access to. This is where they meet. Free to list, set your own day rate, and founders find you directly.
           </p>
         </AnimatedSection>
 
@@ -716,7 +763,7 @@ function InvestorIntelligenceSection() {
 
 function FounderArticlesSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
+    <section id="why-i-built" className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Personal letter from Tristan */}
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
@@ -748,6 +795,9 @@ function FounderArticlesSection() {
             </p>
             <p>
               Alongside the manufacturing network, Fractional Forge brings together 13 specialist AI agents, an investor database of over 7,800 firms, strategy and cash-burn tools, and a marketplace of experienced fractional executives — so the rest of the hardware founder&apos;s job sits in one place too.
+            </p>
+            <p>
+              One of the less obvious things about running a hardware startup is just how distributed the team ends up being — a designer here, a fractional engineer there, a manufacturer in another country, a finance advisor in a third. Keeping everyone moving in the same direction becomes its own full-time job. Fractional Forge has strategy, objectives, and tasks built in, so the whole team knows what they are doing and why — whether they are full-time, fractional, or one of the specialist AI agents.
             </p>
             <p>
               It is also a genuine home for fractional executives. I know so many people who are real domain experts in manufacturing, engineering, finance, and operations who would be great for startup companies to have access to. Startups cannot afford a full range of critical full-time employees. Some experienced people just want to give their expertise on an ad hoc basis. Fractional Forge works for both.
