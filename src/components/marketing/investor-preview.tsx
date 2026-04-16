@@ -62,7 +62,7 @@ const SECTOR_LIST = [
 ]
 
 function buildSignupUrl(searchQuery?: string): string {
-  const params = new URLSearchParams({ role: 'founder' })
+  const params = new URLSearchParams()
 
   if (searchQuery) {
     const lower = searchQuery.toLowerCase()
@@ -304,7 +304,7 @@ export function InvestorPreviewSection() {
         </AnimatedSection>
 
         {/* Search box */}
-        <AnimatedSection className="max-w-2xl mx-auto mb-8 sm:mb-10">
+        <AnimatedSection className="max-w-2xl mx-auto mb-8 sm:mb-10 overflow-hidden">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -339,7 +339,7 @@ export function InvestorPreviewSection() {
 
           {/* Example chips (only shown before search) */}
           {!hasSearched && (
-            <div className="flex flex-wrap gap-2 mt-4 justify-center">
+            <div className="flex flex-wrap gap-2 mt-4 justify-center max-w-full">
               {EXAMPLE_SEARCHES.map((chip) => (
                 <button
                   key={chip}

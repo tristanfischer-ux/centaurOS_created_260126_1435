@@ -34,7 +34,8 @@ import type { OnboardingData } from '@/actions/onboarding'
 type AccountType = 'team_builder' | 'supplier'
 type OnboardingStep = 'welcome' | 'how-it-works' | 'company-name'
 
-const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'company-name']
+const ALL_STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'company-name']
+const STEPS_WITHOUT_COMPANY: OnboardingStep[] = ['welcome', 'how-it-works']
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -55,6 +56,9 @@ interface UnifiedOnboardingProps {
   userRole?: 'Founder' | 'Executive' | 'Apprentice' | 'AI_Agent' | string
   accountType?: AccountType | null
   onboardingData?: OnboardingData | null
+  /** If the foundry already has a real (non-sandbox) name, skip the company-name step. */
+  foundryName?: string | null
+  foundryIsSandbox?: boolean
 }
 
 /**
@@ -68,7 +72,21 @@ export function UnifiedOnboarding({
   userRole,
   accountType: initialAccountType,
   onboardingData,
+  foundryName,
+  foundryIsSandbox,
 }: UnifiedOnboardingProps) {
+  // Skip company-name step if the foundry already has a real (non-sandbox) name.
+  // A sandbox name starts with "sandbox-" or matches "{Name}'s Company".
+  const hasRealFoundry = (() => {
+    if (foundryIsSandbox === false) return true
+    if (!foundryName) return false
+    if (foundryName.startsWith('sandbox-')) return false
+    if (/^.+'s Company$/.test(foundryName)) return false
+    return true
+  })()
+
+  const STEPS = hasRealFoundry ? STEPS_WITHOUT_COMPANY : ALL_STEPS
+
   const [open, setOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome')
   const [direction, setDirection] = useState(1)
@@ -402,11 +420,34 @@ export function UnifiedOnboarding({
                   whileTap={{ scale: 0.98 }}
                 >
                   <Button
-                    onClick={() => goToStep('company-name')}
+                    onClick={hasRealFoundry ? async () => {
+                      setIsSaving(true)
+                      try {
+                        await setAccountType('team_builder')
+                        await updateOnboardingData({
+                          onboarding_modal_completed: true,
+                          has_completed_onboarding: true,
+                          onboarding_completed_at: new Date().toISOString(),
+                          intent_selection: 'setup_company',
+                        })
+                        toast.success(
+                          "You're now visible to companies looking for fractional executives. Set your rates on your profile. You can opt out anytime.",
+                          { duration: 8000 },
+                        )
+                        setOpen(false)
+                        router.refresh()
+                      } catch (error) {
+                        console.error('[UnifiedOnboarding] Failed to complete onboarding:', error)
+                        toast.error('Something went wrong. Please try again.')
+                      } finally {
+                        setIsSaving(false)
+                      }
+                    } : () => goToStep('company-name')}
+                    disabled={isSaving}
                     className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg"
                   >
-                    Continue
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    {isSaving ? 'Setting up...' : 'Continue'}
+                    {!isSaving && <ArrowRight className="w-4 h-4 ml-2" />}
                   </Button>
                 </motion.div>
               </div>

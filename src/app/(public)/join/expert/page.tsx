@@ -117,7 +117,7 @@ async function ExpertLandingContent({ referralCode }: { referralCode?: string })
                                     <TrendingUp className="w-4 h-4 text-international-orange" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-foreground">AI-Matched Leads</p>
+                                    <p className="text-sm font-medium text-foreground">Matched Leads</p>
                                     <p className="text-xs text-muted-foreground">Get matched with startups that need your exact skills</p>
                                 </div>
                             </div>
@@ -135,7 +135,7 @@ async function ExpertLandingContent({ referralCode }: { referralCode?: string })
                         {/* CTA */}
                         <div className="space-y-3">
                             <Button asChild className="w-full gap-2" size="lg">
-                                <Link href={referralCode ? `/auth/sign-up?ref=${referralCode}` : '/auth/sign-up'}>
+                                <Link href={referralCode ? `/join?role=executive&ref=${referralCode}` : '/join?role=executive'}>
                                     <Sparkles className="w-5 h-5" />
                                     Create Your Expert Profile
                                     <ArrowRight className="w-5 h-5" />
@@ -148,21 +148,10 @@ async function ExpertLandingContent({ referralCode }: { referralCode?: string })
                     </CardContent>
                 </Card>
 
-                {/* Social proof */}
-                <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        500+ experts
-                    </span>
-                    <span className="flex items-center gap-1">
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        4.8 avg rating
-                    </span>
-                    <span className="flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" />
-                        200+ startups
-                    </span>
-                </div>
+                {/* Trust signal */}
+                <p className="text-center text-xs text-muted-foreground">
+                    Join a growing network of hardware experts and startups on ForgeOS.
+                </p>
             </div>
         </div>
     )

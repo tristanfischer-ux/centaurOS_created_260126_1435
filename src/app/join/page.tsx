@@ -321,17 +321,43 @@ function JoinPageInner() {
                   defaultValue=""
                   onChange={(e) => setPasswordValue(e.target.value)}
                   autoComplete="new-password"
-                  enterKeyHint="go"
+                  enterKeyHint="next"
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                   required
                   aria-required="true"
                   minLength={8}
-                  aria-describedby="password-hint"
+                  aria-describedby="supplier-password-hint"
                 />
-                <p id="password-hint" className="text-xs text-muted-foreground">
+                <p id="supplier-password-hint" className="text-xs text-muted-foreground">
                   Min 8 characters, with uppercase, lowercase, and a number
                 </p>
                 <PasswordStrength password={passwordValue} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="supplier-confirm-password" className="text-sm font-medium text-foreground">
+                  Confirm Password
+                  <span className="text-destructive ml-1" aria-label="required">*</span>
+                </Label>
+                <Input
+                  id="supplier-confirm-password"
+                  type="password"
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  enterKeyHint="go"
+                  className={cn(
+                    "bg-background border-input focus:border-international-orange focus:ring-international-orange/20",
+                    passwordMismatch && "border-destructive",
+                  )}
+                  required
+                  aria-required="true"
+                  aria-invalid={passwordMismatch}
+                />
+                {passwordMismatch && (
+                  <p className="text-xs text-destructive" role="alert">Passwords do not match</p>
+                )}
               </div>
 
               <motion.div
@@ -341,7 +367,7 @@ function JoinPageInner() {
               >
                 <Button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || passwordMismatch}
                   className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
                 >
                   {isPending ? (
