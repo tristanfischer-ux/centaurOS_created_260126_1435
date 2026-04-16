@@ -45,6 +45,7 @@ const NEW_THRESHOLD_DAYS = 30
  */
 const SECTION_GRADIENT_CLASS: Record<SectionId, string> = {
     me: "from-orange-500 to-amber-400",
+    supplier: "from-orange-500 to-indigo-400",
     plan: "from-orange-500 to-blue-500",
     finance: "from-orange-500 to-emerald-400",
     cashBurn: "from-orange-500 to-red-400",

@@ -84,7 +84,7 @@ async function OrdersContent() {
           {orders.map((order) => (
             <Link 
               key={order.id} 
-              href={`/supplier-portal/orders/${order.id}`}
+              href={`/supplier/orders/${order.id}`}
               className="block"
             >
               <Card className="hover:border-international-orange/50 transition-colors">

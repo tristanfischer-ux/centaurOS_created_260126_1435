@@ -326,7 +326,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   }
 
   if (role === "supplier") {
-    redirect("/supplier-portal");
+    redirect("/today");
   }
 
   redirect("/today");

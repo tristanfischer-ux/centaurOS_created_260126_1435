@@ -28,16 +28,16 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 // Simplified navigation for suppliers
 const mainNavigation = [
-  { name: "Dashboard", href: "/supplier-portal", icon: LayoutDashboard, tooltip: "Your supplier home base" },
-  { name: "My Listing", href: "/supplier-portal/listing", icon: Package, tooltip: "Manage your marketplace listing" },
-  { name: "Orders", href: "/supplier-portal/orders", icon: ShoppingCart, tooltip: "View and manage orders" },
-  { name: "RFQs", href: "/supplier-portal/rfqs", icon: FileText, tooltip: "Respond to quote requests" },
-  { name: "Analytics", href: "/supplier-portal/analytics", icon: BarChart3, tooltip: "Earnings and performance metrics" },
+  { name: "Dashboard", href: "/supplier", icon: LayoutDashboard, tooltip: "Your supplier home base" },
+  { name: "My Listing", href: "/supplier/listing", icon: Package, tooltip: "Manage your marketplace listing" },
+  { name: "Orders", href: "/supplier/orders", icon: ShoppingCart, tooltip: "View and manage orders" },
+  { name: "RFQs", href: "/supplier/rfqs", icon: FileText, tooltip: "Respond to quote requests" },
+  { name: "Analytics", href: "/supplier/analytics", icon: BarChart3, tooltip: "Earnings and performance metrics" },
 ]
 
 const supportNavigation = [
   { name: "Help", href: "/help", icon: HelpCircle, tooltip: "Help center and documentation" },
-  { name: "Settings", href: "/supplier-portal/settings", icon: Settings, tooltip: "Account and portal settings" },
+  { name: "Settings", href: "/supplier/settings", icon: Settings, tooltip: "Account and portal settings" },
 ]
 
 interface SupplierSidebarProps {
@@ -92,7 +92,7 @@ export function SupplierSidebar({ userName, userEmail }: SupplierSidebarProps) {
       {/* App Header */}
       <div className="px-5 pt-8 pb-6">
         <div className="flex items-center justify-between">
-          <Link href="/supplier-portal" className="group flex items-center gap-2">
+          <Link href="/supplier" className="group flex items-center gap-2">
             <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
               ForgeOS
             </span>

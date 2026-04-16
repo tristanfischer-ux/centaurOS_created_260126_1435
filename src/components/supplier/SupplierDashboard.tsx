@@ -97,7 +97,7 @@ export function SupplierDashboard({
             Your Supplier Portal overview
           </p>
         </div>
-        <Link href="/supplier-portal/listing">
+        <Link href="/supplier/listing">
           <Button>
             <Package className="h-4 w-4 mr-2" />
             Edit Listing
@@ -207,7 +207,7 @@ export function SupplierDashboard({
                 ))}
               </div>
               
-              <Link href="/supplier-portal/listing">
+              <Link href="/supplier/listing">
                 <Button variant="secondary" size="sm">
                   Complete Setup
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -227,7 +227,7 @@ export function SupplierDashboard({
               <CardTitle className="text-lg">Recent Orders</CardTitle>
               <CardDescription>Your latest orders</CardDescription>
             </div>
-            <Link href="/supplier-portal/orders">
+            <Link href="/supplier/orders">
               <Button variant="ghost" size="sm">
                 View All
                 <ArrowRight className="ml-1 h-4 w-4" />
@@ -246,7 +246,7 @@ export function SupplierDashboard({
                 {recentOrders.map((order) => (
                   <Link 
                     key={order.id}
-                    href={`/supplier-portal/orders/${order.id}`}
+                    href={`/supplier/orders/${order.id}`}
                     className="flex items-center justify-between p-3 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
@@ -285,7 +285,7 @@ export function SupplierDashboard({
               <CardTitle className="text-lg inline-flex items-center gap-1.5">RFQ Opportunities <HelpTooltip content="Request for Quote — send your requirements to suppliers and receive competitive quotes." /></CardTitle>
               <CardDescription>New requests matching your profile</CardDescription>
             </div>
-            <Link href="/supplier-portal/rfqs">
+            <Link href="/supplier/rfqs">
               <Button variant="ghost" size="sm">
                 View All
                 <ArrowRight className="ml-1 h-4 w-4" />
@@ -304,7 +304,7 @@ export function SupplierDashboard({
                 {rfqOpportunities.map((rfq) => (
                   <Link
                     key={rfq.id}
-                    href={`/supplier-portal/rfqs?id=${rfq.id}`}
+                    href={`/supplier/rfqs?id=${rfq.id}`}
                     className="block p-3 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">

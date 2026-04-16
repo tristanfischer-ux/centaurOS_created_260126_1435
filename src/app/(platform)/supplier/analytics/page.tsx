@@ -29,7 +29,7 @@ export default function SupplierAnalyticsPage() {
       
       if (result.error) {
         if (result.error === 'Provider profile not found') {
-          router.push('/supplier-portal/listing')
+          router.push('/supplier/listing')
           return
         }
         setError(result.error)

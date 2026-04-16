@@ -122,6 +122,20 @@ const meNavigation = [
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Section 1b: "Supplier Portal" — visible when profiles.is_supplier = true
+// Sits between "Me" and "Plan". Rehomed 2026-04-16 from the standalone
+// (supplier-portal) route group into the main platform shell.
+// ─────────────────────────────────────────────────────────────────────────────
+const supplierNavigation = [
+    { name: "Dashboard", href: "/supplier", icon: Store, tooltip: "Your supplier dashboard — listing activity, orders, and earnings" },
+    { name: "My Listing", href: "/supplier/listing", icon: Package, tooltip: "Create and edit your marketplace listing" },
+    { name: "Orders", href: "/supplier/orders", icon: ShoppingBag, tooltip: "Orders from founders on the platform" },
+    { name: "RFQs", href: "/supplier/rfqs", icon: FileText, tooltip: "Inbound requests for quote" },
+    { name: "Analytics", href: "/supplier/analytics", icon: BarChart3, tooltip: "Listing views, contact rate, conversion" },
+    { name: "Settings", href: "/supplier/settings", icon: Settings, tooltip: "Stripe Connect, availability, notifications" },
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Section 2: "Plan" — Strategy and execution
 // ─────────────────────────────────────────────────────────────────────────────
 const planNavigation = [
@@ -220,9 +234,11 @@ interface SidebarProps {
     userFoundries?: FoundryInfo[]
     /** Onboarding data from profiles.onboarding_data for the Getting Started checklist */
     onboardingData?: Record<string, unknown>
+    /** Reveals the "Supplier Portal" sidebar section. Set from profiles.is_supplier. */
+    isSupplier?: boolean
 }
 
-export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandbox, userName, userRole, userFoundries, onboardingData }: SidebarProps) {
+export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandbox, userName, userRole, userFoundries, onboardingData, isSupplier }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -420,6 +436,21 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandb
                         </div>
                     </CollapsibleContent>
                 </Collapsible>
+
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Section 1b: "Supplier Portal" (gated on is_supplier)*/}
+                {/* ══════════════════════════════════════════════════ */}
+                {isSupplier && (
+                    <>
+                        <div className="mt-1.5 mb-0.5 border-t border-border" />
+                        <SectionHeader label="Supplier Portal" introRoute="/supplier" hasNew={false} isOpen={openSections.supplier} onToggle={() => toggleSection("supplier")} />
+                        <Collapsible open={openSections.supplier}>
+                            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                                {supplierNavigation.map(renderNavItem)}
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </>
+                )}
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 2: "Plan" — Strategy and execution         */}

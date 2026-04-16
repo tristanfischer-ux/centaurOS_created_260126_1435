@@ -57,7 +57,7 @@ async function DashboardContent() {
             You haven&apos;t set up your marketplace listing yet. Create your listing to start receiving orders and RFQ opportunities.
           </p>
           <a 
-            href="/supplier-portal/listing" 
+            href="/supplier/listing" 
             className="inline-flex items-center justify-center px-6 py-3 min-h-[48px] bg-international-orange text-white font-semibold rounded-lg hover:bg-international-orange/90 transition-colors"
           >
             Create Your Listing

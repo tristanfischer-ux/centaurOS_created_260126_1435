@@ -48,7 +48,7 @@ const fetchLayoutData = async (userId: string): Promise<CachedLayoutData> => {
   const [profileResult, foundriesResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('foundry_id, active_foundry_id, full_name, role, account_type, onboarding_data')
+      .select('foundry_id, active_foundry_id, full_name, role, account_type, onboarding_data, is_fractional_executive, is_supplier')
       .eq('id', userId)
       .single(),
     supabase

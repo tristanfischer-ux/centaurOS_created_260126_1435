@@ -110,7 +110,7 @@ export async function setAccountType(accountType: AccountType): Promise<{ succes
     }
 
     revalidatePath('/', 'layout')
-    revalidatePath('/supplier-portal', 'layout')
+    revalidatePath('/supplier', 'layout')
     return { success: true }
   }
 
@@ -148,7 +148,7 @@ export async function setAccountType(accountType: AccountType): Promise<{ succes
   // This was Theo's exact bug: Google OAuth → onboarding modal → pick supplier
   // → redirect to /supplier-portal → stale cache → bounced to login.
   revalidatePath('/', 'layout')
-  revalidatePath('/supplier-portal', 'layout')
+  revalidatePath('/supplier', 'layout')
   return { success: true }
 }
 

@@ -78,7 +78,7 @@ async function OrderDetailContent({ orderId }: { orderId: string }) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
           <Link 
-            href="/supplier-portal/orders"
+            href="/supplier/orders"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-2"
           >
             <ArrowLeft className="h-4 w-4" />

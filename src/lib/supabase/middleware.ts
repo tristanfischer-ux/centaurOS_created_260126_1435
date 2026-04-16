@@ -90,6 +90,14 @@ export async function updateSession(request: NextRequest) {
     const pathname = request.nextUrl.pathname
     const hostname = request.headers.get('host') || ''
 
+    // Backwards-compat redirect: /supplier-portal/* → /supplier/* (Phase 3
+    // rehomed the old parallel app under the main platform sidebar).
+    if (pathname === '/supplier-portal' || pathname.startsWith('/supplier-portal/')) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = pathname.replace(/^\/supplier-portal/, '/supplier')
+        return NextResponse.redirect(redirectUrl)
+    }
+
     // Check if route is public (use exact matching to prevent bypass attacks)
     const isPublicRoute = PUBLIC_ROUTES.some(route => {
         // Exact match

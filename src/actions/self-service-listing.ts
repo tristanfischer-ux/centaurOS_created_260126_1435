@@ -32,7 +32,7 @@ const MAX_DESCRIPTION_LENGTH = 2000
 
 function revalidateListingPaths() {
     revalidatePath('/provider-portal')
-    revalidatePath('/supplier-portal')
+    revalidatePath('/supplier')
     revalidatePath('/marketplace')
 }
 

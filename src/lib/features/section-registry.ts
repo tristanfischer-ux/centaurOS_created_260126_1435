@@ -43,7 +43,7 @@ import {
 
 // ─── Section Definitions ────────────────────────────────────────────────────
 
-export type SectionId = "me" | "plan" | "finance" | "cashBurn" | "workshop" | "marketplace"
+export type SectionId = "me" | "supplier" | "plan" | "finance" | "cashBurn" | "workshop" | "marketplace"
 
 export interface SectionFeature {
     /** Display name in the intro page */

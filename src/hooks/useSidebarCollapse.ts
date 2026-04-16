@@ -22,6 +22,7 @@ type OpenSections = Record<SectionId, boolean>
 
 const ALL_OPEN: OpenSections = {
     me: true,
+    supplier: true,
     plan: true,
     finance: true,
     cashBurn: true,
@@ -39,6 +40,10 @@ const SECTION_ROUTES: { sectionId: SectionId; routes: string[] }[] = [
     {
         sectionId: "me",
         routes: ["/today", "/my-profile", "/updates", "/knowledge", "/google-apps", "/me"],
+    },
+    {
+        sectionId: "supplier",
+        routes: ["/supplier"],
     },
     {
         sectionId: "plan",
@@ -91,7 +96,7 @@ function readStorage(): OpenSections | null {
         if (!raw) return null
         const parsed = JSON.parse(raw) as OpenSections
         // Validate shape — must have all 5 section keys
-        const ids: SectionId[] = ["me", "plan", "finance", "cashBurn", "workshop", "marketplace"]
+        const ids: SectionId[] = ["me", "supplier", "plan", "finance", "cashBurn", "workshop", "marketplace"]
         if (ids.every((id) => typeof parsed[id] === "boolean")) {
             return parsed
         }
@@ -147,6 +152,7 @@ export function useSidebarCollapse(pathname: string): {
             const activeSection = getSectionForRoute(pathname)
             const initial: OpenSections = {
                 me: activeSection === "me",
+                supplier: activeSection === "supplier",
                 plan: activeSection === "plan",
                 finance: activeSection === "finance",
                 cashBurn: activeSection === "cashBurn",

@@ -32,17 +32,17 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 // Primary nav items shown in bottom bar
 const mainNavigation = [
-  { name: "Dashboard", shortName: "Home", href: "/supplier-portal", icon: LayoutDashboard },
-  { name: "Listing", shortName: "Listing", href: "/supplier-portal/listing", icon: Package },
-  { name: "Orders", shortName: "Orders", href: "/supplier-portal/orders", icon: ShoppingCart },
-  { name: "RFQs", shortName: "RFQs", href: "/supplier-portal/rfqs", icon: FileText },
+  { name: "Dashboard", shortName: "Home", href: "/supplier", icon: LayoutDashboard },
+  { name: "Listing", shortName: "Listing", href: "/supplier/listing", icon: Package },
+  { name: "Orders", shortName: "Orders", href: "/supplier/orders", icon: ShoppingCart },
+  { name: "RFQs", shortName: "RFQs", href: "/supplier/rfqs", icon: FileText },
 ]
 
 // Items in the "More" dropdown
 const moreNavigation = [
-  { name: "Analytics", href: "/supplier-portal/analytics", icon: BarChart3 },
+  { name: "Analytics", href: "/supplier/analytics", icon: BarChart3 },
   { name: "Marketplace", href: "/marketplace", icon: Store },
-  { name: "Settings", href: "/supplier-portal/settings", icon: Settings },
+  { name: "Settings", href: "/supplier/settings", icon: Settings },
   { name: "Help", href: "/help", icon: HelpCircle },
 ]
 
