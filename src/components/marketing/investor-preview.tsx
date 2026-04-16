@@ -306,8 +306,8 @@ export function InvestorPreviewSection() {
 
         {/* Search box */}
         <AnimatedSection className="max-w-2xl mx-auto mb-8 sm:mb-10 overflow-hidden">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 ref={inputRef}
@@ -315,7 +315,7 @@ export function InvestorPreviewSection() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g. pre-seed hardware startup building consumer electronics"
+                placeholder="e.g. pre-seed hardware startup"
                 className="w-full h-11 pl-9 pr-9 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange transition-colors"
                 aria-label="Describe your startup to find matching investors"
               />
@@ -332,7 +332,7 @@ export function InvestorPreviewSection() {
             <button
               onClick={() => handleSearch(searchQuery)}
               disabled={isPending || searchQuery.trim().length < 2}
-              className="h-11 px-5 rounded-lg bg-international-orange hover:bg-international-orange-hover disabled:opacity-50 text-white font-semibold text-sm transition-colors shrink-0"
+              className="h-11 px-5 rounded-lg bg-international-orange hover:bg-international-orange-hover disabled:opacity-50 text-white font-semibold text-sm transition-colors w-full sm:w-auto sm:shrink-0"
             >
               Search
             </button>
