@@ -86,7 +86,7 @@ const ARTICLES = [
 ] as const
 
 const PRICING_TIERS = [
-  { name: "Explorer", price: "Free", detail: "50 AI assists, all 13 specialists" },
+  { name: "Explorer", price: "Free", detail: "50 AI assists, all 13 specialist AI agents" },
   { name: "Seed", price: "\u00a319.99/mo", detail: "250 assists, verified emails" },
   { name: "Startup Team", price: "\u00a349/mo", detail: "750 assists, supplier matching" },
   { name: "Professional", price: "\u00a3149/mo", detail: "2,500 assists, priority support" },
@@ -99,23 +99,23 @@ const FAQS = [
   },
   {
     question: "How is my data protected?",
-    answer: "Designs are visible only to team members you choose. Factory partners see only what\u2019s needed to quote and manufacture. All parties sign confidentiality agreements before accessing any of your data. We use row-level security and encryption at rest to ensure your information stays private.",
+    answer: "Designs are visible only to team members you choose. Manufacturing partners on the network see only what is needed to quote and manufacture. All parties sign confidentiality agreements before accessing any of your data. We use row-level security and encryption at rest to ensure your information stays private.",
   },
   {
     question: "What if something goes wrong?",
-    answer: "Responsibility is clearly allocated in writing. Factory partners are responsible for manufacturing defects and spec conformance. You are responsible for your design specifications. Fractional Forge facilitates the relationship but does not guarantee manufacturing outcomes. Written terms govern every engagement.",
+    answer: "Responsibility is clearly allocated in writing. Manufacturing partners are responsible for manufacturing defects and spec conformance. You are responsible for your design specifications. Fractional Forge facilitates the relationship but does not guarantee manufacturing outcomes. Written terms govern every engagement.",
   },
   {
     question: "How does the fractional model actually work?",
-    answer: "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. They direct AI-enabled apprentices who execute at speed, then verify the output based on decades of real-world experience. You only pay for the hours and outcomes you need.",
+    answer: "ForgeOS combines two things. First, 13 specialist AI agents — strategy, CTO, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, and chief of staff — provide structured analysis and support across every discipline. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The AI agents provide the breadth; the professionals bring the depth.",
   },
   {
     question: "How quickly can I go from idea to prototype?",
-    answer: "It depends on complexity, but the key advantage is eliminating the months of hiring, onboarding, and infrastructure setup that typically precede any actual engineering work. Because you\u2019re plugging into existing experts and factory capacity from day one, you can start building immediately.",
+    answer: "ForgeOS is designed to move with you from the earliest design stage. The Forge helps you understand what materials, equipment, and suppliers your product will need. The 13 specialist AI agents work through the technical, commercial, and operational questions in parallel. A marketplace of experienced professionals is available for the work that needs a human. 13,700+ UK and European manufacturers are indexed and searchable, so finding the right partner for your first prototype happens in minutes rather than weeks.",
   },
   {
     question: "How much does it cost?",
-    answer: "ForgeOS is free to start \u2014 50 AI assists per month with all 13 specialists. Paid plans start at \u00a319.99/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "ForgeOS is free to start \u2014 50 AI assists per month with all 13 specialist AI agents. Paid plans start at \u00a319.99/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
   },
 ] as const
 
@@ -465,7 +465,7 @@ function HeroSection() {
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform.
+          Fractional expertise, 13 specialist AI agents, investor intelligence, and a connected manufacturing network — everything a hardware startup needs, in one platform.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -542,10 +542,10 @@ function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
+      className="py-12 sm:py-16 md:py-20 lg:py-24 bg-muted/30 border-t border-muted scroll-mt-20"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             The Platform
           </span>
@@ -626,44 +626,42 @@ function HowItWorksSection() {
 const EXECUTIVE_BENEFITS = [
   {
     icon: Banknote,
-    title: "Set Your Rate",
+    title: "Set your own rate",
     description:
-      "You decide what you charge. No bidding wars, no race to the bottom.",
+      "You decide what you charge. The platform does not interfere with your pricing.",
   },
   {
     icon: Users,
-    title: "Clients Come to You",
+    title: "Founders find you directly",
     description:
-      "Get discovered by funded hardware startups who need your expertise.",
+      "Your profile is searchable by specialism and experience. Engagements happen without an agency in the middle.",
   },
   {
     icon: Briefcase,
-    title: "Get Paid on Delivery",
+    title: "Flexible commitment",
     description:
-      "Secure payments via escrow. Complete the engagement, get paid automatically.",
+      "Part-time, weekend, evening work — or a full-time occupation between roles. List for free and choose your hours.",
   },
 ] as const
 
 function FractionalExecutiveSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
+    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            For Executives
+            For Experienced Professionals
           </span>
           <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Fractional Experts.{" "}
-            <span className="text-international-orange">Real Results.</span>
+            Your expertise,{" "}
+            <span className="text-international-orange">your terms.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Hardware startups need experienced leaders — without the full-time
-            overhead. Join ForgeOS as a fractional executive and get matched with
-            funded companies.
+            ForgeOS has a free tier for people who want to list themselves as available for fractional engagements. Set your own day rate, decide how many hours a week you take on, and founders on the platform find you directly by specialism.
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-10 sm:mb-12">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-10 sm:mb-12">
           {EXECUTIVE_BENEFITS.map((benefit) => (
             <AnimatedCard key={benefit.title}>
               <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
@@ -689,7 +687,7 @@ function FractionalExecutiveSection() {
               href="/join?role=executive"
               className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
             >
-              Join as an Executive <ArrowRight className="h-4 w-4" />
+              Join for free <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
           <Link
@@ -718,9 +716,9 @@ function InvestorIntelligenceSection() {
 
 function FounderArticlesSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
+    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Thought Leadership
           </span>
@@ -733,7 +731,7 @@ function FounderArticlesSection() {
         </AnimatedSection>
 
         <AnimatedSection delay={0.1}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
             {ARTICLES.map((article) => (
               <Card key={article.title} className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
                 <CardContent className="p-5 sm:p-6 flex flex-col gap-3 h-full">
@@ -763,9 +761,9 @@ function FounderArticlesSection() {
 
 function PricingTeaserSection() {
   return (
-    <section id="pricing" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
+    <section id="pricing" className="py-12 sm:py-16 md:py-20 lg:py-24 bg-muted/30 border-t border-muted scroll-mt-20">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
           <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             Start free. Scale <span className="text-international-orange">when ready.</span>
           </h2>
@@ -774,7 +772,7 @@ function PricingTeaserSection() {
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10 sm:mb-12">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-10 sm:mb-12">
           {PRICING_TIERS.map((tier) => (
             <AnimatedCard key={tier.name}>
               <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
@@ -812,7 +810,7 @@ function PricingTeaserSection() {
 
 function ProductShowcaseSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
+    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted">
       <ProductShowcase />
     </section>
   )
@@ -820,9 +818,9 @@ function ProductShowcaseSection() {
 
 function FAQSection() {
   return (
-    <section id="faq" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
+    <section id="faq" className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Questions &amp; Answers
           </span>
