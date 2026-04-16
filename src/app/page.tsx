@@ -111,7 +111,7 @@ const FAQS = [
   },
   {
     question: "How quickly can I go from idea to prototype?",
-    answer: "ForgeOS is designed to move with you from the earliest design stage. The Forge helps you understand what materials, equipment, and suppliers your product will need. The 13 specialist AI agents work through the technical, commercial, and operational questions in parallel. A marketplace of experienced professionals is available for the work that needs a human. 13,700+ UK and European manufacturers are indexed and searchable, so finding the right partner for your first prototype happens in minutes rather than weeks.",
+    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. The 13 specialist AI agents work through the technical, commercial, and operational questions in parallel. 13,700+ UK and European manufacturers are indexed and searchable — so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
   },
   {
     question: "How much does it cost?",
@@ -735,13 +735,19 @@ function FounderArticlesSection() {
               Fractional Forge is essentially my wish list of all the things I could have had as a hardware startup founder over the last 26 years.
             </p>
             <p>
-              One of the main issues I have had is that I have spent so much time and energy building — and spending money on! — the infrastructure rather than focusing on the product. This is completely different to what it is like being a software startup, where you can focus on the product and let companies like AWS deal with the infrastructure issue.
+              One of the main issues I have had is that I have spent so much time and energy building — and spending money on! — the infrastructure rather than focusing on the product. This is completely different to what it is like being a software startup, where you can focus on the product and let companies like AWS deal with the infrastructure issue. A software founder builds one thing. A hardware founder builds two.
             </p>
             <p>
-              Hardware has never had an equivalent. Every founder ends up reinventing the same wheels: finding engineers, finding manufacturers, finding investors, building a finance team, sorting out IP. All pre-revenue. All without the budget for any of it.
+              The factory itself is the biggest of those time sinks. Finding a location takes months. Then come the lease negotiations — and as a startup you can easily be asked to pay one, two, or three years of rent up front, which raises the obvious question of where that money is meant to come from. After that comes procuring the equipment, installing it, and hiring the people to run it. You can easily be twelve or eighteen months in before you have built anything at all.
             </p>
             <p>
-              Fractional Forge is that equivalent. It brings together the expertise, the tools, the investors, and the manufacturing connections every hardware founder needs — in one platform.
+              Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels — finding engineers, finding investors, sorting out IP, building a finance team — all pre-revenue, all without the budget for any of it.
+            </p>
+            <p>
+              Fractional Forge is my attempt at that equivalent. Rather than building your own factory from scratch, the platform connects you directly to over 13,700 UK and European manufacturers who already have the building, the machinery, and the expertise. As you work through your product, you can see who can make what you are designing, and reach out to them for real advice on how it actually gets made.
+            </p>
+            <p>
+              Alongside the manufacturing network, Fractional Forge brings together 13 specialist AI agents, an investor database of over 7,800 firms, strategy and cash-burn tools, and a marketplace of experienced fractional executives — so the rest of the hardware founder&apos;s job sits in one place too.
             </p>
             <p>
               It is also a genuine home for fractional executives. I know so many people who are real domain experts in manufacturing, engineering, finance, and operations who would be great for startup companies to have access to. Startups cannot afford a full range of critical full-time employees. Some experienced people just want to give their expertise on an ad hoc basis. Fractional Forge works for both.
@@ -764,7 +770,7 @@ function FounderArticlesSection() {
             Further reading
           </h3>
           <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-            Articles on why hardware is structurally different, and what to do about it.
+            Longer essays on the eighteen-month trap, the AWS-for-hardware question, and why shared infrastructure always wins.
           </p>
         </AnimatedSection>
 
