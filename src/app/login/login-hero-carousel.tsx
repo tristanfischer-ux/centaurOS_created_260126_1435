@@ -31,10 +31,10 @@ const HERO_IMAGES = [
  * Rotating social proof stats shown over the hero images.
  */
 const SOCIAL_PROOF = [
-  { stat: '100', label: 'Founding member spots', emphasis: 'Be one of the first.' },
   { stat: '78+', label: 'Manufacturing techniques', emphasis: 'From concept to production.' },
   { stat: '12', label: 'Week sprints', emphasis: 'Not 12-month projects.' },
   { stat: '£0', label: 'Equity required', emphasis: 'Keep what you build.' },
+  { stat: '24/7', label: 'Expert AI teams', emphasis: 'Always on, always ready.' },
 ] as const
 
 const ROTATION_INTERVAL_MS = 5000

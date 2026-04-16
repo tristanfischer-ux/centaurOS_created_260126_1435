@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   ArrowLeft,
-  Sparkles,
   Building2,
   Factory,
   TestTube2,
@@ -23,45 +22,9 @@ import { createClient } from "@/lib/supabase/client";
 import { signup } from "@/actions/signup";
 import type { SignupState } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
-import { lookupReferrer, getFoundingMemberCount } from "@/actions/referrals";
+import { lookupReferrer } from "@/actions/referrals";
 import { Gift } from "lucide-react";
 import { PasswordStrength } from "@/components/ui/password-strength";
-
-/** Total founding member spots available */
-const TOTAL_FOUNDING_SPOTS = 100;
-
-/**
- * FoundingMemberCounter -- Animated progress bar showing remaining spots.
- */
-function FoundingMemberCounter({ spotsClaimed }: { spotsClaimed: number }) {
-  const clampedClaimed = Math.min(spotsClaimed, TOTAL_FOUNDING_SPOTS);
-  const spotsRemaining = TOTAL_FOUNDING_SPOTS - clampedClaimed;
-  const percentClaimed = (clampedClaimed / TOTAL_FOUNDING_SPOTS) * 100;
-
-  return (
-    <div className="px-3 py-2 sm:p-4 rounded-xl bg-muted/50 border">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-international-orange" />
-          <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
-            Founding Members
-          </span>
-        </div>
-        <span className="text-xs font-bold text-international-orange">
-          {spotsRemaining} of {TOTAL_FOUNDING_SPOTS} spots left
-        </span>
-      </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${percentClaimed}%` }}
-          transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
-          className="h-full bg-international-orange rounded-full"
-        />
-      </div>
-    </div>
-  );
-}
 
 /**
  * GoogleIcon — Inline SVG of the Google "G" logo in brand colours.
@@ -173,7 +136,6 @@ function JoinPageInner() {
   const [demoData, setDemoData] = useState<Omit<DemoAccountData, 'password'> | null>(null);
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);
-  const [foundingCount, setFoundingCount] = useState(53); // sensible default
   const [passwordValue, setPasswordValue] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const passwordMismatch = confirmPassword.length > 0 && passwordValue !== confirmPassword;
@@ -192,11 +154,6 @@ function JoinPageInner() {
       });
     }
   }, [refCode]);
-
-  // Fetch dynamic founding member count
-  useEffect(() => {
-    getFoundingMemberCount().then(setFoundingCount);
-  }, []);
 
   useEffect(() => {
     if (isDemoMode) {
@@ -725,9 +682,6 @@ function JoinPageInner() {
               </Button>
             </motion.div>
           </form>
-
-          {/* Founding member counter */}
-          <FoundingMemberCounter spotsClaimed={foundingCount} />
 
           {/* Trust signals */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs text-muted-foreground">

@@ -12,7 +12,6 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Copy, Check, Gift } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getMyReferralInfo, getAIUsageForCreditsBar, type ReferralInfo } from '@/actions/referrals'
-import { FoundingMemberBadge } from '@/components/ui/founding-member-badge'
 
 /**
  * ReferralNudgeBanner — Always-visible referral card for /today.
@@ -89,9 +88,6 @@ export function ReferralNudgeBanner() {
               ? `${remaining} AI task${remaining !== 1 ? 's' : ''} left`
               : 'Give AI Credits, Get AI Credits'}
           </p>
-          {referralInfo?.isFoundingMember && referralInfo.foundingMemberNumber != null && (
-            <FoundingMemberBadge compact memberNumber={referralInfo.foundingMemberNumber} />
-          )}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {isUrgent ? (

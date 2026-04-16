@@ -339,7 +339,6 @@ function HeroSection() {
   const { scrollY } = useScroll()
   const parallaxY = useTransform(scrollY, [0, 500], [0, isMobile ? 0 : 150])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [memberCount, setMemberCount] = useState<number | null>(null)
 
   const heroImages = [
     { src: "/images/hero-robotic-steel.png", alt: "Robotic arm 3D printing steel structure" },
@@ -354,24 +353,6 @@ function HeroSection() {
     }, 5000)
     return () => clearInterval(interval)
   }, [heroImages.length])
-
-  useEffect(() => {
-    async function fetchStats(): Promise<void> {
-      try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000)
-        const res = await fetch("/api/marketing/stats", { signal: controller.signal })
-        clearTimeout(timeoutId)
-        if (res.ok) {
-          const data = await res.json()
-          setMemberCount(data.foundingMembers ?? null)
-        }
-      } catch {
-        // Graceful fallback
-      }
-    }
-    fetchStats()
-  }, [])
 
   return (
     <section className="relative min-h-[85vh] sm:min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background">
@@ -403,34 +384,9 @@ function HeroSection() {
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            Early Access &mdash; Founding Members Only
+            Early Access
           </span>
         </motion.div>
-
-        {memberCount !== null && memberCount > 0 ? (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
-            <div className="inline-flex flex-col items-center gap-2">
-              <p className="text-sm text-muted-foreground font-mono">
-                <span className="text-2xl font-black text-international-orange">{memberCount}</span>{" "}
-                of 100 founding spots claimed
-              </p>
-              <div className="w-36 sm:w-48 h-1.5 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
-                  transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
-                  className="h-full bg-international-orange rounded-full"
-                />
-              </div>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
-            <p className="text-sm text-muted-foreground font-mono">
-              <span className="text-2xl font-black text-international-orange">Be the first</span>{" "}founding member
-            </p>
-          </motion.div>
-        )}
 
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
           We build atoms at the{" "}
@@ -913,7 +869,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "We're in early access and working directly with founding members to define pricing. No equity is required. Reach out and we'll walk you through what engagement looks like for your situation.",
+    answer: "We're in early access and working directly with early customers to define pricing. No equity is required. Reach out and we'll walk you through what engagement looks like for your situation.",
   },
 ] as const
 

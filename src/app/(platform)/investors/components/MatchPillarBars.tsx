@@ -81,7 +81,7 @@ export function MatchPillarBars({ pillars, compositeScore, compact = false, hide
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">match</span>
         </div>
       )}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-2 gap-y-3">
         {PILLAR_ORDER.map(({ key, label }) => {
           const value = pillars[key] ?? 0
           const isNA = hideZeroValues && value === 0

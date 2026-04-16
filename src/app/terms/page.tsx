@@ -102,8 +102,7 @@ export default function TermsPage() {
             <p className="text-muted-foreground leading-relaxed">
               Fractional Forge charges subscription fees and a platform fee on marketplace
               transactions as described on our pricing page. Fees are subject to change with
-              reasonable notice. Founding member pricing is locked in for the duration of your
-              membership.
+              reasonable notice.
             </p>
           </section>
 

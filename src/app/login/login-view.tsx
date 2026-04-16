@@ -276,11 +276,6 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                     </span>
                 </motion.div>
 
-                <motion.div variants={formItemVariants} className="text-center pt-4">
-                    <span className="text-xs text-muted-foreground">
-                        Trusted by 100 founding members
-                    </span>
-                </motion.div>
             </form>
         </motion.div>
     )

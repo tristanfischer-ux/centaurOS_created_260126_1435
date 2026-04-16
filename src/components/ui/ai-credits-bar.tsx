@@ -5,7 +5,7 @@
  *
  * @description Compact account pill for the sidebar footer. Shows tier name
  * and a mini AI tasks progress bar. Click opens a popover with full detail:
- * usage stats, upgrade link, referral invite, and founding member badge.
+ * usage stats, upgrade link, and referral invite.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -19,7 +19,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getMyReferralInfo, getAIUsageForCreditsBar, type ReferralInfo } from '@/actions/referrals'
-import { FoundingMemberBadge } from '@/components/ui/founding-member-badge'
 import { SUBSCRIPTION_PLANS, type SubscriptionTier } from '@/lib/billing/plans'
 
 /**
@@ -54,8 +53,6 @@ export function AICreditsBarLoader() {
       tier={data.tier}
       referralLink={referralData?.referralLink}
       referralCount={referralData?.referralCount}
-      isFoundingMember={referralData?.isFoundingMember}
-      foundingMemberNumber={referralData?.foundingMemberNumber}
     />
   )
 }
@@ -67,18 +64,16 @@ interface AICreditsBarProps {
   tier?: SubscriptionTier
   referralLink?: string
   referralCount?: number
-  isFoundingMember?: boolean
-  foundingMemberNumber?: number | null
 }
 
 /**
  * AICreditsBar — Compact account pill with popover for full detail.
  *
  * @description Shows tier name + mini progress bar in the sidebar footer.
- * Click opens a popover with: usage stats, upgrade link, referral invite,
- * founding member badge. Replaces the old multi-section inline layout.
+ * Click opens a popover with: usage stats, upgrade link, and referral invite.
+ * Replaces the old multi-section inline layout.
  */
-export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free', referralLink, referralCount, isFoundingMember, foundingMemberNumber }: AICreditsBarProps) {
+export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free', referralLink, referralCount }: AICreditsBarProps) {
   const percentUsed = limit > 0 ? Math.min((currentUsage / limit) * 100, 100) : 0
   const remaining = Math.max(0, limit - currentUsage)
   const isNearLimit = percentUsed >= 80
@@ -141,8 +136,6 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free',
           tierName={tierName}
           referralLink={referralLink}
           referralCount={referralCount}
-          isFoundingMember={isFoundingMember}
-          foundingMemberNumber={foundingMemberNumber}
         />
       </PopoverContent>
     </Popover>
@@ -161,8 +154,6 @@ function AccountPopoverContent({
   tierName,
   referralLink,
   referralCount,
-  isFoundingMember,
-  foundingMemberNumber,
 }: {
   currentUsage: number
   limit: number
@@ -175,8 +166,6 @@ function AccountPopoverContent({
   tierName: string
   referralLink?: string
   referralCount?: number
-  isFoundingMember?: boolean
-  foundingMemberNumber?: number | null
 }) {
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
@@ -273,12 +262,6 @@ function AccountPopoverContent({
         </div>
       )}
 
-      {/* Founding member badge */}
-      {isFoundingMember && foundingMemberNumber != null && (
-        <div className="pt-2 border-t border-border">
-          <FoundingMemberBadge compact memberNumber={foundingMemberNumber} />
-        </div>
-      )}
     </div>
   )
 }

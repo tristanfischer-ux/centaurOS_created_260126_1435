@@ -297,9 +297,9 @@ export function InvestorPreviewSection() {
             { value: '49,000+', label: 'Contacts' },
             { value: '3,000+', label: 'Grants' },
           ].map((stat) => (
-            <div key={stat.label} className="text-center p-4 sm:p-6 rounded-xl border bg-card">
-              <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">{stat.value}</p>
-              <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+            <div key={stat.label} className="text-center p-2 sm:p-6 rounded-xl border bg-card">
+              <p className="text-lg sm:text-3xl md:text-4xl font-black text-international-orange mb-1">{stat.value}</p>
+              <p className="text-[10px] sm:text-sm font-mono uppercase tracking-wider text-muted-foreground">{stat.label}</p>
             </div>
           ))}
         </AnimatedSection>

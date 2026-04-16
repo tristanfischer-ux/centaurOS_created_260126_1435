@@ -5,7 +5,6 @@ export { TeamPulse } from './team-pulse'
 export { ActivityFeed } from './activity-feed'
 export { ProductivityChart } from './productivity-chart'
 export { RecommendedForYou } from './recommended-for-you'
-export { FoundingMemberCard } from './founding-member-card'
 export { UnreadUpdatesCard } from './unread-updates-card'
 
 // Removed from dashboard (kept for backward compat if imported elsewhere):
