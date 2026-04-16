@@ -17,10 +17,8 @@ import {
   Search,
   Lock,
   ArrowRight,
-  Zap,
   X,
   CheckCircle2,
-  TrendingUp,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -354,23 +352,8 @@ export function InvestorPreviewSection() {
           )}
         </AnimatedSection>
 
-        {/* Trust bar (default state) */}
-        {!hasSearched && preview && (
-          <AnimatedSection className="flex flex-wrap justify-center gap-6 sm:gap-10 mb-10 sm:mb-14">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Zap className="h-4 w-4 text-success" />
-              <span>
-                <strong className="text-foreground">{preview.activeDeployingCount}+</strong> actively deploying
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <TrendingUp className="h-4 w-4 text-electric-blue" />
-              <span>
-                <strong className="text-foreground">Keyword</strong> matching
-              </span>
-            </div>
-          </AnimatedSection>
-        )}
+        {/* Trust bar removed — "99+ actively deploying" looks small against 7,800 total,
+            and the keyword-matching label was unclear. Numbers above carry the weight. */}
 
         {/* Loading state */}
         {isPending && (

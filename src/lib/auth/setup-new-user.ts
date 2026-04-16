@@ -93,7 +93,7 @@ export async function setupNewUser({
 
   const memberRole = capitalizeRole(role);
   let foundryId: string;
-  let accountType: "team_builder" | "supplier" | null = null;
+  let accountType: "team_builder" | null = null;
 
   // --- Ensure shared foundries exist BEFORE any profile creation ---
   // INTENT: Suppliers need forge-suppliers. Founders/executives need forge-guild as a
@@ -205,7 +205,11 @@ export async function setupNewUser({
       }
     }
   } else if (role === "supplier") {
-    accountType = "supplier";
+    // DECISION 2026-04-16: founder-first architecture. Suppliers are team_builders
+    // with is_supplier=true set below. We still create their foundry under
+    // forge-suppliers for historical continuity, but they now land on /today and
+    // see the Supplier Portal section in the sidebar (Phase 3) via the flag.
+    accountType = "team_builder";
     foundryId = "forge-suppliers";
   } else {
     // INTENT: Every executive/apprentice gets their own isolated sandbox foundry.
@@ -273,6 +277,9 @@ export async function setupNewUser({
       foundry_id: foundryId,
       active_foundry_id: foundryId,
       account_type: accountType,
+      // Founder-first: supplier signups get the is_supplier flag flipped on
+      // so the Supplier Portal sidebar section shows up on their first visit.
+      is_supplier: role === "supplier",
     });
 
     if (profileError) {
