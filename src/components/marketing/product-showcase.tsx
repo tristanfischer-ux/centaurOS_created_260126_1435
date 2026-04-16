@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, LayoutDashboard, TrendingUp, Target, ShoppingCart, Briefcase, Flame } from 'lucide-react'
+import { Hammer, LayoutDashboard, TrendingUp, Target, ShoppingCart, Briefcase, Flame, Users } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -128,6 +128,20 @@ const TABS: ShowcaseTab[] = [
     callouts: [
       { text: 'Investor Insights dashboard', position: 'top-[10%] left-[5%]' },
       { text: 'Stage + Geographic distribution', position: 'bottom-[15%] right-[5%]' },
+    ],
+  },
+  // 8. Team — org orbit view
+  {
+    id: 'team',
+    label: 'Team',
+    icon: <Users className="h-4 w-4" />,
+    url: 'fractionalforge.app/team',
+    image: '/images/screenshots/team.png',
+    headline: 'Your team, visualised',
+    description: 'See every role covered and every gap at a glance. 13 AI specialists plus your human team — organised by function with live workload and capacity tracking.',
+    callouts: [
+      { text: 'Coverage + gaps', position: 'top-[15%] left-[5%]' },
+      { text: 'Live capacity tracking', position: 'bottom-[15%] right-[5%]' },
     ],
   },
 ]
