@@ -203,7 +203,7 @@ export async function checkAILimit(
       // expensive calls (one credit per call regardless of cost).
       if (costLimitHit) {
         const upgradeHint = tier === 'free'
-          ? 'Upgrade to Seed (£19.99/mo) for more capacity'
+          ? 'Upgrade to Seed (£19/mo) for more capacity'
           : tier === 'seed'
             ? 'Upgrade to Startup Team (£49/mo) for more capacity'
             : tier === 'starter'
@@ -255,7 +255,7 @@ export async function checkAILimit(
       }
 
       const upgradeHint = tier === 'free'
-        ? 'Upgrade to Seed (£19.99/mo) for 250 tasks'
+        ? 'Upgrade to Seed (£19/mo) for 250 tasks'
         : tier === 'seed'
           ? 'Upgrade to Startup Team (£49/mo) for 750 tasks'
           : tier === 'starter'

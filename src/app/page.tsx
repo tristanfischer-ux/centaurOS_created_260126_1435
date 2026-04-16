@@ -87,7 +87,7 @@ const ARTICLES = [
 
 const PRICING_TIERS = [
   { name: "Explorer", price: "Free", detail: "50 AI assists, all 13 specialist AI agents" },
-  { name: "Seed", price: "\u00a319.99/mo", detail: "250 assists, verified emails" },
+  { name: "Seed", price: "\u00a319/mo", detail: "250 assists, verified emails" },
   { name: "Startup Team", price: "\u00a349/mo", detail: "750 assists, supplier matching" },
   { name: "Professional", price: "\u00a3149/mo", detail: "2,500 assists, priority support" },
 ] as const
@@ -115,7 +115,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "ForgeOS is free to start \u2014 50 AI assists per month with all 13 specialist AI agents. Paid plans start at \u00a319.99/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "ForgeOS is free to start \u2014 50 AI assists per month with all 13 specialist AI agents. Paid plans start at \u00a319/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
   },
 ] as const
 

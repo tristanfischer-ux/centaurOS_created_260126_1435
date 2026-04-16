@@ -33,7 +33,7 @@ const TIER_PROGRESSION: Record<
 > = {
   free: {
     nextTierName: 'Seed',
-    price: '£19.99/mo',
+    price: '£19/mo',
     href: '/settings/billing',
   },
   seed: {

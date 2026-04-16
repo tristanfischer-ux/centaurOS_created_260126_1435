@@ -5,7 +5,7 @@
  * detail view cap. Displays the firm name, type, and location (already
  * available from card data) plus a tier-appropriate upgrade CTA.
  *
- * Free users: "Upgrade to Seed — £19.99/mo, 50 profiles/month"
+ * Free users: "Upgrade to Seed — £19/mo, 50 profiles/month"
  * Seed users: "Upgrade to Startup Team — £49/mo, 150 profiles/month"
  * Starter users: "Upgrade to Professional — unlimited profiles"
  */
@@ -31,7 +31,7 @@ const UPGRADE_CTA: Record<string, { label: string; description: string; price: s
   free: {
     label: 'Upgrade to Seed',
     description: '50 investor profiles per month',
-    price: '£19.99/mo',
+    price: '£19/mo',
   },
   seed: {
     label: 'Upgrade to Startup Team',

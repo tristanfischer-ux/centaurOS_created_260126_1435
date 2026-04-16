@@ -159,7 +159,7 @@ function FreeUpgradeOverlay({ firmName, firmType, hqCity }: {
             </p>
             <div className="flex flex-col gap-2 pt-2">
               <Button asChild className="bg-international-orange hover:bg-international-orange-hover">
-                <Link href="/pricing">View Plans — from £19.99/mo</Link>
+                <Link href="/pricing">View Plans — from £19/mo</Link>
               </Button>
               <p className="text-xs text-muted-foreground">No contracts. Cancel anytime.</p>
             </div>

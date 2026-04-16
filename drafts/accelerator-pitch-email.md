@@ -1,6 +1,6 @@
 # Accelerator Partnership Pitch Email
 
-*Send to programme directors at: HAX, Techstars Hardware, Entrepreneur First, Founders Factory, SETsquared*
+*Send to programme directors at accelerators from hardware-accelerator-list.md*
 
 ---
 
@@ -10,38 +10,32 @@
 
 Hi [Name],
 
-I'm Tristan Fischer, founder of Fractional Forge. We've built ForgeOS — the operating system for hardware startups. It brings together expert knowledge, smart tools, investor intelligence, and manufacturing connections in one platform.
+I'm Tristan Fischer, founder of Fractional Forge. I've been running startups for 26 years, including Fischer Farms — one of the UK's largest vertical farms. We've built ForgeOS, the operating system for hardware startups.
 
-**What it does:** ForgeOS gives pre-revenue hardware founders everything they need to go from idea to investable, manufacturing-ready company:
-
-- **13 domain specialists** — strategy, engineering, finance, legal, manufacturing, sales, marketing, and more — available on demand to support your founders' decisions
-- **7,800+ investors** with AI matching, 49,000+ contacts, and 3,000+ grants — so your cohort can find the right funding faster
-- **Concept packages from a product description** — architecture, BOM with cost modelling, DFM analysis, certification roadmap
-- **13,700+ UK manufacturers** indexed with one-click RFQs
-- **Full business operations** — strategy, objectives, tasks, cash burn projections, P&L, team management, and board pack generation
-
-**Why I'm writing:** I'd like to offer ForgeOS free to your current [programme name] cohort as a pilot.
+I'd like to offer ForgeOS to your current [programme name] cohort.
 
 **What your founders get:**
-- Full platform access for the duration of the programme
-- All 13 specialists across every discipline a hardware startup needs
-- Investor search and matching — your cohort is fundraising, and we have 7,800+ investors profiled with stage, sector, and cheque size data
-- Concept packages, manufacturing connections, and business planning tools
-- Personal onboarding from me for each founder
 
-**What you get:**
-- A single platform that addresses the top three time sinks for hardware cohorts: fundraising prep, engineering, and supplier sourcing
-- Usage data showing which founders are most active across which tools (a signal for your team)
-- No cost, no integration required — it's a web platform
+- **A marketplace of fractional executives** — experienced operators (CTOs, VPs of Manufacturing, finance directors, supply chain leads) who set their own rates and can be booked directly by your founders. These are people with 20-30 years of domain expertise who want to help hardware startups succeed.
+- **13 domain specialist AI agents** — strategy, engineering, finance, legal, manufacturing, sales, marketing, supply chain, product, HR, fundraising, chief of staff, and operations — available on demand to support your founders' decisions and fill expertise gaps
+- **7,800+ investors** with AI matching by stage, sector, and cheque size — plus 49,000+ contacts and 3,000+ grants
+- **13,700+ UK and European manufacturers** indexed with capability data
+- **Concept packages** — describe a product idea, get a structured engineering overview, materials analysis, and matched suppliers
+- **Full business operations** — strategy, objectives, tasks, team management, cash burn projections, P&L, and board pack generation
+- **Full platform access for the duration of the programme**
+
+**What your programme gets:**
+
+- A single platform that addresses the top time sinks for hardware cohorts: fundraising prep, engineering, supplier sourcing, and finding the right people with the right expertise
+- No integration required — it's a web platform, your founders sign up and start using it immediately
 
 **Why this works for hardware founders specifically:**
 
-Hardware startups spend 12-18 months before first revenue because they have to build both the product AND the business infrastructure simultaneously. ForgeOS collapses that by giving founders a full support team from day one — strategy, engineering, finance, legal, manufacturing, investors — without the headcount. The specialists support your founders' decisions; they don't replace human judgment. I wrote about this structural problem in detail: [The Eighteen Month Trap](https://www.historyfuturenow.com/articles/the-eighteen-month-trap-why-hardware-startups-are-structurally-slow).
+Hardware startups spend 12-18 months before first revenue because they have to build both the product AND the business infrastructure simultaneously. ForgeOS gives founders a full support team from day one — domain specialist AI agents, experienced fractional executives, investor intelligence, and manufacturing connections — so they can move at the pace the programme demands.
 
-Would you have 20 minutes this week for a quick demo? I can show you the full platform — from investor matching to concept packages to business strategy tools.
+I'd welcome a conversation about how this could work for your cohort.
 
 Best,
 Tristan Fischer
 Founder, Fractional Forge
-fractionalforge.app
-[LinkedIn URL]
+www.fractionalforge.app

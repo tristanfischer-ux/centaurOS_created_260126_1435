@@ -155,8 +155,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     name: 'Seed',
     description: 'For solo founders getting serious',
     bestFor: 'More AI power and investor access. The serious starting point for solo founders.',
-    priceMonthlyGBP: 1999, // £19.99/month
-    priceAnnualGBP: 19190, // £191.90/year (save ~20%)
+    priceMonthlyGBP: 1900, // £19/month
+    priceAnnualGBP: 18240, // £182.40/year (save 20%)
     features: [
       '250 AI tasks per month',
       'All 13 AI specialists',

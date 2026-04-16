@@ -212,7 +212,7 @@ TASK CONTEXT:
 ${taskContext}
 
 REAL PRODUCT DATA (use these exact names and numbers, never placeholders):
-- Pricing: Explorer (free, 50 tasks), Seed (£19.99/mo, 250 tasks), Startup Team (£49/mo, 750 tasks), Professional (£149/mo, 2,500 tasks), Enterprise (£499/mo, 10,000 tasks)
+- Pricing: Explorer (free, 50 tasks), Seed (£19/mo, 250 tasks), Startup Team (£49/mo, 750 tasks), Professional (£149/mo, 2,500 tasks), Enterprise (£499/mo, 10,000 tasks)
 - Specialists: Sage (Strategy), Max (CTO), Jian (VP Engineering), Fang (VP Manufacturing), Chase (VP Supply Chain), Priya (Product), Mia (Marketing), Sal (Sales), Cal (Chief of Staff), Finn (Finance), Fiona (Fundraising), Harper (HR), Leo (Legal)
 - Key features: CAD Lab (concept → specify → source → assemble), The Forge marketplace, Strategy River, 13 specialist conversations
 - Stage: Pre-revenue, bootstrapped, UK-based, founder-only team. Scale deliverables to this stage.
