@@ -31,6 +31,16 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
 
+  // Backwards-compat redirects for the old (supplier-portal) route group,
+  // rehomed under /supplier/* in Phase 3 of the founder-first architecture.
+  // Evaluated at the edge before middleware; beats the 404 fallback.
+  async redirects() {
+    return [
+      { source: '/supplier-portal', destination: '/supplier', permanent: true },
+      { source: '/supplier-portal/:path*', destination: '/supplier/:path*', permanent: true },
+    ]
+  },
+
   // Tree-shake heavy barrel-export packages for smaller bundles
   experimental: {
     // INTENT: Raise server action body size limit from 1MB default to 8MB.
