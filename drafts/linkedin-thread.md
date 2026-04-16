@@ -4,101 +4,73 @@
 
 ---
 
-**Post 1 (Hook)**
+**Post 1 (Warm opener)**
 
-I built an operating system for hardware startups.
+I've just launched Fractional Forge, and it is essentially my wish list of all the things I could have had as a hardware startup founder over the last 26 years.
 
-13 domain specialists. 7,800+ investors. 13,700+ manufacturers. Strategy, engineering, finance, legal, fundraising — everything a pre-revenue founder needs, in one platform.
-
-Here's why, and what it actually does. 🧵
+Here is the story. 🧵
 
 ---
 
-**Post 2 (The Problem)**
+**Post 2 (The problem, personal)**
 
-Hardware founders have a structural problem.
+One of the main issues I have had building hardware startups is that I have spent so much time and energy building — and spending money on! — the infrastructure rather than focusing on the product.
 
-They spend 12-18 months before first revenue. ~70% of seed funding goes to infrastructure — not the product.
+This is completely different to what it is like being a software startup, where you can focus on the product and let companies like AWS deal with the infrastructure issue.
 
-But the real killer? You need expertise across a dozen domains simultaneously — engineering, manufacturing, fundraising, finance, legal, strategy, sales, marketing — and you can't afford any of it pre-revenue.
+Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels: finding engineers, finding manufacturers, finding investors, building a finance team, sorting out IP, negotiating supplier contracts. All pre-revenue. All without a budget for any of it.
 
-A software startup needs a laptop and a weekend. A hardware startup needs a CTO, a VP Manufacturing, a finance lead, a lawyer, a fundraising advisor, and 6 months of runway before anything ships.
-
-The "lean startup" methodology doesn't work when you need a 12-person team to get to MVP.
+That is what I wanted to solve.
 
 ---
 
-**Post 3 (The Platform — attach platform screenshot)**
+**Post 3 (What ForgeOS brings together)**
 
-So I built ForgeOS. Here's what's inside:
+ForgeOS brings together four things every hardware startup needs, in one platform.
 
-→ **13 domain specialists** — strategy, CTO, VP engineering, VP manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, chief of staff
-→ **7,800+ investors** with AI matching by stage, sector, and cheque size — plus 49,000+ contacts and 3,000+ grants
-→ **Concept packages** — describe your product, get architecture, BOM at 3 volumes, DFM analysis, certification roadmap, matched suppliers
-→ **13,700+ UK manufacturers** indexed with capability data and one-click RFQs
-→ **Business tools** — strategy, objectives, tasks, cash burn projections, P&L, team management, board packs
+A marketplace of experienced fractional executives — real people with decades of domain expertise in manufacturing, engineering, finance, and operations. They set their own day rates and work project-based directly with founders.
 
-One platform. Everything a hardware startup needs to go from idea to investable, manufacturing-ready company.
+13 specialist AI agents — strategy, CTO, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, and chief of staff. They fill the expertise gaps and support founder decisions across every discipline.
+
+7,800+ investors with AI matching to find the right ones for your stage and sector, plus 49,000+ contacts and 3,000+ grants.
+
+13,700+ UK and European manufacturers, indexed and searchable, so finding the right partner for a prototype or a production run happens in minutes rather than weeks.
+
+The AI handles the breadth. The experienced people bring the depth. Everything is in one place.
 
 [SCREENSHOT: Platform overview]
 
 ---
 
-**Post 4 (The Cost Comparison)**
+**Post 4 (The fractional executive angle)**
 
-What it costs to run a hardware startup properly:
+The other thing I wanted to build is a genuine home for fractional executives.
 
-• Fractional CTO: £1,500/month
-• VP Manufacturing consultant: £1,500/month
-• Finance advisor: £1,000/month
-• Legal counsel: £500/hour
-• Fundraising advisor: £2,000/month
-• Strategy consultant: £1,500/month
-• Total: £8,000+/month before you've built anything
+I know so many people who are real domain experts in certain areas — manufacturing, engineering, finance, operations — who would be great for startup companies to have access to. But there has never been a good way for those two sides to find each other without an agency in the middle.
 
-ForgeOS:
-• £49/month
-• All 13 specialists
-• 7,800+ investors with matching
-• Concept packages
-• 13,700+ manufacturers
-• Full business operations tools
+Fractional Forge works for both groups. Startups cannot afford a whole range of critical full-time employees. And some people just want to be able to give their expertise on an ad hoc basis — part-time, weekend work, evenings, between roles, or after retirement.
 
-That's not a marginal improvement. That's the difference between a pre-revenue founder having no support team and having a full one.
+Signing up is free. You set your own day rate. Founders find you directly by specialism.
+
+→ www.fractionalforge.app/join
 
 ---
 
-**Post 5 (What's Under the Hood)**
+**Post 5 (The third audience)**
 
-ForgeOS runs on 13 specialists across every domain a hardware startup needs:
+There is a third group Fractional Forge is for.
 
-• Sage — strategy and business planning
-• Max — CTO, architecture and technical decisions
-• Jian — VP engineering, detailed design
-• Fang — VP manufacturing, DFM and production
-• Chase — supply chain and procurement
-• Priya — product management
-• Mia — marketing and growth
-• Sal — sales and partnerships
-• Cal — chief of staff, operations
-• Finn — finance, unit economics, P&L
-• Fiona — fundraising and investor relations
-• Harper — HR and team building
-• Leo — legal counsel and compliance
+A lot of people would love to have their own startup themselves, but do not necessarily know what to do or where to start. Fractional Forge helps them do that. The 13 specialist AI agents, the investor database, the manufacturing network, and the strategy, objectives, and cash-burn tools are all designed to take someone from "I have an idea" to "I know exactly what the next step is".
 
-Each has distinct expertise and domain knowledge. They challenge each other's assumptions. They know your project context.
-
-But here's the key: they SUPPORT you. They don't replace your judgment. They augment what you can do as a founder — so you can operate like a well-funded team while you're still pre-revenue.
+Some fractional executives may end up becoming founders themselves. That is fine. That is the point.
 
 ---
 
-**Post 6 (The CTA)**
+**Post 6 (The CTA, warm)**
 
-If you're building a physical product and feel like you need to be an expert in 12 things simultaneously — that's exactly why I built this.
+If you are building a hardware product, or you are an experienced professional who wants to work with ambitious startups on your own terms, or you have been thinking about starting a company yourself — have a look and let me know how you get on.
 
-DM me if you're building hardware and want to see what 13 specialists can do for your startup. I'll walk you through the platform in 20 minutes.
-
-→ fractionalforge.app
+→ www.fractionalforge.app
 
 ---
 

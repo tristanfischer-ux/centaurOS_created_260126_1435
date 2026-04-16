@@ -718,15 +718,53 @@ function FounderArticlesSection() {
   return (
     <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Personal letter from Tristan */}
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Thought Leadership
+            A Note from Tristan
           </span>
           <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            From the <span className="text-international-orange">Founder</span>
+            Why I built{" "}
+            <span className="text-international-orange">Fractional Forge.</span>
           </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Understanding why hardware is hard — and what to do about it.
+        </AnimatedSection>
+
+        <AnimatedSection delay={0.1}>
+          <div className="max-w-3xl mx-auto space-y-5 text-foreground text-base sm:text-lg leading-relaxed mb-14 sm:mb-16 md:mb-20">
+            <p>
+              Fractional Forge is essentially my wish list of all the things I could have had as a hardware startup founder over the last 26 years.
+            </p>
+            <p>
+              One of the main issues I have had is that I have spent so much time and energy building — and spending money on! — the infrastructure rather than focusing on the product. This is completely different to what it is like being a software startup, where you can focus on the product and let companies like AWS deal with the infrastructure issue.
+            </p>
+            <p>
+              Hardware has never had an equivalent. Every founder ends up reinventing the same wheels: finding engineers, finding manufacturers, finding investors, building a finance team, sorting out IP. All pre-revenue. All without the budget for any of it.
+            </p>
+            <p>
+              Fractional Forge is that equivalent. It brings together the expertise, the tools, the investors, and the manufacturing connections every hardware founder needs — in one platform.
+            </p>
+            <p>
+              It is also a genuine home for fractional executives. I know so many people who are real domain experts in manufacturing, engineering, finance, and operations who would be great for startup companies to have access to. Startups cannot afford a full range of critical full-time employees. Some experienced people just want to give their expertise on an ad hoc basis. Fractional Forge works for both.
+            </p>
+            <p>
+              And if you have been thinking about building your own company — Fractional Forge is designed to take you from &quot;I have an idea&quot; to &quot;I know exactly what the next step is&quot;.
+            </p>
+            <p>
+              Have a look and let me know how you get on.
+            </p>
+            <p className="text-muted-foreground font-semibold pt-2">
+              — Tristan Fischer, Founder
+            </p>
+          </div>
+        </AnimatedSection>
+
+        {/* Further reading — articles */}
+        <AnimatedSection className="text-center mb-8 sm:mb-10 md:mb-12">
+          <h3 className="font-playfair text-xl sm:text-2xl md:text-3xl font-black mb-2 leading-tight">
+            Further reading
+          </h3>
+          <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+            Articles on why hardware is structurally different, and what to do about it.
           </p>
         </AnimatedSection>
 
