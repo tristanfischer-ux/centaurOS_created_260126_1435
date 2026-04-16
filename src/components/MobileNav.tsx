@@ -156,7 +156,17 @@ const marketplaceMoreNavigation = [
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]
 
-const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
+// Drawer — Supplier Portal section (only shown when profiles.is_supplier=true)
+const supplierMoreNavigation = [
+    { name: "Dashboard", href: "/supplier", icon: Store },
+    { name: "My Listing", href: "/supplier/listing", icon: FileOutput },
+    { name: "Orders", href: "/supplier/orders", icon: ShoppingBag },
+    { name: "RFQs", href: "/supplier/rfqs", icon: MessageSquarePlus },
+    { name: "Analytics", href: "/supplier/analytics", icon: BarChart3 },
+    { name: "Settings", href: "/supplier/settings", icon: Settings },
+]
+
+const allMoreItems = [...meMoreNavigation, ...supplierMoreNavigation, ...planMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
 function SectionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
     return (
@@ -178,9 +188,11 @@ function Divider() {
 
 interface MobileNavProps {
     foundryName?: string
+    /** Reveals the Supplier Portal section in the "More" drawer. From profiles.is_supplier. */
+    isSupplier?: boolean
 }
 
-export function MobileNav({ foundryName }: MobileNavProps) {
+export function MobileNav({ foundryName, isSupplier }: MobileNavProps) {
     const pathname = usePathname()
     const router = useRouter()
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
@@ -322,6 +334,15 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                             {meMoreNavigation.map(renderDrawerItem)}
 
                             <Divider />
+
+                            {/* Supplier Portal section — only when profiles.is_supplier = true */}
+                            {isSupplier && (
+                                <>
+                                    <SectionLabel icon={Store} label="Supplier Portal" />
+                                    {supplierMoreNavigation.map(renderDrawerItem)}
+                                    <Divider />
+                                </>
+                            )}
 
                             {/* Plan section */}
                             <SectionLabel icon={Waypoints} label="Plan" />

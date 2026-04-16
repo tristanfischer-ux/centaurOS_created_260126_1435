@@ -137,7 +137,7 @@ export default async function PlatformLayout({
                         <Suspense fallback={null}>
                             <AdvisorPanel />
                         </Suspense>
-                        <MobileNav foundryName={foundryName} />
+                        <MobileNav foundryName={foundryName} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} />
                         <Suspense fallback={null}>
                             <FloatingSpecialistFAB />
                         </Suspense>
