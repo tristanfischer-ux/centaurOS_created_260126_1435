@@ -87,7 +87,8 @@ function buildSignupUrl(searchQuery?: string): string {
     }
   }
 
-  return `/join?${params.toString()}`
+  const qs = params.toString()
+  return qs ? `/join?${qs}` : '/join'
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -49,7 +49,7 @@ export function CookieConsent() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed top-0 sm:top-auto sm:bottom-4 left-0 right-0 z-40 flex justify-center px-4"
+          className="fixed top-0 left-0 right-0 z-40 flex justify-center px-4"
         >
           <Card className="max-w-4xl w-full p-4 sm:p-6 shadow-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
