@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, UserPlus, TrendingUp, Target, ShoppingCart, Briefcase, Flame } from 'lucide-react'
+import { Hammer, UserPlus, TrendingUp, Target, ShoppingCart, Briefcase, Flame, Users } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -116,7 +116,21 @@ const TABS: ShowcaseTab[] = [
       { text: 'Live progress across the team', position: 'top-[45%] right-[5%]' },
     ],
   },
-  // 7. Cash Burn — financial modelling
+  // 7. Team — your full team visualised
+  {
+    id: 'team',
+    label: 'Team',
+    icon: <Users className="h-4 w-4" />,
+    url: 'fractionalforge.app/team',
+    image: '/images/screenshots/team.png',
+    headline: 'Your team, visualised',
+    description: 'See every role covered and every gap at a glance. 13 specialist AI agents plus your human team — organised by function with live workload and capacity tracking.',
+    callouts: [
+      { text: 'Coverage + gaps', position: 'top-[15%] left-[5%]' },
+      { text: 'Live capacity tracking', position: 'bottom-[15%] right-[5%]' },
+    ],
+  },
+  // 8. Cash Burn — financial modelling
   {
     id: 'cash-burn',
     label: 'Cash Burn',
