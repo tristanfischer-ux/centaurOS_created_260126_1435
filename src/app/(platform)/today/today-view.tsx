@@ -487,6 +487,10 @@ export function TodayView({
         <div className="max-w-5xl space-y-8">
             <PageHeader />
 
+            {/* Retroactive opt-in card for users past onboarding who haven't
+                listed themselves as fractional executives (Phase 5). */}
+            <FractionalExecPromoCard visible={showFractionalExecPrompt} />
+
             {/* Hero Narrative Card — Cal's briefing is ALWAYS first */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
