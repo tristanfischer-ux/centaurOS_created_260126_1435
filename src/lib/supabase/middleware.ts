@@ -144,11 +144,9 @@ export async function updateSession(request: NextRequest) {
         if (isAppDomainRoot && profile) {
             const redirectUrl = request.nextUrl.clone()
 
-            // Suppliers go to supplier portal
-            if (profile.account_type === 'supplier') {
-                redirectUrl.pathname = '/supplier-portal'
-                return NextResponse.redirect(redirectUrl)
-            }
+            // DECISION 2026-04-16: founder-first architecture. Every authenticated
+            // user lands on the founder side. Supplier / fractional-executive are
+            // opt-in flags, not separate routing paths. The supplier divert is gone.
 
             // PERF: Foundry membership count only runs for root "/" redirect
             // (not on every page load like before)
@@ -188,38 +186,11 @@ export async function updateSession(request: NextRequest) {
             }
         }
 
-        // Route suppliers to supplier portal for platform-only routes
-        if (profile?.account_type === 'supplier') {
-            const supplierAllowedRoutes = [
-                '/supplier-portal',
-                '/marketplace',
-                '/help',
-                '/rfq',
-                '/profile',
-                '/my-listing',
-                '/claim',
-            ]
-
-            const isAllowedForSupplier = supplierAllowedRoutes.some(route =>
-                pathname === route || pathname.startsWith(`${route}/`)
-            )
-
-            // SECURITY: Restrict supplier API access to an explicit allowlist
-            const supplierAllowedApiRoutes = [
-                '/api/marketplace', '/api/rfq', '/api/messages',
-                '/api/billing', '/api/webhooks', '/api/google',
-                '/api/settings', '/api/health', '/api/shared',
-            ]
-            const isAllowedApiForSupplier = supplierAllowedApiRoutes.some(route =>
-                pathname === route || pathname.startsWith(`${route}/`)
-            )
-
-            if (!isAllowedForSupplier && !isAllowedApiForSupplier) {
-                const redirectUrl = request.nextUrl.clone()
-                redirectUrl.pathname = '/supplier-portal'
-                return NextResponse.redirect(redirectUrl)
-            }
-        }
+        // DECISION 2026-04-16: founder-first architecture. The supplier
+        // route-allowlist gate (and the fence that redirected non-allowlisted
+        // paths back to /supplier-portal) has been removed. Suppliers now have
+        // the full platform available; the supplier-specific pages will be
+        // rehomed under a sidebar section in Phase 3.
     }
 
     return response

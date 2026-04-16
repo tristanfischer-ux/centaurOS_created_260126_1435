@@ -122,21 +122,11 @@ export async function login(formData: FormData) {
 
     // Check user's account type and foundry memberships to determine redirect
     if (loggedInUser) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('account_type, active_foundry_id')
-            .eq('id', loggedInUser.id)
-            .single()
-
-        // INTENT: Honor the redirect param first — suppliers may be returning
-        // to a claim page after login, and must not be short-circuited.
+        // DECISION 2026-04-16: founder-first architecture. Every user lands on
+        // the founder side (/today). Supplier and fractional-executive are now
+        // opt-in flags on top of the founder account, not a separate routing path.
         if (redirectTo) {
             redirect(redirectTo)
-        }
-
-        // Suppliers go to their dedicated portal (only when no redirect)
-        if (profile?.account_type === 'supplier') {
-            redirect('/supplier-portal')
         }
 
         // Check how many foundries the user belongs to

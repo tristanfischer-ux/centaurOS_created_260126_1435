@@ -343,7 +343,10 @@ describe('setupNewUser', () => {
     expect(attrs?.profile_id).toBe(TEST_USER_ID)
   })
 
-  it('assigns suppliers to forge-suppliers (not sandbox)', async () => {
+  // Post founder-first architecture (2026-04-16): supplier role still assigns to
+  // forge-suppliers foundry, but the redirectPath is now /today for everyone.
+  // Supplier becomes an opt-in flag on the founder side (Phase 2).
+  it('assigns suppliers to forge-suppliers and redirects to /today', async () => {
     mock.from.mockImplementation((table: string) => {
       const chain = createMockChain()
 
@@ -372,6 +375,6 @@ describe('setupNewUser', () => {
     })
 
     expect(result.foundryId).toBe('forge-suppliers')
-    expect(result.redirectPath).toBe('/supplier-portal')
+    expect(result.redirectPath).toBe('/today')
   })
 })

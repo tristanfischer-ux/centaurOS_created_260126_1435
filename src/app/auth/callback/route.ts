@@ -153,17 +153,15 @@ export async function GET(request: Request) {
         return response
       }
 
-      // EXISTING USER — honor `next` param for claim flow, otherwise route by role
-      // DECISION: If `next` is a claim path, always honor it regardless of account type.
-      // This lets existing suppliers complete the claim flow instead of getting trapped
-      // in /supplier-portal. For all other paths, use role-based routing.
+      // EXISTING USER — honor `next` param for claim flow, otherwise route to /today
+      // DECISION 2026-04-16: founder-first architecture. Everyone lands on /today.
+      // Supplier / fractional-executive are now opt-in flags layered on the founder
+      // account, not distinct routing paths. `account_type === 'supplier'` branch removed.
       const hasExplicitNext = next !== '/today' && next.startsWith('/')
       let redirectPath: string
 
       if (hasExplicitNext) {
         redirectPath = next
-      } else if (profile.account_type === 'supplier') {
-        redirectPath = '/supplier-portal'
       } else if (profile.role === 'Founder' || profile.role === 'Executive' || profile.role === 'Apprentice') {
         redirectPath = '/today'
       } else {

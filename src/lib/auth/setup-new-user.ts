@@ -86,7 +86,8 @@ export async function setupNewUser({
     console.warn("[setupNewUser] Profile already exists for user, skipping:", userId);
     return {
       foundryId: existingProfile.foundry_id || "forge-guild",
-      redirectPath: role === "supplier" ? "/supplier-portal" : "/today",
+      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
+      redirectPath: "/today",
     };
   }
 
@@ -276,7 +277,8 @@ export async function setupNewUser({
 
     if (profileError) {
       console.error("[setupNewUser] Profile creation failed:", profileError.message);
-      return { foundryId, redirectPath: role === "supplier" ? "/supplier-portal" : "/today" };
+      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
+      return { foundryId, redirectPath: "/today" };
     }
 
     // Set owner on sandbox foundries (same circular FK pattern as founders)
@@ -427,11 +429,8 @@ export async function setupNewUser({
     console.warn('[setupNewUser] Onboarding drip scheduling failed (non-blocking):', e)
   }
 
-  // --- Determine redirect ---
-  let redirectPath = "/today";
-  if (role === "supplier") {
-    redirectPath = "/supplier-portal";
-  }
-
-  return { foundryId, redirectPath };
+  // DECISION 2026-04-16: founder-first. Every new user lands on /today
+  // regardless of signup role. Supplier / fractional-executive are opt-in
+  // flags handled during onboarding, not routing paths.
+  return { foundryId, redirectPath: "/today" };
 }

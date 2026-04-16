@@ -43,17 +43,8 @@ export default async function LoginPage({
             redirect(redirectTo)
         }
 
-        // Fetch profile to determine the correct redirect destination
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('account_type, active_foundry_id')
-            .eq('id', user.id)
-            .single()
-
-        if (profile?.account_type === 'supplier') {
-            redirect('/supplier-portal')
-        }
-
+        // DECISION 2026-04-16: founder-first architecture. Everyone lands on /today.
+        // Supplier / fractional-executive are opt-in flags, not routing paths.
         redirect('/today')
     }
 

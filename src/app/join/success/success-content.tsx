@@ -143,8 +143,10 @@ const SESSION_POLL_INTERVAL = 3000
  * @param role The role the user signed up with
  * @returns The redirect path
  */
-function getPostSignupRedirect(role: string): string {
-  if (role === "supplier") return "/supplier-portal"
+function getPostSignupRedirect(_role: string): string {
+  // DECISION 2026-04-16: founder-first architecture — every new user lands on /today,
+  // regardless of the role they signed up with. Supplier / fractional-executive are
+  // opt-in flags on top of the founder workspace, not distinct routing paths.
   return "/today"
 }
 

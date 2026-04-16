@@ -18,17 +18,9 @@ export default async function WorkspacePickerPage() {
 
   const { foundries } = await getUserFoundries()
 
-  // If user only has one foundry, go straight there
+  // If user only has one foundry, go straight to /today.
+  // DECISION 2026-04-16: founder-first architecture — no more supplier divert.
   if (foundries.length === 1) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_type')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.account_type === 'supplier') {
-      redirect('/supplier-portal')
-    }
     redirect('/today')
   }
 
