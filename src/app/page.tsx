@@ -453,19 +453,19 @@ function HeroSection() {
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            Everything You Need to Build Hardware.
+            For Hardware Startup Founders
           </span>
         </motion.div>
 
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="font-playfair text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
-          The Operating System for{" "}
+          Everything a hardware startup needs,{" "}
           <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
-            Hardware Startups.
+            in one platform.
           </motion.span>
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Fractional expertise, 13 specialist AI agents, investor intelligence, and a connected manufacturing network — everything a hardware startup needs, in one platform.
+          Design your product. Find your investors. Connect with your manufacturers. Supported by 13 specialist AI agents and a marketplace of experienced fractional executives — ForgeOS is the operating system for building hardware businesses.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
