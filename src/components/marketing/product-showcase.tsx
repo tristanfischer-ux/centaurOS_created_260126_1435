@@ -123,11 +123,11 @@ const TABS: ShowcaseTab[] = [
     icon: <TrendingUp className="h-4 w-4" />,
     url: 'fractionalforge.app/investors',
     image: '/images/screenshots/investors.png',
-    headline: '7,800+ investors pre-researched',
-    description: 'UK VC and PE firms with fund sizes, sector focus, and contact details. Ready when you are.',
+    headline: '7,800+ investors, pre-researched',
+    description: 'VC, PE, angel networks, family offices, and grants — with fund sizes, sector focus, stage distribution, and partner contacts. Built-in insights, ready when you are.',
     callouts: [
-      { text: '7,800+ investors', position: 'top-[15%] left-[5%]' },
-      { text: 'Fund sizes + contacts', position: 'top-[45%] right-[5%]' },
+      { text: 'Investor Insights dashboard', position: 'top-[10%] left-[5%]' },
+      { text: 'Stage + Geographic distribution', position: 'bottom-[15%] right-[5%]' },
     ],
   },
 ]
