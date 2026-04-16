@@ -194,6 +194,24 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Prevent horizontal scroll caused by off-screen content */
+    overflow-x: hidden;
+  }
+
+  /* Prevent iOS Safari auto-zoom on focus (kicks in below 16px font-size).
+     Only applies on mobile — desktop keeps design-system sizes. */
+  @media (max-width: 640px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="tel"],
+    input[type="number"],
+    input[type="search"],
+    input[type="url"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
   }
 }
 

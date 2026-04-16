@@ -316,7 +316,7 @@ export function InvestorPreviewSection() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="e.g. pre-seed hardware startup"
-                className="w-full h-11 pl-9 pr-9 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange transition-colors"
+                className="w-full h-11 pl-9 pr-9 rounded-lg border border-input bg-background text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange transition-colors"
                 aria-label="Describe your startup to find matching investors"
               />
               {searchQuery && (
