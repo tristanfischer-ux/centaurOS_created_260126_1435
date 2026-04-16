@@ -48,7 +48,7 @@ const ONBOARDING_DRIP_STEPS: Array<{
   {
     dayOffset: 14,
     template: 'onboarding_day14_upgrade',
-    description: 'Trial ending — upgrade prompt with incentive',
+    description: 'Two-weeks-in check-in — mentions paid tiers, no trial framing',
   },
 ]
 

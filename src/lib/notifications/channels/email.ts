@@ -474,7 +474,7 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
                     <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Open The Forge and describe your product idea. Our engineering specialist will generate a feasibility assessment in under 2 minutes.</p>
                 </div>
                 <a href="${data.actionUrl || 'https://fractionalforge.app/the-forge'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Open The Forge &rarr;</a>
-                <p style="color: #888; font-size: 13px; margin-top: 24px;">Your 14-day full-access trial is active. No credit card needed.</p>
+                <p style="color: #888; font-size: 13px; margin-top: 24px;">Explorer tier is free forever — 50 AI assists a month, no credit card needed.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
                 <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
             </div>
@@ -524,17 +524,13 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
     }),
 
     onboarding_day14_upgrade: (data) => ({
-        subject: 'Your trial ends tomorrow — keep building at full speed',
+        subject: 'Two weeks in — a note on the paid tiers',
         html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                 <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
-                <p style="color: #333; line-height: 1.6;">Your 14-day full-access trial of ForgeOS ends tomorrow. After that, your workspace drops to the free Explorer tier (50 tasks/month, 15 investor profiles/month, no supplier matching).</p>
-                <div style="background: #fff5f0; border: 2px solid #ff4500; padding: 20px; border-radius: 8px; margin: 16px 0;">
-                    <p style="margin: 0 0 8px 0; color: #ff4500; font-weight: 700; font-size: 16px;">Keep everything you&rsquo;ve built</p>
-                    <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.6;">Upgrade to Startup Team (£49/mo) to keep your team workspace, supplier matching, and get 0% marketplace fees on your first £10K of orders.</p>
-                </div>
-                <a href="${data.actionUrl || 'https://fractionalforge.app/settings/billing'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Upgrade Now &rarr;</a>
-                <p style="color: #888; font-size: 13px; margin-top: 16px;">Not ready? Your data stays safe on the free tier &mdash; upgrade whenever you&rsquo;re ready.</p>
+                <p style="color: #333; line-height: 1.6;">You have been on ForgeOS for two weeks. The Explorer tier stays free for as long as you want it &mdash; 50 AI assists a month, all 13 specialists, investor directory browsing, task management. Nothing expires.</p>
+                <p style="color: #333; line-height: 1.6;">If you have been bumping into the assist limit, or want supplier matching, RFQ pack generation and marketplace ordering, the Startup Team tier (&pound;49/mo) covers all of that.</p>
+                <a href="${data.actionUrl || 'https://fractionalforge.app/pricing'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">See the paid tiers &rarr;</a>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
                 <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
             </div>
