@@ -27,6 +27,7 @@ import {
 import {
   CheckCircle2,
   ArrowRight,
+  ArrowLeft,
   Zap,
   Users,
   ShoppingBag,
@@ -124,7 +125,17 @@ export function PricingContent() {
         <MarketingNav />
 
         <main className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+          {/* Breadcrumb back to home */}
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-international-orange transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to home
+          </Link>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
           {/* Header */}
           <div className="text-center space-y-4 mb-8">
             <p className="text-xs font-mono uppercase tracking-widest text-international-orange">

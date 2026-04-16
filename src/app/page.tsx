@@ -571,8 +571,8 @@ const HOW_IT_WORKS_PILLARS = [
   {
     label: "Team Coordination",
     title: "Keep a distributed team aligned.",
-    image: "/images/marketing/human-ai-workshop.png",
-    imageAlt: "Team coordinating across multiple locations",
+    image: "/images/marketing/ecosystem-os.png",
+    imageAlt: "Distributed team working across multiple locations",
     body: "Hardware startups end up with people in different places — a fractional engineer in Manchester, a manufacturer in Poland, a finance person working evenings, investors in Cambridge. Fractional Forge has strategy, objectives, and tasks built in, so the whole team knows what they are doing and why.",
     highlights: [
       "Strategic objectives broken down into weekly tasks",
@@ -862,7 +862,7 @@ function PricingTeaserSection() {
             Start free. Scale <span className="text-international-orange">when ready.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-            Free forever with 50 AI assists. No credit card required.
+            Start free with 50 AI assists and all 13 specialist AI agents. Upgrade when you need more.
           </p>
         </AnimatedSection>
 

@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, LayoutDashboard, TrendingUp, Target, ShoppingCart, Briefcase, Flame, Users } from 'lucide-react'
+import { Hammer, UserPlus, TrendingUp, Target, ShoppingCart, Briefcase, Flame } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -32,91 +32,35 @@ interface ShowcaseTab {
 }
 
 const TABS: ShowcaseTab[] = [
-  // 1. Lead with the product — the hero feature
+  // 1. Design — lead with the product hook
   {
-    id: 'forge',
-    label: 'The Forge',
+    id: 'design',
+    label: 'Design',
     icon: <Hammer className="h-4 w-4" />,
-    url: 'fractionalforge.app/the-forge/design',
+    url: 'fractionalforge.app/the-forge',
     image: '/images/screenshots/design-modules.png',
-    headline: 'From idea to engineering package',
-    description: 'Describe your product. Get module decomposition, isometric illustrations, detailed specs, and a full bill of materials in minutes.',
+    headline: 'From idea to product design',
+    description: 'Describe your product and the platform walks through the materials, hardware, software, and equipment you will need. Every component links directly to suppliers who can make it.',
     callouts: [
-      { text: '7 modules auto-generated', position: 'top-[10%] left-[5%]' },
-      { text: 'Isometric CAD illustrations', position: 'top-[35%] right-[5%]' },
+      { text: 'Product modules, explained', position: 'top-[10%] left-[5%]' },
+      { text: 'Link to matched suppliers', position: 'top-[35%] right-[5%]' },
     ],
   },
-  // 2. Source — natural next step after design
+  // 2. Recruits — fractional executives marketplace
   {
-    id: 'source',
-    label: 'Source',
-    icon: <ShoppingCart className="h-4 w-4" />,
-    url: 'fractionalforge.app/the-forge/source',
-    image: '/images/screenshots/source-sankey.png',
-    headline: 'Component to supplier, mapped',
-    description: 'Every part in your design automatically matched to manufacturing techniques and real suppliers. Visual flow from specs to quotes.',
+    id: 'recruits',
+    label: 'Recruits',
+    icon: <UserPlus className="h-4 w-4" />,
+    url: 'fractionalforge.app/recruits',
+    image: '/images/screenshots/marketplace.png',
+    headline: 'Experienced professionals, on your terms',
+    description: 'A marketplace of experienced professionals with decades of domain expertise. Search by specialism, see their background, and engage them directly at their own day rate.',
     callouts: [
-      { text: 'Auto-matched suppliers', position: 'top-[15%] right-[5%]' },
-      { text: 'Full BOM coverage', position: 'top-[50%] left-[5%]' },
+      { text: 'Search by specialism', position: 'top-[10%] left-[5%]' },
+      { text: 'Rates set by the professionals', position: 'top-[45%] right-[5%]' },
     ],
   },
-  // 3. Specialists — the "team meeting" wow factor
-  {
-    id: 'specialists',
-    label: 'Specialists',
-    icon: <Briefcase className="h-4 w-4" />,
-    url: 'fractionalforge.app/specialists',
-    image: '/images/screenshots/specialists-huddles.png',
-    headline: 'Leadership huddles',
-    description: 'Run strategy, technology, legal, and finance meetings with your specialist team. They pull live data, debate the issues, and you make the call.',
-    callouts: [
-      { text: 'Live data analysis', position: 'top-[15%] left-[5%]' },
-      { text: 'You decide who speaks', position: 'bottom-[20%] right-[5%]' },
-    ],
-  },
-  // 4. Dashboard — daily command centre
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: <LayoutDashboard className="h-4 w-4" />,
-    url: 'fractionalforge.app/today',
-    image: '/images/screenshots/dashboard-today.png',
-    headline: 'Your morning briefing',
-    description: 'Tasks, objectives, team pulse, and strategic health. Everything you need, one screen.',
-    callouts: [
-      { text: 'Daily briefing', position: 'top-[10%] left-[5%]' },
-      { text: 'Onboarding checklist', position: 'top-[55%] right-[5%]' },
-    ],
-  },
-  // 5. Cash Burn — financial modelling
-  {
-    id: 'cash-burn',
-    label: 'Cash Burn',
-    icon: <Flame className="h-4 w-4" />,
-    url: 'fractionalforge.app/cash-burn',
-    image: '/images/screenshots/cash-burn.png',
-    headline: '52-week runway modelling',
-    description: 'Model your cash position with scenario planning. Adjust revenue delays, cost overruns, and growth assumptions — see the impact instantly.',
-    callouts: [
-      { text: 'Scenario modelling', position: 'top-[15%] right-[5%]' },
-      { text: 'Runway projection', position: 'top-[45%] left-[5%]' },
-    ],
-  },
-  // 6. Strategy — objectives tracking
-  {
-    id: 'strategy',
-    label: 'Strategy',
-    icon: <Target className="h-4 w-4" />,
-    url: 'fractionalforge.app/strategy',
-    image: '/images/screenshots/strategy-river.png',
-    headline: 'Strategic objectives, visualised',
-    description: 'See your company objectives flow from vision to execution. Track progress, spot blockers, stay aligned.',
-    callouts: [
-      { text: 'Objective river', position: 'top-[15%] left-[5%]' },
-      { text: 'Live progress', position: 'top-[45%] right-[5%]' },
-    ],
-  },
-  // 7. Investors — fundraising
+  // 3. Investors — fundraising
   {
     id: 'investors',
     label: 'Investors',
@@ -124,24 +68,66 @@ const TABS: ShowcaseTab[] = [
     url: 'fractionalforge.app/investors',
     image: '/images/screenshots/investors.png',
     headline: '7,800+ investors, pre-researched',
-    description: 'VC, PE, angel networks, family offices, and grants — with fund sizes, sector focus, stage distribution, and partner contacts. Built-in insights, ready when you are.',
+    description: 'Venture capital, private equity, angels, family offices, and grants. Every firm researched with fund sizes, sector focus, stage distribution, and partner contacts.',
     callouts: [
-      { text: 'Investor Insights dashboard', position: 'top-[10%] left-[5%]' },
-      { text: 'Stage + Geographic distribution', position: 'bottom-[15%] right-[5%]' },
+      { text: 'AI matching by stage + sector', position: 'top-[10%] left-[5%]' },
+      { text: 'Partner contacts included', position: 'bottom-[15%] right-[5%]' },
     ],
   },
-  // 8. Team — org orbit view
+  // 4. Specialists — the 13 AI agents
   {
-    id: 'team',
-    label: 'Team',
-    icon: <Users className="h-4 w-4" />,
-    url: 'fractionalforge.app/team',
-    image: '/images/screenshots/team.png',
-    headline: 'Your team, visualised',
-    description: 'See every role covered and every gap at a glance. 13 AI specialists plus your human team — organised by function with live workload and capacity tracking.',
+    id: 'specialists',
+    label: 'Specialists',
+    icon: <Briefcase className="h-4 w-4" />,
+    url: 'fractionalforge.app/specialists',
+    image: '/images/screenshots/specialists-huddles.png',
+    headline: '13 specialist AI agents',
+    description: 'Strategy, CTO, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, and chief of staff. They fill expertise gaps across every discipline.',
     callouts: [
-      { text: 'Coverage + gaps', position: 'top-[15%] left-[5%]' },
-      { text: 'Live capacity tracking', position: 'bottom-[15%] right-[5%]' },
+      { text: 'Live data analysis', position: 'top-[15%] left-[5%]' },
+      { text: 'You make the decisions', position: 'bottom-[20%] right-[5%]' },
+    ],
+  },
+  // 5. Source — 13,700+ UK and European manufacturers
+  {
+    id: 'source',
+    label: 'Source',
+    icon: <ShoppingCart className="h-4 w-4" />,
+    url: 'fractionalforge.app/the-forge/source',
+    image: '/images/screenshots/source-sankey.png',
+    headline: '13,700+ UK and European manufacturers',
+    description: 'Every part of your design linked to the manufacturers who can actually make it. Search by capability, location, and specialism — reach out directly for real expertise.',
+    callouts: [
+      { text: 'Matched to your design', position: 'top-[15%] right-[5%]' },
+      { text: 'Reach out to real suppliers', position: 'top-[50%] left-[5%]' },
+    ],
+  },
+  // 6. Strategy — objectives and tasks for distributed teams
+  {
+    id: 'strategy',
+    label: 'Strategy',
+    icon: <Target className="h-4 w-4" />,
+    url: 'fractionalforge.app/strategy',
+    image: '/images/screenshots/strategy-river.png',
+    headline: 'Keep a distributed team aligned',
+    description: 'Break your strategy into objectives and those into weekly tasks. Assign work to teammates or directly to the 13 specialist AI agents — everyone knows what they are doing and why.',
+    callouts: [
+      { text: 'Objectives into weekly tasks', position: 'top-[15%] left-[5%]' },
+      { text: 'Live progress across the team', position: 'top-[45%] right-[5%]' },
+    ],
+  },
+  // 7. Cash Burn — financial modelling
+  {
+    id: 'cash-burn',
+    label: 'Cash Burn',
+    icon: <Flame className="h-4 w-4" />,
+    url: 'fractionalforge.app/cash-burn',
+    image: '/images/screenshots/cash-burn.png',
+    headline: 'Runway and P&L in one place',
+    description: 'Model what is going out, what is coming in, and your resulting profit and loss. Test scenarios, project runway against current burn, and see where things tighten.',
+    callouts: [
+      { text: 'Scenario modelling', position: 'top-[15%] right-[5%]' },
+      { text: 'Runway projection', position: 'top-[45%] left-[5%]' },
     ],
   },
 ]
