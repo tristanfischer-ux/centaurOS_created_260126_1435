@@ -27,6 +27,7 @@ import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
 
 /** Lean return type for single-image generation — avoids React Flight serialization limits */
 interface ImageGenResult {
@@ -56,7 +57,12 @@ export async function uploadSharedImageAssetsAction(
   referenceBase64?: string,
   visualStyle?: VisualStyleSpec,
 ): Promise<{ referenceUrl?: string; visualStyleUrl?: string } | { error: string }> {
-  return withAIGate('cad_lab_images', async () => {
+  return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
+    // SECURITY: Verify the caller's foundry owns this project before touching
+    // its storage namespace via the admin client (which bypasses RLS).
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
     try {
       const admin = createAdminClient()
       const timestamp = Date.now()
@@ -115,7 +121,11 @@ export async function uploadSharedImageAssetsAction(
 export async function cleanupSharedImageAssetsAction(
   projectId: string,
 ): Promise<{ success: boolean } | { error: string }> {
-  return withAIGate('cad_lab_images', async () => {
+  return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
+    // SECURITY: Verify ownership before listing/deleting in the storage namespace.
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
     try {
       const admin = createAdminClient()
       const { data: files } = await admin.storage
@@ -170,7 +180,12 @@ export async function generateCadLabSingleImageAction(
   referenceBase64OrUrl?: string,
   moduleCropBase64?: string,
 ): Promise<ImageGenResult | { error: string }> {
-  return withAIGate('cad_lab_images', async () => {
+  return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
+    // SECURITY: Block cross-foundry projectId — generateModuleImage writes to
+    // xray-images/<projectId>/module-<id>.png via the admin client.
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
     try {
       // INTENT: Resolve shared assets from URLs if strings were passed (Supabase Storage).
       // Same-region fetch is ~10ms vs ~800KB saved per React Flight request.
@@ -235,7 +250,11 @@ export async function generateCadLabModuleImagesAction(
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
 ): Promise<GenerateImagesResult | { error: string }> {
-  return withAIGate('cad_lab_images', async () => {
+  return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
+    // SECURITY: Batch variant of generateCadLabSingleImageAction — same gate.
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
     const updatedModules = [...modules]
     let successCount = 0
     let failedCount = 0
@@ -307,7 +326,11 @@ export async function generateCadLabSystemIllustrationAction(
   heroPrompt?: string,
   referenceImageUrls?: string[],
 ): Promise<{ url: string } | { error: string }> {
-  return withAIGate('cad_lab_images', async () => {
+  return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
+    // SECURITY: hero illustration also writes to xray-images/<projectId>/.
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
     try {
       const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt, heroPrompt, referenceImageUrls)
       return { url }

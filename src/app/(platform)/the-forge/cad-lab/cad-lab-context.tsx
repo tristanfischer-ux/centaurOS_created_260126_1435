@@ -990,6 +990,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
+  // INTENT: Ref-mirror of isGeneratingImages so post-await re-entrancy checks
+  // (e.g. handleRetryIllustration chaining module regen) see the current value.
+  const isGeneratingImagesRef = useRef(false)
+  useEffect(() => { isGeneratingImagesRef.current = isGeneratingImages }, [isGeneratingImages])
+
   // INTENT: Prevents auto-restore from firing twice in React StrictMode.
   const isRestoringRef = useRef(false)
 
@@ -2197,6 +2202,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     } catch (unexpectedErr) {
       console.error("[CAD-LAB] Unexpected error in image generation pipeline:", unexpectedErr)
       failOp(bgOpId, "Illustration generation failed unexpectedly")
+
+      // INTENT: Sweep remaining "generating" modules in this batch to "failed".
+      // Otherwise a mid-pipeline throw leaves them stuck at "generating", and
+      // the Images tab retry UI only matches ["pending", "failed", undefined] —
+      // the user would be stranded with no recovery affordance.
+      // See tasks/lessons.md 2026-04-17 — terminal error states must be visible.
+      const targetIds = new Set(modulesToProcess.map(m => m.id))
+      const errorMsg = unexpectedErr instanceof Error ? unexpectedErr.message : "Image generation interrupted"
+      setModules(prev => prev.map(m =>
+        targetIds.has(m.id) && m.imageStatus === "generating"
+          ? { ...m, imageStatus: "failed" as const, imageError: errorMsg }
+          : m
+      ))
     } finally {
       // INTENT: Clear any leaked safety timeouts — if the try body threw before
       // the normal cleanup, these timers would fire on a potentially stale context.
@@ -2806,6 +2824,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject, waitForSlot, detectedDomain, documentContext])
 
   // ── Retry system illustration ──
+  // INTENT: If the original pipeline ran module images without a hero (because
+  // hero failed), the module images were generated with no cross-module visual
+  // reference and may look inconsistent. After a successful hero retry, we
+  // offer to regenerate any failed/pending modules using the new hero, so the
+  // Design tab isn't stranded in a half-broken state. See tasks/lessons.md
+  // 2026-04-17 on recovery UI + terminal error states.
   const handleRetryIllustration = useCallback(() => {
     if (!activeProjectId) return
     setSystemIllustrationStatus("generating")
@@ -2817,12 +2841,36 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       modules.map((m) => m.purpose),
       visualStyle ?? undefined,
     )
-      .then((illRes) => {
+      .then(async (illRes) => {
         if ("url" in illRes) {
           setSystemIllustrationUrl(illRes.url)
           setSystemIllustrationStatus("complete")
           saveCadLabSystemIllustration(activeProjectId!, illRes.url)
             .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
+
+          // INTENT: Offer module-image regen if any module is failed/pending.
+          // Reads from the ref to avoid a stale snapshot across the await.
+          const snapshot = modulesRef.current
+          const needsRegen = snapshot.filter(
+            (m) => m.imageStatus === "failed" || m.imageStatus === "pending" || !m.imageStatus,
+          )
+          if (needsRegen.length > 0 && !isGeneratingImagesRef.current) {
+            toast.info(
+              `Regenerating ${needsRegen.length} illustration${needsRegen.length === 1 ? "" : "s"} with the new hero image…`,
+            )
+            try {
+              await handleGenerateModuleImages(
+                needsRegen,
+                activeProjectId,
+                visualStyle ?? undefined,
+                undefined,               // referenceBase64 — let upload handle it
+                undefined,               // moduleCrops — none available here
+                illRes.url,              // new hero URL
+              )
+            } catch (regenErr) {
+              console.error("[CAD-LAB] Module regen after hero retry failed:", regenErr)
+            }
+          }
         } else {
           console.error("[CAD-LAB] System illustration retry failed:", "error" in illRes ? illRes.error : "unknown")
           setSystemIllustrationStatus("failed")
@@ -2834,7 +2882,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setSystemIllustrationStatus("failed")
         setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
       })
-  }, [activeProjectId, subject, modules, visualStyle])
+  }, [activeProjectId, subject, modules, visualStyle, handleGenerateModuleImages])
 
   // ── Research ──
   const handleResearch = useCallback(async () => {
