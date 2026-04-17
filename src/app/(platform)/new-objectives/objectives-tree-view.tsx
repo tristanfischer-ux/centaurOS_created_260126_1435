@@ -296,7 +296,7 @@ export function ObjectivesTreeView({ objectives, strategicObjectives = [], selec
   if (strategicObjectives.length === 0) {
     const tree = buildTree(objectives)
     return (
-      <div className="space-y-0.5 bg-background rounded-xl border border-slate-100 p-2">
+      <div className="space-y-0.5 bg-background rounded-xl border border-border p-2">
         <TreeHeader />
         <Separator />
         {tree.map(node => (

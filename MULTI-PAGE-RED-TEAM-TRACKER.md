@@ -114,6 +114,28 @@ Per-page composite rubric score recorded. Rubric:
 
 **Founder-impact note:** A founder who creates a goal without a deadline no longer risks a white-screen page-crash later (although the null-guard was already present, verified by audit). The UUID gate means a malformed link in an email or bookmark returns a clean 404 instead of an ugly DB error. Hardcoded-colour cleanup means the Strategy page stays coherent if the design-token palette ever shifts.
 
+### 2. Objectives — `/objectives` (redirects to `/new-objectives`)
+
+**Founder question:** *"What's my top objective this quarter, how close am I, what's blocking it?"*
+
+**Pass A findings:**
+1. **[P1 — schema gap]** No Objectives ↔ Products link. A founder can't answer "Which product is this objective shipping?" → architectural, **deferred** for this pass (needs a migration + UI; too big for overnight).
+2. **[P2]** Silent `catch (error)` on delete at `objectives-board.tsx:339` — swallows error, generic toast. User can't debug.
+3. **[P2]** 2× empty `catch {}` in `gantt-view.tsx` (date-update at L736, move-task at L779) — silent failures on Gantt drag.
+4. **[P2]** Hardcoded `border-slate-200` (2×) in `strategic-objectives-manager.tsx` L257/L348 — design-token violation.
+5. **[P2]** Hardcoded `border-slate-100` in `objectives-tree-view.tsx:299` — same.
+
+**Pass B shipped:**
+- `objectives-board.tsx` delete catch: `console.error(...)` added AND toast now surfaces the actual error message when available (`err instanceof Error ? err.message : …`). A failed delete now tells the founder what went wrong.
+- `gantt-view.tsx`: two empty catches now log the underlying error and preserve the existing state-reset + toast. Founder dragging a Gantt bar that silently fails to save gets a logged trail.
+- `strategic-objectives-manager.tsx`: both `border-slate-200` instances → `border-border`.
+- `objectives-tree-view.tsx`: `border-slate-100` → `border-border`.
+
+**Commit:** bundled with next page's commit (tracker only batching).
+**Score:** Utility 4 / Integration 3 (Products link still missing) / Voice 5 / Robustness 4 (was 3) / A11y 4 → **Composite 4.0**.
+
+**Founder-impact note:** A failed "delete objective" click used to leave a founder squinting at "Failed to delete objective" with zero context — now they see the actual reason (RLS policy, FK constraint, etc.). Gantt-view drag-failures stop being invisible; a founder who thinks they moved a deadline will see something in dev tools if it didn't stick. Design-token cleanup means the strategy chip + objective tree stay coherent under theme shifts.
+
 
 ## Deferred / backlog
 

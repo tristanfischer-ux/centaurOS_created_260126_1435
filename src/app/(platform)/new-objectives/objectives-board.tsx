@@ -337,7 +337,9 @@ export function ObjectivesBoard({
         }
       }
     } catch (error) {
-      toast.error('Failed to delete objective')
+      console.error('[objectives-board] delete failed:', error)
+      const msg = error instanceof Error ? error.message : 'Failed to delete objective'
+      toast.error(msg)
     } finally {
       setIsDeleting(false)
     }

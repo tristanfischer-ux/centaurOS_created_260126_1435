@@ -733,7 +733,8 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], onSe
           }, 10000)
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('[gantt-view] date update failed:', err)
       setLocalDateOverrides(prev => {
         const next = { ...prev }
         delete next[task.id]
@@ -776,7 +777,8 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], onSe
         const targetObj = objectives.find(o => o.id === targetObjectiveId)
         toast.success(`Task moved to "${targetObj?.title || 'objective'}"`)
       }
-    } catch {
+    } catch (err) {
+      console.error('[gantt-view] moveTaskToObjective failed:', err)
       toast.error('Failed to move task')
     }
   }, [objectives])

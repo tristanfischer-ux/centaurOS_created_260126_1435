@@ -254,7 +254,7 @@ export function StrategicObjectivesManager({
                   'group flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all cursor-pointer',
                   isActive
                     ? 'border-international-orange bg-international-orange/5 text-international-orange shadow-sm'
-                    : 'border-slate-200 bg-background text-foreground hover:border-international-orange/40 hover:shadow-sm'
+                    : 'border-border bg-background text-foreground hover:border-international-orange/40 hover:shadow-sm'
                 )}
                 onClick={() => onFilterChange(isActive ? null : obj.id)}
               >
@@ -345,7 +345,7 @@ export function StrategicObjectivesManager({
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 text-xs text-muted-foreground border border-dashed border-slate-200 hover:border-international-orange/40 hover:text-foreground rounded-lg"
+              className="h-8 text-xs text-muted-foreground border border-dashed border-border hover:border-international-orange/40 hover:text-foreground rounded-lg"
               onClick={() => {
                 setIsAdding(true)
                 requestAnimationFrame(() => addInputRef.current?.focus())
