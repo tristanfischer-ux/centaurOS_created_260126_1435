@@ -612,12 +612,25 @@ async function uploadToStorage(
     throw new Error(`[XRayImageGen] Storage upload failed: ${error.message}`)
   }
 
-  // SECURITY: Use signed URL — generated engineering images are confidential
-  const { data: urlData } = await supabase.storage
+  // SECURITY: getPublicUrl is the correct choice here despite C3's original switch to
+  // createSignedUrl. Three reasons:
+  //   1. The xray-images bucket is `public=true`. A 1-hour signed URL prevents nothing —
+  //      `/object/public/{bucket}/{path}` resolves anyway for anyone with the path.
+  //   2. Access control IS the UUID in `{scanId}/{filename}`. scanId is a v4 UUID (122 bits of
+  //      entropy); the filename is a stable slug. Guessing a project's images requires guessing
+  //      its UUID — infeasible.
+  //   3. The URL is persisted into `cad_lab_projects.modules[].imageUrl` / `.system_illustration_url`
+  //      and rendered via <img src={imageUrl}> on subsequent loads. A signed URL that expires 1h
+  //      after generation breaks the project the next time the user opens it. Before commit
+  //      1c45905a a race condition masked this by wiping the column entirely; now that the race
+  //      is fixed, signed URLs would reach the DB and silently rot.
+  // If the bucket is ever flipped to `public=false`, switch to on-read resigning (not on-write),
+  // because storage objects outlive the 1h window.
+  const { data: urlData } = supabase.storage
     .from(STORAGE_BUCKET)
-    .createSignedUrl(path, 3600)
+    .getPublicUrl(path)
 
-  return urlData?.signedUrl ?? ''
+  return urlData.publicUrl
 }
 
 // ─── Reference Image Preparation ────────────────────────────────────

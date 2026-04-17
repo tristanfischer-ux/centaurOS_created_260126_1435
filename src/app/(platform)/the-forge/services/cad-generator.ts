@@ -681,12 +681,16 @@ async function uploadCadFile(
     throw new Error(`[XRayCadGen] Storage upload failed for ${filename}: ${error.message}`)
   }
 
-  // SECURITY: Use signed URL — generated CAD files are confidential
-  const { data: urlData } = await supabase.storage
+  // SECURITY: getPublicUrl on xray-images (bucket is public=true). Signed URLs expire in 1h
+  // and this URL is persisted to cad_lab_projects — it must outlive that window. Access
+  // control is the 122-bit UUID scanId in the path; URL guessing is infeasible. Keep aligned
+  // with image-generator.ts uploadToStorage. If xray-images is ever flipped to public=false,
+  // switch to on-read resigning (not on-write), because storage objects outlive any signed window.
+  const { data: urlData } = supabase.storage
     .from(STORAGE_BUCKET)
-    .createSignedUrl(path, 3600)
+    .getPublicUrl(path)
 
-  return urlData?.signedUrl ?? ''
+  return urlData.publicUrl
 }
 
 // ─── Public API ──────────────────────────────────────────────────────

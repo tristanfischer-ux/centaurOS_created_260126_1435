@@ -309,10 +309,12 @@ async function uploadAnalysisFile(
     throw new Error(`[XRayPremium] Storage upload failed: ${error.message}`)
   }
 
-  // SECURITY: Use signed URL — premium analysis results are confidential
-  const { data: urlData } = await supabase.storage
+  // SECURITY: getPublicUrl on xray-images (public=true). URL is persisted and rendered later,
+  // so signed URLs would rot after 1h. Access control = UUID in path. See image-generator.ts
+  // uploadToStorage for the full reasoning.
+  const { data: urlData } = supabase.storage
     .from(STORAGE_BUCKET)
-    .createSignedUrl(path, 3600)
+    .getPublicUrl(path)
 
-  return urlData?.signedUrl ?? ''
+  return urlData.publicUrl
 }
