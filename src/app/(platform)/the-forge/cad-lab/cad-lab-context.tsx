@@ -1002,6 +1002,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const isGeneratingImagesRef = useRef(false)
   useEffect(() => { isGeneratingImagesRef.current = isGeneratingImages }, [isGeneratingImages])
 
+  // INTENT: Synchronous guard against concurrent hero illustration retries.
+  // Mirrors the existing isGeneratingImagesRef pattern — setState doesn't
+  // flush synchronously, so React batching allows a double-click through the
+  // gap. Set at entry, cleared when the retry settles (success, failure, or
+  // unexpected error).
+  const systemIllustrationStatusRef = useRef<"idle" | "generating" | "complete" | "failed">("idle")
+  useEffect(() => { systemIllustrationStatusRef.current = systemIllustrationStatus }, [systemIllustrationStatus])
+
+  // INTENT: Synchronous guard against concurrent "Regenerate illustrations"
+  // clicks on the Specify stale-drawings card. See handleRegenerateDrawingsAfterRevision.
+  const isRegeneratingImagesRef = useRef(false)
+  useEffect(() => { isRegeneratingImagesRef.current = isRegeneratingImages }, [isRegeneratingImages])
+
   // INTENT: Prevents auto-restore from firing twice in React StrictMode.
   const isRestoringRef = useRef(false)
 
@@ -1925,11 +1938,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
   const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string, moduleCrops?: Map<string, string>, heroUrl?: string) => {
+    // SECURITY: Synchronous in-flight guard. Without this, double-clicking
+    // any retry button fires concurrent pipelines that race on Supabase
+    // upserts, duplicate AI cost, and last-write-wins the modules snapshot.
+    if (isGeneratingImagesRef.current) {
+      console.warn("[CAD-LAB] Image generation already in flight — ignoring duplicate call")
+      return
+    }
     const projectId = explicitProjectId ?? activeProjectId
     if (modulesToProcess.length === 0 || !projectId) {
       if (!projectId) console.warn("[CAD-LAB] handleGenerateModuleImages skipped — no project ID")
       return
     }
+    isGeneratingImagesRef.current = true
     setIsGeneratingImages(true)
     setImageGenProgress({ completed: 0, total: modulesToProcess.length, failed: 0, phase: "generating" })
 
@@ -2279,6 +2300,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       moduleTimeouts.clear()
     }
     setIsGeneratingImages(false)
+    // Release the synchronous in-flight guard paired with the entry check.
+    isGeneratingImagesRef.current = false
     setImageGenProgress(null)
   }, [activeProjectId, startOp, updateOp, completeOp, failOp])
 
@@ -2333,6 +2356,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // specs, then regenerates per-module images. Skips hero regen (layout unchanged).
   const handleRegenerateDrawingsAfterRevision = useCallback(async () => {
     if (modules.length === 0 || !activeProjectId) return
+    // SECURITY: Double-click guard on the Specify "Regenerate illustrations"
+    // button. Each regen chain fires a 240s Opus reconcile call + a module
+    // image pipeline; without this guard a second click fires another full
+    // chain in parallel, duplicating cost + risking state races.
+    if (isRegeneratingImagesRef.current) {
+      console.warn("[CAD-LAB] Drawings regeneration already in flight — ignoring duplicate call")
+      return
+    }
+    isRegeneratingImagesRef.current = true
     setIsRegeneratingImages(true)
     addProgressLine("Re-reconciling design for updated image prompts...")
 
@@ -2397,6 +2429,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       toast.error("Drawing regeneration failed — try again")
     } finally {
       setIsRegeneratingImages(false)
+      // Release the synchronous in-flight guard paired with the entry check.
+      isRegeneratingImagesRef.current = false
     }
   }, [modules, activeProjectId, subject, decompositionConnections, visualStyle, systemIllustrationUrl, handleGenerateModuleImages, handleRefreshModuleImages, addProgressLine])
 
@@ -2917,6 +2951,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // 2026-04-17 on recovery UI + terminal error states.
   const handleRetryIllustration = useCallback(() => {
     if (!activeProjectId) return
+    // SECURITY: Double-click guard. Two concurrent hero retries race on the
+    // same storage path and both eventually chain module-image regen.
+    if (systemIllustrationStatusRef.current === "generating") {
+      console.warn("[CAD-LAB] System illustration retry already in flight — ignoring duplicate call")
+      return
+    }
+    systemIllustrationStatusRef.current = "generating"
     setSystemIllustrationStatus("generating")
     setSystemIllustrationError(null)
     generateCadLabSystemIllustrationAction(
@@ -3341,6 +3382,25 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     })
     setReferenceImages([])
     setReferenceDocuments([])
+
+    // INTENT: The previous reset missed 8 state slices that then leaked
+    // across project boundaries. If a user loaded Project A, clicked
+    // "new project" (handleReset), and started Project B, fields like
+    // reviewSkipped / aiCostEstimates / revisedModuleIds were carried over
+    // — meaning Project B could land with stale cost estimates keyed by
+    // Project A's module ids, or skip-reviews state that made
+    // canProceedToSource true before Project B had any reviews.
+    // Add every non-blobbed state that persists across the reset.
+    setReviewSkipped(false)
+    setRevisedModuleIds(new Set())
+    setCheckpointAcknowledged(false)
+    setAiCostEstimates({})
+    setPartCategoryOverrides({})
+    setInterfaceContracts([])
+    setDecompositionConnections([])
+    setUnmatchedPorts({ outputs: [], inputs: [] })
+    setImagesGeneratedAtRevision(1)
+    setDesignRevision(1)
   }, [])
 
   // ── Load a saved project ──

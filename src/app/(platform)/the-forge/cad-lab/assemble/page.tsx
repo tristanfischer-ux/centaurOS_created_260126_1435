@@ -133,10 +133,15 @@ export default function AssemblePage(): React.ReactNode {
   // DECISION: Exit briefing for assemble not wired yet — no assembly completion gate exists.
   // When the gate is added, use useStageBriefing({ stage: "assemble", variant: "exit", ... }).
 
-  // Gate: redirect to Source if prerequisites are missing
+  // Gate: redirect to the correct earlier stage when prerequisites are missing.
+  // GOTCHA: Previously we redirected to Source, but Source itself redirects
+  // to Specify when specifiedModuleCount === 0, creating a Specify→Source→
+  // Specify ping-pong. Send the user back to the actual blocking stage.
   useEffect(() => {
-    if (!hasResearch || specifiedModuleCount === 0) {
-      router.replace(FORGE_ROUTES.cadLabSource)
+    if (!hasResearch) {
+      router.replace(FORGE_ROUTES.cadLab)
+    } else if (specifiedModuleCount === 0) {
+      router.replace(FORGE_ROUTES.cadLabSpecify)
     }
   }, [hasResearch, specifiedModuleCount, router])
 
