@@ -664,7 +664,55 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Specialist reviews (lifted from Build/Specify pages for persistence) ──
   const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
-  const [pendingReviewKeys, setPendingReviewKeys] = useState<Set<string>>(new Set())
+
+  // INTENT: pendingReviewKeys persisted to sessionStorage keyed by projectId.
+  // Without this, F5 during a batch review dropped the pending flag — reviews
+  // in flight either double-fired on retry or appeared stuck with no CTA.
+  // sessionStorage (not localStorage) because pending state shouldn't survive
+  // a browser close — the request will have completed or timed out by then.
+  const pendingReviewStorageKey = activeProjectId ? `forge-pending-reviews-${activeProjectId}` : null
+
+  const [pendingReviewKeys, setPendingReviewKeys] = useState<Set<string>>(() => {
+    if (!pendingReviewStorageKey || typeof window === "undefined") return new Set()
+    try {
+      const stored = sessionStorage.getItem(pendingReviewStorageKey)
+      if (stored) return new Set(JSON.parse(stored) as string[])
+    } catch (err) {
+      console.warn("[CAD-LAB] Failed to hydrate pendingReviewKeys:", err)
+    }
+    return new Set()
+  })
+
+  // Persist on every change.
+  useEffect(() => {
+    if (!pendingReviewStorageKey || typeof window === "undefined") return
+    try {
+      if (pendingReviewKeys.size === 0) {
+        sessionStorage.removeItem(pendingReviewStorageKey)
+      } else {
+        sessionStorage.setItem(pendingReviewStorageKey, JSON.stringify([...pendingReviewKeys]))
+      }
+    } catch (err) {
+      console.warn("[CAD-LAB] Failed to persist pendingReviewKeys:", err)
+    }
+  }, [pendingReviewStorageKey, pendingReviewKeys])
+
+  // Rehydrate when the project changes (mirrors the Source-page rehydrate).
+  const prevPendingProjectIdRef = useRef<string | null>(activeProjectId)
+  useEffect(() => {
+    if (activeProjectId === prevPendingProjectIdRef.current) return
+    prevPendingProjectIdRef.current = activeProjectId
+    if (!pendingReviewStorageKey || typeof window === "undefined") {
+      setPendingReviewKeys(new Set())
+      return
+    }
+    try {
+      const stored = sessionStorage.getItem(pendingReviewStorageKey)
+      setPendingReviewKeys(stored ? new Set(JSON.parse(stored) as string[]) : new Set())
+    } catch {
+      setPendingReviewKeys(new Set())
+    }
+  }, [activeProjectId, pendingReviewStorageKey])
 
   const markReviewPending = useCallback((moduleId: string, specialistId: string) => {
     setPendingReviewKeys(prev => new Set(prev).add(`${moduleId}:${specialistId}`))
@@ -2195,21 +2243,59 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (!fullModuleIndex.has(mod.id)) fullModuleIndex.set(mod.id, mod)
     }
 
+    // Known directional prefix → which side is the primary, and which flip axis
+    // the pair is symmetric on. Fore/Aft intentionally omitted: front and back
+    // of a vehicle (cockpit vs tail) are almost never true mirror images.
+    // Upper/Lower and Top/Bottom are retained despite the semantic risk
+    // (e.g. "Upper Wing Skin" vs "Lower Wing Skin" are the two faces of the
+    // same wing, not port/starboard equivalents) — the fallback regex only
+    // fires when explicit `mirrorOf` isn't set, so the LLM can opt out by
+    // naming those kinds of parts without the directional prefix.
+    const DIRECTIONAL_PAIRS: Array<{
+      primary: string
+      mirror: string
+      axis: 'horizontal' | 'vertical'
+    }> = [
+      { primary: 'Left', mirror: 'Right', axis: 'horizontal' },
+      { primary: 'Port', mirror: 'Starboard', axis: 'horizontal' },
+      { primary: 'Upper', mirror: 'Lower', axis: 'vertical' },
+      { primary: 'Top', mirror: 'Bottom', axis: 'vertical' },
+    ]
+    const DIRECTIONAL_RE = new RegExp(
+      `^(${DIRECTIONAL_PAIRS.flatMap(p => [p.primary, p.mirror]).join('|')})\\s+(.+)$`,
+      'i',
+    )
+    const axisForPrimary = (primaryWord: string): 'horizontal' | 'vertical' => {
+      const pair = DIRECTIONAL_PAIRS.find(p => p.primary.toLowerCase() === primaryWord.toLowerCase())
+      return pair?.axis ?? 'horizontal'
+    }
+
     const mirrorMap = new Map<string, string>() // mirrorId → primaryId
+    const mirrorAxisByMirrorId = new Map<string, 'horizontal' | 'vertical'>()
     for (const mod of modulesToProcess) {
       if (mod.mirrorOf && fullModuleIndex.has(mod.mirrorOf)) {
         mirrorMap.set(mod.id, mod.mirrorOf)
+        // Explicit mirrorOf doesn't carry axis info — infer from the primary's
+        // name; fall back to horizontal (port/starboard is the most common
+        // engineering pair).
+        const primary = fullModuleIndex.get(mod.mirrorOf)
+        const primaryMatch = primary?.name.match(DIRECTIONAL_RE)
+        mirrorAxisByMirrorId.set(
+          mod.id,
+          primaryMatch ? axisForPrimary(primaryMatch[1]) : 'horizontal',
+        )
       }
     }
-    // Fallback: detect implicit mirror pairs via Left/Right naming pattern.
+    // Fallback: detect implicit mirror pairs via directional naming pattern.
     // We scan the FULL module list for twins, not just modulesToProcess, so a
-    // lone retry of a Right module can still locate its Left primary.
+    // lone retry of a mirror module can still locate its primary.
     if (mirrorMap.size === 0) {
+      // Group by (base name without prefix) → the two variants that share it
       const byBaseName = new Map<string, CadLabModule[]>()
       for (const mod of fullModuleIndex.values()) {
-        const match = mod.name.match(/^(Left|Right)\s+(.+)$/i)
+        const match = mod.name.match(DIRECTIONAL_RE)
         if (match) {
-          const baseName = match[2]
+          const baseName = match[2].toLowerCase()
           const group = byBaseName.get(baseName) ?? []
           group.push(mod)
           byBaseName.set(baseName, group)
@@ -2217,14 +2303,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
       const processingIds = new Set(modulesToProcess.map(m => m.id))
       for (const [, group] of byBaseName) {
-        if (group.length === 2) {
-          const left = group.find(m => m.name.match(/^Left\s/i))
-          const right = group.find(m => m.name.match(/^Right\s/i))
-          // Only register the pair if the RIGHT side is actually in the batch
-          // we're about to process — otherwise we'd needlessly orchestrate
-          // mirror logic for a batch that doesn't contain any mirrors.
-          if (left && right && processingIds.has(right.id)) {
-            mirrorMap.set(right.id, left.id)
+        if (group.length !== 2) continue
+        // Identify which member is the primary and which is the mirror by
+        // matching directional words. Skip groups that don't map to a known
+        // pair (e.g. "Left X" + "Upper X" — cross-axis, not a mirror).
+        for (const { primary, mirror, axis } of DIRECTIONAL_PAIRS) {
+          const primaryMember = group.find(m => new RegExp(`^${primary}\\s`, 'i').test(m.name))
+          const mirrorMember = group.find(m => new RegExp(`^${mirror}\\s`, 'i').test(m.name))
+          if (primaryMember && mirrorMember && processingIds.has(mirrorMember.id)) {
+            mirrorMap.set(mirrorMember.id, primaryMember.id)
+            mirrorAxisByMirrorId.set(mirrorMember.id, axis)
+            break
           }
         }
       }
@@ -2265,26 +2354,28 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       const primaryImage = primaryId ? primaryImageUrls.get(primaryId) : undefined
 
       // INTENT: If this module is a mirror and its primary succeeded, flip
-      // the primary image horizontally (left↔right) and upload it as this
-      // module's own asset. Previously we reused the primary URL verbatim
-      // which made paired cards look literally identical; sharp.flop()
-      // produces a true port/starboard mirror. On any failure we fall back
-      // to the old URL-copy so we never ship worse than before.
+      // the primary image along the pair's axis of symmetry (horizontal for
+      // Left/Right and Port/Starboard; vertical for Upper/Lower and
+      // Top/Bottom) and upload it as this module's own asset. Previously we
+      // reused the primary URL verbatim which made paired cards look
+      // literally identical. On any failure we fall back to the old URL-copy
+      // so we never ship worse than before.
       if (primaryImage && projectId) {
         let mirroredUrl = primaryImage.url
-        let stepLabel = `${mod.name} (mirrored)`
+        const axis = mirrorAxisByMirrorId.get(mod.id) ?? 'horizontal'
+        let stepLabel = `${mod.name} (${axis} mirror)`
         try {
-          const flipRes = await flipCadLabImageForMirrorAction(projectId, mod.id, primaryImage.url)
+          const flipRes = await flipCadLabImageForMirrorAction(projectId, mod.id, primaryImage.url, axis)
           if ('imageUrl' in flipRes) {
             mirroredUrl = flipRes.imageUrl
-            console.log(`[CAD-LAB] Flipped primary ${primaryId} → mirror ${mod.id}`)
+            console.log(`[CAD-LAB] Flipped primary ${primaryId} → mirror ${mod.id} (${axis})`)
           } else {
             console.warn(`[CAD-LAB] Flip failed for mirror ${mod.id}, falling back to URL copy: ${flipRes.error}`)
-            stepLabel = `${mod.name} (mirrored, flip fallback)`
+            stepLabel = `${mod.name} (${axis} mirror, flip fallback)`
           }
         } catch (err) {
           console.warn(`[CAD-LAB] Flip threw for mirror ${mod.id}, falling back to URL copy`, err)
-          stepLabel = `${mod.name} (mirrored, flip fallback)`
+          stepLabel = `${mod.name} (${axis} mirror, flip fallback)`
         }
         const update: Partial<CadLabModule> = {
           imageUrl: mirroredUrl,
@@ -3456,6 +3547,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Reset ──
   const handleReset = useCallback(() => {
+    // Capture the departing project id BEFORE state is cleared — we'll use
+    // it to sweep the per-project localStorage keys owned by Source + Assemble.
+    const departingProjectId = activeProjectIdRef.current
+
     // Flush any pending debounced save before clearing state
     if (savePendingRef.current) {
       clearTimeout(savePendingRef.current)
@@ -3464,6 +3559,32 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (typeof window !== "undefined") {
       localStorage.removeItem(CAD_LAB_ACTIVE_PROJECT_KEY)
       localStorage.removeItem(CAD_LAB_DRAFT_SUBJECT_KEY)
+
+      // INTENT: Source + Assemble pages cache per-project state in localStorage
+      // under these prefixes. Resetting the CAD Lab context without sweeping
+      // these keys leaks state across project boundaries: Project B could
+      // inherit Project A's supplier matches / shortlist / buy-part results /
+      // assembly tiers / branding / shipping until the localStorage value
+      // expires naturally (never). Sweep exactly the keys for the departing
+      // project — leave other projects' caches alone.
+      if (departingProjectId) {
+        const perProjectKeys = [
+          `forge-supplier-matches-${departingProjectId}`,
+          `forge-supplier-shortlist-v2-${departingProjectId}`,
+          `forge-supplier-shortlist-v3-${departingProjectId}`,
+          `forge-supplier-rfqs-${departingProjectId}`,
+          `forge-buy-search-v7-${departingProjectId}`,
+          `forge-assembly-matches-${departingProjectId}`,
+          `forge-assembly-tiers-${departingProjectId}`,
+          `forge-assembly-branding-${departingProjectId}`,
+          `forge-assembly-shipping-${departingProjectId}`,
+        ]
+        for (const key of perProjectKeys) {
+          try { localStorage.removeItem(key) } catch (e) { console.warn("[CAD-LAB] reset localStorage sweep failed for", key, e) }
+        }
+        // sessionStorage: pending reviews (see pendingReviewKeys persistence)
+        try { sessionStorage.removeItem(`forge-pending-reviews-${departingProjectId}`) } catch (e) { console.warn("[CAD-LAB] reset sessionStorage sweep failed", e) }
+      }
     }
     setSubject("")
     setResearchResult(null)

@@ -368,12 +368,39 @@ export function SpecialistReviewPanel({
     // for rendering, which can be several MB total and exceed Next.js's
     // 1MB server action body limit.
     const buildSlimRequest = useCallback((specialistId: string): ReviewRequest => {
-        const slimModules = allModules.map(m => {
-            if (!m.result) return m
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { svgIso, svgTop, svgFront, svgBack, svgRight, svgLeft, svgExploded, ...rest } = m.result
-            return { ...m, result: rest }
-        })
+        // INTENT: Strip to the ReviewModuleInput shape — only the fields the
+        // prompt builder in buildCadLabReviewContext reads. Drops imageUrl,
+        // imageBase64, svgUrls, templateMatchResult, moduleImagePrompt,
+        // conceptSnapshot, costOverrides, result.svg* and result.code which
+        // together can push the Flight payload over 4MB on 10+ module projects
+        // post-image-gen. Per forgeos-rules.md R3.
+        const slimModules: ReviewRequest["allModules"] = allModules.map((m) => ({
+            id: m.id,
+            name: m.name,
+            purpose: m.purpose,
+            status: m.status,
+            leadWeeks: m.leadWeeks,
+            keyParts: m.keyParts,
+            inputs: m.inputs,
+            outputs: m.outputs,
+            description: m.description,
+            whyItMatters: m.whyItMatters,
+            failureModes: m.failureModes,
+            unknowns: m.unknowns,
+            interfaceDefinition: m.interfaceDefinition,
+            result: m.result
+                ? {
+                      bbox: m.result.bbox,
+                      massGrams: m.result.massGrams,
+                      volumeMm3: m.result.volumeMm3,
+                      fillRatio: m.result.fillRatio,
+                      massProperties: m.result.massProperties,
+                      dfm: m.result.dfm,
+                      validationWarnings: m.result.validationWarnings,
+                      assumptions: m.result.assumptions,
+                  }
+                : undefined,
+        }))
 
         return {
             projectId,

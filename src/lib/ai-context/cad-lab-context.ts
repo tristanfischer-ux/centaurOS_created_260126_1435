@@ -70,11 +70,39 @@ Use \`lookup_material\` and \`lookup_process\` for real data.`,
 
 // ─── Context Building ───────────────────────────────────────────────
 
+/**
+ * Lean shape the review context reads — avoids dragging image binary data
+ * (imageUrl, imageBase64, svgUrls, result.svg*, result.code, templateMatchResult,
+ * moduleImagePrompt, conceptSnapshot, costOverrides) through React Flight.
+ * Mirrors ReviewModuleInput in cad-lab-reviews.ts.
+ */
+type LeanCadLabResult = Pick<
+    NonNullable<CadLabModule["result"]>,
+    "bbox" | "massGrams" | "volumeMm3" | "fillRatio" | "massProperties" | "dfm" | "validationWarnings" | "assumptions"
+>
+
+export interface CadLabReviewModule {
+    id: string
+    name: string
+    purpose: string
+    status: CadLabModule["status"]
+    leadWeeks: number
+    keyParts: string[]
+    inputs: string[]
+    outputs: string[]
+    description: string
+    whyItMatters: string
+    failureModes: string[]
+    unknowns: string[]
+    interfaceDefinition?: string
+    result?: LeanCadLabResult
+}
+
 export interface CadLabReviewContext {
     /** The specific module being reviewed */
-    module: CadLabModule
+    module: CadLabReviewModule
     /** All modules in the project (for system-level context) */
-    allModules: CadLabModule[]
+    allModules: CadLabReviewModule[]
     /** Research report text */
     researchReport?: string
     /** Design brief from diagnostics */

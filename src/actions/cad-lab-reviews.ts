@@ -65,12 +65,46 @@ const REVIEW_SPECIALISTS = new Set([
 
 // ─── Public API ─────────────────────────────────────────────────────
 
+/**
+ * Lean shape of CadLabModule for review payloads — keeps only the fields
+ * buildCadLabReviewContext actually reads. Drops imageUrl, imageBase64,
+ * svgUrls, templateMatchResult, moduleImagePrompt, conceptSnapshot,
+ * costOverrides and the heavy result.svg* / result.code fields.
+ *
+ * Per forgeos-rules.md R3 (React Flight 4MB limit). On a 10+ module project
+ * post-image-gen the full CadLabModule shape can serialize to 5-10 MB.
+ *
+ * Uses `Pick` on the full CadLabModule["result"] so the lean `result`
+ * subset tracks upstream additions to the text/numeric properties without
+ * accidentally reintroducing the binary SVG / code fields.
+ */
+type LeanResultFields = "bbox" | "massGrams" | "volumeMm3" | "fillRatio" | "massProperties" | "dfm" | "validationWarnings" | "assumptions"
+type LeanCadLabResult = Pick<NonNullable<CadLabModule["result"]>, LeanResultFields>
+
+export interface ReviewModuleInput {
+    id: string
+    name: string
+    purpose: string
+    status: CadLabModule["status"]
+    leadWeeks: number
+    keyParts: string[]
+    inputs: string[]
+    outputs: string[]
+    description: string
+    whyItMatters: string
+    failureModes: string[]
+    unknowns: string[]
+    interfaceDefinition?: string
+    /** Lean subset of result — bbox + mass properties + DFM summary only. */
+    result?: LeanCadLabResult
+}
+
 export interface ReviewRequest {
     projectId: string
     moduleId: string
     specialistId: string
     /** All modules in the project (for system-level context) */
-    allModules: CadLabModule[]
+    allModules: ReviewModuleInput[]
     /** Design brief from diagnostics */
     designBrief?: CadLabDesignBrief
     /** Diagnostic answers keyed by module ID */
@@ -861,7 +895,13 @@ export interface RevisedModuleFields {
 }
 
 export interface RevisionRequest {
-    modules: CadLabModule[]
+    // INTENT: Lean module shape — same 8 fields reviseModulesFromReviews uses.
+    // Full CadLabModule[] would push post-image-gen projects over the 4MB
+    // React Flight limit because modules carry imageUrl/result.svg*/imageBase64/
+    // templateMatchResult/conceptSnapshot/costOverrides. The prompt at
+    // reviseModulesFromCheckpoints only reads {id, name, purpose, description,
+    // keyParts, whyItMatters, failureModes, unknowns}.
+    modules: RevisionModuleInput[]
     checkpoints: Record<string, DecompositionCheckpoint>
     researchReport: string
     projectSubject: string
