@@ -158,6 +158,9 @@ export function ProductListView({ products }: ProductListViewProps) {
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>Products</h1>
+          <Badge variant="brand" size="sm" className="ml-1 uppercase tracking-wide">
+            Beta
+          </Badge>
         </div>
         <p className={typography.pageSubtitle}>
           Where your designs, market research, and unit economics come together.
