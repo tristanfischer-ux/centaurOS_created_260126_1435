@@ -58,7 +58,7 @@ export const STAGES: StageDefinition[] = [
   {
     id: "design",
     label: "Design",
-    mobileLabel: "D",
+    mobileLabel: "Design",
     icon: Search,
     href: FORGE_ROUTES.cadLab,
     description: "Describe your product. Get research, module decomposition, and AI blueprint illustrations.",
@@ -68,7 +68,7 @@ export const STAGES: StageDefinition[] = [
   {
     id: "specify",
     label: "Specify",
-    mobileLabel: "S",
+    mobileLabel: "Spec",
     icon: ClipboardList,
     href: FORGE_ROUTES.cadLabSpecify,
     description: "Detailed specs per module with specialist review gate.",
@@ -78,7 +78,7 @@ export const STAGES: StageDefinition[] = [
   {
     id: "source",
     label: "Source",
-    mobileLabel: "$",
+    mobileLabel: "Source",
     icon: ShoppingCart,
     href: FORGE_ROUTES.cadLabSource,
     description: "Match suppliers, create RFQs, compare quotes, and award contracts.",
@@ -88,7 +88,7 @@ export const STAGES: StageDefinition[] = [
   {
     id: "assemble",
     label: "Assemble",
-    mobileLabel: "A",
+    mobileLabel: "Build",
     icon: Package,
     href: FORGE_ROUTES.cadLabAssemble,
     description: "Track manufacturing orders, receive parts, and manage assembly.",
@@ -176,6 +176,7 @@ export function CadLabBottomNav(): React.ReactNode {
               <button
                 key={stage.id}
                 onClick={() => setPreviewStageId(stage.id)}
+                aria-label={`${stage.label} (locked — tap to preview)`}
                 className="flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground/50 transition-opacity hover:opacity-70"
               >
                 <Icon className="h-4 w-4" />

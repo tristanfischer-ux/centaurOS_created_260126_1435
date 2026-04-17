@@ -650,11 +650,43 @@ export default function SpecifyPage(): React.ReactNode {
       </div>
 
       {/* ── Tab navigation ── */}
+      {/* a11y: role="tablist" + role="tab" + aria-selected/controls gives
+          screen readers proper tab semantics. Left/Right arrow handlers
+          match ARIA APG pattern so keyboard users can cycle tabs. */}
       <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
-        <div className="flex items-center gap-2">
-          {TABS.map((tab) => (
+        <div
+          role="tablist"
+          aria-label="Specify stage sections"
+          className="flex items-center gap-2"
+        >
+          {TABS.map((tab, idx) => (
             <button
               key={tab.id}
+              id={`specify-tab-${tab.id}`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`specify-panel-${tab.id}`}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                  e.preventDefault()
+                  const delta = e.key === "ArrowRight" ? 1 : -1
+                  const nextIdx = (idx + delta + TABS.length) % TABS.length
+                  const nextTab = TABS[nextIdx]
+                  handleTabClick(nextTab.id)
+                  // Move focus to the newly active tab so keyboard users see it
+                  document.getElementById(`specify-tab-${nextTab.id}`)?.focus()
+                } else if (e.key === "Home") {
+                  e.preventDefault()
+                  handleTabClick(TABS[0].id)
+                  document.getElementById(`specify-tab-${TABS[0].id}`)?.focus()
+                } else if (e.key === "End") {
+                  e.preventDefault()
+                  const last = TABS[TABS.length - 1]
+                  handleTabClick(last.id)
+                  document.getElementById(`specify-tab-${last.id}`)?.focus()
+                }
+              }}
               onClick={() => handleTabClick(tab.id)}
               className={cn(
                 "px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors",
@@ -683,7 +715,7 @@ export default function SpecifyPage(): React.ReactNode {
       <AnimatePresence mode="wait">
         {/* ═══ Overview tab ═══ */}
         {activeTab === "overview" && (
-          <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="overview" role="tabpanel" id="specify-panel-overview" aria-labelledby="specify-tab-overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             {/* Product overview card — always visible so user can add/edit */}
             <ProductOverviewCard
               overview={productOverview}
@@ -914,7 +946,7 @@ export default function SpecifyPage(): React.ReactNode {
 
         {/* ═══ Module Specs tab ═══ */}
         {activeTab === "specs" && (
-          <motion.div key="specs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="specs" role="tabpanel" id="specify-panel-specs" aria-labelledby="specify-tab-specs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             {/* AI pre-fill banner */}
             {aiPrefilled && (
               <div className="flex items-center gap-2 p-2.5 bg-status-info-light rounded text-xs text-status-info-dark">
@@ -1420,7 +1452,7 @@ export default function SpecifyPage(): React.ReactNode {
 
         {/* ═══ Specialist Review tab ═══ */}
         {activeTab === "review" && (
-          <motion.div key="review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="review" role="tabpanel" id="specify-panel-review" aria-labelledby="specify-tab-review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             {/* Gate status */}
             <Card className={cn(allDiagnosticsComplete ? "border-success/30" : "border-border")}>
               <CardContent className="pt-4 pb-4">
@@ -1724,7 +1756,7 @@ export default function SpecifyPage(): React.ReactNode {
 
         {/* ═══ Manufacturing Intelligence tab ═══ */}
         {activeTab === "mfg_intelligence" && (
-          <motion.div key="mfg_intelligence" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="mfg_intelligence" role="tabpanel" id="specify-panel-mfg_intelligence" aria-labelledby="specify-tab-mfg_intelligence" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             <ManufacturingIntelligenceTab
               modules={modules}
               diagnosticAnswers={diagnosticAnswers}
@@ -1736,7 +1768,7 @@ export default function SpecifyPage(): React.ReactNode {
 
         {/* ═══ Executive Review tab ═══ */}
         {activeTab === "executive_review" && (
-          <motion.div key="executive_review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="executive_review" role="tabpanel" id="specify-panel-executive_review" aria-labelledby="specify-tab-executive_review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             <ExecutiveReviewTab
               modules={modules}
               diagnosticAnswers={diagnosticAnswers}

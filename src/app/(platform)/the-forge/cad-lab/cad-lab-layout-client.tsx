@@ -222,7 +222,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 min-h-[44px] min-w-[44px] flex-shrink-0"
+                      className="h-11 w-11 flex-shrink-0"
                       onClick={() => handleDeleteProject(p.id)}
                       aria-label={`Delete ${p.subject}`}
                     >

@@ -121,7 +121,7 @@ export function ModuleImageCard({ module, onToggleExpand, onRetry, onReload, isR
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 min-h-[44px] min-w-[44px] shrink-0 text-muted-foreground hover:text-international-orange"
+              className="h-11 w-11 shrink-0 text-muted-foreground hover:text-international-orange"
               disabled={isReloading}
               onClick={(e) => { e.stopPropagation(); onReload(); }}
               aria-label={`Reload ${module.name}`}
