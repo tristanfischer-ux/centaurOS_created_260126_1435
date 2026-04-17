@@ -191,6 +191,30 @@ Per-page composite rubric score recorded. Rubric:
 
 **Founder-impact note:** A first-time user landing on an empty Cash Burn page used to see "Runway: Sustainable" — a comforting lie for an empty projection. Now it says "Runway: No data yet", prompting the founder to enter cash-in / cash-out rows. Screen-reader users can now hear slider values change as they drag. The bigger win (auto-sync from Products / Orders / Objectives) is on the backlog.
 
+### 6–8. Cash Out + Cash In + P&L — `/cash-burn/cash-out` · `/cash-burn/cash-in` · `/cash-burn/pnl`
+
+Batched — same audit patterns, same fixes ship together.
+
+**Founder questions:**
+- Cash Out: *"Where is my money going — and what can I cut?"*
+- Cash In: *"Where is my money coming from — and what can I accelerate?"*
+- P&L: *"Am I profitable yet? Which products drive it?"*
+
+**Pass A findings (across the three):**
+1. **[P1]** Both Cash Out (`cash-out-view.tsx:374`) and Cash In (`cash-in-view.tsx:523`) triggered `window.location.reload()` after a spreadsheet import success. This blows away unsaved state in other sections (opening-balance input, draft row edits, scroll position). Hard reload where a soft RSC refresh was sufficient. [Fixed]
+2. **[P2]** P&L Product tab empty state said *"Link cash in/out items to products to see per-product P&L"* — no button, no link. Founder had to remember where to go. [Fixed]
+3. **[P2]** `probabilityPct` fetched but not rendered on Cash In item rows (`cash-in-view.tsx:461`). Dead data-in-dead-out. [Deferred — UX call, may be intentional hiding]
+4. **[P3]** Briefing context strings format pence as pounds without thousands separators in multiple places — prose cosmetic only, not rendered as numbers. [Deferred]
+5. **[P2]** P&L COGS filter at `pnl-view.tsx:126` hardcodes `item.pnlCategory === 'cogs'`. Items with NULL pnlCategory are silently dropped from product P&L. [Deferred — needs documentation or a default]
+
+**Pass B shipped:**
+- Cash Out + Cash In: `window.location.reload()` → `router.refresh()` (useRouter from next/navigation). Soft RSC refresh preserves scroll and any unsaved state in other sections. Added `// INTENT:` comment explaining why.
+- P&L product empty state: now has two actionable links — "Tag revenue" → `/cash-burn/cash-in`, "Tag COGS" → `/cash-burn/cash-out`. Copy rewritten to make the mechanism explicit: *"Tag revenue and COGS items to a product in Cash In and Cash Out — per-product P&L will build itself as you go."*
+
+**Score (batched composite):** Utility 4 / Integration 3 (still siloed from Products) / Voice 5 / Robustness 4 (was 3, fixed the data-loss reloads) / A11y 4 → **Composite 4.0**.
+
+**Founder-impact note:** A founder mid-session entering cash items used to lose their work if they clicked Import — the page reloaded fresh. No more. On the P&L empty state, a founder seeing "no product-level data yet" now has two one-click paths to the fix instead of having to navigate away and back. The biggest gap (auto-attributing revenue from Orders, COGS from Products) is still architectural — on the backlog.
+
 
 ## Deferred / backlog
 

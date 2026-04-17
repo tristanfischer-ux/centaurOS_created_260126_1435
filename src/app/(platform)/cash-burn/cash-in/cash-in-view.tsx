@@ -8,6 +8,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap, Banknote, Loader2, Upload } from 'lucide-react'
@@ -53,6 +54,7 @@ const SOURCE_TYPE_CONFIG: Array<{
 ]
 
 export function CashInView({ initialItems, defaultScenario, hasError }: CashInViewProps) {
+  const router = useRouter()
   const [items, setItems] = useState<CashInItem[]>(initialItems)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -520,7 +522,10 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
         open={importOpen}
         onOpenChange={setImportOpen}
         kind="in"
-        onImported={() => { window.location.reload() }}
+        onImported={() => {
+          // INTENT: Soft RSC refresh preserves scroll + any open inputs.
+          router.refresh()
+        }}
       />
     </div>
   )

@@ -8,6 +8,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingDown, AlertTriangle, Zap, Upload } from 'lucide-react'
@@ -42,6 +43,7 @@ interface CashOutViewProps {
 }
 
 export function CashOutView({ initialItems, hasError, humanProfiles, companyContext }: CashOutViewProps) {
+  const router = useRouter()
   const [items, setItems] = useState<CashOutItem[]>(initialItems)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -371,7 +373,12 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
         open={importOpen}
         onOpenChange={setImportOpen}
         kind="out"
-        onImported={() => { window.location.reload() }}
+        onImported={() => {
+          // INTENT: Soft refresh via RSC so the founder keeps their scroll,
+          // any open dialogs, and unsaved edits in other sections. A full
+          // window.location.reload() was wiping mid-workflow state.
+          router.refresh()
+        }}
       />
     </div>
   )

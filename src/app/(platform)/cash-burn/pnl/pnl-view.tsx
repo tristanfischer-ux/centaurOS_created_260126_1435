@@ -330,11 +330,25 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
                     <Package className="h-5 w-5 text-muted-foreground" />
                   </div>
                 </div>
-                <div>
+                <div className="space-y-3 max-w-sm mx-auto">
                   <p className="text-sm font-medium text-foreground">No product-level data yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Link cash in/out items to products to see per-product P&L.
+                  <p className="text-sm text-muted-foreground">
+                    Tag revenue and COGS items to a product in Cash In and Cash Out — per-product P&amp;L will build itself as you go.
                   </p>
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    <Link
+                      href="/cash-burn/cash-in"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                    >
+                      Tag revenue
+                    </Link>
+                    <Link
+                      href="/cash-burn/cash-out"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                    >
+                      Tag COGS
+                    </Link>
+                  </div>
                 </div>
               </CardContent>
             </Card>
