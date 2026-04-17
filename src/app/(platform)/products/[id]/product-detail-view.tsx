@@ -213,7 +213,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         const refreshed = await getProduct(product.id)
         if (!cancelled && refreshed.data) {
           setProduct(refreshed.data)
-          toast.success(`COGS updated from Forge (${result.data.newCogsPence ? `£${(result.data.newCogsPence / 100).toFixed(2)}` : 'new estimate'})`)
+          toast.success(`${product.name}: COGS updated from The Forge${result.data.newCogsPence ? ` to £${(result.data.newCogsPence / 100).toFixed(2)} / unit` : ' with a new estimate'}.`)
 
           // FLOW: Auto-trigger fundability rescore → synthesis
           scoreFundability(product.id).then((fsResult) => {
@@ -311,7 +311,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   }, [product.id, editDescription])
 
   const handleDelete = React.useCallback(async () => {
-    if (!confirm('Delete this product? This cannot be undone.')) return
+    if (!confirm(`Remove ${product.name} from your products? You can create it again later, but iteration history and linked briefs will be cleared.`)) return
     setIsDeleting(true)
     try {
       const result = await deleteProduct(product.id)
@@ -504,7 +504,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         // INTENT: Re-fetch product to pick up lifecycle change (concept -> researching)
         const refreshed = await import('@/actions/products').then(m => m.getProduct(product.id))
         if (refreshed.data) setProduct(refreshed.data)
-        toast.success('Market assessment generated — review and validate the findings')
+        toast.success(`Market assessment ready for ${product.name}. Review the TAM, competitors, and pricing, then validate or refine.`)
 
         // FLOW: Auto-trigger synthesis after market assessment
         synthesizeProductStatus(product.id).then((synthResult) => {
@@ -531,7 +531,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         toast.error(result.error)
       } else if (result.data) {
         setProduct(result.data)
-        toast.success('Market assessment saved')
+        toast.success(`Market assessment saved for ${product.name}.`)
       }
     } catch {
       toast.error('Failed to save assessment')
@@ -605,7 +605,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         toast.error(result.error)
       } else if (result.data) {
         setSynthesis(result.data)
-        toast.success('Synthesis complete')
+        toast.success(`Synthesis updated — all four Pareto scores refreshed for ${product.name}.`)
       }
     } catch {
       toast.error('Synthesis failed')
@@ -683,7 +683,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
 
           if (allImproved) {
             setIterationResult('celebration')
-            setIterationResultMessage('All dimensions improved! Consider one more iteration or declare this product ready.')
+            setIterationResultMessage('Every dimension improved this round. Review the trade-offs and decide if another pass is worth the time.')
           } else if (anyRegressed) {
             const regressed = PARETO_DIMENSIONS.filter(d => curr[d] < prev[d])
             setIterationResult('warning')
@@ -1326,7 +1326,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                   </div>
                   <p className="text-sm font-medium text-foreground mb-1">No market assessment yet</p>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    Click &quot;Assess Market&quot; to generate research on market size, competitors, pricing, and opportunities for Priya to present.
+                    Run Assess Market to generate research on TAM, competitors, pricing, and opportunities you can take into your next pitch or planning session.
                   </p>
                 </div>
               </CardContent>

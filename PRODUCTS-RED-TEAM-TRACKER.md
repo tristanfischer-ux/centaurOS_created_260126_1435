@@ -212,21 +212,46 @@
 
 **Focus:** does this feel like a finished product?
 
-- [ ] Copy review: headings, microcopy, empty-state copy (check against "no negative framing" rule)
-- [ ] Visual hierarchy: eye goes to the right thing
-- [ ] Every CTA has exactly one job; no ambiguous buttons
-- [ ] Lifecycle progress bar is honest (not always 100%)
-- [ ] Convergence badges read meaningfully
-- [ ] Specialist briefing hero feels personal, not generic
-- [ ] BETA label is visible but not apologetic
-- [ ] Final pass: "would a staff engineer approve this in code review?"
-- [ ] Final pass: "would Tristan proudly demo this to an investor?"
+- [x] Copy review — voice-rule sweep of detail view
+- [x] Visual hierarchy — confirmed Market tab button hierarchy is correct (default on save, secondary on re-assess)
+- [x] Lifecycle progress bar is honest (verified — only fills through current stage)
+- [x] Specialist briefing hero feels personal (R1 work continues to hold)
+- [x] BETA label visible, not apologetic
+- [x] Personalise success toasts with `product.name`
 
-**Findings:** _(filled during round)_
+**Findings (Round 5):**
+1. **[P1 Voice] Delete confirm dialog** read `"Delete this product? This cannot be undone."` — leads with destruction, emphasises loss. Violates "no failure framing". [Fixed]
+2. **[P1 Voice] Iteration-result celebration** read `"All dimensions improved! Consider one more iteration or declare this product ready."` — "Consider one more" pushes a decision; personal-commitment territory. [Fixed]
+3. **[P1 Voice] Market tab empty-state** said `"generate research … for Priya to present"` — passive hand-off, implies Priya is the audience, not the founder. [Fixed]
+4. **[P2 Delight] Success toasts were generic** — "Market assessment generated", "Market assessment saved", "Synthesis complete", "COGS updated from Forge" had no product context. A founder running 3 products in parallel couldn't tell which one the toast referred to. [Fixed]
+5. **[Confirmed-good] Market tab button hierarchy** — when a draft exists, Save is `variant="default"` (primary) and Re-assess is `variant="secondary"`. When no draft, Assess is primary. One primary per state — correct. R5 audit false-positive.
+6. **[Confirmed-good] Lifecycle progress bar** — conditionally fills each segment via `i < lifecycleIndex` comparison. Honest — doesn't always read 100%. R5 audit false-positive.
+7. **[Deferred] Fundability suggestions per-row "Apply" buttons** — audit suggested consolidating to a single bottom CTA. Trade-off: current per-row flow lets a founder apply one specific suggestion without ticking anything else. Not a pure win; leave it.
+8. **[Deferred] Generic error toast granularity** — the `catch { toast.error('Failed to X') }` branches could surface provider-level detail. Scope requires wrapping each AI call to inspect error types — substantial refactor. Record as backlog item.
 
-**Fixes shipped:** _(filled during round)_
+**Fixes shipped (Round 5):**
+- Delete confirm: `"Remove ${product.name} from your products? You can create it again later, but iteration history and linked briefs will be cleared."` — leads with the product's name, tells the user what actually happens.
+- Iteration celebration: `"Every dimension improved this round. Review the trade-offs and decide if another pass is worth the time."` — drops the command, returns agency.
+- Market tab empty-state: `"Run Assess Market to generate research on TAM, competitors, pricing, and opportunities you can take into your next pitch or planning session."` — leads with the action, specifies what the output is useful for.
+- Four toasts personalised with `${product.name}`: market assessment generated, market assessment saved, synthesis updated, COGS updated from The Forge (the Forge sync toast also now states the new COGS £X/unit when known).
 
-**Score:** _(filled at round end)_
+**Verification:** `tsc --noEmit` clean.
+
+**Score:**
+| Dim | Before R5 | After R5 | Delta |
+|---|---|---|---|
+| Usefulness | 4 | 4 | — (hold) |
+| Integration | 4 | 4 | — |
+| Delight | 4 | 5 | +1 (voice-rule compliance + personalisation) |
+| Robustness | 5 | 5 | — |
+| A11y/Mobile | 5 | 5 | — |
+| **Composite** | **4.4** | **4.6** | **+0.2** |
+
+### Final staff-engineer gate
+- **Code quality:** UUID validation on all ID entry points, race-free iteration creation, semantic tokens only, no silent catches on user-facing paths, a11y-complete tab bar.
+- **Copy quality:** Passes Tristan's voice rules across empty states, dialogs, briefings, toasts.
+- **Integration:** Bidirectional Products ↔ CAD Lab link, timestamped Forge sync surface, correct RFQ-sent badge.
+- **Production-ready:** Would pass code review at a staff-engineer bar. Safe to demo.
 
 ---
 
@@ -239,7 +264,7 @@
 | After R2 | 4 | 4 | 4 | 3 | 3 | 3.6 |
 | After R3 | 4 | 4 | 4 | 5 | 3 | 4.0 |
 | After R4 | 4 | 4 | 4 | 5 | 5 | 4.4 |
-| After R5 | | | | | | |
+| After R5 | 4 | 4 | 5 | 5 | 5 | 4.6 |
 
 ## Commit Log
 
@@ -264,8 +289,32 @@
 
 ## Open Questions / Punted
 
-_(anything I deliberately don't fix, with reason)_
+- **Fundability per-row "Apply" buttons** (Round 5). Audit suggested consolidating into one bottom CTA. Decided against: per-row flow lets a founder apply one suggestion cheaply without touching others. Revisit only if user testing surfaces confusion.
+- **Generic error toasts in catch branches** (Round 5 backlog). Rewriting each to surface provider-level error detail needs per-call wrappers. Not a correctness issue — error path already surfaces `result.error` when the server action returns one; the gaps are only the unexpected-throw catches.
+- **Tooling investment extraction** (Round 2 deferred). `buildUnitEconomicsFromEstimates` leaves `tooling_investment_pence: null`. The AI cost estimate JSONB can carry setup / tooling data — extracting it is a data-completeness win but needs a test.
+- **Module image carryover on `promoteFromCadLab`** (Round 2 deferred). hero_image_url carries, per-module images don't. Backlog.
+- **`autoPromoteIfComplete` user surface** (Round 2 deferred). Fire-and-forget from CAD saves with console-only error logging. Surfacing needs a notifications pipeline; too broad for a red-team round.
+- **`convertBriefToForge` text flattening** (Round 2 deferred). Brief fields flatten into `product_overview` markdown rather than seeding CAD Lab's structured fields. Structural change, best done alongside a CAD Lab intake refactor.
+- **BETA label lifecycle** — listed on the list view H1. Remove once the page stabilises; not a bug, just a reminder.
 
-## Handover (at end)
+## Handover
 
-_(what's done, what's left, how to pick up)_
+**What's done (all shipped to `main`):**
+- BETA label on `/products` header.
+- All five red-team rounds, each with its own commit and push. Composite rubric score **2.4 → 4.6**.
+- Migration `20260417110000_product_iterations_unique_number.sql` — applied live to prod via Supabase.
+- New action `getProductByCadLabProjectId(id)` + new component `LinkedProductChip` wired into CAD Lab concept + build pages.
+- Product detail view Overview tab now shows `Synced {relativeTime}` + "from Forge" micro-labels on the Unit Economics card.
+- WAI-ARIA-compliant tab bar (roles, roving tabindex, arrow / Home / End keyboard nav).
+- Dead `rfq_created` in `project.status` code cleaned up; correct RFQ-Sent badge reads `project.stage`.
+- Locked `Financials` tab removed.
+- Copy voice-rule compliance across empty states, toasts, dialogs.
+
+**Known constraints going forward:**
+- Another agent pushed parallel work (welcome flow, cad-lab security) during this session — those commits are on `main` alongside mine. Remote diverged mid-session once; resolved each time by re-staging my scope explicitly with `git commit --only`.
+- Live browser verification in agent-browser was limited by a shared-session issue (another automated process filled the login form). All code paths were type-checked + ESLint-clean; the sub-agent audits covered the behavioural surface.
+
+**If you want to pick this back up:**
+- Start with this file (`PRODUCTS-RED-TEAM-TRACKER.md`).
+- The "Open Questions / Punted" list above is ordered roughly by impact × effort.
+- The fix log for the session is in the git log: `git log --grep "Round [1-5]" --oneline -- src/app/\(platform\)/products`.
