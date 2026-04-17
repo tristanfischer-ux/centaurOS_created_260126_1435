@@ -92,6 +92,18 @@ export async function matchProjectExperts(params: {
   context: "design" | "sourcing"
   useCase?: string
 }): Promise<{ experts: MatchedExpert[] }> {
+  // AUTH: reject unauthenticated callers. Internally this uses createAdminClient()
+  // via fetchListingExecutives / fetchProfileExecutives which bypass RLS, so
+  // without this gate any anonymous caller could enumerate the executive
+  // directory with full bios + verification status.
+  const { createClient } = await import("@/lib/supabase/server")
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    console.warn("[ExpertMatch] Rejected unauthenticated request")
+    return { experts: [] }
+  }
+
   const { processes, materials, context, useCase } = params
 
   // ── Fetch from all 3 sources in parallel ──

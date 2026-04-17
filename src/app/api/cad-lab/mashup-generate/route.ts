@@ -66,12 +66,16 @@ async function uploadCadAsset(
 
   if (error) throw new Error(`Failed to upload ${filename}: ${error.message}`)
 
-  const { data: publicUrl } = admin.storage
+  // SECURITY: confidential mashup output — signed URL (see generate-module/route.ts).
+  const { data: signed, error: signErr } = await admin.storage
     .from(CAD_LAB_STORAGE_BUCKET)
-    .getPublicUrl(path)
+    .createSignedUrl(path, 60 * 60 * 24 * 7)
+  if (signErr || !signed?.signedUrl) {
+    throw new Error(`Failed to sign URL for ${filename}: ${signErr?.message ?? "unknown"}`)
+  }
 
   return {
-    url: publicUrl.publicUrl,
+    url: signed.signedUrl,
     sizeKb: Math.round(buffer.length / 1024),
   }
 }

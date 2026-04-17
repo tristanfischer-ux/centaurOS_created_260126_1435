@@ -38,6 +38,20 @@ export interface SupplierDetail {
 export async function getSupplierDetail(listingId: string): Promise<SupplierDetail | null> {
   const supabase = await createClient()
 
+  // AUTH: defence in depth — marketplace_listings RLS restricts anon access
+  // as of 20260415100000, but we also require an authenticated caller here so
+  // the endpoint is never a public scraping surface for supplier-DB metadata.
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return null
+  }
+
+  // Defence in depth: reject obviously bad ids before hitting the DB
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!listingId || !UUID_RE.test(listingId)) {
+    return null
+  }
+
   const { data, error } = await supabase
     .from("marketplace_listings")
     .select(

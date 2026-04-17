@@ -18,6 +18,33 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
+ * Checks if a URL is safe for server-side fetching from a CAD Lab server action.
+ *
+ * @description Blocks SSRF by requiring the URL to be HTTPS and hosted on our
+ * own Supabase storage hostname. Without this, any server action that accepts
+ * a URL string from the client and fetches it (e.g. to rehydrate an image
+ * reference from Storage) is a vector to hit internal network endpoints like
+ * AWS IMDS at 169.254.169.254 or Supabase internal control-plane URLs.
+ *
+ * @param url - Client-supplied URL string
+ * @returns true if the URL is safe to fetch, false otherwise
+ */
+export function isSafeStorageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "https:") return false
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!supabaseUrl) return false
+    const expectedHost = new URL(supabaseUrl).hostname
+    // Accept the project's Supabase hostname exactly. Storage URLs for signed
+    // and public assets both use this hostname (path prefix is /storage/v1/).
+    return parsed.hostname === expectedHost
+  } catch {
+    return false
+  }
+}
+
+/**
  * Verifies that `projectId` is a valid UUID and belongs to `foundryId`.
  *
  * @param supabase - Authenticated (non-admin) Supabase client — the RLS client

@@ -27,7 +27,7 @@ import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
+import { ensureCadLabProjectOwnership, isSafeStorageUrl } from "@/lib/cad-lab/project-ownership"
 
 /** Lean return type for single-image generation — avoids React Flight serialization limits */
 interface ImageGenResult {
@@ -193,6 +193,14 @@ export async function generateCadLabSingleImageAction(
       let referenceBase64: string | undefined
 
       if (typeof visualStyleOrUrl === "string") {
+        // SECURITY: SSRF guard — server-side fetch is only allowed against
+        // our own Supabase storage hostname. Without this, a client could
+        // pass any URL (e.g. 169.254.169.254 metadata endpoints) and cause
+        // the server to issue an outbound fetch to that target.
+        if (!isSafeStorageUrl(visualStyleOrUrl)) {
+          console.warn("[CAD-LAB-IMAGES] Blocked visualStyle URL outside storage allowlist")
+          return { error: "Invalid visualStyle URL" }
+        }
         const res = await fetchWithTimeout(visualStyleOrUrl, {}, 5_000)
         if (res.ok) visualStyle = await res.json() as VisualStyleSpec
       } else {
@@ -202,6 +210,11 @@ export async function generateCadLabSingleImageAction(
       if (referenceBase64OrUrl) {
         // DECISION: If it starts with http, it's a URL to fetch. Otherwise it's raw base64.
         if (referenceBase64OrUrl.startsWith("http")) {
+          // SECURITY: SSRF guard on reference-image URL (see above).
+          if (!isSafeStorageUrl(referenceBase64OrUrl)) {
+            console.warn("[CAD-LAB-IMAGES] Blocked reference URL outside storage allowlist")
+            return { error: "Invalid reference URL" }
+          }
           const res = await fetchWithTimeout(referenceBase64OrUrl, {}, 10_000)
           if (res.ok) {
             const buf = await res.arrayBuffer()
@@ -356,6 +369,13 @@ export async function fetchAndCropReferenceAction(
   url: string,
 ): Promise<{ base64: string } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
+    // SECURITY: SSRF guard — the hero URL comes from the DB, but any action
+    // callable from the client can be invoked with arbitrary arguments, so
+    // treat the input as untrusted.
+    if (!isSafeStorageUrl(url)) {
+      console.warn("[CAD-LAB-IMAGES] Blocked reference fetch URL outside storage allowlist")
+      return { error: "Invalid reference URL" }
+    }
     try {
       const response = await fetchWithTimeout(url, {}, 10_000)
       if (!response.ok) {

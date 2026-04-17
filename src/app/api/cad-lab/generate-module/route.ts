@@ -80,12 +80,20 @@ async function uploadCadAsset(
 
   if (error) throw new Error(`Failed to upload ${filename}: ${error.message}`)
 
-  const { data: publicUrl } = admin.storage
+  // SECURITY: CAD assets (STEP/STL/drawings) are confidential IP. The bucket
+  // is public=true for compatibility with legacy renderers, so we must use a
+  // signed URL instead of a public one — otherwise anyone with the URL (or
+  // who can guess the path given a leaked projectId) can fetch across
+  // foundries. 7-day expiry balances UX against exposure window.
+  const { data: signed, error: signErr } = await admin.storage
     .from(CAD_LAB_STORAGE_BUCKET)
-    .getPublicUrl(path)
+    .createSignedUrl(path, 60 * 60 * 24 * 7)
+  if (signErr || !signed?.signedUrl) {
+    throw new Error(`Failed to sign URL for ${filename}: ${signErr?.message ?? "unknown"}`)
+  }
 
   return {
-    url: publicUrl.publicUrl,
+    url: signed.signedUrl,
     sizeKb: Math.round(buffer.length / 1024),
   }
 }
@@ -111,11 +119,17 @@ async function uploadDrawingManifest(
     return undefined
   }
 
-  const { data: publicUrl } = admin.storage
+  // SECURITY: drawing manifest contains project metadata — use signed URL
+  // to keep it scoped (see above for rationale).
+  const { data: signed, error: signErr } = await admin.storage
     .from(CAD_LAB_STORAGE_BUCKET)
-    .getPublicUrl(path)
+    .createSignedUrl(path, 60 * 60 * 24 * 7)
+  if (signErr || !signed?.signedUrl) {
+    console.warn("[CAD-LAB-MODULE] Failed to sign drawing manifest URL:", signErr?.message)
+    return undefined
+  }
 
-  return publicUrl.publicUrl
+  return signed.signedUrl
 }
 
 /**
