@@ -701,8 +701,25 @@ export default function SpecifyPage(): React.ReactNode {
                   <div className="flex items-center gap-1.5 mb-3">
                     <PoundSterling className="h-4 w-4 text-muted-foreground shrink-0" />
                     <h3 className="text-sm font-semibold text-foreground">Cost Summary</h3>
+                    <Badge variant="warning" className="ml-1 text-[10px] px-1.5 py-0 h-4">BETA</Badge>
                     <span className="text-xs text-muted-foreground ml-1">— early estimates across {Object.keys(aiCostEstimates).length} modules</span>
                   </div>
+
+                  {/* BETA warning — costs are rough estimates and must be qualified-reviewed */}
+                  <div
+                    className="flex gap-2 p-3 mb-3 rounded-md border border-warning/40 bg-warning/10"
+                    role="note"
+                    aria-label="Cost estimate warning"
+                  >
+                    <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                    <div className="text-xs text-foreground space-y-1">
+                      <p className="font-semibold">These figures are rough early estimates and could be completely wrong.</p>
+                      <p className="text-muted-foreground">
+                        This feature is in <span className="font-semibold text-foreground">BETA</span>. Numbers are AI-generated from limited information and may be off by a large margin — in either direction. Do not use them for pricing, fundraising, or any business decision without having a qualified cost engineer or your supply chain lead fully review each line item. Confidence labels (low/medium/high) reflect the model&apos;s own self-assessment and are not a substitute for human review.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     {modules.map(mod => {
                       const est = aiCostEstimates[mod.id]
