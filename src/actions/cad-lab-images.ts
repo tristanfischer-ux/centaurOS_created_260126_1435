@@ -868,3 +868,88 @@ export async function reconcileDesignAction(
     }
   })
 }
+
+/**
+ * Generates the mirror-image variant of a primary module's illustration by
+ * horizontally flipping it (left-right axis) and uploading it as the mirror
+ * module's own asset in the xray-images bucket.
+ *
+ * @description Paired modules like "Left Wing" / "Right Wing" should render
+ * as mirror images of each other. Previously the pipeline reused the primary
+ * image URL verbatim, which made left/right cards visually identical. This
+ * action produces a true horizontal mirror and persists it so downstream
+ * consumers (PDF export, public share links, caching) get the correct image
+ * without any render-time transform.
+ *
+ * sharp.flop() = flip about the vertical axis (left↔right swap), which is
+ * the semantically correct mirror for port/starboard pairs. sharp.flip() is
+ * the vertical axis flip (top↔bottom) — not what we want here.
+ *
+ * @param projectId - Owning CAD Lab project (storage namespace)
+ * @param mirrorModuleId - ID of the module whose asset we're writing to
+ * @param primaryImageUrl - Supabase storage URL of the already-generated
+ *   primary (Left) image to be mirrored
+ * @returns New public URL for the mirrored asset, or an error string
+ */
+export async function flipCadLabImageForMirrorAction(
+  projectId: string,
+  mirrorModuleId: string,
+  primaryImageUrl: string,
+): Promise<{ imageUrl: string } | { error: string }> {
+  return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
+    // SECURITY: Only allow fetching from our own Supabase storage. Without
+    // this the caller could pass any URL and trigger a server-side outbound
+    // fetch (SSRF) to an internal metadata endpoint or control-plane host.
+    if (!isSafeStorageUrl(primaryImageUrl)) {
+      return { error: "Unsafe primary image URL" }
+    }
+
+    // SECURITY: The mirror module ID is used as a filename — reject anything
+    // that isn't a plain UUID-like token so it can't escape the project path.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(mirrorModuleId)) {
+      return { error: "Invalid mirror module id" }
+    }
+
+    try {
+      const resp = await fetchWithTimeout(primaryImageUrl, {}, 15000)
+      if (!resp.ok) {
+        return { error: `Primary image fetch failed: ${resp.status}` }
+      }
+      const inputBuf = Buffer.from(await resp.arrayBuffer())
+
+      // INTENT: Lazy-load sharp — it's a heavy native module and the rest of
+      // this file doesn't need it. Top-level import would bloat cold starts
+      // even when the caller is only hitting generateCadLabSingleImageAction.
+      const sharpModule = await import("sharp")
+      const sharp = sharpModule.default
+      const flippedBuf = await sharp(inputBuf).flop().png().toBuffer()
+
+      const admin = createAdminClient()
+      const destPath = `${projectId}/module-${mirrorModuleId}.png`
+      const { error: uploadErr } = await admin.storage
+        .from(STORAGE_BUCKET)
+        .upload(destPath, flippedBuf, {
+          contentType: "image/png",
+          upsert: true,
+        })
+      if (uploadErr) {
+        return { error: `Flip upload failed: ${uploadErr.message}` }
+      }
+
+      const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(destPath)
+      if (!data?.publicUrl) {
+        return { error: "Flipped image uploaded but public URL unavailable" }
+      }
+      // INTENT: Cache-bust so the card swaps from any stale copied URL to the
+      // freshly flipped file without needing a hard reload.
+      return { imageUrl: `${data.publicUrl}?v=${Date.now()}` }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.error("[CAD-LAB-IMAGES] Flip failed:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}

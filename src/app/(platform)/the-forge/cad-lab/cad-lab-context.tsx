@@ -60,7 +60,7 @@ import {
 } from "@/actions/cad-lab-projects"
 import { getProjectOrders } from "@/actions/manufacturing-orders"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, generateDesignSynthesisAction, generateProductIdentityAction, reconcileDesignAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, generateDesignSynthesisAction, generateProductIdentityAction, reconcileDesignAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction, flipCadLabImageForMirrorAction } from "@/actions/cad-lab-images"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -2108,20 +2108,31 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     }
 
-    // INTENT: Detect mirror pairs so we can reuse the primary module's image for
-    // the mirror module — guarantees pixel-identical drawings and saves an API call.
-    // Detection: (1) explicit mirrorOf field, (2) Left/Right name pattern fallback.
-    const mirrorMap = new Map<string, string>() // mirrorId → primaryId
-    const processModuleIds = new Set(modulesToProcess.map(m => m.id))
+    // INTENT: Detect mirror pairs so we can horizontally flip the primary
+    // module's image to produce the mirror module's asset — guarantees a true
+    // left/right mirror (not an identical copy) and saves an API call.
+    // Detection: (1) explicit mirrorOf field, (2) Left/Right name pattern
+    // fallback. We look at BOTH modulesToProcess and the full modules list so
+    // that retrying just the Right module alone still finds its Left twin.
+    let modulesSnapshot: CadLabModule[] = []
+    setModules((current) => { modulesSnapshot = current; return current })
+    const fullModuleIndex = new Map<string, CadLabModule>(modulesSnapshot.map(m => [m.id, m]))
     for (const mod of modulesToProcess) {
-      if (mod.mirrorOf && processModuleIds.has(mod.mirrorOf)) {
+      if (!fullModuleIndex.has(mod.id)) fullModuleIndex.set(mod.id, mod)
+    }
+
+    const mirrorMap = new Map<string, string>() // mirrorId → primaryId
+    for (const mod of modulesToProcess) {
+      if (mod.mirrorOf && fullModuleIndex.has(mod.mirrorOf)) {
         mirrorMap.set(mod.id, mod.mirrorOf)
       }
     }
-    // Fallback: detect implicit mirror pairs via Left/Right naming pattern
+    // Fallback: detect implicit mirror pairs via Left/Right naming pattern.
+    // We scan the FULL module list for twins, not just modulesToProcess, so a
+    // lone retry of a Right module can still locate its Left primary.
     if (mirrorMap.size === 0) {
       const byBaseName = new Map<string, CadLabModule[]>()
-      for (const mod of modulesToProcess) {
+      for (const mod of fullModuleIndex.values()) {
         const match = mod.name.match(/^(Left|Right)\s+(.+)$/i)
         if (match) {
           const baseName = match[2]
@@ -2130,17 +2141,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           byBaseName.set(baseName, group)
         }
       }
+      const processingIds = new Set(modulesToProcess.map(m => m.id))
       for (const [, group] of byBaseName) {
         if (group.length === 2) {
-          // Convention: "Left" variant is primary, "Right" is mirror
           const left = group.find(m => m.name.match(/^Left\s/i))
           const right = group.find(m => m.name.match(/^Right\s/i))
-          if (left && right) mirrorMap.set(right.id, left.id)
+          // Only register the pair if the RIGHT side is actually in the batch
+          // we're about to process — otherwise we'd needlessly orchestrate
+          // mirror logic for a batch that doesn't contain any mirrors.
+          if (left && right && processingIds.has(right.id)) {
+            mirrorMap.set(right.id, left.id)
+          }
         }
       }
     }
 
-    // Reorder: primaries first, then mirrors (so image is available to clone)
+    // Reorder: primaries first, then mirrors (so primary image exists when we
+    // flip it to produce the mirror)
     const primaryIds = new Set(mirrorMap.values())
     const mirrorIds = new Set(mirrorMap.keys())
     const orderedModules = [
@@ -2152,8 +2169,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       console.log(`[CAD-LAB] Mirror pairs detected: ${[...mirrorMap.entries()].map(([m, p]) => `${m} → ${p}`).join(", ")}`)
     }
 
-    // Track primary module image URLs for mirror reuse
+    // Track primary module image URLs for mirror flipping. Seeded with
+    // already-completed primaries from the full module list so a retry of
+    // just a Right module can flip the existing Left image without
+    // regenerating anything.
     const primaryImageUrls = new Map<string, { url: string; model?: string }>()
+    for (const primaryId of primaryIds) {
+      if (modulesToProcess.some(m => m.id === primaryId)) continue // will be generated below
+      const existing = fullModuleIndex.get(primaryId)
+      if (existing?.imageStatus === "complete" && existing.imageUrl) {
+        primaryImageUrls.set(primaryId, { url: existing.imageUrl, model: existing.imageModelUsed })
+      }
+    }
 
     // INTENT: Process one at a time — concurrent large base64 payloads trigger
     // React Flight's "Maximum array nesting exceeded" serialization limit.
@@ -2163,12 +2190,30 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       const primaryId = mirrorMap.get(mod.id)
       const primaryImage = primaryId ? primaryImageUrls.get(primaryId) : undefined
 
-      // INTENT: If this module is a mirror and its primary succeeded, reuse the same image
-      // instead of making another API call. Saves cost and guarantees visual consistency.
-      if (primaryImage) {
-        console.log(`[CAD-LAB] Reusing image from primary ${primaryId} for mirror ${mod.id}`)
+      // INTENT: If this module is a mirror and its primary succeeded, flip
+      // the primary image horizontally (left↔right) and upload it as this
+      // module's own asset. Previously we reused the primary URL verbatim
+      // which made paired cards look literally identical; sharp.flop()
+      // produces a true port/starboard mirror. On any failure we fall back
+      // to the old URL-copy so we never ship worse than before.
+      if (primaryImage && projectId) {
+        let mirroredUrl = primaryImage.url
+        let stepLabel = `${mod.name} (mirrored)`
+        try {
+          const flipRes = await flipCadLabImageForMirrorAction(projectId, mod.id, primaryImage.url)
+          if ('imageUrl' in flipRes) {
+            mirroredUrl = flipRes.imageUrl
+            console.log(`[CAD-LAB] Flipped primary ${primaryId} → mirror ${mod.id}`)
+          } else {
+            console.warn(`[CAD-LAB] Flip failed for mirror ${mod.id}, falling back to URL copy: ${flipRes.error}`)
+            stepLabel = `${mod.name} (mirrored, flip fallback)`
+          }
+        } catch (err) {
+          console.warn(`[CAD-LAB] Flip threw for mirror ${mod.id}, falling back to URL copy`, err)
+          stepLabel = `${mod.name} (mirrored, flip fallback)`
+        }
         const update: Partial<CadLabModule> = {
-          imageUrl: primaryImage.url,
+          imageUrl: mirroredUrl,
           imageStatus: "complete" as const,
           imageModelUsed: primaryImage.model,
         }
@@ -2176,7 +2221,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setModules((prev) => prev.map((m) => (m.id === mod.id ? { ...m, ...update } : m)))
         completedCount++
         setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
-        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 89), stepLabel: `${mod.name} (mirrored)` })
+        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 89), stepLabel })
         revealModule(mod.id)
       } else {
         await generateOne(mod)
