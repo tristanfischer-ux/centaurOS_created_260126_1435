@@ -59,7 +59,15 @@ export interface StoredReferenceDocument {
   id: string
   name: string
   mimeType: string
+  /** Signed URL — expires; see storagePath for the stable handle */
   storageUrl: string
+  /**
+   * Supabase storage path inside xray-images (e.g.
+   * `cad-lab/${projectId}/reference-docs/${id}.pdf`). Stable handle for
+   * re-signing on project load. Present on NEW uploads (2026-04-17+);
+   * legacy rows have undefined and fall back to the stored URL.
+   */
+  storagePath?: string
   originalSize: number
   fileType: DocumentFileType
   rawText: string | null // full extracted text (stays in DB, not sent to client)

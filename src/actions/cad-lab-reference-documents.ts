@@ -16,6 +16,7 @@ import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkStorageQuota } from "@/lib/billing/storage-quota"
+import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
 import type { Json } from "@/types/database.types"
 import type { StoredReferenceDocument, DocumentFileType } from "@/lib/cad-lab/reference-document-types"
 import { EXTRACTABLE_TYPES, MAX_DOCUMENTS_PER_PROJECT } from "@/lib/cad-lab/reference-document-types"
@@ -70,7 +71,7 @@ export async function uploadReferenceDocuments(
     originalSize: number
     fileType: DocumentFileType
   }>,
-): Promise<{ stored: Array<{ id: string; name: string; mimeType: string; storageUrl: string; originalSize: number; fileType: DocumentFileType }>; failed: string[] } | { error: string }> {
+): Promise<{ stored: Array<{ id: string; name: string; mimeType: string; storageUrl: string; storagePath: string; originalSize: number; fileType: DocumentFileType }>; failed: string[] } | { error: string }> {
   return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId) return { error: "Project ID required" }
     if (!UUID_RE.test(projectId)) return { error: "Invalid project ID format" }
@@ -102,7 +103,7 @@ export async function uploadReferenceDocuments(
 
     try {
       const admin = createAdminClient()
-      const stored: Array<{ id: string; name: string; mimeType: string; storageUrl: string; originalSize: number; fileType: DocumentFileType }> = []
+      const stored: Array<{ id: string; name: string; mimeType: string; storageUrl: string; storagePath: string; originalSize: number; fileType: DocumentFileType }> = []
       const failed: string[] = []
 
       for (const doc of documents) {
@@ -158,10 +159,8 @@ export async function uploadReferenceDocuments(
           continue
         }
 
-        // SECURITY: Use signed URL — user-uploaded reference documents are confidential.
-        // TTL = 30 days (not 1 hour): persisted into reference_documents JSONB
-        // and re-rendered on project load. See the sibling comment in
-        // cad-lab-reference-images.ts for rationale.
+        // SECURITY: Signed URL for immediate rendering + persist storagePath
+        // so refreshReferenceUrls can re-sign on load.
         const { data: urlData } = await admin.storage
           .from(STORAGE_BUCKET)
           .createSignedUrl(storagePath, 60 * 60 * 24 * 30)
@@ -171,6 +170,7 @@ export async function uploadReferenceDocuments(
           name: doc.name.slice(0, MAX_NAME_LENGTH),
           mimeType: doc.mimeType,
           storageUrl: urlData?.signedUrl ?? '',
+          storagePath,
           originalSize: doc.originalSize,
           fileType: doc.fileType,
         })
@@ -371,6 +371,7 @@ export async function saveReferenceDocumentUrls(
     // (e.g., "https://project.supabase.co.attacker.com" passes .startsWith() but not hostname check)
     let expectedHostname: string
     try { expectedHostname = new URL(supabaseHost).hostname } catch { return { error: "Server configuration error" } }
+    const expectedPathPrefix = `cad-lab/${projectId}/documents/`
     for (const doc of documents) {
       try {
         if (new URL(doc.storageUrl).hostname !== expectedHostname) {
@@ -384,6 +385,13 @@ export async function saveReferenceDocumentUrls(
       // SECURITY: Cap name length to prevent JSONB bloat / log poisoning
       if (doc.name.length > MAX_NAME_LENGTH) {
         return { error: "Document name too long" }
+      }
+      // SECURITY: If storagePath is present, it must live under this project's
+      // documents prefix. Mirrors saveReferenceImageUrls.
+      if (doc.storagePath !== undefined) {
+        if (typeof doc.storagePath !== "string" || !doc.storagePath.startsWith(expectedPathPrefix)) {
+          return { error: "Invalid storage path" }
+        }
       }
     }
 
@@ -403,5 +411,36 @@ export async function saveReferenceDocumentUrls(
     }
 
     return { success: true }
+  })
+}
+
+// ─── Refresh signed URLs on project load ────────────────────────────
+
+/**
+ * Re-signs a batch of reference document storage paths.
+ * Mirrors refreshReferenceImageUrls. See that function for rationale.
+ */
+export async function refreshReferenceDocumentUrls(
+  projectId: string,
+  paths: string[],
+): Promise<{ urls: Record<string, string> } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
+    if (!Array.isArray(paths) || paths.length === 0) return { urls: {} }
+    const capped = paths.slice(0, MAX_DOCUMENTS_PER_PROJECT)
+
+    const admin = createAdminClient()
+    const urls: Record<string, string> = {}
+    const expectedPrefix = `cad-lab/${projectId}/documents/`
+    for (const p of capped) {
+      if (typeof p !== "string" || !p.startsWith(expectedPrefix)) continue
+      const { data, error } = await admin.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(p, 60 * 60 * 24 * 30)
+      if (!error && data?.signedUrl) urls[p] = data.signedUrl
+    }
+    return { urls }
   })
 }

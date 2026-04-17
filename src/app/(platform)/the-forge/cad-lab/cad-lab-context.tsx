@@ -3823,7 +3823,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Restore reference images from database
       // INTENT: Explicit field mapping from StoredReferenceImage → ReferenceImageFile
       // to avoid spreading DB fields that don't belong in client state.
+      // SIGNED-URL REFRESH: Signed URLs expire (30d TTL). On every load we try
+      // to re-sign via storagePath; fall back to the stored (possibly stale)
+      // URL for legacy rows without a path. See refreshReferenceImageUrls.
       if (p.referenceImages && p.referenceImages.length > 0) {
+        // Kick off the refresh in parallel with the initial paint — we
+        // populate with the stored URL first, then patch with the fresh
+        // signed URL as soon as it arrives.
+        const imgPaths = p.referenceImages
+          .map((i) => i.storagePath)
+          .filter((x): x is string => typeof x === "string")
         setReferenceImages(p.referenceImages.map((img) => ({
           id: img.id,
           name: img.name,
@@ -3834,12 +3843,30 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           previewUrl: img.storageUrl, // Use storage URL as preview
           uploaded: true,
         })))
+        if (imgPaths.length > 0) {
+          import("@/actions/cad-lab-reference-images").then(({ refreshReferenceImageUrls }) =>
+            refreshReferenceImageUrls(p.id, imgPaths),
+          ).then((res) => {
+            if ("urls" in res) {
+              setReferenceImages((prev) => prev.map((entry) => {
+                const storedImg = p.referenceImages?.find((i) => i.id === entry.id)
+                const path = storedImg?.storagePath
+                const freshUrl = path ? res.urls[path] : undefined
+                if (!freshUrl) return entry
+                return { ...entry, storageUrl: freshUrl, previewUrl: freshUrl }
+              }))
+            }
+          }).catch((e) => console.warn("[CAD-LAB] reference image URL refresh failed:", e))
+        }
       } else {
         setReferenceImages([])
       }
 
-      // Restore reference documents from database
+      // Restore reference documents from database (same refresh strategy)
       if (p.referenceDocuments && p.referenceDocuments.length > 0) {
+        const docPaths = p.referenceDocuments
+          .map((d) => d.storagePath)
+          .filter((x): x is string => typeof x === "string")
         setReferenceDocuments(p.referenceDocuments.map((doc) => ({
           id: doc.id,
           name: doc.name,
@@ -3852,6 +3879,21 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           extractionStatus: doc.extractionStatus,
           extractedSpecs: doc.extractedSpecs,
         })))
+        if (docPaths.length > 0) {
+          import("@/actions/cad-lab-reference-documents").then(({ refreshReferenceDocumentUrls }) =>
+            refreshReferenceDocumentUrls(p.id, docPaths),
+          ).then((res) => {
+            if ("urls" in res) {
+              setReferenceDocuments((prev) => prev.map((entry) => {
+                const storedDoc = p.referenceDocuments?.find((d) => d.id === entry.id)
+                const path = storedDoc?.storagePath
+                const freshUrl = path ? res.urls[path] : undefined
+                if (!freshUrl) return entry
+                return { ...entry, storageUrl: freshUrl }
+              }))
+            }
+          }).catch((e) => console.warn("[CAD-LAB] reference document URL refresh failed:", e))
+        }
       } else {
         setReferenceDocuments([])
       }

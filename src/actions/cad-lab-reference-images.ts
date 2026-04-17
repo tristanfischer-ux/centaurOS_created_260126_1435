@@ -14,6 +14,7 @@ import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkStorageQuota } from "@/lib/billing/storage-quota"
+import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
 import type { Json } from "@/types/database.types"
 import type { StoredReferenceImage } from "@/lib/cad-lab/reference-image-types"
 
@@ -122,13 +123,10 @@ export async function uploadReferenceImages(
           continue
         }
 
-        // SECURITY: Use signed URL — user-uploaded reference images are confidential.
-        // TTL = 30 days (not 1 hour): the URL is persisted into
-        // cad_lab_projects.reference_images JSONB and rendered by <img src> on
-        // subsequent project loads. A 1-hour TTL meant the URL 403'd after the
-        // session. 30 days covers typical project lifetime; for long-running
-        // projects a path-persistence + on-read resign refactor is the proper
-        // long-term fix (FORGE-REVIEW-REPORT.md handover).
+        // SECURITY: Signed URL for immediate rendering. Persist `storagePath`
+        // alongside so handleLoadProject can re-sign on load (URLs expire; the
+        // path is stable). 30d TTL is a sanity bound — refreshReferenceUrls
+        // will re-sign fresh on every load.
         const { data: urlData } = await admin.storage
           .from(STORAGE_BUCKET)
           .createSignedUrl(storagePath, 60 * 60 * 24 * 30)
@@ -138,6 +136,7 @@ export async function uploadReferenceImages(
           name: img.name.slice(0, MAX_NAME_LENGTH),
           mimeType: img.mimeType,
           storageUrl: urlData?.signedUrl ?? '',
+          storagePath,
           originalSize: img.originalSize,
         })
       }
@@ -194,6 +193,7 @@ export async function saveReferenceImageUrls(
     // SECURITY: Parse hostname to prevent subdomain collision bypass
     let expectedHostname: string
     try { expectedHostname = new URL(supabaseHost).hostname } catch { return { error: "Server configuration error" } }
+    const expectedPathPrefix = `cad-lab/${projectId}/reference/`
     for (const img of images) {
       try {
         if (new URL(img.storageUrl).hostname !== expectedHostname) {
@@ -208,6 +208,14 @@ export async function saveReferenceImageUrls(
       if (img.name.length > MAX_NAME_LENGTH) {
         return { error: "Image name too long" }
       }
+      // SECURITY: If storagePath is present, it must live under this project's
+      // reference prefix. Blocks a crafted payload from writing a path that
+      // belongs to another project/foundry (which would leak on resign).
+      if (img.storagePath !== undefined) {
+        if (typeof img.storagePath !== "string" || !img.storagePath.startsWith(expectedPathPrefix)) {
+          return { error: "Invalid storage path" }
+        }
+      }
     }
 
     const { error } = await supabase
@@ -221,5 +229,54 @@ export async function saveReferenceImageUrls(
     }
 
     return { success: true }
+  })
+}
+
+// ─── Refresh signed URLs on project load ────────────────────────────
+
+/**
+ * Re-signs a batch of reference image storage paths.
+ *
+ * @description Reference image signed URLs expire (30 day TTL is a sanity
+ * bound). On every project load we call this to guarantee fresh URLs —
+ * avoids the class of bug where a <img src> 403s silently because the URL
+ * has expired since last save.
+ *
+ * Only processes paths — legacy rows without `storagePath` are skipped
+ * (caller falls back to their stored URL).
+ *
+ * @param projectId - Project that owns these paths (for ownership + rate limit scope)
+ * @param paths - storagePath values from StoredReferenceImage rows
+ * @returns Map from path → fresh signed URL (or null if re-sign failed)
+ *
+ * @security Caller's foundry must own the project — enforced via
+ * ensureCadLabProjectOwnership. Paths are validated to live under
+ * `cad-lab/${projectId}/reference/` so an authed user can't resign paths
+ * from another project.
+ */
+export async function refreshReferenceImageUrls(
+  projectId: string,
+  paths: string[],
+): Promise<{ urls: Record<string, string> } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
+
+    if (!Array.isArray(paths) || paths.length === 0) return { urls: {} }
+    // Cap to the per-project limit so a crafted payload can't enumerate storage
+    const capped = paths.slice(0, MAX_IMAGES_PER_PROJECT)
+
+    const admin = createAdminClient()
+    const urls: Record<string, string> = {}
+    const expectedPrefix = `cad-lab/${projectId}/reference/`
+    for (const p of capped) {
+      // SECURITY: Only re-sign paths under the caller's project prefix
+      if (typeof p !== "string" || !p.startsWith(expectedPrefix)) continue
+      const { data, error } = await admin.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(p, 60 * 60 * 24 * 30)
+      if (!error && data?.signedUrl) urls[p] = data.signedUrl
+    }
+    return { urls }
   })
 }
