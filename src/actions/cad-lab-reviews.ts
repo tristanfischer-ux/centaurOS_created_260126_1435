@@ -208,7 +208,12 @@ ${reviewContext}${assemblyNotesInstructions}`
         }
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
-        const client = new Anthropic({ apiKey })
+        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
+        // function limit. SDK default is 10min + 2 retries, which in a
+        // tool loop can silently blow past the ceiling and return 504 with
+        // no actionable error. 240s + no retries lets us fail fast and
+        // surface the real cause. See forgeos-rules.md R4/R5.
+        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
         const toolCtx = { foundryId, specialistId: req.specialistId, userId }
         const calculationsPerformed: ReviewCalculation[] = []
@@ -437,7 +442,12 @@ SUMMARY: <one sentence explaining the verdict>`
         }
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
-        const client = new Anthropic({ apiKey })
+        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
+        // function limit. SDK default is 10min + 2 retries, which in a
+        // tool loop can silently blow past the ceiling and return 504 with
+        // no actionable error. 240s + no retries lets us fail fast and
+        // surface the real cause. See forgeos-rules.md R4/R5.
+        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
         const response = await client.messages.create({
             model: QUICK_VERDICT_MODEL,
@@ -636,7 +646,12 @@ export async function requestDecompositionCheckpoints(
         }
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
-        const client = new Anthropic({ apiKey })
+        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
+        // function limit. SDK default is 10min + 2 retries, which in a
+        // tool loop can silently blow past the ceiling and return 504 with
+        // no actionable error. 240s + no retries lets us fail fast and
+        // surface the real cause. See forgeos-rules.md R4/R5.
+        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
         // Build module summary for the prompt
         const moduleSummary = req.modules.map((m, i) =>
@@ -897,7 +912,12 @@ export async function reviseModulesFromCheckpoints(
         if (flaggedModules.length === 0) return {}
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
-        const client = new Anthropic({ apiKey })
+        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
+        // function limit. SDK default is 10min + 2 retries, which in a
+        // tool loop can silently blow past the ceiling and return 504 with
+        // no actionable error. 240s + no retries lets us fail fast and
+        // surface the real cause. See forgeos-rules.md R4/R5.
+        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
         const results = await Promise.allSettled(
             flaggedModules.map(async (mod) => {
@@ -1026,7 +1046,12 @@ export async function reviseModulesFromReviews(
         if (affectedModules.length === 0) return {}
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
-        const client = new Anthropic({ apiKey })
+        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
+        // function limit. SDK default is 10min + 2 retries, which in a
+        // tool loop can silently blow past the ceiling and return 504 with
+        // no actionable error. 240s + no retries lets us fail fast and
+        // surface the real cause. See forgeos-rules.md R4/R5.
+        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
         const results = await Promise.allSettled(
             affectedModules.map(async (mod) => {

@@ -321,11 +321,15 @@ async function callNanoBananaImage(
 
   let response: Response
   try {
-    response = await fetch(url, {
+    // RELIABILITY: 90s timeout. Nano Banana 2 has a long tail at 2-4 min
+    // on pathological prompts; without a cap a single hung call starves
+    // the sequential batch loop in handleGenerateModuleImages and eventually
+    // hits Vercel's 300s cap. Per forgeos-rules.md R4.
+    response = await fetchWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(body),
-    })
+    }, 90_000)
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : "Network error"
     console.error("[XRayImageGen] Fetch failed:", { model, error: msg })
@@ -412,11 +416,13 @@ async function callNanoBananaImageWithReference(
 
   let response: Response
   try {
-    response = await fetch(url, {
+    // RELIABILITY: 90s timeout to match callNanoBananaImage. Multimodal
+    // prompts with reference images have the same pathological tail risk.
+    response = await fetchWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(body),
-    })
+    }, 90_000)
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : "Network error"
     console.error("[XRayImageGen] Fetch failed (multimodal):", { model: NANO_BANANA_MODEL, error: msg })
@@ -486,7 +492,9 @@ async function callOpenAIImage(
   }
 
   const OpenAI = (await import("openai")).default
-  const client = new OpenAI({ apiKey })
+  // RELIABILITY: 120s timeout + no retries. OpenAI SDK default is 10min
+  // with 2 retries, which can blow past Vercel's 300s function ceiling.
+  const client = new OpenAI({ apiKey, timeout: 120_000, maxRetries: 0 })
 
   // DECISION: gpt-image-1 only supports b64_json (not URL).
   // This is ideal — we need base64 for Supabase upload anyway.
@@ -861,7 +869,8 @@ async function tryOpenAIEdit(
     const openaiModule = await import("openai")
     const OpenAI = openaiModule.default
     const { toFile } = openaiModule
-    const client = new OpenAI({ apiKey: openaiKey })
+    // RELIABILITY: 120s timeout + no retries — see the other OpenAI ctor.
+    const client = new OpenAI({ apiKey: openaiKey, timeout: 120_000, maxRetries: 0 })
 
     const prompt = buildReferenceEditPrompt(module, visualStyle)
     const imageFile = await toFile(Buffer.from(referenceBase64, "base64"), "reference.png", { type: "image/png" })
