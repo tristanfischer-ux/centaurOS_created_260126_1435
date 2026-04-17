@@ -1158,6 +1158,11 @@ export async function getRFQClarifications(
 /**
  * Get quote data for a linked RFQ — used by sourcing reports.
  * Returns top quotes with supplier name, price, timeline.
+ *
+ * @security Requires authenticated user AND the caller's foundry must either
+ * own the RFQ (foundry_id match) OR the caller must be the buyer on the RFQ.
+ * Without this gate, any authenticated user could enumerate quotes by RFQ id,
+ * leaking competitor pricing across foundries.
  */
 export async function getLinkedRFQQuotes(rfqId: string): Promise<{
   quotes: { supplierName: string; price: number | null; timelineWeeks: number | null; proposalTitle: string | null }[]
@@ -1165,12 +1170,38 @@ export async function getLinkedRFQQuotes(rfqId: string): Promise<{
 }> {
   const supabase = await createClient()
 
-  // Get RFQ title
+  // AUTH: require authenticated user
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    console.warn("[RFQ] getLinkedRFQQuotes: unauthenticated")
+    return { quotes: [], rfqTitle: null }
+  }
+
+  // AUTH: validate rfqId as UUID (defense in depth against SQL shape abuse)
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!rfqId || !UUID_RE.test(rfqId)) {
+    return { quotes: [], rfqTitle: null }
+  }
+
+  // AUTH: fetch RFQ with foundry + buyer fields to scope
   const { data: rfq } = await supabase
     .from("rfqs")
-    .select("title")
+    .select("title, foundry_id, buyer_id")
     .eq("id", rfqId)
     .single()
+
+  if (!rfq) {
+    return { quotes: [], rfqTitle: null }
+  }
+
+  // AUTH: caller must be the buyer OR belong to the RFQ's foundry
+  const callerFoundryId = await getFoundryIdCached()
+  const isBuyer = (rfq.buyer_id as string | null) === user.id
+  const isSameFoundry = !!callerFoundryId && (rfq.foundry_id as string | null) === callerFoundryId
+  if (!isBuyer && !isSameFoundry) {
+    console.warn("[RFQ] getLinkedRFQQuotes: cross-foundry access blocked", { userId: user.id, rfqId })
+    return { quotes: [], rfqTitle: null }
+  }
 
   // Get responses with accepted/interest status
   const { data: responses } = await supabase
@@ -1182,7 +1213,7 @@ export async function getLinkedRFQQuotes(rfqId: string): Promise<{
     .limit(10)
 
   if (!responses || responses.length === 0) {
-    return { quotes: [], rfqTitle: (rfq?.title as string) ?? null }
+    return { quotes: [], rfqTitle: (rfq.title as string) ?? null }
   }
 
   // Get provider names via provider_profiles → display_name
@@ -1201,7 +1232,7 @@ export async function getLinkedRFQQuotes(rfqId: string): Promise<{
   }
 
   return {
-    rfqTitle: (rfq?.title as string) ?? null,
+    rfqTitle: (rfq.title as string) ?? null,
     quotes: responses.map(r => ({
       supplierName: providerNames.get(r.provider_id as string) ?? "Unknown Supplier",
       price: r.quoted_price as number | null,

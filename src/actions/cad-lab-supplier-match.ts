@@ -362,11 +362,23 @@ function scoreCapabilityMatch(
  *
  * @param input - Module data including diagnostics-derived process/material
  * @returns Top 8 marketplace matches ranked by score (min 25pts)
+ *
+ * @security Requires authenticated user. Marketplace listings are cross-foundry
+ * (publicly visible to logged-in Forge users), but authentication is required
+ * to prevent unauthenticated enumeration and embedding-call cost abuse.
  */
 export async function matchCadLabModuleSuppliers(
   input: CadLabModuleInput,
 ): Promise<CadLabSupplierMatch[]> {
+  // AUTH: reject unauthenticated callers. Returning [] rather than throwing
+  // because the caller (source/page.tsx) treats error as "no matches" and
+  // this endpoint would otherwise be a public embedding-cost vector.
   const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    console.warn("[CadLabMatch] Rejected unauthenticated request")
+    return []
+  }
 
   const hasProcess = !!input.process && input.process.toLowerCase() !== "other"
   const hasMaterial = !!input.material && input.material.toLowerCase() !== "other"

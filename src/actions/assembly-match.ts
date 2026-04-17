@@ -79,7 +79,16 @@ function scoreKeywords(
 export async function matchAssemblyCompanies(
   input: AssemblyMatchInput,
 ): Promise<AssemblyCompanyMatch[]> {
+  // AUTH: reject unauthenticated callers. Mirrors matchCadLabModuleSuppliers —
+  // fulfillment_capabilities and approved marketplace listings are cross-foundry
+  // public to logged-in Forge users, but authentication is required to prevent
+  // unauthenticated enumeration of the assembler database.
   const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    console.warn("[AssemblyMatch] Rejected unauthenticated request")
+    return []
+  }
 
   // INTENT: If categories provided, infer required specialties for weighted scoring
   const requiredSpecialties = input.categories
