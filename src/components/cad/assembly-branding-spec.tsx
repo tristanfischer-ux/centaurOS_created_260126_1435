@@ -98,7 +98,8 @@ export function AssemblyBrandingSpec({
               id="logo-url"
               placeholder="https://example.com/logo.png or upload later"
               value={branding.logoUrl ?? ""}
-              onChange={(e) => onUpdate({ logoUrl: e.target.value || null })}
+              onChange={(e) => onUpdate({ logoUrl: e.target.value.slice(0, 500) || null })}
+              maxLength={500}
             />
             <p className="text-xs text-muted-foreground">
               PNG or SVG recommended. Will appear on packaging.
@@ -259,9 +260,11 @@ export function AssemblyBrandingSpec({
                 id="instruction-notes"
                 placeholder="Key assembly or usage instructions to include..."
                 value={branding.instructionCardNotes}
-                onChange={(e) => onUpdate({ instructionCardNotes: e.target.value })}
+                onChange={(e) => onUpdate({ instructionCardNotes: e.target.value.slice(0, 2000) })}
+                maxLength={2000}
                 rows={3}
               />
+              <p className="text-xs text-muted-foreground">{branding.instructionCardNotes.length}/2000</p>
             </div>
           )}
 
@@ -271,9 +274,11 @@ export function AssemblyBrandingSpec({
               id="unboxing-notes"
               placeholder="Any special unboxing requirements (tissue paper, foam inserts, etc.)..."
               value={branding.unboxingNotes}
-              onChange={(e) => onUpdate({ unboxingNotes: e.target.value })}
+              onChange={(e) => onUpdate({ unboxingNotes: e.target.value.slice(0, 2000) })}
+              maxLength={2000}
               rows={2}
             />
+            <p className="text-xs text-muted-foreground">{branding.unboxingNotes.length}/2000</p>
           </div>
         </CardContent>
       </Card>

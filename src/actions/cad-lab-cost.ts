@@ -18,6 +18,7 @@
 
 import type { AiCostEstimate, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import { classifyPart } from "@/lib/part-classification"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
@@ -191,23 +192,30 @@ ${JSON.stringify(moduleSummaries, null, 2)}
 Return ONLY valid JSON.`
 
   try {
-    // DECISION: Direct fetch to DeepSeek API (OpenAI-compatible format).
-    // Vercel's 300s maxDuration is the natural ceiling.
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+    // DECISION: fetchWithTimeout (90s) not the raw fetch — per rule R4/R5 in
+    // ~/.claude/projects/-Users-tristanfischer/memory/forgeos-rules.md, letting
+    // Vercel's 300s maxDuration be the only ceiling means a single hung
+    // upstream call can burn the whole function budget and starve downstream
+    // fallbacks. 90s fits comfortably under the cap with room for retries.
+    const response = await fetchWithTimeout(
+      "https://api.deepseek.com/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          max_tokens: 8192,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
       },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        max_tokens: 8192,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    })
+      90_000,
+    )
 
     if (!response.ok) {
       return { success: false, error: `DeepSeek API error: ${response.status}` }

@@ -592,6 +592,60 @@ export default function SourcePage(): React.ReactNode {
     }
   }, [activeTab, supplierMatches.size, eligibleModules.length, matchAllLoading, handleMatchAll])
 
+  // ── Rehydrate per-project state on project switch ──
+  // INTENT: Every `useState(() => ...)` initializer above reads localStorage
+  // once at mount. If the user switches projects via the CAD Lab context
+  // (without a route change), storageKey/shortlistKey/etc. recompute to the
+  // new project's keys but the in-memory state still holds the OLD project's
+  // data. The setter wrappers then WRITE that stale data into the new
+  // project's localStorage bucket — silently corrupting Project B's state
+  // with Project A's matches.
+  // FIX: watch activeProjectId and force a rehydrate from the new project's
+  // keys. Reset one-shot refs so auto-trigger effects fire for the new
+  // project. Guarded on first mount to avoid a double-init.
+  const prevProjectIdRef = useRef<string | null>(activeProjectId)
+  useEffect(() => {
+    // First mount: prevProjectIdRef was initialized to activeProjectId, so this
+    // effect's first run is a no-op. Only rehydrate on actual change.
+    if (activeProjectId === prevProjectIdRef.current) return
+    prevProjectIdRef.current = activeProjectId
+
+    // INTENT: read fresh from localStorage for the new project. If no stored
+    // data exists (or we don't have a project yet), fall back to empty.
+    const readMap = <V,>(key: string | null): Map<string, V> => {
+      if (!key || typeof window === "undefined") return new Map()
+      try {
+        const stored = localStorage.getItem(key)
+        if (stored) return new Map(JSON.parse(stored) as [string, V][])
+      } catch (err) {
+        console.warn("[SOURCE] Failed to rehydrate map from key:", key, err)
+      }
+      return new Map()
+    }
+    const readArray = <T,>(key: string | null): T[] => {
+      if (!key || typeof window === "undefined") return []
+      try {
+        const stored = localStorage.getItem(key)
+        if (stored) return JSON.parse(stored) as T[]
+      } catch (err) {
+        console.warn("[SOURCE] Failed to rehydrate array from key:", key, err)
+      }
+      return []
+    }
+
+    setSupplierMatchesRaw(readMap<CadLabSupplierMatch[]>(storageKey))
+    setShortlistedSuppliersRaw(readMap<ShortlistedSupplier>(shortlistKey))
+    setPerSupplierRfqIdsRaw(readMap<string>(rfqIdsKey))
+    setCategoryRankingsRaw(readMap<string[]>(categoryRankingsKey))
+    setBuyPartResultsRaw(readArray<BuyPartSearchResult>(buySearchKey))
+    setRfqQuotes(undefined)
+
+    // Reset one-shot refs so auto-behaviour runs for the new project
+    autoSelectKeyRef.current = ""
+    autoMatchTriggeredRef.current = false
+    buySearchTriggeredRef.current = false
+  }, [activeProjectId, storageKey, shortlistKey, rfqIdsKey, categoryRankingsKey, buySearchKey])
+
   // ── Screen context ──
   useRegisterScreenContext(
     useMemo(() => ({

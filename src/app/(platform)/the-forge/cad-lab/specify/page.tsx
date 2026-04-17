@@ -170,6 +170,8 @@ export default function SpecifyPage(): React.ReactNode {
     designRevision,
     imagesStale,
     isRegeneratingImages,
+    markImagesCurrentManually,
+    handleRegenerateDrawingsAfterRevision,
     progressLines,
     linkedRfqId,
     linkRfqToProject,
@@ -387,7 +389,16 @@ export default function SpecifyPage(): React.ReactNode {
 
   // ── Gate: can proceed to Source? ──
   // INTENT: Full pipeline — diagnostics + reviews done before sourcing. Costings live in Source/Assemble.
-  const canProceedToSource = allDiagnosticsComplete && (allModulesReviewed || reviewSkipped)
+  // INTENT: canProceedToSource also checks imagesStale / isRegeneratingImages
+  // so the header "Continue to Source" button enforces the same gate as the
+  // review-tab CTA at line ~1542. Previously the header button let users move
+  // to Source while image regeneration was still in flight or stale, which
+  // could show Source with obsolete reference images.
+  const canProceedToSource =
+    allDiagnosticsComplete &&
+    (allModulesReviewed || reviewSkipped) &&
+    !imagesStale &&
+    !isRegeneratingImages
 
   // ── Stage briefings — Specify stage owned by Fang (VP Manufacturing) ──
   const specifyMapping = STAGE_SPECIALISTS.specify
@@ -1636,6 +1647,46 @@ export default function SpecifyPage(): React.ReactNode {
                   </CardContent>
                 </Card>
               </div>
+            ) : (allModulesReviewed || reviewSkipped) && imagesStale && !isRegeneratingImages ? (
+              // INTENT: Reviewed but images stale (revisions were made and regen
+              // has been attempted or not yet run). Previously this state had no
+              // UI at all — the user was trapped because the only CTA appeared
+              // when !imagesStale. Two paths out: retry regeneration, or accept
+              // the current (outdated) drawings and move on.
+              <Card className="border-warning/30 bg-gradient-to-r from-warning/5 to-background">
+                <CardContent className="pt-6 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        Drawings are out of date
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Your revised module specs don&apos;t match the current illustrations. Regenerate them, or continue to Source with the existing drawings (they&apos;ll no longer reflect your latest spec).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button size="sm" onClick={handleRegenerateDrawingsAfterRevision} className="gap-1.5">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Regenerate illustrations
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (window.confirm("Continue to Source with the current (outdated) drawings? You can regenerate them later.")) {
+                          markImagesCurrentManually()
+                          router.push(`${FORGE_ROUTES.cadLabSource}?from=specify`)
+                        }
+                      }}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Skip &amp; continue to Source
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ) : allDiagnosticsComplete && !allModulesReviewed && !reviewSkipped ? (
               <Card className="border-warning/30 bg-gradient-to-r from-warning/5 to-background">
                 <CardContent className="pt-6">

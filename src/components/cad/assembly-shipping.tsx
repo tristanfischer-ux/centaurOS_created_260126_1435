@@ -33,11 +33,23 @@ export function AssemblyShipping({
   onUpdate,
   assemblerMatches,
 }: AssemblyShippingProps) {
+  // Per-field max lengths cap unbounded user input so it can't bloat JSONB
+  // persistence or localStorage quota (Rule 27 in forgeos-rules.md).
+  const ADDRESS_CAPS: Record<keyof ShippingAddress, number> = {
+    name: 200,
+    line1: 200,
+    line2: 200,
+    city: 100,
+    postcode: 20,
+    country: 100,
+  }
+
   const handleAddressChange = useCallback((field: keyof ShippingAddress, value: string) => {
     const current = shipping.shippingAddress ?? {
       name: "", line1: "", line2: "", city: "", postcode: "", country: "GB",
     }
-    onUpdate({ shippingAddress: { ...current, [field]: value } })
+    const capped = value.slice(0, ADDRESS_CAPS[field])
+    onUpdate({ shippingAddress: { ...current, [field]: capped } })
   }, [shipping.shippingAddress, onUpdate])
 
   // Filter assemblers that can kit_and_ship (for 3PL selection)

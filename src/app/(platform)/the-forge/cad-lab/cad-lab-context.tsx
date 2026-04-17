@@ -328,6 +328,8 @@ export interface CadLabContextValue {
   designRevision: number
   imagesStale: boolean
   isRegeneratingImages: boolean
+  /** Escape hatch when regeneration fails persistently — marks images current without regenerating. */
+  markImagesCurrentManually: () => void
   handleRegenerateDrawingsAfterRevision: () => Promise<void>
 
   /** Directly trigger cost re-estimation (bypasses effect system to avoid cascading re-renders) */
@@ -2241,6 +2243,25 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setIsGeneratingImages(false)
     setImageGenProgress(null)
   }, [activeProjectId, startOp, updateOp, completeOp, failOp])
+
+  // ── Escape hatch: mark images current without regenerating ──
+  // INTENT: If image regeneration fails persistently (API outage, quota
+  // exhausted, etc.), users were trapped with imagesStale=true forever,
+  // blocking the "Continue to Source" CTA on the Specify page. This
+  // callback lets them manually mark the drawings as current at the
+  // latest design revision — the visual won't match the revised spec but
+  // the user can then proceed to Source and still work. Called from the
+  // Specify review tab when imagesStale + regeneration has failed.
+  const markImagesCurrentManually = useCallback(() => {
+    const currentRev = designRevisionRef.current
+    setImagesGeneratedAtRevision(currentRev)
+    if (activeProjectId) {
+      saveCadLabDesignRevision(activeProjectId, currentRev, currentRev).catch(err =>
+        console.error("[CAD-LAB] Failed to persist manual imagesGeneratedAtRevision:", err),
+      )
+    }
+    toast.info("Drawings marked current. The images may not match the revised spec until you regenerate them.")
+  }, [activeProjectId])
 
   // ── Refresh module images using current diagnostic specs ──
   // INTENT: Called from the Specify finalize card. Regenerates blueprint illustrations
@@ -4338,6 +4359,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     designRevision,
     imagesStale,
     isRegeneratingImages,
+    markImagesCurrentManually,
     handleRegenerateDrawingsAfterRevision,
     reEstimateCosts,
     reExpandingModuleIds,
