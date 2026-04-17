@@ -60,7 +60,7 @@ import {
 } from "@/actions/cad-lab-projects"
 import { getProjectOrders } from "@/actions/manufacturing-orders"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, generateDesignSynthesisAction, generateProductIdentityAction, reconcileDesignAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction, flipCadLabImageForMirrorAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, generateDesignSynthesisAction, generateProductIdentityAction, reconcileDesignAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction, flipCadLabImageForMirrorAction, refreshCadLabAssetUrlAction } from "@/actions/cad-lab-images"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -237,6 +237,13 @@ export interface CadLabContextValue {
   systemIllustrationUrl: string | null
   systemIllustrationStatus: "idle" | "generating" | "complete" | "failed"
   systemIllustrationError: string | null
+  /** Vision-QA confidence from the hero scorer: "high" if the rendered hero
+   *  scored ≥ 7/10, "low" if the best attempt still scored below threshold.
+   *  Null when no score is available (scoring skipped / not yet run). */
+  systemIllustrationConfidence: "high" | "low" | null
+  /** Issues surfaced by the vision scorer when confidence is low. Shown in
+   *  the warning banner so the user knows WHY the hero was flagged. */
+  systemIllustrationIssues: string[]
   handleRetryIllustration: () => void
 
   // Integration (combined system assembly)
@@ -551,6 +558,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [systemIllustrationUrl, setSystemIllustrationUrl] = useState<string | null>(null)
   const [systemIllustrationStatus, setSystemIllustrationStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
   const [systemIllustrationError, setSystemIllustrationError] = useState<string | null>(null)
+  const [systemIllustrationConfidence, setSystemIllustrationConfidence] = useState<"high" | "low" | null>(null)
+  const [systemIllustrationIssues, setSystemIllustrationIssues] = useState<string[]>([])
 
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
@@ -1017,6 +1026,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const isGeneratingImagesRef = useRef(false)
   useEffect(() => { isGeneratingImagesRef.current = isGeneratingImages }, [isGeneratingImages])
 
+  // INTENT: Synchronous in-flight guard for handleDecompose. Mirrors the
+  // pattern handleResearch uses (researchInFlightRef). Without this, a
+  // double-click in the same event tick fires two concurrent decomposition
+  // pipelines that race on Supabase upserts, duplicate Opus/Gemini spend,
+  // and last-write-wins the modules snapshot.
+  const decomposeInFlightRef = useRef(false)
+
   // INTENT: Synchronous guard against concurrent hero illustration retries.
   // Mirrors the existing isGeneratingImagesRef pattern — setState doesn't
   // flush synchronously, so React batching allows a double-click through the
@@ -1327,6 +1343,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Decompose into modules (progressive: skeleton → expand → images) ──
   const handleDecompose = useCallback(async () => {
     if (!editableReport.trim()) return
+
+    // SECURITY: Synchronous double-click guard. Released in `finally` at the
+    // bottom of the try block. Prevents the same-tick second click from
+    // firing a parallel decomposition pipeline.
+    if (decomposeInFlightRef.current) {
+      console.warn("[CAD-LAB] Decomposition already in flight — ignoring duplicate call")
+      return
+    }
+
     // SECURITY: Capture the project ID at function entry so every save site
     // can check the user hasn't switched projects mid-decompose. Without this,
     // the later save sites that use `activeProjectIdRef.current` would write
@@ -1335,7 +1360,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // to distinguish from the captured-closure `activeProjectId` which is also
     // pinned to the starting project.
     const startProjectId = activeProjectIdRef.current
+    if (!startProjectId) {
+      // Defensive — UI gates this button on activeProjectId, but if a caller
+      // invokes us without one we fail fast rather than sending literal null
+      // to every save action.
+      console.warn("[CAD-LAB] handleDecompose called without an active project")
+      setDecompositionError("No active project — load or create one before decomposing.")
+      return
+    }
     const stillOnStartProject = () => activeProjectIdRef.current === startProjectId
+
+    decomposeInFlightRef.current = true
     setIsDecomposing(true)
     setDecompositionError(null)
     setProgressLines([])
@@ -1508,6 +1543,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               if ("url" in illRes) {
                 fallbackHeroUrl = illRes.url
                 setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
+                setSystemIllustrationConfidence(illRes.confidence ?? null)
+                setSystemIllustrationIssues(illRes.issues ?? [])
                 saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
                 try { const cropRes = await fetchAndCropReferenceAction(illRes.url); if ("base64" in cropRes) referenceBase64 = cropRes.base64 } catch { /* Non-critical */ }
                 if (referenceBase64) {
@@ -1730,6 +1767,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             expandedModules.map(m => ({
               id: m.id, name: m.name, purpose: m.purpose, description: m.description,
               keyParts: m.keyParts, inputs: m.inputs, outputs: m.outputs,
+              mirrorOf: m.mirrorOf ?? null,
             })),
             skeletonRes.connections,
             extractExecutiveSummary(editableReport)?.slice(0, 2000) ?? editableReport.slice(0, 2000),
@@ -1854,8 +1892,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           else if ("url" in illRes) {
             illustrationUrl = illRes.url
             setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
+            setSystemIllustrationConfidence(illRes.confidence ?? null)
+            setSystemIllustrationIssues(illRes.issues ?? [])
             saveCadLabSystemIllustration(startProjectId!, illRes.url).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
-            addProgressLine("System illustration complete — preparing module image references...")
+            addProgressLine(
+              illRes.confidence === "low"
+                ? `System illustration complete with a low-confidence score (${illRes.score ?? "?"}/10) — preparing module images...`
+                : "System illustration complete — preparing module image references...",
+            )
           } else {
             setSystemIllustrationStatus("failed")
             setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
@@ -1961,6 +2005,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       toast.error(catchMsg)
     } finally {
       setIsDecomposing(false)
+      // Release the synchronous in-flight guard paired with the entry check.
+      decomposeInFlightRef.current = false
     }
   }, [editableReport, subject, modelId, activeProjectId, documentContext, refreshProjects, addProgressLine])
 
@@ -2446,6 +2492,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       const currentModules = modulesRef.current.map(m => ({
         id: m.id, name: m.name, purpose: m.purpose, description: m.description,
         keyParts: m.keyParts, inputs: m.inputs, outputs: m.outputs,
+        mirrorOf: m.mirrorOf ?? null,
       }))
       const reconcileRes = await reconcileDesignAction(
         subject,
@@ -3033,6 +3080,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     systemIllustrationStatusRef.current = "generating"
     setSystemIllustrationStatus("generating")
     setSystemIllustrationError(null)
+    setSystemIllustrationConfidence(null)
+    setSystemIllustrationIssues([])
     generateCadLabSystemIllustrationAction(
       activeProjectId,
       subject,
@@ -3044,8 +3093,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         if ("url" in illRes) {
           setSystemIllustrationUrl(illRes.url)
           setSystemIllustrationStatus("complete")
+          setSystemIllustrationConfidence(illRes.confidence ?? null)
+          setSystemIllustrationIssues(illRes.issues ?? [])
           saveCadLabSystemIllustration(activeProjectId!, illRes.url)
             .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
+          if (illRes.confidence === "low") {
+            toast.warning(
+              `Hero scored ${illRes.score ?? "?"}/10 — review before using downstream.`,
+              { description: illRes.issues?.slice(0, 2).join(" · ") || undefined, duration: 8000 },
+            )
+          }
 
           // INTENT: Offer module-image regen if any module is failed/pending.
           // Reads from the ref to avoid a stale snapshot across the await.
@@ -3799,8 +3856,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (alreadyRevised) return
 
     setIsRevising(true)
+    // INTENT: Strip heavy fields before Flight — same rationale as
+    // handleApplyReviewRevisions at line ~720. Post-image-gen CadLabModule
+    // objects carry imageUrl/result.svg*/templateMatchResult which bloat
+    // the Flight payload well past the 4MB limit. The checkpoint revision
+    // prompt only needs the 8 text fields below.
+    const leanModules = modulesRef.current.map(m => ({
+      id: m.id,
+      name: m.name,
+      purpose: m.purpose,
+      description: m.description,
+      keyParts: m.keyParts,
+      whyItMatters: m.whyItMatters,
+      failureModes: m.failureModes,
+      unknowns: m.unknowns,
+    }))
     reviseModulesFromCheckpoints({
-      modules: modulesRef.current,
+      modules: leanModules,
       checkpoints,
       researchReport: editableReport,
       projectSubject: subject,
@@ -4292,12 +4364,31 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const projectId = activeProjectIdRef.current
     if (!projectId || tripoPreviewStatus === "generating") return
 
-    // If Tripo was already generated via Compare Providers, reuse it
+    // If Tripo was already generated via Compare Providers, reuse it.
+    // GOTCHA: The stored glbUrl is a signed URL with a finite expiry (initially
+    // 1 hour, now 7 days) — after expiry the ModelViewer fetches a 403 and
+    // renders an empty canvas. Re-sign on read via refreshCadLabAssetUrlAction
+    // so users who return to a project after any amount of time get a working
+    // viewer. Fall through to regeneration only if re-sign itself fails.
     const existing = providerResults["tripo"]
     if (existing?.status === "completed" && existing.glbUrl) {
-      setTripoPreviewUrl(existing.glbUrl)
-      setTripoPreviewStatus("complete")
-      setTripoPreviewError(null)
+      ;(async () => {
+        setTripoPreviewStatus("generating")
+        setTripoPreviewError(null)
+        const refreshed = await refreshCadLabAssetUrlAction(projectId, existing.glbUrl!)
+        if ("url" in refreshed && refreshed.url) {
+          setTripoPreviewUrl(refreshed.url)
+          setTripoPreviewStatus("complete")
+          setTripoPreviewError(null)
+        } else {
+          // Refresh failed (asset gone, URL unparseable, etc). Reset so the
+          // regeneration branch below can fire on the next click.
+          console.warn("[CAD-LAB] Tripo preview URL refresh failed:", "error" in refreshed ? refreshed.error : "unknown")
+          setTripoPreviewUrl(null)
+          setTripoPreviewStatus("idle")
+          setTripoPreviewError(null)
+        }
+      })()
       return
     }
 
@@ -4500,7 +4591,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isGeneratingImages, imageGenProgress, handleGenerateModuleImages, handleRefreshModuleImages,
     revealedModuleIds,
     visualStyle,
-    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
+    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, systemIllustrationConfidence, systemIllustrationIssues, handleRetryIllustration,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, integrationAssemblyCode, setIntegrationError, handleGenerateIntegration,

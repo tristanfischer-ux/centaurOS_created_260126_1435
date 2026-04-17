@@ -82,7 +82,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     isGeneratingImages, handleGenerateModuleImages,
     revealedModuleIds,
     decompositionConnections, interfaceContracts, isExtractingContracts, generatingModuleIds, unmatchedPorts,
-    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
+    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, systemIllustrationConfidence, systemIllustrationIssues, handleRetryIllustration,
     progressLines,
     checkpoints, isCheckpointing,
     isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
@@ -847,6 +847,42 @@ export default function CadLabResearchPage(): React.ReactNode {
               {/* System overview illustration — below modules so user reads text content first */}
               {hasResearch && (
                 <>
+                  {systemIllustrationUrl && systemIllustrationStatus === "complete" && systemIllustrationConfidence === "low" && (
+                    <Card className="border-warning/40 bg-warning/5">
+                      <CardContent className="pt-4 pb-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                          <div className="flex-1 space-y-1.5">
+                            <p className="text-sm font-medium text-foreground">
+                              Low-confidence concept illustration
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              A vision check flagged consistency or plausibility issues. Review before relying on this hero as a design reference.
+                            </p>
+                            {systemIllustrationIssues.length > 0 && (
+                              <ul className="text-xs text-muted-foreground list-disc ml-4 space-y-0.5">
+                                {systemIllustrationIssues.slice(0, 3).map((issue, i) => (
+                                  <li key={i}>{issue}</li>
+                                ))}
+                              </ul>
+                            )}
+                            <div className="pt-1">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleRetryIllustration}
+                                className="text-xs gap-1.5"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                Regenerate
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
                     <Card className="overflow-hidden">
                       {/* 2D/3D segmented toggle + download */}

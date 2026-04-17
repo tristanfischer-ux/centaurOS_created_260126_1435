@@ -24,10 +24,12 @@ import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/imag
 import { getDesignSynthesisPrompt, getProductIdentityPrompt, getDesignReconciliationPrompt } from "@/lib/cad-lab/domain-prompts"
 import type { ModuleConnection } from "@/lib/cad-lab-types"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import { withAuth } from '@/lib/server-action-utils'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { ensureCadLabProjectOwnership, isSafeStorageUrl } from "@/lib/cad-lab/project-ownership"
+import { scoreRenderVision } from "@/lib/cad-lab/vision-scorer"
 
 /** Lean return type for single-image generation — avoids React Flight serialization limits */
 interface ImageGenResult {
@@ -329,6 +331,15 @@ export async function generateCadLabModuleImagesAction(
  * @param visualStyle - Optional shared visual style for cross-module cohesion
  * @returns The public URL of the generated illustration, or an error
  */
+/** Threshold below which the hero is considered low-confidence and returned
+ *  with a `"low"` flag so the UI can surface a warning banner. 7 is the same
+ *  threshold the module-level pipeline uses (see cad-lab.ts:1311). */
+const HERO_QUALITY_THRESHOLD = 7
+/** Max attempts to regenerate a low-scoring hero before we accept the best
+ *  one. Keeps cost bounded (each retry costs one image gen + one vision call
+ *  ≈ $0.08) while still catching egregious failures. */
+const HERO_MAX_ATTEMPTS = 2
+
 export async function generateCadLabSystemIllustrationAction(
   projectId: string,
   subject: string,
@@ -338,21 +349,127 @@ export async function generateCadLabSystemIllustrationAction(
   researchExcerpt?: string,
   heroPrompt?: string,
   referenceImageUrls?: string[],
-): Promise<{ url: string } | { error: string }> {
+): Promise<{ url: string; confidence?: "high" | "low"; score?: number; issues?: string[] } | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     // SECURITY: hero illustration also writes to xray-images/<projectId>/.
     const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
     if (ownershipErr) return { error: ownershipErr }
 
+    // INTENT: Build a domain-aware rubric so low-scoring heroes get caught.
+    // The rubric describes what the hero SHOULD show; the vision scorer then
+    // decides whether the rendered PNG matches. Without this, the system would
+    // happily persist physically implausible output (asymmetric wings, sideways
+    // propellers, floating sub-assemblies) with no quality signal.
+    const rubric = buildHeroQualityRubric(subject, moduleNames, modulePurposes)
+
+    let bestUrl: string | null = null
+    let bestScore = -1
+    let bestIssues: string[] = []
+
     try {
-      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt, heroPrompt, referenceImageUrls)
-      return { url }
+      for (let attempt = 1; attempt <= HERO_MAX_ATTEMPTS; attempt++) {
+        const url = await generateResearchIllustration(
+          projectId,
+          subject,
+          moduleNames,
+          modulePurposes,
+          visualStyle,
+          researchExcerpt,
+          heroPrompt,
+          referenceImageUrls,
+        )
+        // Fetch the rendered hero bytes and base64-encode for the scorer.
+        // If the fetch fails (CDN hiccup, signed-URL oddity), skip scoring
+        // rather than blocking the action — a working but unscored hero is
+        // still more useful than no hero.
+        let score: number | null = null
+        let issues: string[] = []
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer())
+            const base64 = buf.toString("base64")
+            const result = await scoreRenderVision(
+              base64,
+              rubric,
+              "System Illustration",
+              undefined,
+              undefined,
+              "image/png",
+            )
+            if (result) {
+              score = result.score
+              issues = result.issues
+              console.log(`[CAD-LAB-IMAGES] Hero attempt ${attempt} scored ${result.score}/10 — ${result.summary}`)
+              if (result.issues.length > 0) {
+                console.log(`[CAD-LAB-IMAGES] Hero issues: ${result.issues.join(" | ")}`)
+              }
+            }
+          }
+        } catch (scoreErr) {
+          console.warn("[CAD-LAB-IMAGES] Hero vision scoring failed (non-fatal):", sanitizeErrorMessage(scoreErr))
+        }
+
+        // Always keep the best-scoring attempt (unknown score counts as 0).
+        const effectiveScore = score ?? 0
+        if (effectiveScore > bestScore) {
+          bestUrl = url
+          bestScore = effectiveScore
+          bestIssues = issues
+        }
+
+        // Early-exit once we clear the threshold — don't pay for more attempts.
+        if (score !== null && score >= HERO_QUALITY_THRESHOLD) break
+      }
+
+      if (!bestUrl) {
+        return { error: "Hero generation failed after all attempts" }
+      }
+
+      const confidence: "high" | "low" = bestScore >= HERO_QUALITY_THRESHOLD ? "high" : "low"
+      return { url: bestUrl, confidence, score: bestScore, issues: bestIssues }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.error("[CAD-LAB-IMAGES] Failed to generate system illustration:", errorMsg)
       return { error: errorMsg }
     }
   })
+}
+
+/** Build the hero quality rubric used by the vision scorer. Generic by default;
+ *  when the subject line matches aircraft-adjacent keywords we layer in hard
+ *  geometric constraints (symmetric wings, forward-facing propellers, tail
+ *  attached to fuselage) because those are the failure modes we've seen. */
+function buildHeroQualityRubric(
+  subject: string,
+  moduleNames: string[],
+  modulePurposes: string[],
+): string {
+  const subjectLc = subject.toLowerCase()
+  const aircraftTerms = ["uav", "drone", "aircraft", "airplane", "plane", "glider", "haps", "wingspan", "rotorcraft", "helicopter", "quadcopter", "airship", "vtol", "aeroplane"]
+  const isAircraft = aircraftTerms.some((t) => subjectLc.includes(t))
+
+  const moduleSummary = moduleNames.length > 0
+    ? `The product decomposes into these modules: ${moduleNames.slice(0, 12).map((n, i) => `${n}${modulePurposes[i] ? ` (${modulePurposes[i].slice(0, 80)})` : ""}`).join("; ")}.`
+    : ""
+
+  const aircraftRules = isAircraft
+    ? `\n\nAIRCRAFT-SPECIFIC CONSTRAINTS (MANDATORY for a good score):
+- Wings must be SYMMETRIC: identical shape, identical colour/material, identical surface detail (including solar-cell layout) on left and right.
+- Propellers must face FORWARD along the flight axis. Side-mounted props facing outboard are WRONG.
+- Propeller count must be plausible for the configuration (typically 2 or 4 for a fixed-wing UAV). An odd fifth propeller on a detached pod is WRONG.
+- The empennage (tail) must be CONNECTED to the fuselage (directly or via a visible boom). A floating detached tail is WRONG.
+- Wings must attach to the fuselage at a wing root. Wings floating in space beside the fuselage are WRONG.
+- A single part should not appear twice (e.g. a battery pack drawn both inside the fuselage and outside).`
+    : ""
+
+  return `Product: ${subject}
+
+The rendered image should be a physically plausible, coherent single-product illustration — an assembled or cleanly exploded view of ONE product, NOT a collage of disconnected parts. All mirror-pair components (e.g. left and right wings, port and starboard thrusters) MUST render as visually identical mirror copies of each other: same colour, same material, same surface detail.
+
+${moduleSummary}${aircraftRules}
+
+Score the render against these expectations. A score of ≥ 7 means the render is usable as a system illustration in a founder-facing design tool. A score of < 7 means the render has at least one serious consistency or plausibility issue the user should be warned about.`
 }
 
 /**
@@ -774,7 +891,7 @@ interface ReconciliationResult {
  */
 export async function reconcileDesignAction(
   subject: string,
-  modules: Array<{ id: string; name: string; purpose: string; description: string; keyParts: string[]; inputs: string[]; outputs: string[] }>,
+  modules: Array<{ id: string; name: string; purpose: string; description: string; keyParts: string[]; inputs: string[]; outputs: string[]; mirrorOf?: string | null }>,
   connections?: ModuleConnection[],
   researchExcerpt?: string,
   productIdentity?: Partial<VisualStyleSpec>,
@@ -800,7 +917,23 @@ export async function reconcileDesignAction(
       ? `\n\nProduct Design Identity:\n- Design Language: ${productIdentity.designLanguage ?? "not established"}\n- Consistency Brief: ${productIdentity.consistencyBrief ?? "not established"}\n- Spatial Principles: ${productIdentity.spatialPrinciples?.join(", ") ?? "not established"}\n- Color Palette: ${productIdentity.colorPalette ?? "not established"}\n- Material Rendering: ${productIdentity.materialRendering ?? "not established"}`
       : ""
 
-    const userMessage = `Product: ${subject}${identityContext}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}`
+    // INTENT: Expose mirror-pair relationships to Opus so the MIRROR PAIR SYMMETRY
+    // rule in getDesignReconciliationPrompt() can actually fire. Previously the
+    // reconciliation prompt asked Opus to "assign the IDENTICAL prompt text to
+    // BOTH module IDs in perModuleImagePrompts" for mirror pairs, but the
+    // user-message never told Opus which modules were mirrors — so it treated
+    // Left Wing and Right Wing as independent modules and produced different
+    // colour/cell-layout directives for each, leaking into the hero as an
+    // asymmetric two-tone aircraft.
+    const modulesById = new Map(modules.map((m) => [m.id, m]))
+    const mirrorLines = modules
+      .filter((m) => m.mirrorOf && modulesById.has(m.mirrorOf))
+      .map((m) => `- ${m.name} (id: ${m.id}) is the mirror of ${modulesById.get(m.mirrorOf!)?.name} (id: ${m.mirrorOf})`)
+    const mirrorContext = mirrorLines.length > 0
+      ? `\n\n## Mirror Pair Relationships (CRITICAL for symmetry)\nThe following modules are mirror pairs. Per the MIRROR PAIR SYMMETRY rule, assign IDENTICAL perModuleImagePrompts entries to each mirror pair, and ensure colourPalette decisions treat them as a single logical part (same colour, same material, same cell layout):\n${mirrorLines.join("\n")}`
+      : ""
+
+    const userMessage = `Product: ${subject}${identityContext}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}${mirrorContext}`
 
     try {
       const response = await fetchWithTimeout(
@@ -866,6 +999,73 @@ export async function reconcileDesignAction(
       console.error("[CAD-LAB-IMAGES] Reconciliation failed:", errorMsg)
       return { error: errorMsg }
     }
+  })
+}
+
+/**
+ * Re-signs a CAD Lab storage URL so stored signed URLs don't expire out from
+ * under persistent UI state (most notably the 3D viewer's `tripoPreviewUrl`).
+ *
+ * @description The generate-provider and generate-gencad routes write signed
+ * URLs into the `cad_lab_projects` row (`provider_results`, `integrated_-
+ * assembly_stl_url`, etc). Signed URLs have a finite lifetime — the viewer
+ * breaks silently once they expire. This action takes the stored URL, verifies
+ * it belongs to the caller's foundry, extracts the storage path, and returns a
+ * freshly-signed URL with a 7-day expiry.
+ *
+ * @security Uses withAuth + ensureCadLabProjectOwnership. The URL must point
+ * to the project's storage namespace (cad-lab/<projectId>/...) or the action
+ * refuses to re-sign.
+ *
+ * @param projectId - Project UUID for ownership check
+ * @param expiredUrl - The stored (possibly-expired) signed URL
+ * @returns { url } with a fresh 7-day signed URL, or { error }
+ */
+export async function refreshCadLabAssetUrlAction(
+  projectId: string,
+  expiredUrl: string,
+): Promise<{ url: string } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const ownErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownErr) return { error: ownErr }
+
+    if (!expiredUrl || !isSafeStorageUrl(expiredUrl)) {
+      return { error: "Invalid storage URL" }
+    }
+
+    // Storage signed URLs look like:
+    //   https://<host>/storage/v1/object/sign/<bucket>/<path>?token=...
+    // Extract <bucket> + <path> so we can re-sign the same object.
+    let bucket: string
+    let objectPath: string
+    try {
+      const parsed = new URL(expiredUrl)
+      const match = parsed.pathname.match(/^\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/(.+)$/)
+      if (!match) return { error: "Unrecognised storage URL shape" }
+      bucket = decodeURIComponent(match[1])
+      objectPath = decodeURIComponent(match[2])
+    } catch {
+      return { error: "Failed to parse storage URL" }
+    }
+
+    // SECURITY: Refuse to re-sign URLs that don't live under this project's
+    // storage namespace — stops a caller from re-signing cross-project assets
+    // that happen to still live in the same bucket.
+    const expectedPrefix = `cad-lab/${projectId}/`
+    if (!objectPath.startsWith(expectedPrefix)) {
+      return { error: "Asset does not belong to this project" }
+    }
+
+    const admin = createAdminClient()
+    const { data, error } = await admin.storage
+      .from(bucket)
+      .createSignedUrl(objectPath, 60 * 60 * 24 * 7)
+
+    if (error || !data?.signedUrl) {
+      console.error("[CAD-LAB-IMAGES] Failed to re-sign asset URL:", error?.message)
+      return { error: "Failed to refresh URL" }
+    }
+    return { url: data.signedUrl }
   })
 }
 

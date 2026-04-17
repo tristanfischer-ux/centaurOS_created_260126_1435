@@ -23,11 +23,15 @@ export interface VisionScoreResult {
  * Sends an SVG render to Claude vision API and scores how well it matches
  * the product description (or a reference image when provided).
  *
- * @param svgIsoBase64 - Base64-encoded SVG of the isometric view
+ * @param svgIsoBase64 - Base64-encoded image to score (SVG by default; set
+ *   `renderMediaType` to "image/png" or "image/jpeg" to score rasters)
  * @param productDescription - What the product should look like
  * @param moduleName - Name of the module being scored
  * @param interfaceDefinition - Optional interface spec for more precise scoring
  * @param referenceImageBase64 - Optional hero image for visual comparison (much more accurate than text-only)
+ * @param renderMediaType - Media type of svgIsoBase64. Defaults to "image/svg+xml"
+ *   for backward compatibility with the per-module caller. The hero caller
+ *   passes "image/png" since hero illustrations are PNG.
  * @returns Score result, or null on any failure (non-blocking)
  */
 export async function scoreRenderVision(
@@ -36,6 +40,7 @@ export async function scoreRenderVision(
   moduleName: string,
   interfaceDefinition?: string,
   referenceImageBase64?: string,
+  renderMediaType: "image/svg+xml" | "image/png" | "image/jpeg" = "image/svg+xml",
 ): Promise<VisionScoreResult | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
@@ -93,7 +98,7 @@ Do not include any text outside the JSON.`
     }
     contentBlocks.push({
       type: "image",
-      source: { type: "base64", media_type: "image/svg+xml", data: svgIsoBase64 },
+      source: { type: "base64", media_type: renderMediaType, data: svgIsoBase64 },
     })
 
     const textPrompt = referenceImageBase64

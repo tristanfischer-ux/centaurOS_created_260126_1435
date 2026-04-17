@@ -91,10 +91,15 @@ async function uploadComparisonAsset(
 
   if (error) throw new Error(`Failed to upload ${filename}: ${error.message}`)
 
-  // SECURITY: Use signed URL — generated CAD comparison files are confidential
+  // SECURITY: Use signed URL — generated CAD comparison files are confidential.
+  // GOTCHA: The signed URL is persisted in `provider_results` JSONB and read
+  // back across sessions when users return to a project. 1-hour expiry
+  // silently broke the 3D viewer within an hour of a first render. 7 days
+  // matches the pattern used for other CAD assets and gives the downstream
+  // `refreshCadLabAssetUrlAction` a larger fresh-sign window on read.
   const { data: signedData } = await admin.storage
     .from(CAD_LAB_STORAGE_BUCKET)
-    .createSignedUrl(path, 3600)
+    .createSignedUrl(path, 60 * 60 * 24 * 7)
 
   return {
     url: signedData?.signedUrl ?? '',
