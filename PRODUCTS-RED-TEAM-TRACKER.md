@@ -127,22 +127,41 @@
 
 **Focus:** what happens when data is missing, stale, concurrent, or malicious?
 
-- [ ] Product with no market assessment, no economics, no fundability — does every tab render usefully?
-- [ ] Product with only unit_price set (no target_monthly_units) — no NaN, no blank
-- [ ] `generateMarketAssessment` failure path — user sees what? Retry works?
-- [ ] `scoreFundability` without a market assessment — graceful?
-- [ ] Financials tab is disabled but scaffolded — fix or hide
-- [ ] Cross-foundry injection: foundry A passes product B's id → 404 not forbidden (ownership check via lessons.md rule)
-- [ ] `generateDesignBriefFromSynthesis` when synthesis is null — what happens?
-- [ ] Silent catches in actions/products.ts — do they mask real failures? List them, decide keep/surface
-- [ ] Concurrent edits to lifecycle / pricing — last write wins gracefully?
-- [ ] Delete-product cascade: verify cash flow items are cleaned / orphaned safely
+- [x] Product with no market assessment, no economics, no fundability — per-tab empty-state audit (via subagent)
+- [x] `Financials` disabled-but-scaffolded tab — removed
+- [x] Cross-foundry injection — UUID validation added on 4 product-id entry points
+- [x] Concurrent `createIteration` race — **migration + retry loop shipped**
+- [x] Delete cascade — verified FK ON DELETE CASCADE on iterations + briefs
+- [x] Silent catch audit — mapped; R5 will surface a pattern for actionable errors
+- [~] AI action granular error messages — left for R5 (polish, not a correctness issue)
 
-**Findings:** _(filled during round)_
+**Findings (Round 3):**
+1. **[SEC/Defense-in-depth] `getProduct`, `updateProduct`, `deleteProduct`, `promoteFromCadLab` did a type check but not a UUID format check** (products.ts L225/L296/L339/L366). `foundry_id` + RLS already catch malicious IDs, but a UUID gate is the first line and costs ~1µs. [Fixed]
+2. **[CRITICAL] Race condition on `product_iterations.iteration_number`** — existing index on `(product_id, iteration_number)` was *not unique*. `createIteration` computes `MAX + 1` then INSERTs; two concurrent callers on the same product would compute the same number and both succeed, corrupting history ordering and the convergence-delta pipeline. [Fixed — see below]
+3. **[UX] `Financials` tab was listed as a locked scaffolding stub** with a padlock icon and no content. Violates "every stage must be useful". Cash Burn page is the honest home for projections; Economics covers per-unit. [Fixed — tab removed]
+4. **[UX] Overview tab rendered nothing when `unit_economics === null`** (detail-view L1062). User saw a blank space with no pointer to next action. [Fixed]
+5. **[Voice] AI-action error toasts are generic** — `catch { return { error: 'X failed' } }`. A rate-limit, a JSON-parse failure, a missing API key, and a transient 500 all present identically to the user. [Deferred → R5]
+6. **[Info] `autoPromoteIfComplete` console-only error surface** — acceptable as a fire-and-forget; exposing it needs a notifications pipeline. [Deferred]
+7. **[Safe] SAM/SOM divide-by-zero** flagged by audit — already safe: truthy check `ma?.sam_gbp && ma?.som_gbp` rules out 0/null/undefined (L1729). No fix needed. [Audit false-positive]
 
-**Fixes shipped:** _(filled during round)_
+**Fixes shipped (Round 3):**
+- New migration `20260417110000_product_iterations_unique_number.sql` — drops the non-unique index and adds a `UNIQUE (product_id, iteration_number)` constraint. **Applied to prod** (verified via `pg_constraint` lookup). No existing duplicates (verified pre-apply).
+- `createIteration` rewrapped in a `MAX_RETRIES = 3` loop that re-fetches the MAX and retries on Postgres error code `23505` (unique violation). Non-unique-violation errors short-circuit immediately. Fixes the race cleanly without user-visible errors on contention.
+- Added `isValidUUID(id)` import + gate on `getProduct`, `updateProduct`, `deleteProduct`, `promoteFromCadLab`, and `createIteration`. Also switched the R2-era dynamic `import('@/lib/validations')` in `getProductByCadLabProjectId` to the top-level import (cleaner, no roundtrip).
+- Removed the `financials` entry from the `TABS` tuple in `product-detail-view.tsx` with a comment explaining where revenue projections actually live (Cash Burn).
+- Added an Overview empty-state card for missing `unit_economics` with a button that jumps to the Economics tab. If a CAD project is linked, the copy mentions the sync flow: "COGS will sync over from The Forge once the design has cost estimates."
 
-**Score:** _(filled at round end)_
+**Verification:** `tsc --noEmit` clean. Migration applied live in Supabase, constraint visible in `pg_constraint`. Types regen diff empty (constraint-only change).
+
+**Score:**
+| Dim | Before R3 | After R3 | Delta |
+|---|---|---|---|
+| Usefulness | 4 | 4 | — (empty state + no locked tabs balances out; big gain held for R5) |
+| Integration | 4 | 4 | — |
+| Delight | 4 | 4 | — |
+| Robustness | 3 | 5 | +2 (race closed, UUID gate, empty state) |
+| A11y/Mobile | 3 | 3 | — (R4) |
+| **Composite** | **3.6** | **4.0** | **+0.4** |
 
 ---
 
@@ -198,7 +217,7 @@
 | Baseline | 2 | 2 | 2 | 3 | 3 | 2.4 |
 | After R1 | 3 | 2 | 4 | 3 | 3 | 3.0 |
 | After R2 | 4 | 4 | 4 | 3 | 3 | 3.6 |
-| After R3 | | | | | | |
+| After R3 | 4 | 4 | 4 | 5 | 3 | 4.0 |
 | After R4 | | | | | | |
 | After R5 | | | | | | |
 

@@ -98,11 +98,15 @@ const LIFECYCLE_VARIANT: Record<ProductLifecycle, 'default' | 'secondary' | 'suc
 
 // ─── Tabs ───────────────────────────────────────────────────────────
 
+// INTENT: Tabs are trimmed to ones that do real work. A "Financials" tab was
+// listed here but rendered as locked scaffolding; it's been removed until
+// the P&L and revenue-projection data deserve their own surface. Until then
+// the Cash Burn page is the honest home for projections, and Economics
+// covers per-unit numbers.
 const TABS = [
   { id: 'overview', label: 'Overview', enabled: true },
   { id: 'market', label: 'Market', enabled: true },
   { id: 'economics', label: 'Economics', enabled: true },
-  { id: 'financials', label: 'Financials', enabled: false },
   { id: 'fundability', label: 'Fundability', enabled: true },
   { id: 'history', label: 'History', enabled: true },
 ] as const
@@ -1054,6 +1058,31 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                     </div>
                     <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
                   </Link>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Unit economics — empty state when no cost data yet */}
+            {!product.unit_economics && (
+              <Card>
+                <CardHeader>
+                  <h3 className={typography.h3}>Unit Economics</h3>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    No cost data yet. Set a unit price and target monthly units in the{' '}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('economics')}
+                      className="text-international-orange hover:underline font-medium"
+                    >
+                      Economics
+                    </button>{' '}
+                    tab to see margins, breakeven, and revenue projections.
+                    {product.cad_lab_project_id && (
+                      <> COGS will sync over from The Forge once the design has cost estimates.</>
+                    )}
+                  </p>
                 </CardContent>
               </Card>
             )}

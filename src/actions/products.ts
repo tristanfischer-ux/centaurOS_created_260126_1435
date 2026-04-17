@@ -19,6 +19,7 @@
 import { withAuth } from '@/lib/server-action-utils'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { isValidUUID } from '@/lib/validations'
 import type {
   Product,
   ProductSummary,
@@ -193,7 +194,6 @@ export async function getProductByCadLabProjectId(
   return withAuth(async ({ supabase, foundryId }) => {
     // VALIDATION: silent null on bad input — caller renders nothing
     if (!cadLabProjectId || typeof cadLabProjectId !== 'string') return { data: null }
-    const { isValidUUID } = await import('@/lib/validations')
     if (!isValidUUID(cadLabProjectId)) return { data: null }
 
     const { data, error } = await productsTable(supabase)
@@ -224,8 +224,12 @@ export async function getProductByCadLabProjectId(
  */
 export async function getProduct(id: string): Promise<ActionResult<Product>> {
   return withAuth(async ({ supabase, foundryId }) => {
-    // VALIDATION: Basic UUID format check
-    if (!id || typeof id !== 'string') return { error: 'Invalid product ID' }
+    // VALIDATION: UUID format gate — rejects malformed/malicious input before
+    // the query runs. Foundry filter + RLS is defense in depth; this is the
+    // first line.
+    if (!id || typeof id !== 'string' || !isValidUUID(id)) {
+      return { error: 'Invalid product ID' }
+    }
 
     const { data, error } = await productsTable(supabase)
       .select('*')
@@ -295,7 +299,9 @@ export async function createProduct(input: CreateProductInput): Promise<ActionRe
  */
 export async function updateProduct(id: string, input: UpdateProductInput): Promise<ActionResult<Product>> {
   return withAuth(async ({ supabase, foundryId }) => {
-    if (!id || typeof id !== 'string') return { error: 'Invalid product ID' }
+    if (!id || typeof id !== 'string' || !isValidUUID(id)) {
+      return { error: 'Invalid product ID' }
+    }
 
     // VALIDATION: Prevent empty name
     if (input.name !== undefined && !input.name.trim()) {
@@ -338,7 +344,9 @@ export async function updateProduct(id: string, input: UpdateProductInput): Prom
  */
 export async function deleteProduct(id: string): Promise<ActionResult<{ success: true }>> {
   return withAuth(async ({ supabase, foundryId }) => {
-    if (!id || typeof id !== 'string') return { error: 'Invalid product ID' }
+    if (!id || typeof id !== 'string' || !isValidUUID(id)) {
+      return { error: 'Invalid product ID' }
+    }
 
     const { error } = await productsTable(supabase)
       .delete()
@@ -365,7 +373,7 @@ export async function deleteProduct(id: string): Promise<ActionResult<{ success:
  */
 export async function promoteFromCadLab(cadLabProjectId: string): Promise<ActionResult<Product>> {
   return withAuth(async ({ supabase, user, foundryId }) => {
-    if (!cadLabProjectId || typeof cadLabProjectId !== 'string') {
+    if (!cadLabProjectId || typeof cadLabProjectId !== 'string' || !isValidUUID(cadLabProjectId)) {
       return { error: 'Invalid CAD Lab project ID' }
     }
 
@@ -996,75 +1004,95 @@ export async function createIteration(
   hypothesis: string,
 ): Promise<ActionResult<ProductIteration>> {
   return withAuth(async ({ supabase, foundryId }) => {
-    if (!productId || typeof productId !== 'string') return { error: 'Invalid product ID' }
-
-    // FLOW: Fetch all existing iterations to determine number + convergence
-    const { data: existing, error: fetchError } = await iterationsTable(supabase)
-      .select('iteration_number, pareto_scores, convergence_delta')
-      .eq('product_id', productId)
-      .eq('foundry_id', foundryId)
-      .order('iteration_number', { ascending: true })
-
-    if (fetchError) return { error: fetchError.message }
-
-    const iterations = (existing ?? []) as Array<{
-      iteration_number: number
-      pareto_scores: IterationPareto
-      convergence_delta: number
-    }>
-
-    const nextNumber = iterations.length > 0
-      ? Math.max(...iterations.map(i => i.iteration_number)) + 1
-      : 1
-
-    // INTENT: Compute convergence delta — difference in total Pareto score vs previous
-    const currentTotal = scores.market + scores.financial + scores.fundability + scores.manufacturing
-    let convergenceDelta = 0
-    let convergenceStatus: ConvergenceStatus = 'initial'
-
-    if (iterations.length > 0) {
-      const prev = iterations[iterations.length - 1]
-      const prevScores = prev.pareto_scores
-      const prevTotal = prevScores.market + prevScores.financial + prevScores.fundability + prevScores.manufacturing
-      convergenceDelta = currentTotal - prevTotal
-
-      // INTENT: Check for convergence — 3+ iterations with small deltas
-      const recentDeltas = [
-        ...iterations.slice(-2).map(i => i.convergence_delta),
-        convergenceDelta,
-      ]
-      const allSmall = recentDeltas.length >= 3 && recentDeltas.every(d => Math.abs(d) < 5)
-
-      if (allSmall) {
-        convergenceStatus = 'converged'
-      } else if (convergenceDelta > 10) {
-        convergenceStatus = 'improving'
-      } else if (convergenceDelta >= 0) {
-        convergenceStatus = 'moderate'
-      } else if (convergenceDelta >= -5) {
-        convergenceStatus = 'plateauing'
-      } else {
-        convergenceStatus = 'regressing'
-      }
+    if (!productId || typeof productId !== 'string' || !isValidUUID(productId)) {
+      return { error: 'Invalid product ID' }
     }
 
-    const { data, error } = await iterationsTable(supabase)
-      .insert({
-        product_id: productId,
-        foundry_id: foundryId,
-        iteration_number: nextNumber,
-        pareto_scores: scores,
-        changes_made: changes,
-        hypothesis,
-        convergence_delta: convergenceDelta,
-        convergence_status: convergenceStatus,
-      })
-      .select('*')
-      .single()
+    // GOTCHA: The (product_id, iteration_number) unique constraint from
+    // migration 20260417110000 rejects racing INSERTs. When that happens the
+    // loser re-fetches and retries with a fresh MAX. Up to 3 retries before
+    // we surface the error.
+    const MAX_RETRIES = 3
+    let lastError: string | null = null
 
-    if (error) return { error: error.message }
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      // FLOW: Fetch all existing iterations to determine number + convergence
+      const { data: existing, error: fetchError } = await iterationsTable(supabase)
+        .select('iteration_number, pareto_scores, convergence_delta')
+        .eq('product_id', productId)
+        .eq('foundry_id', foundryId)
+        .order('iteration_number', { ascending: true })
 
-    return { data: data as ProductIteration }
+      if (fetchError) return { error: fetchError.message }
+
+      const iterations = (existing ?? []) as Array<{
+        iteration_number: number
+        pareto_scores: IterationPareto
+        convergence_delta: number
+      }>
+
+      const nextNumber = iterations.length > 0
+        ? Math.max(...iterations.map(i => i.iteration_number)) + 1
+        : 1
+
+      // INTENT: Compute convergence delta — difference in total Pareto score vs previous
+      const currentTotal = scores.market + scores.financial + scores.fundability + scores.manufacturing
+      let convergenceDelta = 0
+      let convergenceStatus: ConvergenceStatus = 'initial'
+
+      if (iterations.length > 0) {
+        const prev = iterations[iterations.length - 1]
+        const prevScores = prev.pareto_scores
+        const prevTotal = prevScores.market + prevScores.financial + prevScores.fundability + prevScores.manufacturing
+        convergenceDelta = currentTotal - prevTotal
+
+        // INTENT: Check for convergence — 3+ iterations with small deltas
+        const recentDeltas = [
+          ...iterations.slice(-2).map(i => i.convergence_delta),
+          convergenceDelta,
+        ]
+        const allSmall = recentDeltas.length >= 3 && recentDeltas.every(d => Math.abs(d) < 5)
+
+        if (allSmall) {
+          convergenceStatus = 'converged'
+        } else if (convergenceDelta > 10) {
+          convergenceStatus = 'improving'
+        } else if (convergenceDelta >= 0) {
+          convergenceStatus = 'moderate'
+        } else if (convergenceDelta >= -5) {
+          convergenceStatus = 'plateauing'
+        } else {
+          convergenceStatus = 'regressing'
+        }
+      }
+
+      const { data, error } = await iterationsTable(supabase)
+        .insert({
+          product_id: productId,
+          foundry_id: foundryId,
+          iteration_number: nextNumber,
+          pareto_scores: scores,
+          changes_made: changes,
+          hypothesis,
+          convergence_delta: convergenceDelta,
+          convergence_status: convergenceStatus,
+        })
+        .select('*')
+        .single()
+
+      if (!error && data) return { data: data as ProductIteration }
+
+      // Unique-violation on (product_id, iteration_number) — retry.
+      // Postgres error code 23505 surfaces via error.code; fall through if it's
+      // any other error since those are unlikely to succeed on retry.
+      const isUniqueViolation =
+        (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === '23505') ||
+        (error?.message ?? '').includes('duplicate key value violates unique constraint')
+      if (!isUniqueViolation) return { error: error?.message ?? 'Failed to create iteration' }
+      lastError = error?.message ?? 'Unique violation'
+    }
+
+    return { error: lastError ?? 'Failed to create iteration after retries' }
   })
 }
 
