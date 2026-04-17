@@ -18,6 +18,7 @@
 import { zodResponseFormat } from "openai/helpers/zod"
 import OpenAI from "openai"
 
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { AIScanOutputSchema, ModuleSpecSchema } from "./xray-schema"
 
 import type { XRaySpec, ModuleSpec } from "./xray-schema"
@@ -118,21 +119,24 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
   const { withRetry } = await import("@/lib/retry")
 
   const parsed = await withRetry<AIScanOutput>(async () => {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const resp = await fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-6",
+          max_tokens: 32768,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMessage }],
+        }),
       },
-      body: JSON.stringify({
-        model: "claude-opus-4-6",
-        max_tokens: 32768,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userMessage }],
-      }),
-      signal: AbortSignal.timeout(240_000), // 4 min — Opus with 32K output for thorough decomposition
-    })
+      240_000, // 4 min — Opus with 32K output for thorough decomposition
+    )
 
     if (!resp.ok) {
       const errText = await resp.text()

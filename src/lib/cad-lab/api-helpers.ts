@@ -396,13 +396,16 @@ export async function searchCadModels(
 
     const url = `https://api.thingiverse.com/search/${encodeURIComponent(searchTerm)}?type=things&per_page=5&sort=relevant`
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
+    const response = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
       },
-      signal: AbortSignal.timeout(10_000),
-    })
+      10_000,
+    )
 
     if (!response.ok) {
       console.warn(`[THE-FORGE] Thingiverse API error (${response.status})`)
@@ -488,16 +491,19 @@ export function getModalCadBaseUrl(): string {
 }
 
 export async function executeOnModal(code: string): Promise<ModalResponse> {
-  const response = await fetch(`${getModalCadBaseUrl()}/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      code,
-      module_id: "cad-lab-v3",
-      material_density: 1240,
-    }),
-    signal: AbortSignal.timeout(600_000), // 10 min — building models need extended execution time
-  })
+  const response = await fetchWithTimeout(
+    `${getModalCadBaseUrl()}/generate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        module_id: "cad-lab-v3",
+        material_density: 1240,
+      }),
+    },
+    280_000, // Clamped from 600_000 — Vercel 300s cap
+  )
 
   if (!response.ok) {
     const errText = await response.text()
@@ -529,17 +535,20 @@ export async function executeMashupOnModal(
   mashupCode: string,
   materialDensity: number = 1240,
 ): Promise<MashupModalResponse> {
-  const response = await fetch(`${getModalCadBaseUrl()}/mashup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sources,
-      mashup_code: mashupCode,
-      module_id: "mashup",
-      material_density: materialDensity,
-    }),
-    signal: AbortSignal.timeout(600_000),
-  })
+  const response = await fetchWithTimeout(
+    `${getModalCadBaseUrl()}/mashup`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sources,
+        mashup_code: mashupCode,
+        module_id: "mashup",
+        material_density: materialDensity,
+      }),
+    },
+    280_000, // Clamped from 600_000 — Vercel 300s cap
+  )
 
   if (!response.ok) {
     const errText = await response.text()

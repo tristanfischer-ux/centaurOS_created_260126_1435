@@ -13,6 +13,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { rateLimit } from "@/lib/security/rate-limit"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min — match module generation
@@ -97,7 +98,7 @@ async function fetchStepAsBase64(url: string): Promise<string> {
     throw new Error(`Source URL host not allowed: ${parsed.hostname}`)
   }
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  const res = await fetchWithTimeout(url, {}, 30_000)
   if (!res.ok) throw new Error(`Failed to fetch source: ${res.status}`)
 
   const buf = Buffer.from(await res.arrayBuffer())
@@ -216,17 +217,20 @@ export async function POST(
   }
 
   try {
-    const response = await fetch(`${baseUrl}/mashup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sources: modalSources,
-        mashup_code,
-        module_id: mashup_project_id ?? "mashup",
-        material_density,
-      }),
-      signal: AbortSignal.timeout(600_000),
-    })
+    const response = await fetchWithTimeout(
+      `${baseUrl}/mashup`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sources: modalSources,
+          mashup_code,
+          module_id: mashup_project_id ?? "mashup",
+          material_density,
+        }),
+      },
+      280_000, // Clamped from 600_000 — Vercel 300s cap
+    )
 
     if (!response.ok) {
       const errText = await response.text()

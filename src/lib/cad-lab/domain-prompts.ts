@@ -8,6 +8,8 @@
  * @related src/actions/cad-lab.ts
  */
 
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+
 export type CadLabDomain = "electronics" | "mechanical" | "electromechanical" | "fluid"
 
 const DOMAIN_VALUES: CadLabDomain[] = ["electronics", "mechanical", "electromechanical", "fluid"]
@@ -60,21 +62,24 @@ async function classifyWithClaude(
   if (!apiKey) return "mechanical"
 
   const truncated = text.slice(0, 8000)
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+  const response = await fetchWithTimeout(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 32,
+        system: prompt,
+        messages: [{ role: "user", content: truncated }],
+      }),
     },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 32,
-      system: prompt,
-      messages: [{ role: "user", content: truncated }],
-    }),
-    signal: AbortSignal.timeout(15_000),
-  })
+    15_000,
+  )
 
   if (!response.ok) return "mechanical"
   const data = await response.json()

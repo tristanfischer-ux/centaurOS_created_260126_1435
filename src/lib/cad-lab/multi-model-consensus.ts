@@ -9,6 +9,7 @@
  */
 
 import { withRetry } from '@/lib/retry'
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 
 export interface ConsensusResult {
   /** Agreed value when 2+ models match; null when no majority */
@@ -47,21 +48,24 @@ async function callClaude(systemPrompt: string, userPrompt: string): Promise<str
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
   return withRetry(async () => {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const response = await fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-6",
+          max_tokens: 256,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
       },
-      body: JSON.stringify({
-        model: "claude-opus-4-6",
-        max_tokens: 256,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-      signal: AbortSignal.timeout(30_000),
-    })
+      30_000,
+    )
     if (!response.ok) throw new Error(`Claude error: ${response.status}`)
     const data = await response.json()
     return (data.content?.[0]?.text ?? "").trim()
@@ -73,15 +77,22 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
   const OpenAI = (await import("openai")).default
   const openai = new OpenAI({ apiKey })
-  const completion = await openai.chat.completions.create({
-    model: "gpt-5.4",
-    max_tokens: 256,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-  }, { signal: AbortSignal.timeout(30_000) })
-  return (completion.choices?.[0]?.message?.content ?? "").trim()
+  // R4: AbortSignal.timeout() silently fails in server actions. Use AbortController + setTimeout.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 30_000)
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4",
+      max_tokens: 256,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }, { signal: controller.signal })
+    return (completion.choices?.[0]?.message?.content ?? "").trim()
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
@@ -90,15 +101,18 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`
   return withRetry(async () => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-        generationConfig: { maxOutputTokens: 256 },
-      }),
-      signal: AbortSignal.timeout(30_000),
-    })
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+          generationConfig: { maxOutputTokens: 256 },
+        }),
+      },
+      30_000,
+    )
     if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
     const data = await response.json()
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""

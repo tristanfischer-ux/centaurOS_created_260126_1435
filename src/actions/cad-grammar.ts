@@ -25,6 +25,7 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { withRetry } from '@/lib/retry'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -144,21 +145,24 @@ async function callClaude(
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
   return withRetry(async () => {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const response = await fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
       },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-      signal: AbortSignal.timeout(120_000), // 2 min — grammar selection/extraction is fast
-    })
+      120_000, // 2 min — grammar selection/extraction is fast
+    )
 
     if (!response.ok) {
       const errText = await response.text()
@@ -610,17 +614,20 @@ async function executeGrammarOnModal(
   const baseUrl = process.env.MODAL_CAD_ENDPOINT_URL?.replace(/\/$/, "")
   if (!baseUrl) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
 
-  const response = await fetch(`${baseUrl}/grammar`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      core_code: grammar.coreLibraryCode,
-      grammar_code: grammar.pythonCode,
-      params,
-      material_density: 1240,
-    }),
-    signal: AbortSignal.timeout(600_000), // 10 min — complex assemblies need time
-  })
+  const response = await fetchWithTimeout(
+    `${baseUrl}/grammar`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        core_code: grammar.coreLibraryCode,
+        grammar_code: grammar.pythonCode,
+        params,
+        material_density: 1240,
+      }),
+    },
+    280_000, // Clamped from 600_000 — Vercel 300s cap
+  )
 
   if (!response.ok) {
     const errText = await response.text()

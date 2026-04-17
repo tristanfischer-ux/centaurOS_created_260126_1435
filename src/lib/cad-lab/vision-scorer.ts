@@ -12,6 +12,7 @@
  */
 
 import { withRetry } from '@/lib/retry'
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 
 export interface VisionScoreResult {
   score: number // 1-10
@@ -108,26 +109,29 @@ Do not include any text outside the JSON.`
     contentBlocks.push({ type: "text", text: textPrompt })
 
     const data = await withRetry(async () => {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+      const response = await fetchWithTimeout(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [
+              {
+                role: "user",
+                content: contentBlocks,
+              },
+            ],
+          }),
         },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: contentBlocks,
-            },
-          ],
-        }),
-        signal: AbortSignal.timeout(30_000),
-      })
+        30_000,
+      )
 
       if (!response.ok) {
         throw new Error(`Vision scorer API error: ${response.status} ${response.statusText}`)

@@ -1069,40 +1069,32 @@ export async function refreshCadLabAssetUrlAction(
   })
 }
 
-/** Axis of symmetry for a mirror pair. */
-export type MirrorAxis = 'horizontal' | 'vertical'
-
 /**
  * Generates the mirror-image variant of a primary module's illustration by
- * flipping it along the requested axis and uploading it as the mirror
+ * horizontally flipping it (left-right axis) and uploading it as the mirror
  * module's own asset in the xray-images bucket.
  *
- * @description Paired modules like "Left Wing" / "Right Wing" (horizontal),
- * or "Upper Deck" / "Lower Deck" (vertical), should render as mirror images
- * of each other. Previously the pipeline reused the primary image URL
- * verbatim, which made paired cards visually identical. This action produces
- * a true axis-correct mirror and persists it so downstream consumers (PDF
- * export, public share links, caching) get the correct image without any
- * render-time transform.
+ * @description Paired modules like "Left Wing" / "Right Wing" should render
+ * as mirror images of each other. Previously the pipeline reused the primary
+ * image URL verbatim, which made left/right cards visually identical. This
+ * action produces a true horizontal mirror and persists it so downstream
+ * consumers (PDF export, public share links, caching) get the correct image
+ * without any render-time transform.
  *
- * Axis mapping:
- * - horizontal (default) → sharp.flop() — swaps left↔right about the vertical
- *   axis. Use for Left/Right and Port/Starboard pairs.
- * - vertical             → sharp.flip() — swaps top↔bottom about the
- *   horizontal axis. Use for Upper/Lower and Top/Bottom pairs.
+ * sharp.flop() = flip about the vertical axis (left↔right swap), which is
+ * the semantically correct mirror for port/starboard pairs. sharp.flip() is
+ * the vertical axis flip (top↔bottom) — not what we want here.
  *
  * @param projectId - Owning CAD Lab project (storage namespace)
  * @param mirrorModuleId - ID of the module whose asset we're writing to
  * @param primaryImageUrl - Supabase storage URL of the already-generated
- *   primary image to be mirrored
- * @param axis - Axis of symmetry (defaults to 'horizontal' for back-compat)
+ *   primary (Left) image to be mirrored
  * @returns New public URL for the mirrored asset, or an error string
  */
 export async function flipCadLabImageForMirrorAction(
   projectId: string,
   mirrorModuleId: string,
   primaryImageUrl: string,
-  axis: MirrorAxis = 'horizontal',
 ): Promise<{ imageUrl: string } | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
@@ -1121,10 +1113,6 @@ export async function flipCadLabImageForMirrorAction(
       return { error: "Invalid mirror module id" }
     }
 
-    if (axis !== 'horizontal' && axis !== 'vertical') {
-      return { error: `Invalid mirror axis: ${axis}` }
-    }
-
     try {
       const resp = await fetchWithTimeout(primaryImageUrl, {}, 15000)
       if (!resp.ok) {
@@ -1137,10 +1125,7 @@ export async function flipCadLabImageForMirrorAction(
       // even when the caller is only hitting generateCadLabSingleImageAction.
       const sharpModule = await import("sharp")
       const sharp = sharpModule.default
-      const pipeline = sharp(inputBuf)
-      const flippedBuf = await (
-        axis === 'vertical' ? pipeline.flip() : pipeline.flop()
-      ).png().toBuffer()
+      const flippedBuf = await sharp(inputBuf).flop().png().toBuffer()
 
       const admin = createAdminClient()
       const destPath = `${projectId}/module-${mirrorModuleId}.png`

@@ -941,7 +941,7 @@ Resolve any ambiguities with engineering judgment — do not ask for clarificati
         console.warn("[THE-FORGE] Step 3: Blueprint image URL rejected — not from Supabase storage:", blueprintImageUrl.slice(0, 80))
       } else {
         try {
-          const imgRes = await fetch(blueprintImageUrl, { signal: AbortSignal.timeout(10_000) })
+          const imgRes = await fetchWithTimeout(blueprintImageUrl, {}, 10_000)
           if (imgRes.ok) {
             const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
             // SECURITY: Cap image size at 10MB to prevent memory abuse
@@ -1558,9 +1558,7 @@ async function generateCadLabModelWithSeed(
 
     // ── Fetch seed STEP file with size guard ──
     console.info(`[THE-FORGE] Seed path: Fetching STEP from ${seedTemplate.slug}...`)
-    const stepResponse = await fetch(seedTemplate.stepUrl, {
-      signal: AbortSignal.timeout(30_000),
-    })
+    const stepResponse = await fetchWithTimeout(seedTemplate.stepUrl, {}, 30_000)
     if (!stepResponse.ok) {
       throw new Error(`Failed to fetch seed STEP (${stepResponse.status})`)
     }
@@ -3336,7 +3334,7 @@ export async function generateMashup(
       if (s?.step_b64) {
         step_b64 = s.step_b64
       } else if (s?.step_url) {
-        const res = await fetch(s.step_url, { signal: AbortSignal.timeout(30_000) })
+        const res = await fetchWithTimeout(s.step_url, {}, 30_000)
         if (!res.ok) throw new Error(`Failed to fetch source ${name}: ${res.status}`)
         const buf = Buffer.from(await res.arrayBuffer())
         step_b64 = buf.toString("base64")
@@ -3562,7 +3560,7 @@ export async function planMashup(
       if (s?.step_b64) {
         step_b64 = s.step_b64
       } else if (s?.step_url) {
-        const res = await fetch(s.step_url, { signal: AbortSignal.timeout(30_000) })
+        const res = await fetchWithTimeout(s.step_url, {}, 30_000)
         if (!res.ok) throw new Error(`Failed to fetch source ${name}: ${res.status}`)
         const buf = Buffer.from(await res.arrayBuffer())
         step_b64 = buf.toString("base64")
@@ -3886,7 +3884,7 @@ export async function generateSystemAssembly(
         return { success: false, error: `Module "${mod.name}" STEP URL blocked by allowlist` }
       }
 
-      const stepResponse = await fetch(stepUrl, { signal: AbortSignal.timeout(60_000) })
+      const stepResponse = await fetchWithTimeout(stepUrl, {}, 60_000)
       if (!stepResponse.ok) {
         return { success: false, error: `Failed to fetch STEP for module "${mod.name}" (${stepResponse.status})` }
       }
