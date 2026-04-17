@@ -16,6 +16,76 @@
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { ShortlistedSupplier } from "@/app/(platform)/the-forge/cad-lab/source/page"
 
+// ─── Country normalisation ──────────────────────────────────────────
+
+// INTENT: marketplace_listings.country is mixed — mostly ISO-2 codes (GB, DE,
+// CN) but with some free-text ("United Kingdom"). Normalise to canonical
+// lower-case names so downstream matching is uniform.
+// Mapping only covers the codes actually present in the DB as of the 2026-04-17
+// enrichment pass; extend as new countries land.
+const ISO2_TO_NAME: Record<string, string> = {
+  gb: "united kingdom",
+  uk: "united kingdom",
+  de: "germany",
+  fr: "france",
+  it: "italy",
+  es: "spain",
+  nl: "netherlands",
+  be: "belgium",
+  lu: "luxembourg",
+  at: "austria",
+  ch: "switzerland",
+  ie: "ireland",
+  pl: "poland",
+  cz: "czech republic",
+  se: "sweden",
+  no: "norway",
+  dk: "denmark",
+  fi: "finland",
+  pt: "portugal",
+  us: "united states",
+  ca: "canada",
+  mx: "mexico",
+  cn: "china",
+  hk: "hong kong",
+  tw: "taiwan",
+  jp: "japan",
+  kr: "south korea",
+  vn: "vietnam",
+  in: "india",
+  pk: "pakistan",
+  bd: "bangladesh",
+  au: "australia",
+  nz: "new zealand",
+  za: "south africa",
+  ae: "united arab emirates",
+  il: "israel",
+  tr: "turkey",
+  sg: "singapore",
+  my: "malaysia",
+  th: "thailand",
+  id: "indonesia",
+  ph: "philippines",
+  br: "brazil",
+  ar: "argentina",
+  cl: "chile",
+}
+
+/** Returns a canonical lower-case country name for display + matching. */
+function canonicaliseCountry(raw: string): string {
+  const trimmed = raw.trim().toLowerCase()
+  if (!trimmed) return trimmed
+  // 2-letter ISO → name
+  if (trimmed.length === 2 && ISO2_TO_NAME[trimmed]) return ISO2_TO_NAME[trimmed]
+  // 3-letter alpha codes (USA, GBR) get passed through raw — rare in this DB
+  return trimmed
+}
+
+/** Title-case a canonical country name for UI display. */
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 // ─── Tariff / trade-lane reference data ─────────────────────────────
 
 // INTENT: Countries that trigger US Section 301 tariff exposure when shipping
@@ -27,15 +97,18 @@ const US_SECTION_301_ORIGINS = new Set<string>([
   "taiwan",
 ])
 
-// INTENT: Single-port / single-lane dependency signals. Country name substring
-// matches — we use country strings loosely because marketplace_listings.country
-// is free text and varies in casing.
+// INTENT: Single-port / single-lane dependency signals. Keys are canonical
+// lower-case country names produced by canonicaliseCountry() above.
 const TRADE_LANE_CLUSTERS: Record<string, string[]> = {
-  "east asia": ["china", "hong kong", "taiwan", "south korea", "japan", "vietnam"],
-  "eu": ["germany", "france", "italy", "spain", "netherlands", "poland", "czech republic", "czechia"],
-  "uk": ["united kingdom", "uk", "england", "scotland", "wales", "northern ireland"],
-  "north america": ["united states", "usa", "us", "canada", "mexico"],
+  "east asia": ["china", "hong kong", "taiwan", "south korea", "japan", "vietnam", "singapore", "malaysia", "thailand", "indonesia", "philippines"],
+  "eu": ["germany", "france", "italy", "spain", "netherlands", "poland", "czech republic", "belgium", "luxembourg", "austria", "sweden", "denmark", "finland", "portugal", "ireland"],
+  "uk": ["united kingdom"],
+  "north america": ["united states", "canada", "mexico"],
   "south asia": ["india", "pakistan", "bangladesh"],
+  "oceania": ["australia", "new zealand"],
+  "mena": ["united arab emirates", "israel", "turkey"],
+  "latam": ["brazil", "argentina", "chile"],
+  "africa": ["south africa"],
 }
 
 // ─── Public types ────────────────────────────────────────────────────
@@ -103,18 +176,21 @@ function buildMatchIndex(
   return idx
 }
 
+/**
+ * Normalise raw supplier country to a canonical lower-case name. Handles ISO-2
+ * codes ("GB" → "united kingdom"), free-text ("United Kingdom" → "united kingdom"),
+ * and null/empty. Returns null if unusable.
+ */
 function normaliseCountry(raw: string | null | undefined): string | null {
   if (!raw) return null
-  const trimmed = raw.trim()
-  if (!trimmed) return null
-  return trimmed
+  const canonical = canonicaliseCountry(raw)
+  return canonical || null
 }
 
-function laneFor(countryLower: string): string | null {
+/** Exact-match canonical name to a trade-lane cluster, or null if none. */
+function laneFor(canonicalCountry: string): string | null {
   for (const [lane, countries] of Object.entries(TRADE_LANE_CLUSTERS)) {
-    for (const c of countries) {
-      if (countryLower.includes(c)) return lane
-    }
+    if (countries.includes(canonicalCountry)) return lane
   }
   return null
 }
@@ -182,7 +258,8 @@ export function computeSupplyRisk(input: SupplyRiskInput): SupplyRiskReport {
   const totalGeocoded = [...byCountry.values()].reduce((sum, arr) => sum + arr.length, 0)
   const geography: GeographicBreakdown[] = [...byCountry.entries()]
     .map(([country, supplierIds]) => ({
-      country,
+      // INTENT: `country` is the canonical lower-case name; title-case for UI.
+      country: titleCase(country),
       supplierCount: supplierIds.length,
       percent: totalGeocoded > 0 ? Math.round((supplierIds.length / totalGeocoded) * 100) : 0,
       supplierIds,
@@ -204,6 +281,8 @@ export function computeSupplyRisk(input: SupplyRiskInput): SupplyRiskReport {
   }
 
   // ── Trade-lane clusters ──
+  // INTENT: geography.country is already title-cased for UI; lowercase back
+  // to match the canonical keys used by laneFor() + TRADE_LANE_CLUSTERS.
   const laneBuckets = new Map<string, number>()
   for (const geo of geography) {
     const lane = laneFor(geo.country.toLowerCase())
@@ -220,6 +299,8 @@ export function computeSupplyRisk(input: SupplyRiskInput): SupplyRiskReport {
   // ── Section 301 tariff exposure (US-bound products) ──
   if (targetMarket === "US") {
     const exposed = geography.filter((g) =>
+      // geography.country is title-cased for UI; lowercase back to match the
+      // canonical keys in US_SECTION_301_ORIGINS.
       US_SECTION_301_ORIGINS.has(g.country.toLowerCase()),
     )
     const exposedCount = exposed.reduce((sum, g) => sum + g.supplierCount, 0)

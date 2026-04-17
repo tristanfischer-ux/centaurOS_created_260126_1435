@@ -16,9 +16,10 @@
 import React, { useCallback, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MessageSquare, Mail, CheckCircle2, Clock, XCircle, Circle, AlertCircle } from "lucide-react"
+import { MessageSquare, Mail, CheckCircle2, Clock, XCircle, Circle, AlertCircle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ShortlistedSupplier } from "@/app/(platform)/the-forge/cad-lab/source/page"
+import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 
 export type OutreachStatus = "not_contacted" | "sent" | "replied" | "awarded" | "declined"
 
@@ -38,6 +39,8 @@ interface SupplierOutreachLogProps {
   /** SLA in days for an expected supplier reply — used to flag stale threads */
   replySlaDays?: number
   onReplySlaChange?: (days: number) => void
+  /** Supplier matches by module, used to look up contact email/website */
+  supplierMatches?: Map<string, CadLabSupplierMatch[]>
 }
 
 const STATUS_CONFIG: Record<OutreachStatus, { label: string; icon: React.ComponentType<{ className?: string }>; chip: "secondary" | "info" | "warning" | "success" | "destructive" }> = {
@@ -61,11 +64,34 @@ export function SupplierOutreachLog({
   onChange,
   replySlaDays = 5,
   onReplySlaChange,
+  supplierMatches,
 }: SupplierOutreachLogProps) {
   const suppliers = useMemo(
     () => [...shortlistedSuppliers.values()].sort((a, b) => b.bestMatchScore - a.bestMatchScore),
     [shortlistedSuppliers],
   )
+
+  // INTENT: Build contact index once. Supplier email/website come from the
+  // supplier-match results (populated from marketplace_listings). Coverage is
+  // patchy — email ~39%, website ~65% — so show whatever we have and don't
+  // surface a placeholder when the field is empty.
+  const contactBySupplier = useMemo(() => {
+    const map = new Map<string, { email?: string | null; website?: string | null; contactName?: string | null; country?: string | null }>()
+    if (!supplierMatches) return map
+    for (const matches of supplierMatches.values()) {
+      for (const m of matches) {
+        if (!map.has(m.id)) {
+          map.set(m.id, {
+            email: m.contactEmail ?? null,
+            website: m.websiteUrl ?? null,
+            contactName: m.contactName ?? null,
+            country: m.country ?? null,
+          })
+        }
+      }
+    }
+    return map
+  }, [supplierMatches])
 
   const updateEntry = useCallback((supplierId: string, patch: Partial<OutreachEntry>) => {
     const current = state[supplierId] ?? { status: "not_contacted" as OutreachStatus }
@@ -177,6 +203,7 @@ export function SupplierOutreachLog({
               ? daysBetween(entry.lastContactedAt, new Date(entry.firstResponseAt))
               : null
             const isStale = entry.status === "sent" && daysSinceContact !== null && daysSinceContact > replySlaDays
+            const contact = contactBySupplier.get(s.id)
             return (
               <div
                 key={s.id}
@@ -196,6 +223,34 @@ export function SupplierOutreachLog({
                       <Badge variant="warning" className="h-4 px-1.5 text-[10px]">Stale</Badge>
                     )}
                   </div>
+                  {/* Supplier contact details — shown only when the DB has them populated */}
+                  {(contact?.email || contact?.website || contact?.contactName) && (
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      {contact?.contactName && (
+                        <span className="text-[10px] text-muted-foreground">{contact.contactName}</span>
+                      )}
+                      {contact?.email && (
+                        <a
+                          href={`mailto:${contact.email}`}
+                          className="text-[10px] text-info hover:underline flex items-center gap-0.5"
+                        >
+                          <Mail className="h-2.5 w-2.5" />
+                          {contact.email}
+                        </a>
+                      )}
+                      {contact?.website && (
+                        <a
+                          href={contact.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-info hover:underline flex items-center gap-0.5"
+                        >
+                          <ExternalLink className="h-2.5 w-2.5" />
+                          Website
+                        </a>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {entry.lastContactedAt && (
                       <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">

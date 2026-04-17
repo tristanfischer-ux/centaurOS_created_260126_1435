@@ -67,8 +67,9 @@ export interface CadLabSupplierMatch {
     tolerance_value_mm?: number
     batch_size_range?: string
   }>
-  // INTENT: Enriched fields surfaced to Supply Risk Radar + NDA gate. Filled
-  // from marketplace_listings columns on the scoring pass.
+  // INTENT: Enriched fields surfaced to Supply Risk Radar + NDA gate + Outreach
+  // Log. Filled from marketplace_listings columns on the scoring pass. DB coverage
+  // varies: country ~58%, email ~39%, website ~65%, MOQ ~2%, lead_time ~5%.
   country?: string | null
   city?: string | null
   employeeCountExact?: number | null
@@ -79,6 +80,9 @@ export interface CadLabSupplierMatch {
   securityClearances?: string[] | null
   certifications?: string[] | null
   websiteUrl?: string | null
+  contactEmail?: string | null
+  contactName?: string | null
+  dataQualityScore?: number | null
 }
 
 // ─── Category Normalization Maps ────────────────────────────────────
@@ -480,7 +484,7 @@ export async function matchCadLabModuleSuppliers(
   // engine can't see enrichment data, causing weak process/material matches.
   const { data: listings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, city, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url")
+    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, city, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, data_quality_score")
     .in("id", [...candidateIds])
 
   const matches: CadLabSupplierMatch[] = []
@@ -608,6 +612,9 @@ export async function matchCadLabModuleSuppliers(
           securityClearances: clearancesArr,
           certifications: certsArr,
           websiteUrl: listing.website_url ?? null,
+          contactEmail: listing.contact_email ?? null,
+          contactName: listing.contact_name ?? null,
+          dataQualityScore: listing.data_quality_score ?? null,
         })
       }
     }

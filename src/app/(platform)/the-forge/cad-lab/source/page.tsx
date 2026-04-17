@@ -1080,6 +1080,7 @@ export default function SourcePage(): React.ReactNode {
               onChange={setOutreachState}
               replySlaDays={replySlaDays}
               onReplySlaChange={setReplySlaDays}
+              supplierMatches={supplierMatches}
             />
 
             <p className="text-xs text-muted-foreground">Click a supplier to set priority (1st → 2nd → 3rd). Top-ranked suppliers per category receive your RFQ.</p>
