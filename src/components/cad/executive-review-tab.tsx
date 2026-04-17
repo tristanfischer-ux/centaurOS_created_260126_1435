@@ -6,13 +6,24 @@
  * @description Shared component for Specify and Source pages. Shows matched
  * fractional executives from the marketplace who can review the design (Specify)
  * or sourcing strategy (Source). Uses matchProjectExperts() server action.
+ *
+ * The panel refuses to advertise weak matches as "matches". Executives whose
+ * specialisations don't overlap with the project's processes or materials are
+ * labelled "closest candidates" and hidden behind an opt-in disclosure. The
+ * default view is honest by construction: either strong matches, or a
+ * "no strong matches yet" message — never a wall of 5pt baseline noise.
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Users, Loader2, RefreshCw } from "lucide-react"
+import { Users, Loader2, RefreshCw, ChevronDown } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { ExpertCard } from "@/components/directory/ExpertCard"
 import { matchProjectExperts } from "@/actions/cad-lab-expert-match"
 import type { MatchedExpert } from "@/actions/cad-lab-expert-match"
@@ -32,8 +43,10 @@ export function ExecutiveReviewTab({
   context,
   useCase,
 }: ExecutiveReviewTabProps) {
-  const [experts, setExperts] = useState<MatchedExpert[]>([])
+  const [strong, setStrong] = useState<MatchedExpert[]>([])
+  const [closest, setClosest] = useState<MatchedExpert[]>([])
   const [loading, setLoading] = useState(false)
+  const [showClosest, setShowClosest] = useState(false)
   const fetchedFingerprintRef = useRef<string>("")
 
   // INTENT: Memoize project needs so we get stable references and a stable fingerprint.
@@ -64,7 +77,8 @@ export function ExecutiveReviewTab({
         context,
         useCase,
       })
-      setExperts(result.experts)
+      setStrong(result.strong)
+      setClosest(result.closest)
     } catch (error) {
       console.error("[ExecutiveReviewTab] Failed to match experts:", error)
     } finally {
@@ -82,6 +96,7 @@ export function ExecutiveReviewTab({
   }, [fingerprint, projectNeeds.processes.length, projectNeeds.materials.length, fetchExperts])
 
   const contextLabel = context === "design" ? "design review" : "sourcing review"
+  const hasAnyResults = strong.length > 0 || closest.length > 0
 
   return (
     <div className="space-y-6">
@@ -100,7 +115,7 @@ export function ExecutiveReviewTab({
                 </p>
               </div>
             </div>
-            {experts.length > 0 && (
+            {hasAnyResults && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -142,8 +157,8 @@ export function ExecutiveReviewTab({
         </Card>
       )}
 
-      {/* Empty state */}
-      {!loading && experts.length === 0 && (
+      {/* Empty state — no results at all */}
+      {!loading && !hasAnyResults && (
         <Card>
           <CardContent className="py-12 text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -159,34 +174,107 @@ export function ExecutiveReviewTab({
         </Card>
       )}
 
-      {/* Expert grid */}
-      {!loading && experts.length > 0 && (
+      {/* Strong matches — the honest headline + grid */}
+      {!loading && strong.length > 0 && (
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            {experts.length} executive{experts.length !== 1 ? "s" : ""} matched for {contextLabel}
+            <span className="font-medium text-foreground">
+              {strong.length} strong match{strong.length !== 1 ? "es" : ""}
+            </span>{" "}
+            for {contextLabel} — based on specialisation overlap with your project.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {experts.map(({ expert, matchScore, matchReasons, sourceLabel }) => (
-              <div key={expert.id} className="space-y-2">
-                <ExpertCard expert={expert} />
-                <div className="px-1 flex flex-wrap items-center gap-1.5">
-                  <Badge variant="info" className="text-[10px]">
-                    {matchScore}pt match
-                  </Badge>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {sourceLabel}
-                  </Badge>
-                  {matchReasons.slice(0, 4).map((reason) => (
-                    <span key={reason} className="text-[10px] text-muted-foreground">
-                      {reason}
-                    </span>
-                  ))}
-                </div>
-              </div>
+            {strong.map((match) => (
+              <ExpertCardWithTier key={match.expert.id} match={match} tier="strong" />
             ))}
           </div>
         </div>
       )}
+
+      {/* No-strong-matches headline (when only closest candidates exist) */}
+      {!loading && strong.length === 0 && closest.length > 0 && (
+        <Card className="border-muted-foreground/20">
+          <CardContent className="py-5">
+            <p className="text-sm font-medium text-foreground">
+              No strong matches yet
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              None of the executives we scanned have the right specialisation for this {contextLabel}.
+              You can still look at the closest candidates, but don&rsquo;t rely on them as experts in this area.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Closest candidates — opt-in disclosure */}
+      {!loading && closest.length > 0 && (
+        <Collapsible open={showClosest} onOpenChange={setShowClosest}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs w-full sm:w-auto"
+            >
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${showClosest ? "rotate-180" : ""}`}
+              />
+              {showClosest ? "Hide" : "Show"} {closest.length} closest candidate{closest.length !== 1 ? "s" : ""}
+              <span className="text-muted-foreground font-normal">(not strong matches)</span>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 pt-3">
+            <p className="text-xs text-muted-foreground italic">
+              These candidates didn&rsquo;t match your specifications. Consider them only as distant options,
+              not as experts in your processes or materials.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {closest.map((match) => (
+                <ExpertCardWithTier key={match.expert.id} match={match} tier="closest" />
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Renders an expert card with a tier pill (Strong match / Closest candidate)
+ * plus the existing match score and reasons. Split out so both strong and
+ * closest grids share the same card shape, with only the tier styling differing.
+ */
+function ExpertCardWithTier({
+  match,
+  tier,
+}: {
+  match: MatchedExpert
+  tier: "strong" | "closest"
+}) {
+  const { expert, matchScore, matchReasons, sourceLabel } = match
+
+  return (
+    <div className="space-y-2">
+      <ExpertCard expert={expert} />
+      <div className="px-1 flex flex-wrap items-center gap-1.5">
+        {tier === "strong" ? (
+          <Badge variant="info" className="text-[10px]">
+            Strong match · {matchScore}pt
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+            Closest candidate · {matchScore}pt
+          </Badge>
+        )}
+        <Badge variant="secondary" className="text-[10px]">
+          {sourceLabel}
+        </Badge>
+        {matchReasons.slice(0, 4).map((reason) => (
+          <span key={reason} className="text-[10px] text-muted-foreground">
+            {reason}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

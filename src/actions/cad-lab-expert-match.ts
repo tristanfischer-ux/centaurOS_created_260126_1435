@@ -27,8 +27,40 @@ import type { DirectoryExpert } from "@/lib/directory/types"
 export interface MatchedExpert {
   expert: DirectoryExpert
   matchScore: number
+  /**
+   * Score contribution from process/material overlap alone (0–40pts).
+   * Used to classify the match as "strong" (≥ STRONG_MATCH_SPEC_THRESHOLD)
+   * vs "closest candidate" (< threshold). Role/industry/baseline-trust scoring
+   * doesn't count toward specialisation fit — a CTO with no process overlap
+   * isn't a design reviewer for a CNC project.
+   */
+  specializationScore: number
   matchReasons: string[]
   sourceLabel: string
+}
+
+/**
+ * Minimum specialisation score for an expert to be considered a "strong" match.
+ * 10pts = at least one material overlap; 15pts = at least one process overlap.
+ * Everything below this is rendered as a "closest candidate" behind a disclosure.
+ *
+ * Why not gate on total matchScore? Because role relevance (+30) and industry
+ * alignment (+20) can push a total to 50+ with zero actual specialisation
+ * overlap — which hides the failure mode the UX is trying to surface.
+ */
+const STRONG_MATCH_SPEC_THRESHOLD = 10
+
+/** Max strong matches returned. Closest-candidate expander is capped separately. */
+const STRONG_MATCH_LIMIT = 20
+
+/** Max closest candidates returned (shown only if the user expands the disclosure). */
+const CLOSEST_CANDIDATE_LIMIT = 10
+
+export interface ExpertMatchResult {
+  strong: MatchedExpert[]
+  closest: MatchedExpert[]
+  /** Total clickable, scored candidates considered — strong + closest after filters/caps have applied. */
+  totalScanned: number
 }
 
 // ── Internal type for normalizing across sources ──
@@ -91,7 +123,7 @@ export async function matchProjectExperts(params: {
   materials: string[]
   context: "design" | "sourcing"
   useCase?: string
-}): Promise<{ experts: MatchedExpert[] }> {
+}): Promise<ExpertMatchResult> {
   // AUTH: reject unauthenticated callers. Internally this uses createAdminClient()
   // via fetchListingExecutives / fetchProfileExecutives which bypass RLS, so
   // without this gate any anonymous caller could enumerate the executive
@@ -101,7 +133,7 @@ export async function matchProjectExperts(params: {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     console.warn("[ExpertMatch] Rejected unauthenticated request")
-    return { experts: [] }
+    return { strong: [], closest: [], totalScanned: 0 }
   }
 
   const { processes, materials, context, useCase } = params
@@ -121,7 +153,7 @@ export async function matchProjectExperts(params: {
   ]
 
   if (normalized.length === 0) {
-    return { experts: [] }
+    return { strong: [], closest: [], totalScanned: 0 }
   }
 
   // ── Deduplicate: keep highest potential (directory > listing > profile) ──
@@ -178,7 +210,8 @@ export async function matchProjectExperts(params: {
       }
     }
 
-    score += Math.min(specScore, 40)
+    const cappedSpecScore = Math.min(specScore, 40)
+    score += cappedSpecScore
 
     // ── Role relevance (max 30pts) ──
     const headline = (expert.headline ?? "").toLowerCase()
@@ -254,6 +287,7 @@ export async function matchProjectExperts(params: {
       scored.push({
         expert: expertData,
         matchScore: Math.min(score, 100),
+        specializationScore: cappedSpecScore,
         matchReasons: reasons,
         sourceLabel,
       })
@@ -266,10 +300,32 @@ export async function matchProjectExperts(params: {
     (s) => s.expert.profile_slug || s.expert.username,
   )
 
-  // Sort by score descending, take top 12
+  // Sort by score descending so the best candidates sit at the top of each bucket.
   clickable.sort((a, b) => b.matchScore - a.matchScore)
 
-  return { experts: clickable.slice(0, 12) }
+  // ── Partition into strong matches vs closest candidates ──
+  // INTENT: The UI refuses to advertise weak matches as "matches". An expert is
+  // only "strong" if their specialisations actually overlap with the project's
+  // processes/materials. Role/industry/baseline scores boost ranking WITHIN each
+  // bucket but don't promote a candidate out of the "closest" bucket.
+  const strong: MatchedExpert[] = []
+  const closest: MatchedExpert[] = []
+  for (const candidate of clickable) {
+    if (candidate.specializationScore >= STRONG_MATCH_SPEC_THRESHOLD) {
+      strong.push(candidate)
+    } else {
+      closest.push(candidate)
+    }
+  }
+
+  const cappedStrong = strong.slice(0, STRONG_MATCH_LIMIT)
+  const cappedClosest = closest.slice(0, CLOSEST_CANDIDATE_LIMIT)
+
+  return {
+    strong: cappedStrong,
+    closest: cappedClosest,
+    totalScanned: cappedStrong.length + cappedClosest.length,
+  }
 }
 
 // ── Source A: Directory (provider_profiles via RPC) ──
