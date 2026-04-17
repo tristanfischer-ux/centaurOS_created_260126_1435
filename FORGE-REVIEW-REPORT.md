@@ -1,4 +1,4 @@
-# Forge End-to-End Review — Report
+Go for C.# Forge End-to-End Review — Report
 
 **Date:** 2026-04-17 (evening session, autonomous — user was away)
 **Scope:** Design → Specify → Source → Assemble across the CAD Lab Forge pipeline, plus all supporting server actions.
@@ -79,26 +79,38 @@
 3. Gate consolidation — every "continue" CTA for a stage must evaluate the same gate expression.
 4. Multi-step gates must have an escape hatch when upstream can fail permanently.
 
-## Items not fixed in this pass — handover list
+## Handover list — Round 2 sweep in progress
 
-These are documented for the next session (all are lower-risk than the shipped fixes):
+**Status:** Tristan greenlit a full sweep of this list on 2026-04-17 (post-lunch, fully autonomous). Checkboxes + commit refs appended as each lands. This report IS the tracker — single source of truth.
 
 ### Security (P1)
-- **`saveCadLabProjectRfq` accepts any RFQ id** — no UUID check + no buyer/foundry verification. Low blast radius today because the id only renders to the owning foundry, but it taints the link invariant. Fix: UUID_RE test + `SELECT rfqs WHERE id=rfqId AND (buyer_id=user.id OR foundry_id=foundryId)`.
-- **`loadCadLabBatchStatus` and `updateCadLabBatchStatus` rely entirely on RLS** — defence-in-depth pattern used elsewhere (explicit SELECT precheck) not applied here.
+- [ ] **`saveCadLabProjectRfq` accepts any RFQ id** — no UUID check + no buyer/foundry verification. Low blast radius today because the id only renders to the owning foundry, but it taints the link invariant. Fix: UUID_RE test + `SELECT rfqs WHERE id=rfqId AND (buyer_id=user.id OR foundry_id=foundryId)`.
+- [ ] **`loadCadLabBatchStatus` and `updateCadLabBatchStatus` rely entirely on RLS** — defence-in-depth pattern used elsewhere (explicit SELECT precheck) not applied here.
 
 ### Reliability (P1/P2)
-- **Persisted `imageUrl` contains a 1-hour signed-URL JWT** — images 403 after an hour when the project is reloaded. Fix path: store the Supabase path (not the URL), generate a fresh signed URL on read. Small refactor across `cad-lab-context.tsx` image-gen callsites and the rendering components.
-- **`reviseModulesFromReviews` still receives full `CadLabModule[]`** through React Flight (R3). Strip heavy fields before the call.
-- **~20 bare `.catch(() => {})` in `cad-lab-context.tsx`** — each silently drops errors from fire-and-forget saves. Mechanical fix: replace each with `.catch((e) => console.error("[CAD-LAB] <op>:", e))`.
-- **`handleDecompose` has no "still on the same project" check after awaits** — switching projects mid-decompose saves Project A's modules into Project B.
+- [ ] **Persisted `imageUrl` contains a 1-hour signed-URL JWT** — images 403 after an hour when the project is reloaded. Fix: bump signed URL TTL to 7 days as a first-pass, then refactor to store Supabase path + sign on read.
+- [ ] **`reviseModulesFromReviews` still receives full `CadLabModule[]`** through React Flight (R3). Strip heavy fields before the call.
+- [ ] **~20 bare `.catch(() => {})` in `cad-lab-context.tsx`** — each silently drops errors from fire-and-forget saves. Mechanical fix: replace each with `.catch((e) => console.error("[CAD-LAB] <op>:", e))`.
+- [ ] **`handleDecompose` has no "still on the same project" check after awaits** — switching projects mid-decompose saves Project A's modules into Project B.
 
 ### UX / a11y (P1)
-- **Mobile bottom nav shows single-character labels** (`D`, `S`, `$`, `A`) — fails WCAG 2.4.4 link-purpose. Fix: show 3-4 char labels (`Design`, `Spec`, `Source`, `Build`).
-- **Specify 5-tab strip is `<button>` inside `<nav>`** — no `role="tablist"`, no arrow-key navigation, screen readers just hear "button" five times. Replace with the existing `Tabs` component.
-- **Locked-stage buttons in the bottom nav have no `aria-label`** announcing "locked".
-- **Conflicting `h-8 w-8 min-h-[44px] min-w-[44px]`** on icon buttons (cad-lab-layout-client.tsx:225 + module-image-card.tsx:124). Pick one.
-- **No `useSearchParams` Suspense boundary** in layout — deploys haven't failed so Next 16 isn't enforcing this here, but it's a pattern-risk.
+- [ ] **Mobile bottom nav shows single-character labels** (`D`, `S`, `$`, `A`) — fails WCAG 2.4.4 link-purpose. Fix: show 3-4 char labels (`Design`, `Spec`, `Source`, `Build`).
+- [ ] **Specify 5-tab strip is `<button>` inside `<nav>`** — no `role="tablist"`, no arrow-key navigation, screen readers just hear "button" five times. Replace with the existing `Tabs` component.
+- [ ] **Locked-stage buttons in the bottom nav have no `aria-label`** announcing "locked".
+- [ ] **Conflicting `h-8 w-8 min-h-[44px] min-w-[44px]`** on icon buttons (cad-lab-layout-client.tsx:225 + module-image-card.tsx:124). Pick one.
+- [ ] **No `useSearchParams` Suspense boundary** in layout — deploys haven't failed so Next 16 isn't enforcing this here, but it's a pattern-risk.
+
+### Verification & regression
+- [ ] Create a purpose-flagged test user + foundry on prod Supabase
+- [ ] Live agent-browser walkthrough (Design → Specify → Source → Assemble) as that test user
+- [ ] Red Team Round 6: security regression on today's fixes
+- [ ] Red Team Round 7: state/race on path-persistence refactor
+- [ ] Red Team Round 8: a11y regression on UI changes
+- [ ] Red Team Round 9: Flight payload + timeout re-audit
+- [ ] Red Team Round 10: cross-stage integration
+
+### Commit log — Round 2 (append as we go)
+_(populated during execution)_
 
 ## Scorecard
 

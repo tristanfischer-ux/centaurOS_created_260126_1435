@@ -15,6 +15,7 @@
 
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
+import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
 import type { Json } from "@/types/database.types"
 import type {
   CadLabResult,
@@ -866,9 +867,37 @@ export async function saveCadLabProjectRfq(
   projectId: string,
   rfqId: string,
 ): Promise<{ success: true } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
-    if (!rfqId.trim()) return { error: "RFQ ID required" }
+    if (!rfqId || !UUID_RE.test(rfqId.trim())) return { error: "Invalid RFQ ID" }
+    const trimmedRfqId = rfqId.trim()
+
+    // SECURITY: verify the caller's foundry owns the project. Defence in depth
+    // alongside RLS — without it, a compromised or buggy client could write the
+    // linkage against any project the user hasn't been authorised to touch.
+    const projectOwnershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (projectOwnershipErr) return { error: projectOwnershipErr }
+
+    // SECURITY: verify the caller owns (or belongs to the foundry of) the RFQ
+    // they're linking. Before this check, any authed user could pass any
+    // valid RFQ UUID and persist the linkage — tainting the procurement
+    // invariant that getLinkedRFQQuotes relies on.
+    const { data: rfqRow, error: rfqErr } = await supabase
+      .from("rfqs")
+      .select("buyer_id, foundry_id")
+      .eq("id", trimmedRfqId)
+      .maybeSingle()
+    if (rfqErr) {
+      console.error("[CAD-LAB-PROJECTS] RFQ ownership lookup failed:", rfqErr.message)
+      return { error: "Failed to validate RFQ" }
+    }
+    if (!rfqRow) return { error: "RFQ not found" }
+    const isBuyer = (rfqRow.buyer_id as string | null) === user.id
+    const isSameFoundry = (rfqRow.foundry_id as string | null) === foundryId
+    if (!isBuyer && !isSameFoundry) {
+      console.warn("[CAD-LAB-PROJECTS] Cross-foundry RFQ link blocked", { userId: user.id, rfqId: trimmedRfqId })
+      return { error: "RFQ not found" }
+    }
 
     const { data: current, error: loadError } = await supabase
       .from("cad_lab_projects")
@@ -931,8 +960,14 @@ export async function updateCadLabBatchStatus(
   projectId: string,
   batchStatus: "idle" | "running" | "done" | "error",
 ): Promise<{ success: true } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+
+    // SECURITY: defence in depth — RLS should already block cross-foundry
+    // writes, but an explicit ownership SELECT precheck catches the case
+    // where a policy regression (e.g. USING (true)) silently opens this up.
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
 
     const updateData: Record<string, unknown> = { batch_status: batchStatus }
     if (batchStatus === "running") {
@@ -977,8 +1012,12 @@ export async function loadCadLabBatchStatus(
     }
   | { error: string }
 > {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+
+    // SECURITY: explicit ownership precheck (see updateCadLabBatchStatus).
+    const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
+    if (ownershipErr) return { error: ownershipErr }
 
     const { data: project, error } = await supabase
       .from("cad_lab_projects")

@@ -158,10 +158,13 @@ export async function uploadReferenceDocuments(
           continue
         }
 
-        // SECURITY: Use signed URL — user-uploaded reference documents are confidential
+        // SECURITY: Use signed URL — user-uploaded reference documents are confidential.
+        // TTL = 30 days (not 1 hour): persisted into reference_documents JSONB
+        // and re-rendered on project load. See the sibling comment in
+        // cad-lab-reference-images.ts for rationale.
         const { data: urlData } = await admin.storage
           .from(STORAGE_BUCKET)
-          .createSignedUrl(storagePath, 3600)
+          .createSignedUrl(storagePath, 60 * 60 * 24 * 30)
 
         stored.push({
           id: doc.id,

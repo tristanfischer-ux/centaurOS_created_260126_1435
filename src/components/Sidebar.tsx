@@ -70,6 +70,7 @@ import {
     Swords,
     Package,
     ClipboardCheck,
+    Compass,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -111,6 +112,7 @@ const APP_VERSION = "0.9.0"
 // ─────────────────────────────────────────────────────────────────────────────
 // Section 1: "Me" — Personal pages
 // ─────────────────────────────────────────────────────────────────────────────
+const welcomeNavItem = { name: "Welcome", href: "/welcome", icon: Compass, tooltip: "A tour of ForgeOS from Tristan — the sections, the specialists, and where to start" }
 const todayNavItem = { name: "Today", href: "/today", icon: CalendarDays, tooltip: "Your personalized daily focus — tasks, risks, and wins" }
 
 const meNavigation = [
@@ -425,6 +427,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandb
                 <SectionHeader label="Me" introRoute="/me" hasNew={badges.me} isOpen={openSections.me} onToggle={() => toggleSection("me")} />
                 <Collapsible open={openSections.me}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {renderNavItem(welcomeNavItem)}
                         {renderNavItem(todayNavItem)}
                         {meNavigation.map(item =>
                             renderNavItem(item.href === '/updates' ? { ...item, badge: unreadAlertCount } : item)

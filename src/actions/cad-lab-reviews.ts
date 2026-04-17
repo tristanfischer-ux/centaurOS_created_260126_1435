@@ -999,8 +999,26 @@ Revise the module fields to address the specialist concerns. Return a JSON objec
 
 // ─── Module Revision from Review Feedback (Post-Specialist Review) ───
 
+/**
+ * Lean module shape for revision — only the fields the prompt actually uses.
+ * Dropping imageUrl, imageBase64, result, templateMatchResult, svgUrls,
+ * conceptSnapshot, costOverrides, moduleImagePrompt, etc. avoids hitting
+ * React Flight's serialization limit (R3 in forgeos-rules.md) and keeps the
+ * payload well under 4 MB even for 10+ modules.
+ */
+export interface RevisionModuleInput {
+    id: string
+    name: string
+    purpose: string
+    description: string
+    keyParts: string[]
+    whyItMatters: string
+    failureModes: string[]
+    unknowns: string[]
+}
+
 export interface ReviewRevisionRequest {
-    modules: CadLabModule[]
+    modules: RevisionModuleInput[]
     /** Accepted issues from the ReviewIssueSummary component, grouped by module */
     acceptedIssues: Array<{
         moduleId: string

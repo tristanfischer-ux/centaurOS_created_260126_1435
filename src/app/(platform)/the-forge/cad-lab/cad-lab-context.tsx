@@ -711,8 +711,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setIsApplyingReviewRevisions(true)
 
     try {
+      // INTENT: Strip heavy fields before Flight — the action only needs the
+      // 8 text fields below to build its revision prompt. Sending full
+      // CadLabModule[] (including imageUrl, result, templateMatchResult, svgUrls)
+      // risks hitting Flight's serialization limit on projects with 10+ modules.
+      // See forgeos-rules.md R3.
+      const leanModules = modulesRef.current.map(m => ({
+        id: m.id,
+        name: m.name,
+        purpose: m.purpose,
+        description: m.description,
+        keyParts: m.keyParts,
+        whyItMatters: m.whyItMatters,
+        failureModes: m.failureModes,
+        unknowns: m.unknowns,
+      }))
       const revised = await reviseModulesFromReviews({
-        modules: modulesRef.current,
+        modules: leanModules,
         acceptedIssues,
         diagnosticAnswers: diagnosticAnswersRef.current,
         projectSubject: subject,
@@ -1221,21 +1236,21 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         clearTimeout(savePendingRef.current)
         savePendingRef.current = null
         if (pid) {
-          saveCadLabModules(pid, JSON.stringify(modulesRef.current)).catch(() => { /* best-effort */ })
+          saveCadLabModules(pid, JSON.stringify(modulesRef.current)).catch((e) => console.error("[CAD-LAB] best-effort save failed:", e))
         }
       }
       if (overviewPendingRef.current) {
         clearTimeout(overviewPendingRef.current)
         overviewPendingRef.current = null
         if (pid) {
-          saveCadLabProductOverview(pid, productOverviewRef.current).catch(() => { /* best-effort */ })
+          saveCadLabProductOverview(pid, productOverviewRef.current).catch((e) => console.error("[CAD-LAB] best-effort save failed:", e))
         }
       }
       if (diagPendingRef.current) {
         clearTimeout(diagPendingRef.current)
         diagPendingRef.current = null
         if (pid) {
-          saveCadLabDiagnosticAnswers(pid, diagnosticAnswersRef.current).catch(() => { /* best-effort */ })
+          saveCadLabDiagnosticAnswers(pid, diagnosticAnswersRef.current).catch((e) => console.error("[CAD-LAB] best-effort save failed:", e))
         }
       }
     }
@@ -1312,6 +1327,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Decompose into modules (progressive: skeleton → expand → images) ──
   const handleDecompose = useCallback(async () => {
     if (!editableReport.trim()) return
+    // SECURITY: Capture the project ID at function entry so every save site
+    // can check the user hasn't switched projects mid-decompose. Without this,
+    // the later save sites that use `activeProjectIdRef.current` would write
+    // Project A's decomposition payload into Project B's row if the user
+    // loaded Project B while the pipeline was in flight. Named `startProjectId`
+    // to distinguish from the captured-closure `activeProjectId` which is also
+    // pinned to the starting project.
+    const startProjectId = activeProjectIdRef.current
+    const stillOnStartProject = () => activeProjectIdRef.current === startProjectId
     setIsDecomposing(true)
     setDecompositionError(null)
     setProgressLines([])
@@ -1396,14 +1420,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
         if (fallbackRes.connections && fallbackRes.connections.length > 0) {
           setDecompositionConnections(fallbackRes.connections)
-          if (activeProjectId) saveCadLabDecompositionConnections(activeProjectId, fallbackRes.connections).catch(() => {})
+          if (activeProjectId) saveCadLabDecompositionConnections(activeProjectId, fallbackRes.connections).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
         }
 
         if (!productOverviewRef.current) {
           const summary = extractExecutiveSummary(editableReport)
           if (summary) {
             setProductOverview(summary)
-            if (activeProjectId) saveCadLabProductOverview(activeProjectId, summary).catch(() => {})
+            if (activeProjectId) saveCadLabProductOverview(activeProjectId, summary).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
           }
         }
 
@@ -1444,10 +1468,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               setAiPrefilled(true)
               if (prefillRes.enrichment && Object.keys(prefillRes.enrichment).length > 0) {
                 setDiagnosticEnrichment(prefillRes.enrichment)
-                if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment).catch(() => {})
+                if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(startProjectId!, prefillRes.enrichment).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
               }
             }
-          }).catch(() => {})
+          }).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
 
         if (fallbackModules.length >= 2) {
           setIsExtractingContracts(true)
@@ -1457,9 +1481,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               setInterfaceContracts(contractRes.contracts)
               setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
               setIsExtractingContracts(false)
-              if (activeProjectId) saveCadLabInterfaceContracts(activeProjectId, contractRes).catch(() => {})
+              if (activeProjectId) saveCadLabInterfaceContracts(activeProjectId, contractRes).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
             })
-            .catch(() => { if (activeProjectIdRef.current) setIsExtractingContracts(false) })
+            .catch((e) => { console.error("[CAD-LAB] interface contracts extraction failed:", e); if (activeProjectIdRef.current) setIsExtractingContracts(false) })
         }
 
         // Images pipeline (same as before)
@@ -1471,7 +1495,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           try {
             const styleRes = await generateVisualStyleAction(subject, fallbackModules.map(m => ({ name: m.name, purpose: m.purpose })), extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800), refImageUrls.length > 0 ? refImageUrls : undefined, documentContext || undefined)
             if (!activeProjectIdRef.current) return
-            if ("visualStyle" in styleRes) { visualStyle = styleRes.visualStyle; setVisualStyle(visualStyle); if (activeProjectId) saveCadLabVisualStyle(activeProjectId, visualStyle).catch(() => {}) }
+            if ("visualStyle" in styleRes) { visualStyle = styleRes.visualStyle; setVisualStyle(visualStyle); if (activeProjectId) saveCadLabVisualStyle(activeProjectId, visualStyle).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e)) }
           } catch { /* Non-critical */ }
 
           let referenceBase64: string | undefined
@@ -1484,7 +1508,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               if ("url" in illRes) {
                 fallbackHeroUrl = illRes.url
                 setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
-                saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch(() => {})
+                saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
                 try { const cropRes = await fetchAndCropReferenceAction(illRes.url); if ("base64" in cropRes) referenceBase64 = cropRes.base64 } catch { /* Non-critical */ }
                 if (referenceBase64) {
                   try {
@@ -1521,7 +1545,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setIsCheckpointing(true)
           requestDecompositionCheckpoints({ projectId: activeProjectId, projectSubject: subject, modules: fallbackModules, researchReport: editableReport })
             .then((cr) => { if (activeProjectIdRef.current && "checkpoints" in cr) setCheckpoints(cr.checkpoints) })
-            .catch(() => {}).finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
+            .catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e)).finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
         }
 
         return // Fallback path complete
@@ -1565,7 +1589,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Persist connections from skeleton
       if (skeletonRes.connections && skeletonRes.connections.length > 0) {
         setDecompositionConnections(skeletonRes.connections)
-        if (activeProjectIdRef.current) saveCadLabDecompositionConnections(activeProjectIdRef.current, skeletonRes.connections).catch(() => {})
+        if (activeProjectIdRef.current) saveCadLabDecompositionConnections(startProjectId!, skeletonRes.connections).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
       }
 
       // Seed product overview
@@ -1573,13 +1597,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const summary = extractExecutiveSummary(editableReport)
         if (summary) {
           setProductOverview(summary)
-          if (activeProjectIdRef.current) saveCadLabProductOverview(activeProjectIdRef.current, summary).catch(() => {})
+          if (activeProjectIdRef.current) saveCadLabProductOverview(startProjectId!, summary).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
         }
       }
 
       // Save skeleton modules immediately
-      if (activeProjectIdRef.current) {
-        const saveRes = await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(skeletonAsCadModules))
+      if (stillOnStartProject()) {
+        const saveRes = await saveCadLabModules(startProjectId!, JSON.stringify(skeletonAsCadModules))
         if ("error" in saveRes) {
           toast.error("Modules mapped but failed to save")
         } else {
@@ -1601,7 +1625,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           researchReport: editableReport,
         })
           .then((cr) => { if (activeProjectIdRef.current && "checkpoints" in cr) setCheckpoints(cr.checkpoints) })
-          .catch(() => {})
+          .catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
           .finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
       }
 
@@ -1687,8 +1711,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       addProgressLine(`All ${skeletonRes.modules.length} modules expanded`)
 
       // INTENT: Save expanded modules BEFORE reconciliation — prevents data loss if later steps fail
-      if (activeProjectIdRef.current) {
-        saveCadLabModules(activeProjectIdRef.current, JSON.stringify(expandedModules)).catch((err) =>
+      if (stillOnStartProject()) {
+        saveCadLabModules(startProjectId!, JSON.stringify(expandedModules)).catch((err) =>
           console.error("[CAD-LAB] Post-expansion save failed:", err)
         )
       }
@@ -1715,7 +1739,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           else if ("visualStyle" in reconcileRes) {
             style = reconcileRes.visualStyle
             setVisualStyle(style)
-            saveCadLabVisualStyle(activeProjectIdRef.current, style).catch(() => {})
+            saveCadLabVisualStyle(startProjectId!, style).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
 
             // Apply module patches (light-touch corrections) + per-module image prompts
             const patchCount = Object.keys(reconcileRes.modulePatch).length
@@ -1741,8 +1765,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
 
             // Save modules again after reconciliation patches + moduleImagePrompts
-            if (activeProjectIdRef.current) {
-              saveCadLabModules(activeProjectIdRef.current, JSON.stringify(expandedModules)).catch((err) =>
+            if (stillOnStartProject()) {
+              saveCadLabModules(startProjectId!, JSON.stringify(expandedModules)).catch((err) =>
                 console.error("[CAD-LAB] Post-reconciliation save failed:", err)
               )
             }
@@ -1771,7 +1795,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             if ("visualStyle" in styleRes) {
               style = styleRes.visualStyle
               setVisualStyle(style)
-              saveCadLabVisualStyle(activeProjectIdRef.current!, style).catch(() => {})
+              saveCadLabVisualStyle(startProjectId!, style).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
               addProgressLine("Visual style generated — generating system illustration...")
             }
           } catch { /* Non-critical */ }
@@ -1793,10 +1817,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             setAiPrefilled(true)
             if (prefillRes.enrichment && Object.keys(prefillRes.enrichment).length > 0) {
               setDiagnosticEnrichment(prefillRes.enrichment)
-              if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment).catch(() => {})
+              if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(startProjectId!, prefillRes.enrichment).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
             }
           }
-        }).catch(() => {})
+        }).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
 
       if (finalModulesForDiagnostics.length >= 2) {
         setIsExtractingContracts(true)
@@ -1806,9 +1830,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             setInterfaceContracts(contractRes.contracts)
             setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
             setIsExtractingContracts(false)
-            if (activeProjectIdRef.current) saveCadLabInterfaceContracts(activeProjectIdRef.current, contractRes).catch(() => {})
+            if (activeProjectIdRef.current) saveCadLabInterfaceContracts(startProjectId!, contractRes).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
           })
-          .catch(() => { if (activeProjectIdRef.current) setIsExtractingContracts(false) })
+          .catch((e) => { console.error("[CAD-LAB] interface contracts extraction failed:", e); if (activeProjectIdRef.current) setIsExtractingContracts(false) })
       }
 
       // 3b: Hero image generation — uses Opus-crafted prompt when available
@@ -1830,7 +1854,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           else if ("url" in illRes) {
             illustrationUrl = illRes.url
             setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
-            saveCadLabSystemIllustration(activeProjectIdRef.current!, illRes.url).catch(() => {})
+            saveCadLabSystemIllustration(startProjectId!, illRes.url).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
             addProgressLine("System illustration complete — preparing module image references...")
           } else {
             setSystemIllustrationStatus("failed")
@@ -1916,7 +1940,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         })
         setModules(merged)
         modulesRef.current = merged // GOTCHA: useEffect ref sync runs after render; manually sync so the save below sees image fields
-        const saveRes = await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(merged))
+        if (!stillOnStartProject() || !startProjectId) {
+          console.warn("[CAD-LAB] Skipping post-merge save — user switched projects mid-decompose")
+          return
+        }
+        const saveRes = await saveCadLabModules(startProjectId, JSON.stringify(merged))
         if ("error" in saveRes) {
           toast.error("Modules mapped but failed to save")
         } else {
@@ -2931,7 +2959,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
             // Request notification permission after the first success (less disruptive)
             if (completedCount === 1 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-              Notification.requestPermission().catch(() => { /* Non-critical */ })
+              Notification.requestPermission().catch((e) => console.warn("[CAD-LAB] notification permission request failed (non-critical):", e))
             }
             return // Success — exit the retry loop
           } catch (err) {
@@ -3322,8 +3350,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             await saveCadLabResearch(projId, res)
             // Persist seeded overview alongside research
             if (productOverviewRef.current) {
-              saveCadLabProductOverview(projId, productOverviewRef.current).catch(() => {
-                console.error("[CAD-LAB] Failed to persist seeded overview")
+              saveCadLabProductOverview(projId, productOverviewRef.current).catch((e) => {
+                console.error("[CAD-LAB] Failed to persist seeded overview:", e)
               })
             }
             setLastSaved(new Date().toISOString())

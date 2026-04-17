@@ -325,11 +325,11 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     redirect(redirectTo);
   }
 
-  if (role === "supplier") {
-    redirect("/today");
-  }
-
-  redirect("/today");
+  // DECISION 2026-04-17: new email/password signups land on /welcome — the
+  // guided tour from Tristan. The Welcome page's CTA marks onboarding_data
+  // and routes to /today. Supplier flag is handled during onboarding, not
+  // routing. Mirrors the OAuth path (setup-new-user.ts returns /welcome).
+  redirect("/welcome");
 }
 
 /**

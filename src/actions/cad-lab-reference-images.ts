@@ -122,10 +122,16 @@ export async function uploadReferenceImages(
           continue
         }
 
-        // SECURITY: Use signed URL — user-uploaded reference images are confidential
+        // SECURITY: Use signed URL — user-uploaded reference images are confidential.
+        // TTL = 30 days (not 1 hour): the URL is persisted into
+        // cad_lab_projects.reference_images JSONB and rendered by <img src> on
+        // subsequent project loads. A 1-hour TTL meant the URL 403'd after the
+        // session. 30 days covers typical project lifetime; for long-running
+        // projects a path-persistence + on-read resign refactor is the proper
+        // long-term fix (FORGE-REVIEW-REPORT.md handover).
         const { data: urlData } = await admin.storage
           .from(STORAGE_BUCKET)
-          .createSignedUrl(storagePath, 3600)
+          .createSignedUrl(storagePath, 60 * 60 * 24 * 30)
 
         stored.push({
           id: img.id,

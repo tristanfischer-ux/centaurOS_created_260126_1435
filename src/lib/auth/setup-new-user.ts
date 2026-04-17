@@ -436,8 +436,12 @@ export async function setupNewUser({
     console.warn('[setupNewUser] Onboarding drip scheduling failed (non-blocking):', e)
   }
 
-  // DECISION 2026-04-16: founder-first. Every new user lands on /today
-  // regardless of signup role. Supplier / fractional-executive are opt-in
-  // flags handled during onboarding, not routing paths.
-  return { foundryId, redirectPath: "/today" };
+  // DECISION 2026-04-17: every brand-new user lands on /welcome — a guided
+  // tour from Tristan covering each section and the 13 specialists. The
+  // Welcome page's primary CTA marks onboarding_data.has_completed_welcome
+  // and routes to /today. Existing-profile and error-fallback branches in
+  // this file keep returning "/today" so only first-time signups hit the tour.
+  // Supplier / fractional-executive are opt-in flags handled during
+  // onboarding, not routing paths.
+  return { foundryId, redirectPath: "/welcome" };
 }
