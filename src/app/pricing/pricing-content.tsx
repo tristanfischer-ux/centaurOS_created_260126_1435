@@ -581,7 +581,6 @@ const COMPARISON_FEATURES: Array<{
   { name: 'Engineering reports', free: true, seed: true, starter: true, professional: true, enterprise: true },
   { name: 'Pay-as-you-go overage', free: false, seed: true, starter: true, professional: true, enterprise: true },
   { name: 'API access', free: false, seed: false, starter: false, professional: true, enterprise: true },
-  { name: 'Priority support', free: false, seed: false, starter: false, professional: true, enterprise: true },
   { name: 'Dedicated account manager', free: false, seed: false, starter: false, professional: false, enterprise: true },
   { name: 'Platform fee', free: '10%', seed: '10%', starter: '10% (0% first 3 orders)', professional: '5%', enterprise: '5%' },
 ]

@@ -30,7 +30,7 @@
 - [x] upgrade-prompt.tsx: Shared dual-path component (upgrade primary, invite secondary)
 - [x] limit-check.ts: Seed in upgrade hint chain for all deny messages
 - [x] Pricing page: 4-tier grid with Seed card + updated comparison table
-- [x] share-result-banner.tsx: Post-assessment share component (ready for integration)
+- [~] share-result-banner.tsx: DELETED Apr 16 — built but never wired into any page; removed as dead code
 
 ## Commits
 1. `4863bc25` — Phase 1: Seed tier + DB foundation

@@ -49,15 +49,10 @@ export default function AboutPage() {
             </h2>
             <div className="space-y-4 text-lg text-muted-foreground leading-relaxed max-w-3xl">
               <p className="text-xl sm:text-2xl font-medium text-foreground">
-                We&apos;re building the operating system for hardware companies.
+                Fractional Forge is building ForgeOS — the operating system for hardware startups.
               </p>
               <p>
-                Hardware startups shouldn&apos;t need to lease factories, hire full
-                engineering teams, or spend 18 months getting to a first
-                prototype. We believe AI can compress that timeline from months
-                to weeks — giving founders access to manufacturing expertise,
-                supplier networks, and structured engineering processes from day
-                one.
+                A software startup gets to focus on the product because companies like AWS take care of the infrastructure. Hardware doesn&apos;t have an AWS. ForgeOS is our attempt to build one — the investors, the manufacturers, the specialist expertise, the team tools, and the cash burn tracking a hardware startup needs, all in one place, from day one.
               </p>
             </div>
           </section>
@@ -85,12 +80,13 @@ export default function AboutPage() {
                     </p>
                   </div>
                   <p className="text-muted-foreground leading-relaxed">
-                    Tristan built Fractional Forge after seeing first-hand how
-                    hardware startups struggle to bridge the gap between product
-                    idea and manufactured reality. With a background in product
-                    development and deep-tech venture building, he&apos;s on a
-                    mission to make manufacturing as accessible as deploying
-                    software.
+                    I have spent 26 years running startups — software and hardware — most recently Fischer Farms, one of the UK&apos;s larger vertical farms. Fractional Forge is essentially my wish list of all the things I could have had as a hardware startup founder over those 26 years.
+                  </p>
+                  <p className="text-muted-foreground leading-relaxed">
+                    One of the main issues I&apos;ve had is that I&apos;ve spent so much time and energy (and money!) on infrastructure rather than focusing on the product. A software startup gets to focus on the product and let companies like AWS deal with the infrastructure. Hardware doesn&apos;t have an AWS. Fractional Forge is my attempt to build one.
+                  </p>
+                  <p className="text-muted-foreground leading-relaxed">
+                    It&apos;s for three groups: hardware founders who need expertise across a dozen domains but can&apos;t afford full-time seniors in every role; experienced people with decades of domain expertise who want to work with startups on their own terms; and people who&apos;d love to have their own startup but don&apos;t know where to begin.
                   </p>
                   <a
                     href="https://linkedin.com/in/tristanfischer"
@@ -143,8 +139,7 @@ export default function AboutPage() {
               Want to build with us?
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Join the next generation of hardware companies building on
-              ForgeOS.
+              Free tier, no credit card needed. Have a look and let me know how you get on.
             </p>
             <Link
               href="/join"

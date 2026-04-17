@@ -32,7 +32,6 @@ export interface SubscriptionPlan {
     maxRetainers?: number
     maxAiTasksPerMonth: number
     apiAccess?: boolean
-    prioritySupport?: boolean
     dedicatedAccount?: boolean
     /** Maximum conversation mode available for this tier */
     maxConversationMode: 'text' | 'voice' | 'avatar'
@@ -137,7 +136,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxRetainers: 0,
       maxAiTasksPerMonth: 50,
       apiAccess: false,
-      prioritySupport: false,
       dedicatedAccount: false,
       maxConversationMode: 'text',
       voiceMinutesPerMonth: 0,
@@ -171,7 +169,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxRetainers: 0,
       maxAiTasksPerMonth: 250,
       apiAccess: false,
-      prioritySupport: false,
       dedicatedAccount: false,
       maxConversationMode: 'text' as const,
       voiceMinutesPerMonth: 0,
@@ -207,7 +204,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxRetainers: undefined,
       maxAiTasksPerMonth: 750,
       apiAccess: false,
-      prioritySupport: false,
       dedicatedAccount: false,
       maxConversationMode: 'text',
       voiceMinutesPerMonth: 0,
@@ -235,7 +231,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Fund performance + hardware fit scores',
       'Reduced 5% marketplace fee',
       'API access',
-      'Priority support',
     ],
     limits: {
       maxOrders: undefined, // unlimited
@@ -243,7 +238,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxRetainers: undefined, // unlimited
       maxAiTasksPerMonth: 2500,
       apiAccess: true,
-      prioritySupport: true,
       dedicatedAccount: false,
       maxConversationMode: 'voice',
       voiceMinutesPerMonth: 120, // 2 hours of real-time voice per month
@@ -278,7 +272,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxRetainers: undefined,
       maxAiTasksPerMonth: 10000, // effectively unlimited
       apiAccess: true,
-      prioritySupport: true,
       dedicatedAccount: true,
       maxConversationMode: 'avatar',
       voiceMinutesPerMonth: 600, // 10 hours of real-time voice per month
