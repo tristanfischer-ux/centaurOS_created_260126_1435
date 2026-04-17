@@ -1152,10 +1152,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                   {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} illustrations
                 </p>
                 {(() => {
-                  const heroReady = systemIllustrationStatus === "complete" || !!systemIllustrationUrl
                   const hasStuck = modules.some(m => !m.imageStatus || m.imageStatus === "pending")
                   const hasFailed = modules.some(m => m.imageStatus === "failed")
-                  if (!heroReady || isGeneratingImages || (!hasStuck && !hasFailed)) return null
+                  if (isGeneratingImages || (!hasStuck && !hasFailed)) return null
                   return (
                     <Button variant="ghost" size="sm" onClick={handleRefreshModuleImages} className="gap-1.5 text-xs">
                       <ImageIcon className="h-3.5 w-3.5" />

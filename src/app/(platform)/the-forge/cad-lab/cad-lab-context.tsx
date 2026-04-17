@@ -3263,15 +3263,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
 
       if (p.modules && p.modules.length > 0) {
-        // INTENT: Failed image statuses are transient (API timeouts, stale errors, etc.)
-        // and shouldn't persist across sessions — clear them so users see pending skeletons
-        // instead of stale error messages. Only imageUrl (successful results) persists.
-        const cleanedModules = p.modules.map(m =>
-          m.imageStatus === "failed"
-            ? { ...m, imageStatus: undefined, imageError: undefined }
-            : m
-        )
-        setModules(cleanedModules)
+        // INTENT: Preserve imageStatus="failed" on load so the card's Retry button
+        // renders and users have a recovery path. Silently resetting to undefined
+        // hid failures behind a "queued" skeleton with no way forward.
+        setModules(p.modules)
         // All loaded modules are immediately revealed (no progressive reveal for saved projects)
         setRevealedModuleIds(new Set(p.modules.map((m) => m.id)))
         // Recompute revisedModuleIds and acknowledgment from persisted conceptSnapshot

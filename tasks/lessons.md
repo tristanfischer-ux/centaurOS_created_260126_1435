@@ -22,6 +22,28 @@ RELATED: [files or patterns]
 
 <!-- Add lessons below this line -->
 
+## 2026-04-17 - RULE: Do not gate recovery UI on upstream success if the recovery action does not strictly depend on it
+
+**NEVER** hide a "Generate" / "Retry" / "Resume" button behind a flag like `heroReady` unless the button's action genuinely cannot run without that upstream state. Otherwise a failure upstream silently strands the user at the downstream step with no path forward.
+
+**ALWAYS** ask: "If the upstream failed, can this action still run?" If yes, the gate is wrong.
+
+**REASON:** CAD Lab Images tab hid its "Generate Illustrations" button when `heroReady === false`, but module image generation works fine without the hero (falls back to `heroUrl ?? undefined`). Users whose hero failed on first decompose were trapped forever with "Illustration queued" on all 8 modules and no UI to act.
+
+**RELATED:** `src/app/(platform)/the-forge/cad-lab/page.tsx:1154-1157`
+
+---
+
+## 2026-04-17 - RULE: Do not silently reset terminal error states (`"failed"` → `undefined`) on reload
+
+**NEVER** map `imageStatus === "failed"` (or any `status === "error"` terminal state) to `undefined` on load "to hide stale errors". That erases both the error message AND the retry affordance the component needs to render.
+
+**ALWAYS** keep failed/errored status on load. Let the component show the error + a Retry button. If an error is genuinely stale, clicking Retry costs one API call — far better than stranding the user.
+
+**REASON:** `handleLoadProject` in `cad-lab-context.tsx` mapped `imageStatus: "failed"` → `undefined` on reload, which compounded with the heroReady gate above to leave users with a "queued" skeleton and zero way to recover.
+
+**RELATED:** `src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx:3265`
+
 ## 2026-02-02 - Dialog Size Prop Pattern (Recurring)
 
 **What happened:** Fixed custom width in QuickComposeDialog.tsx (`sm:max-w-[500px]`) but failed to search for and fix ALL instances of this pattern across the codebase after the first fix in OnboardingModal.tsx.
