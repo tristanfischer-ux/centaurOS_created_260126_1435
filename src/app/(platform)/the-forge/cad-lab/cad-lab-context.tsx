@@ -2373,13 +2373,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // OWN name: a module called "Lower X" is always a vertical mirror,
         // a "Right X" is always horizontal. This makes the flip correct
         // even if upstream detection has stale behaviour.
-        const registeredAxis = mirrorAxisByMirrorId.get(mod.id)
-        const nameMatch = mod.name.match(DIRECTIONAL_RE)
-        const nameInferredAxis = nameMatch
-          ? (DIRECTIONAL_PAIRS.find(p => p.mirror.toLowerCase() === nameMatch[1].toLowerCase())?.axis
-             ?? DIRECTIONAL_PAIRS.find(p => p.primary.toLowerCase() === nameMatch[1].toLowerCase())?.axis)
-          : undefined
-        const axis = registeredAxis ?? nameInferredAxis ?? 'horizontal'
+        // Dead-simple axis resolution: inspect the mirror module's own name.
+        // No closures, no map lookups, no regex — just prefix match. Previous
+        // attempts via mirrorAxisByMirrorId + regex inference consistently
+        // produced 'horizontal' for Upper/Lower pairs in production despite
+        // the local logic proving 'vertical'. Hardcode and surface axis to
+        // the caller via the step label so any regression is obvious.
+        const nameLc = mod.name.trim().toLowerCase()
+        const axis: 'horizontal' | 'vertical' =
+          /^(lower|bottom|upper|top)\s/.test(nameLc) ? 'vertical'
+          : /^(right|starboard|left|port)\s/.test(nameLc) ? 'horizontal'
+          : (mirrorAxisByMirrorId.get(mod.id) ?? 'horizontal')
+        toast.info(`Mirroring ${mod.name} (${axis})`, { duration: 2000 })
         let stepLabel = `${mod.name} (${axis} mirror)`
         try {
           const flipRes = await flipCadLabImageForMirrorAction(projectId, mod.id, primaryImage.url, axis)
