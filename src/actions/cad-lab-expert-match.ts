@@ -47,6 +47,14 @@ interface NormalizedExpert {
   companyName: string | null
   /** Original DirectoryExpert shape — present for directory source */
   directoryExpert: DirectoryExpert | null
+  /** profile_slug from provider_profiles — used to build /expert/[slug] link */
+  profileSlug: string | null
+  /** username from provider_profiles — fallback slug */
+  username: string | null
+  /** user_id — used to look up provider_profile when not already linked */
+  userId: string | null
+  /** provider_profile_id — direct link to provider_profiles for enrichment */
+  providerProfileId: string | null
 }
 
 // ── Role keywords for design vs sourcing contexts ──
@@ -116,6 +124,11 @@ export async function matchProjectExperts(params: {
   }
 
   const deduped = Array.from(dedupMap.values())
+
+  // ── Enrich missing slugs by looking up provider_profiles for known user_ids ──
+  // INTENT: Profile-sourced experts arrive without a slug. If they also have a
+  // provider_profile (linked by user_id), promote that slug so the card links.
+  await enrichSlugsFromProviderProfiles(deduped)
 
   // ── Score each expert ──
   const processLower = processes.map((p) => p.toLowerCase())
@@ -201,8 +214,8 @@ export async function matchProjectExperts(params: {
       // so ExpertCard can render them.
       const expertData: DirectoryExpert = expert.directoryExpert ?? {
         id: expert.dedupKey,
-        profile_slug: null,
-        username: null,
+        profile_slug: expert.profileSlug,
+        username: expert.username,
         headline: expert.headline,
         bio: expert.bio,
         location: null,
@@ -235,10 +248,16 @@ export async function matchProjectExperts(params: {
     }
   }
 
-  // Sort by score descending, take top 12
-  scored.sort((a, b) => b.matchScore - a.matchScore)
+  // INTENT: Drop experts whose card would link nowhere. A matched exec the user
+  // cannot click through to is noise, and renders a dead href="#" on the card.
+  const clickable = scored.filter(
+    (s) => s.expert.profile_slug || s.expert.username,
+  )
 
-  return { experts: scored.slice(0, 12) }
+  // Sort by score descending, take top 12
+  clickable.sort((a, b) => b.matchScore - a.matchScore)
+
+  return { experts: clickable.slice(0, 12) }
 }
 
 // ── Source A: Directory (provider_profiles via RPC) ──
@@ -258,6 +277,10 @@ async function fetchDirectoryExperts(): Promise<NormalizedExpert[]> {
       source: "directory" as const,
       companyName: null,
       directoryExpert: e,
+      profileSlug: e.profile_slug,
+      username: e.username,
+      userId: null,
+      providerProfileId: e.id,
     }))
   } catch (error) {
     console.error("[ExpertMatch] Failed to fetch directory experts:", error)
@@ -286,6 +309,12 @@ async function fetchListingExecutives(): Promise<NormalizedExpert[]> {
           title,
           status,
           industries
+        ),
+        provider_profiles (
+          id,
+          profile_slug,
+          username,
+          user_id
         )
       `)
       .eq("marketplace_listings.status", "active")
@@ -305,6 +334,12 @@ async function fetchListingExecutives(): Promise<NormalizedExpert[]> {
         status: string
         industries: string[] | null
       }
+      const providerProfile = row.provider_profiles as unknown as {
+        id: string
+        profile_slug: string | null
+        username: string | null
+        user_id: string | null
+      } | null
 
       return {
         dedupKey,
@@ -318,6 +353,10 @@ async function fetchListingExecutives(): Promise<NormalizedExpert[]> {
         source: "listing" as const,
         companyName: listing?.title ?? null,
         directoryExpert: null,
+        profileSlug: providerProfile?.profile_slug ?? null,
+        username: providerProfile?.username ?? null,
+        userId: providerProfile?.user_id ?? null,
+        providerProfileId: row.provider_profile_id ?? null,
       }
     })
   } catch (error) {
@@ -356,6 +395,10 @@ async function fetchProfileExecutives(): Promise<NormalizedExpert[]> {
       source: "profile" as const,
       companyName: null,
       directoryExpert: null,
+      profileSlug: null,
+      username: null,
+      userId: row.id,
+      providerProfileId: null,
     }))
   } catch (error) {
     console.error("[ExpertMatch] Failed to fetch profile executives:", error)
@@ -364,6 +407,55 @@ async function fetchProfileExecutives(): Promise<NormalizedExpert[]> {
 }
 
 // ── Helpers ──
+
+/**
+ * Looks up provider_profiles for any experts missing a slug/username but with
+ * a known user_id, then mutates those experts to carry the slug forward.
+ *
+ * @description Without this step, profile-sourced experts have no slug, so the
+ * ExpertCard renders an inert href="#" and clicking the name does nothing.
+ */
+async function enrichSlugsFromProviderProfiles(experts: NormalizedExpert[]): Promise<void> {
+  const userIdsNeedingSlug = experts
+    .filter((e) => !e.profileSlug && !e.username && e.userId)
+    .map((e) => e.userId as string)
+
+  if (userIdsNeedingSlug.length === 0) return
+
+  try {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from("provider_profiles")
+      .select("user_id, profile_slug, username")
+      .in("user_id", userIdsNeedingSlug)
+
+    if (error) {
+      console.error("[ExpertMatch] Failed to enrich slugs from provider_profiles:", error)
+      return
+    }
+
+    const byUserId = new Map<string, { profile_slug: string | null; username: string | null }>()
+    for (const row of data ?? []) {
+      if (row.user_id) {
+        byUserId.set(row.user_id, {
+          profile_slug: row.profile_slug,
+          username: row.username,
+        })
+      }
+    }
+
+    for (const expert of experts) {
+      if (expert.profileSlug || expert.username || !expert.userId) continue
+      const slug = byUserId.get(expert.userId)
+      if (slug) {
+        expert.profileSlug = slug.profile_slug
+        expert.username = slug.username
+      }
+    }
+  } catch (error) {
+    console.error("[ExpertMatch] Unexpected error enriching slugs:", error)
+  }
+}
 
 /**
  * Extracts industry categories from a useCase string by matching keywords.
