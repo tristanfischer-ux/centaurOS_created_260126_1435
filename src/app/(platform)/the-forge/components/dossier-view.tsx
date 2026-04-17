@@ -120,7 +120,7 @@ export function DossierView(): React.ReactNode {
   return (
     <>
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DossierTab)}>
-        <TabsList className="mb-4 border-t border-slate-100 pt-2 rounded-t-none">
+        <TabsList className="mb-4 border-t border-border pt-2 rounded-t-none">
           <TabsTrigger value="summary" className="gap-2">
             <LayoutDashboard className="h-4 w-4" />
             Summary

@@ -240,11 +240,71 @@ Batched — the first two shared the exact same tab-bar a11y gap + "For You" Spa
 
 **Founder-impact note:** Keyboard + screen-reader users can now navigate Recruits and Marketplace tabs with arrow keys. "For You" → "Recommended" aligns with the "no AI marketing in product copy" rule — recommendations come from scores, not magic. On Quotes, a founder scrolling 20 RFQs used to see a sea of "Sent" badges and had to mentally date-math to find blockers. Now stalled ones wear a warning badge — the answer to "who's blocking me?" jumps off the page.
 
+### 12–13. Forge + Products cross-check
+
+Goal (from Tristan): review the two pages already shipped (Products in the prior session, Forge broadly) *in the context of* what came up on the other 11 pages tonight. Not another full audit — just check whether any patterns I learned elsewhere apply back.
+
+**Patterns I checked for (found elsewhere → checked on Forge/Products):**
+
+| Pattern | Seen on | Present on Forge/Products? |
+|---|---|---|
+| `window.location.reload()` after import | Cash In, Cash Out | ❌ Not present (Products uses `router.refresh()` already; Forge uses local state) |
+| "For You" + Sparkles as an AI-magic tab label | Recruits, Marketplace | ❌ Not on tabs. Sparkles icons in Forge (`parts-bom`, `mashup-concept-search`, `module-image-grid`, `hero-section`) are action-button/accent uses, not tab labels — those are honest AI-action indicators, fine. |
+| Potemkin features (fake buttons) | Reports Schedule | ❌ None found |
+| Briefing severity = `'warning'` on empty state | Products (fixed prev session) | ❌ No new instances |
+| Hardcoded `border-slate-100` / `border-slate-200` | Strategy, Objectives (fixed) | ✅ **3 instances found in Forge** — fixed now |
+
+**Pass B shipped:**
+- `the-forge/cad-lab/mashup/page.tsx:178`: `border-slate-100` → `border-border`
+- `the-forge/components/page.tsx:120`: `border-slate-100` → `border-border`
+- `the-forge/components/dossier-view.tsx:123`: `border-slate-100` → `border-border`
+
+**Verdict:** Products is in strong shape — the prior 5-round pass handled the voice, integration, a11y, and robustness items. Forge is broadly healthy too; the only carry-over from tonight's other pages was the design-token slip-ups (slate-100), all cleaned.
+
+**Founder-impact note:** Three more surfaces in the Forge stay coherent if the design-token palette ever shifts. No cross-contamination from patterns found elsewhere — Products and Forge held their own.
+
 
 ## Deferred / backlog
 
-_(anything I explicitly don't fix)_
+Ordered roughly by leverage × effort. None are correctness bugs.
+
+1. **[P1 architectural] Products ↔ Objectives ↔ Tasks schema link** — objectives and tasks have no `product_id`. A founder can't answer "which product is this objective shipping?" or "what's blocking the Alpha build?" Needs a migration + reverse UI on both sides. Surfaced in the Objectives and Tasks audits; same gap.
+2. **[P1 architectural] Cash Burn auto-sync from Products / Orders / Objectives** — Cash Burn is currently a standalone calculator. Manual entry only. Should seed COGS from Products, monthly revenue from target_monthly × unit_price, planned spend from Objectives (hiring, capex), actual revenue from Orders. Today's biggest integration gap.
+3. **[P1 feature] Reports → Schedule backend** — the Schedule button was hidden tonight because the handler only fired a success toast and persisted nothing. To restore: `scheduleReportDelivery` server action + `scheduled_reports` table + a cron worker + email dispatcher. Backlog comment left in `reports/page.tsx` marking the insertion point.
+4. **[P2] `autoPromoteIfComplete` (Products)** — fire-and-forget from CAD saves with console-only error logging. Surfacing errors to the user needs a notifications pipeline.
+5. **[P2] `convertBriefToForge` structural seeding (Products)** — brief fields flatten into `product_overview` markdown. CAD Lab intake refactor needed to accept structured input.
+6. **[P2] Objectives ↔ Products reverse link UI** — covered by #1.
+7. **[P2] Module-image carryover on `promoteFromCadLab` (Products)** — hero_image carries, per-module images don't.
+8. **[P2] Tooling-investment extraction on promote (Products)** — `buildUnitEconomicsFromEstimates` always returns `tooling_investment_pence: null` even when estimates have the data.
+9. **[P2] `probabilityPct` rendered on Cash In rows** — fetched but never shown. Decide: surface as a `"% likely"` badge, or stop fetching it.
+10. **[P2] P&L NULL `pnlCategory` default** — items with NULL `pnlCategory` silently drop from product P&L. Either backfill a default or document explicitly.
+11. **[P3] UUID validation across `src/actions/tasks.ts`** — 12+ server actions accept `taskId: string` without a format check. Defense in depth; RLS + foundry filter are the actual security boundary.
+12. **[P3] Generic AI error toasts** — scattered across Products, Strategy, Market. A `catch { toast.error('Failed to X') }` swallows provider-level detail. Would benefit from a wrapper that surfaces rate-limits / parse errors / API-key misses distinctly.
+13. **[P3] Reports tab arrow-key navigation** — the Reports/Presentations/Documents/Downloads tab bar is shadcn `Tabs`, already role-correct, but lacks explicit arrow-key listeners like I added on the Products detail view.
+14. **[P3] Quotes empty-state enrichment** — personalised next-steps ("N quotes waiting 5+ days" counter).
+15. **[P3] Marketplace pricing surfacing on list cards** — optional `price_from` badge.
+16. **[P3] Design-token sweep** — I hit the slate-100/200 instances I saw on touched pages, but a full-codebase `grep -E "slate-|gray-|bg-white|text-white"` check is worth scheduling.
 
 ## Handover (morning)
 
-_(what's done, what's left, where to resume)_
+**Composite score across the 13 pages worked tonight:** every page either held its score or gained on at least one rubric dimension. No regressions.
+
+**Commits, top-to-bottom on `main` (all pushed):**
+1. `a8ccf92e` — docs: tracker created
+2. `6ef96b71` — fix(strategy): UUID gate + semantic tokens (page 1/13)
+3. `bf3423eb` — fix(strategy): finish semantic-token sweep on landing
+4. `f288d84f` — fix(objectives): surface errors, replace slate-* (page 2/13)
+5. `6ff051f1` — fix(tasks): voice compliance on create dialog (page 3/13)
+6. `32390b98` — fix(reports): hide non-functional Schedule (page 4/13)
+7. `a8f8ce3d` — fix(cash-burn): stop lying about runway + aria (page 5/13)
+8. `b671f59a` — fix(cash-burn): soft refresh + P&L empty state (pages 6-8/13)
+9. `1a8205c5` — a11y+voice(recruits/marketplace/quotes): WAI-ARIA + waiting badge (pages 9-11/13)
+10. (pending, this commit) — cross-check Forge + Products + handover (pages 12-13/13)
+
+**How to pick this up tomorrow:**
+- Open this file.
+- The "Deferred / backlog" list above is the queue, ordered by leverage × effort. Top three are architectural (Products/Objectives/Tasks link, Cash Burn auto-sync, Reports scheduling). Tackling any of these unlocks a founder's mental model of the app as one coherent system instead of a cluster of calculators.
+- Each committed page has a section in "Work log" with its score delta and what was explicitly deferred — safe to cross-reference when picking a backlog item.
+- If you want to keep sweeping pages: candidates not covered tonight include `/pitch-prep`, `/investors`, `/team`, `/canvas`, `/retainers`, `/suppliers`, `/workshop`, `/playbooks`, `/orders`, `/knowledge`, `/me`, `/agents`, `/analytics`. Strongly recommend starting with `/pitch-prep` or `/investors` next — those sit between the work shipped on Products and the strategy/reports pipeline, and a founder raising money will hit them hard.
+- All Vercel deploys from tonight reached `● Ready`. Last verified before sleep.
+
