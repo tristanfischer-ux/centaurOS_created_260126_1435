@@ -5982,6 +5982,48 @@ export type Database = {
         }
         Relationships: []
       }
+      email_preferences: {
+        Row: {
+          created_at: string
+          dormancy_nudges: boolean
+          morning_digest: boolean
+          outreach_drip: boolean
+          paused_all_until: string | null
+          product_announcements: boolean
+          specialist_briefings: boolean
+          unsubscribed_all_at: string | null
+          updated_at: string
+          user_id: string
+          welcome_drip: boolean
+        }
+        Insert: {
+          created_at?: string
+          dormancy_nudges?: boolean
+          morning_digest?: boolean
+          outreach_drip?: boolean
+          paused_all_until?: string | null
+          product_announcements?: boolean
+          specialist_briefings?: boolean
+          unsubscribed_all_at?: string | null
+          updated_at?: string
+          user_id: string
+          welcome_drip?: boolean
+        }
+        Update: {
+          created_at?: string
+          dormancy_nudges?: boolean
+          morning_digest?: boolean
+          outreach_drip?: boolean
+          paused_all_until?: string | null
+          product_announcements?: boolean
+          specialist_briefings?: boolean
+          unsubscribed_all_at?: string | null
+          updated_at?: string
+          user_id?: string
+          welcome_drip?: boolean
+        }
+        Relationships: []
+      }
       entity_reviews: {
         Row: {
           body: string

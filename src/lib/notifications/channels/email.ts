@@ -20,6 +20,8 @@
 import { EmailOptions, EmailTemplate, ChannelSendResult } from '../types'
 import { escapeHtml } from '@/lib/security/sanitize'
 import { Resend } from 'resend'
+import { isEmailAllowed } from '@/lib/email/preferences'
+import { buildMarketingFooter } from '@/lib/email/footer'
 
 // Initialize Resend client (null if API key not configured)
 const resend = process.env.RESEND_API_KEY
@@ -559,9 +561,25 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
  * @returns Success status with error message on failure
  */
 export async function sendEmail(options: EmailOptions): Promise<ChannelSendResult> {
-    const { to, subject, body, template = 'generic', templateData = {} } = options
+    const { to, subject, body, template = 'generic', templateData = {}, marketing } = options
 
     try {
+        // MARKETING GATE: check per-channel preferences before doing any work.
+        // Fails closed on error (see isEmailAllowed). Transactional emails omit
+        // `marketing` and bypass this check entirely.
+        if (marketing) {
+            const allowed = await isEmailAllowed(marketing.userId, marketing.channel)
+            if (!allowed) {
+                console.info('[Email] Marketing send skipped — user opted out', {
+                    to,
+                    template,
+                    userId: marketing.userId,
+                    channel: marketing.channel,
+                })
+                return { success: true }
+            }
+        }
+
         // SECURITY: Sanitize all template data to prevent XSS/HTML injection
         const sanitizedData = sanitizeTemplateData({
             subject,
@@ -572,7 +590,14 @@ export async function sendEmail(options: EmailOptions): Promise<ChannelSendResul
 
         // Generate email content from template
         const templateFn = EMAIL_TEMPLATES[template]
-        const { subject: templateSubject, html } = templateFn(sanitizedData)
+        const { subject: templateSubject, html: templateHtml } = templateFn(sanitizedData)
+
+        // MARKETING FOOTER: append UK PECR + GDPR compliant unsubscribe footer
+        // to any email flagged as marketing. Footer contains signed tokens so
+        // the recipient can unsubscribe without being logged in.
+        const html = marketing
+            ? templateHtml + buildMarketingFooter(marketing.userId, marketing.channel)
+            : templateHtml
 
         // Send via Resend if configured
         if (resend) {

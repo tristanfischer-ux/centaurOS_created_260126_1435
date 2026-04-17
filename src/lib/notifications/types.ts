@@ -54,6 +54,22 @@ export interface EmailOptions {
     body: string
     template?: EmailTemplate
     templateData?: Record<string, unknown>
+    /**
+     * When present, this is a marketing email. The send path will:
+     *   (a) check email_preferences for the given channel and skip if opted out
+     *   (b) append an unsubscribe footer with a signed token for this user
+     * Transactional emails omit this field and bypass preferences + footer.
+     */
+    marketing?: {
+        userId: string
+        channel:
+            | 'product_announcements'
+            | 'welcome_drip'
+            | 'dormancy_nudges'
+            | 'morning_digest'
+            | 'outreach_drip'
+            | 'specialist_briefings'
+    }
 }
 
 export type EmailTemplate = 
