@@ -2287,9 +2287,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     }
     // Fallback: detect implicit mirror pairs via directional naming pattern.
-    // We scan the FULL module list for twins, not just modulesToProcess, so a
-    // lone retry of a mirror module can still locate its primary.
-    if (mirrorMap.size === 0) {
+    // Always run — previously gated on `mirrorMap.size === 0`, which meant a
+    // project with explicit L/R mirrorOf skipped regex detection entirely and
+    // U/L pairs were silently missed. We scan the FULL module list for twins,
+    // not just modulesToProcess, so a lone retry of a mirror module can still
+    // locate its primary.
+    {
       // Group by (base name without prefix) → the two variants that share it
       const byBaseName = new Map<string, CadLabModule[]>()
       for (const mod of fullModuleIndex.values()) {
@@ -2310,7 +2313,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         for (const { primary, mirror, axis } of DIRECTIONAL_PAIRS) {
           const primaryMember = group.find(m => new RegExp(`^${primary}\\s`, 'i').test(m.name))
           const mirrorMember = group.find(m => new RegExp(`^${mirror}\\s`, 'i').test(m.name))
-          if (primaryMember && mirrorMember && processingIds.has(mirrorMember.id)) {
+          if (primaryMember && mirrorMember && processingIds.has(mirrorMember.id)
+              && !mirrorMap.has(mirrorMember.id)) {
             mirrorMap.set(mirrorMember.id, primaryMember.id)
             mirrorAxisByMirrorId.set(mirrorMember.id, axis)
             break
@@ -2391,11 +2395,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       } else {
         await generateOne(mod)
         updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 89), stepLabel: mod.name })
-        // If this is a primary, capture its URL for mirror reuse
+        // If this is a primary, capture its URL for mirror reuse. Read it
+        // from `imageUpdates` (synchronous Map, populated by generateOne in
+        // the same microtask) rather than from a `setModules((c)=>...)`
+        // snapshot — the updater pattern is deferred by React 18 batching
+        // and yields a stale/empty array (same gotcha flagged at the
+        // retry-sweep step below, Rule 9 in cad-lab-react-patterns.md).
+        // Before this fix, mirror modules silently fell through to full
+        // regeneration because primaryImageUrls was never populated.
         if (primaryIds.has(mod.id)) {
-          let snap: CadLabModule[] = []
-          setModules((current) => { snap = current; return current })
-          const generated = snap.find(m => m.id === mod.id)
+          const generated = imageUpdates.get(mod.id)
           if (generated?.imageStatus === "complete" && generated.imageUrl) {
             primaryImageUrls.set(mod.id, { url: generated.imageUrl, model: generated.imageModelUsed })
           }
