@@ -2389,10 +2389,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           } else {
             console.warn(`[CAD-LAB] Flip failed for mirror ${mod.id}, falling back to URL copy: ${flipRes.error}`)
             stepLabel = `${mod.name} (${axis} mirror, flip fallback)`
+            // Surface the actual flip error to the user for diagnosis —
+            // silent URL-copy fallback is what let the original bug ship.
+            toast.error(`Mirror flip failed for ${mod.name}: ${String(flipRes.error).slice(0, 140)}`)
           }
         } catch (err) {
           console.warn(`[CAD-LAB] Flip threw for mirror ${mod.id}, falling back to URL copy`, err)
           stepLabel = `${mod.name} (${axis} mirror, flip fallback)`
+          toast.error(`Mirror flip threw for ${mod.name}: ${err instanceof Error ? err.message.slice(0, 140) : 'unknown'}`)
         }
         const update: Partial<CadLabModule> = {
           imageUrl: mirroredUrl,
