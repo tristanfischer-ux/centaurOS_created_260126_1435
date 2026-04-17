@@ -513,10 +513,10 @@ function TristanIntroSection() {
             From Tristan
           </p>
           <p className="text-foreground text-lg sm:text-xl md:text-2xl font-playfair leading-snug mb-2">
-            &ldquo;A software founder builds one thing. A hardware founder builds two. Fractional Forge handles the second.&rdquo;
+            &ldquo;I spent years burning time and money on infrastructure — factories, supply chains, operations — before I could focus on the product. That&apos;s the problem ForgeOS solves.&rdquo;
           </p>
           <p className="text-muted-foreground text-sm font-mono uppercase tracking-widest mb-4">
-            — Tristan Fischer, 26 years building hardware startups
+            — Tristan Fischer, Founder &amp; CEO
           </p>
           <a
             href="#why-i-built"
