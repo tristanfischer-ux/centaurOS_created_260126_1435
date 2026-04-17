@@ -198,7 +198,7 @@ export async function generateInvestorIntel(
   const searchPrompt = buildIntelPrompt(firmName, firmType, website, sectors, location)
 
   try {
-    const client = new Anthropic({ apiKey })
+    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
     // DECISION: Use web_search tool to get current data about the firm.
     // Non-streaming because we need to parse the structured response.

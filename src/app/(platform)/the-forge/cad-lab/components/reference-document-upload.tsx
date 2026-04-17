@@ -191,6 +191,7 @@ export function ReferenceDocumentUpload({
           accept={ACCEPTED_DOCUMENT_EXTENSIONS}
           multiple
           className="hidden"
+          aria-label="Upload reference documents"
           onChange={handleFileSelect}
           disabled={disabled}
         />

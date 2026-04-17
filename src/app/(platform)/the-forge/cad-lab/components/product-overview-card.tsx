@@ -194,9 +194,13 @@ export function ProductOverviewCard({
           <div className="space-y-3">
             <Textarea
               ref={textareaRef}
+              id="product-overview"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={6}
+              aria-label="Product overview"
+              aria-invalid={!!saveError}
+              aria-describedby={saveError ? "product-overview-error" : undefined}
               className="resize-y text-sm"
               placeholder="Describe your product at a high level..."
             />
@@ -233,7 +237,7 @@ export function ProductOverviewCard({
 
         {/* ── Save feedback — error only; success is silent (autosave pattern) ── */}
         {!isEditing && saveError && (
-          <div className="flex items-center gap-1.5 mt-2">
+          <div id="product-overview-error" role="alert" className="flex items-center gap-1.5 mt-2">
             <AlertCircle className="h-3 w-3 text-destructive" />
             <span className="text-[11px] text-destructive">Save failed — check your connection</span>
           </div>

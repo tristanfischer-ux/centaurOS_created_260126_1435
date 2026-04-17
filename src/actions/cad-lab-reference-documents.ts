@@ -296,7 +296,7 @@ export async function extractDocumentText(
       }
 
       const Anthropic = (await import("@anthropic-ai/sdk")).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const response = await client.messages.create({
         model: "claude-haiku-4-5-20251001",

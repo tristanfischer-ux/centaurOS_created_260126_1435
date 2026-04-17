@@ -94,7 +94,7 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
 
   try {
     const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey })
+    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
     const response = await client.messages.create({
       model: "claude-opus-4-6",

@@ -149,6 +149,8 @@ export function HeroSection({
               onChange={(e) => setSubject(e.target.value)}
               onSpeechTranscript={(text) => setSubject(subject ? subject + " " + text : text)}
               placeholder="e.g., 1U CubeSat bus structure, EV battery module enclosure, 6-DOF robotic arm joint"
+              aria-label="What do you want to build?"
+              aria-required={true}
               className="pl-10 h-12 text-base"
               disabled={isAnyLoading}
               onKeyDown={(e) => {

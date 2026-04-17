@@ -204,7 +204,7 @@ Respond with ONLY valid JSON:
     }
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey })
+    const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
     const response = await client.messages.create({
       model: BOM_MODEL,
@@ -352,7 +352,7 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
     }
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey })
+    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
     const response = await client.messages.create({
       model: BOM_MODEL,
@@ -562,7 +562,7 @@ Create structured parts and hierarchical BOM lines. Deduplicate common fasteners
     }
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey })
+    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
     const response = await client.messages.create({
       model: BOM_MODEL,

@@ -692,7 +692,7 @@ Provide your structured market assessment as JSON.`
 
     try {
       const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
@@ -903,7 +903,7 @@ export async function scoreFundability(
       const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
       if (apiKey) {
         const Anthropic = (await import('@anthropic-ai/sdk')).default
-        const client = new Anthropic({ apiKey })
+        const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
         const scoresContext = JSON.stringify({
           market_size_score,
@@ -1428,7 +1428,7 @@ Produce the design brief JSON.`
 
     try {
       const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
@@ -1614,7 +1614,7 @@ Generate the design brief JSON that will guide engineering changes to achieve th
 
     try {
       const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
@@ -1830,7 +1830,7 @@ export async function synthesizeProductStatus(
 
     try {
       const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const systemPrompt = `You are the cross-system synthesis engine for Fractional Forge, a platform helping hardware startups build, fund, and ship products. You are given a product's complete data across 4 dimensions:
 
@@ -2020,7 +2020,7 @@ export async function generateDesignBriefFromSynthesis(
 
     try {
       const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const systemPrompt = `You are Max, the CTO of Fractional Forge. You translate business improvements into engineering design briefs for hardware products.
 
@@ -2237,7 +2237,7 @@ export async function reviewBriefFeasibility(
 
     try {
       const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const systemPrompt = `You are Max, CTO of Fractional Forge. You're a pragmatic engineer who's built hardware products from prototype to mass production. You review design briefs for technical feasibility.
 

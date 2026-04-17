@@ -270,6 +270,8 @@ export function DesignBriefInterview({
         {/* Error */}
         {error && (
           <motion.div
+            id="interview-answer-error"
+            role="alert"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-sm text-destructive text-center py-2"
@@ -306,6 +308,7 @@ export function DesignBriefInterview({
           <div className="relative flex-1">
             <InputWithSpeech
               ref={inputRef}
+              id="interview-answer"
               enableSpeech
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
@@ -313,6 +316,10 @@ export function DesignBriefInterview({
                 setCurrentAnswer((prev) => (prev ? prev + " " + text : text))
               }
               placeholder="Type your answer..."
+              aria-label="Your answer to Max's question"
+              aria-required={true}
+              aria-invalid={!!error}
+              aria-describedby={error ? "interview-answer-error" : undefined}
               className="h-10 text-sm pr-10"
               disabled={isThinking}
               onKeyDown={(e) => {

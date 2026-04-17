@@ -117,6 +117,7 @@ export function AssemblyShipping({
             <Input
               id="ship-name"
               placeholder="Full name"
+              aria-required={true}
               value={shipping.shippingAddress?.name ?? ""}
               onChange={(e) => handleAddressChange("name", e.target.value)}
             />
@@ -126,6 +127,7 @@ export function AssemblyShipping({
             <Input
               id="ship-line1"
               placeholder="Street address"
+              aria-required={true}
               value={shipping.shippingAddress?.line1 ?? ""}
               onChange={(e) => handleAddressChange("line1", e.target.value)}
             />
@@ -145,6 +147,7 @@ export function AssemblyShipping({
               <Input
                 id="ship-city"
                 placeholder="City"
+                aria-required={true}
                 value={shipping.shippingAddress?.city ?? ""}
                 onChange={(e) => handleAddressChange("city", e.target.value)}
               />
@@ -154,6 +157,7 @@ export function AssemblyShipping({
               <Input
                 id="ship-postcode"
                 placeholder="Postcode / ZIP"
+                aria-required={true}
                 value={shipping.shippingAddress?.postcode ?? ""}
                 onChange={(e) => handleAddressChange("postcode", e.target.value)}
               />
@@ -164,6 +168,7 @@ export function AssemblyShipping({
             <Input
               id="ship-country"
               placeholder="Country"
+              aria-required={true}
               value={shipping.shippingAddress?.country ?? ""}
               onChange={(e) => handleAddressChange("country", e.target.value)}
             />

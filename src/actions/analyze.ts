@@ -252,7 +252,7 @@ export async function analyzeBusinessPlan(
       const truncatedText = text.slice(0, 100000)
 
       const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
       // DECISION: Run all 6 Sonnet calls in parallel within the server action.
       // Objectives extraction also runs via /api/analyze-objectives (Opus, 300s)

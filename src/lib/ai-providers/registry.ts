@@ -134,7 +134,7 @@ function buildMessages(opts: StreamingTextOptions): ChatMessage[] {
 
 async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
     const OpenAI = (await import("openai")).default
-    const client = new OpenAI({ apiKey: opts.apiKey })
+    const client = new OpenAI({ apiKey: opts.apiKey, timeout: 90_000, maxRetries: 0 })
 
     const messages = buildMessages(opts)
 
@@ -173,7 +173,7 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
     }
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey: opts.apiKey })
+    const client = new Anthropic({ apiKey: opts.apiKey, timeout: 240_000, maxRetries: 0 })
 
     // Anthropic uses a separate `system` param, so we build messages without it
     const conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = []
@@ -267,7 +267,7 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
  */
 async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise<void> {
     const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey: opts.apiKey })
+    const client = new Anthropic({ apiKey: opts.apiKey, timeout: 240_000, maxRetries: 0 })
 
     const conversationMessages: Array<{ role: "user" | "assistant"; content: string | Array<{ type: string; text?: string }> }> = []
     if (opts.conversationHistory && opts.conversationHistory.length > 0) {
@@ -414,7 +414,7 @@ async function streamGoogle(opts: StreamingTextOptions): Promise<void> {
 
 async function generateOpenAIImage(opts: ImageGenerationOptions): Promise<ImageGenerationResult> {
     const OpenAI = (await import("openai")).default
-    const client = new OpenAI({ apiKey: opts.apiKey })
+    const client = new OpenAI({ apiKey: opts.apiKey, timeout: 120_000, maxRetries: 0 })
 
     const response = await client.images.generate({
         model: opts.modelId,
@@ -537,7 +537,7 @@ async function generateReplicateImage(opts: ImageGenerationOptions): Promise<Ima
 
 async function generateOpenAIAudio(opts: AudioGenerationOptions): Promise<AudioGenerationResult> {
     const OpenAI = (await import("openai")).default
-    const client = new OpenAI({ apiKey: opts.apiKey })
+    const client = new OpenAI({ apiKey: opts.apiKey, timeout: 120_000, maxRetries: 0 })
 
     const response = await client.audio.speech.create({
         model: opts.modelId,
@@ -596,6 +596,8 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
     const client = new OpenAI({
         apiKey: opts.apiKey,
         baseURL: "https://api.minimax.io/v1",
+        timeout: 90_000,
+        maxRetries: 0,
     })
 
     const messages = buildMessages(opts)
@@ -633,6 +635,8 @@ async function streamDeepSeek(opts: StreamingTextOptions): Promise<void> {
     const client = new OpenAI({
         apiKey: opts.apiKey,
         baseURL: "https://api.deepseek.com",
+        timeout: 90_000,
+        maxRetries: 0,
     })
 
     const messages = buildMessages(opts)
@@ -670,6 +674,8 @@ async function streamTogether(opts: StreamingTextOptions): Promise<void> {
     const client = new OpenAI({
         apiKey: opts.apiKey,
         baseURL: "https://api.together.xyz/v1",
+        timeout: 90_000,
+        maxRetries: 0,
     })
 
     const messages = buildMessages(opts)
@@ -716,6 +722,8 @@ async function streamQwen(opts: StreamingTextOptions): Promise<void> {
     const client = new OpenAI({
         apiKey: opts.apiKey,
         baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        timeout: 90_000,
+        maxRetries: 0,
     })
 
     // Qwen3.5-plus supports enable_thinking for extended reasoning (similar to Anthropic)
@@ -768,6 +776,8 @@ async function streamQwenLocal(opts: StreamingTextOptions): Promise<void> {
     const client = new OpenAI({
         apiKey: opts.apiKey || "ollama",
         baseURL,
+        timeout: 240_000,
+        maxRetries: 0,
     })
 
     const messages = buildMessages(opts)

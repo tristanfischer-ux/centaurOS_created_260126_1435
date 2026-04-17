@@ -287,7 +287,7 @@ async function verifyProductPrice(
 
   // Tier 3: Haiku extraction (paid)
   try {
-    const client = new Anthropic({ apiKey })
+    const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 256,
@@ -531,7 +531,7 @@ async function scrapePartFromRS(
   }
 
   try {
-    const client = new Anthropic({ apiKey })
+    const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 256,
@@ -631,7 +631,7 @@ async function searchViaWebSearch(
   partNames: string[],
   apiKey: string,
 ): Promise<BuyPartSearchResult[]> {
-  const client = new Anthropic({ apiKey })
+  const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
   const allResults: BuyPartSearchResult[] = []
 
   // INTENT: Batch parts into groups of 5 to balance cost vs quality

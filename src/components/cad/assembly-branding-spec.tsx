@@ -115,11 +115,13 @@ export function AssemblyBrandingSpec({
                     type="color"
                     value={color}
                     onChange={(e) => handleColorChange(i, e.target.value)}
+                    aria-label={`Brand color ${i + 1} swatch`}
                     className="h-8 w-8 rounded border border-border cursor-pointer"
                   />
                   <Input
                     value={color}
                     onChange={(e) => handleColorChange(i, e.target.value)}
+                    aria-label={`Brand color ${i + 1} hex value`}
                     className="w-24 h-8 text-xs font-mono"
                   />
                   <button

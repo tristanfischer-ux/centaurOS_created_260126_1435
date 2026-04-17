@@ -88,7 +88,7 @@ export async function generateStrategicBriefing(
     const genStart = Date.now()
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim(), timeout: 240_000, maxRetries: 0 })
 
     const t = timeoutWithCleanup(API_TIMEOUT_MS)
     let result: Awaited<ReturnType<InstanceType<typeof Anthropic>['messages']['create']>>

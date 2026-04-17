@@ -174,6 +174,7 @@ export function ReferenceImageUpload({
           accept={ACCEPTED_TYPES.join(",")}
           multiple
           className="hidden"
+          aria-label="Upload reference images"
           onChange={handleFileSelect}
           disabled={disabled}
         />
