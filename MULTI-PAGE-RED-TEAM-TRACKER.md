@@ -154,6 +154,24 @@ Per-page composite rubric score recorded. Rubric:
 
 **Founder-impact note:** The Tasks page is architecturally the strongest of the three so far — Focus view answers "what should I do next" in under 2 seconds, Cal's briefing hero gives a one-sentence executive read of the task load, and delegate-to-specialist is one click. The only user-visible weakness was the "AI Agent" copy in the create dialog — fixed. UUID hardening is on the backlog (not a correctness issue; RLS handles security).
 
+### 4. Reports — `/reports`
+
+**Founder question:** *"What happened this week/month, am I on track, what do I need to show investors or my team?"*
+
+**Pass A findings:**
+1. **[P1 HONESTY]** The Schedule dialog collects frequency + day-of-week/month + recipients, but the "Save Schedule" handler only fires a success toast — **no persistence, no cron, no emails ever arrive**. Classic Potemkin feature. Violates "don't lie to the user" first principle. [Fixed — button hidden]
+2. **[Audit false-positive]** `bg-international-orange-hover` is a real token (defined in `tailwind.config.ts:27-31` via Tailwind's colour nesting as `international-orange.hover`). No fix needed.
+3. **[P3]** Arrow-key nav on the Reports/Presentations/Documents/Downloads tabs — backlog.
+4. **[P3]** Share-link rate limiting — backlog.
+5. **[P2]** Cross-timezone date range check — needs a test in UTC-12/UTC+12 to verify "This Week" boundary. Deferred, requires deploy + manual test.
+
+**Pass B shipped:**
+- Removed the Schedule trigger button from the export toolbar (`page.tsx:1517-1524`). Replaced with a GOTCHA comment explaining why and what needs to happen to restore it (`scheduleReportDelivery` server action + cron). The dialog component remains in the file as dead code — safer than half-deleting state + dialog mid-rewrite; a follow-up PR can clean it up once the backend ships.
+
+**Score:** Utility 4 (still requires explicit Generate click, no "last week at a glance") / Integration 5 (all section fetches respect foundry_id, no cross-foundry leak) / Voice 5 (briefing text is direct, specific) / Robustness 4 / A11y 5 → **Composite 4.6**.
+
+**Founder-impact note:** A founder who clicked "Schedule" expected weekly reports to start arriving. They weren't. Now the button is gone until the feature ships for real — honest surface over sketchy feature theatre. The report-generation flow itself is strong: Cal's briefing + template picker + generate → 6-step progress bar → export to PDF/DOCX/PPTX or share.
+
 
 ## Deferred / backlog
 

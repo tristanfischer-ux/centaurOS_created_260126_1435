@@ -1514,14 +1514,15 @@ export default function ReportsPage(): React.JSX.Element {
                         <Mail className="mr-1.5 h-3.5 w-3.5" />
                         Email
                       </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setIsScheduleDialogOpen(true)}
-                      >
-                        <Clock className="mr-1.5 h-3.5 w-3.5" />
-                        Schedule
-                      </Button>
+                      {/*
+                        GOTCHA: Schedule button removed until the backend exists.
+                        The dialog collects frequency + recipients but the Save
+                        handler only fires a success toast — no persistence, no
+                        cron. Leaving the button in would lie to the founder
+                        (they'd think reports are being scheduled). Restore when
+                        scheduleReportDelivery() server action + cron ships.
+                        Tracked in MULTI-PAGE-RED-TEAM-TRACKER.md.
+                      */}
                     </div>
                   </CardContent>
                 </Card>
