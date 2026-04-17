@@ -54,10 +54,17 @@ export default async function QuoteRequestsPage() {
                         <div className="divide-y divide-border">
                             {requests.map((req) => {
                                 const statusInfo = STATUS_BADGE[req.status] ?? STATUS_BADGE.sent
+                                // INTENT: surface "waiting" time so a founder can spot blockers.
+                                // An RFQ sent 14 days ago with no reply is what they need to chase —
+                                // the bare status badge doesn't convey urgency.
+                                const daysWaiting = req.status === 'sent'
+                                    ? Math.floor((Date.now() - new Date(req.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                                    : null
+                                const isStalled = daysWaiting !== null && daysWaiting >= 7
                                 return (
                                     <div key={req.id} className="flex items-center justify-between px-6 py-4 hover:bg-muted/50 transition-colors">
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <Link
                                                     href={`/marketplace/${req.listing_id}`}
                                                     className="text-sm font-medium text-foreground hover:text-international-orange transition-colors truncate"
@@ -67,6 +74,11 @@ export default async function QuoteRequestsPage() {
                                                 <Badge variant={statusInfo.variant} className="text-[10px] shrink-0">
                                                     {statusInfo.label}
                                                 </Badge>
+                                                {isStalled && (
+                                                    <Badge variant="warning" className="text-[10px] shrink-0">
+                                                        Waiting {daysWaiting} day{daysWaiting === 1 ? '' : 's'}
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <p className="text-xs text-muted-foreground truncate mt-0.5">
                                                 {req.subject}

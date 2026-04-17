@@ -47,11 +47,23 @@ export function RecruitPageTabs({
 
   return (
     <div className="space-y-6">
-      {/* Tab bar */}
+      {/* Tab bar — WAI-ARIA tablist with keyboard navigation */}
       <div className="flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" role="tablist" aria-label="Recruit views">
           <button
+            id="recruit-tab-for-you"
+            role="tab"
+            aria-selected={activeTab === 'for-you'}
+            aria-controls="recruit-tabpanel-for-you"
+            tabIndex={activeTab === 'for-you' ? 0 : -1}
             onClick={() => setActiveTab('for-you')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                setActiveTab('browse')
+                document.getElementById('recruit-tab-browse')?.focus()
+              }
+            }}
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
               activeTab === 'for-you'
@@ -59,11 +71,23 @@ export function RecruitPageTabs({
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
             )}
           >
-            <Sparkles className="h-4 w-4" />
-            For You
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            Recommended
           </button>
           <button
+            id="recruit-tab-browse"
+            role="tab"
+            aria-selected={activeTab === 'browse'}
+            aria-controls="recruit-tabpanel-browse"
+            tabIndex={activeTab === 'browse' ? 0 : -1}
             onClick={() => setActiveTab('browse')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                setActiveTab('for-you')
+                document.getElementById('recruit-tab-for-you')?.focus()
+              }
+            }}
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
               activeTab === 'browse'
@@ -71,7 +95,7 @@ export function RecruitPageTabs({
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
             )}
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-4 w-4" aria-hidden="true" />
             Browse All
           </button>
         </div>
@@ -97,8 +121,26 @@ export function RecruitPageTabs({
       </div>
 
       {/* Tab content */}
-      {activeTab === 'for-you' && <div className="space-y-6">{forYouContent}</div>}
-      {activeTab === 'browse' && <div className="space-y-6">{browseContent}</div>}
+      {activeTab === 'for-you' && (
+        <div
+          className="space-y-6"
+          role="tabpanel"
+          id="recruit-tabpanel-for-you"
+          aria-labelledby="recruit-tab-for-you"
+        >
+          {forYouContent}
+        </div>
+      )}
+      {activeTab === 'browse' && (
+        <div
+          className="space-y-6"
+          role="tabpanel"
+          id="recruit-tabpanel-browse"
+          aria-labelledby="recruit-tab-browse"
+        >
+          {browseContent}
+        </div>
+      )}
     </div>
   )
 }

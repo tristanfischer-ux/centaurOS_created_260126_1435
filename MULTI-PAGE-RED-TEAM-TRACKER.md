@@ -215,6 +215,31 @@ Batched — same audit patterns, same fixes ship together.
 
 **Founder-impact note:** A founder mid-session entering cash items used to lose their work if they clicked Import — the page reloaded fresh. No more. On the P&L empty state, a founder seeing "no product-level data yet" now has two one-click paths to the fix instead of having to navigate away and back. The biggest gap (auto-attributing revenue from Orders, COGS from Products) is still architectural — on the backlog.
 
+### 9–11. Recruits + Marketplace + Quotes — `/recruits` · `/marketplace` · `/marketplace/quotes`
+
+Batched — the first two shared the exact same tab-bar a11y gap + "For You" Sparkles voice issue; the Quotes page got a separate founder-utility win.
+
+**Founder questions:**
+- Recruits: *"Who should I hire next, where do I find them, and who is in the pipeline?"*
+- Marketplace: *"Who can I hire to help me ship, and what do they cost?"*
+- Quotes: *"What's the status of the quotes I've sent out — who's blocking me?"*
+
+**Pass A findings:**
+1. **[P1 A11y]** Both `RecruitPageTabs.tsx` and `MarketplacePageTabs.tsx` rendered tab bars as plain `<button>`s with no `role="tablist"`, no `role="tab"`, no `aria-selected`, no `aria-controls`, no keyboard arrow-key navigation. Same pattern I fixed on the Products page in the previous session. [Fixed]
+2. **[P2 Voice]** Both had a "For You" tab decorated with a Sparkles icon — reads as "AI recommendations" mystery magic, which Tristan's "No AI Emphasis" rule forbids in in-product copy. [Fixed → renamed "Recommended"]
+3. **[P2 Founder-utility]** Quotes page showed a `Sent` badge on unresponded RFQs with no indication of *how long* they've been waiting. A founder scanning 15 sent RFQs can't tell which suppliers are ghosting them vs just replied yesterday. [Fixed]
+4. **[P3]** Quotes empty state could be enriched with personalised next steps (e.g. "3 quotes waiting 5+ days"). [Deferred — needs richer data model]
+5. **[P3]** Marketplace "price from" surfacing in list view. [Deferred — optional data field, needs schema check]
+
+**Pass B shipped:**
+- `RecruitPageTabs.tsx` and `MarketplacePageTabs.tsx`: full WAI-ARIA tab pattern — `role="tablist"` on the wrapper, `role="tab"` on the buttons with `aria-selected` + `aria-controls` + roving `tabIndex={isActive ? 0 : -1}`, arrow-key nav with focus movement, Sparkles / Grid3X3 / Search icons marked `aria-hidden="true"`, tab panels wrapped in `role="tabpanel"` with `id` + `aria-labelledby`. Same contract I used on the Products detail view.
+- Both "For You" labels renamed to **"Recommended"**. Sparkles icon kept as visual accent (not AI-branding now that the label is honest).
+- Quotes page (`marketplace/quotes/page.tsx:55-93`): new *"Waiting N days"* warning badge on RFQs in `sent` status that are 7+ days old. A founder scanning the list now spots the stalled ones immediately. Pluralisation handled.
+
+**Score (batched):** Utility 4 (+1 on Quotes) / Integration 3 / Voice 5 / Robustness 4 / A11y 5 (was 3, two tab bars) → **Composite 4.2**.
+
+**Founder-impact note:** Keyboard + screen-reader users can now navigate Recruits and Marketplace tabs with arrow keys. "For You" → "Recommended" aligns with the "no AI marketing in product copy" rule — recommendations come from scores, not magic. On Quotes, a founder scrolling 20 RFQs used to see a sea of "Sent" badges and had to mentally date-math to find blockers. Now stalled ones wear a warning badge — the answer to "who's blocking me?" jumps off the page.
+
 
 ## Deferred / backlog
 
