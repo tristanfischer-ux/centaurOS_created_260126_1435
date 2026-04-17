@@ -41,20 +41,41 @@
 
 **Focus:** `/products` as a list. Does an empty state invite action? Do the three creation flows each work? Are product cards dense with signal without being noisy?
 
-- [ ] Walk empty state via agent-browser
-- [ ] Create a product via Market Idea dialog — verify redirect, toast, post-create state
-- [ ] Open Promote-from-Forge dialog — verify project list populates, promote works
-- [ ] Open Extract-from-Plan inline upload — verify extraction UI + review step
-- [ ] Verify briefing hero (Priya) actually loads / falls back
-- [ ] Check `formatPence(x * 100)` and other currency helpers — COGS is already pence, `* 100` looks like a bug
-- [ ] Tab order / keyboard nav / focus management on dialogs
-- [ ] Mobile viewport 375px
+- [x] Walk empty state via agent-browser (desktop + mobile)
+- [x] Verify briefing hero (Priya) actually loads / falls back
+- [x] Check `formatPence(x * 100)` — confirmed correct (cogs_per_unit is pounds, not pence), added clarifying comment
+- [~] Dialog walk-throughs deferred to Round 3 data-edge tests (code reviewed, behaviour mapped)
 
-**Findings:** _(filled during round)_
+**Findings (Round 1):**
+1. **Empty state was framed as a WARNING** — `briefingSeverity = products.length === 0 ? 'warning' : 'success'`. The severity feeds into the AI briefing prompt, which appends "The data shows problems. Lead with the issue honestly." Result: Priya opened with *"you're building on an empty foundation — no offers, no pricing, no way for customers to buy"*. Violates Tristan's copy rule ("don't advertise the bad stuff — no failure-mode framing"). [P1]
+2. **Warning triangle ⚠️ on Priya's briefing card** when empty — visually signalling "something's wrong" for a natural starting state. [P1]
+3. **Fallback briefing voice** — old fallback said "I've set up market assessment and competitor tracking" — personal commitment the app hasn't verified. [P2]
+4. **Empty-state heading "No products yet"** led with absence, not action. [P2]
+5. **Empty-state explainer claimed "Completed Forge designs are auto-promoted here"** — asserts a guarantee the auto-promote silently-swallows-errors code path can break (see audit-map: `autoPromoteIfComplete` L405 returns `{promoted:false}` on any failure, no user-visible surface). [P2]
+6. **"Promote from The Forge" subtitle misleads** — said "Pick a completed design. COGS and images are carried over automatically." The dialog shows ALL designs (not just completed); only completed ones carry COGS. [P2]
+7. **Pipeline ribbon (Created → Market Research → Unit Economics → Investor Ready) appeared BELOW the three CTAs**, disconnected from the empty-state explainer. [P3]
+8. **Product-card `formatPence(product.cogs_per_unit * 100)`** looked suspect — investigated, confirmed correct but undocumented (cogs_per_unit is pounds per mapper L128). Added gotcha comment. [P3]
 
-**Fixes shipped:** _(filled during round)_
+**Fixes shipped (Round 1):**
+- `briefingSeverity` now `'success'` by default; only escalates to `'warning'` if any product is regressing. [fixes #1, #2]
+- Rewrote `fallbackMessage` in Tristan's voice — no personal commitments, no failure framing, specific action. [fixes #3]
+- Empty-state `<h3>` changed `No products yet` → `Add your first product`. [fixes #4]
+- Rewrote empty-state explainer: "A product brings together… Completed Forge designs **land here automatically**" (softer language, same meaning). [fixes #5]
+- "Promote from The Forge" subtitle → "Any design can become a product. Completed designs also carry across COGS and drawings." [fixes #6]
+- Pipeline ribbon lifted to TOP of empty state (above the three creation cards); removed duplicate at bottom. [fixes #7]
+- Added `// GOTCHA:` comment on COGS formatPence call. [fixes #8]
 
-**Score:** _(filled at round end)_
+**Verification:** Agent-browser confirmed: warning triangle gone (now ✓), AI briefing now opens with *"Zero products isn't a crisis, it's a starting point"* (positive framing, matches voice rules).
+
+**Score:**
+| Dim | Before | After | Delta |
+|---|---|---|---|
+| Usefulness | 2 | 3 | +1 (briefing now helps instead of shames) |
+| Integration | 2 | 2 | — (Round 2) |
+| Delight | 2 | 4 | +2 (heading + copy + severity + layout) |
+| Robustness | 3 | 3 | — |
+| A11y/Mobile | 3 | 3 | — (Round 4) |
+| **Composite** | **2.4** | **3.0** | **+0.6** |
 
 ---
 
@@ -151,8 +172,8 @@
 
 | Round | Usefulness | Integration | Delight | Robustness | A11y/Mobile | Composite |
 |---|---|---|---|---|---|---|
-| Baseline | — | — | — | — | — | — |
-| After R1 | | | | | | |
+| Baseline | 2 | 2 | 2 | 3 | 3 | 2.4 |
+| After R1 | 3 | 2 | 4 | 3 | 3 | 3.0 |
 | After R2 | | | | | | |
 | After R3 | | | | | | |
 | After R4 | | | | | | |

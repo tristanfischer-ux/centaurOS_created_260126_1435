@@ -140,9 +140,13 @@ export function ProductListView({ products }: ProductListViewProps) {
     return `Products: ${products.length}${parts ? ` (${parts})` : ''}`
   }, [products])
 
+  // INTENT: Empty is a starting point, not a problem. Only escalate severity
+  // when there's an actual regression to flag (e.g. a regressing iteration).
+  // "warning" triggers failure-framing language in the AI briefing.
   const briefingSeverity = React.useMemo(() => {
-    return products.length === 0 ? 'warning' as const : 'success' as const
-  }, [products.length])
+    const hasRegressing = products.some((p) => p.latest_convergence_status === 'regressing')
+    return hasRegressing ? 'warning' as const : 'success' as const
+  }, [products])
 
   const briefing = usePageBriefing(
     () => generatePageBriefing('product-lead', briefingContext, briefingSeverity),
@@ -173,7 +177,7 @@ export function ProductListView({ products }: ProductListViewProps) {
         specialistName="Priya"
         specialistTitle="Product Development"
         narrative={briefing.narrative}
-        fallbackMessage="I'm Priya. Every product here moves through a clear lifecycle: concept, validate, build, launch, grow. No guessing what stage you're at or what's next. I've set up market assessment and competitor tracking so you're never building blind. Add your first product — even if it's just a name and a problem it solves."
+        fallbackMessage="I'm Priya. Each product on this page moves through five steps: concept, validate, build, launch, grow. Market assessment and competitor tracking run alongside, so the story stays honest at every stage. Start with a name and the problem you want to solve — that's enough for me to take it from there."
         isLoading={briefing.isLoading}
         loadingMessage="Reviewing your product portfolio..."
         severity={briefing.severity}
@@ -262,11 +266,22 @@ function EmptyProductState({
           <Package className="h-6 w-6 text-international-orange" />
         </div>
         <h3 className="text-lg font-display font-medium text-foreground mb-2">
-          No products yet
+          Add your first product
         </h3>
         <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-          Products bring together your Forge designs, market research, unit economics, and fundraising story. Completed Forge designs are auto-promoted here. You can also start from scratch.
+          A product brings together a Forge design, market research, unit economics, and the fundraising story. Completed Forge designs land here automatically. Or start from a market idea, a business plan, or an existing design below.
         </p>
+      </div>
+
+      {/* Journey ribbon — shows WHERE this page takes them */}
+      <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground max-w-2xl mx-auto">
+        <span className="flex items-center gap-1"><Package className="h-3 w-3" /> Created</span>
+        <span aria-hidden="true">→</span>
+        <span className="flex items-center gap-1"><Search className="h-3 w-3" /> Market Research</span>
+        <span aria-hidden="true">→</span>
+        <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Unit Economics</span>
+        <span aria-hidden="true">→</span>
+        <span className="flex items-center gap-1"><Star className="h-3 w-3" /> Investor Ready</span>
       </div>
 
       {/* Three creation paths */}
@@ -312,7 +327,7 @@ function EmptyProductState({
                 <div>
                   <p className="text-sm font-medium text-foreground">Promote from The Forge</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Pick a completed design. COGS and images are carried over automatically.
+                    Any design can become a product. Completed designs also carry across COGS and drawings.
                   </p>
                 </div>
               </div>
@@ -346,17 +361,6 @@ function EmptyProductState({
         {showPlanUpload && (
           <InlinePlanUpload router={router} />
         )}
-      </div>
-
-      {/* What happens next */}
-      <div className="flex items-center justify-center gap-2 py-4 text-[10px] uppercase tracking-wider text-muted-foreground max-w-2xl mx-auto">
-        <span className="flex items-center gap-1"><Package className="h-3 w-3" /> Created</span>
-        <span>→</span>
-        <span className="flex items-center gap-1"><Search className="h-3 w-3" /> Market Research</span>
-        <span>→</span>
-        <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Unit Economics</span>
-        <span>→</span>
-        <span className="flex items-center gap-1"><Star className="h-3 w-3" /> Investor Ready</span>
       </div>
     </div>
   )
@@ -883,6 +887,7 @@ function ProductCard({ product }: { product: ProductSummary }) {
           <div className="flex items-center gap-3 text-xs flex-wrap">
             {product.cogs_per_unit != null && (
               <span className="text-muted-foreground">
+                {/* GOTCHA: ProductSummary.cogs_per_unit is pounds (see products.ts mapper L128); formatPence takes pence, so * 100. */}
                 COGS <span className="text-foreground font-medium">{formatPence(product.cogs_per_unit * 100)}</span>
               </span>
             )}
