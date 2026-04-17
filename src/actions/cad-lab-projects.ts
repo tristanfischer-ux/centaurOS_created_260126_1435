@@ -623,6 +623,24 @@ export async function saveCadLabSystemIllustration(
   return withAuth(async ({ supabase }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
+    // SECURITY: Only accept URLs pointing at our own Supabase storage hostname.
+    // Without this, a client could persist `javascript:…` or `https://evil/`
+    // as the illustration URL. `system_illustration_url` is fetched server-side
+    // by fetchAndCropReferenceAction (SSRF vector) and rendered as an <img src>
+    // in the report/UI (phishing vector).
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== "https:") return { error: "Illustration URL must be https" }
+      const expectedHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+        : null
+      if (!expectedHost || parsed.hostname !== expectedHost) {
+        return { error: "Illustration URL must be on the project's storage hostname" }
+      }
+    } catch {
+      return { error: "Invalid illustration URL" }
+    }
+
     const { error } = await supabase
       .from("cad_lab_projects")
       .update({ system_illustration_url: url })

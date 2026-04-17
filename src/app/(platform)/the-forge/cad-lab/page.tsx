@@ -872,7 +872,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                             />
                           )
                         ) : tripoPreviewStatus === "complete" && tripoPreviewUrl ? (
-                          <ModelViewer glbUrl={tripoPreviewUrl} backgroundColor="#f9fafb" className="!border-0 !rounded-none w-full h-full" />
+                          <ModelViewer glbUrl={tripoPreviewUrl} className="!border-0 !rounded-none w-full h-full" />
                         ) : tripoPreviewStatus === "generating" ? (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                             <Loader2 className="h-6 w-6 animate-spin text-international-orange" />
