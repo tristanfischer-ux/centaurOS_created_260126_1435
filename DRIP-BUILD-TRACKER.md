@@ -41,10 +41,12 @@ If any abort criterion hits: write the blocker into HANDOVER-DRIP.md, push what'
 
 | Phase | Scope | Status | Migration | Code | Tests | Deploy | Notes |
 |---|---|---|---|---|---|---|---|
-| P1 | Unsubscribe mechanism | ⏳ pending | | | | | |
-| P2 | 6-email drip templates + cron | ⏳ pending | | | | | |
-| P3 | Retire 4 old onboarding templates | ⏳ pending | | | | | |
-| P4 | Back-enrol script (not triggered) | ⏳ pending | | | | | |
+| P1 | Unsubscribe mechanism | ✅ done | applied 20260417010000 | 8 new files + 2 modified | 828 pass | Ready | Commit 134b1777 |
+| P2 | 6-email drip templates + cron | ✅ done | — | EmailTemplate union + 6 templates + cron flag | 828 pass | Ready | Commit ca3a5814 |
+| P3 | Retire 4 old onboarding templates | ✅ done | applied 20260417020000 | 4 templates removed from union + map | 828 pass | Ready | Commit ca3a5814 |
+| P4 | Back-enrol script (not triggered) | ✅ done | — | 1 new endpoint, dry-run default | 828 pass | deploying | Commit c3e0ccdb |
+
+See `HANDOVER-DRIP.md` for morning instructions.
 
 Legend: ⏳ pending · 🔄 in progress · ✅ done · ⚠️ blocked · 🚫 aborted
 
@@ -202,23 +204,56 @@ Legend: ⏳ pending · 🔄 in progress · ✅ done · ⚠️ blocked · 🚫 ab
 
 ---
 
-## Execution log (I update as I go)
+## Execution log
 
-### Phase 1 — Unsubscribe mechanism
+### Phase 1 — Unsubscribe mechanism (done)
 
-_(starts next)_
+- Migration `20260417010000_email_preferences.sql` created + applied
+- `src/lib/email/preferences.ts` — per-channel helpers
+- `src/lib/email/unsub-token.ts` — HMAC-SHA256 signed tokens, 30-day expiry, timing-safe verify
+- `src/lib/email/footer.ts` — unsubscribe footer HTML
+- `src/app/api/unsubscribe/route.ts` — unauth endpoint, GET + POST
+- `src/actions/email-preferences.ts` — server actions for settings page
+- `src/app/(platform)/settings/email/page.tsx` — preferences page
+- `src/components/settings/email-preferences-form.tsx` — client form (toggles, pause, unsub-all)
+- `src/lib/notifications/types.ts` — EmailOptions.marketing added
+- `src/lib/notifications/channels/email.ts` — preference gate + footer injection on marketing sends
+- Type check: clean. Tests: 828 pass. Deploy: Ready.
 
-### Phase 2 — Welcome drip templates
+### Phase 2 — 6-email welcome drip templates (done)
 
-_(starts after P1 verified)_
+- Added 6 templates to `EmailTemplate` union: `welcome_day0` + `welcome_day1_investors` + `welcome_day2_specialists` + `welcome_day3_forge` + `welcome_day4_strategy` + `welcome_day5_cashburn`
+- Added 6 template bodies in `email.ts` — letter-style Apr 16 voice, no headers / bullets / emoji
+- Copy taken verbatim from `ENGAGEMENT-PLAN.md` lines 125-297
+- Rewrote `src/actions/onboarding-drip.ts` with new `WELCOME_DRIP_STEPS` array
+- Day 0 immediate, Days 1-5 at 08:00 UTC (09:00 UK BST)
+- Cron passes `marketing: { userId, channel: 'welcome_drip' }` to `sendEmail`
+- Type check: clean. Tests: 828 pass. Deploy: Ready.
 
-### Phase 3 — Retire old templates
+### Phase 3 — Retire 4 old onboarding templates (done)
 
-_(starts after P2 verified)_
+- Migration `20260417020000_cancel_legacy_onboarding_drip.sql` created + applied — cancels all pending legacy rows (status = 'cancelled', audit trail preserved)
+- Removed `onboarding_day1_welcome`, `onboarding_day3_dfm`, `onboarding_day7_assessment`, `onboarding_day14_upgrade` from `EmailTemplate` union
+- Removed matching template functions from `EMAIL_TEMPLATES` map
+- Atomic swap: no user receives both sequences
+- Type check: clean. Tests: 828 pass. Deploy: Ready (same commit as P2).
 
-### Phase 4 — Back-enrol script
+### Phase 4 — Back-enrol endpoint (done, NOT triggered)
 
-_(starts after P3 verified)_
+- `src/app/api/admin/backfill-welcome-drip/route.ts` — admin-only POST endpoint
+- Dry-run by default; live run requires `confirm: "BACKFILL_WELCOME_DRIP_2026_04_17"`
+- Idempotent: skips users with existing `welcome_day0` row
+- Respects email_preferences: skips users opted out of `welcome_drip`
+- Excludes `@perigee-labs.com` + `@fractionalforge.app`
+- Pagination: 500 users per call, returns `nextOffset` for continuation
+- Type check: clean. Tests: 828 pass. Deploy: in progress.
+- **Tristan runs this himself in the morning after a test send.**
+
+---
+
+## Abort criteria (none tripped)
+
+No abort criterion was hit. All migrations applied cleanly, all type checks passed, all tests passed, all deploys are Ready or building successfully.
 
 ---
 
