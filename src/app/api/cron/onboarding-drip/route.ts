@@ -1,22 +1,19 @@
 /**
- * @file Onboarding Drip Processor — Cron job that sends scheduled onboarding emails.
+ * @file Welcome drip cron processor.
  *
- * @description Runs hourly via Vercel cron. Finds scheduled_emails that are due
- * and sends them. Handles Day 1 (welcome), Day 3 (DFM prompt), Day 7 (assessment),
- * and Day 14 (upgrade prompt) onboarding touchpoints.
+ * @description Runs hourly. Fetches scheduled_emails rows that are due and
+ * sends them via the email channel. Every send passes a marketing flag so
+ * the preference gate runs and the unsubscribe footer is appended.
  *
- * INTENT: Drive new user activation through timed, value-focused email nudges.
- * Each email has one clear CTA leading to a high-value platform action.
+ * HISTORICAL NAME: the route is still called `onboarding-drip` because the
+ * scheduled_emails table and Vercel cron path were named before the drip
+ * was rewritten as a feature-education welcome sequence. Renaming the path
+ * would require two coordinated deploys to avoid a gap; not worth the risk.
  *
  * @security
- * - CRON_SECRET verification prevents unauthorized invocations
- * - Rate-limited to 50 emails per cron run to stay within Resend limits
- * - Updates status to prevent double-sends
- *
- * @related
- * - src/actions/onboarding-drip.ts — Scheduling logic
- * - src/lib/notifications/channels/email.ts — Email templates
- * - vercel.json — Cron schedule definition
+ * - CRON_SECRET Bearer token (verifyCronSecret)
+ * - Rate-limited to 50 emails per run (Resend send-rate headroom)
+ * - Status update prevents double-send
  */
 
 import { NextResponse } from 'next/server'
@@ -28,18 +25,17 @@ import type { EmailTemplate } from '@/lib/notifications/types'
 const MAX_EMAILS_PER_RUN = 50
 
 export async function GET(request: Request): Promise<NextResponse> {
-  // SECURITY: Verify cron secret using shared timing-safe utility
   const authFailure = verifyCronSecret(request)
   if (authFailure) return authFailure
 
   let sent = 0
   let errors = 0
+  const skipped = 0
 
   try {
     const supabase = createAdminClient()
     const now = new Date().toISOString()
 
-    // Fetch emails that are due to be sent
     const { data: pendingEmails, error: fetchError } = await supabase
       .from('scheduled_emails')
       .select('*')
@@ -49,7 +45,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       .limit(MAX_EMAILS_PER_RUN)
 
     if (fetchError) {
-      console.error('[OnboardingDrip Cron] Fetch error:', fetchError.message)
+      console.error('[WelcomeDrip Cron] Fetch error:', fetchError.message)
       return NextResponse.json({
         error: 'Failed to fetch scheduled emails',
         details: fetchError.message,
@@ -62,27 +58,43 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     for (const email of pendingEmails) {
       try {
-        await sendEmail({
+        const result = await sendEmail({
           to: email.email,
           subject: '',
           body: '',
           template: email.template as EmailTemplate,
           templateData: (email.template_data as Record<string, unknown>) || {},
+          // Preference gate + unsubscribe footer. All rows in scheduled_emails
+          // are currently welcome_drip; extend the row schema if this changes.
+          marketing: { userId: email.user_id, channel: 'welcome_drip' },
         })
 
-        // Mark as sent
-        await supabase
-          .from('scheduled_emails')
-          .update({
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', email.id)
-
-        sent++
+        // sendEmail returns success even when it skips (user opted out).
+        // Mark the row as sent either way — the audit trail shows the
+        // attempt was made and the preference gate was honoured.
+        if (result.success) {
+          await supabase
+            .from('scheduled_emails')
+            .update({
+              status: 'sent',
+              sent_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', email.id)
+          sent++
+        } else {
+          await supabase
+            .from('scheduled_emails')
+            .update({
+              status: 'failed',
+              error_message: result.error || 'Unknown send failure',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', email.id)
+          errors++
+        }
       } catch (err) {
-        console.error(`[OnboardingDrip Cron] Failed to send ${email.id}:`, err)
+        console.error(`[WelcomeDrip Cron] Failed to send ${email.id}:`, err)
 
         await supabase
           .from('scheduled_emails')
@@ -97,9 +109,14 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
-    return NextResponse.json({ sent, errors, total: pendingEmails.length })
+    return NextResponse.json({
+      sent,
+      errors,
+      skipped,
+      total: pendingEmails.length,
+    })
   } catch (error) {
-    console.error('[OnboardingDrip Cron] Unexpected error:', error)
+    console.error('[WelcomeDrip Cron] Unexpected error:', error)
     return NextResponse.json({
       error: 'Internal server error',
       sent,

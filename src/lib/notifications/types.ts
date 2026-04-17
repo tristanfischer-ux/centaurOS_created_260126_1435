@@ -91,10 +91,12 @@ export type EmailTemplate =
     | 'listing_claim_value'
     | 'listing_claim_case_study'
     | 'listing_claim_breakup'
-    | 'onboarding_day1_welcome'
-    | 'onboarding_day3_dfm'
-    | 'onboarding_day7_assessment'
-    | 'onboarding_day14_upgrade'
+    | 'welcome_day0'
+    | 'welcome_day1_investors'
+    | 'welcome_day2_specialists'
+    | 'welcome_day3_forge'
+    | 'welcome_day4_strategy'
+    | 'welcome_day5_cashburn'
     | 'generic'
 
 export interface PushNotificationOptions {

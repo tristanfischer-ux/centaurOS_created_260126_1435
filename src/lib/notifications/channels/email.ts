@@ -457,84 +457,91 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
     }),
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Onboarding Drip Sequence — Day 1, 3, 7, 14
-    // INTENT: Guide new users to "aha moment" and paid conversion
+    // Welcome drip — Day 0 + 5-day feature-education sequence
+    // INTENT: Letter-style prose in Tristan's Apr 16 voice. No headers, no
+    // bullets, no emoji, no marketing boxes. Just a short note per day with
+    // one clear link. Approved verbatim from ENGAGEMENT-PLAN.md lines 125-297.
     // ─────────────────────────────────────────────────────────────────────────
 
-    onboarding_day1_welcome: (data) => ({
-        subject: 'Welcome to ForgeOS — your hardware workspace is ready',
+    welcome_day0: (data) => ({
+        subject: 'Welcome to ForgeOS',
         html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="text-align: center; padding: 24px 0;">
-                    <h1 style="color: #1a1a1a; font-size: 24px; margin: 0;">Welcome to ForgeOS</h1>
-                    <p style="color: #ff4500; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px;">The Operating System for Hardware Companies</p>
-                </div>
-                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
-                <p style="color: #333; line-height: 1.6;">Your ForgeOS workspace is live. Here&rsquo;s one thing to try in the next 5 minutes:</p>
-                <div style="background: #fff5f0; border-left: 4px solid #ff4500; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
-                    <p style="margin: 0; color: #333; font-weight: 600;">Quick win: Talk to your first specialist</p>
-                    <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Open The Forge and describe your product idea. Our engineering specialist will generate a feasibility assessment in under 2 minutes.</p>
-                </div>
-                <a href="${data.actionUrl || 'https://fractionalforge.app/the-forge'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Open The Forge &rarr;</a>
-                <p style="color: #888; font-size: 13px; margin-top: 24px;">Explorer tier is free forever — 50 AI assists a month, no credit card needed.</p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; font-size: 15px; line-height: 1.7;">
+                <p>Dear ${data.firstName || 'there'},</p>
+                <p>Welcome to ForgeOS.</p>
+                <p>Over the next five days you will receive one short email a day covering the main sections of the platform: investors, specialists, the design workbench, strategy and tasks, and cash burn. Each takes a minute or two to read.</p>
+                <p>If at any point something is broken or missing, reply to this email. I read everything.</p>
+                <p>Best wishes,<br/>Tristan</p>
             </div>
         `
     }),
 
-    onboarding_day3_dfm: (data) => ({
-        subject: 'Have you tried the DFM analysis yet?',
+    welcome_day1_investors: (data) => ({
+        subject: 'Matching your business plan against 7,800 investors',
         html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
-                <p style="color: #333; line-height: 1.6;">Most founders find the Design for Manufacturability analysis is the feature that saves them the most time. It catches costly design mistakes before they reach the factory floor.</p>
-                <div style="background: #f0f7ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
-                    <p style="margin: 0; color: #333; font-weight: 600;">Try this: Upload a CAD file or describe your part</p>
-                    <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Our specialist will run a full DFM check: material compatibility, wall thickness, draft angles, undercuts, and tolerancing — with specific suggestions to reduce cost and improve yield.</p>
-                </div>
-                <a href="${data.actionUrl || 'https://fractionalforge.app/the-forge'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Run a DFM Check &rarr;</a>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; font-size: 15px; line-height: 1.7;">
+                <p>Dear ${data.firstName || 'there'},</p>
+                <p>The investor section of ForgeOS takes a business plan and converts it into a series of searches across a database of over 7,800 investors, ranked by how well each one fits what you are doing.</p>
+                <p>Behind that ranking is something I am not aware of existing on any other platform: every investor&rsquo;s website has been read, their published thesis synthesised, their partners mapped, and a picture built of what each firm has actually invested in. Each firm carries a contact status so you can see upfront whether a verified email is on file.</p>
+                <p>&rarr; <a href="https://fractionalforge.app/investors" style="color: #ff4500;">fractionalforge.app/investors</a></p>
+                <p>Best wishes,<br/>Tristan</p>
             </div>
         `
     }),
 
-    onboarding_day7_assessment: (data) => ({
-        subject: 'Your free engineering assessment is ready to generate',
+    welcome_day2_specialists: (data) => ({
+        subject: "The expert team most pre-revenue founders can't afford",
         html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
-                <p style="color: #333; line-height: 1.6;">One week in &mdash; here&rsquo;s what ForgeOS can deliver for you today:</p>
-                <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 16px 0;">
-                    <p style="margin: 0 0 12px 0; color: #333; font-weight: 600; font-size: 16px;">Full Engineering Package includes:</p>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; STEP files and 3D CAD models</td></tr>
-                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; 7 engineering drawings (GA, detail, assembly)</td></tr>
-                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; Bill of materials with costed alternatives</td></tr>
-                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; DFM analysis with improvement suggestions</td></tr>
-                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; Top 3 matched UK manufacturers</td></tr>
-                    </table>
-                </div>
-                <p style="color: #666; line-height: 1.6;">Most teams generate their first full package in under an hour. The output is ready to send directly to suppliers.</p>
-                <a href="${data.actionUrl || 'https://fractionalforge.app/the-forge'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Generate Your Package &rarr;</a>
-                <p style="color: #888; font-size: 13px; margin-top: 24px;">7 days left on your full-access trial.</p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; font-size: 15px; line-height: 1.7;">
+                <p>Dear ${data.firstName || 'there'},</p>
+                <p>In the first year of a hardware startup, a founder typically needs input from a CTO, a VP of Manufacturing, a finance advisor, a fundraising advisor and a legal counsel. Hiring any of them at the required seniority is usually out of reach.</p>
+                <p>ForgeOS does two things about this. First, it ships with 13 AI specialists &mdash; Sage on strategy, Max on CTO decisions, Fang on manufacturing, Finn on finance, Fiona on fundraising and the rest. Each one remembers the decisions you have made, challenges the assumptions you are operating under, and can take a task from your list and produce a first pass on it in minutes.</p>
+                <p>Second, the marketplace lists fractional executives &mdash; real people, available by the day or the week. Where the AI&rsquo;s answer is useful but needs a human to vet it, correct it, or set the direction, that is what they are for.</p>
+                <p>Most founders get a long way with the AI specialists on their own. The fractional executives are there for when it matters.</p>
+                <p>&rarr; <a href="https://fractionalforge.app/today" style="color: #ff4500;">fractionalforge.app/today</a></p>
+                <p>Best wishes,<br/>Tristan</p>
             </div>
         `
     }),
 
-    onboarding_day14_upgrade: (data) => ({
-        subject: 'Two weeks in — a note on the paid tiers',
+    welcome_day3_forge: (data) => ({
+        subject: 'Turning a product description into a plan to build it',
         html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
-                <p style="color: #333; line-height: 1.6;">You have been on ForgeOS for two weeks. The Explorer tier stays free for as long as you want it &mdash; 50 AI assists a month, all 13 specialists, investor directory browsing, task management. Nothing expires.</p>
-                <p style="color: #333; line-height: 1.6;">If you have been bumping into the assist limit, or want supplier matching, RFQ pack generation and marketplace ordering, the Startup Team tier (&pound;49/mo) covers all of that.</p>
-                <a href="${data.actionUrl || 'https://fractionalforge.app/pricing'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">See the paid tiers &rarr;</a>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; font-size: 15px; line-height: 1.7;">
+                <p>Dear ${data.firstName || 'there'},</p>
+                <p>The Forge is the section of ForgeOS for the design phase.</p>
+                <p>You can write a description of the kind of thing you want to make &mdash; a handheld device, a bench unit, a piece of infrastructure &mdash; and the platform will deconstruct it in detail: what it needs to do, the likely materials, hardware choices, electronics and software, the I/O, and the skills that will be required to move from idea to prototype. From there it connects to the 13,000-supplier database so the companies who could actually make each part are one click away, with an indicative cost to produce.</p>
+                <p>This section is less about generating a finished CAD file and more about helping a founder see what they do not yet know &mdash; the fields outside their own expertise &mdash; and who to speak to next.</p>
+                <p>&rarr; <a href="https://fractionalforge.app/the-forge/cad-lab" style="color: #ff4500;">fractionalforge.app/the-forge/cad-lab</a></p>
+                <p>Best wishes,<br/>Tristan</p>
+            </div>
+        `
+    }),
+
+    welcome_day4_strategy: (data) => ({
+        subject: 'Business plan to a week of work',
+        html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; font-size: 15px; line-height: 1.7;">
+                <p>Dear ${data.firstName || 'there'},</p>
+                <p>The strategy section of ForgeOS takes an existing business plan and breaks it down into a whole series of strategic objectives, and those objectives into tasks that can be worked in a week.</p>
+                <p>Each task can be allocated to a teammate or to one of the 13 AI specialists. In most cases the specialists will be able to do the work themselves and hand it back for review. Where the work requires real judgement, the fractional executives on the marketplace are the route.</p>
+                <p>The point of this section is to keep a founder focused on what needs doing this week, not what the plan said nine months ago.</p>
+                <p>&rarr; <a href="https://fractionalforge.app/strategic-planner" style="color: #ff4500;">fractionalforge.app/strategic-planner</a></p>
+                <p>Best wishes,<br/>Tristan</p>
+            </div>
+        `
+    }),
+
+    welcome_day5_cashburn: (data) => ({
+        subject: 'Cash burn — runway and the speed-versus-cost tradeoff',
+        html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; font-size: 15px; line-height: 1.7;">
+                <p>Dear ${data.firstName || 'there'},</p>
+                <p>The cash burn section of ForgeOS is the least glamorous part and probably the most important one for any pre-revenue business.</p>
+                <p>Three connected views: what is going out, what is coming in, and the resulting profit and loss. Numbers are entered directly today, with connections to bank accounts and accounting software planned. Once they are in, the platform calculates runway against current burn, surfaces the months where things tighten, and lets Finn walk through the assumptions with you.</p>
+                <p>The less obvious use is for thinking about speed against cost. Early-stage founders tend to default to spending as little as possible to drag runway out, and often that is the right instinct. Sometimes, though, it is cheaper to spend more and move faster &mdash; a team sitting on a problem for six weeks costs more in people-time than paying once to solve it properly in one. The cash burn section is where that tradeoff becomes visible.</p>
+                <p>&rarr; <a href="https://fractionalforge.app/cash-burn" style="color: #ff4500;">fractionalforge.app/cash-burn</a></p>
+                <p>Best wishes,<br/>Tristan</p>
             </div>
         `
     }),
