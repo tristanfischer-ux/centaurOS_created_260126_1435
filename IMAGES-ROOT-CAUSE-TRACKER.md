@@ -131,3 +131,22 @@ Now that the race is fixed, signed URLs WILL start reaching the DB — and they 
 - If bucket `public` flag changes between audit and deploy, STOP — the plan's security assumption flips.
 - If any call site of `uploadToStorage` writes to a different (private) bucket, STOP — need per-call URL strategy, not a blanket change.
 - If red-team pass 2 or 3 surfaces a real regression, STOP, re-plan before deploying.
+
+### Round 2 Execution — Done
+
+- [x] Audit: 60 hero + 182 module URLs all public format; 0 signed; bucket `public=true`; commit f4efa76a (Apr 5) introduced the signed-URL write
+- [x] P1 — uploadToStorage: `image-generator.ts` reverted to `getPublicUrl` with in-line security rationale
+- [x] Red-team pass 1: found 6 more generators (cad, cfd, topo, thermal, fea, premium-analysis) with the same bug → all reverted
+- [x] Red-team pass 2: no read path re-signs or format-checks URLs; mirror flow, retry flow, load-project flow all pass
+- [x] Red-team pass 3: signed URL on public bucket is cargo cult; UUID path is real access control; CSP allows `https:` images; RLS bypassed by admin client at write; temp-ref/temp-style ephemeral uploads correctly kept as signed URLs (consumed within minutes, deleted)
+- [x] P3 — HAPS UAV hero: `scripts/regen-haps-hero.ts` called `generateResearchIllustration` via Nano Banana fallback chain (Nano Banana 2 timed out, stable model succeeded). Hero uploaded at `3dad9cd7/research-illustration.png` (1.4 MB), `system_illustration_url` persisted in DB. Image verified — clean exploded-view of solar-wing HAPS UAV with 6 labelled module regions.
+- [x] tsc --noEmit clean; pre-push hooks passed
+- [x] Commit `e4bcc0c4` pushed; Vercel deploy `l0893mmj6` ● Ready on Production; fractionalforge.app alias pointing at it
+- [x] P4 — agent-browser: fractionalforge.app/login loads cleanly (accessibility snapshot + screenshot confirmed); 7/7 HAPS image URLs (6 modules + 1 hero) return HTTP 200 with expected content sizes (4-5 MB each module, 1.4 MB hero)
+- [x] P5 — post-deploy DB: HAPS project now reports `hero_set=true`, `ok_modules=8/8`
+
+### What's fixed end-to-end
+
+1. **Race in handleDecompose (commit 1c45905a)** — save after image pipeline no longer overwrites with the stale pre-image JS array
+2. **Signed-URL expiry (commit e4bcc0c4)** — 7 services under `the-forge/services/` now write public URLs to `xray-images`. Future projects' images survive past 1h.
+3. **HAPS UAV recovery** — 8/8 modules + hero all populated; user reload will render the full Images tab.
