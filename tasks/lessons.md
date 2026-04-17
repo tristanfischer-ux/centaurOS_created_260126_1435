@@ -214,3 +214,15 @@ NEVER: Use `npx tsc --noEmit` as the sole verification step.
 ALWAYS: After code changes that affect UI or data, verify the actual deployed feature: check the page loads, counts are correct, clicking works, data appears. TypeScript compilation checks types, not functionality.
 REASON: Multiple deploys where tsc passed but the feature was broken (wrong counts, missing components, empty tabs).
 RELATED: All UI components, CLAUDE.md "Compilation is not verification" section
+
+### 2026-04-17 - RULE: When an awaited function mutates React state, save the REF not the local argument array
+NEVER: `await pipelineThatSetsState(modulesArr); save(modulesArr)` — the local JS array was never mutated; setModules writes to state, not to this reference. Saving it wipes out whatever state the pipeline produced.
+ALWAYS: After awaiting a state-mutating pipeline, save `modulesRef.current` (synced via useEffect) or manually recompute the merged state before saving.
+REASON: handleDecompose awaited handleGenerateModuleImages (which writes imageUrl/imageStatus via setModules), then saved the stale `finalModules` JS array. This raced the pipeline's own fire-and-forget save; when decompose's awaited save won, all image data was wiped from the DB. Storage objects were already written, so images existed as orphan blobs with no pointer from the modules row. Symptom: "0 of 8 illustrations" stuck at "queued" despite the PNGs being generated. Intermittent because the race outcome was timing-dependent.
+RELATED: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx line ~1888, commit TBD
+
+### 2026-04-17 - RULE: `.then()` on a server action that returns {error} instead of throwing must check the shape
+NEVER: `saveFoo(...).then(() => setSaved()).catch(err => log(err))` — server actions conventionally return `{ error: "..." }` on RLS/validation failure instead of throwing. The .then() branch fires, setSaved() runs, and the user sees a successful toast while data never landed.
+ALWAYS: Inside .then(), inspect `"error" in res` and surface a toast/log before treating it as success.
+REASON: The image pipeline's final save surfaced no warning when saveCadLabModules returned { error }, compounding the root cause above — users had no signal that save had failed silently.
+RELATED: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx line ~2183

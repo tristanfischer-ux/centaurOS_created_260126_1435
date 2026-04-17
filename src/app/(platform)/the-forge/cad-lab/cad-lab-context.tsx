@@ -1883,14 +1883,20 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (criticalPath > 0) addProgressLine(`Critical path: ${criticalPath} weeks${criticalModule ? ` (${criticalModule.name})` : ""}`)
       if (totalRisks > 0) addProgressLine(`${totalRisks} risk items flagged for engineering review`)
 
-      // Final save — merge expansion data without clobbering in-flight image state
+      // Final save — merge expansion data over the ref (which already holds imageUrl/imageStatus
+      // written by handleGenerateModuleImages via setModules). Saving `finalModules` (the local
+      // expandedModules JS array that the image pipeline never mutated) would race the pipeline's
+      // own fire-and-forget save at line 2172 and, when it won, wipe out all image data — leaving
+      // modules stuck at "pending" even though the PNGs sat complete in storage.
       if (activeProjectIdRef.current) {
-        setModules((prev) => prev.map((m) => {
+        const merged = modulesRef.current.map((m) => {
           const exp = finalModules.find(e => e.id === m.id)
           if (!exp) return m
           return { ...m, keyParts: exp.keyParts, leadWeeks: exp.leadWeeks, description: exp.description, whyItMatters: exp.whyItMatters, failureModes: exp.failureModes, unknowns: exp.unknowns }
-        }))
-        const saveRes = await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(finalModules))
+        })
+        setModules(merged)
+        modulesRef.current = merged // GOTCHA: useEffect ref sync runs after render; manually sync so the save below sees image fields
+        const saveRes = await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(merged))
         if ("error" in saveRes) {
           toast.error("Modules mapped but failed to save")
         } else {
@@ -2175,7 +2181,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const snapshot = modulesRef.current
     if (snapshot.length > 0) {
       saveCadLabModules(projectId, JSON.stringify(snapshot))
-        .then(() => setLastSaved(new Date().toISOString()))
+        .then((res) => {
+          // GOTCHA: saveCadLabModules returns { error } on RLS/validation failure without throwing.
+          // .then() fires regardless — must inspect the shape or the user sees a silent data-loss.
+          if (res && "error" in res) {
+            console.error("[CAD-LAB] Failed to save modules after image generation:", res.error)
+            toast.error("Illustrations generated but failed to save — please try again")
+            return
+          }
+          setLastSaved(new Date().toISOString())
+        })
         .catch((err) => {
           console.error("[CAD-LAB] Failed to save modules after image generation:", err)
           toast.error("Illustrations generated but failed to save — please try again")
