@@ -609,8 +609,12 @@ function ForgePickerDialog({
         const eligible = result.projects.filter(
           (p) => !existingProjectIds.includes(p.id),
         )
+        // GOTCHA: project.status is the top-level column enum: draft | researched |
+        // interface_ready | generated | complete. The 'rfq_created' label lives in
+        // result.procurement.stage (JSONB), not status — we surface it via the
+        // separate `stage` column below.
         const STAGE_ORDER: Record<string, number> = {
-          generated: 0, complete: 0, rfq_created: 0,
+          generated: 0, complete: 0,
           interface_ready: 1, researched: 2, draft: 3,
         }
         eligible.sort((a, b) =>
@@ -655,16 +659,19 @@ function ForgePickerDialog({
             </p>
           )}
           {projects.map((project) => {
-            const isComplete = project.status === 'generated' || project.status === 'complete' || project.status === 'rfq_created'
+            const isComplete = project.status === 'generated' || project.status === 'complete'
+            const rfqSent = project.stage === 'rfq_created'
             const STAGE_BADGE: Record<string, { label: string; variant: 'success' | 'info' | 'warning' | 'secondary' }> = {
               draft: { label: 'Draft', variant: 'secondary' },
               researched: { label: 'Researched', variant: 'info' },
               interface_ready: { label: 'Build Ready', variant: 'info' },
               generated: { label: 'Complete', variant: 'success' },
               complete: { label: 'Complete', variant: 'success' },
-              rfq_created: { label: 'RFQ Sent', variant: 'success' },
             }
-            const badge = STAGE_BADGE[project.status] ?? { label: project.status, variant: 'secondary' as const }
+            // An RFQ-sent project overrides any status badge — it's the most specific signal.
+            const badge = rfqSent
+              ? { label: 'RFQ Sent', variant: 'success' as const }
+              : (STAGE_BADGE[project.status] ?? { label: project.status, variant: 'secondary' as const })
 
             return (
               <div

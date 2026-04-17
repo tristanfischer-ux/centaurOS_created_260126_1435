@@ -75,6 +75,7 @@ import { ModuleCarousel } from "../components/module-carousel"
 import { IntegrationView } from "../components/integration-view"
 import { PreExecValidationAlerts } from "../components/pre-exec-validation-alerts"
 import { ProductOverview } from "../components/product-overview-hero"
+import { LinkedProductChip } from "../components/linked-product-chip"
 import { ModuleResultsView, type ViewTab } from "../components/module-results-view"
 import { SystemArchitecture } from "../components/system-architecture-graph"
 import { CollapsibleSection } from "../components/collapsible-section"
@@ -336,6 +337,12 @@ export default function CadLabBuildPage(): React.ReactNode {
           {/* ── Overview tab ── */}
           {activeTab === "overview" && (
             <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              {/* Reverse link: if this design was promoted to a product, surface the link here. */}
+              {activeProjectId && (
+                <div className="flex items-center">
+                  <LinkedProductChip cadLabProjectId={activeProjectId} />
+                </div>
+              )}
               {modules.length > 0 && (
                 <ProductOverview
                   subject={subject}

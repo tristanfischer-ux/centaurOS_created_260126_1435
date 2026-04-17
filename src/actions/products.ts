@@ -173,6 +173,47 @@ export async function getProductsWithFundability(): Promise<ActionResult<Array<{
   })
 }
 
+// ─── getProductByCadLabProjectId ────────────────────────────────────
+
+/**
+ * Find the product linked to a given CAD Lab project, if any.
+ *
+ * @description Powers the reverse link from CAD Lab → Products. Returns
+ * null (not an error) when no product is linked, so callers can treat
+ * the reverse-link as optional UI.
+ *
+ * @param cadLabProjectId - CAD Lab project UUID
+ * @returns `{ data: { id, name } | null }` — null means no linked product
+ * @security foundry-isolated via withAuth + explicit foundry_id filter.
+ *           Invalid UUID returns null (no enumeration oracle).
+ */
+export async function getProductByCadLabProjectId(
+  cadLabProjectId: string,
+): Promise<ActionResult<{ id: string; name: string; lifecycle: string } | null>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // VALIDATION: silent null on bad input — caller renders nothing
+    if (!cadLabProjectId || typeof cadLabProjectId !== 'string') return { data: null }
+    const { isValidUUID } = await import('@/lib/validations')
+    if (!isValidUUID(cadLabProjectId)) return { data: null }
+
+    const { data, error } = await productsTable(supabase)
+      .select('id, name, lifecycle')
+      .eq('cad_lab_project_id', cadLabProjectId)
+      .eq('foundry_id', foundryId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[getProductByCadLabProjectId] error:', error.message)
+      return { error: error.message }
+    }
+    return {
+      data: data
+        ? { id: data.id as string, name: data.name as string, lifecycle: data.lifecycle as string }
+        : null,
+    }
+  })
+}
+
 // ─── getProduct ─────────────────────────────────────────────────────
 
 /**

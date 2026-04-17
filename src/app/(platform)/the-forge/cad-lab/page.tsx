@@ -53,6 +53,7 @@ const ModelViewer = dynamic(
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
+import { LinkedProductChip } from "./components/linked-product-chip"
 import { DesignBriefInterview } from "./components/design-brief-interview"
 import { ModuleImageGrid } from "./components/module-image-grid"
 import { ModuleFlowCanvas } from "./components/module-flow-canvas"
@@ -405,6 +406,13 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
+      {/* ── Reverse link to the product this design was promoted to, if any ── */}
+      {activeProjectId && (
+        <div className="flex items-center">
+          <LinkedProductChip cadLabProjectId={activeProjectId} />
+        </div>
+      )}
+
       {/* ── Primary input — always visible so the user sees what they're building ── */}
       <HeroSection
         subject={subject}
@@ -460,12 +468,42 @@ export default function CadLabResearchPage(): React.ReactNode {
       </AnimatePresence>
 
       {/* ── Tab navigation — appears after research is complete ── */}
+      {/* a11y: role=tablist + role=tab + arrow-key nav per ARIA APG */}
       {hasResearch && CONCEPT_TABS.length > 1 && (
         <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
-          <div className="flex items-center gap-2">
-            {CONCEPT_TABS.map((tab) => (
+          <div
+            role="tablist"
+            aria-label="Design stage sections"
+            className="flex items-center gap-2"
+          >
+            {CONCEPT_TABS.map((tab, idx) => (
               <button
                 key={tab.id}
+                id={`design-tab-${tab.id}`}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`design-panel-${tab.id}`}
+                aria-label={tab.id === "modules" && modulesUnseen ? `${tab.label} (unread updates)` : undefined}
+                tabIndex={activeTab === tab.id ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                    e.preventDefault()
+                    const delta = e.key === "ArrowRight" ? 1 : -1
+                    const nextIdx = (idx + delta + CONCEPT_TABS.length) % CONCEPT_TABS.length
+                    const nextTab = CONCEPT_TABS[nextIdx]
+                    handleTabClick(nextTab.id)
+                    document.getElementById(`design-tab-${nextTab.id}`)?.focus()
+                  } else if (e.key === "Home") {
+                    e.preventDefault()
+                    handleTabClick(CONCEPT_TABS[0].id)
+                    document.getElementById(`design-tab-${CONCEPT_TABS[0].id}`)?.focus()
+                  } else if (e.key === "End") {
+                    e.preventDefault()
+                    const last = CONCEPT_TABS[CONCEPT_TABS.length - 1]
+                    handleTabClick(last.id)
+                    document.getElementById(`design-tab-${last.id}`)?.focus()
+                  }
+                }}
                 onClick={() => handleTabClick(tab.id)}
                 className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
                   activeTab === tab.id
@@ -475,7 +513,10 @@ export default function CadLabResearchPage(): React.ReactNode {
               >
                 {tab.label}
                 {tab.id === "modules" && modulesUnseen && (
-                  <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-international-orange animate-pulse" />
+                  <>
+                    <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-international-orange animate-pulse" aria-hidden="true" />
+                    <span className="sr-only"> (unread updates)</span>
+                  </>
                 )}
               </button>
             ))}
@@ -498,7 +539,7 @@ export default function CadLabResearchPage(): React.ReactNode {
         <AnimatePresence mode="wait">
           {/* ═══ Research tab ═══ */}
           {activeTab === "research" && (
-            <motion.div key="research" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <motion.div key="research" role="tabpanel" id="design-panel-research" aria-labelledby="design-tab-research" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               {/* Product overview — always first */}
               {(productOverview || modules.length > 0 || isDecomposing) && (
                 <ProductOverviewCard
@@ -1030,7 +1071,7 @@ export default function CadLabResearchPage(): React.ReactNode {
 
           {/* ═══ Modules tab (text-only — no images, focused on reading) ═══ */}
           {activeTab === "modules" && modules.length > 0 && (
-            <motion.div key="modules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <motion.div key="modules" role="tabpanel" id="design-panel-modules" aria-labelledby="design-tab-modules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-foreground">{modules.length} Sub-Assemblies</p>
                 <Button variant="ghost" size="sm" onClick={() => handleTabClick("images")} className="gap-1.5 text-xs">
@@ -1163,7 +1204,7 @@ export default function CadLabResearchPage(): React.ReactNode {
 
           {/* ═══ Images tab — all illustrations in one place ═══ */}
           {activeTab === "images" && modules.length > 0 && (
-            <motion.div key="images" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <motion.div key="images" role="tabpanel" id="design-panel-images" aria-labelledby="design-tab-images" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-foreground">
                   {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} illustrations

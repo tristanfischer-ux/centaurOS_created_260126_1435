@@ -52,6 +52,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { typography } from '@/lib/design-system'
 import { formatCurrency } from '@/types/payments'
+import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import {
   Package,
@@ -1061,12 +1062,30 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
             {product.unit_economics && (
               <Card>
                 <CardHeader>
-                  <h3 className={typography.h3}>Unit Economics</h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className={typography.h3}>Unit Economics</h3>
+                    {product.unit_economics.last_synced_from_cad_at && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground"
+                        title={`COGS last synced from The Forge on ${new Date(product.unit_economics.last_synced_from_cad_at).toLocaleString()}`}
+                      >
+                        <Hammer className="h-3 w-3 text-international-orange" aria-hidden="true" />
+                        Synced {formatDistanceToNow(new Date(product.unit_economics.last_synced_from_cad_at), { addSuffix: true })}
+                      </span>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">COGS / unit</span>
+                      <span className="text-sm text-muted-foreground">
+                        COGS / unit
+                        {product.cad_lab_project_id && (
+                          <span className="ml-1 text-[10px] uppercase tracking-wider text-international-orange">
+                            from Forge
+                          </span>
+                        )}
+                      </span>
                       <span className="text-sm font-medium text-foreground">
                         {formatPence(product.unit_economics.cogs_per_unit_pence)}
                       </span>

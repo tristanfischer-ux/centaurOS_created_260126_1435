@@ -83,20 +83,43 @@
 
 **Focus:** the Products ↔ CAD Lab bridge in both directions.
 
-- [ ] promoteFromCadLab — real data carryover (name, subject, image, COGS breakdown, lifecycle inference)
-- [ ] Detail view overview tab: does it show the linked Forge project + deep link?
-- [ ] `convertBriefToForge` — is the resulting CAD Lab project actually seeded with brief constraints?
-- [ ] Reverse link: CAD Lab page showing "promoted to product X" — known gap, add it
-- [ ] `checkForgeCompletionAndSync` — does COGS auto-update when Forge project completes? Is it user-visible?
-- [ ] auto-promote duplicate-safe? (autoPromoteIfComplete silently swallows errors)
-- [ ] Forge-picker dialog: does it show all designs including non-complete? Sort makes sense?
-- [ ] Test link from `/the-forge/cad-lab/{id}` back to `/products/{productId}` when linked
+- [x] `promoteFromCadLab` — real data carryover audit (via sub-agent)
+- [x] Detail view Overview: linked CAD project card + deep link (correct route `/the-forge/cad-lab?project=…`)
+- [x] `convertBriefToForge` — brief seeding fidelity audit
+- [x] Reverse link: CAD Lab → Products — **known gap, now FIXED**
+- [x] `checkForgeCompletionAndSync` — invocation map + user surface
+- [x] `autoPromoteIfComplete` — error-path audit
+- [x] Forge-picker dialog sort + badge audit
+- [x] Verified `project.status` enum against migration `20260212800000_cad_lab_projects.sql`
 
-**Findings:** _(filled during round)_
+**Findings (Round 2):**
+1. **[P1] CAD Lab had zero reverse link to its linked product** — a designer who completed a design had no way to jump to the product it became. The link existed in DB (`products.cad_lab_project_id`) but was never surfaced in the CAD Lab UI. [Fixed]
+2. **[P1] Product detail view didn't indicate which fields came from The Forge** — when COGS auto-synced from CAD Lab via `checkForgeCompletionAndSync`, user saw a one-off toast but the Unit Economics card gave no visual indicator of source/freshness afterwards. [Fixed]
+3. **[P2] Forge-picker used dead code** — `STAGE_ORDER` and `STAGE_BADGE` both included an `rfq_created` key, but `project.status` is constrained by CHECK to `draft | researched | interface_ready | generated | complete` (migration 20260212800000). RFQ-sent lives in `result.procurement.stage` JSONB (cad-lab-projects.ts:921), not in `status`. Result: RFQ-sent projects never got the "RFQ Sent" badge, misleading the picker. [Fixed]
+4. **[P2] `promoteFromCadLab` discards `tooling_investment_pence`** — `buildUnitEconomicsFromEstimates` returns `tooling_investment_pence: null` always (products.ts:2295). AI cost estimates can have setup/tooling data but we don't extract it. [Deferred → Round 3 as data-completeness gap; needs a test rather than a rushed edit]
+5. **[P2] Module image URLs not carried on promote** — `hero_image_url` copies across from `system_illustration_url`, but individual module image URLs are not pulled. [Deferred → backlog, not a core R2 integration bug]
+6. **[P3] `autoPromoteIfComplete` failure is console-only** — duplicates, ownership fails, missing estimates all log to console and return `{promoted:false}`. No user-visible signal when auto-promotion happens or doesn't. [Deferred → needs a notifications pipeline, scope too large for R2]
+7. **[P3] `convertBriefToForge` flattens brief structure to text** — every brief field is joined into `product_overview` as markdown (products.ts:1207). CAD Lab then renders it as a single text blob, not structured data. [Deferred → structural change, needs CAD Lab intake refactor]
 
-**Fixes shipped:** _(filled during round)_
+**Fixes shipped (Round 2):**
+- New server action `getProductByCadLabProjectId(projectId)` — returns `{id, name, lifecycle} | null`, foundry-isolated via `withAuth`, UUID-validated, returns null (no enumeration oracle) on invalid input.
+- New client component `LinkedProductChip` (cad-lab/components/linked-product-chip.tsx) — renders only when a linked product exists; orange brand pill linking to `/products/{id}`.
+- Wired `LinkedProductChip` into `cad-lab/page.tsx` (concept/landing) and `cad-lab/build/page.tsx` (build overview tab). Both sites show the chip next to the page entry area when a linked product exists.
+- Product detail view Unit Economics card now shows: (a) "Synced {relative time}" pill with Hammer icon in the header when `last_synced_from_cad_at` is set, and (b) "from Forge" micro-label next to the COGS/unit row when `cad_lab_project_id` is present. Both use semantic tokens, no hardcoded colours.
+- Removed dead `rfq_created` entry from Forge-picker STAGE_ORDER. Added GOTCHA comment on the ordering map documenting where rfq_created actually lives (result.procurement.stage JSONB).
+- RFQ-sent projects now correctly get the **"RFQ Sent"** badge in the Forge-picker via `project.stage === 'rfq_created'` check (not via status).
 
-**Score:** _(filled at round end)_
+**Verification:** Full `tsc --noEmit` clean. DB check: one linked product exists in `forge-guild` foundry — reverse link will surface on that CAD project once deployed. Other fixes are static (code-only).
+
+**Score:**
+| Dim | Before R2 | After R2 | Delta |
+|---|---|---|---|
+| Usefulness | 3 | 4 | +1 (Overview now tells the Forge story) |
+| Integration | 2 | 4 | +2 (bidirectional + source labels + correct badges) |
+| Delight | 4 | 4 | — |
+| Robustness | 3 | 3 | — (R3) |
+| A11y/Mobile | 3 | 3 | — (R4) |
+| **Composite** | **3.0** | **3.6** | **+0.6** |
 
 ---
 
@@ -174,7 +197,7 @@
 |---|---|---|---|---|---|---|
 | Baseline | 2 | 2 | 2 | 3 | 3 | 2.4 |
 | After R1 | 3 | 2 | 4 | 3 | 3 | 3.0 |
-| After R2 | | | | | | |
+| After R2 | 4 | 4 | 4 | 3 | 3 | 3.6 |
 | After R3 | | | | | | |
 | After R4 | | | | | | |
 | After R5 | | | | | | |
