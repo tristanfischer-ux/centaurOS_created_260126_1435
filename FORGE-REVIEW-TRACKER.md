@@ -37,11 +37,11 @@
 
 ## Phase 1 — User's explicit request: Cost Summary BETA warning
 
-- [ ] Add prominent amber warning banner above Cost Summary
-- [ ] Language: (1) BETA, (2) rough early estimates, could be completely wrong, (3) must be fully reviewed by qualified people
-- [ ] Commit + push
-- [ ] Verify Vercel deploy (Production AND Preview Ready)
-- [ ] Verify on live site with agent-browser
+- [x] Add prominent amber warning banner above Cost Summary
+- [x] Language: (1) BETA, (2) rough early estimates, could be completely wrong, (3) must be fully reviewed by qualified people
+- [x] Commit + push (3692c46f)
+- [x] Verify Vercel deploy (Ready on Production)
+- [ ] Verify on live site with agent-browser (BLOCKED: no auth credentials for Tristan's account)
 
 ## Phase 2 — Design page walkthrough
 
@@ -94,19 +94,42 @@
 
 ---
 
-## Findings log (append as we go)
+## Findings log
 
-_(populated during execution)_
+### Round 1 — deep static review (4 subagents, parallel)
+
+**CRITICAL (P0) — fixed**
+1. **Design** — `cad-lab-images.ts` actions accept client-supplied `projectId` without foundry ownership check, all use `createAdminClient()` (bypasses RLS). Cross-foundry storage overwrite + quota burn. Applied to uploadSharedImageAssets / cleanupSharedImageAssets / generateCadLabSingleImage / generateCadLabModuleImages / generateCadLabSystemIllustration. Fixed in `fa55e31c`.
+2. **Design** — modules stranded in `imageStatus: "generating"` if `handleGenerateModuleImages` throws mid-pipeline. Retry button in page.tsx only matches `["pending", "failed", undefined]`. Added catch-sweep in `cad-lab-context.tsx`. Fixed in `fa55e31c`.
+3. **Design** — `handleRetryIllustration` retries hero only; module images stay bad (ran without hero reference). After successful hero retry, now chains `handleGenerateModuleImages` for any failed/pending modules. Fixed in `fa55e31c`.
+4. **Source** — `matchCadLabModuleSuppliers` had zero auth, allowed unauthed embedding cost abuse + marketplace enumeration. Fixed by `getUser()` gate at `fc507919`.
+5. **Source** — `getLinkedRFQQuotes` had zero auth AND no scope check. Any authed user could enumerate any RFQ id and pull competitor quotes. Added auth + buyer-or-same-foundry check + UUID validation at `fc507919`.
+6. **Source** — project-switch corruption: all `useState(() => localStorage.getItem(key-${id}))` initialisers read once at mount, stale across project change, setters write into the NEW project's bucket. Added rehydrate effect keyed on `activeProjectId` at `d9960656`.
+7. **Assemble** — `matchAssemblyCompanies` had zero auth. Added `getUser()` gate at `fc507919`.
+
+**HIGH (P1) — fixed**
+8. **Specify** — Header "Continue to Source" bypassed `imagesStale` gate that the review-tab CTA enforced. Unified into single `canProceedToSource` at `d9960656`.
+9. **Specify** — `imagesStale=true` trap: if total regen fails, `imagesGeneratedAtRevision` never advances, CTA never appears. Added `markImagesCurrentManually` + "Drawings out of date" card with Regenerate/Skip at `d9960656`.
+10. **Specify** — `cad-lab-cost.ts` DeepSeek call used raw `fetch()` with no timeout, could burn full Vercel 300s budget. Wrapped in `fetchWithTimeout(90s)` at `d9960656`.
+11. **Assemble** — Branding/shipping free-text fields (Rule 27) had no maxLength. Added client-side caps with visible counters at `d9960656`.
+
+**Red team rounds (5) — in progress**
+_(populated as subagents return)_
 
 ## Scorecard
 
-| Page | Loaded OK | Interactive OK | Data OK | Bugs Found | Bugs Fixed |
-|------|-----------|-----------------|---------|------------|------------|
-| Design | — | — | — | 0 | 0 |
-| Specify | — | — | — | 0 | 0 |
-| Source | — | — | — | 0 | 0 |
-| Assemble | — | — | — | 0 | 0 |
+| Stage | Loaded OK | Static Review | P0s Fixed | P1s Fixed | Outstanding |
+|-------|-----------|---------------|-----------|-----------|-------------|
+| Design | - (auth-blocked) | ✅ | 3/3 | 0/flagged | see red team |
+| Specify | - (auth-blocked) | ✅ | 0 critical found | 3/3 | see red team |
+| Source | - (auth-blocked) | ✅ | 3/3 | 0 flagged | see red team |
+| Assemble | - (auth-blocked) | ✅ | 2/2 | 1/1 | see red team |
 
 ## Commit log
 
-_(each commit referenced here as we go)_
+| Commit | Description | Pushed | Vercel |
+|--------|-------------|--------|--------|
+| `3692c46f` | Cost Summary BETA warning | ✅ | Ready |
+| `fc507919` | Auth on 3 unauthed actions (bundled with slug backfill) | ✅ | Ready |
+| `fa55e31c` | Foundry-scope image actions + unstuck generating + hero retry cascade | ✅ | Ready |
+| `d9960656` | Source rehydration + gate unification + imagesStale escape + DeepSeek timeout + Assemble caps | ✅ | Building |
