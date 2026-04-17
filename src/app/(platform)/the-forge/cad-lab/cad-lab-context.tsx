@@ -2366,7 +2366,20 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // so we never ship worse than before.
       if (primaryImage && projectId) {
         let mirroredUrl = primaryImage.url
-        const axis = mirrorAxisByMirrorId.get(mod.id) ?? 'horizontal'
+        // INTENT: If mirrorAxisByMirrorId didn't register this mirror (can
+        // happen when the map was populated by an older code path that
+        // predates multi-axis support, OR if a stale bundle is serving the
+        // old L/R-only detection), infer the axis from the mirror module's
+        // OWN name: a module called "Lower X" is always a vertical mirror,
+        // a "Right X" is always horizontal. This makes the flip correct
+        // even if upstream detection has stale behaviour.
+        const registeredAxis = mirrorAxisByMirrorId.get(mod.id)
+        const nameMatch = mod.name.match(DIRECTIONAL_RE)
+        const nameInferredAxis = nameMatch
+          ? (DIRECTIONAL_PAIRS.find(p => p.mirror.toLowerCase() === nameMatch[1].toLowerCase())?.axis
+             ?? DIRECTIONAL_PAIRS.find(p => p.primary.toLowerCase() === nameMatch[1].toLowerCase())?.axis)
+          : undefined
+        const axis = registeredAxis ?? nameInferredAxis ?? 'horizontal'
         let stepLabel = `${mod.name} (${axis} mirror)`
         try {
           const flipRes = await flipCadLabImageForMirrorAction(projectId, mod.id, primaryImage.url, axis)
