@@ -461,14 +461,14 @@ function HeroSection() {
         </motion.div>
 
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="font-playfair text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
-          Everything a hardware startup needs,{" "}
+          Hardware has never had its AWS moment.{" "}
           <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
-            in one platform.
+            This is it.
           </motion.span>
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Design your product. Find your investors. Connect with your manufacturers. Supported by 13 specialist AI agents and a marketplace of experienced fractional executives — ForgeOS is the operating system for building hardware businesses.
+          A software founder builds one thing. A hardware founder builds two. ForgeOS handles the second — so you can focus on what only you can build.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -512,8 +512,11 @@ function TristanIntroSection() {
           <p className="text-international-orange text-xs font-mono uppercase tracking-widest mb-4">
             From Tristan
           </p>
-          <p className="text-foreground text-lg sm:text-xl md:text-2xl font-playfair leading-snug mb-4">
-            I have spent 26 years building hardware startups. Fractional Forge is the wish list of everything I could have had along the way.
+          <p className="text-foreground text-lg sm:text-xl md:text-2xl font-playfair leading-snug mb-2">
+            &ldquo;A software founder builds one thing. A hardware founder builds two. Fractional Forge handles the second.&rdquo;
+          </p>
+          <p className="text-muted-foreground text-sm font-mono uppercase tracking-widest mb-4">
+            — Tristan Fischer, 26 years building hardware startups
           </p>
           <a
             href="#why-i-built"
