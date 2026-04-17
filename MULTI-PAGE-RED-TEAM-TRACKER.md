@@ -136,6 +136,24 @@ Per-page composite rubric score recorded. Rubric:
 
 **Founder-impact note:** A failed "delete objective" click used to leave a founder squinting at "Failed to delete objective" with zero context — now they see the actual reason (RLS policy, FK constraint, etc.). Gantt-view drag-failures stop being invisible; a founder who thinks they moved a deadline will see something in dev tools if it didn't stick. Design-token cleanup means the strategy chip + objective tree stay coherent under theme shifts.
 
+### 3. Tasks — `/tasks` (redirects to `/new-tasks`)
+
+**Founder question:** *"What should I do next, what's blocked, who's waiting on me?"*
+
+**Pass A findings:**
+1. **[P2 Voice] `create-task-dialog.tsx:409`** — `"Assign a new task. Assign to an AI Agent for auto-execution."` — violates "No AI Emphasis" rule from CLAUDE.md (no "AI Agent" / "AI-powered" in in-product copy; that's marketing-only).
+2. **[P2]** UUID validation missing on 12+ server actions in `src/actions/tasks.ts` — acceptTask, completeTask, updateTaskDates, etc. all accept `taskId: string` without a format check. RLS + foundry filter catch misuse; not a correctness bug but a defense-in-depth gap.
+3. **[P3]** `trackAIUsage` failures swallowed with `.catch(() => {})` — observability gap, not user-facing.
+4. **[P1 architectural]** No Tasks ↔ Products link — a task doesn't carry `product_id`. Architectural, same gap as Objectives. Deferred.
+5. **[P3]** Default quick-filter on Focus view is "My Tasks". Arguable that "Due Today" would land on the more urgent answer faster. Opinion; deferred.
+
+**Pass B shipped:**
+- Create-task dialog description rewritten: *"Assign a new task — to a teammate, to a specialist, or to yourself."* No "AI Agent", no "auto-execution", matches Tristan's voice (specialist framing is the approved term).
+
+**Score:** Utility 5 (Focus view is genuinely strong) / Integration 4 / Voice 5 (was 4) / Robustness 4 / A11y 5 → **Composite 4.6**.
+
+**Founder-impact note:** The Tasks page is architecturally the strongest of the three so far — Focus view answers "what should I do next" in under 2 seconds, Cal's briefing hero gives a one-sentence executive read of the task load, and delegate-to-specialist is one click. The only user-visible weakness was the "AI Agent" copy in the create dialog — fixed. UUID hardening is on the backlog (not a correctness issue; RLS handles security).
+
 
 ## Deferred / backlog
 

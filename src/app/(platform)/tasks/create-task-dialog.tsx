@@ -406,7 +406,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                     ⚠️ You must create at least one objective before creating tasks.
                                 </span>
                             ) : (
-                                "Assign a new task. Assign to an AI Agent for auto-execution."
+                                "Assign a new task — to a teammate, to a specialist, or to yourself."
                             )}
                         </DialogDescription>
                     </DialogHeader>
