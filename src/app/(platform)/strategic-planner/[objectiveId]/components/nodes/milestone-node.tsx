@@ -22,7 +22,7 @@ function MilestoneNodeComponent({ data }: NodeProps) {
     <div className="flex flex-col items-center gap-1">
       {/* Diamond shape */}
       <div className="w-8 h-8 rotate-45 bg-international-orange rounded-sm flex items-center justify-center shadow-sm">
-        <Flag className="w-3.5 h-3.5 text-white -rotate-45" />
+        <Flag className="w-3.5 h-3.5 text-primary-foreground -rotate-45" />
       </div>
       {/* Label */}
       <div className="text-center mt-1">

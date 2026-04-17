@@ -118,7 +118,7 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
   return (
     <div className="flex flex-col h-full">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 mb-2">
             <Button
@@ -171,7 +171,7 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
       </div>
 
       {/* Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-border">
         <div className="flex items-center gap-3">
           {/* View mode toggle */}
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as CanvasViewMode)}>
@@ -261,7 +261,7 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
 
       {/* Collapsible bottom panel */}
       {activePanel && (
-        <div className="border-t border-slate-100 max-h-[300px] overflow-y-auto">
+        <div className="border-t border-border max-h-[300px] overflow-y-auto">
           {activePanel === 'resources' && (
             <ResourcesPanel
               suggestions={goal.resource_suggestions || []}

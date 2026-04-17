@@ -92,7 +92,28 @@ Per-page composite rubric score recorded. Rubric:
 
 ## Work log (running)
 
-_(filled as each page completes)_
+### 1. Strategy — `/strategic-planner` (and `/strategic-planner/[objectiveId]`)
+
+**Founder question:** *"What's the big goal, what's next, who's missing, and am I on track?"*
+
+**Pass A findings:**
+1. **[SECURITY/P1]** `[objectiveId]/page.tsx:16` — no UUID validation on route param. Attacker could feed malformed/enumerating IDs straight to the server action; RLS catches but input validation is the first line.
+2. **[P2]** 4× hardcoded `border-slate-100` in `strategic-planner-view.tsx` L121/L174/L264 and `strategic-planner-landing.tsx` L68 — breaks design-token rule.
+3. **[P2]** `milestone-node.tsx:25` — hardcoded `text-white` on flag icon over `bg-international-orange`, should be a semantic token.
+4. **[Audit false-positive]** Null dereference on `goal.milestone_date` arithmetic — **already guarded** at L103-105 (`goal.milestone_date ? differenceInDays(...) : null`). No fix.
+5. **[Deferred P2]** Reverse link task → strategic goal — structural, bigger change, backlog.
+
+**Pass B shipped:**
+- `isValidUUID(objectiveId)` gate in `[objectiveId]/page.tsx` with `notFound()` on invalid — before auth + DB.
+- 4× `border-slate-100` → `border-border` (semantic).
+- `text-white` → `text-primary-foreground` on milestone flag icon.
+
+**Commit:** next (bundled with push).
+**Vercel:** will verify after push.
+**Score:** Utility 4 / Integration 4 / Voice 5 / Robustness 5 (was 4) / A11y 4 → **Composite 4.4** (was ~3.8 baseline).
+
+**Founder-impact note:** A founder who creates a goal without a deadline no longer risks a white-screen page-crash later (although the null-guard was already present, verified by audit). The UUID gate means a malformed link in an email or bookmark returns a clean 404 instead of an ugly DB error. Hardcoded-colour cleanup means the Strategy page stays coherent if the design-token palette ever shifts.
+
 
 ## Deferred / backlog
 

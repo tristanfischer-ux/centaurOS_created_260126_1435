@@ -1,5 +1,6 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { isValidUUID } from '@/lib/validations'
 import { StrategicPlannerView } from './strategic-planner-view'
 
 /**
@@ -14,6 +15,14 @@ interface StrategicPlannerPageProps {
 
 export default async function StrategicPlannerPage({ params }: StrategicPlannerPageProps) {
   const { objectiveId } = await params
+
+  // SECURITY: UUID gate before we touch auth or DB. Prevents enumeration
+  // oracle + malformed-input paths. RLS + foundry filter is defense in depth;
+  // this is the first line.
+  if (!isValidUUID(objectiveId)) {
+    notFound()
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
