@@ -268,7 +268,9 @@ describe('setupNewUser', () => {
     // Should NOT be forge-guild
     expect(result.foundryId).not.toBe('forge-guild')
     expect(result.foundryId).toBe(`sandbox-${TEST_USER_ID.slice(0, 8)}`)
-    expect(result.redirectPath).toBe('/today')
+    // DECISION 2026-04-17: every brand-new user lands on /welcome for the guided tour
+    // before /today. See setup-new-user.ts return statement comment.
+    expect(result.redirectPath).toBe('/welcome')
 
     // Verify sandbox foundry was created with is_sandbox: true
     const foundryInsert = insertedData.find(d => d.table === 'foundries' && (d.id as string)?.startsWith('sandbox-'))
@@ -375,6 +377,7 @@ describe('setupNewUser', () => {
     })
 
     expect(result.foundryId).toBe('forge-suppliers')
-    expect(result.redirectPath).toBe('/today')
+    // DECISION 2026-04-17: brand-new users land on /welcome (see setup-new-user.ts).
+    expect(result.redirectPath).toBe('/welcome')
   })
 })
