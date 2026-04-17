@@ -72,6 +72,15 @@ import type { CategoryInput } from "@/lib/cad-lab/assembly-capability-map"
 import type { OrderTrackingStep } from "@/lib/assembly-utils"
 import type { OrderLineSummary } from "@/actions/assembly"
 import type { ShortlistedSupplier } from "../source/page"
+import { LaunchReadinessGauge } from "@/components/cad/launch-readiness-gauge"
+import { FAIChecklist } from "@/components/cad/fai-checklist"
+import { BOMTraceabilityCard } from "@/components/cad/bom-traceability-card"
+import { CompliancePacket } from "@/components/cad/compliance-packet"
+import { computeLaunchReadiness } from "@/lib/cad-lab/launch-readiness"
+import { emptyCompliancePacket } from "@/lib/cad-lab/compliance-regulations"
+import type { CompliancePacketState } from "@/lib/cad-lab/compliance-regulations"
+import type { FAIChecklistState } from "@/lib/cad-lab/fai-state"
+import { buildSankeyData } from "@/lib/sankey-utils"
 
 // ─── localStorage helpers ───────────────────────────────────────────
 
@@ -255,6 +264,82 @@ export default function AssemblePage(): React.ReactNode {
     setRequiredSpecialtiesRaw(specs)
     saveJson(reqSpecsKey, specs)
   }, [reqSpecsKey])
+
+  // ── Compliance packet state (per-project localStorage) ──
+  const complianceKey = pid ? `forge-compliance-packet-${pid}` : null
+  const [complianceState, setComplianceStateRaw] = useState<CompliancePacketState>(
+    () => loadJson<CompliancePacketState>(complianceKey, emptyCompliancePacket()),
+  )
+  const setComplianceState = useCallback((next: CompliancePacketState) => {
+    setComplianceStateRaw(next)
+    saveJson(complianceKey, next)
+  }, [complianceKey])
+
+  // ── FAI state (per-project localStorage) ──
+  const faiKey = pid ? `forge-fai-state-${pid}` : null
+  const [faiState, setFaiStateRaw] = useState<FAIChecklistState>(
+    () => loadJson<FAIChecklistState>(faiKey, {}),
+  )
+  const setFaiState = useCallback((next: FAIChecklistState) => {
+    setFaiStateRaw(next)
+    saveJson(faiKey, next)
+  }, [faiKey])
+
+  // INTENT: Build categories for Launch Readiness (same buildSankeyData as elsewhere).
+  const readinessCategories = useMemo(
+    () => buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates).categories,
+    [eligibleModules, diagnosticAnswers, aiCostEstimates],
+  )
+
+  // INTENT: Derive readiness flags for Launch Readiness gauge.
+  const brandingReady = useMemo(
+    () => !!(branding.packagingType || (branding.customInserts?.length ?? 0) > 0 || branding.unboxingNotes),
+    [branding],
+  )
+  const shippingReady = useMemo(
+    () => !!(shipping.fulfilmentModel && shipping.shippingAddress?.country),
+    [shipping],
+  )
+
+  const launchReadinessReport = useMemo(
+    () => computeLaunchReadiness({
+      categories: readinessCategories,
+      shortlistedSuppliers,
+      categoryRankings,
+      faiState,
+      complianceState,
+      shippingReady,
+      brandingReady,
+      manufacturingOrderCount: orderLines.length,
+      moduleCount: eligibleModules.length,
+    }),
+    [readinessCategories, shortlistedSuppliers, categoryRankings, faiState, complianceState, shippingReady, brandingReady, orderLines.length, eligibleModules.length],
+  )
+
+  // INTENT: Supplier name lookup for compliance packet attestation display + BOM traceability.
+  const supplierNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const s of shortlistedSuppliers.values()) m.set(s.id, s.name)
+    return m
+  }, [shortlistedSuppliers])
+
+  // INTENT: For BOM traceability, pick the top-ranked supplier per module (crude but useful MVP).
+  const supplierByModule = useMemo(() => {
+    const m = new Map<string, string>()
+    // Go through categoryRankings, find modules that contribute to the category, pick the top supplier.
+    for (const mod of eligibleModules) {
+      for (const [catId, rankedIds] of categoryRankings) {
+        if (rankedIds.length === 0) continue
+        // A category may contain parts from this module — approximate with the top rank.
+        // FUTURE: deeper mapping via module→category→supplier chain.
+        const topId = rankedIds[0]
+        const name = supplierNameById.get(topId)
+        if (name && !m.has(mod.id)) m.set(mod.id, name)
+        void catId
+      }
+    }
+    return m
+  }, [eligibleModules, categoryRankings, supplierNameById])
 
   // ── Match assemblers action ──
   const handleMatchAssemblers = useCallback(async () => {
@@ -445,6 +530,7 @@ export default function AssemblePage(): React.ReactNode {
       { id: "flow", label: "Assembly Flow", icon: Layers },
       { id: "branding", label: "Branding & Packaging", icon: Paintbrush },
       { id: "shipping", label: "Shipping & Fulfilment", icon: Truck },
+      { id: "compliance", label: "Compliance", icon: ShieldCheck },
     ],
     [],
   )
@@ -525,6 +611,9 @@ export default function AssemblePage(): React.ReactNode {
         briefing={assembleEntryText}
       />
 
+      {/* ── Launch Readiness Gauge (hero — top-level snapshot) ── */}
+      <LaunchReadinessGauge report={launchReadinessReport} />
+
       {/* ── Assembler fitness checks + AI company review ── */}
       <AssemblerFitnessReview
         assemblerMatches={assemblerMatches}
@@ -590,13 +679,42 @@ export default function AssemblePage(): React.ReactNode {
       </div>
 
       {/* ── Tab navigation ── */}
+      {/* a11y: role=tablist + role=tab + arrow-key nav per ARIA APG */}
       <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
-        <div className="flex items-center gap-2">
-          {TABS.map((tab) => {
+        <div
+          role="tablist"
+          aria-label="Assemble stage sections"
+          className="flex items-center gap-2"
+        >
+          {TABS.map((tab, idx) => {
             const Icon = tab.icon
             return (
               <button
                 key={tab.id}
+                id={`assemble-tab-${tab.id}`}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`assemble-panel-${tab.id}`}
+                tabIndex={activeTab === tab.id ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                    e.preventDefault()
+                    const delta = e.key === "ArrowRight" ? 1 : -1
+                    const nextIdx = (idx + delta + TABS.length) % TABS.length
+                    const nextTab = TABS[nextIdx]
+                    handleTabClick(nextTab.id)
+                    document.getElementById(`assemble-tab-${nextTab.id}`)?.focus()
+                  } else if (e.key === "Home") {
+                    e.preventDefault()
+                    handleTabClick(TABS[0].id)
+                    document.getElementById(`assemble-tab-${TABS[0].id}`)?.focus()
+                  } else if (e.key === "End") {
+                    e.preventDefault()
+                    const last = TABS[TABS.length - 1]
+                    handleTabClick(last.id)
+                    document.getElementById(`assemble-tab-${last.id}`)?.focus()
+                  }
+                }}
                 onClick={() => handleTabClick(tab.id)}
                 className={cn(
                   "px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors flex items-center gap-1.5",
@@ -605,7 +723,7 @@ export default function AssemblePage(): React.ReactNode {
                     : "text-muted-foreground hover:text-foreground hover:bg-muted",
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                 {tab.label}
               </button>
             )
@@ -627,7 +745,7 @@ export default function AssemblePage(): React.ReactNode {
       <AnimatePresence mode="wait">
         {/* ═══ Assembly Flow tab ═══ */}
         {activeTab === "flow" && (
-          <motion.div key="flow" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="flow" role="tabpanel" id="assemble-panel-flow" aria-labelledby="assemble-tab-flow" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             {/* Match button */}
             <div className="flex items-center justify-between">
               <div>
@@ -896,12 +1014,37 @@ export default function AssemblePage(): React.ReactNode {
               matchReasons={selectedAssembler?.matchReasons}
               cache={assemblerDetailCache}
             />
+
+            {/* ── First Article Inspection checklist ── */}
+            <FAIChecklist
+              modules={eligibleModules.map((m) => ({ id: m.id, name: m.name }))}
+              state={faiState}
+              onChange={setFaiState}
+            />
+
+            {/* ── BOM traceability template ── */}
+            <BOMTraceabilityCard
+              productName={productDisplayName}
+              modules={eligibleModules.map((m) => ({ id: m.id, name: m.name }))}
+              supplierByModule={supplierByModule}
+            />
+          </motion.div>
+        )}
+
+        {/* ═══ Compliance tab ═══ */}
+        {activeTab === "compliance" && (
+          <motion.div key="compliance" role="tabpanel" id="assemble-panel-compliance" aria-labelledby="assemble-tab-compliance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <CompliancePacket
+              state={complianceState}
+              onChange={setComplianceState}
+              supplierNameById={supplierNameById}
+            />
           </motion.div>
         )}
 
         {/* ═══ Branding & Packaging tab ═══ */}
         {activeTab === "branding" && (
-          <motion.div key="branding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+          <motion.div key="branding" role="tabpanel" id="assemble-panel-branding" aria-labelledby="assemble-tab-branding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
             <AssemblyBrandingSpec
               branding={branding}
               onUpdate={updateBranding}
@@ -911,7 +1054,7 @@ export default function AssemblePage(): React.ReactNode {
 
         {/* ═══ Shipping & Fulfilment tab ═══ */}
         {activeTab === "shipping" && (
-          <motion.div key="shipping" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="shipping" role="tabpanel" id="assemble-panel-shipping" aria-labelledby="assemble-tab-shipping" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             <AssemblyShipping
               shipping={shipping}
               onUpdate={updateShipping}

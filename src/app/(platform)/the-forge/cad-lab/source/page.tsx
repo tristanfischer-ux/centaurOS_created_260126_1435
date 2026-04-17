@@ -52,6 +52,15 @@ import { SupplierFitnessReview } from "@/components/cad/supplier-fitness-review"
 import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
 import { useStageBriefing } from "@/hooks/use-stage-briefing"
 import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
+import { SupplyRiskRadar } from "@/components/cad/supply-risk-radar"
+import { VolumeRampPlanner } from "@/components/cad/volume-ramp-planner"
+import type { RampRole, RampRoleState } from "@/components/cad/volume-ramp-planner"
+import { CapabilityInterviewPackDialog } from "@/components/cad/capability-interview-pack-dialog"
+import { NDAGate } from "@/components/cad/nda-gate"
+import type { NDAState } from "@/components/cad/nda-gate"
+import { SupplierOutreachLog } from "@/components/cad/supplier-outreach-log"
+import type { OutreachLogState } from "@/components/cad/supplier-outreach-log"
+import { FileText } from "lucide-react"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
 
@@ -305,6 +314,118 @@ export default function SourcePage(): React.ReactNode {
   // DECISION: activeTab declared here (before effects that reference it) to avoid block-scoping TDZ error.
   const [activeTab, setActiveTab] = useState("suppliers")
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+
+  // ── Volume Ramp Planner state (per-project localStorage) ──
+  const rampRolesKey = activeProjectId ? `forge-ramp-roles-${activeProjectId}` : null
+  const [rampRoles, setRampRolesRaw] = useState<RampRoleState>(() => {
+    if (!rampRolesKey || typeof window === "undefined") return {}
+    try {
+      const stored = localStorage.getItem(rampRolesKey)
+      if (stored) return JSON.parse(stored) as RampRoleState
+    } catch { /* ignore */ }
+    return {}
+  })
+  const setRampRole = useCallback((supplierId: string, role: RampRole) => {
+    setRampRolesRaw((prev) => {
+      const next: RampRoleState = { ...prev, [supplierId]: role }
+      if (rampRolesKey) {
+        try { localStorage.setItem(rampRolesKey, JSON.stringify(next)) } catch { /* quota */ }
+      }
+      return next
+    })
+  }, [rampRolesKey])
+
+  // ── NDA state (per-project localStorage) ──
+  const ndaKey = activeProjectId ? `forge-nda-state-${activeProjectId}` : null
+  const [ndaState, setNdaStateRaw] = useState<NDAState>(() => {
+    if (!ndaKey || typeof window === "undefined") return { acknowledged: false, ndaReference: "" }
+    try {
+      const stored = localStorage.getItem(ndaKey)
+      if (stored) return JSON.parse(stored) as NDAState
+    } catch { /* ignore */ }
+    return { acknowledged: false, ndaReference: "" }
+  })
+  const setNdaState = useCallback((next: NDAState) => {
+    setNdaStateRaw(next)
+    if (ndaKey) {
+      try { localStorage.setItem(ndaKey, JSON.stringify(next)) } catch { /* quota */ }
+    }
+  }, [ndaKey])
+
+  // ── Target market (per-project localStorage, used by Supply Risk + Assemble) ──
+  const targetMarketKey = activeProjectId ? `forge-target-market-${activeProjectId}` : null
+  const [targetMarket, setTargetMarketRaw] = useState<"US" | "UK" | "EU" | "other">(() => {
+    if (!targetMarketKey || typeof window === "undefined") return "UK"
+    try {
+      const stored = localStorage.getItem(targetMarketKey)
+      if (stored === "US" || stored === "UK" || stored === "EU" || stored === "other") return stored
+    } catch { /* ignore */ }
+    return "UK"
+  })
+  const setTargetMarket = useCallback((next: "US" | "UK" | "EU" | "other") => {
+    setTargetMarketRaw(next)
+    if (targetMarketKey) {
+      try { localStorage.setItem(targetMarketKey, next) } catch { /* quota */ }
+    }
+  }, [targetMarketKey])
+
+  // ── Capability interview pack dialog ──
+  const [interviewPackOpen, setInterviewPackOpen] = useState(false)
+  const [interviewPackSupplier, setInterviewPackSupplier] = useState<string | null>(null)
+
+  // ── Supplier outreach log state (per-project localStorage) ──
+  const outreachKey = activeProjectId ? `forge-outreach-log-${activeProjectId}` : null
+  const [outreachState, setOutreachStateRaw] = useState<OutreachLogState>(() => {
+    if (!outreachKey || typeof window === "undefined") return {}
+    try {
+      const stored = localStorage.getItem(outreachKey)
+      if (stored) return JSON.parse(stored) as OutreachLogState
+    } catch { /* ignore */ }
+    return {}
+  })
+  const setOutreachState = useCallback((next: OutreachLogState) => {
+    setOutreachStateRaw(next)
+    if (outreachKey) {
+      try { localStorage.setItem(outreachKey, JSON.stringify(next)) } catch { /* quota */ }
+    }
+  }, [outreachKey])
+
+  const replySlaKey = activeProjectId ? `forge-outreach-sla-${activeProjectId}` : null
+  const [replySlaDays, setReplySlaDaysRaw] = useState<number>(() => {
+    if (!replySlaKey || typeof window === "undefined") return 5
+    try {
+      const stored = localStorage.getItem(replySlaKey)
+      if (stored) {
+        const n = parseInt(stored, 10)
+        if (!Number.isNaN(n) && n >= 1 && n <= 30) return n
+      }
+    } catch { /* ignore */ }
+    return 5
+  })
+  const setReplySlaDays = useCallback((n: number) => {
+    setReplySlaDaysRaw(n)
+    if (replySlaKey) {
+      try { localStorage.setItem(replySlaKey, String(n)) } catch { /* quota */ }
+    }
+  }, [replySlaKey])
+
+  // ── Category labels map for Supply Risk Radar ──
+  const categoryLabels = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const cat of sankeyCategories) m.set(cat.id, cat.label)
+    return m
+  }, [sankeyCategories])
+
+  // ── MOQ lookup for Volume Ramp Planner (reads supplier matches) ──
+  const moqBySupplier = useMemo(() => {
+    const m = new Map<string, string | null>()
+    for (const matches of supplierMatches.values()) {
+      for (const match of matches) {
+        if (!m.has(match.id)) m.set(match.id, match.minimumOrder ?? null)
+      }
+    }
+    return m
+  }, [supplierMatches])
 
   // ── Auto-trigger buy search when buy parts exist but no results cached ──
   const buySearchTriggeredRef = useRef(false)
@@ -640,11 +761,32 @@ export default function SourcePage(): React.ReactNode {
     setBuyPartResultsRaw(readArray<BuyPartSearchResult>(buySearchKey))
     setRfqQuotes(undefined)
 
+    // INTENT: Also rehydrate ramp roles, NDA state, and target market on project switch.
+    // See 2026-04-17 rule: useState initialisers don't re-run when activeProjectId changes.
+    const readJson = <T,>(key: string | null, fallback: T): T => {
+      if (!key || typeof window === "undefined") return fallback
+      try {
+        const stored = localStorage.getItem(key)
+        if (stored) return JSON.parse(stored) as T
+      } catch (err) {
+        console.warn("[SOURCE] Failed to rehydrate json from key:", key, err)
+      }
+      return fallback
+    }
+    setRampRolesRaw(readJson<RampRoleState>(rampRolesKey, {}))
+    setNdaStateRaw(readJson<NDAState>(ndaKey, { acknowledged: false, ndaReference: "" }))
+    const tm = targetMarketKey && typeof window !== "undefined" ? localStorage.getItem(targetMarketKey) : null
+    setTargetMarketRaw(tm === "US" || tm === "UK" || tm === "EU" || tm === "other" ? tm : "UK")
+    setOutreachStateRaw(readJson<OutreachLogState>(outreachKey, {}))
+    const sla = replySlaKey && typeof window !== "undefined" ? localStorage.getItem(replySlaKey) : null
+    const slaN = sla ? parseInt(sla, 10) : NaN
+    setReplySlaDaysRaw(!Number.isNaN(slaN) && slaN >= 1 && slaN <= 30 ? slaN : 5)
+
     // Reset one-shot refs so auto-behaviour runs for the new project
     autoSelectKeyRef.current = ""
     autoMatchTriggeredRef.current = false
     buySearchTriggeredRef.current = false
-  }, [activeProjectId, storageKey, shortlistKey, rfqIdsKey, categoryRankingsKey, buySearchKey])
+  }, [activeProjectId, storageKey, shortlistKey, rfqIdsKey, categoryRankingsKey, buySearchKey, rampRolesKey, ndaKey, targetMarketKey, outreachKey, replySlaKey])
 
   // ── Screen context ──
   useRegisterScreenContext(
@@ -705,6 +847,16 @@ export default function SourcePage(): React.ReactNode {
         subject={subject}
       />
 
+      {/* ── Supply Risk Radar (always visible once suppliers shortlisted) ── */}
+      <SupplyRiskRadar
+        shortlistedSuppliers={shortlistedSuppliers}
+        categoryRankings={categoryRankings}
+        supplierMatches={supplierMatches}
+        categoryLabels={categoryLabels}
+        targetMarket={targetMarket}
+        onTargetMarketChange={setTargetMarket}
+      />
+
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -747,11 +899,40 @@ export default function SourcePage(): React.ReactNode {
       />
 
       {/* ── Tab navigation ── */}
+      {/* a11y: role=tablist + role=tab + arrow-key nav per ARIA APG */}
       <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
-        <div className="flex items-center gap-2">
-          {TABS.map((tab) => (
+        <div
+          role="tablist"
+          aria-label="Source stage sections"
+          className="flex items-center gap-2"
+        >
+          {TABS.map((tab, idx) => (
             <button
               key={tab.id}
+              id={`source-tab-${tab.id}`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`source-panel-${tab.id}`}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                  e.preventDefault()
+                  const delta = e.key === "ArrowRight" ? 1 : -1
+                  const nextIdx = (idx + delta + TABS.length) % TABS.length
+                  const nextTab = TABS[nextIdx]
+                  handleTabClick(nextTab.id)
+                  document.getElementById(`source-tab-${nextTab.id}`)?.focus()
+                } else if (e.key === "Home") {
+                  e.preventDefault()
+                  handleTabClick(TABS[0].id)
+                  document.getElementById(`source-tab-${TABS[0].id}`)?.focus()
+                } else if (e.key === "End") {
+                  e.preventDefault()
+                  const last = TABS[TABS.length - 1]
+                  handleTabClick(last.id)
+                  document.getElementById(`source-tab-${last.id}`)?.focus()
+                }
+              }}
               onClick={() => handleTabClick(tab.id)}
               className={cn(
                 "px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors",
@@ -789,7 +970,7 @@ export default function SourcePage(): React.ReactNode {
       <AnimatePresence mode="wait">
         {/* ═══ Suppliers tab ═══ */}
         {activeTab === "suppliers" && (
-          <motion.div key="suppliers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="suppliers" role="tabpanel" id="source-panel-suppliers" aria-labelledby="source-tab-suppliers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             {eligibleModules.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center">
@@ -858,7 +1039,49 @@ export default function SourcePage(): React.ReactNode {
 
         {/* ═══ Shortlist tab ═══ */}
         {activeTab === "shortlist" && (
-          <motion.div key="shortlist" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="shortlist" role="tabpanel" id="source-panel-shortlist" aria-labelledby="source-tab-shortlist" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+
+            {/* ── NDA gate: required discipline before sharing designs with suppliers ── */}
+            <NDAGate state={ndaState} onChange={setNdaState} />
+
+            {/* ── Volume ramp planner: tag suppliers proto/pilot/production ── */}
+            <VolumeRampPlanner
+              shortlistedSuppliers={shortlistedSuppliers}
+              rampRoles={rampRoles}
+              onRampRoleChange={setRampRole}
+              moqBySupplier={moqBySupplier}
+            />
+
+            {/* ── Capability interview pack trigger ── */}
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/40 border border-border">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-international-orange" />
+                  Capability interview pack
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Send this to every shortlisted supplier before awarding work. Covers MOQ, tooling, lead time, payment terms, quality &amp; compliance — with red flags to watch for in replies.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setInterviewPackSupplier(null); setInterviewPackOpen(true) }}
+                className="flex-shrink-0"
+              >
+                Open pack
+              </Button>
+            </div>
+
+            {/* ── Supplier outreach log (status tracker + stale flags) ── */}
+            <SupplierOutreachLog
+              shortlistedSuppliers={shortlistedSuppliers}
+              state={outreachState}
+              onChange={setOutreachState}
+              replySlaDays={replySlaDays}
+              onReplySlaChange={setReplySlaDays}
+            />
+
             <p className="text-xs text-muted-foreground">Click a supplier to set priority (1st → 2nd → 3rd). Top-ranked suppliers per category receive your RFQ.</p>
             <CadLabShortlist
               modules={eligibleModules}
@@ -910,7 +1133,7 @@ export default function SourcePage(): React.ReactNode {
 
         {/* ═══ Costs tab ═══ */}
         {activeTab === "costs" && (
-          <motion.div key="costs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="costs" role="tabpanel" id="source-panel-costs" aria-labelledby="source-tab-costs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             <CadLabCostEstimate
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
@@ -952,7 +1175,7 @@ export default function SourcePage(): React.ReactNode {
 
         {/* ═══ Supplier Intelligence tab ═══ */}
         {activeTab === "supplier_intelligence" && (
-          <motion.div key="supplier_intelligence" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="supplier_intelligence" role="tabpanel" id="source-panel-supplier_intelligence" aria-labelledby="source-tab-supplier_intelligence" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             <SupplierIntelligenceTab
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
@@ -963,7 +1186,7 @@ export default function SourcePage(): React.ReactNode {
 
         {/* ═══ Executive Review tab ═══ */}
         {activeTab === "executive_review" && (
-          <motion.div key="executive_review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="executive_review" role="tabpanel" id="source-panel-executive_review" aria-labelledby="source-tab-executive_review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             <ExecutiveReviewTab
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
@@ -995,6 +1218,14 @@ export default function SourcePage(): React.ReactNode {
           ),
           ...(rfqQuotes && rfqQuotes.quotes.length > 0 ? { rfqQuotes } : {}),
         }}
+      />
+
+      <CapabilityInterviewPackDialog
+        open={interviewPackOpen}
+        onOpenChange={setInterviewPackOpen}
+        productName={subject || "Your product"}
+        supplierName={interviewPackSupplier ? (shortlistedSuppliers.get(interviewPackSupplier)?.name ?? undefined) : undefined}
+        moduleNames={eligibleModules.map((m) => m.name)}
       />
     </div>
   )

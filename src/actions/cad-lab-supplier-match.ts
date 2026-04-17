@@ -67,6 +67,18 @@ export interface CadLabSupplierMatch {
     tolerance_value_mm?: number
     batch_size_range?: string
   }>
+  // INTENT: Enriched fields surfaced to Supply Risk Radar + NDA gate. Filled
+  // from marketplace_listings columns on the scoring pass.
+  country?: string | null
+  city?: string | null
+  employeeCountExact?: number | null
+  foundedYear?: number | null
+  leadTime?: string | null
+  minimumOrder?: string | null
+  exportControls?: string | null
+  securityClearances?: string[] | null
+  certifications?: string[] | null
+  websiteUrl?: string | null
 }
 
 // ─── Category Normalization Maps ────────────────────────────────────
@@ -468,7 +480,7 @@ export async function matchCadLabModuleSuppliers(
   // engine can't see enrichment data, causing weak process/material matches.
   const { data: listings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties")
+    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, city, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url")
     .in("id", [...candidateIds])
 
   const matches: CadLabSupplierMatch[] = []
@@ -568,6 +580,15 @@ export async function matchCadLabModuleSuppliers(
         if (capabilityRaw >= 0.4) reasons.push("Verified capabilities")
         if (listing.subcategory) reasons.push(listing.subcategory)
 
+        // INTENT: Coerce JSONB arrays to string[] for UI consumption.
+        // security_clearances + certifications are stored as JSONB arrays.
+        const certsArr = Array.isArray(listing.certifications)
+          ? (listing.certifications as unknown[]).filter((c): c is string => typeof c === "string")
+          : null
+        const clearancesArr = Array.isArray(listing.security_clearances)
+          ? (listing.security_clearances as unknown[]).filter((c): c is string => typeof c === "string")
+          : null
+
         matches.push({
           id: listing.id,
           name: listing.title || "Unknown Supplier",
@@ -577,6 +598,16 @@ export async function matchCadLabModuleSuppliers(
           isVerified: listing.is_verified ?? false,
           supplierType: listing.category === "Products" ? "manufacturer" : "service",
           processCapabilities: caps.length > 0 ? caps : undefined,
+          country: listing.country ?? null,
+          city: listing.city ?? null,
+          employeeCountExact: listing.employee_count_exact ?? null,
+          foundedYear: listing.founded_year ?? null,
+          leadTime: listing.lead_time ?? null,
+          minimumOrder: listing.minimum_order ?? null,
+          exportControls: listing.export_controls ?? null,
+          securityClearances: clearancesArr,
+          certifications: certsArr,
+          websiteUrl: listing.website_url ?? null,
         })
       }
     }
