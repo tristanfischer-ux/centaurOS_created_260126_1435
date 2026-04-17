@@ -768,34 +768,71 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         context={{ type: 'general', title: product.name, description: briefingContext }}
       />
 
-      {/* Tab bar */}
-      <div className="border-b border-border">
+      {/* Tab bar — WAI-ARIA tablist with arrow-key navigation */}
+      <div className="border-b border-border" role="tablist" aria-label="Product sections">
         <div className="flex gap-0 -mb-px">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => tab.enabled && setActiveTab(tab.id)}
-              disabled={!tab.enabled}
-              className={`
-                inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors
-                ${activeTab === tab.id
-                  ? 'border-international-orange text-international-orange'
-                  : tab.enabled
-                    ? 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                    : 'border-transparent text-muted-foreground/50 cursor-not-allowed'
-                }
-              `}
-            >
-              {!tab.enabled && <Lock className="h-3 w-3" />}
-              {tab.label}
-            </button>
-          ))}
+          {TABS.map((tab, i) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                id={`product-tab-${tab.id}`}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`product-tabpanel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => tab.enabled && setActiveTab(tab.id)}
+                onKeyDown={(e) => {
+                  if (!tab.enabled) return
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault()
+                    const enabledTabs = TABS.filter((t) => t.enabled)
+                    const currentIdx = enabledTabs.findIndex((t) => t.id === activeTab)
+                    const nextIdx = e.key === 'ArrowRight'
+                      ? (currentIdx + 1) % enabledTabs.length
+                      : (currentIdx - 1 + enabledTabs.length) % enabledTabs.length
+                    const nextTab = enabledTabs[nextIdx]
+                    setActiveTab(nextTab.id)
+                    // Move focus to the newly active tab so arrow nav keeps flowing.
+                    document.getElementById(`product-tab-${nextTab.id}`)?.focus()
+                  } else if (e.key === 'Home') {
+                    e.preventDefault()
+                    const first = TABS.find((t) => t.enabled)
+                    if (first) { setActiveTab(first.id); document.getElementById(`product-tab-${first.id}`)?.focus() }
+                  } else if (e.key === 'End') {
+                    e.preventDefault()
+                    const enabledTabs = TABS.filter((t) => t.enabled)
+                    const last = enabledTabs[enabledTabs.length - 1]
+                    if (last) { setActiveTab(last.id); document.getElementById(`product-tab-${last.id}`)?.focus() }
+                  }
+                }}
+                disabled={!tab.enabled}
+                className={`
+                  inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors
+                  ${isActive
+                    ? 'border-international-orange text-international-orange'
+                    : tab.enabled
+                      ? 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                      : 'border-transparent text-muted-foreground/50 cursor-not-allowed'
+                  }
+                `}
+              >
+                {!tab.enabled && <Lock className="h-3 w-3" aria-hidden="true" />}
+                {tab.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
       {/* Tab content: Overview */}
       {activeTab === 'overview' && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div
+          className="grid gap-6 lg:grid-cols-3"
+          role="tabpanel"
+          id="product-tabpanel-overview"
+          aria-labelledby="product-tab-overview"
+        >
           {/* Main column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Hero image */}
@@ -1217,7 +1254,12 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
 
       {/* Tab content: Market */}
       {activeTab === 'market' && (
-        <div className="space-y-6">
+        <div
+          className="space-y-6"
+          role="tabpanel"
+          id="product-tabpanel-market"
+          aria-labelledby="product-tab-market"
+        >
           {/* Header with action button */}
           <div className="flex items-center justify-between">
             <div>
@@ -1815,7 +1857,12 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
 
       {/* Tab content: Economics */}
       {activeTab === 'economics' && (
-        <div className="space-y-6">
+        <div
+          className="space-y-6"
+          role="tabpanel"
+          id="product-tabpanel-economics"
+          aria-labelledby="product-tab-economics"
+        >
           {/* Price & Volume */}
           <Card>
             <CardContent className="pt-6 space-y-4">
@@ -1923,7 +1970,12 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
 
       {/* Tab content: Fundability */}
       {activeTab === 'fundability' && (
-        <div className="space-y-6">
+        <div
+          className="space-y-6"
+          role="tabpanel"
+          id="product-tabpanel-fundability"
+          aria-labelledby="product-tab-fundability"
+        >
           {/* Score Overview */}
           <Card>
             <CardHeader>
@@ -2098,7 +2150,12 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
 
       {/* Tab content: History */}
       {activeTab === 'history' && (
-        <div className="space-y-6">
+        <div
+          className="space-y-6"
+          role="tabpanel"
+          id="product-tabpanel-history"
+          aria-labelledby="product-tab-history"
+        >
           {/* Synthesis Overview */}
           <Card>
             <CardHeader>

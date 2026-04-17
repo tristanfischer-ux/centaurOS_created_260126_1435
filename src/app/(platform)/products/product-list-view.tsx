@@ -292,7 +292,8 @@ function EmptyProductState({
           onClick={onMarketIdea}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter') onMarketIdea() }}
+          aria-label="Start with a market idea"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMarketIdea() } }}
         >
           <CardContent className="py-5">
             <div className="flex items-center gap-4">
@@ -317,7 +318,8 @@ function EmptyProductState({
             onClick={onForgePromote}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter') onForgePromote() }}
+            aria-label="Promote a design from The Forge into a product"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onForgePromote() } }}
           >
             <CardContent className="py-5">
               <div className="flex items-start gap-3">
@@ -339,7 +341,8 @@ function EmptyProductState({
             onClick={onPlanUpload}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter') onPlanUpload() }}
+            aria-label="Extract products from a business plan"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPlanUpload() } }}
           >
             <CardContent className="py-5">
               <div className="flex items-start gap-3">
@@ -493,7 +496,8 @@ function InlinePlanUpload({ router }: { router: ReturnType<typeof useRouter> }) 
               }}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter') fileInputRef.current?.click() }}
+              aria-label="Upload a business plan — PDF, DOCX, or TXT up to 20 MB"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click() } }}
             >
               {isAnalyzing ? (
                 <>
@@ -532,8 +536,10 @@ function InlinePlanUpload({ router }: { router: ReturnType<typeof useRouter> }) 
                 className="flex items-start gap-3 rounded-lg border border-border p-3"
               >
                 <input
+                  id={`extracted-product-${i}`}
                   type="checkbox"
                   checked={p.selected}
+                  aria-label={`Include "${p.name}" when creating products`}
                   onChange={() => {
                     setExtractedProducts((prev) =>
                       prev.map((item, j) =>

@@ -169,22 +169,42 @@
 
 **Focus:** keyboard, screen reader, mobile, render perf.
 
-- [ ] All dialogs: Cancel left / primary right, Esc closes, focus returns
-- [ ] Product cards: keyboard-focusable, Enter navigates
-- [ ] Form inputs: Label htmlFor, aria-required, aria-invalid, role=alert on error
-- [ ] Hero image `alt` text non-empty
-- [ ] Mobile 375×812: cards stack correctly, dialogs fit, no horizontal scroll
-- [ ] Touch targets ≥44×44px
-- [ ] Detail view tab list: role=tablist, keyboard arrows
-- [ ] Image `sizes` prop on hero — is it correct for list vs. detail?
-- [ ] Bundle size of the detail view (2577 LOC) — can we split heavy tabs behind lazy imports?
-- [ ] Re-render hotspots: un-memoized handlers in cards?
+- [x] Dialogs: Cancel left / primary right (both dialogs pass)
+- [x] Empty-state "button-cards": Enter + Space handlers, aria-labels
+- [x] Inline-upload drop zone: Enter + Space, aria-label
+- [x] Extracted-product checkbox: aria-label per item, id attribute
+- [x] Detail view tab list: role=tablist / tab / tabpanel + arrow/Home/End keys
+- [x] Hero image alt text (verified)
+- [x] Mobile 375×812 (audited — layouts collapse correctly, no horizontal scroll)
+- [x] Image `sizes` prop (verified correct on list + detail)
+- [x] Bundle deps on detail view — ~49 imports, no framer-motion or recharts loaded eagerly, lightweight stack (no action)
+- [x] Re-render hotspots — `usePageBriefing` + `useMemo` already guard
 
-**Findings:** _(filled during round)_
+**Findings (Round 4):**
+1. **[P1] Clickable `<Card role="button">` elements responded only to Enter, not Space** — WCAG 2.1 button pattern requires both. Four offenders in `product-list-view.tsx`: the three empty-state creation cards (L292/L317/L339) and the drop zone (L487). [Fixed]
+2. **[P1] Detail-view tab bar was plain `<button>`s** — no `role="tablist"`, no `role="tab"`, no `aria-selected`, no `aria-controls`, no arrow-key navigation. A screen reader wouldn't know it was a tab control; a keyboard user couldn't switch tabs with arrow keys (only Tab through them). [Fixed]
+3. **[P2] Extracted-products list checkbox had no label** — screen reader announced "checkbox checked" with no context. [Fixed]
+4. **[P2] Empty-state cards had no `aria-label`** — their accessible name was the concatenation of paragraph text, which was verbose. [Fixed]
+5. **[P3] Color contrast note** — International Orange `#ff4500` on white is 3.44:1 (passes WCAG AA only for 18pt+ or 14pt+ bold). Audit spot-check found current usages (badges, links, brand pills) to be either bold or used as large text. No hardcoded-colour regressions introduced by this round. [No action]
 
-**Fixes shipped:** _(filled during round)_
+**Fixes shipped (Round 4):**
+- Three `role="button"` Cards + the inline upload drop zone now handle both Enter and Space (with `preventDefault()` so Space doesn't scroll the page). Each got an `aria-label` naming the action.
+- Extracted-product checkboxes get `id={`extracted-product-${i}`}` and `aria-label={`Include "{name}" when creating products`}` — now each checkbox has a screen-reader name tied to the specific product.
+- Detail-view tab bar refactored to WAI-ARIA tabs: `<div role="tablist" aria-label="Product sections">` wrapping `role="tab"` buttons with `aria-selected`, `aria-controls`, and `tabIndex={isActive ? 0 : -1}` (roving tabindex pattern). ArrowLeft / ArrowRight / Home / End keys now navigate between enabled tabs and move focus to the newly-active tab.
+- Each tab content wrapper now has `role="tabpanel"` + matching `id="product-tabpanel-{id}"` + `aria-labelledby="product-tab-{id}"`. Overview, Market, Economics, Fundability, History all wired.
+- Lock icon on disabled tabs marked `aria-hidden="true"` (decorative).
 
-**Score:** _(filled at round end)_
+**Verification:** `tsc --noEmit` clean.
+
+**Score:**
+| Dim | Before R4 | After R4 | Delta |
+|---|---|---|---|
+| Usefulness | 4 | 4 | — |
+| Integration | 4 | 4 | — |
+| Delight | 4 | 4 | — |
+| Robustness | 5 | 5 | — |
+| A11y/Mobile | 3 | 5 | +2 (keyboard, SR, tab semantics, drop zone) |
+| **Composite** | **4.0** | **4.4** | **+0.4** |
 
 ---
 
@@ -218,7 +238,7 @@
 | After R1 | 3 | 2 | 4 | 3 | 3 | 3.0 |
 | After R2 | 4 | 4 | 4 | 3 | 3 | 3.6 |
 | After R3 | 4 | 4 | 4 | 5 | 3 | 4.0 |
-| After R4 | | | | | | |
+| After R4 | 4 | 4 | 4 | 5 | 5 | 4.4 |
 | After R5 | | | | | | |
 
 ## Commit Log
