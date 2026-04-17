@@ -1069,32 +1069,41 @@ export async function refreshCadLabAssetUrlAction(
   })
 }
 
+/** Axis of symmetry for a mirror pair. */
+export type MirrorAxis = 'horizontal' | 'vertical'
+
 /**
  * Generates the mirror-image variant of a primary module's illustration by
- * horizontally flipping it (left-right axis) and uploading it as the mirror
+ * flipping it along the requested axis and uploading it as the mirror
  * module's own asset in the xray-images bucket.
  *
- * @description Paired modules like "Left Wing" / "Right Wing" should render
- * as mirror images of each other. Previously the pipeline reused the primary
- * image URL verbatim, which made left/right cards visually identical. This
- * action produces a true horizontal mirror and persists it so downstream
- * consumers (PDF export, public share links, caching) get the correct image
- * without any render-time transform.
+ * @description Paired modules like "Left Wing" / "Right Wing" (horizontal),
+ * or "Upper Deck" / "Lower Deck" (vertical), should render as mirror images
+ * of each other. Previously the pipeline reused the primary image URL
+ * verbatim, which made paired cards visually identical. This action produces
+ * a true axis-correct mirror and persists it so downstream consumers (PDF
+ * export, public share links, caching) get the correct image without any
+ * render-time transform.
  *
- * sharp.flop() = flip about the vertical axis (left↔right swap), which is
- * the semantically correct mirror for port/starboard pairs. sharp.flip() is
- * the vertical axis flip (top↔bottom) — not what we want here.
+ * Axis mapping:
+ * - horizontal (default) → sharp.flop() — swaps left↔right about the vertical
+ *   axis. Use for Left/Right and Port/Starboard pairs.
+ * - vertical             → sharp.flip() — swaps top↔bottom about the
+ *   horizontal axis. Use for Upper/Lower and Top/Bottom pairs.
  *
  * @param projectId - Owning CAD Lab project (storage namespace)
  * @param mirrorModuleId - ID of the module whose asset we're writing to
  * @param primaryImageUrl - Supabase storage URL of the already-generated
- *   primary (Left) image to be mirrored
+ *   primary image to be mirrored
+ * @param axis - Axis of symmetry (defaults to 'horizontal' for back-compat)
  * @returns New public URL for the mirrored asset, or an error string
  */
 export async function flipCadLabImageForMirrorAction(
   projectId: string,
   mirrorModuleId: string,
   primaryImageUrl: string,
+  axis: MirrorAxis = 'horizontal',
+  mirrorModuleName?: string,
 ): Promise<{ imageUrl: string } | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
@@ -1113,6 +1122,34 @@ export async function flipCadLabImageForMirrorAction(
       return { error: "Invalid mirror module id" }
     }
 
+    if (axis !== 'horizontal' && axis !== 'vertical') {
+      return { error: `Invalid mirror axis: ${axis}` }
+    }
+
+    // Server-side defence-in-depth: if the mirror module's NAME starts
+    // with a vertical-axis directional prefix (Upper/Lower/Top/Bottom)
+    // but the caller sent axis='horizontal', override to vertical.
+    // Client-side axis resolution has historically been lossy — stale
+    // bundles, React batching quirks, and server-action arg transmission
+    // all produced the wrong axis. Deriving from the explicit name
+    // parameter makes the server's decision independent of how the
+    // client packaged the axis argument.
+    let effectiveAxis: MirrorAxis = axis
+    if (mirrorModuleName) {
+      const nameLc = mirrorModuleName.trim().toLowerCase()
+      if (/^(lower|bottom|upper|top)\s/.test(nameLc)) {
+        if (effectiveAxis !== 'vertical') {
+          console.warn(`[CAD-LAB-IMAGES] Overriding axis to vertical for name="${mirrorModuleName}" (caller sent ${axis})`)
+          effectiveAxis = 'vertical'
+        }
+      } else if (/^(left|right|port|starboard)\s/.test(nameLc)) {
+        if (effectiveAxis !== 'horizontal') {
+          console.warn(`[CAD-LAB-IMAGES] Overriding axis to horizontal for name="${mirrorModuleName}" (caller sent ${axis})`)
+          effectiveAxis = 'horizontal'
+        }
+      }
+    }
+
     try {
       const resp = await fetchWithTimeout(primaryImageUrl, {}, 15000)
       if (!resp.ok) {
@@ -1125,7 +1162,10 @@ export async function flipCadLabImageForMirrorAction(
       // even when the caller is only hitting generateCadLabSingleImageAction.
       const sharpModule = await import("sharp")
       const sharp = sharpModule.default
-      const flippedBuf = await sharp(inputBuf).flop().png().toBuffer()
+      const pipeline = sharp(inputBuf)
+      const flippedBuf = await (
+        effectiveAxis === 'vertical' ? pipeline.flip() : pipeline.flop()
+      ).png().toBuffer()
 
       const admin = createAdminClient()
       const destPath = `${projectId}/module-${mirrorModuleId}.png`

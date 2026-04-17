@@ -2387,7 +2387,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         toast.info(`Mirroring ${mod.name} (${axis})`, { duration: 2000 })
         let stepLabel = `${mod.name} (${axis} mirror)`
         try {
-          const flipRes = await flipCadLabImageForMirrorAction(projectId, mod.id, primaryImage.url, axis)
+          const flipRes = await flipCadLabImageForMirrorAction(projectId, mod.id, primaryImage.url, axis, mod.name)
           if ('imageUrl' in flipRes) {
             mirroredUrl = flipRes.imageUrl
             console.log(`[CAD-LAB] Flipped primary ${primaryId} → mirror ${mod.id} (${axis})`)
