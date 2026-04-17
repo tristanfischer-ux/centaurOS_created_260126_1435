@@ -531,15 +531,18 @@ export default function SpecifyPage(): React.ReactNode {
 
   const [activeTab, setActiveTab] = useState("overview")
 
-  // INTENT: Read tab from URL after hydration — avoids React #418.
-  // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
+  // INTENT: Sync activeTab with the URL ?tab=... param.
+  // - `useState` starts with "overview" (hydration-safe default, avoids React #418).
+  // - This effect runs on mount AND whenever searchParams change — so browser
+  //   back/forward navigation (which keeps this component mounted but advances
+  //   the URL) updates the active tab too. Without the [searchParams] dep the
+  //   back button moved the URL but left the page on the old tab.
   useEffect(() => {
     const param = searchParams.get("tab")
     if (param && TABS.some((t) => t.id === param)) {
       setActiveTab(param)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams])
 
   const handleTabClick = useCallback(
     (tabId: string) => {
@@ -548,7 +551,7 @@ export default function SpecifyPage(): React.ReactNode {
       params.set("tab", tabId)
       router.replace(`?${params.toString()}`, { scroll: false })
     },
-    [router, searchParams],
+    [router, searchParams, setActiveTab],
   )
 
   // ── Screen context for specialists ──
