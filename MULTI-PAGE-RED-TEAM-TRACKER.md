@@ -172,6 +172,25 @@ Per-page composite rubric score recorded. Rubric:
 
 **Founder-impact note:** A founder who clicked "Schedule" expected weekly reports to start arriving. They weren't. Now the button is gone until the feature ships for real — honest surface over sketchy feature theatre. The report-generation flow itself is strong: Cal's briefing + template picker + generate → 6-step progress bar → export to PDF/DOCX/PPTX or share.
 
+### 5. Cash Burn — `/cash-burn`
+
+**Founder question:** *"How long until I run out of money? What can I change?"*
+
+**Pass A findings:**
+1. **[P2]** "Runway: Sustainable" rendered when the founder has entered **zero data** (zero cash-out rows AND zero cash-in rows). That's a lie — with no data we don't know if they're sustainable, they could be months from insolvency. `cash-burn-view.tsx:357`. [Fixed]
+2. **[P2 A11y]** Three scenario-panel range sliders (`revenue-delay`, `cost-delay`, `revenue-growth`) had `aria-label` but no `aria-valuetext`. Screen-reader users hear the slider but not the chosen value change as they drag. [Fixed]
+3. **[P1 architectural]** Cash Burn data is **siloed** from Products (COGS / monthly revenue forecast), Objectives (planned hiring / capex), Orders (actual revenue). Founder has to copy numbers across three surfaces. Architectural — needs a sync layer or at least a "seed from Products" button. [Deferred to backlog — too big for overnight]
+4. **[Audit false-positive]** `formatCurrency` callsite type safety — I verified: cash-burn-view uses pence consistently for pence-valued helpers (formatCurrency expects pence). No bug.
+5. **[Audit confirmed]** All burn-engine edge cases already handled — divide-by-zero guards on `rows.length`, negative-revenue-growth guard via `growthBase > 0`, negative-balance flagging in weekly grid.
+
+**Pass B shipped:**
+- `cash-burn-view.tsx:354-368`: Runway now distinguishes "No data yet" (no cash-in AND no cash-out rows) from "Sustainable" (actually net-positive over 52 weeks). A founder with an empty projection sees a call to action instead of a false-positive green light.
+- `scenario-panel.tsx:181-237`: Added `aria-valuetext` to all three sliders (revenue delay, cost delay, revenue growth). Handles singular/plural for weeks and always includes the sign for growth percentage.
+
+**Score:** Utility 5 (runway + burn + cash-zero all above the fold in <3s) / Integration 2 (silos with Products, Objectives, Orders — architectural gap) / Voice 5 / Robustness 5 (was 4, fixed the no-data edge) / A11y 5 (was 4, fixed sliders) → **Composite 4.4**.
+
+**Founder-impact note:** A first-time user landing on an empty Cash Burn page used to see "Runway: Sustainable" — a comforting lie for an empty projection. Now it says "Runway: No data yet", prompting the founder to enter cash-in / cash-out rows. Screen-reader users can now hear slider values change as they drag. The bigger win (auto-sync from Products / Orders / Objectives) is on the backlog.
+
 
 ## Deferred / backlog
 

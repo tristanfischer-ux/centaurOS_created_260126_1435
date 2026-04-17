@@ -354,7 +354,12 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         {
           label: 'Runway',
           tooltip: 'How many weeks your current cash will last at the current burn rate.',
-          value: projection.runwayWeeks === null ? 'Sustainable' : `${projection.runwayWeeks} weeks`,
+          // INTENT: Distinguish "no data entered" from "net-positive over 52 weeks".
+          // Saying "Sustainable" when the founder hasn't entered anything is
+          // misleading — they could be a month from insolvency and not know it.
+          value: cashOut.length === 0 && cashIn.length === 0
+            ? 'No data yet'
+            : projection.runwayWeeks === null ? 'Sustainable' : `${projection.runwayWeeks} weeks`,
           detail: projection.runwayWeeks !== null && projection.runwayWeeks > 0
             ? `~${Math.round(projection.runwayWeeks / 4.33)} months`
             : undefined,

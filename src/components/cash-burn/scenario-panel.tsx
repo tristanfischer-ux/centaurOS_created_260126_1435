@@ -182,6 +182,7 @@ export function ScenarioPanel({
             id="revenue-delay"
             type="range"
             aria-label="Revenue delay in weeks"
+            aria-valuetext={`${revenueDelay} ${Math.abs(revenueDelay) === 1 ? 'week' : 'weeks'}`}
             min={-4}
             max={26}
             step={1}
@@ -205,6 +206,7 @@ export function ScenarioPanel({
             id="cost-delay"
             type="range"
             aria-label="Cost delay in weeks"
+            aria-valuetext={`${costDelay} ${Math.abs(costDelay) === 1 ? 'week' : 'weeks'}`}
             min={-4}
             max={26}
             step={1}
@@ -228,6 +230,7 @@ export function ScenarioPanel({
             id="revenue-growth"
             type="range"
             aria-label="Revenue growth percentage"
+            aria-valuetext={`${revenueGrowth > 0 ? '+' : ''}${revenueGrowth}%`}
             min={-50}
             max={200}
             step={5}
