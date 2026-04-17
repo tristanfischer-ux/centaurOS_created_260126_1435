@@ -963,9 +963,26 @@ export default function CadLabResearchPage(): React.ReactNode {
                       <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
                         <div className="flex flex-col items-center gap-3 text-center px-6">
                           <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
-                          <span className="text-xs text-muted-foreground">
-                            System illustration will appear here after decomposition
-                          </span>
+                          {modules.length > 0 && !systemIllustrationUrl ? (
+                            <>
+                              <span className="text-xs text-muted-foreground">
+                                Concept illustration not yet generated for this project.
+                              </span>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleRetryIllustration}
+                                className="text-xs gap-1.5"
+                              >
+                                <ImageIcon className="h-3.5 w-3.5" />
+                                Generate concept illustration
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              System illustration will appear here after decomposition
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Card>

@@ -648,6 +648,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // can auto-chain drawing regen without a forward-reference TDZ issue in deps.
   const regenDrawingsRef = useRef<(() => Promise<void>) | null>(null)
 
+  // INTENT: Ref for handleRetryIllustration so handleRefreshModuleImages can
+  // trigger hero generation when the system illustration is missing, without
+  // taking a forward reference on a callback declared later in the file.
+  const retryIllustrationRef = useRef<(() => void) | null>(null)
+
   // ── Specialist reviews (lifted from Build/Specify pages for persistence) ──
   const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
   const [pendingReviewKeys, setPendingReviewKeys] = useState<Set<string>>(new Set())
@@ -1934,6 +1939,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // Hoisted so the finally block can clean up leaked timers on unexpected throw
     const moduleTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
+    // INTENT: Track image field updates per module as generation progresses.
+    // Each setModules call inside generateOne also writes into this map, so the
+    // final save can overlay known image data onto modulesRef.current. Without
+    // this, the save reads modulesRef immediately after the last setModules —
+    // React has not re-rendered yet, the useEffect ref sync has not fired, and
+    // the last module's imageUrl/imageStatus is lost to the DB write. This
+    // matches Rule 10 in cad-lab-react-patterns.md (sync refs after setState
+    // in async functions), but uses an explicit overlay instead of touching
+    // the ref directly so we never race a concurrent setModules writer.
+    const imageUpdates = new Map<string, Partial<CadLabModule>>()
+
     try {
     // Immediately set all modules to "generating" image status in local state
     setModules((prev) =>
@@ -2031,9 +2047,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const moduleCrop = moduleCrops?.get(mod.id)
         const res = await generateCadLabSingleImageAction(projectId, slimMod, effectiveVisualStyle, effectiveReference, moduleCrop)
         if ("imageStatus" in res) {
-          setModules((prev) =>
-            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.imageUrl, imageStatus: res.imageStatus, imageError: res.imageError, imageModelUsed: res.imageModelUsed } : m)),
-          )
+          const update: Partial<CadLabModule> = {
+            imageUrl: res.imageUrl,
+            imageStatus: res.imageStatus,
+            imageError: res.imageError,
+            imageModelUsed: res.imageModelUsed,
+          }
+          imageUpdates.set(mod.id, update)
+          setModules((prev) => prev.map((m) => (m.id === mod.id ? { ...m, ...update } : m)))
           if (res.imageStatus === "complete") {
             completedCount++
             setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
@@ -2045,9 +2066,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
           }
         } else if ("error" in res) {
-          setModules((prev) =>
-            prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: res.error } : m)),
-          )
+          const update: Partial<CadLabModule> = { imageStatus: "failed" as const, imageError: res.error }
+          imageUpdates.set(mod.id, update)
+          setModules((prev) => prev.map((m) => (m.id === mod.id ? { ...m, ...update } : m)))
           setImageGenProgress(p => p ? { ...p, completed: p.completed + 1, failed: p.failed + 1 } : p)
           // INTENT: Show actual error on first failure so user can diagnose
           if (res.error && completedCount === 0) {
@@ -2058,9 +2079,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Image generation failed"
         console.error(`[CAD-LAB] Image generation failed for ${mod.name}:`, err)
-        setModules((prev) =>
-          prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: errorMsg } : m)),
-        )
+        const update: Partial<CadLabModule> = { imageStatus: "failed" as const, imageError: errorMsg }
+        imageUpdates.set(mod.id, update)
+        setModules((prev) => prev.map((m) => (m.id === mod.id ? { ...m, ...update } : m)))
         setImageGenProgress(p => p ? { ...p, completed: p.completed + 1, failed: p.failed + 1 } : p)
         revealModule(mod.id)
       }
@@ -2125,9 +2146,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // instead of making another API call. Saves cost and guarantees visual consistency.
       if (primaryImage) {
         console.log(`[CAD-LAB] Reusing image from primary ${primaryId} for mirror ${mod.id}`)
-        setModules((prev) =>
-          prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: primaryImage.url, imageStatus: "complete" as const, imageModelUsed: primaryImage.model } : m)),
-        )
+        const update: Partial<CadLabModule> = {
+          imageUrl: primaryImage.url,
+          imageStatus: "complete" as const,
+          imageModelUsed: primaryImage.model,
+        }
+        imageUpdates.set(mod.id, update)
+        setModules((prev) => prev.map((m) => (m.id === mod.id ? { ...m, ...update } : m)))
         completedCount++
         setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
         updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 89), stepLabel: `${mod.name} (mirrored)` })
@@ -2153,10 +2178,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     // INTENT: Auto-retry failed modules once with backoff. Skip if ALL failed
     // (systemic issue like missing API key — retrying won't help).
-    let retrySnapshot: CadLabModule[] = []
-    setModules((current) => { retrySnapshot = current; return current })
+    // GOTCHA: Read failures from imageUpdates, not a setModules(updater)
+    // snapshot — the updater pattern is deferred by React 18 batching and
+    // yields an empty array (Rule 9 in cad-lab-react-patterns.md).
     const failedModules = modulesToProcess.filter(mod =>
-      retrySnapshot.find(m => m.id === mod.id)?.imageStatus === "failed"
+      imageUpdates.get(mod.id)?.imageStatus === "failed"
     )
     if (failedModules.length > 0 && failedModules.length < modulesToProcess.length) {
       setImageGenProgress({ completed: 0, total: failedModules.length, failed: 0, phase: "retrying" })
@@ -2176,11 +2202,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
     }
 
-    // Final persist — use ref to read current modules synchronously.
-    // GOTCHA: The previous approach used setModules(updater) to extract state,
-    // but React 18 automatic batching defers the updater, so snapshot was []
-    // and we overwrote valid modules with an empty array.
-    const snapshot = modulesRef.current
+    // Final persist — overlay the local imageUpdates map onto modulesRef.current.
+    // GOTCHA: Reading modulesRef.current immediately after the last setModules
+    // call yields a stale snapshot because useEffect ref sync only fires after
+    // render, and there is no await between the final setModules and this save
+    // (the main loop's 500ms yield only runs if i < orderedModules.length - 1).
+    // The overlay pattern guarantees every image-update we have dispatched is
+    // present in the save, regardless of React flush timing.
+    const baseSnapshot = modulesRef.current
+    const snapshot = baseSnapshot.length > 0
+      ? baseSnapshot.map((m) => {
+          const update = imageUpdates.get(m.id)
+          return update ? { ...m, ...update } : m
+        })
+      : baseSnapshot
+    // Sync the ref so any caller who reads it immediately after this function
+    // (e.g. handleDecompose's final save) sees the image fields we just wrote.
+    modulesRef.current = snapshot
     if (snapshot.length > 0) {
       saveCadLabModules(projectId, JSON.stringify(snapshot))
         .then((res) => {
@@ -2269,13 +2307,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // the user's refined manufacturing/material choices.
   const handleRefreshModuleImages = useCallback(async () => {
     if (modules.length === 0) return
+    // INTENT: If the system illustration (hero) was never generated for this
+    // project, chain hero generation first via the ref-pinned
+    // handleRetryIllustration — that helper persists the new URL and then
+    // regenerates any failed/pending module images against the fresh hero,
+    // which is what a user clicking "Generate Illustrations" with no hero
+    // expects. A ref sidesteps the forward-reference issue (handleRetry-
+    // Illustration is declared further down the file).
+    if (!systemIllustrationUrl) {
+      retryIllustrationRef.current?.()
+      return
+    }
     await handleGenerateModuleImages(
       modules,
       activeProjectId ?? undefined,
       visualStyle ?? undefined,
       undefined,                           // no referenceBase64 — upload will handle it
       undefined,                           // no moduleCrops — refresh doesn't re-analyze hero
-      systemIllustrationUrl ?? undefined,   // hero URL for upload-failure fallback
+      systemIllustrationUrl,                // hero URL for upload-failure fallback
     )
   }, [modules, activeProjectId, visualStyle, systemIllustrationUrl, handleGenerateModuleImages])
 
@@ -2919,6 +2968,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
       })
   }, [activeProjectId, subject, modules, visualStyle, handleGenerateModuleImages])
+
+  // Sync ref so handleRefreshModuleImages can trigger hero gen without a TDZ
+  // forward reference. See retryIllustrationRef declaration above.
+  retryIllustrationRef.current = handleRetryIllustration
 
   // ── Research ──
   const handleResearch = useCallback(async () => {

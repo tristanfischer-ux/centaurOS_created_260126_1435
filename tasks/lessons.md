@@ -22,6 +22,54 @@ RELATED: [files or patterns]
 
 <!-- Add lessons below this line -->
 
+## 2026-04-17 - RULE: `useState(() => localStorage.getItem(key-${id}))` doesn't re-run when `id` changes
+
+**NEVER** initialise per-entity state from `useState(() => readLocalStorage(key-${entityId}))` without also wiring an effect that rehydrates when `entityId` changes. `useState` initialisers run ONCE per component mount. If the key is parameterised on something that can change without a remount (like an `activeProjectId` from a hoisted context), the stored data from the OLD entity remains in memory, and the next write-wrapper happily persists it under the NEW key — corrupting the new entity's storage.
+
+**ALWAYS** pair the initialiser with a `useEffect` keyed on the entity id: when it changes, re-read every `useState` that's backed by that key, reset one-shot refs (auto-trigger flags), and clear any derived state.
+
+**REASON:** ForgeOS Source page had 5 `useState` initialisers reading `localStorage[key-${activeProjectId}]`. Switching projects via the CAD Lab context (no route change → no remount) kept Project A's matches in state, and the setter wrappers then wrote those matches into Project B's localStorage bucket. Silent cross-project data corruption.
+
+**RELATED:** `src/app/(platform)/the-forge/cad-lab/source/page.tsx` — rehydrate effect keyed on activeProjectId (commit d9960656).
+
+---
+
+## 2026-04-17 - RULE: Actions with client-supplied `projectId` + `createAdminClient()` MUST verify foundry ownership
+
+**NEVER** let a server action accept a `projectId: string` from the client and pass it to `createAdminClient()` (which bypasses RLS) without first confirming the caller's foundry owns that project. A logged-in user from foundry A can otherwise pass a projectId owned by foundry B and (a) burn foundry A's AI quota writing into foundry B's storage, or (b) overwrite files in foundry B's `<bucket>/<projectId>/` namespace.
+
+**ALWAYS** call `ensureCadLabProjectOwnership(supabase, projectId, foundryId)` at the top of every such action. The helper lives at `src/lib/cad-lab/project-ownership.ts` and uses the RLS client (not admin) so the caller must themselves be permitted to see the project — any mismatch returns "Project not found" (not "Forbidden", to avoid enumeration oracle).
+
+**REASON:** `cad-lab-images.ts` had 5 actions (uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction, generateCadLabSingleImageAction, generateCadLabModuleImagesAction, generateCadLabSystemIllustrationAction) taking `projectId` through `withAIGate` (auth-checked) but then using `createAdminClient()` / calling helpers that used the admin client, with no cross-check that the caller's foundry owned the project. Fixed in commit fa55e31c.
+
+**RELATED:** `src/actions/cad-lab-images.ts`, `src/lib/cad-lab/project-ownership.ts`.
+
+---
+
+## 2026-04-17 - RULE: Gate consolidation — every "continue" CTA for a stage must evaluate the SAME gate expression
+
+**NEVER** let two CTAs advance the user to the next stage with different gate conditions. If the page has a header "Continue" button AND an inline "Continue" button, they must both read the single source-of-truth boolean.
+
+**ALWAYS** compute the gate as a single named constant at the top of the component (e.g. `canProceedToSource`) and reference it from every advance CTA, including the one in the `useStageBriefing` hook's `enabled` condition.
+
+**REASON:** Specify page had `canProceedToSource = allDiagnosticsComplete && (allModulesReviewed || reviewSkipped)` (header button) but the inline review-tab CTA additionally required `!imagesStale && !isRegeneratingImages`. Users could bypass the stronger gate by clicking the header, landing on Source with stale illustrations. Fixed in commit d9960656.
+
+**RELATED:** `src/app/(platform)/the-forge/cad-lab/specify/page.tsx:388-399`.
+
+---
+
+## 2026-04-17 - RULE: Multi-step gates must have an escape hatch when upstream can fail permanently
+
+**NEVER** gate a terminal CTA behind a condition that's set by a potentially-failing async pipeline with no user-driven override. Example: `imagesStale` is set by a failed regeneration pipeline — if the pipeline keeps failing (API outage, quota), the user is trapped with no CTA.
+
+**ALWAYS** provide an explicit "skip / mark current" action when the gate can realistically stay unsatisfied. UX: primary button retries; secondary ghost button acknowledges the drift and proceeds anyway after a confirm.
+
+**REASON:** Specify review-tab CTA required `!imagesStale`. When `finalCompleted === 0` after image regen retries, `imagesGeneratedAtRevision` stayed behind `designRevision`, so `imagesStale` stayed true forever and the review tab showed no CTA at all — a dead-end UI. Fix: added `markImagesCurrentManually` context action + a "Drawings out of date" card on the review tab with "Regenerate" + "Skip & continue" choices. Commit d9960656.
+
+**RELATED:** `src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx` (markImagesCurrentManually), `specify/page.tsx` (stale-drawings card).
+
+---
+
 ## 2026-04-17 - RULE: Do not gate recovery UI on upstream success if the recovery action does not strictly depend on it
 
 **NEVER** hide a "Generate" / "Retry" / "Resume" button behind a flag like `heroReady` unless the button's action genuinely cannot run without that upstream state. Otherwise a failure upstream silently strands the user at the downstream step with no path forward.
@@ -226,3 +274,15 @@ NEVER: `saveFoo(...).then(() => setSaved()).catch(err => log(err))` — server a
 ALWAYS: Inside .then(), inspect `"error" in res` and surface a toast/log before treating it as success.
 REASON: The image pipeline's final save surfaced no warning when saveCadLabModules returned { error }, compounding the root cause above — users had no signal that save had failed silently.
 RELATED: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx line ~2183
+
+### 2026-04-17 (afternoon) - RULE: Never read `modulesRef.current` immediately after the LAST `setModules` call in a batch inside the SAME function
+NEVER: `for (...) { ...setModules(...) } ; const snapshot = modulesRef.current ; save(snapshot)` — the ref is synced via `useEffect(() => { modulesRef.current = modules }, [modules])`, which only fires after React renders. A loop with an `await`/`setTimeout` between iterations flushes the ref for all iterations EXCEPT the last — after the last `setModules`, no yield occurs before the save line, so the ref is stale by at least one update. Related anti-pattern: `let snap; setModules((cur) => { snap = cur; return cur })` — React 18 defers the updater, so `snap` stays at its declaration value.
+ALWAYS: Track per-item updates in a local `Map<id, Partial<State>>` as you dispatch them, then at save time overlay the map onto `modulesRef.current` to produce a deterministic snapshot. Also sync `modulesRef.current = snapshot` after overlay so later callers see the merged state.
+REASON: `handleGenerateModuleImages` saved stale module data after the last image generation — the last module's `imageUrl`/`imageStatus` was missing from the JSONB write, so on reload the UI showed "queued" for that module despite the PNG existing in storage. The broken retry-detection (Rule 9 anti-pattern on line 2157) hid this behind an "auto-retry" that silently skipped everything. Fixed afternoon of 2026-04-17.
+RELATED: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx handleGenerateModuleImages; cad-lab-react-patterns.md Rules 9 & 10
+
+### 2026-04-17 (afternoon) - RULE: Any "do step N" button must chain step N-1 when N-1's artifact is missing and no other UI produces it
+NEVER: Ship a "Generate X" button that assumes an upstream artifact (hero image, report, embedding) already exists when the UI offers no other path from the current project state to produce that artifact. Users get stuck in a trap: they click the button, nothing happens (or only a partial result appears), and they have no discoverable way forward.
+ALWAYS: Check the full pre-conditions in the button's handler. If an upstream is missing AND the artifact is required AND no other UI path triggers the upstream, chain the upstream first. If the upstream callback is declared later in the same Provider, pin it to a ref (`retryIllustrationRef.current = handleRetryIllustration`) and call it via the ref to sidestep TDZ forward references.
+REASON: After the morning heroReady-gate fix, users clicked "Generate Illustrations" on the Images tab and got only module images — the hero never regenerated because `handleRefreshModuleImages` was scoped to per-module images only, and the hero's retry button was nested inside a card that only rendered on status === "failed" (not the post-reload "idle" state). Fixed by (a) chaining `retryIllustrationRef.current?.()` from `handleRefreshModuleImages` when the hero URL is missing, and (b) adding a "Generate concept illustration" button to the Research tab's idle-state card when modules exist without a hero URL.
+RELATED: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx handleRefreshModuleImages + retryIllustrationRef; cad-lab/page.tsx idle-state hero card
