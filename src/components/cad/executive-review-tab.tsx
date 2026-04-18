@@ -15,7 +15,8 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Users, Loader2, RefreshCw, ChevronDown } from "lucide-react"
+import Link from "next/link"
+import { Users, Loader2, RefreshCw, ChevronDown, Factory, ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -202,6 +203,46 @@ export function ExecutiveReviewTab({
               None of the executives we scanned have the right specialisation for this {contextLabel}.
               You can still look at the closest candidates, but don&rsquo;t rely on them as experts in this area.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Supplier-review fallback — offered on Specify (design context) when
+          experts are missing or few. Suppliers can review + price the design,
+          so this is a useful second path rather than a dead end. */}
+      {!loading && context === "design" && strong.length < 2 && (projectNeeds.processes.length > 0 || projectNeeds.materials.length > 0) && (
+        <Card className="border-international-orange/30">
+          <CardContent className="py-5 space-y-3">
+            <div className="flex items-start gap-2.5">
+              <Factory className="h-4 w-4 text-international-orange flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Or talk to suppliers who could make this
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Suppliers in the Forge marketplace can review the design and quote the work. A 20-minute capability call with two shortlisted suppliers often surfaces the same manufacturability gaps an executive review would — plus pricing and lead-time reality.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pl-6">
+              <Button asChild size="sm" className="gap-1.5">
+                <Link
+                  href={{
+                    pathname: "/marketplace",
+                    query: {
+                      category: "Services",
+                      q: [...projectNeeds.processes, ...projectNeeds.materials].slice(0, 3).join(" "),
+                    },
+                  }}
+                >
+                  Browse matching suppliers
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+              <span className="text-[10px] text-muted-foreground">
+                Filters applied: {[...projectNeeds.processes.slice(0, 2), ...projectNeeds.materials.slice(0, 2)].join(" · ") || "your project tags"}
+              </span>
+            </div>
           </CardContent>
         </Card>
       )}
