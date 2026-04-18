@@ -322,16 +322,26 @@ export function buildEdgesFromConnections(connections: ModuleConnection[], modul
  * available data, gracefully degrading for older projects.
  *
  * Priority: connections (highest fidelity) → contracts (legacy) → keywords (oldest)
+ *
+ * GOTCHA: Each tier must produce at least one edge to be picked — otherwise
+ * fall through to the next. Previous behaviour: a non-empty but fully-stale
+ * `connections` array (IDs no longer match the current module set, e.g. after
+ * a re-decompose or schema drift) would return `[]` and never reach the
+ * contracts tier. Users saw "0 interfaces mapped (contract-validated)" in the
+ * header even though contracts + keyword overlap would have produced edges.
+ * Reported live on the Mirror Verify project — fix: fall through on empty.
  */
 export function buildEdgesUnified(
   modules: CadLabModule[],
   opts: { connections?: ModuleConnection[]; contracts?: InterfaceContract[] },
 ): FlowEdge[] {
   if (opts.connections && opts.connections.length > 0) {
-    return buildEdgesFromConnections(opts.connections, modules)
+    const connectionEdges = buildEdgesFromConnections(opts.connections, modules)
+    if (connectionEdges.length > 0) return connectionEdges
   }
   if (opts.contracts && opts.contracts.length > 0) {
-    return buildEdgesHybrid(opts.contracts, modules)
+    const contractEdges = buildEdgesHybrid(opts.contracts, modules)
+    if (contractEdges.length > 0) return contractEdges
   }
   return buildEdges(modules)
 }
