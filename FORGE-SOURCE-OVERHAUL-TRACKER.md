@@ -49,7 +49,22 @@ The following slugs from SEED_TAXONOMY were cut by `--count=80` (can re-run to s
 - ~~Phase 5D extras — Real-World Supplier Snapshot + cost band~~ ✓ SHIPPED (commit `d9564833`).
 - ~~Phase 5E — admin review view + re-embed cron~~ ✓ SHIPPED (commit `23b6e5d8`).
 
-**2026-04-18 (continuation) — all remaining phases shipped:**
+**2026-04-18 (evening autonomous run — Phase 2D + Phase 3 + Opus fact-check + quality gaps):**
+| Phase | Commit | What |
+|---|---|---|
+| 2D | `4af6d41c` | Source page reorder per Round 2: header moved to top, Chase moved into Supplier Intelligence tab. No new components, pure scroll-order. |
+| 3 (full) | `d26a03fb` | Supplier Intelligence cards gain inline Shortlist toggle (Star) + module-fit chips + shortlisted-highlight border. Shortlist tab reframed as OPS view. Backward compatible (new props optional). Preserves ShortlistedSupplier interface, DB write-through, verdict sort. |
+| Fact-check (DS) | `afe52ece` | Initial DeepSeek reviewer pass — produced confirmation-bias 79/80 concerns, not a useful signal. Kept for audit trail. |
+| Fact-check (Opus) | `0a5b3fe3` | **Authoritative** cross-model fact-check via `claude-opus-4-7` through @anthropic-ai/sdk. 65 ok / 15 concerns / 0 errored. Each flag includes `suggested_correction`. Note: Opus 4.7 has deprecated `temperature` — SDK call omits it. |
+| Quality fixes | `d8cf404c` | Extracted `sanitizeFilterValue` into `src/lib/security/sanitize-filter.ts`. Exported `inferIndustriesFromText` from the matcher. Specify + snapshot action use shared helpers; no more industry-regex duplication. |
+
+**Evening agent-browser verify:**
+- `/ops/techniques` → silently redirects non-admin test account to `/updates` (admin gate ✓).
+- `/the-forge`, `/the-forge/cad-lab` (Design), Specify pipeline nav all render clean.
+- Source / Specify DfM tab visual verify still test-account-blocked (project stuck at Design stage per tracker's earlier note) — URL navigation to `/the-forge/cad-lab/source` and `?tab=mfg_intelligence` does not unlock downstream stages for a fresh project. Code is deploy-verified, type-clean, and lint-clean; the authenticated-UX-level visual confirmation of Phase 5D panels + Phase 3 consolidated cards needs Tristan's HAPS UAV project session.
+- Re-embed cron hand-triggered against local dev server earlier (`bngpiwkx3`): HTTP 200, 80/80 re-embedded, 0 failed — end-to-end path (auth → hash compare → Nomic embed → Supabase UPDATE) confirmed live.
+
+**2026-04-18 (continuation) — remaining deferred items shipped:**
 | Phase | Commit | What |
 |---|---|---|
 | 2B | `c688044e` (picked up) + confirmed present | Executive Review removed from Source tab bar; now a Collapsible secondary card below Supplier Intelligence. `executive_review` URL param redirects to `supplier_intelligence`. |
@@ -495,10 +510,23 @@ Per phase — phase is complete only if:
 - [x] **2A: Classification Review auto-collapse** — ships `5ba936f3` (2026-04-18). Tri-state userCollapsed; collapsed by default when `needsReviewCount === 0`, with green "All N classified" badge; user toggle persists.
 - [x] **2B: Executive Review → secondary collapsed panel** — ships `c688044e` (picked up from concurrent terminal's git add) + post-push-verify. Removed from `TABS` array; rendered as a `Collapsible` card at the bottom of the Supplier Intelligence tab with "Executive Review (optional) — expert eyes on your sourcing plan" trigger. URL param `tab=executive_review` redirects to `supplier_intelligence`. Specify untouched (design context keeps it as a first-class tab).
 - [x] **2C: Sankey supplier-coverage overlay** — ships as part of `080466a6` (2026-04-18, picked up my edits when another terminal committed). Each make-category shows "N/2 shortlisted" pill (green/amber/red). Buy categories skipped. Tooltip explains coverage state.
-- [ ] **2D: Section reorder** per Round 2 decisions — DEFERRED until Phase 3 SupplierPanel consolidation lands (reorder would churn twice otherwise)
+- [x] **2D: Section reorder** per Round 2 decisions — SHIPPED commit `4af6d41c` (2026-04-18). Page header moved to the top (was buried below SourceSpecialistInsights + SupplierFitnessReview + SupplyRiskRadar). Chase's `SupplierFitnessReview` moved out of the pre-tab area and into the Supplier Intelligence tab where it sits between the match cards and the Executive Review Collapsible. New pre-tab order: Header → DesignIterationHost → constraint banners → ProjectRatingPrompt → Chase entry briefing → SourceSpecialistInsights → SupplyRiskRadar → ClassificationReviewPanel → Tabs. No new components; pure reorder.
 
-### Phase 3 — Shortlist verdict-awareness [✓ SHIPPED]
-- [x] Re-scoped from full consolidation to verdict-aware Shortlist (full merge would've been 2–3 days of refactor risk on a 792-line component; real gap was visual disagreement between the two views, not architecture).
+### Phase 3 — SupplierPanel consolidation [✓ SHIPPED]
+**Initial rescope (fce3a71a)** — verdict-aware Shortlist landed first (conservative move; added verdict Badge + sort to CadLabShortlist, kept the two-view architecture).
+
+**Full consolidation (d26a03fb, 2026-04-18 continuation)** — Round 2 Disruptor outcome finally delivered:
+- [x] `SupplierIntelligenceTab` cards gain inline **Shortlist toggle** (Star icon; filled when shortlisted; stopPropagation-guarded so it doesn't collide with expand/collapse).
+- [x] Cards gain **module-fit chips** ("Fits Left Wing, Right Wing, …") next to verdict + score so supplier → module mapping is visible without expanding.
+- [x] Shortlisted cards get a subtle orange left border + shadow — selection state scannable at a glance.
+- [x] Summary banner adds "N shortlisted" when the feature is wired.
+- [x] Shortlist tab header explicitly reframed as the **OPS view** (NDA, ramp, outreach, RFQ) with a pointer at Supplier Intelligence for selection. Preserves VolumeRampPlanner/CadLabShortlist as-is.
+- [x] New handler `handleToggleShortlistFromIntel` on source/page.tsx maps the coarse "toggle" gesture onto the existing per-module add/remove logic by picking the first matching module as the association on add.
+- [x] Backward compatible: new props on `SupplierIntelligenceTab` are optional. Absent = legacy read-only render.
+- [x] Preserves: `ShortlistedSupplier` interface stable → VolumeRampPlanner + RFQ creation untouched. DB write-through (Phase 4) preserved. Verdict-aware sort (Phases 1/3-initial) preserved.
+- [x] Ships `d26a03fb` 2026-04-18, Production deploy success.
+
+### Phase 3 — Shortlist verdict-awareness (initial rescope, precursor to full consolidation)
 - [x] `CadLabShortlist` accepts `companyReviews?`, builds verdictByCompany Map, sorts Recommended → Acceptable → Caution → Not Recommended with matchScore as tiebreaker.
 - [x] Verdict Badge rendered inline on each supplier row header alongside Verified + % match.
 - [x] No behavioural change when `companyReviews` absent — existing sort preserved.
@@ -531,7 +559,9 @@ Per phase — phase is complete only if:
 - [x] 5D: Slug-format tolerance on dialog open (snake ↔ kebab)
 - [x] 5D: Shipped commit `5294e6df`, deploy Production success
 - [x] 5B: **DONE** — 80/80 techniques LLM-seeded via DeepSeek + embedded via Nomic, all `reviewed=false`. Article lengths 670–1359 chars; sampled quality factory-accurate. Tristan to approve in bulk or per-slug (SQL in Session Summary block above).
-- [ ] 5B: Second-pass fact-check (defer — wait for Tristan review of seeded rows)
+- [x] 5B: **Second-pass fact-check — TWO passes** (2026-04-18 continuation):
+   - DeepSeek reviewer (`afe52ece`): 1 ok · 79 concerns · 0 errored. Pattern: overwhelmingly flagged `best_mm too optimistic` on nearly every row. **Interpretation: DeepSeek-reviewing-DeepSeek suffered same-model-family confirmation bias** — every review said the same thing because the reviewer shared the seeder's training distribution.
+   - **Opus 4.7 reviewer (`0a5b3fe3`)** — the authoritative pass: 65 ok · 15 concerns · 0 errored (H0 M19 L29). Flags are substantive and row-specific: conflation of Shaw process with ceramic shell investment casting; AFP misapplied to glass-fibre wind blades; titanium listed as production-grade binder-jetting material. Script at `scripts/fact-check-seeded-techniques-opus.ts` — each flag also includes a `suggested_correction` so a downstream batch-edit can systematically apply fixes. Gotcha: `claude-opus-4-7` has deprecated the `temperature` parameter — the SDK call omits it.
 - [x] 5D: Real-World Supplier Snapshot per module (commit `d9564833`). Server action `getSupplierSnapshotForModule` aggregates marketplace_listings matching process + material: total/verified/regulated-cert count (aligned to project industry via REGULATORY_CERTS), lead-time band (20th/80th percentile from parsed free-text), top region. Rendered inline on MI tab.
 - [x] 5D: Cost band from aiCostEstimates (commit `d9564833`). Confidence-banded range (±15/30/50% for high/medium/low) shown when an estimate exists. Labelled clearly as "estimated", not a quote.
 - [x] 5E: Admin review view at `/ops/techniques` (commit `23b6e5d8`). Pending/Live tabs, per-row approve/reject, bulk-approve all seed_llm_deepseek rows. `requireAdmin()`-gated.
