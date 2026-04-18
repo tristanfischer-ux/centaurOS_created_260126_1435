@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { updateObjective, updateObjectivePrivacy, getObjectiveShares } from "@/actions/objectives"
+import { getProducts } from "@/actions/products"
 import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
 
 interface Objective {
@@ -18,6 +19,7 @@ interface Objective {
     extended_description: string | null
     is_private?: boolean
     creator_id?: string | null
+    product_id?: string | null
 }
 
 interface EditObjectiveDialogProps {
@@ -57,6 +59,8 @@ export function EditObjectiveDialog({ open, onOpenChange, objective, members = [
     const [extendedDescription, setExtendedDescription] = useState(objective.extended_description || "")
     const [isPrivate, setIsPrivate] = useState(objective.is_private || false)
     const [sharedWith, setSharedWith] = useState<ShareTarget[]>([])
+    const [productId, setProductId] = useState<string>(objective.product_id || "")
+    const [products, setProducts] = useState<{ id: string; name: string }[]>([])
     const isCreator = objective.creator_id === currentUserId
 
     // Reset form when dialog opens or objective changes
@@ -66,6 +70,7 @@ export function EditObjectiveDialog({ open, onOpenChange, objective, members = [
             setDescription(objective.description || "")
             setExtendedDescription(objective.extended_description || "")
             setIsPrivate(objective.is_private || false)
+            setProductId(objective.product_id || "")
             // Load existing shares
             if (objective.is_private) {
                 getObjectiveShares(objective.id).then(res => {
@@ -76,6 +81,12 @@ export function EditObjectiveDialog({ open, onOpenChange, objective, members = [
             } else {
                 setSharedWith([])
             }
+            // Load products list for the selector
+            getProducts().then((res) => {
+                if ('data' in res && res.data) {
+                    setProducts(res.data.map((p) => ({ id: p.id, name: p.name })))
+                }
+            }).catch(() => { /* best-effort — selector simply shows empty */ })
         }
     }, [open, objective])
 
@@ -92,7 +103,8 @@ export function EditObjectiveDialog({ open, onOpenChange, objective, members = [
             const result = await updateObjective(objective.id, {
                 title: title.trim(),
                 description: description.trim() || null,
-                extendedDescription: extendedDescription.trim() || null
+                extendedDescription: extendedDescription.trim() || null,
+                productId: productId ? productId : null,
             })
 
             if (result.error) {
@@ -179,6 +191,29 @@ export function EditObjectiveDialog({ open, onOpenChange, objective, members = [
                             Use this for detailed context that helps team members understand the full scope.
                         </p>
                     </div>
+
+                    {/* Linked product (optional) */}
+                    {products.length > 0 && (
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-objective-product">
+                                Linked product <span className="text-muted-foreground font-normal">(Optional)</span>
+                            </Label>
+                            <select
+                                id="edit-objective-product"
+                                value={productId}
+                                onChange={(e) => setProductId(e.target.value)}
+                                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                                <option value="">— No product —</option>
+                                {products.map((p) => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-muted-foreground">
+                                Tagging this objective to a product surfaces it on the product&apos;s Overview tab. New tasks from this objective inherit the same product.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Privacy & Sharing (only for objective creator) */}
                     {isCreator && members.length > 0 && (

@@ -62,7 +62,8 @@ export const createObjectiveSchema = z.object({
     .max(10000, 'Description must be 10,000 characters or less')
     .optional(),
   playbookId: z.string().uuid().optional(),
-  selectedTaskIds: z.array(z.string()).optional()
+  selectedTaskIds: z.array(z.string()).optional(),
+  productId: z.string().uuid('Invalid product ID').optional()
 })
 
 export const updateObjectiveSchema = z.object({
@@ -78,7 +79,8 @@ export const updateObjectiveSchema = z.object({
   extendedDescription: z.string()
     .max(50000, 'Extended description must be 50,000 characters or less')
     .optional()
-    .nullable()
+    .nullable(),
+  productId: z.string().uuid('Invalid product ID').optional().nullable()
 })
 
 // Team/Member schemas

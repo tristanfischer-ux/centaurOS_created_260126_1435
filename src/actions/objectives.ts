@@ -46,6 +46,8 @@ export async function createObjective(formData: FormData) {
         const sourceThreadId = (formData.get('source_thread_id') as string)?.trim() || null
         const startDate = (formData.get('start_date') as string)?.trim() || null
         const endDate = (formData.get('end_date') as string)?.trim() || null
+        const productIdRaw = (formData.get('productId') as string | null)?.trim()
+        const productId = productIdRaw && productIdRaw !== 'none' ? productIdRaw : undefined
 
         // Get selected tasks (handle multiple values with same name)
         const selectedTaskIds = formData.getAll('selectedTaskIds') as string[]
@@ -68,7 +70,8 @@ export async function createObjective(formData: FormData) {
             title: title || '',
             description: description || undefined,
             playbookId: playbookId && playbookId !== 'none' ? playbookId : undefined,
-            selectedTaskIds: selectedTaskIds.length > 0 ? selectedTaskIds : undefined
+            selectedTaskIds: selectedTaskIds.length > 0 ? selectedTaskIds : undefined,
+            productId,
         }
 
         const validation = validate(createObjectiveSchema, rawData)
@@ -76,7 +79,7 @@ export async function createObjective(formData: FormData) {
             return { error: 'error' in validation ? validation.error : 'Validation failed' }
         }
 
-        const { title: validatedTitle, description: validatedDescription, playbookId: validatedPlaybookId, selectedTaskIds: validatedSelectedTaskIds } = validation.data
+        const { title: validatedTitle, description: validatedDescription, playbookId: validatedPlaybookId, selectedTaskIds: validatedSelectedTaskIds, productId: validatedProductId } = validation.data
 
         // 2. Create the objective
         let objective
@@ -90,6 +93,10 @@ export async function createObjective(formData: FormData) {
                     foundry_id: foundryId,
                     is_private: isPrivate,
                     source_pack_id: validatedPlaybookId || null,
+                    // SECURITY: RLS on products + foundry_id filter prevent
+                    // cross-foundry injection. The Zod schema already validated
+                    // UUID format.
+                    ...(validatedProductId ? { product_id: validatedProductId } : {}),
                     ...(parentObjectiveId ? { parent_objective_id: parentObjectiveId } : {}),
                     ...(startDate ? { start_date: startDate } : {}),
                     ...(endDate ? { end_date: endDate } : {}),
@@ -211,6 +218,10 @@ export async function createObjective(formData: FormData) {
                         assignee_id: assigneeId,
                         start_date: dates.start_date,
                         end_date: dates.end_date,
+                        // INTENT: tasks born from a product-tagged objective
+                        // inherit the product, so a founder doesn't have to
+                        // tag each one. They can re-tag individually later.
+                        ...(validatedProductId ? { product_id: validatedProductId } : {}),
                     }
                 })
 
@@ -343,6 +354,7 @@ export async function updateObjective(
         title?: string
         description?: string | null
         extendedDescription?: string | null
+        productId?: string | null
     }
 ) {
     return withAuth(async ({ supabase, user, foundryId }) => {
@@ -351,7 +363,8 @@ export async function updateObjective(
             objectiveId,
             title: updates.title,
             description: updates.description,
-            extendedDescription: updates.extendedDescription
+            extendedDescription: updates.extendedDescription,
+            productId: updates.productId,
         }
 
         const validation = validate(updateObjectiveSchema, rawData)
@@ -359,7 +372,7 @@ export async function updateObjective(
             return { error: 'error' in validation ? validation.error : 'Validation failed' }
         }
 
-        const { title, description, extendedDescription } = validation.data
+        const { title, description, extendedDescription, productId } = validation.data
 
         // SECURITY: Verify objective exists and belongs to user's foundry
         const { data: objective, error: fetchError } = await supabase
@@ -383,6 +396,7 @@ export async function updateObjective(
             title?: string
             description?: string | null
             extended_description?: string | null
+            product_id?: string | null
             updated_at: string
         } = {
             updated_at: new Date().toISOString()
@@ -396,6 +410,12 @@ export async function updateObjective(
         }
         if (extendedDescription !== undefined) {
             updateData.extended_description = extendedDescription
+        }
+        // INTENT: productId === null means "unlink". The partial-update
+        // pattern requires an explicit key on updateData; use `in updates`
+        // so that "not provided" (skip) differs from "explicitly null".
+        if ('productId' in updates) {
+            updateData.product_id = productId ?? null
         }
 
         // Perform the update
