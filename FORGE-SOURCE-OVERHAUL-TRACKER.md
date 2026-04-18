@@ -468,10 +468,12 @@ Per phase — phase is complete only if:
 - [ ] 5E: Admin review view + nightly re-embed cron
 - [ ] Ship + verify
 
-### Phase 6 — Specify Executive Review extension
-- [ ] Secondary "Talk to suppliers" card
-- [ ] Empty-state executive → supplier promoted
-- [ ] Ship + verify
+### Phase 6 — Specify Executive Review extension [✓ SHIPPED 2026-04-18]
+- [x] Secondary "Or talk to suppliers who could make this" card (commit `7983560c`)
+- [x] Triggers on Specify (context=design) when strong matches < 2 AND project has processes/materials
+- [x] CTA routes to `/marketplace?category=Services&q=<top 3 tags>` with filter summary shown inline
+- [x] Copy follows house voice rule — no assumption about user state, leads with the useful action
+- [x] tsc + lint clean, pushed to main
 
 ---
 
