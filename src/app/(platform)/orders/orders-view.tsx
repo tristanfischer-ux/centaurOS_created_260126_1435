@@ -181,34 +181,10 @@ export function OrdersView({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Orders</h1>
-          </div>
-          <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
-            Manage your marketplace orders
-          </p>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={fetchOrders}
-          disabled={isPending}
-        >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          Refresh
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* Filters — note: the page-level heading lives in orders/page.tsx. This
+          view used to render a second "Orders" h1 which produced a visible
+          double-header bug. Refresh button moved inline with the filter row. */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
         {/* Role Tabs */}
         <Tabs
           value={role}
@@ -257,8 +233,27 @@ export function OrdersView({
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             className="pl-9"
+            aria-label="Search orders by order number"
           />
         </div>
+
+        {/* Refresh — was in the (now removed) duplicate header; kept accessible
+            from the filter row so founders can force-fetch after a supplier update. */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={fetchOrders}
+          disabled={isPending}
+          className="sm:ml-auto"
+          aria-label="Refresh orders"
+        >
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          Refresh
+        </Button>
       </div>
 
       {/* Results Summary */}
