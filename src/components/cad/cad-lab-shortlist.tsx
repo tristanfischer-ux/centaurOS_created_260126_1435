@@ -39,6 +39,8 @@ import type { AiCostEstimate, CadLabDesignBrief, CadLabModule } from "@/lib/cad-
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { CategorySupplierEntry } from "@/lib/sankey-utils"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+import type { CompanyReview } from "@/actions/company-review"
+import { Badge } from "@/components/ui/badge"
 import { ShortlistCoverageFlow } from "./shortlist-coverage-flow"
 import { SupplierDetailDialog } from "./supplier-detail-dialog"
 import type { SupplierDetail } from "@/actions/cad-lab-supplier-detail"
@@ -99,6 +101,12 @@ interface CadLabShortlistProps {
   buySearchLoading?: boolean
   /** Callback to re-trigger buy part price search */
   onRefreshBuyParts?: () => void
+  /** Per-company verdicts from Chase's Supplier Assessment (Phase 3). When
+   * supplied, each shortlist row shows a Recommended / Acceptable / Caution /
+   * Not Recommended badge and the list is sorted Recommended → Not Recommended
+   * before falling back to matchScore descending. Makes Shortlist agree
+   * visually with the Supplier Intelligence tab. */
+  companyReviews?: CompanyReview[]
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -153,6 +161,7 @@ export function CadLabShortlist({
   buyPartResults,
   buySearchLoading,
   onRefreshBuyParts,
+  companyReviews,
 }: CadLabShortlistProps): React.ReactNode {
   // ── Shared buyer details ──
   const [buyerName, setBuyerName] = useState("")
@@ -233,9 +242,37 @@ export function CadLabShortlist({
     return map
   }, [modules])
 
+  // Verdict lookup + verdict-primary sort. When no reviews are supplied, falls
+  // back to pure matchScore sort so the existing ordering is preserved.
+  const VERDICT_PRIORITY: Record<string, number> = {
+    recommended: 0,
+    acceptable: 1,
+    caution: 2,
+    not_recommended: 3,
+  }
+  const VERDICT_LABEL: Record<string, { label: string; variant: "success" | "secondary" | "warning" | "destructive" }> = {
+    recommended: { label: "Recommended", variant: "success" },
+    acceptable: { label: "Acceptable", variant: "secondary" },
+    caution: { label: "Caution", variant: "warning" },
+    not_recommended: { label: "Not Recommended", variant: "destructive" },
+  }
+  const verdictByCompany = useMemo(() => {
+    const m = new Map<string, string>()
+    if (companyReviews) {
+      for (const r of companyReviews) m.set(r.companyId, r.verdict)
+    }
+    return m
+  }, [companyReviews])
+
   const suppliers = useMemo(
-    () => [...shortlistedSuppliers.values()].sort((a, b) => b.bestMatchScore - a.bestMatchScore),
-    [shortlistedSuppliers],
+    () => [...shortlistedSuppliers.values()].sort((a, b) => {
+      const va = VERDICT_PRIORITY[verdictByCompany.get(a.id) ?? ""] ?? 99
+      const vb = VERDICT_PRIORITY[verdictByCompany.get(b.id) ?? ""] ?? 99
+      if (va !== vb) return va - vb
+      return b.bestMatchScore - a.bestMatchScore
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shortlistedSuppliers, verdictByCompany],
   )
 
   // ── Document generation (per-supplier, filtered modules) ──
@@ -540,6 +577,15 @@ export function CadLabShortlist({
                     {supplier.isVerified && (
                       <BadgeCheck className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
                     )}
+                    {(() => {
+                      const verdict = verdictByCompany.get(supplier.id)
+                      const cfg = verdict ? VERDICT_LABEL[verdict] : null
+                      return cfg ? (
+                        <Badge variant={cfg.variant} className="text-[10px] flex-shrink-0">
+                          {cfg.label}
+                        </Badge>
+                      ) : null
+                    })()}
                     <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
                       {Math.round(supplier.bestMatchScore)}% match
                     </span>

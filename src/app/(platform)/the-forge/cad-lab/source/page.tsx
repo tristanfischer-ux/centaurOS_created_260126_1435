@@ -92,6 +92,7 @@ export default function SourcePage(): React.ReactNode {
     designBrief,
     assumptionNotes,
     activeProjectId,
+    initialized,
     specifiedModuleCount,
     manufacturingOrderCount,
     refreshManufacturingOrderCount,
@@ -124,12 +125,17 @@ export default function SourcePage(): React.ReactNode {
     return () => { cancelled = true }
   }, [linkedRfqId])
 
-  // Gate: redirect to Specify if no specified modules
+  // Gate: redirect to Specify if no specified modules.
+  // GATE-HYDRATION FIX: Wait for `initialized=true` from context before firing —
+  // otherwise direct URL hits silently bounce to Specify because context values
+  // are their initial defaults (hasResearch=false, specifiedModuleCount=0) on
+  // first render. See MEMORY.md "gate-redirect pre-hydration" rule.
   useEffect(() => {
+    if (!initialized) return
     if (!hasResearch || specifiedModuleCount === 0) {
       router.replace(FORGE_ROUTES.cadLabSpecify)
     }
-  }, [hasResearch, specifiedModuleCount, router])
+  }, [initialized, hasResearch, specifiedModuleCount, router])
 
   // ── Supplier matching state (persisted to localStorage per project) ──
   const storageKey = activeProjectId ? `forge-supplier-matches-${activeProjectId}` : null
@@ -1207,6 +1213,7 @@ export default function SourcePage(): React.ReactNode {
               buyPartResults={buyPartResults}
               buySearchLoading={buySearchLoading}
               onRefreshBuyParts={() => handleSearchBuyParts(buyPartNames)}
+              companyReviews={sharedCompanyReviews}
             />
             {/* INTENT: Show re-search button when all buy parts returned empty (stale cache from RS blocking) */}
             {buyPartResults.length > 0 &&
