@@ -16,6 +16,7 @@
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
+import { isIllustrationStyle, type IllustrationStyle } from "@/lib/cad-lab/illustration-styles"
 import type { Json } from "@/types/database.types"
 import type {
   CadLabResult,
@@ -89,6 +90,10 @@ export interface CadLabProjectData {
 
   /** AI-generated visual style spec for cohesive module illustrations */
   visualStyle: VisualStyleSpec | null
+
+  /** Project-level illustration style preference. Applied on the next
+   *  hero/module regeneration. Silent — does not auto-regenerate on change. */
+  illustrationStyle: IllustrationStyle
 
   /** System overview illustration URL */
   systemIllustrationUrl: string | null
@@ -246,6 +251,9 @@ export async function loadCadLabProject(
         modules,
         linkedRfqId,
         visualStyle: (project.visual_style as VisualStyleSpec | null) ?? null,
+        illustrationStyle: isIllustrationStyle(project.illustration_style)
+          ? project.illustration_style
+          : "blueprint",
         systemIllustrationUrl: project.system_illustration_url ?? null,
         integratedAssemblyStlUrl: project.integrated_assembly_stl_url ?? null,
         integratedAssemblyStepUrl: project.integrated_assembly_step_url ?? null,
@@ -656,6 +664,41 @@ export async function saveCadLabSystemIllustration(
   })
 }
 
+// ─── Save Illustration Style (project-level preference) ──────────────
+
+/**
+ * Persists the user-chosen illustration style for a project. Silent
+ * preference update — does NOT auto-regenerate. The next hero + module
+ * regeneration picks it up and injects the matching prompt preamble.
+ *
+ * @param projectId - Project to update
+ * @param style - One of `blueprint` | `photoreal` | `isometric_vector`
+ * @returns Success or error
+ */
+export async function saveCadLabIllustrationStyle(
+  projectId: string,
+  style: IllustrationStyle,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+    // SECURITY: Validate against the enum — a DB CHECK also exists, but
+    // failing early here keeps the 400 response clean and avoids a round-trip.
+    if (!isIllustrationStyle(style)) return { error: "Invalid illustration style" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ illustration_style: style })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save illustration style:", error.message)
+      return { error: `Failed to save illustration style: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
 // ─── Save Visual Style ────────────────────────────────────────────────
 
 /**
@@ -928,6 +971,10 @@ export async function saveCadLabProjectRfq(
         result: nextResult as unknown as Json,
       })
       .eq("id", projectId)
+      // SECURITY: Belt-and-braces — every other write in this file chains
+      // .eq("foundry_id", foundryId). If RLS regresses (e.g. USING(true))
+      // this extra filter still prevents cross-foundry writes.
+      .eq("foundry_id", foundryId)
 
     if (error) {
       return { error: `Failed to save RFQ linkage: ${sanitizeErrorMessage(error)}` }

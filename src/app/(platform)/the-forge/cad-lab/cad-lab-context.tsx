@@ -41,7 +41,8 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, saveCadLabReviewSkipped, saveCadLabPartCategoryOverrides, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, saveCadLabReviewSkipped, saveCadLabPartCategoryOverrides, saveCadLabIllustrationStyle, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
+import { DEFAULT_ILLUSTRATION_STYLE, type IllustrationStyle } from "@/lib/cad-lab/illustration-styles"
 import { estimateModuleCostsAi } from "@/actions/cad-lab-cost"
 import { getTechniqueInsightsByProcess } from "@/actions/manufacturing-techniques"
 import { useBackgroundOps } from "@/contexts/background-ops-context"
@@ -245,6 +246,14 @@ export interface CadLabContextValue {
   /** Issues surfaced by the vision scorer when confidence is low. Shown in
    *  the warning banner so the user knows WHY the hero was flagged. */
   systemIllustrationIssues: string[]
+  /** Project-level illustration style preference. Silent — applied on next regen. */
+  illustrationStyle: IllustrationStyle
+  /** The style the currently-displayed hero was actually generated with, if
+   *  known. When this differs from `illustrationStyle`, the UI shows a
+   *  "(Regenerate to apply)" hint so users understand the preference won't
+   *  take effect until they explicitly regenerate. Null before first gen. */
+  appliedIllustrationStyle: IllustrationStyle | null
+  handleSetIllustrationStyle: (style: IllustrationStyle) => Promise<void>
   handleRetryIllustration: () => void
 
   // Integration (combined system assembly)
@@ -561,6 +570,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [systemIllustrationError, setSystemIllustrationError] = useState<string | null>(null)
   const [systemIllustrationConfidence, setSystemIllustrationConfidence] = useState<"high" | "low" | "unavailable" | null>(null)
   const [systemIllustrationIssues, setSystemIllustrationIssues] = useState<string[]>([])
+  const [illustrationStyle, setIllustrationStyle] = useState<IllustrationStyle>(DEFAULT_ILLUSTRATION_STYLE)
+  const [appliedIllustrationStyle, setAppliedIllustrationStyle] = useState<IllustrationStyle | null>(null)
+  // INTENT: Mirror the state into refs so async pipelines (handleDecompose,
+  // handleRetryIllustration) read the latest value across awaits without
+  // re-capturing via useCallback dependency arrays.
+  const illustrationStyleRef = useRef<IllustrationStyle>(DEFAULT_ILLUSTRATION_STYLE)
+  useEffect(() => { illustrationStyleRef.current = illustrationStyle }, [illustrationStyle])
 
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
@@ -1587,13 +1603,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           const moduleCrops = new Map<string, string>()
           if (activeProjectId) {
             try {
-              const illRes = await generateCadLabSystemIllustrationAction(activeProjectId, subject, fallbackModules.map(m => m.name), fallbackModules.map(m => m.purpose), visualStyle, extractExecutiveSummary(editableReport)?.slice(0, 600), undefined, refImageUrls.length > 0 ? refImageUrls : undefined)
+              const illRes = await generateCadLabSystemIllustrationAction(activeProjectId, subject, fallbackModules.map(m => m.name), fallbackModules.map(m => m.purpose), visualStyle, extractExecutiveSummary(editableReport)?.slice(0, 600), undefined, refImageUrls.length > 0 ? refImageUrls : undefined, illustrationStyleRef.current)
               if (!activeProjectIdRef.current) return
               if ("url" in illRes) {
                 fallbackHeroUrl = illRes.url
                 setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
                 setSystemIllustrationConfidence(illRes.confidence ?? null)
                 setSystemIllustrationIssues(illRes.issues ?? [])
+                setAppliedIllustrationStyle(illustrationStyleRef.current)
                 saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
                 try { const cropRes = await fetchAndCropReferenceAction(illRes.url); if ("base64" in cropRes) referenceBase64 = cropRes.base64 } catch { /* Non-critical */ }
                 if (referenceBase64) {
@@ -1821,6 +1838,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             skeletonRes.connections,
             extractExecutiveSummary(editableReport)?.slice(0, 2000) ?? editableReport.slice(0, 2000),
             productIdentity,
+            illustrationStyleRef.current,
           )
           if (!activeProjectIdRef.current) { /* stale */ }
           else if ("visualStyle" in reconcileRes) {
@@ -1936,6 +1954,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             extractExecutiveSummary(editableReport)?.slice(0, 600),
             style?.heroImagePrompt,
             heroRefUrls.length > 0 ? heroRefUrls : undefined,
+            illustrationStyleRef.current,
           )
           if (!activeProjectIdRef.current) { /* stale */ }
           else if ("url" in illRes) {
@@ -1943,6 +1962,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
             setSystemIllustrationConfidence(illRes.confidence ?? null)
             setSystemIllustrationIssues(illRes.issues ?? [])
+            setAppliedIllustrationStyle(illustrationStyleRef.current)
             saveCadLabSystemIllustration(startProjectId!, illRes.url).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
             addProgressLine(
               illRes.confidence === "low"
@@ -2625,6 +2645,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         decompositionConnections.length > 0 ? decompositionConnections : undefined,
         undefined,      // researchExcerpt — not needed for regen
         visualStyle ?? undefined,  // productIdentity — seed from existing style
+        illustrationStyleRef.current,
       )
 
       if ("error" in reconcileRes) {
@@ -3194,6 +3215,29 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // offer to regenerate any failed/pending modules using the new hero, so the
   // Design tab isn't stranded in a half-broken state. See tasks/lessons.md
   // 2026-04-17 on recovery UI + terminal error states.
+
+  // INTENT: Silent preference update for project-level illustration style.
+  // Does NOT auto-regenerate — users click Regenerate to apply. Applies on
+  // next decompose or hero retry via illustrationStyleRef. Persists via
+  // saveCadLabIllustrationStyle so reloads restore the choice.
+  const handleSetIllustrationStyle = useCallback(async (style: IllustrationStyle): Promise<void> => {
+    // Optimistic local update — user sees the card selection flip instantly.
+    setIllustrationStyle(style)
+    illustrationStyleRef.current = style
+    const pid = activeProjectIdRef.current
+    if (!pid) return
+    try {
+      const res = await saveCadLabIllustrationStyle(pid, style)
+      if ("error" in res) {
+        console.error("[CAD-LAB] Failed to persist illustration style:", res.error)
+        toast.error("Couldn't save style preference — try again.")
+      }
+    } catch (e) {
+      console.error("[CAD-LAB] Illustration style save threw:", e)
+      toast.error("Couldn't save style preference — try again.")
+    }
+  }, [])
+
   const handleRetryIllustration = useCallback(() => {
     if (!activeProjectId) return
     // SECURITY: Double-click guard. Two concurrent hero retries race on the
@@ -3213,6 +3257,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       modules.map((m) => m.name),
       modules.map((m) => m.purpose),
       visualStyle ?? undefined,
+      undefined, // researchExcerpt
+      visualStyle?.heroImagePrompt, // reuse crafted hero prompt when available
+      undefined, // referenceImageUrls
+      illustrationStyleRef.current,
     )
       .then(async (illRes) => {
         if ("url" in illRes) {
@@ -3220,6 +3268,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setSystemIllustrationStatus("complete")
           setSystemIllustrationConfidence(illRes.confidence ?? null)
           setSystemIllustrationIssues(illRes.issues ?? [])
+          setAppliedIllustrationStyle(illustrationStyleRef.current)
           saveCadLabSystemIllustration(activeProjectId!, illRes.url)
             .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
           if (illRes.confidence === "low") {
@@ -3658,8 +3707,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setIntegrationError(null)
     setRevealedModuleIds(new Set())
     setVisualStyle(null)
+    setIllustrationStyle(DEFAULT_ILLUSTRATION_STYLE)
+    illustrationStyleRef.current = DEFAULT_ILLUSTRATION_STYLE
+    setAppliedIllustrationStyle(null)
     setSystemIllustrationUrl(null)
     setSystemIllustrationStatus("idle")
+    setSystemIllustrationConfidence(null)
+    setSystemIllustrationIssues([])
     setCheckpoints(null)
     setModuleReviews({})
     setProductOverview("")
@@ -3773,9 +3827,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setMilestone(null)
       setProgressLines([])
       setVisualStyle(p.visualStyle ?? null)
+      setIllustrationStyle(p.illustrationStyle ?? DEFAULT_ILLUSTRATION_STYLE)
+      illustrationStyleRef.current = p.illustrationStyle ?? DEFAULT_ILLUSTRATION_STYLE
+      // On load we can't know which style the persisted hero was rendered
+      // with (the persisted pref IS the style if no regen has happened
+      // since the hero was written). Assume they match — the "(Regenerate
+      // to apply)" hint only fires after a live preference-change within
+      // the same session.
+      setAppliedIllustrationStyle(p.systemIllustrationUrl ? (p.illustrationStyle ?? DEFAULT_ILLUSTRATION_STYLE) : null)
       setSystemIllustrationUrl(p.systemIllustrationUrl ?? null)
       setSystemIllustrationStatus(p.systemIllustrationUrl ? "complete" : "idle")
       setSystemIllustrationError(null)
+      setSystemIllustrationConfidence(null)
+      setSystemIllustrationIssues([])
       setIntegratedAssemblyStlUrl(p.integratedAssemblyStlUrl ?? null)
       setIntegratedAssemblyStepUrl(p.integratedAssemblyStepUrl ?? null)
       setCheckpoints(p.checkpoints ?? null)
@@ -4793,7 +4857,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isGeneratingImages, imageGenProgress, handleGenerateModuleImages, handleRefreshModuleImages,
     revealedModuleIds,
     visualStyle,
-    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, systemIllustrationConfidence, systemIllustrationIssues, handleRetryIllustration,
+    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, systemIllustrationConfidence, systemIllustrationIssues, illustrationStyle, appliedIllustrationStyle, handleSetIllustrationStyle, handleRetryIllustration,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, integrationAssemblyCode, setIntegrationError, handleGenerateIntegration,

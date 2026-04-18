@@ -55,6 +55,8 @@ import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { LinkedProductChip } from "./components/linked-product-chip"
 import { DesignBriefInterview } from "./components/design-brief-interview"
+import { IllustrationStyleSelector } from "./components/illustration-style-selector"
+import { getIllustrationStyleMeta } from "@/lib/cad-lab/illustration-styles"
 import { ModuleImageGrid } from "./components/module-image-grid"
 import { ModuleFlowCanvas } from "./components/module-flow-canvas"
 import { ProductOverviewCard } from "./components/product-overview-card"
@@ -96,6 +98,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     handleGenerateTripoPreview,
     referenceImages, setReferenceImages,
     referenceDocuments, setReferenceDocuments,
+    illustrationStyle, appliedIllustrationStyle,
   } = useCadLab()
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
@@ -412,6 +415,12 @@ export default function CadLabResearchPage(): React.ReactNode {
           <LinkedProductChip cadLabProjectId={activeProjectId} />
         </div>
       )}
+
+      {/* ── Illustration style selector — pick the visual language up-front.
+          Silent preference: the selection is persisted immediately but does
+          not auto-regenerate. The hero card surfaces a "(Regenerate to apply)"
+          hint when the stored preference differs from what was actually rendered. ── */}
+      <IllustrationStyleSelector />
 
       {/* ── Primary input — always visible so the user sees what they're building ── */}
       <HeroSection
@@ -921,6 +930,19 @@ export default function CadLabResearchPage(): React.ReactNode {
                           )}
                         </button>
                         <div className="flex-1" />
+                        {/* Style chip — shows what was rendered, plus a hint when the
+                            stored preference has drifted and a regen is needed to apply it. */}
+                        {heroView === "2d" && appliedIllustrationStyle && (
+                          <span
+                            className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-background border border-border text-muted-foreground"
+                            title="Project-level illustration style used to render this hero"
+                          >
+                            Style: {getIllustrationStyleMeta(appliedIllustrationStyle).label}
+                            {appliedIllustrationStyle !== illustrationStyle && (
+                              <span className="text-international-orange">· regenerate to apply {getIllustrationStyleMeta(illustrationStyle).label}</span>
+                            )}
+                          </span>
+                        )}
                         {heroView === "2d" && systemIllustrationUrl && (
                           <button
                             onClick={() => handleDownloadFile(systemIllustrationUrl, `${subject || "concept"}-illustration.png`)}

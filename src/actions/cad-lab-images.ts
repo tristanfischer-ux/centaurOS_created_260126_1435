@@ -30,6 +30,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { ensureCadLabProjectOwnership, isSafeStorageUrl } from "@/lib/cad-lab/project-ownership"
 import { scoreRenderVision } from "@/lib/cad-lab/vision-scorer"
+import { DEFAULT_ILLUSTRATION_STYLE, getRubricOverridesForStyle, getStyleDirectivesForReconciliation, type IllustrationStyle } from "@/lib/cad-lab/illustration-styles"
 
 /** Lean return type for single-image generation — avoids React Flight serialization limits */
 interface ImageGenResult {
@@ -349,6 +350,7 @@ export async function generateCadLabSystemIllustrationAction(
   researchExcerpt?: string,
   heroPrompt?: string,
   referenceImageUrls?: string[],
+  illustrationStyle: IllustrationStyle = DEFAULT_ILLUSTRATION_STYLE,
 ): Promise<{ url: string; confidence?: "high" | "low" | "unavailable"; score?: number | null; issues?: string[] } | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     // SECURITY: hero illustration also writes to xray-images/<projectId>/.
@@ -359,8 +361,11 @@ export async function generateCadLabSystemIllustrationAction(
     // The rubric describes what the hero SHOULD show; the vision scorer then
     // decides whether the rendered PNG matches. Without this, the system would
     // happily persist physically implausible output (asymmetric wings, sideways
-    // propellers, floating sub-assemblies) with no quality signal.
-    const rubric = buildHeroQualityRubric(subject, moduleNames, modulePurposes)
+    // propellers, floating sub-assemblies) with no quality signal. The rubric
+    // adapts per illustration style — photoreal drops "pure white background"
+    // and "thin precise lines" clauses so the scorer doesn't punish legitimate
+    // studio renders for looking nothing like a blueprint.
+    const rubric = buildHeroQualityRubric(subject, moduleNames, modulePurposes, illustrationStyle)
 
     // INTENT: Track the best-scored attempt separately from the best unscored
     // fallback, so we can distinguish "no attempt was ever scored" (→ score
@@ -461,11 +466,16 @@ export async function generateCadLabSystemIllustrationAction(
 /** Build the hero quality rubric used by the vision scorer. Generic by default;
  *  when the subject line matches aircraft-adjacent keywords we layer in hard
  *  geometric constraints (symmetric wings, forward-facing propellers, tail
- *  attached to fuselage) because those are the failure modes we've seen. */
+ *  attached to fuselage) because those are the failure modes we've seen.
+ *  The rubric also adapts to the project's illustration style — photoreal
+ *  and isometric styles legitimately violate the blueprint-y "pure white
+ *  background / thin precise lines / flat colours" defaults, so their
+ *  scorer rubrics omit those clauses and add style-specific expectations. */
 function buildHeroQualityRubric(
   subject: string,
   moduleNames: string[],
   modulePurposes: string[],
+  illustrationStyle: IllustrationStyle = DEFAULT_ILLUSTRATION_STYLE,
 ): string {
   const subjectLc = subject.toLowerCase()
   const aircraftTerms = ["uav", "drone", "aircraft", "airplane", "plane", "glider", "haps", "wingspan", "rotorcraft", "helicopter", "quadcopter", "airship", "vtol", "aeroplane"]
@@ -485,11 +495,16 @@ function buildHeroQualityRubric(
 - A single part should not appear twice (e.g. a battery pack drawn both inside the fuselage and outside).`
     : ""
 
+  const { extraClauses } = getRubricOverridesForStyle(illustrationStyle)
+  const styleNotes = extraClauses.length > 0
+    ? `\n\nSTYLE CONTEXT (this project uses the "${illustrationStyle}" illustration style — adapt expectations accordingly):\n${extraClauses.map((c) => `- ${c}`).join("\n")}`
+    : ""
+
   return `Product: ${subject}
 
 The rendered image should be a physically plausible, coherent single-product illustration — an assembled or cleanly exploded view of ONE product, NOT a collage of disconnected parts. All mirror-pair components (e.g. left and right wings, port and starboard thrusters) MUST render as visually identical mirror copies of each other: same colour, same material, same surface detail.
 
-${moduleSummary}${aircraftRules}
+${moduleSummary}${aircraftRules}${styleNotes}
 
 Score the render against these expectations. A score of ≥ 7 means the render is usable as a system illustration in a founder-facing design tool. A score of < 7 means the render has at least one serious consistency or plausibility issue the user should be warned about.`
 }
@@ -917,6 +932,7 @@ export async function reconcileDesignAction(
   connections?: ModuleConnection[],
   researchExcerpt?: string,
   productIdentity?: Partial<VisualStyleSpec>,
+  illustrationStyle: IllustrationStyle = DEFAULT_ILLUSTRATION_STYLE,
 ): Promise<ReconciliationResult | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
@@ -955,7 +971,13 @@ export async function reconcileDesignAction(
       ? `\n\n## Mirror Pair Relationships (CRITICAL for symmetry)\nThe following modules are mirror pairs. Per the MIRROR PAIR SYMMETRY rule, assign IDENTICAL perModuleImagePrompts entries to each mirror pair, and ensure colourPalette decisions treat them as a single logical part (same colour, same material, same cell layout):\n${mirrorLines.join("\n")}`
       : ""
 
-    const userMessage = `Product: ${subject}${identityContext}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}${mirrorContext}`
+    // INTENT: Project-level illustration style. Injected after mirror context so
+    // Opus treats it as the terminal visual contract — blueprint vs photoreal
+    // vs isometric vector radically change the heroImagePrompt + perModule
+    // prompts Opus writes. Default 'blueprint' preserves the historical output.
+    const styleDirectives = getStyleDirectivesForReconciliation(illustrationStyle)
+
+    const userMessage = `Product: ${subject}${identityContext}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}${mirrorContext}${styleDirectives}`
 
     try {
       const response = await fetchWithTimeout(
