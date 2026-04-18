@@ -196,7 +196,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
 
                         {/* Has input indicator */}
                         {hasInput && status === "idle" && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-blue-50 text-blue-600">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-status-info-light text-status-info-dark">
                                 <FileText className="w-2.5 h-2.5" />
                                 Has input
                             </span>
@@ -339,7 +339,7 @@ function HumanTaskNodeComponent({ data, selected }: NodeProps) {
             <div className="p-3">
                 {/* Header */}
                 <div className="flex items-start gap-2.5">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-50">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-status-info-light">
                         {status === "approved" ? (
                             <CheckCircle className="w-4 h-4 text-status-success-dark" />
                         ) : (
@@ -350,7 +350,7 @@ function HumanTaskNodeComponent({ data, selected }: NodeProps) {
                         <p className="text-sm font-semibold text-foreground truncate leading-tight">
                             {nodeData.label || "Team Step"}
                         </p>
-                        <p className="text-[10px] font-medium mt-0.5 text-blue-600">
+                        <p className="text-[10px] font-medium mt-0.5 text-status-info-dark">
                             People
                         </p>
                     </div>

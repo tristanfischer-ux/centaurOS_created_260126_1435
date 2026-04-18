@@ -95,7 +95,7 @@ function ProviderModelSelector({
                             onClick={() => handleModalityChange(m)}
                             className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                                 modality === m
-                                    ? "bg-blue-100 text-blue-700 border border-blue-200"
+                                    ? "bg-status-info-light text-status-info-dark border border-status-info/30"
                                     : "bg-muted text-muted-foreground hover:bg-muted border border-transparent"
                             }`}
                         >
@@ -574,11 +574,11 @@ export function NodeInspector({
                     {/* Input/Output labels */}
                     {prompt && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-100">
-                                <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-0.5">
+                            <div className="p-2.5 rounded-lg bg-status-info-light border border-status-info/30">
+                                <p className="text-[10px] font-semibold text-status-info-dark uppercase tracking-wider mb-0.5">
                                     Input
                                 </p>
-                                <p className="text-[11px] text-blue-700">
+                                <p className="text-[11px] text-status-info-dark">
                                     {prompt.inputLabel}
                                 </p>
                             </div>
@@ -608,7 +608,7 @@ export function NodeInspector({
                                 Input Data
                             </label>
                             {userInput.trim() && !inputExpanded && (
-                                <span className="ml-auto text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                                <span className="ml-auto text-[10px] text-status-info-dark bg-status-info-light px-1.5 py-0.5 rounded-full">
                                     Has data
                                 </span>
                             )}
@@ -699,7 +699,7 @@ export function NodeInspector({
                                     Output
                                 </label>
                                 {status === "running" && (
-                                    <span className="ml-auto text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full animate-pulse">
+                                    <span className="ml-auto text-[10px] text-status-info-dark bg-status-info-light px-1.5 py-0.5 rounded-full animate-pulse">
                                         Generating...
                                     </span>
                                 )}
@@ -1079,7 +1079,7 @@ function HumanTaskInspector({
             {/* Header */}
             <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-blue-600">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-status-info-dark">
                         People
                     </span>
                     <button
@@ -1091,8 +1091,8 @@ function HumanTaskInspector({
                 </div>
 
                 <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-50">
-                        <UserCheck className="w-5 h-5 text-blue-600" />
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-status-info-light">
+                        <UserCheck className="w-5 h-5 text-status-info-dark" />
                     </div>
                     <div>
                         <h3 className="text-sm font-semibold text-foreground">
@@ -1112,11 +1112,11 @@ function HumanTaskInspector({
                 <div className="p-4 space-y-4">
                     {/* Guidance */}
                     {data.guidance && (
-                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
-                            <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-1.5">
+                        <div className="p-3 rounded-lg bg-status-info-light border border-status-info/30">
+                            <p className="text-[10px] font-semibold text-status-info-dark uppercase tracking-wider mb-1.5">
                                 What to do
                             </p>
-                            <p className="text-xs text-blue-800 leading-relaxed whitespace-pre-line">
+                            <p className="text-xs text-status-info-dark leading-relaxed whitespace-pre-line">
                                 {data.guidance}
                             </p>
                         </div>

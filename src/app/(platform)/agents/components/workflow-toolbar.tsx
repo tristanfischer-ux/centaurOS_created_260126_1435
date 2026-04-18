@@ -365,7 +365,7 @@ export function WorkflowToolbar({
                                 <Square className="w-3 h-3" />
                                 Stop
                                 {chainProgress && (
-                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full ml-1">
+                                    <span className="text-[10px] bg-status-info-light text-status-info-dark px-1.5 py-0.5 rounded-full ml-1">
                                         {chainProgress.current}/{chainProgress.total}
                                     </span>
                                 )}

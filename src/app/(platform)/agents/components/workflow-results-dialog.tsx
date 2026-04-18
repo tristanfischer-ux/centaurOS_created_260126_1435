@@ -183,7 +183,7 @@ function ResultStep({
                             {data.label || "Untitled"}
                         </span>
                         {isHuman && (
-                            <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full border border-blue-100 flex-shrink-0">
+                            <span className="text-[10px] font-medium text-status-info-dark bg-status-info-light px-1.5 py-0.5 rounded-full border border-status-info/30 flex-shrink-0">
                                 People
                             </span>
                         )}
@@ -205,11 +205,11 @@ function ResultStep({
                     {isHuman ? (
                         <>
                             {data.guidance && (
-                                <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
-                                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-1">
+                                <div className="p-3 rounded-lg bg-status-info-light border border-status-info/30">
+                                    <p className="text-[10px] font-semibold text-status-info-dark uppercase tracking-wider mb-1">
                                         Guidance
                                     </p>
-                                    <p className="text-xs text-blue-800 leading-relaxed whitespace-pre-line">
+                                    <p className="text-xs text-status-info-dark leading-relaxed whitespace-pre-line">
                                         {data.guidance}
                                     </p>
                                 </div>
