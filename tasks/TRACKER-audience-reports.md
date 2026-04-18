@@ -61,18 +61,15 @@
 ### D — DOCX — Image resize + audience cover ✓ DONE (pass 1) · deeper layout PENDING
 - [x] D-docx-1. Image-resize wired — `fetchImageAsBuffer` routes through `resizeImageToBufferBase64` server action; all `ImageRun` types swap from 'png' to 'jpg'. Commit `cdc40974`. **This is the 45MB-docx fix.**
 - [x] D-docx-2. Audience-aware cover — editorial (investor/marketing) gets Cambria 60pt title + orange audience eyebrow replacing the generic FRACTIONAL FORGE masthead. Engineer/supplier keep Calibri 48pt.
-- [ ] D-docx-3. Investor-specific section composition — KPI callout table near top, cost deferred to end, specialist prose prioritised over raw tables
-- [ ] D-docx-4. Engineer-specific section composition — dense spec table per module (already close to this by default)
-- [ ] D-docx-5. Supplier-specific section composition — part classification first, supplier tables before specs
-- [ ] D-docx-6. Marketing-specific section composition — editorial narrative blocks, module grid, brand voice hero caption
+- [x] D-docx-3. Audience-aware KPI callout row — 4-card "At a glance" table right after the cover. Per-audience KPI sets (investor: modules/mass/£/unit/lead; engineer: modules/diagnosed/standards/CAD mass; supplier: modules/parts/buy/quotes; marketing: modules/weight/standards/stage). Commit `c3539d92`.
+- [ ] D-docx-4. Section reordering per audience — supplier wants part classification first; marketing wants narrative-led; investor wants cost at the end. *Deferred — body currently generic across audiences.*
 
-### D — PPTX — Image resize + audience cover ✓ DONE (pass 1) · deeper layout PENDING
+### D — PPTX — Image resize + audience cover + KPI slide ✓ DONE · deeper layout PENDING
 - [x] D-pptx-1. Image-resize wired — `fetchImageAsBase64` routes through `resizeImageToDataUri` server action. Commit `69ad06f6`.
 - [x] D-pptx-2. Audience-aware cover slide — editorial (investor/marketing) gets Georgia 36pt title + orange audience eyebrow; engineer/supplier keep Helvetica Neue 28pt. Subtitle Y reflows.
-- [ ] D-pptx-3. Investor — pptxgenjs native KPI chart slide (bar chart for module mass vs lead time)
-- [ ] D-pptx-4. Engineer — dense module-detail slide per module with full spec grid
-- [ ] D-pptx-5. Supplier — BOM comparison slide, supplier-match fitness slide
-- [ ] D-pptx-6. Marketing — full-bleed hero cover, 3-5 feature-focused slides
+- [x] D-pptx-3. Audience-aware "At a glance" KPI slide — 4 rounded-rect card tiles right after the cover. Commit `9f303def`.
+- [ ] D-pptx-4. Native pptxgenjs bar chart for investor (module mass vs lead time) — *Deferred.*
+- [ ] D-pptx-5. BOM comparison slide for supplier — *Deferred.*
 
 ### D — Print-HTML PENDING (lowest priority — may defer)
 - [ ] D-html-1. Create `export-design-report-html.tsx`
@@ -81,8 +78,8 @@
 ## Phase E — Verification
 
 - [x] E1. `NODE_OPTIONS="--max-old-space-size=8192" npx tsc --noEmit` — clean at every commit
-- [x] E6. Push to main — all commits pushed (A rescue, B, C, D-PDF, D-DOCX, D-PPTX)
-- [ ] E2. `npm run test -- cad-lab-report` passes (tests not yet extended for audience parameter — deferred)
+- [x] E2. `npx jest --testPathPatterns="cad-lab-report.test.ts"` — 16/16 passing (5 new audience steering tests in commit 8ad6bbe4)
+- [x] E6. Push to main — all commits pushed
 - [ ] E3. agent-browser login with `~/.claude/scripts/forgeos-login.sh` — **deferred to Tristan** (multi-agent working tree made autonomous browser testing risky)
 - [ ] E4. Seed complete test project (concept → journey) on claude-test-foundry
 - [ ] E5. Export all 16 combinations; record results in matrix below
