@@ -17,6 +17,8 @@
 import PptxGenJS from 'pptxgenjs'
 
 import type { DesignReportData, AiReportSection, SlideData } from '@/lib/cad-lab/design-report-types'
+import { AUDIENCE_META, DEFAULT_AUDIENCE } from '@/lib/cad-lab/audience'
+import type { ReportAudience } from '@/lib/cad-lab/audience'
 
 // ─── Brand Constants ────────────────────────────────────────────────
 
@@ -59,19 +61,18 @@ function addSectionTitle(slide: PptxGenJS.Slide, title: string): void {
   })
 }
 
+/** Fetch + resize a remote image via the server action (sharp lives server-side).
+ *  Returns a `data:image/jpeg;base64,...` URI for pptxgenjs.
+ *
+ *  WHY: before this change, the pptx exporter fetched raw PNGs and embedded
+ *  them at their native resolution — a single deck could ship 30+MB of
+ *  unnecessary pixels. Routing through the resize server action gives Sharp
+ *  compression (1600px, JPEG q85) while keeping the native binding
+ *  server-side (sharp can't run in the browser bundle). */
 async function fetchImageAsBase64(url: string): Promise<string | null> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10_000)
-    const response = await fetch(url, { signal: controller.signal })
-    clearTimeout(timeout)
-    if (!response.ok) return null
-    const blob = await response.blob()
-    return await new Promise<string>((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.readAsDataURL(blob)
-    })
+    const { resizeImageToDataUri } = await import('@/actions/image-resize-action')
+    return await resizeImageToDataUri(url, { maxEdge: 1600, quality: 85 })
   } catch {
     return null
   }
@@ -97,8 +98,15 @@ const DIAG_LABELS: Record<string, string> = {
 
 // ─── Shared Builders ────────────────────────────────────────────────
 
-/** Build the branded cover slide — used by both legacy and AI paths. */
+/** Build the branded cover slide — used by both legacy and AI paths.
+ *  Audience-aware: editorial audiences (investor / marketing) get a larger
+ *  serif title and an audience eyebrow in the orange brand colour; the
+ *  engineer / supplier masthead stays sans-serif and tighter. */
 function buildCoverSlide(pres: PptxGenJS, data: DesignReportData, heroBase64: string | null): void {
+  const audience: ReportAudience = data.audience ?? DEFAULT_AUDIENCE
+  const audienceMeta = AUDIENCE_META[audience]
+  const editorial = audience === 'investor' || audience === 'marketing'
+
   const coverSlide = pres.addSlide()
   coverSlide.addShape('rect', {
     x: 0, y: 0, w: '100%', h: 0.04,
@@ -113,18 +121,29 @@ function buildCoverSlide(pres: PptxGenJS, data: DesignReportData, heroBase64: st
     })
   }
 
+  // Audience eyebrow — replaces the generic "FRACTIONAL FORGE" banner so the
+  // reader sees the edition label first (Investor edition / Press asset etc.).
+  coverSlide.addText(audienceMeta.label.toUpperCase(), {
+    x: MARGIN, y: 0.5, w: 4.5, h: 0.3,
+    fontSize: 11,
+    fontFace: 'Helvetica Neue',
+    color: ORANGE,
+    bold: true,
+    charSpacing: 4,
+  })
+
   coverSlide.addText('FRACTIONAL FORGE', {
-    x: MARGIN, y: 0.5, w: 4.5, h: 0.35,
-    fontSize: 12,
+    x: MARGIN, y: 0.78, w: 4.5, h: 0.28,
+    fontSize: 9,
     fontFace: 'Helvetica Neue',
     color: MID_TEXT,
     charSpacing: 3,
   })
 
   coverSlide.addText(data.projectName, {
-    x: MARGIN, y: 1.0, w: 4.5, h: 0.9,
-    fontSize: 28,
-    fontFace: 'Helvetica Neue',
+    x: MARGIN, y: 1.15, w: 4.5, h: editorial ? 1.1 : 0.9,
+    fontSize: editorial ? 36 : 28,
+    fontFace: editorial ? 'Georgia' : 'Helvetica Neue',
     bold: true,
     color: DARK_TEXT,
   })
@@ -137,8 +156,11 @@ function buildCoverSlide(pres: PptxGenJS, data: DesignReportData, heroBase64: st
     : data.stage === 'journey' ? 'Design Journey Report'
     : 'Engineering Design Report'
 
+  // Title height varies by audience — push subtitle + date down for editorial
+  // so the bigger Georgia title doesn't overlap.
+  const subtitleY = editorial ? 2.35 : 2.1
   coverSlide.addText(coverSubtitle, {
-    x: MARGIN, y: 2.0, w: 4.5, h: 0.35,
+    x: MARGIN, y: subtitleY, w: 4.5, h: 0.35,
     fontSize: 14,
     fontFace: 'Helvetica Neue',
     color: MID_TEXT,
@@ -150,7 +172,7 @@ function buildCoverSlide(pres: PptxGenJS, data: DesignReportData, heroBase64: st
     year: 'numeric',
   })
   coverSlide.addText(dateFormatted, {
-    x: MARGIN, y: 2.45, w: 4.5, h: 0.35,
+    x: MARGIN, y: subtitleY + 0.45, w: 4.5, h: 0.35,
     fontSize: 12,
     fontFace: 'Helvetica Neue',
     color: MID_TEXT,
