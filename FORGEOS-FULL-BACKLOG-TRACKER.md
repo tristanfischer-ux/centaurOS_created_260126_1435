@@ -143,7 +143,7 @@ Items already surfaced by prior audits but explicitly deferred. Small, parallel,
 - [ ] Pitch Prep pre-fill from Products / Investors / Objectives.
 - [ ] Investors: pipeline-stage chip on `/investors/[id]` so founder sees shortlist stage inside the detail.
 - [ ] Quotes: enriched empty state ("N quotes waiting 5+ days" counter).
-- [ ] Marketplace: `price_from` badge on list cards.
+- [x] Marketplace: `price_from` badge on list cards. (`2673c4f0`, 2026-04-18 — added "FROM" prefix on MarketCardV2 grid cards, MarketplaceListingGrid row view, and MarketplaceSavedView mobile + desktop cells. Unified getDisplayPrice on {amount, period} shape and extracted a renderPrice helper for reuse. Fixed-price listings unchanged.)
 - [ ] Reports: cross-timezone date handling test (UTC-12 / UTC+12).
 - [ ] Reports: share-link rate limiting (10/user/report).
 - [x] Cash Out Finn briefing: "most founders are leaking" generalisation wobble. (`75a69a82`, 2026-04-18 — neutralised to "The subscriptions tab is the first place I'd check — unused SaaS tends to hide there.")
