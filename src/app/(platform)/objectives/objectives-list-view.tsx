@@ -118,6 +118,18 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             obj.extended_description?.toLowerCase().includes(query)
         )
     }, [objectives, debouncedQuery])
+
+    // Lookup: objective id → title, used to render the "Part of <pillar>" reverse-link
+    // chip on child objectives so founders see strategic context without bouncing.
+    // GOTCHA: native Map is shadowed by the Map icon import from lucide-react above,
+    // so use a plain object indexer.
+    const parentTitleById = useMemo(() => {
+        const map: Record<string, string> = {}
+        for (const obj of objectives) {
+            if (obj.is_strategic_goal) map[obj.id] = obj.title
+        }
+        return map
+    }, [objectives])
     
     const isSearching = debouncedQuery.trim() !== ''
 
@@ -489,6 +501,21 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                 <FileText className="h-3 w-3" />
                                                 Full Context
                                             </Badge>
+                                        )}
+                                        {objective.parent_objective_id && parentTitleById[objective.parent_objective_id] && (
+                                            <Link
+                                                href={`/strategic-planner/${objective.parent_objective_id}`}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="inline-flex"
+                                            >
+                                                <Badge
+                                                    variant="outline"
+                                                    className="ml-1 text-xs gap-1 border-international-orange/30 bg-international-orange/5 text-international-orange hover:bg-international-orange/10 cursor-pointer max-w-[220px]"
+                                                >
+                                                    <Map className="h-3 w-3 shrink-0" />
+                                                    <span className="truncate">Part of {parentTitleById[objective.parent_objective_id]}</span>
+                                                </Badge>
+                                            </Link>
                                         )}
                                         {hasOverdueTasks && (
                                             <Badge variant="destructive" className="ml-2">
