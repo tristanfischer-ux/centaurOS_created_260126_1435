@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import Link from 'next/link'
-import { BarChart3, TrendingDown, TrendingUp, Package } from 'lucide-react'
+import { BarChart3, TrendingDown, TrendingUp, Package, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -209,6 +209,33 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         context={{ type: 'general', title: 'P&L', description: 'Finn on P&L.', metadata: {} }}
         storageKey="pnl"
       />
+
+      {/* Unclassified-cost warning — items without a pnlCategory are silently
+          excluded from the income statement, which can understate costs.
+          Surface the count so the founder can classify them. */}
+      {(() => {
+        const unclassifiedCount = cashOut.filter(i => !i.pnlCategory).length
+        if (unclassifiedCount === 0) return null
+        return (
+          <Card className="border-status-warning/30 bg-status-warning-light/30">
+            <CardContent className="py-3 flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-status-warning-dark shrink-0 mt-0.5" />
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-foreground">
+                  {unclassifiedCount} cost item{unclassifiedCount === 1 ? '' : 's'} without a P&amp;L category
+                </p>
+                <p className="text-muted-foreground mt-0.5">
+                  These are excluded from the income statement below. Edit each item and
+                  set COGS, OpEx, or R&amp;D so the projection reflects your true costs.
+                </p>
+              </div>
+              <Button asChild variant="outline" size="sm" className="shrink-0">
+                <Link href="/cash-burn/cash-out">Review costs</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {cashOut.length === 0 && cashIn.length === 0 && (
         <Card>
