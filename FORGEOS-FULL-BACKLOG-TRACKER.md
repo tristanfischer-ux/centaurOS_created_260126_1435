@@ -262,7 +262,7 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 2.1 | /today | **done** | `8d8ec577` | pending prod check | Strategy pillar health now readable by colourblind + screen-reader users (aria-label + role=img on dot, richer aria-label on the Link). Insights empty-state stops saying "check back tomorrow" and gives three concrete actions that unblock the pulse. Plus collateral fix to scheduled-reports/frequency.ts type — lib referenced a Postgres enum that was actually a plain text+CHECK column; hardcoded the union. |
 | 2.2 | /agents | **done** | `39047c26` | pending prod check | Audit found the page genuinely solid — real `<button>`s on Key Leaders row, no voice violations, no dead routes, all server actions RLS-gated. Only shipped two token-hygiene fixes (text-white → text-primary-foreground on CEO circle + specialist-card CTA). |
 | 2.3 | /comms (routes to `/updates`) | **done** | `1f5c06e9` | pending prod check | Mobile was dropping Cal's AI-generated briefing and falling back to static copy — now mobile + desktop both render `briefing.narrative`. TabsList gets aria-label. Page was otherwise solid (Radix tabs, voice-clean, tokens valid). |
-| 2.4 | /knowledge/[id] | pending | — | — | — |
+| 2.4 | Knowledge note detail dialog (no `/knowledge/[id]` route — detail is a dialog) | **done** | `f8e3b1b8` | pending prod check | Shadcn Dialog primitive already provides focus trap + aria + keyboard — only issue was one hardcoded border-slate-100 on the footer divider, swapped to border-border. |
 | 3.* | Polish sprint | pending (22 items) | — | — | — |
 | 4.1 | /orders | pending | — | — | — |
 | 4.2 | /suppliers + /[id] | pending | — | — | — |
