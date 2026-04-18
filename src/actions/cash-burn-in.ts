@@ -174,6 +174,132 @@ export async function deleteCashInItem(id: string): Promise<ActionResult> {
 }
 
 // ============================================================
+// Seed from Products — 1.1A
+// ============================================================
+
+/**
+ * Seed revenue cash-in rows from Products that have unit_price + target monthly volume set.
+ *
+ * @description For each eligible product, upsert one `cash_in_items` row marked with
+ * `source='product_seed'` and the product's id. Re-running is safe: rows are updated in
+ * place by (foundry_id, product_id, source='product_seed'), never duplicated. Default
+ * probability is 50% — forecasts aren't certain, founder can edit after.
+ *
+ * @returns { seeded: number; skipped: number } — seeded = rows created OR updated;
+ *          skipped = products without both unit_price_pence + target_monthly_units.
+ */
+export async function seedCashInFromProducts(): Promise<
+  ActionResult<{ seeded: number; skipped: number; updated: number }>
+> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Not authenticated' }
+
+    // Fetch products with enough signal to forecast revenue.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: products, error: productsErr } = await (supabase as any)
+      .from('products')
+      .select('id, name, unit_price_pence, target_monthly_units')
+      .eq('foundry_id', foundryId)
+
+    if (productsErr) {
+      console.error('[CashBurn] seedCashInFromProducts: products fetch failed:', productsErr)
+      return { data: null, error: 'Could not read products' }
+    }
+
+    const eligible = (products ?? []).filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (p: any) => p.unit_price_pence != null && p.target_monthly_units != null && p.target_monthly_units > 0,
+    )
+    const skipped = (products ?? []).length - eligible.length
+
+    if (eligible.length === 0) {
+      return { data: { seeded: 0, skipped, updated: 0 }, error: null }
+    }
+
+    // Load existing product_seed rows for idempotent upsert.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing, error: existingErr } = await (supabase as any)
+      .from('cash_in_items')
+      .select('id, product_id')
+      .eq('foundry_id', foundryId)
+      .eq('source', 'product_seed')
+      .eq('source_type', 'revenue')
+      .in('product_id', eligible.map((p: { id: string }) => p.id))
+
+    if (existingErr) {
+      console.error('[CashBurn] seedCashInFromProducts: existing lookup failed:', existingErr)
+      return { data: null, error: 'Could not read existing seed rows' }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existingByProduct = new Map<string, string>((existing ?? []).map((r: any) => [r.product_id as string, r.id as string]))
+
+    let created = 0
+    let updated = 0
+
+    for (const p of eligible as Array<{ id: string; name: string; unit_price_pence: number; target_monthly_units: number }>) {
+      const monthlyAmount = p.unit_price_pence * p.target_monthly_units
+      const noteToday = new Date().toISOString().slice(0, 10)
+      const existingId = existingByProduct.get(p.id)
+
+      if (existingId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: updateErr } = await (supabase as any)
+          .from('cash_in_items')
+          .update({
+            name: `${p.name} — revenue`,
+            amount: monthlyAmount,
+            frequency: 'monthly',
+            notes: `Seeded from product on ${noteToday}. Adjust probability as you validate.`,
+            is_active: true,
+          })
+          .eq('id', existingId)
+          .eq('foundry_id', foundryId)
+        if (updateErr) {
+          console.error('[CashBurn] seedCashInFromProducts: update failed for', p.id, updateErr)
+          continue
+        }
+        updated++
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: insertErr } = await (supabase as any)
+          .from('cash_in_items')
+          .insert({
+            foundry_id: foundryId,
+            created_by: user.id,
+            name: `${p.name} — revenue`,
+            source_type: 'revenue',
+            amount: monthlyAmount,
+            frequency: 'monthly',
+            probability_pct: 50,
+            effective_from: new Date().toISOString().slice(0, 10),
+            notes: `Seeded from product on ${noteToday}. Adjust probability as you validate.`,
+            product_id: p.id,
+            source: 'product_seed',
+          })
+        if (insertErr) {
+          console.error('[CashBurn] seedCashInFromProducts: insert failed for', p.id, insertErr)
+          continue
+        }
+        created++
+      }
+    }
+
+    revalidatePath('/cash-burn')
+    revalidatePath('/cash-burn/cash-in')
+    return { data: { seeded: created, updated, skipped }, error: null }
+  } catch (err) {
+    console.error('[CashBurn] seedCashInFromProducts failed:', err)
+    return { data: null, error: 'Seed failed — check server logs' }
+  }
+}
+
+// ============================================================
 // Mapper
 // ============================================================
 

@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap, Banknote, Loader2, Upload } from 'lucide-react'
+import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap, Banknote, Loader2, Upload, Package } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +31,9 @@ import {
   createCashInItem,
   updateCashInItem,
   deleteCashInItem,
+  seedCashInFromProducts,
 } from '@/actions/cash-burn-in'
+import { toast } from 'sonner'
 import { updateOpeningBalance } from '@/actions/cash-burn-scenarios'
 import { getProducts } from '@/actions/products'
 import type { CashInItem, CashInSourceType, CreateCashInInput, BurnScenario } from '@/types/cash-burn'
@@ -60,6 +62,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   const [wizardOpen, setWizardOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashInItem | null>(null)
+  const [isSeeding, setIsSeeding] = useState(false)
   // INTENT: Auto-collapse empty sections so the page doesn't show huge whitespace
   // when most source types have 0 items. Sections with items start expanded.
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -308,6 +311,50 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             Quick Setup
           </Button>
+          {Object.keys(productNameMap).length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isSeeding}
+              onClick={async () => {
+                setIsSeeding(true)
+                try {
+                  const result = await seedCashInFromProducts()
+                  if (result.error) {
+                    toast.error(result.error)
+                    return
+                  }
+                  const d = result.data
+                  if (!d) { toast.error('Seed returned no data'); return }
+                  const total = d.seeded + d.updated
+                  if (total === 0) {
+                    toast.info(d.skipped > 0
+                      ? `No products had both unit price and target monthly volume set yet. Add pricing on ${d.skipped} product${d.skipped === 1 ? '' : 's'} to seed revenue rows.`
+                      : 'No products with pricing to seed from.')
+                  } else {
+                    const parts = []
+                    if (d.seeded > 0) parts.push(`${d.seeded} new revenue row${d.seeded === 1 ? '' : 's'}`)
+                    if (d.updated > 0) parts.push(`${d.updated} existing row${d.updated === 1 ? '' : 's'} refreshed`)
+                    toast.success(`Seeded from Products — ${parts.join(', ')}. Default probability 50% — adjust as you validate.`)
+                  }
+                  router.refresh()
+                } catch (err) {
+                  console.error('[CashIn] seed from products failed:', err)
+                  toast.error('Seed failed — check server logs')
+                } finally {
+                  setIsSeeding(false)
+                }
+              }}
+              title="Create (or refresh) monthly revenue rows from every product with unit price + target monthly volume set"
+            >
+              {isSeeding ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Package className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Seed from Products
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
