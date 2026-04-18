@@ -475,8 +475,8 @@ export function LearnPage({
 
                       {/* Key takeaways */}
                       {tutorialDetail.key_takeaways.length > 0 && (
-                        <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-4 space-y-2">
-                          <h3 className="text-sm font-semibold flex items-center gap-2 text-emerald-600">
+                        <div className="rounded-lg bg-status-success-light/50 border border-status-success/20 p-4 space-y-2">
+                          <h3 className="text-sm font-semibold flex items-center gap-2 text-status-success-dark">
                             <CheckCircle2 className="h-4 w-4" />
                             Key Takeaways
                           </h3>

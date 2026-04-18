@@ -583,10 +583,10 @@ export function NodeInspector({
                                 </p>
                             </div>
                             <div className="p-2.5 rounded-lg bg-status-success-light border border-status-success/20">
-                                <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-0.5">
+                                <p className="text-[10px] font-semibold text-status-success-dark uppercase tracking-wider mb-0.5">
                                     Output
                                 </p>
-                                <p className="text-[11px] text-emerald-700">
+                                <p className="text-[11px] text-status-success-dark">
                                     {prompt.outputLabel}
                                 </p>
                             </div>
@@ -982,7 +982,7 @@ export function NodeInspector({
                 >
                     {copied ? (
                         <>
-                            <Check className="w-4 h-4 text-emerald-600" /> Copied!
+                            <Check className="w-4 h-4 text-status-success-dark" /> Copied!
                         </>
                     ) : (
                         <>
@@ -1140,12 +1140,12 @@ function HumanTaskInspector({
                                         }`}
                                     >
                                         {completed[i] ? (
-                                            <CheckSquare className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                                            <CheckSquare className="w-4 h-4 text-status-success-dark flex-shrink-0 mt-0.5" />
                                         ) : (
                                             <Square className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                                         )}
                                         <span className={`text-xs leading-relaxed ${
-                                            completed[i] ? "text-emerald-700 line-through" : "text-foreground"
+                                            completed[i] ? "text-status-success-dark line-through" : "text-foreground"
                                         }`}>
                                             {item}
                                         </span>
@@ -1184,8 +1184,8 @@ function HumanTaskInspector({
                     {/* Done state */}
                     {isDone && (
                         <div className="p-3 rounded-lg bg-status-success-light border border-status-success/20 text-center">
-                            <CheckCircle className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-                            <p className="text-xs font-medium text-emerald-700">Step completed</p>
+                            <CheckCircle className="w-5 h-5 text-status-success-dark mx-auto mb-1" />
+                            <p className="text-xs font-medium text-status-success-dark">Step completed</p>
                         </div>
                     )}
                 </div>

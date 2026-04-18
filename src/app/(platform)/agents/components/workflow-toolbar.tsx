@@ -484,8 +484,8 @@ export function WorkflowToolbar({
                         >
                             {copied ? (
                                 <>
-                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span className="text-emerald-600">Copied</span>
+                                    <Check className="w-3.5 h-3.5 text-status-success-dark" />
+                                    <span className="text-status-success-dark">Copied</span>
                                 </>
                             ) : (
                                 <>

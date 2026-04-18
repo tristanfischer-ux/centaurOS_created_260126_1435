@@ -212,7 +212,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
 
                         {/* Has output indicator */}
                         {hasOutput && status === "idle" && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-emerald-50 text-emerald-600">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-status-success-light text-status-success-dark">
                                 <Check className="w-2.5 h-2.5" />
                                 Output
                             </span>
@@ -307,12 +307,12 @@ function HumanTaskNodeComponent({ data, selected }: NodeProps) {
                 ? `${completedCount}/${totalChecklist}`
                 : null
 
-    const badgeBg = status === "approved" ? "bg-emerald-100" : "bg-blue-100"
-    const badgeText = status === "approved" ? "text-emerald-700" : "text-blue-700"
+    const badgeBg = status === "approved" ? "bg-status-success-light" : "bg-status-info-light"
+    const badgeText = status === "approved" ? "text-status-success-dark" : "text-status-info-dark"
     const ringClass = status === "approved"
-        ? "ring-2 ring-emerald-400/60"
+        ? "ring-2 ring-status-success/60"
         : status === "review"
-            ? "ring-2 ring-blue-400/60"
+            ? "ring-2 ring-status-info/60"
             : ""
 
     return (
@@ -341,9 +341,9 @@ function HumanTaskNodeComponent({ data, selected }: NodeProps) {
                 <div className="flex items-start gap-2.5">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-50">
                         {status === "approved" ? (
-                            <CheckCircle className="w-4 h-4 text-emerald-600" />
+                            <CheckCircle className="w-4 h-4 text-status-success-dark" />
                         ) : (
-                            <UserCheck className="w-4 h-4 text-blue-600" />
+                            <UserCheck className="w-4 h-4 text-status-info-dark" />
                         )}
                     </div>
                     <div className="flex-1 min-w-0">

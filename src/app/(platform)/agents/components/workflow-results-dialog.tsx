@@ -223,12 +223,12 @@ function ResultStep({
                                                 key={ci}
                                                 className={`flex items-start gap-2 p-2 rounded text-xs ${
                                                     done
-                                                        ? "bg-emerald-50 text-emerald-700 line-through"
+                                                        ? "bg-status-success-light text-status-success-dark line-through"
                                                         : "bg-muted text-foreground"
                                                 }`}
                                             >
                                                 {done ? (
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-status-success-dark flex-shrink-0 mt-0.5" />
                                                 ) : (
                                                     <div className="w-3.5 h-3.5 rounded border border-muted-foreground/40 flex-shrink-0 mt-0.5" />
                                                 )}
@@ -363,7 +363,7 @@ function ResultStep({
                             >
                                 {copied ? (
                                     <>
-                                        <Check className="w-3 h-3 text-emerald-600" />
+                                        <Check className="w-3 h-3 text-status-success-dark" />
                                         Copied
                                     </>
                                 ) : (
@@ -449,7 +449,7 @@ export function WorkflowResultsDialog({
                             >
                                 {copiedAll ? (
                                     <>
-                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                        <Check className="w-3.5 h-3.5 text-status-success-dark" />
                                         Copied
                                     </>
                                 ) : (
