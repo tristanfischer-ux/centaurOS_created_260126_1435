@@ -149,8 +149,8 @@ Items already surfaced by prior audits but explicitly deferred. Small, parallel,
 - [x] Cash Out Finn briefing: "most founders are leaking" generalisation wobble. (`75a69a82`, 2026-04-18 — neutralised to "The subscriptions tab is the first place I'd check — unused SaaS tends to hide there.")
 - [ ] Cash In: surface `probabilityPct` on rows (or stop fetching).
 - [ ] P&L: NULL `pnlCategory` handling — either default-backfill or explicit warn.
-- [ ] AI-generated briefing personal-commitment language — `specialist-page-insights.ts` prompt engineering: forbid "I'll …" / "Want me to …" framings, prefer specific action suggestions that don't make personal commitments.
-- [ ] Full-codebase sweep: `grep -rnE "slate-|gray-|bg-white[^a-z]|text-white[^a-z]"` + cleanup.
+- [x] AI-generated briefing personal-commitment language — `specialist-page-insights.ts` prompt engineering: forbid "I'll …" / "Want me to …" framings, prefer specific action suggestions that don't make personal commitments. (`d414d872`, 2026-04-18 — rewrote CAPABILITY AWARENESS in generatePageBriefing + added FORBIDDEN FRAMINGS block; points at buttons/workflows instead of first-person commitments.)
+- [ ] Full-codebase sweep: `grep -rnE "slate-|gray-|bg-white[^a-z]|text-white[^a-z]"` + cleanup. *(Partial: slate done across founder surfaces — `67a48768` (borders) + `d27a2fc6` (bg/text + !bg-white). Remaining: ~120 hardcoded status colours (red/emerald/amber/blue × text+bg) + 17 `bg-background/XX` transparency violations + StateRow legend refactor. Tracked as follow-up.)*
 - [ ] Products: module-image carryover on `promoteFromCadLab` (per-module URLs, not just hero).
 - [ ] Products: tooling-investment extraction (buildUnitEconomicsFromEstimates returns `tooling_investment_pence: null` today).
 - [ ] Products: Fundability per-row "Apply" consolidation (if re-audit says it's still noisy).
@@ -263,7 +263,7 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 2.2 | /agents | **done** | `39047c26` | pending prod check | Audit found the page genuinely solid — real `<button>`s on Key Leaders row, no voice violations, no dead routes, all server actions RLS-gated. Only shipped two token-hygiene fixes (text-white → text-primary-foreground on CEO circle + specialist-card CTA). |
 | 2.3 | /comms (routes to `/updates`) | **done** | `1f5c06e9` | pending prod check | Mobile was dropping Cal's AI-generated briefing and falling back to static copy — now mobile + desktop both render `briefing.narrative`. TabsList gets aria-label. Page was otherwise solid (Radix tabs, voice-clean, tokens valid). |
 | 2.4 | Knowledge note detail dialog (no `/knowledge/[id]` route — detail is a dialog) | **done** | `f8e3b1b8` | pending prod check | Shadcn Dialog primitive already provides focus trap + aria + keyboard — only issue was one hardcoded border-slate-100 on the footer divider, swapped to border-border. |
-| 3.* | Polish sprint | in progress (2/22 + border sweep done) | `75a69a82`, `67a48768` | pending prod check | Voice wobbles on strategic-planner subtitle + Finn cash-out fallback fixed (items 141, 149). Founder-surface `border-slate-*` → `border-border` token sweep across 61 files — item 153 partially addressed (slate only; gray-*/text-white/bg-white still open). |
+| 3.* | Polish sprint | in progress (3/22 + 153 partial) | `75a69a82`, `67a48768`, `d27a2fc6`, `d414d872` | pending prod check | Items done: 141 (strategy subtitle voice), 149 (Finn cash-out fallback), 152 (briefing personal-commitment framings — forbid "I'll…" / "Want me to…"). Item 153 partial: founder-surface `border-slate-*` → `border-border` (61 files) + slate bg/text + `!bg-white` swaps landed; ~120 status-colour and 17 transparent-bg violations still open. |
 | 4.1 | /orders | pending | — | — | — |
 | 4.2 | /suppliers + /[id] | pending | — | — | — |
 | 4.3 | /retainers + subs | pending | — | — | — |
