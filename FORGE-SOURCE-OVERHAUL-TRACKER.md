@@ -7,6 +7,39 @@
 
 ---
 
+## Session Summary — 2026-04-18 (Tristan asleep)
+
+**Shipped to main + deployed (all Production = success):**
+| Phase | Commit | What |
+|---|---|---|
+| 1 — Narrative ↔ Score reconciliation | `e4a1d935` | 9-factor match, attributes-JSONB fallback, Chase prompt reconciliation rule, verdict-primary sort. Astra projected ~55pt on HAPS UAV vs 21pt. |
+| 2A — Classification auto-collapse | `5ba936f3` | "N need review" collapses by default when all parts classified; green "All N classified" badge. |
+| 2C — Sankey coverage pills | `080466a6` | Each make-category shows "N/2 shortlisted" pill (green/amber/red). Single-source risks visible pre-RFQ. |
+| 6 — Supplier-review fallback | `7983560c` | "Or talk to suppliers who could make this" card on Specify Exec Review when executives don't strong-match. |
+| 5 — Vector-backed DfM (MVP) | `5294e6df` | DB schema: embedding vector(768) + content_hash + reviewed flag; 47/47 existing rows embedded; RPC `match_manufacturing_techniques`. Tab renamed "Design for Manufacture", "Related Techniques (semantic)" section, data-provenance popover. |
+| — | `b1016117` | Tracker + extensive-taxonomy seed script. |
+
+**In-flight while asleep:** Phase 5B LLM seed (`batqsdh8k` bg task). Progress at last check: 33/80 inserted, all embedded, all `reviewed=false` (hidden from RPC until human approval). Will complete autonomously; rows sit hidden until you flip reviewed=true on the ones you want.
+
+**Deferred for your review / decision:**
+- Phase 2B — Executive Review tab → collapsible card (merged into Phase 3's restructure to avoid double-churn).
+- Phase 3 — Consolidate SupplierIntelligenceTab + CadLabShortlist into one grouped-by-category SupplierPanel (large refactor; high-value but high blast radius — want your review).
+- Phase 4 — DB-backed shortlist table + localStorage→DB migration (explicit abort criterion for autonomous shipping: "Any phase breaks withAuth / RLS on shortlist data"; schema + actions ready to design but not shipped).
+- Phase 5B fact-check + reviewed-flag flip for the LLM-seeded rows.
+- Phase 5D extras — Real-World Supplier Snapshot per module; cost band.
+- Phase 5E — admin review view + nightly re-embed cron.
+
+**agent-browser verification:**
+- `/the-forge` + `/the-forge/cad-lab` (Design stage) + `/marketplace?category=Services&q=…` + `/today` all render clean post-deploys.
+- Source / Specify page visual verify is test-account-blocked (project gated at Design stage; cannot reach Source panel without progressing through diagnostics + research). Need your HAPS UAV session to visually confirm Astra now surfaces as Recommended with a reconciled narrative.
+- All commits on main have `success` deployment status on Production as of 14:35 local.
+
+**Concurrent-terminal notes:** 4 terminals were running this afternoon. Two race events handled:
+- commit `080466a6` (another terminal's "Reconsider this" feature) included my uncommitted Phase 2C Sankey edits via concurrent `git add` — no conflict, both shipped cleanly.
+- Several of my push attempts hit "cannot lock ref" rejection; resolved via `git pull --rebase --autostash`. See `meta/gotchas` drawer in MemPalace.
+
+---
+
 ## 0. Context — What Tristan Flagged
 
 Watching a European HAPS UAV project (7 modules, 93 parts, 6 categories). Screenshots walked through:
