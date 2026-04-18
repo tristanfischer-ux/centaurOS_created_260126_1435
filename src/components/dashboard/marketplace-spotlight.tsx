@@ -74,9 +74,9 @@ export function MarketplaceSpotlight({ featuredListings }: MarketplaceSpotlightP
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-green-50/50 to-transparent">
+      <div className="p-6 border-b border-border bg-gradient-to-r from-green-50/50 to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-100 rounded-lg">
@@ -98,7 +98,7 @@ export function MarketplaceSpotlight({ featuredListings }: MarketplaceSpotlightP
       </div>
 
       {/* Footer */}
-      <div className="p-4 bg-slate-50 border-t border-slate-100">
+      <div className="p-4 bg-slate-50 border-t border-border">
         <Link
           href="/marketplace"
           className="text-sm text-international-orange hover:text-orange-700 font-medium flex items-center gap-1 group w-fit"
@@ -154,7 +154,7 @@ function SpotlightCard({ listing }: { listing: FeaturedListing }) {
 
         {/* Badges row */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <Badge variant="outline" className={cn("text-[10px] border-slate-200", config.color)}>
+          <Badge variant="outline" className={cn("text-[10px] border-border", config.color)}>
             <Icon className="w-2.5 h-2.5 mr-1" />
             {config.label}
           </Badge>
@@ -210,9 +210,9 @@ function MarketplaceSpotlightEmpty() {
   ]
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-green-50/50 to-transparent">
+      <div className="p-6 border-b border-border bg-gradient-to-r from-green-50/50 to-transparent">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-green-100 rounded-lg">
             <Store className="w-5 h-5 text-green-600" />
@@ -231,7 +231,7 @@ function MarketplaceSpotlightEmpty() {
             key={card.href}
             href={card.href}
             className={cn(
-              "group flex items-center gap-4 p-4 rounded-xl border border-slate-100 transition-all duration-200",
+              "group flex items-center gap-4 p-4 rounded-xl border border-border transition-all duration-200",
               card.borderHover, "hover:shadow-sm"
             )}
           >

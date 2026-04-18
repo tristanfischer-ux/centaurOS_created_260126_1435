@@ -47,7 +47,7 @@ export default async function AdminWaitlistPage() {
   if (error) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
-        <div className="flex flex-col gap-4 pb-4 border-b border-slate-100">
+        <div className="flex flex-col gap-4 pb-4 border-b border-border">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <h1 className={typography.h1}>Waitlist</h1>
@@ -62,7 +62,7 @@ export default async function AdminWaitlistPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />

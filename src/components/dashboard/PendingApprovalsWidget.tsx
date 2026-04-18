@@ -107,7 +107,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                             return (
                                 <div 
                                     key={task.id} 
-                                    className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-slate-300 bg-background transition-colors"
+                                    className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-slate-300 bg-background transition-colors"
                                 >
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
                                         {assignee && (

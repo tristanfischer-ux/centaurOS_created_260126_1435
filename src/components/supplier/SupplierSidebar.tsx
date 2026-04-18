@@ -88,7 +88,7 @@ export function SupplierSidebar({ userName, userEmail }: SupplierSidebarProps) {
   }
 
   return (
-    <div className="hidden sm:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
+    <div className="hidden sm:flex h-screen w-64 flex-col bg-background border-r border-border text-foreground">
       {/* App Header */}
       <div className="px-5 pt-8 pb-6">
         <div className="flex items-center justify-between">
@@ -125,10 +125,10 @@ export function SupplierSidebar({ userName, userEmail }: SupplierSidebarProps) {
         {mainNavigation.map(renderNavItem)}
         
         {/* Spacer */}
-        <div className="my-3 border-t border-slate-100" />
+        <div className="my-3 border-t border-border" />
         
         {/* Spacer */}
-        <div className="my-3 border-t border-slate-100" />
+        <div className="my-3 border-t border-border" />
         
         {/* Support Navigation */}
         {supportNavigation.map(renderNavItem)}

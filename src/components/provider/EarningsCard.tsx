@@ -85,7 +85,7 @@ export function EarningsCard({
                             {formatCurrency(pendingPayout, currency)}
                         </p>
                     </div>
-                    <div className="p-4 rounded-lg bg-muted border border-slate-100">
+                    <div className="p-4 rounded-lg bg-muted border border-border">
                         <div className="flex items-center gap-2 text-foreground">
                             <TrendingUp className="h-4 w-4" />
                             <p className="text-sm font-medium">Total Earned</p>

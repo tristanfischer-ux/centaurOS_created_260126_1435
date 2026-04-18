@@ -27,11 +27,11 @@ function ObjectiveNodeComponent({ data, selected }: NodeProps) {
     <div
       className={`
         bg-white rounded-xl border-2 shadow-sm w-[280px] transition-all duration-200
-        ${selected ? 'border-international-orange shadow-lg ring-2 ring-international-orange/20' : 'border-slate-200 hover:shadow-md hover:border-slate-300'}
+        ${selected ? 'border-international-orange shadow-lg ring-2 ring-international-orange/20' : 'border-border hover:shadow-md hover:border-slate-300'}
       `}
     >
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-slate-100">
+      <div className="px-4 pt-4 pb-3 border-b border-border">
         <div className="flex items-start gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-international-orange/10 flex items-center justify-center flex-shrink-0 mt-0.5">
             <Target className="w-4 h-4 text-international-orange" />

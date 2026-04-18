@@ -5,7 +5,7 @@ export default function ApprenticeshipLoading() {
   return (
     <div className="space-y-8">
       {/* Header Skeleton */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Skeleton className="h-1 w-8" />

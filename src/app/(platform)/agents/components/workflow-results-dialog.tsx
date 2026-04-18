@@ -329,7 +329,7 @@ function ResultStep({
                                         Output
                                     </p>
                                     <div className="p-3 rounded-lg bg-muted/50 border text-xs leading-relaxed max-h-80 overflow-y-auto">
-                                        <Markdown content={data.output!} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200 [&_th]:bg-muted [&_th]:font-semibold" />
+                                        <Markdown content={data.output!} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_td]:border [&_td]:border-border [&_th]:bg-muted [&_th]:font-semibold" />
                                     </div>
                                 </div>
                             ) : !hasOutput ? (

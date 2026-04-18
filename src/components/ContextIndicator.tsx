@@ -70,7 +70,7 @@ export function ContextIndicator({
       className={cn(
         'flex items-center gap-2 px-4 sm:px-6 lg:px-8 py-2 text-xs font-medium border-b transition-colors',
         isPerson
-          ? 'bg-muted/30 text-muted-foreground border-slate-100'
+          ? 'bg-muted/30 text-muted-foreground border-border'
           : 'bg-orange-50/50 text-international-orange border-orange-100/50'
       )}
     >

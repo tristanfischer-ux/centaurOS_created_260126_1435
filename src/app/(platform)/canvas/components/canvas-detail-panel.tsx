@@ -31,9 +31,9 @@ export function CanvasDetailPanel({ nodeType, data, onClose }: CanvasDetailPanel
     const health = HEALTH_CONFIG[objData.health] || HEALTH_CONFIG['not-started']
 
     return (
-      <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full overflow-hidden">
+      <div className="w-80 bg-white border-l border-border flex flex-col h-full overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-international-orange" />
             <span className="text-sm font-semibold text-foreground">Objective</span>
@@ -99,7 +99,7 @@ export function CanvasDetailPanel({ nodeType, data, onClose }: CanvasDetailPanel
         </div>
 
         {/* Footer link */}
-        <div className="px-4 py-3 border-t border-slate-100">
+        <div className="px-4 py-3 border-t border-border">
           <Link
             href={`/new-objectives?objectiveId=${objData.objectiveId}`}
             className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm font-medium text-international-orange bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
@@ -117,9 +117,9 @@ export function CanvasDetailPanel({ nodeType, data, onClose }: CanvasDetailPanel
   const statusColor = getStatusColor(taskData.status)
 
   return (
-    <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full overflow-hidden">
+    <div className="w-80 bg-white border-l border-border flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <CheckSquare className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">Task</span>
@@ -191,7 +191,7 @@ export function CanvasDetailPanel({ nodeType, data, onClose }: CanvasDetailPanel
       </div>
 
       {/* Footer link */}
-      <div className="px-4 py-3 border-t border-slate-100">
+      <div className="px-4 py-3 border-t border-border">
         <Link
           href={`/new-tasks?taskId=${taskData.taskId}`}
           className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm font-medium text-international-orange bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"

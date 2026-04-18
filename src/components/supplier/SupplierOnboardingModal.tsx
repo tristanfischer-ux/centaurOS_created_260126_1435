@@ -105,7 +105,7 @@ export function SupplierOnboardingModal({ forceOpen }: SupplierOnboardingModalPr
           {/* Content */}
           <div className="pt-16 pb-10 px-10 text-center relative z-10 font-sans">
             <div className={cn(
-              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-muted border border-slate-100 shadow-sm',
+              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-muted border border-border shadow-sm',
               step.color
             )}>
               <Icon className="w-8 h-8" strokeWidth={1.5} />

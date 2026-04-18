@@ -26,7 +26,7 @@ export function CanvasTabs({ spatialCanvas, whiteboardList }: CanvasTabsProps) {
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 bg-white border-b border-slate-100">
+      <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 bg-white border-b border-border">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id
           const Icon = tab.icon

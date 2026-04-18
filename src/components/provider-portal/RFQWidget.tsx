@@ -122,7 +122,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Active Matches */}
-          <div className="p-3 rounded-lg bg-background border border-slate-100">
+          <div className="p-3 rounded-lg bg-background border border-border">
             <div className="flex items-center gap-2 mb-1">
               <FileSearch className="h-4 w-4 text-status-info" />
               <span className="text-xs text-muted-foreground">Active Matches</span>
@@ -155,7 +155,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
           </div>
 
           {/* Win Rate */}
-          <div className="p-3 rounded-lg bg-background border border-slate-100">
+          <div className="p-3 rounded-lg bg-background border border-border">
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="h-4 w-4 text-status-success" />
               <span className="text-xs text-muted-foreground">Win Rate</span>
@@ -166,7 +166,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
           </div>
 
           {/* Avg Response Time */}
-          <div className="p-3 rounded-lg bg-background border border-slate-100">
+          <div className="p-3 rounded-lg bg-background border border-border">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="h-4 w-4 text-purple-600" />
               <span className="text-xs text-muted-foreground">Avg Response</span>

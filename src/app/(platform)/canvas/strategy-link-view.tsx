@@ -349,7 +349,7 @@ function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies,
   )
 
   return (
-    <div className="h-[calc(100vh-340px)] sm:h-[calc(100vh-260px)] min-h-[400px] bg-muted/20 rounded-lg border border-slate-100">
+    <div className="h-[calc(100vh-340px)] sm:h-[calc(100vh-260px)] min-h-[400px] bg-muted/20 rounded-lg border border-border">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -367,7 +367,7 @@ function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies,
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
         <Controls
           showInteractive={false}
-          className="!bg-background !border !border-slate-200 !shadow-sm !rounded-lg"
+          className="!bg-background !border !border-border !shadow-sm !rounded-lg"
         />
       </ReactFlow>
 

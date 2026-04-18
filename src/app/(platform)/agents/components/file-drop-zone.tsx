@@ -175,7 +175,7 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
                     ${compact ? "p-2" : "p-4"}
                     ${isDragging
                         ? "border-blue-400 bg-blue-50"
-                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        : "border-border hover:border-slate-300 hover:bg-slate-50"
                     }
                 `}
             >
@@ -218,7 +218,7 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
                     {attachedFiles.map((file) => (
                         <div
                             key={file.name}
-                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-100 group"
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-slate-50 border border-border group"
                         >
                             <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                             <span className="text-[11px] font-medium text-foreground truncate flex-1">

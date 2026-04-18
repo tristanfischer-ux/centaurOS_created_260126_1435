@@ -182,11 +182,11 @@ export function AnswerThread({
                 "border rounded-lg overflow-hidden",
                 answer.is_ai_generated 
                     ? "bg-gradient-to-br from-violet-50/50 to-blue-50/50 border-violet-200" 
-                    : "bg-background border-slate-200"
+                    : "bg-background border-border"
             )}
         >
             {/* Answer Header */}
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-4 border-b border-border">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <UserAvatar
@@ -320,7 +320,7 @@ export function AnswerThread({
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="border-t border-slate-100 overflow-hidden"
+                        className="border-t border-border overflow-hidden"
                     >
                         <div className="p-4 bg-muted/50 space-y-3">
                             {localComments.length === 0 ? (
@@ -351,7 +351,7 @@ export function AnswerThread({
                             )}
 
                             {/* Add Comment */}
-                            <div className="flex gap-2 pt-2 border-t border-slate-200">
+                            <div className="flex gap-2 pt-2 border-t border-border">
                                 <Textarea
                                     value={newComment}
                                     onChange={(e) => setNewComment(e.target.value)}

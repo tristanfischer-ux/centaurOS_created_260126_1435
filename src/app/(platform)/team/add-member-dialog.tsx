@@ -142,7 +142,7 @@ export function AddMemberDialog() {
                             </div>
                         )}
                     </div>
-                    <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
+                    <DialogFooter className="gap-2 pt-4 border-t border-border">
                         <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
                         <SubmitButton />
                     </DialogFooter>

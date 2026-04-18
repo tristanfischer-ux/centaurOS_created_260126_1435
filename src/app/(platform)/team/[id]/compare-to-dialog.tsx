@@ -115,7 +115,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
-                                    <tr className="border-b border-slate-200">
+                                    <tr className="border-b border-border">
                                         <th className="py-4 px-4 text-left text-muted-foreground font-medium w-32"></th>
                                         {[currentMember, selectedMember!].map(member => (
                                             <th key={member.id} className="py-4 px-6 text-center">
@@ -124,7 +124,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                                         name={member.full_name}
                                                         role={member.role || undefined}
                                                         size="xl"
-                                                        className="border-2 border-slate-200"
+                                                        className="border-2 border-border"
                                                     />
                                                     <span className="font-semibold text-foreground">{member.full_name}</span>
                                                 </div>

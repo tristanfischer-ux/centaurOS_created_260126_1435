@@ -179,7 +179,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                 'flex items-center justify-between p-3 rounded-lg border',
                                                 isExpired 
                                                     ? 'bg-muted border opacity-60'
-                                                    : 'bg-background border-slate-200'
+                                                    : 'bg-background border-border'
                                             )}
                                         >
                                             <div className="flex items-center gap-3">

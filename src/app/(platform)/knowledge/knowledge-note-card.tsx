@@ -265,7 +265,7 @@ export function KnowledgeNoteCard({
         )}
 
         {/* Footer: metadata */}
-        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+        <div className="flex items-center justify-between pt-1 border-t border-border">
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
             {specialistName && (
               <span className="flex items-center gap-1">

@@ -73,7 +73,7 @@ export default async function BuyerDashboardPage() {
 
     return (
         <div className="container max-w-6xl mx-auto py-8 px-4">
-            <div className="pb-4 border-b border-slate-100 mb-8">
+            <div className="pb-4 border-b border-border mb-8">
                 <div className="flex items-center gap-3 mb-1">
                     <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                     <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Buyer Dashboard</h1>

@@ -168,7 +168,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                 isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
             )}>
                 <div className="overflow-hidden">
-                    <div className="border-t border-slate-100">
+                    <div className="border-t border-border">
                         {/* Batch Actions Bar */}
                         {tasks.length > 0 && (
                             <div className="flex items-center justify-between px-4 py-2 bg-muted">
@@ -296,7 +296,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
                         placeholder="Enter rejection reason..."
-                        className="min-h-[100px] bg-background border-slate-200"
+                        className="min-h-[100px] bg-background border-border"
                     />
                     <DialogFooter>
                         <Button variant="secondary" onClick={() => setRejectDialogOpen(false)}>Cancel</Button>

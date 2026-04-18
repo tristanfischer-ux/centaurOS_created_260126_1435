@@ -80,9 +80,9 @@ export function QuickActions({ foundryId }: QuickActionsProps) {
   ]
   
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-orange-50/50 to-transparent">
+      <div className="p-6 border-b border-border bg-gradient-to-r from-orange-50/50 to-transparent">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-international-orange/10 rounded-lg">
             <Zap className="w-5 h-5 text-international-orange" />
@@ -123,7 +123,7 @@ function ActionButton({ action }: { action: ActionItem }) {
       href={action.href}
       className={cn(
         "group relative overflow-hidden rounded-xl p-3 transition-all duration-300",
-        "border border-slate-200 hover:border-transparent hover:shadow-lg",
+        "border border-border hover:border-transparent hover:shadow-lg",
         "flex flex-col items-center justify-center gap-1.5 text-center"
       )}
     >

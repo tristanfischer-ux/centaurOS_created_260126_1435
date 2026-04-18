@@ -83,7 +83,7 @@ function MetricCard({ metric, showComparison }: MetricCardProps) {
   
   const variantStyles = {
     default: {
-      bg: 'bg-muted border-slate-100',
+      bg: 'bg-muted border-border',
       icon: 'text-muted-foreground',
       value: 'text-foreground',
     },

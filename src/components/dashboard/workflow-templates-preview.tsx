@@ -58,9 +58,9 @@ export function WorkflowTemplatesPreview({ templates }: WorkflowTemplatesPreview
   const displayed = templates.slice(0, 3)
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-orange-50/50 to-transparent">
+      <div className="p-6 border-b border-border bg-gradient-to-r from-orange-50/50 to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-international-orange/10 rounded-lg">
@@ -99,7 +99,7 @@ export function WorkflowTemplatesPreview({ templates }: WorkflowTemplatesPreview
       </div>
 
       {/* Footer */}
-      <div className="p-4 bg-slate-50 border-t border-slate-100">
+      <div className="p-4 bg-slate-50 border-t border-border">
         <Link
           href="/agents"
           className="text-sm text-international-orange hover:text-orange-700 font-medium flex items-center gap-1 group w-fit"

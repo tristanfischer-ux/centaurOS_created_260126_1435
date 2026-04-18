@@ -254,7 +254,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-background border-b border-slate-100 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-background border-b border-border flex-shrink-0">
         {/* Left: Back + title */}
         <div className="flex items-center gap-3">
           <Link

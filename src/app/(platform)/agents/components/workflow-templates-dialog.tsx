@@ -194,7 +194,7 @@ function TemplateCard({
     const chainPreview = template.nodes.map((n) => n.data.label).filter(Boolean)
 
     return (
-        <div className="group border border-slate-200 rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all">
+        <div className="group border border-border rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all">
             <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div

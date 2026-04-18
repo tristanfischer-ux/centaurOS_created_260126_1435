@@ -79,7 +79,7 @@ export function AgentsHelpDialog({ open, onOpenChange }: AgentsHelpDialogProps) 
                             Step Types
                         </h3>
                         <div className="grid gap-2.5">
-                            <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                            <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-50 border border-border">
                                 <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 bg-orange-50 mt-0.5">
                                     <Sparkles className="w-3.5 h-3.5 text-orange-600" />
                                 </div>

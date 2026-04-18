@@ -109,7 +109,7 @@ export function ReaderView({ pageData, className }: ReaderViewProps): React.Reac
           </header>
 
           {/* Divider */}
-          <hr className="border-slate-100" />
+          <hr className="border-border" />
 
           {/* Rendered HTML content */}
           <div

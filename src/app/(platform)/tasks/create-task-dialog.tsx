@@ -706,7 +706,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                             </div>
                         )}
                     </div>
-                    <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
+                    <DialogFooter className="gap-2 pt-4 border-t border-border">
                         <Button variant="secondary" onClick={() => setOpenState(false)} disabled={isLoading}>Cancel</Button>
                         <Button
                             type="submit"

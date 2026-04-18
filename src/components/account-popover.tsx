@@ -109,7 +109,7 @@ export function AccountPopover({ userName, userRole }: AccountPopoverProps) {
                     })}
 
                     {/* Separator */}
-                    <div className="my-1 border-t border-slate-100" />
+                    <div className="my-1 border-t border-border" />
 
                     {/* Sign Out */}
                     <form action={signOut}>

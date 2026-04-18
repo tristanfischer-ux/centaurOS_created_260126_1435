@@ -321,7 +321,7 @@ export function StrategyDashboard({
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="space-y-4 pb-4 border-b border-slate-100">
+      <div className="space-y-4 pb-4 border-b border-border">
         {/* Row 1: Title + primary CTA */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="min-w-0 flex-1">

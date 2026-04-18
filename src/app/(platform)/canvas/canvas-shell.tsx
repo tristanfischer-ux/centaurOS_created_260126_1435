@@ -232,7 +232,7 @@ export function CanvasShell({
   return (
     <div>
       {/* Page header with inline company purpose */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-3 border-b border-slate-100">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-3 border-b border-border">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className={typography.pageHeader}>
@@ -256,7 +256,7 @@ export function CanvasShell({
 
       {/* Tab bar with status badges + action-button slot */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CanvasTab)}>
-        <div className="flex items-center px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background">
+        <div className="flex items-center px-4 sm:px-6 lg:px-8 py-2 border-b border-border bg-background">
           <TabsList aria-label="Strategy views">
             {TABS.map((tab) => {
               const Icon = tab.icon

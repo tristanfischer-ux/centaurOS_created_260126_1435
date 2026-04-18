@@ -158,7 +158,7 @@ export default function WhatsNewPage() {
     return (
         <div className="max-w-5xl space-y-6 -mt-2">
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
                 <div className="min-w-0 flex-1">
                     <div className={typography.pageHeader}>
                         <div className={typography.pageHeaderAccent} />
@@ -187,7 +187,7 @@ export default function WhatsNewPage() {
             {/* New Features Highlight */}
             {newFeatures.length > 0 && (
                 <Card className="border overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-amber-50/80 to-transparent border-b border-slate-100">
+                    <CardHeader className="bg-gradient-to-r from-amber-50/80 to-transparent border-b border-border">
                         <CardTitle className="flex items-center gap-2">
                             <div className="p-2 bg-amber-100 rounded-lg">
                                 <Sparkles className="h-4 w-4 text-amber-600" />

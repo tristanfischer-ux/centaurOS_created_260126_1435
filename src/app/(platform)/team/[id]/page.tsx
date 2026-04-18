@@ -124,7 +124,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                         const activeTasks = tasks?.filter(t => t.status === 'Pending' || t.status === 'Accepted') || []
                         const completedTasks = tasks?.filter(t => t.status === 'Completed') || []
                         return (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8 border-t border-slate-100 pt-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8 border-t border-border pt-6">
                                 <div className="flex items-center gap-3">
 <div className="p-2 bg-status-info-light text-status-info rounded-lg">
                                                         <Briefcase className="w-5 h-5" />
@@ -164,9 +164,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                 return activeTasks.length > 0 ? (
                     <div>
                         <h2 className="text-xl font-bold text-foreground mb-4">Current Tasks</h2>
-                        <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
+                        <div className="bg-background border border-border rounded-lg overflow-hidden">
                             {activeTasks.map(task => (
-                                <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center">
+                                <div key={task.id} className="p-4 border-b border-border last:border-0 hover:bg-muted flex justify-between items-center">
                                     <div>
                                         <div className="font-medium text-foreground">{task.title}</div>
                                         <div className="text-sm text-muted-foreground truncate max-w-md">{task.description}</div>
@@ -185,12 +185,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                 return (
                     <div>
                         <h2 className="text-xl font-bold text-foreground mb-4">Completed Tasks</h2>
-                        <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
+                        <div className="bg-background border border-border rounded-lg overflow-hidden">
                             {completedTasks.length === 0 ? (
                                 <div className="p-8 text-center text-muted-foreground">No completed tasks yet.</div>
                             ) : (
                                 completedTasks.map(task => (
-                                    <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center">
+                                    <div key={task.id} className="p-4 border-b border-border last:border-0 hover:bg-muted flex justify-between items-center">
                                         <div>
                                             <div className="font-medium text-foreground">{task.title}</div>
                                             <div className="text-sm text-muted-foreground truncate max-w-md">{task.description}</div>
