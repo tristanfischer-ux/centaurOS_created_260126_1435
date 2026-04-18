@@ -21,7 +21,7 @@ export interface Notification {
     read_at: string | null
 }
 
-export type NotificationType = 
+export type NotificationType =
     | 'task_assigned'
     | 'task_completed'
     | 'task_amended'
@@ -33,6 +33,7 @@ export type NotificationType =
     | 'advisory_verified'
     | 'standup_reminder'
     | 'event_reminder'
+    | 'product_auto_promoted'  // 1.3 — Forge design auto-promoted to a Product
     | 'system'
 
 // ==========================================

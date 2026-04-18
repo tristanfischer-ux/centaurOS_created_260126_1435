@@ -526,6 +526,27 @@ export async function autoPromoteIfComplete(
       cadLabProjectId,
       productId: result.data?.id,
     })
+
+    // 1.3 — Notify the founder their design landed as a Product. Fire-and-forget:
+    // a notification insert failing must not roll back or retry the promotion.
+    const promoted = result.data
+    if (promoted) {
+      const { createNotification } = await import('@/actions/notifications')
+      void createNotification({
+        userId: promoted.created_by,
+        type: 'product_auto_promoted',
+        title: `${promoted.name} is now a product`,
+        message: 'Your completed Forge design has been added to Products. Set pricing, run a market assessment, and score fundability when you are ready.',
+        link: `/products/${promoted.id}`,
+        metadata: {
+          cad_lab_project_id: cadLabProjectId,
+          product_id: promoted.id,
+        },
+      }).catch((err) => {
+        console.warn('[Products] auto-promote notification insert failed:', err)
+      })
+    }
+
     return { promoted: true, productId: result.data?.id }
   } catch (err) {
     console.error("[Products] Auto-promote failed:", err)
