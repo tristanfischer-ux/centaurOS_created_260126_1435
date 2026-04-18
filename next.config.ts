@@ -153,7 +153,16 @@ const nextConfig: NextConfig = {
               //   - Strict form-action, base-uri, and object-src restrictions below
               //
               // TODO: Migrate to nonce-based CSP when Next.js App Router supports it
-              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.stripe.com https://*.sentry.io https://*.posthog.com https://eu-assets.i.posthog.com",
+              //
+              // 'wasm-unsafe-eval': CSP3 directive that permits WebAssembly
+              // module compilation (strictly narrower than the full
+              // script-executing directive — it only lets the browser compile
+              // and instantiate .wasm modules). Required by
+              // @react-pdf/renderer, which uses WASM for its PDF font and
+              // layout pipeline. Without this, the Design Report PDF export
+              // silently fails with a "WebAssembly.instantiate violates CSP"
+              // message and the background op completes with zero output.
+              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://*.supabase.co https://*.stripe.com https://*.sentry.io https://*.posthog.com https://eu-assets.i.posthog.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
