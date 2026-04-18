@@ -93,6 +93,8 @@ import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommender"
 import { matchManufacturingTechniques } from "@/actions/cad-lab-dfm-match"
 import type { ManufacturingTechniqueMatch } from "@/actions/cad-lab-dfm-match"
+import { getSupplierSnapshotForModule } from "@/actions/cad-lab-supplier-snapshot"
+import type { SupplierSnapshot } from "@/actions/cad-lab-supplier-snapshot"
 import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
@@ -287,6 +289,48 @@ export default function SpecifyPage(): React.ReactNode {
         .catch((err) => console.warn("[SPECIFY] DfM semantic match failed:", err))
     }
   }, [modules, diagnosticAnswers])
+
+  // ── Phase 5D: Real-World Supplier Snapshot per module ──
+  // Aggregates marketplace listings matching the module's process + material
+  // into a short "7 suppliers match, 3 aerospace-certified, 4–8 wk lead" line
+  // inside the Manufacturing Intelligence tab. Separate from the per-supplier
+  // match used on Source — this one surfaces counts, not a candidate list.
+  const [supplierSnapshots, setSupplierSnapshots] = useState<Record<string, SupplierSnapshot>>({})
+  const snapshotFingerprintRef = useRef<Record<string, string>>({})
+
+  useEffect(() => {
+    // Infer project-level industries once from use case / purpose free-text,
+    // using the same keyword map as the matcher would. Keeping it light here
+    // to avoid an extra server round-trip.
+    const useCaseText = (designBrief?.useCase ?? "").toLowerCase()
+    const purposeText = modules.map((m) => `${m.name} ${m.purpose}`).join(" ").toLowerCase()
+    const haystack = `${useCaseText} ${purposeText}`
+    const industryGuess: string[] = []
+    if (/aerospace|aviation|uav|drone|haps|satellite|space|aircraft|avionics/.test(haystack)) industryGuess.push("aerospace")
+    if (/medical|implant|surgical|dental|orthopaedic|orthopedic/.test(haystack)) industryGuess.push("medical")
+    if (/automotive|vehicle|electric vehicle/.test(haystack)) industryGuess.push("automotive")
+    if (/defence|defense|military|tactical/.test(haystack)) industryGuess.push("defence")
+
+    for (const mod of modules) {
+      const diag = diagnosticAnswers[mod.id]
+      const process = diag?.mfg_process?.trim() ?? null
+      const material = diag?.material?.trim() ?? null
+      if (!process && !material) continue
+      const fp = `${process ?? ""}|${material ?? ""}|${industryGuess.join(",")}`
+      if (snapshotFingerprintRef.current[mod.id] === fp) continue
+      snapshotFingerprintRef.current[mod.id] = fp
+      getSupplierSnapshotForModule({
+        moduleId: mod.id,
+        process,
+        material,
+        projectIndustries: industryGuess.length > 0 ? industryGuess : undefined,
+      })
+        .then((snap) => {
+          setSupplierSnapshots((prev) => ({ ...prev, [mod.id]: snap }))
+        })
+        .catch((err) => console.warn("[SPECIFY] Supplier snapshot failed:", err))
+    }
+  }, [modules, diagnosticAnswers, designBrief?.useCase])
 
   // ── Diagnostic handlers ──
 
@@ -1807,6 +1851,8 @@ export default function SpecifyPage(): React.ReactNode {
               processInsights={processInsights}
               techniqueRecs={techniqueRecs}
               semanticTechniqueMatches={semanticTechniqueMatches}
+              supplierSnapshots={supplierSnapshots}
+              aiCostEstimates={aiCostEstimates}
             />
           </motion.div>
         )}

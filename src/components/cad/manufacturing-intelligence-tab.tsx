@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react"
-import { Factory, Lightbulb, Zap, Info, Sparkles } from "lucide-react"
+import { Factory, Lightbulb, Zap, Info, Sparkles, Building2, Banknote } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -27,11 +27,12 @@ import { ManufacturingInsightCard } from "@/components/cad/manufacturing-insight
 import { TechniqueDetailDialog } from "@/components/techniques/technique-detail-dialog"
 import { getTechniqueBySlug } from "@/lib/manufacturing-techniques"
 import type { ManufacturingTechnique } from "@/lib/manufacturing-techniques"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommender"
 import type { ManufacturingTechniqueMatch } from "@/actions/cad-lab-dfm-match"
+import type { SupplierSnapshot } from "@/actions/cad-lab-supplier-snapshot"
 
 interface ManufacturingIntelligenceTabProps {
   modules: CadLabModule[]
@@ -40,6 +41,37 @@ interface ManufacturingIntelligenceTabProps {
   techniqueRecs: Record<string, TechniqueRecommendation[]>
   /** Phase 5: vector-backed semantic matches per module from match_manufacturing_techniques RPC. */
   semanticTechniqueMatches?: Record<string, ManufacturingTechniqueMatch[]>
+  /** Phase 5D: per-module aggregate of marketplace suppliers matching the spec. */
+  supplierSnapshots?: Record<string, SupplierSnapshot>
+  /** Phase 5D: module cost estimates used to render a confidence-banded cost line. */
+  aiCostEstimates?: Record<string, AiCostEstimate>
+}
+
+/**
+ * Confidence → band width as a ± fraction around `totalPerUnit`.
+ * Matches the realism users expect: low-confidence estimates swing wider
+ * than high-confidence ones, so we show a fatter band.
+ */
+const CONFIDENCE_BAND: Record<"low" | "medium" | "high", number> = {
+  low: 0.5,
+  medium: 0.3,
+  high: 0.15,
+}
+
+function formatDayRange(minDays: number | null, maxDays: number | null): string | null {
+  if (minDays == null || maxDays == null) return null
+  const toWeeks = (d: number) => Math.max(1, Math.round(d / 7))
+  if (minDays >= 14) {
+    return `${toWeeks(minDays)}–${toWeeks(maxDays)} weeks`
+  }
+  return `${minDays}–${maxDays} days`
+}
+
+function formatGbp(n: number): string {
+  if (n >= 1000) {
+    return `£${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k`
+  }
+  return `£${Math.round(n)}`
 }
 
 export function ManufacturingIntelligenceTab({
@@ -48,6 +80,8 @@ export function ManufacturingIntelligenceTab({
   processInsights,
   techniqueRecs,
   semanticTechniqueMatches,
+  supplierSnapshots,
+  aiCostEstimates,
 }: ManufacturingIntelligenceTabProps) {
   const [selectedTechnique, setSelectedTechnique] = useState<ManufacturingTechnique | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -115,7 +149,7 @@ export function ManufacturingIntelligenceTab({
                   What&rsquo;s this data?
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-[320px] text-xs space-y-2">
+              <PopoverContent className="w-[340px] text-xs space-y-2">
                 <p className="font-medium text-foreground">Design-for-Manufacture data sources</p>
                 <ul className="space-y-1 text-muted-foreground list-disc pl-4">
                   <li>
@@ -126,6 +160,12 @@ export function ManufacturingIntelligenceTab({
                   </li>
                   <li>
                     <span className="text-foreground">Related techniques (semantic)</span> &mdash; vector retrieval (nomic-embed-text-v1.5, 768-dim pgvector HNSW) over the technique enrichment library. Surfaces near-neighbour techniques a keyword rule would miss.
+                  </li>
+                  <li>
+                    <span className="text-foreground">Real-World Supplier Snapshot</span> &mdash; live aggregate across marketplace_listings matching the module&rsquo;s process + material. Regulated-cert counts align to the project&rsquo;s inferred industry.
+                  </li>
+                  <li>
+                    <span className="text-foreground">Cost Band</span> &mdash; the specialist cost estimate widened by a confidence band (±50/30/15% for low/medium/high). Directional, not a quote.
                   </li>
                 </ul>
                 <p className="pt-1 text-muted-foreground">
@@ -243,8 +283,66 @@ export function ManufacturingIntelligenceTab({
                 )
               })()}
 
+              {/* Real-World Supplier Snapshot (Phase 5D) — aggregate counts
+                  from marketplace_listings matching this module's spec. */}
+              {(() => {
+                const snap = supplierSnapshots?.[mod.id]
+                if (!snap || snap.total === 0) return null
+                const leadBand = formatDayRange(snap.leadTimeDaysMin, snap.leadTimeDaysMax)
+                const topRegion = snap.topRegions[0]
+                return (
+                  <div className="space-y-1.5 rounded-md bg-muted/40 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <Building2 className="h-3.5 w-3.5" />
+                      Real-World Supplier Snapshot
+                    </div>
+                    <p className="text-xs text-foreground leading-relaxed">
+                      <span className="font-semibold">{snap.total}</span> marketplace supplier{snap.total !== 1 ? "s" : ""} match this spec
+                      {snap.verified > 0 && (
+                        <>, <span className="font-medium">{snap.verified}</span> verified</>
+                      )}
+                      {snap.regulatedCertCount > 0 && snap.regulatedCertLabel && (
+                        <>, <span className="font-medium">{snap.regulatedCertCount}</span> {snap.regulatedCertLabel}</>
+                      )}
+                      {leadBand && (
+                        <>. Typical lead time <span className="font-medium">{leadBand}</span></>
+                      )}
+                      {topRegion && topRegion.count > 0 && (
+                        <>. Most are in <span className="font-medium">{topRegion.region}</span> ({topRegion.count})</>
+                      )}
+                      .
+                    </p>
+                  </div>
+                )
+              })()}
+
+              {/* Cost Band (Phase 5D) — confidence-adjusted ± around the
+                  per-unit estimate. Not a commitment; just grounds the design
+                  discussion in realistic numbers. */}
+              {(() => {
+                const est = aiCostEstimates?.[mod.id]
+                if (!est || !est.totalPerUnit || est.totalPerUnit <= 0) return null
+                const band = CONFIDENCE_BAND[est.confidence]
+                const low = est.totalPerUnit * (1 - band)
+                const high = est.totalPerUnit * (1 + band)
+                return (
+                  <div className="space-y-1.5 rounded-md bg-muted/40 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <Banknote className="h-3.5 w-3.5" />
+                      Cost Band
+                    </div>
+                    <p className="text-xs text-foreground leading-relaxed">
+                      Estimated{" "}
+                      <span className="font-semibold">{formatGbp(low)}–{formatGbp(high)}</span>{" "}
+                      per unit
+                      <span className="text-muted-foreground"> ({Math.round(band * 100)}% band · {est.confidence} confidence)</span>
+                    </p>
+                  </div>
+                )
+              })()}
+
               {/* No insights available */}
-              {!insights && recs.length === 0 && !(semanticTechniqueMatches?.[mod.id]?.length) && (
+              {!insights && recs.length === 0 && !(semanticTechniqueMatches?.[mod.id]?.length) && !supplierSnapshots?.[mod.id] && !aiCostEstimates?.[mod.id] && (
                 <p className="text-xs text-muted-foreground italic">
                   No manufacturing intelligence available for this process yet.
                 </p>
