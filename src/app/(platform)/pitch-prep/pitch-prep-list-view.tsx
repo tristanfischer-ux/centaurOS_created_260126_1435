@@ -19,9 +19,34 @@ import {
   ChevronRight,
   TrendingUp,
 } from 'lucide-react'
+import { ProgressRing } from '@/components/ui/progress-ring'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { PitchPrepRequest, PitchPrepStatus } from '@/types/pitch-prep'
 import { formatDistanceToNow } from 'date-fns'
+
+// 8 canonical readiness sections a pitch-prep request should fill before sending.
+// Mirrors the high-signal fields investors ask about.
+const READINESS_SECTIONS = [
+  { key: 'company_website', label: 'Website' },
+  { key: 'target_market', label: 'Target market' },
+  { key: 'problem_solved', label: 'Problem' },
+  { key: 'competitive_landscape', label: 'Competitive landscape' },
+  { key: 'traction_summary', label: 'Traction' },
+  { key: 'amount_seeking', label: 'Raise amount' },
+  { key: 'use_of_funds', label: 'Use of funds' },
+  { key: 'pitch_deck_url', label: 'Deck' },
+] as const
+
+function computeReadiness(request: PitchPrepRequest): { complete: number; total: number; percent: number } {
+  const total = READINESS_SECTIONS.length
+  let complete = 0
+  for (const { key } of READINESS_SECTIONS) {
+    const value = request[key as keyof PitchPrepRequest]
+    if (typeof value === 'string' && value.trim().length > 0) complete += 1
+    else if (Array.isArray(value) && value.length > 0) complete += 1
+  }
+  return { complete, total, percent: Math.round((complete / total) * 100) }
+}
 
 interface PitchPrepListViewProps {
   requests: PitchPrepRequest[]
@@ -115,6 +140,7 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
         <div className="grid gap-4">
           {requests.map((request) => {
             const statusConfig = STATUS_COLORS[request.status]
+            const readiness = computeReadiness(request)
             return (
               <Link key={request.id} href={`/pitch-prep/${request.id}`}>
                 <Card className="hover:border-accent hover:shadow-md transition-all cursor-pointer">
@@ -129,6 +155,13 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
                           <Badge variant={statusConfig.variant}>
                             {statusConfig.label}
                           </Badge>
+                          <span
+                            className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground"
+                            title={`${readiness.complete}/${readiness.total} readiness sections complete`}
+                          >
+                            <ProgressRing progress={readiness.percent} size={20} strokeWidth={3} />
+                            <span>{readiness.complete}/{readiness.total} ready</span>
+                          </span>
                         </div>
                         
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
