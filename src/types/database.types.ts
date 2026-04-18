@@ -4122,6 +4122,7 @@ export type Database = {
       }
       cad_lab_projects: {
         Row: {
+          accepted_risks: Json | null
           ai_cost_estimates: Json | null
           batch_started_at: string | null
           batch_status: string
@@ -4161,6 +4162,7 @@ export type Database = {
           status: string
           subject: string
           system_illustration_url: string | null
+          target_unit_cost_gbp: number | null
           thumbnail_svg: string | null
           unified_code: string | null
           unified_result: Json | null
@@ -4168,6 +4170,7 @@ export type Database = {
           visual_style: Json | null
         }
         Insert: {
+          accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
           batch_started_at?: string | null
           batch_status?: string
@@ -4207,6 +4210,7 @@ export type Database = {
           status?: string
           subject: string
           system_illustration_url?: string | null
+          target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
           unified_result?: Json | null
@@ -4214,6 +4218,7 @@ export type Database = {
           visual_style?: Json | null
         }
         Update: {
+          accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
           batch_started_at?: string | null
           batch_status?: string
@@ -4253,6 +4258,7 @@ export type Database = {
           status?: string
           subject?: string
           system_illustration_url?: string | null
+          target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
           unified_result?: Json | null
@@ -5406,6 +5412,72 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_iterations: {
+        Row: {
+          alternatives_presented: Json
+          applied_at: string | null
+          chosen_option_index: number | null
+          concern_hash: string
+          concern_text: string
+          created_at: string
+          founder_notes: string | null
+          foundry_id: string
+          id: string
+          initiated_by: string | null
+          override_reason: string | null
+          project_id: string
+          trigger_context: Json | null
+          triggered_by: string
+        }
+        Insert: {
+          alternatives_presented: Json
+          applied_at?: string | null
+          chosen_option_index?: number | null
+          concern_hash: string
+          concern_text: string
+          created_at?: string
+          founder_notes?: string | null
+          foundry_id: string
+          id?: string
+          initiated_by?: string | null
+          override_reason?: string | null
+          project_id: string
+          trigger_context?: Json | null
+          triggered_by: string
+        }
+        Update: {
+          alternatives_presented?: Json
+          applied_at?: string | null
+          chosen_option_index?: number | null
+          concern_hash?: string
+          concern_text?: string
+          created_at?: string
+          founder_notes?: string | null
+          foundry_id?: string
+          id?: string
+          initiated_by?: string | null
+          override_reason?: string | null
+          project_id?: string
+          trigger_context?: Json | null
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_iterations_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_iterations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
             referencedColumns: ["id"]
           },
         ]
