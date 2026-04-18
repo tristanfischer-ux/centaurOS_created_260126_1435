@@ -6,6 +6,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FrequencyBadge } from '@/components/cash-burn/frequency-badge'
 import { formatCurrency } from '@/types/payments'
 import type { Frequency } from '@/types/cash-burn'
@@ -107,9 +108,22 @@ export function ItemsSection({
                   )}
                   <FrequencyBadge frequency={item.frequency} />
                   {item.probabilityPct != null && item.probabilityPct < 100 && (
-                    <Badge variant="warning" size="sm">
-                      {item.probabilityPct}%
-                    </Badge>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="warning" size="sm" className="cursor-help">
+                            {item.probabilityPct}% likely
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>
+                            This income has a {item.probabilityPct}% probability of landing
+                            (e.g. a pipeline deal, pending grant, or seeded revenue forecast).
+                            Weekly amount shown on the right is already discounted by this factor.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                   {item.productName && (
                     <Badge variant="outline" size="sm">
