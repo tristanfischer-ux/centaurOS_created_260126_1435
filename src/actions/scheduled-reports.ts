@@ -81,7 +81,7 @@ function daysInMonth(year: number, monthZeroBased: number): number {
   return new Date(Date.UTC(year, monthZeroBased + 1, 0)).getUTCDate()
 }
 
-function computeNextRunAt(frequency: ScheduledReportFrequency, dayOfWeek: number | undefined, dayOfMonth: number | undefined, from: Date = new Date()): Date {
+export function computeNextRunAt(frequency: ScheduledReportFrequency, dayOfWeek: number | undefined, dayOfMonth: number | undefined, from: Date = new Date()): Date {
   const nowUtc = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate(), from.getUTCHours(), from.getUTCMinutes()))
   if (frequency === 'weekly') {
     const targetDow = dayOfWeek ?? 1

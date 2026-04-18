@@ -15815,6 +15815,50 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_report_runs: {
+        Row: {
+          created_at: string
+          error: string | null
+          foundry_id: string
+          id: string
+          recipients_count: number
+          run_at: string
+          schedule_id: string
+          status: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          foundry_id: string
+          id?: string
+          recipients_count?: number
+          run_at?: string
+          schedule_id: string
+          status: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          foundry_id?: string
+          id?: string
+          recipients_count?: number
+          run_at?: string
+          schedule_id?: string
+          status?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_report_runs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_reports: {
         Row: {
           config_json: Json
