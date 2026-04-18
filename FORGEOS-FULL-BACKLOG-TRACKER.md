@@ -238,7 +238,7 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 1.1A | Cash Burn: migration + revenue seed (Cash In button) | **done** | `07395016` | ✓ (conditional-empty verified on prod; retrofit green-check also live as bonus) | A founder with priced products can one-click seed monthly revenue rows into Cash In at 50% probability. Idempotent re-runs. |
 | 1.1B | Cash Burn: COGS seed (Cash Out button) | **done** | `3fec72bd` | pending (will verify post-deploy) | Founder with priced products + COGS estimates can one-click seed monthly COGS rows into Cash Out. Mirrors 1.1A idempotency. |
 | 1.1C | Cash Burn: objective-driven spend seed (optional) | **deferred** | — | — | Objectives schema has no clean planned-spend column; only signal would be fragile description-parsing. Moved to backlog — revisit when adding `planned_monthly_spend_pence` + `spend_category` columns is its own dedicated change. |
-| 1.2A | Reports Schedule: migration (scheduled_reports table) | pending | — | — | — |
+| 1.2A | Reports Schedule: migration (scheduled_reports table) | **done** | `4f9b97f7` | N/A (migration only — no UI yet) | Foundation for Reports Schedule feature. 14 cols, 4 indexes, 4 RLS policies mirroring Products. Zero risk — additive, no consumers yet. |
 | 1.2B | Reports Schedule: action + restored button | pending | — | — | — |
 | 1.2C | Reports Schedule: cron worker + email dispatch | pending | — | — | — |
 | 1.3 | autoPromoteIfComplete surface | pending | — | — | — |
