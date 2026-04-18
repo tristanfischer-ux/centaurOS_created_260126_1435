@@ -2,6 +2,7 @@
 
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { classifyAIError } from '@/lib/agents/error-classification'
 import { z } from 'zod'
 import {
   businessPlanAnalysisSchema,
@@ -331,7 +332,7 @@ export async function analyzeBusinessPlan(
       const jsonSectionCount = 5
       if (failedSections.length === jsonSectionCount) {
         console.error('[analyze] All sections failed to parse:', { failedSections })
-        return { error: 'Failed to parse AI response. Please try again.' }
+        return { error: classifyAIError(new Error('json parse failed on all sections')).message }
       }
 
       if (failedSections.length > 0) {

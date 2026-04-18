@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
+import { classifyAIError } from "@/lib/agents/error-classification"
 import type { CadLabDesignBrief } from "@/lib/cad-lab-types"
 
 /** Maximum length for a single user answer — prevents context overflow and cost abuse */
@@ -267,6 +268,6 @@ export async function synthesizeDesignBrief(
     }
   } catch (err) {
     console.error("[INTERVIEW] Failed to parse Opus response:", text.slice(0, 500), err)
-    throw new Error("Failed to synthesize design brief")
+    throw new Error(classifyAIError(err).message)
   }
 }
