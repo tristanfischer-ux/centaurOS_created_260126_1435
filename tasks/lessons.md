@@ -367,6 +367,26 @@ REASON: First PDF prototype used `useMemo(() => Font.register(...), [])` inside 
 
 RELATED: `src/lib/cad-lab/export-design-report-pdf.tsx`, `src/lib/constants/brand-tokens.ts` (GOOGLE_FONT_URLS registry).
 
+### 2026-04-18 - RULE: Adding `@react-pdf/renderer` (or anything WASM-backed) to a client bundle requires 'wasm-unsafe-eval' in CSP script-src
+
+NEVER: Assume a new client-side dependency will run under the existing Next.js CSP. Anything that ships WebAssembly (`@react-pdf/renderer` for its font/layout pipeline; `onnxruntime-web`; `opencascade.js`; some image-processing libs) is blocked by default because the project's CSP does not include `'wasm-unsafe-eval'`. The failure mode is silent: no console throw the user notices, only a dev-tools warning "WebAssembly.instantiate() violates the following Content Security Policy directive", and the feature just does not work.
+
+ALWAYS: After installing a WASM-backed dependency, check `next.config.ts` → `headers()` → Content-Security-Policy → `script-src`. If `'wasm-unsafe-eval'` isn't there, add it. It is a CSP3 directive strictly narrower than the full code-execution directive — it only permits WebAssembly compilation, not arbitrary string-to-code evaluation, so the XSS threat surface is unchanged.
+
+REASON: The Design Report PDF variant failed on 2026-04-18 across all four audiences. The BackgroundOps pill reported "completed" because the fetch+upload code ran, but the WASM module never instantiated, so the produced Blob was zero bytes and the download was broken. Fixed in commit `f796f86a`.
+
+RELATED: `next.config.ts`, any client-loaded library that ships `.wasm`.
+
+### 2026-04-18 - RULE: Supabase Storage's allowed_mime_types does an exact-string match — no charset suffix, no blob fallback
+
+NEVER: Rely on the `contentType` option of `supabase.storage.upload()` alone to satisfy the bucket's `allowed_mime_types` check. The check reads the Blob's own `.type` field first, and Supabase doesn't strip `; charset=...` suffixes or normalise synonyms. Two symptoms: (a) pptxgenjs blobs have `type: ''` so even with `contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'` in options the upload is rejected because the Blob's empty string doesn't match the allow-list; (b) an `upload(..., { contentType: 'text/html; charset=utf-8' })` fails even though 'text/html' is on the allow-list, because the full header value is compared against the array.
+
+ALWAYS: Rewrap the Blob with the exact allowed MIME before upload — `new Blob([blob], { type: 'text/html' })`. Strip any `; charset` suffixes. Verify `allowed_mime_types` via `SELECT allowed_mime_types FROM storage.buckets WHERE id = '<bucket>'` if uploads silently produce null storage_paths.
+
+REASON: 16-cell audience × format verification on 2026-04-18 showed 7/16 exports with `report_downloads.storage_path = null` despite the local download working fine. Tracked down to (a) pptxgenjs Blob type='' and (b) my html content-type including the charset. Fixed in commit `47dddd86`.
+
+RELATED: `src/app/(platform)/the-forge/cad-lab/components/design-report-dialog.tsx`, any new bucket with `allowed_mime_types` set.
+
 ### 2026-04-18 - RULE: agent-browser (headless Chromium) does not route downloads to `~/Downloads` — verify via DB + BackgroundOps pill, never filesystem
 
 NEVER: After triggering an authenticated in-app download from an agent-browser session, assume the file will land in the user's `~/Downloads` folder. The headless Chromium sandbox writes downloads into an ephemeral profile directory and does not inherit the Mac user's download prefs. `ls ~/Downloads` will show nothing new, and you will chase phantom bugs.
