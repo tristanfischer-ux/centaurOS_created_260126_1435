@@ -13,7 +13,7 @@
 
 // DECISION: Dynamic import per-call (matches cad-lab-cost.ts pattern) to avoid
 // module-scope side effects. The Anthropic SDK handles connection pooling internally.
-const MODEL_ID = 'claude-opus-4-6'
+const MODEL_ID = 'claude-opus-4-7'
 const API_TIMEOUT_MS = 45_000
 
 // ─── Public Types ─────────────────────────────────────────────────

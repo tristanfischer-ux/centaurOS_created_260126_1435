@@ -335,7 +335,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       hardwareItemCount: number; processesApplied: string[];
       supplierTechniques: number; totalDataPoints: number;
     } | undefined
-    let synthesisModel = "claude-opus-4-6"
+    let synthesisModel = "claude-opus-4-7"
     try {
       const domain = await detectDomainFromProductDescription(description)
 
@@ -496,7 +496,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
 export async function generateCadLabInterface(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
 ): Promise<CadLabInterfaceResult & { templateMatchResult?: TemplateMatchResult }> {
@@ -792,7 +792,7 @@ export async function generateCadLabModel(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   checkpointContext?: string,
   interfaceWarnings?: PreExecValidationResult[],
   cachedTemplateMatch?: TemplateMatchResult,
@@ -1541,7 +1541,7 @@ async function generateCadLabModelWithSeed(
   researchReport: string,
   interfaceDefinition: string,
   seedTemplate: { slug: string; name: string; category: string; stepUrl: string; score: number },
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   checkpointContext?: string,
   designBrief?: CadLabDesignBrief,
   domainHint?: CadLabDomain,
@@ -1975,7 +1975,7 @@ export async function prepareDecomposition(
 export async function skeletonDecompose(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   domainHint?: CadLabDomain,
   documentContext?: string,
 ): Promise<SkeletonDecompositionResult> {
@@ -2147,7 +2147,7 @@ export async function expandModuleDetail(
   targetModuleId: string,
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   domainHint?: CadLabDomain,
   consistencyBrief?: string,
   documentContext?: string,
@@ -2311,7 +2311,7 @@ function dlog(msg: string) {
 export async function decomposeIntoModules(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   domainHint?: CadLabDomain,
 ): Promise<CadLabDecompositionResult> {
   // AUTH: Verify user is authenticated
@@ -2359,66 +2359,61 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections" arrays.`
 
-    // DECISION: Race Sonnet + Gemini in parallel via Promise.any, then OpenAI sequential fallback.
-    // Parallel racing means total time = max(150s, 150s) + 120s = 270s worst case — fits Vercel 300s cap.
-    // TRIED: Sequential Opus(120s)→Sonnet(120s)→Qwen(120s)→Gemini(120s)→OpenAI(120s) — 600s worst case,
-    //   far exceeds Vercel 300s cap. All models genuinely timeout at 120s for complex prompts (~13.5K chars).
-    // TRIED: AbortSignal.timeout — silently fails in Next.js server actions (commit 0795994c fixed mechanism,
-    //   but sequential chain still too slow).
+    // DECISION: Claude is AUTHORITATIVE for breakdown. Gemini + OpenAI are
+    // sequential fallbacks only when Claude genuinely fails.
+    //
+    // TRIED (previous): Promise.any race between Claude and Gemini — whichever
+    // responded first got credited. Gemini often won on speed, not quality,
+    // producing the "Breakdown: Gemini Pro" UI label that Tristan called out
+    // as wrong. Race optimises for latency, not output quality.
+    //
+    // NEW: Claude first with 180s timeout (Opus 4.7 typically completes in
+    // 30-60s on 8K tokens; 180s is generous headroom without breaching the
+    // Vercel 300s cap). If Claude fails (network, timeout, API error),
+    // Gemini tries for 90s. If both fail, OpenAI for 30s. Worst case 300s.
+    // In practice Claude succeeds, Gemini/OpenAI rarely trigger.
     dlog(`System prompt length: ${modulePrompt.length} chars`)
     dlog(`User prompt length: ${userPrompt.length} chars`)
     let text: string, tokensIn: number, tokensOut: number
     let winnerModel = ""
 
-    // Race user's chosen Claude model + Gemini in parallel — first success wins
     const claudeLabel = modelId.includes("opus") ? "Opus" : modelId.includes("haiku") ? "Haiku" : "Sonnet"
-    dlog(`>>> RACING: ${claudeLabel}(150s) + Gemini(150s) in parallel`)
-    const raceStart = Date.now()
-
-    type RaceResult = { text: string; tokensIn: number; tokensOut: number; model: string }
-
-    const claudePromise: Promise<RaceResult> = callClaude(
-      modulePrompt, userPrompt, modelId, 8192, 150_000, 1,
-    ).then(r => {
-      dlog(`<<< ${claudeLabel.toUpperCase()} SUCCEEDED in ${Date.now() - raceStart}ms`)
-      return { ...r, model: claudeLabel }
-    }).catch(err => {
-      const msg = err instanceof Error ? err.message.slice(0, 200) : String(err)
-      dlog(`<<< ${claudeLabel.toUpperCase()} FAILED in ${Date.now() - raceStart}ms: ${msg}`)
-      triedModels.push({ model: claudeLabel, error: msg })
-      throw err
-    })
-
-    const geminiPromise: Promise<RaceResult> = callGemini(
-      modulePrompt, userPrompt, "gemini-3.1-pro-preview", 8192, 150_000,
-    ).then(r => {
-      dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - raceStart}ms`)
-      return { ...r, model: "Gemini" }
-    }).catch(err => {
-      const msg = err instanceof Error ? err.message.slice(0, 200) : String(err)
-      dlog(`<<< GEMINI FAILED in ${Date.now() - raceStart}ms: ${msg}`)
-      triedModels.push({ model: "Gemini", error: msg })
-      throw err
-    })
-
+    dlog(`>>> CLAUDE (${claudeLabel}, timeout=180s) — authoritative`)
+    const claudeStart = Date.now()
     try {
-      const winner = await Promise.any([claudePromise, geminiPromise])
-      text = winner.text; tokensIn = winner.tokensIn; tokensOut = winner.tokensOut
-      winnerModel = winner.model
-      dlog(`<<< RACE WON by ${winner.model} in ${Date.now() - raceStart}ms`)
-    } catch {
-      // Both failed — try OpenAI as final resort
-      dlog(">>> ATTEMPTING OPENAI (timeout=120s) — final fallback")
-      const openaiStart = Date.now()
+      const r = await callClaude(modulePrompt, userPrompt, modelId, 8192, 180_000, 1)
+      text = r.text; tokensIn = r.tokensIn; tokensOut = r.tokensOut
+      winnerModel = claudeLabel
+      dlog(`<<< CLAUDE SUCCEEDED in ${Date.now() - claudeStart}ms`)
+    } catch (claudeErr) {
+      const claudeMsg = claudeErr instanceof Error ? claudeErr.message.slice(0, 200) : String(claudeErr)
+      dlog(`<<< CLAUDE FAILED in ${Date.now() - claudeStart}ms: ${claudeMsg}`)
+      triedModels.push({ model: claudeLabel, error: claudeMsg })
+
+      dlog(">>> GEMINI fallback (timeout=90s)")
+      const geminiStart = Date.now()
       try {
-        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-5.4", 8192, 120_000))
-        winnerModel = "GPT-5.3"
-        dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
-      } catch (openaiErr) {
-        const msg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
-        dlog(`<<< OPENAI FAILED in ${Date.now() - openaiStart}ms: ${msg}`)
-        triedModels.push({ model: "OpenAI", error: msg })
-        throw openaiErr
+        const r = await callGemini(modulePrompt, userPrompt, "gemini-3.1-pro-preview", 8192, 90_000)
+        text = r.text; tokensIn = r.tokensIn; tokensOut = r.tokensOut
+        winnerModel = "Gemini"
+        dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms`)
+      } catch (geminiErr) {
+        const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
+        dlog(`<<< GEMINI FAILED in ${Date.now() - geminiStart}ms: ${geminiMsg}`)
+        triedModels.push({ model: "Gemini", error: geminiMsg })
+
+        dlog(">>> OPENAI final fallback (timeout=30s)")
+        const openaiStart = Date.now()
+        try {
+          ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-5.4", 8192, 30_000))
+          winnerModel = "GPT-5.3"
+          dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
+        } catch (openaiErr) {
+          const msg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
+          dlog(`<<< OPENAI FAILED in ${Date.now() - openaiStart}ms: ${msg}`)
+          triedModels.push({ model: "OpenAI", error: msg })
+          throw openaiErr
+        }
       }
     }
 
@@ -2665,7 +2660,7 @@ function buildUnmatchedPortsSummary(
 export async function extractInterfaceContracts(
   modules: CadLabModule[],
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
 ): Promise<InterfaceContractResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -2870,7 +2865,7 @@ Rules:
 export async function prefillDiagnostics(
   modules: CadLabModule[],
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   domainHint?: CadLabDomain,
   options?: { useConsensusForMaterial?: boolean },
 ): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; enrichment: DiagnosticEnrichment; error?: string }> {
@@ -3205,7 +3200,7 @@ export async function generateCadLabModelSmart(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
   designBrief?: CadLabDesignBrief,
@@ -3315,7 +3310,7 @@ export async function generateMashup(
     return { success: false, error: "At least two sources are required" }
   }
 
-  const modelId = options?.modelId ?? "claude-opus-4-6"
+  const modelId = options?.modelId ?? "claude-opus-4-7"
   const materialDensity = options?.materialDensity ?? 1240
   const startTime = Date.now()
   let tokensIn = 0
@@ -3545,7 +3540,7 @@ export async function planMashup(
     return { success: false, error: "At least two sources are required" }
   }
 
-  const modelId = options?.modelId ?? "claude-opus-4-6"
+  const modelId = options?.modelId ?? "claude-opus-4-7"
   const startTime = Date.now()
 
   try {
@@ -3641,7 +3636,7 @@ export async function executeMashupPlan(
   const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
   if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" } as MashupExecuteResult
 
-  const modelId = options?.modelId ?? "claude-opus-4-6"
+  const modelId = options?.modelId ?? "claude-opus-4-7"
   const materialDensity = options?.materialDensity ?? 1240
   const startTime = Date.now()
   let tokensIn = 0

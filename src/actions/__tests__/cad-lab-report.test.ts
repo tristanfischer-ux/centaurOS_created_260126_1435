@@ -117,7 +117,7 @@ const FIXTURE_DATA: DesignReportData = {
     'mod-2': { moduleId: 'mod-2', totalPerUnit: 12.30, confidence: 'high', assumptions: ['Standard PCB fab'] },
   },
   researchModelUsed: 'gemini-3.1-pro',
-  decompositionModelUsed: 'claude-opus-4-6',
+  decompositionModelUsed: 'claude-opus-4-7',
 }
 
 const VALID_OUTLINE: ReportOutline = {

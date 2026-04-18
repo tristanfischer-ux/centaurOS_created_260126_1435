@@ -104,7 +104,7 @@ export interface ConversationEngineConfig {
     /** AI provider ID (e.g., "minimax", "anthropic") */
     providerId: string
 
-    /** Model ID (e.g., "MiniMax-M2.7", "claude-opus-4-6") */
+    /** Model ID (e.g., "MiniMax-M2.7", "claude-opus-4-7") */
     modelId: string
 
     /** Pre-built system prompt suffix (screen context, handoff, cross-specialist) */

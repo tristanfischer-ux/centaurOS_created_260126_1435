@@ -743,7 +743,7 @@ export async function generateProductIdentityAction(
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-opus-4-6",
+            model: "claude-opus-4-7",
             max_tokens: 4096,
             system: getProductIdentityPrompt(),
             messages: [{ role: "user", content: userMessage }],
@@ -858,7 +858,7 @@ export async function generateDesignSynthesisAction(
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-opus-4-6",
+            model: "claude-opus-4-7",
             max_tokens: 4096,
             system: getDesignSynthesisPrompt(),
             messages: [{ role: "user", content: messageContent }],
@@ -990,7 +990,7 @@ export async function reconcileDesignAction(
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-opus-4-6",
+            model: "claude-opus-4-7",
             max_tokens: 16384,
             // GOTCHA: Pass the project's illustration_style so the schema's
             // heroImagePrompt + perModuleImagePrompts rendering contract is

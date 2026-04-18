@@ -20,7 +20,7 @@ export const DEBATE_PERSONAS: DebatePersona[] = [
     label: "BULL",
     position: "Argues FOR the proposition",
     providerId: "anthropic",
-    modelId: "claude-opus-4-6",
+    modelId: "claude-opus-4-7",
     color: "text-success",
   },
   {

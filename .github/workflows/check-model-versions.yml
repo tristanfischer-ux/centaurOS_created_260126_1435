@@ -1,0 +1,101 @@
+name: LLM model-version monitor
+
+# Weekly check that the aliases in src/lib/ai/models.ts still point at the
+# newest release in each provider's family. If a provider ships a newer model,
+# this workflow opens (or updates) a GitHub issue summarising the drift.
+# Never auto-upgrades — upgrades go through code review.
+#
+# SECURITY: No untrusted input (issue/PR titles/bodies, commit messages, etc.)
+# is ever passed into a run: step — the workflow only reads from a file this
+# action itself generated, and all GitHub interactions go through
+# actions/github-script which does proper escaping for us. The only external
+# network calls are GET requests to Anthropic/Google/OpenAI model-listing
+# endpoints via scripts/check-model-versions.ts.
+#
+# Secrets required:
+#   ANTHROPIC_API_KEY — mandatory (workflow fails if missing)
+#   OPENAI_API_KEY    — optional (OpenAI check soft-fails without it)
+#   GOOGLE_API_KEY    — optional (Google check soft-fails without it)
+#   GITHUB_TOKEN      — automatic, no action needed
+
+on:
+  schedule:
+    # Mondays at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Run version check
+        id: check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          tsx scripts/check-model-versions.ts > .tmp/report.md 2> .tmp/signal.log
+          cat .tmp/signal.log
+          if grep -q "DRIFT_DETECTED=true" .tmp/signal.log; then
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Print report (always)
+        run: cat .tmp/report.md
+
+      - name: Open or update drift issue
+        if: steps.check.outputs.drift == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const body = fs.readFileSync('.tmp/report.md', 'utf8')
+            const title = body.split('\n', 1)[0].replace(/^#\s*/, '').slice(0, 120)
+
+            // Find an existing open drift issue — update in place to avoid spam.
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'llm-drift,automation',
+              per_page: 5,
+            })
+            if (openIssues.length > 0) {
+              const issue = openIssues[0]
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                title,
+                body,
+              })
+              core.notice(`Updated existing drift issue #${issue.number}`)
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['llm-drift', 'automation'],
+              })
+              core.notice(`Opened new drift issue #${created.data.number}`)
+            }

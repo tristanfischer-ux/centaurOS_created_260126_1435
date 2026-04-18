@@ -129,7 +129,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           max_tokens: 32768,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
@@ -176,7 +176,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
   console.info("[XRayScan] AI scan complete:", {
     moduleCount: parsed.modules.length,
     gatingModule: parsed.modules.find((m: { isGatingModule?: boolean; name: string }) => m.isGatingModule)?.name,
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
   })
 
   return parsed

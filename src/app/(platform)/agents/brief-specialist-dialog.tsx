@@ -130,7 +130,7 @@ function detectPresentationIntent(message: string): boolean {
 // Each specialist declares its tier in specialists-data.ts via `modelTier`.
 
 const MODEL_TIERS = {
-    claude: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+    claude: { providerId: "anthropic", modelId: "claude-opus-4-7" },
     sonnet: { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
     deepseek: { providerId: "deepseek", modelId: "deepseek-chat" },
     google: { providerId: "google", modelId: "gemini-3.1-pro-preview" },

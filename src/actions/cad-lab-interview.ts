@@ -246,7 +246,7 @@ export async function synthesizeDesignBrief(
   const text = await callClaudeForInterview(
     SYNTHESIS_SYSTEM_PROMPT,
     userPrompt,
-    "claude-opus-4-6",
+    "claude-opus-4-7",
     4096, // Generous — brief fields + summary need room for specific engineering detail
     60_000, // 60s — Opus needs more time than Sonnet for synthesis
   )

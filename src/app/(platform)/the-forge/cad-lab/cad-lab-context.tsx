@@ -449,7 +449,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Input state ──
   const [subject, setSubject] = useState("")
-  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-6")
+  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-7")
 
   // Persist draft subject so it survives navigation before Research is triggered
   useEffect(() => {

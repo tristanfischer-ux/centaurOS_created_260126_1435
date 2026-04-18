@@ -358,7 +358,7 @@ ${dataSummary}`
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           max_tokens: 12288,
           temperature: 0.3,
           system: systemPrompt,
@@ -421,7 +421,7 @@ ${dataSummary}`
   outline.executiveSummary ??= ''
   outline.narrativeThread ??= ''
 
-  await trackUsage({ model: 'claude-opus-4-6', promptTokens: tokensIn, completionTokens: tokensOut })
+  await trackUsage({ model: 'claude-opus-4-7', promptTokens: tokensIn, completionTokens: tokensOut })
 
   return { outline, tokensIn, tokensOut }
   }) // end withAIGate

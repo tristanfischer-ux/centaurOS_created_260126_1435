@@ -332,7 +332,7 @@ export async function POST(request: Request) {
         // ── Synthesis ────────────────────────────────────
         emit({ phase: "synthesis_start", message: "Writing verdict..." })
         const { text: synthesisText, costUsd: synthCost } = await callLLMStreaming(
-          "anthropic", "claude-opus-4-6",
+          "anthropic", "claude-opus-4-7",
           "Write the authoritative final synthesis. Be measured, specific, honest.",
           getSynthesisPrompt(topic, fullTranscript),
           (chunk) => emit({ phase: "synthesis_chunk", chunk }),

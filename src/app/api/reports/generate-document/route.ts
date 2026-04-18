@@ -162,7 +162,7 @@ export async function POST(request: Request): Promise<Response> {
         let tokensUsed = 0
 
         const messageStream = client.messages.stream({
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           max_tokens: 8192,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
@@ -180,7 +180,7 @@ export async function POST(request: Request): Promise<Response> {
         tokensUsed = (finalMessage.usage?.input_tokens ?? 0) + (finalMessage.usage?.output_tokens ?? 0)
 
         guard.trackUsage({
-          model: 'claude-opus-4-6',
+          model: 'claude-opus-4-7',
           promptTokens: finalMessage.usage?.input_tokens,
           completionTokens: finalMessage.usage?.output_tokens,
         }).catch(() => {})

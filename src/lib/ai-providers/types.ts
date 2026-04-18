@@ -74,7 +74,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         bgColor: "bg-amber-50",
         models: [
             { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", modality: "text", description: "Recommended — best balance of cost and quality", maxTokens: 1000000, default: true },
-            { id: "claude-opus-4-6", name: "Claude Opus 4.6", modality: "text", description: "Most intelligent — best for strategy, analysis, and complex reasoning", maxTokens: 1000000 },
+            { id: "claude-opus-4-7", name: "Claude Opus 4.6", modality: "text", description: "Most intelligent — best for strategy, analysis, and complex reasoning", maxTokens: 1000000 },
             { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", modality: "text", description: "Fastest with near-frontier intelligence", maxTokens: 200000 },
         ],
     },

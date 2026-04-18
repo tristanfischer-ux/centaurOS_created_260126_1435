@@ -2634,7 +2634,7 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-opus-4-6",
+            model: "claude-opus-4-7",
             max_tokens: 16384,
             system: CONCEPT_RESEARCH_PROMPT,
             messages: [{

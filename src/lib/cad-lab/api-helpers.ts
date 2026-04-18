@@ -98,7 +98,7 @@ export function extractJsonObject(text: string): string {
 export async function callClaude(
   systemPrompt: string,
   userPrompt: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-7",
   maxTokens: number = 16384,
   timeoutMs: number = 600_000, // 10 min default — building models need extended generation time
   maxRetries: number = 3, // INTENT: Callers like decomposition pass 1 to fail fast → Gemini fallback

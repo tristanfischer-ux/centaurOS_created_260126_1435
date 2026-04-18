@@ -18,7 +18,7 @@ import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 // on complex action plans because it can't synthesize day-by-day checklists
 // into structured objectives. Other sections (hires, funding, products) are
 // simpler extraction tasks that Sonnet handles fine.
-const OBJECTIVES_MODEL = 'claude-opus-4-6'
+const OBJECTIVES_MODEL = 'claude-opus-4-7'
 const SECTION_MODEL = 'claude-sonnet-4-6'
 const OBJECTIVES_MAX_TOKENS = 8192
 const SECTION_MAX_TOKENS = 4096

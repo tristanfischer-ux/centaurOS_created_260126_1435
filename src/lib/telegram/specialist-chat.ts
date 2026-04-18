@@ -181,7 +181,7 @@ export async function sendToSpecialist(
 
     // Determine provider and model from specialist config
     const providerId: AIProviderId = specialist.modelTier === 'claude' ? 'anthropic' : 'minimax'
-    const modelId = specialist.modelTier === 'claude' ? 'claude-opus-4-6' : 'MiniMax-M2.7'
+    const modelId = specialist.modelTier === 'claude' ? 'claude-opus-4-7' : 'MiniMax-M2.7'
 
     // Resolve API key from environment
     const envMap: Partial<Record<AIProviderId, string>> = {

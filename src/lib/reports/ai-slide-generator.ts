@@ -25,7 +25,7 @@ import { generateSlideBackgroundImage } from './report-image-generator'
 
 // DECISION: Dynamic import per-call (matches cad-lab-cost.ts pattern) to avoid
 // module-scope side effects. The Anthropic SDK handles connection pooling internally.
-const MODEL_ID = 'claude-opus-4-6'
+const MODEL_ID = 'claude-opus-4-7'
 // DECISION: 60s timeout because structured JSON generation with
 // 12-18 slides takes significantly longer than a short narrative summary.
 const API_TIMEOUT_MS = 60_000

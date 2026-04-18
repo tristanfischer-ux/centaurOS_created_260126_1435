@@ -269,7 +269,7 @@ Do NOT:
           // proportionate output that respects the 15KB scope cap.
           // Sonnet is faster/cheaper for marketing content (Mia, Cal, Max, etc.).
           model: ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist', 'sales-lead'].includes(specialistId)
-            ? 'claude-opus-4-6'
+            ? 'claude-opus-4-7'
             : 'claude-sonnet-4-6',
           max_tokens: 8192,
           system: executionPrompt,

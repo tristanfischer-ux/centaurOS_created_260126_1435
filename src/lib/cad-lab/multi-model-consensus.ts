@@ -58,7 +58,7 @@ async function callClaude(systemPrompt: string, userPrompt: string): Promise<str
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           max_tokens: 256,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],

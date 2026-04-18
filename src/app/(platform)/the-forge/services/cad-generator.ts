@@ -327,7 +327,7 @@ async function callOpus(
   const Anthropic = (await import("@anthropic-ai/sdk")).default
   const client = new Anthropic({ apiKey })
 
-  const ANTHROPIC_MODELS = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-6"] as const
+  const ANTHROPIC_MODELS = ["claude-sonnet-4-6", "claude-opus-4-7", "claude-sonnet-4-6"] as const
 
   for (const model of ANTHROPIC_MODELS) {
     try {

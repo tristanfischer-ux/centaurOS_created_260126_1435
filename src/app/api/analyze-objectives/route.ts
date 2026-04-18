@@ -24,7 +24,7 @@ import { aiGuard } from '@/lib/ai/guard'
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-const OBJECTIVES_MODEL = 'claude-opus-4-6'
+const OBJECTIVES_MODEL = 'claude-opus-4-7'
 // GOTCHA: With dates on every task, 15 objectives × 8 tasks × full fields
 // produces ~12K-16K tokens. 8192 was truncating the JSON mid-string.
 const OBJECTIVES_MAX_TOKENS = 16384

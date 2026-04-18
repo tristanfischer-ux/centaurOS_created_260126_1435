@@ -84,7 +84,7 @@ function tryFormatBriefJson(text: string): string | null {
 /** Maps raw model IDs to human-friendly display names */
 function getModelDisplayName(modelId: string): string {
   const DISPLAY_NAMES: Record<string, string> = {
-    "claude-opus-4-6": "Claude Opus 4.6",
+    "claude-opus-4-7": "Claude Opus 4.6",
     "claude-sonnet-4-6": "Claude Sonnet 4.6",
     "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
     "gemini-3.1-flash-image-preview": "Nano Banana 2 (Gemini)",
@@ -102,7 +102,7 @@ function getModelDisplayName(modelId: string): string {
 // ─── Types ────────────────────────────────────────────────────────────
 
 export interface ModelAudit {
-  /** Model ID used for code generation (e.g. "claude-opus-4-6") */
+  /** Model ID used for code generation (e.g. "claude-opus-4-7") */
   codeModel: string
   /** Total module count */
   moduleCount: number
