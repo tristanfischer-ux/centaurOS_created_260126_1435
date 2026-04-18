@@ -22,7 +22,7 @@ import { withAuth, type ActionError } from '@/lib/server-action-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export type ReportSource = 'cad-lab' | 'reports' | 'investors' | 'finance' | 'agents'
-export type FileFormat = 'docx' | 'pptx' | 'pdf' | 'csv' | 'png'
+export type FileFormat = 'docx' | 'pptx' | 'pdf' | 'csv' | 'png' | 'html'
 
 export interface ReportDownloadRow {
   id: string

@@ -17,7 +17,7 @@
 import PptxGenJS from 'pptxgenjs'
 
 import type { DesignReportData, AiReportSection, SlideData } from '@/lib/cad-lab/design-report-types'
-import { AUDIENCE_META, DEFAULT_AUDIENCE } from '@/lib/cad-lab/audience'
+import { AUDIENCE_META, DEFAULT_AUDIENCE, reorderSectionsForAudience } from '@/lib/cad-lab/audience'
 import type { ReportAudience } from '@/lib/cad-lab/audience'
 
 // ─── Brand Constants ────────────────────────────────────────────────
@@ -299,6 +299,144 @@ function buildKpiCalloutSlide(pres: PptxGenJS, data: DesignReportData): void {
   })
 }
 
+// ─── Investor: native bar chart slide (module mass vs lead time) ────
+
+/** Render a clustered bar chart comparing per-module mass (kg) and lead
+ *  time (weeks) — native pptxgenjs chart, not a shape mosaic. Editable
+ *  inside PowerPoint. Only rendered for investor audience when there are
+ *  ≥ 2 modules with at least one of mass or lead populated. */
+function buildInvestorKpiChartSlide(pres: PptxGenJS, data: DesignReportData): void {
+  const eligible = data.modules.filter(
+    (m) => (m.estimatedMassKg ?? 0) > 0 || (m.leadWeeks ?? 0) > 0,
+  )
+  if (eligible.length < 2) return
+
+  const slide = pres.addSlide()
+  addSectionTitle(slide, 'Module mass vs lead time')
+
+  const labels = eligible.map((m) => truncate(m.name, 18))
+  const masses = eligible.map((m) => Number((m.estimatedMassKg ?? 0).toFixed(2)))
+  const leads = eligible.map((m) => m.leadWeeks ?? 0)
+
+  const chartData = [
+    { name: 'Mass (kg)', labels, values: masses },
+    { name: 'Lead (weeks)', labels, values: leads },
+  ]
+
+  slide.addChart(pres.ChartType.bar, chartData, {
+    x: MARGIN, y: 1.0, w: CONTENT_W, h: 3.9,
+    barDir: 'col',
+    barGrouping: 'clustered',
+    showLegend: true,
+    legendPos: 'b',
+    legendFontSize: 10,
+    chartColors: [ORANGE, TEAL],
+    catAxisLabelFontSize: 9,
+    catAxisLabelColor: MID_TEXT,
+    valAxisLabelFontSize: 9,
+    valAxisLabelColor: MID_TEXT,
+    showValAxisTitle: false,
+    showCatAxisTitle: false,
+    dataLabelColor: DARK_TEXT,
+    dataLabelFontSize: 8,
+  })
+
+  slide.addText(
+    'Longer bars = heavier or slower modules. Use to prioritise mass-reduction or lead-time-reduction bets.',
+    {
+      x: MARGIN, y: FOOTER_Y, w: CONTENT_W, h: 0.3,
+      fontSize: 9,
+      fontFace: 'Helvetica Neue',
+      color: MID_TEXT,
+      italic: true,
+    },
+  )
+}
+
+// ─── Supplier: BOM comparison slide ─────────────────────────────────
+
+/** Render a procurement-ready BOM table: one row per classified part with
+ *  module, make/buy, confidence, plus the module-level process/material/
+ *  lead inherited from diagnosticAnswers. Supplier-only slide. */
+function buildSupplierBomSlide(pres: PptxGenJS, data: DesignReportData): void {
+  const parts = data.classifiedParts ?? []
+  if (parts.length === 0) return
+
+  const slide = pres.addSlide()
+  addSectionTitle(slide, 'Bill of materials')
+  slide.addText(
+    `${parts.length} parts across ${data.modules.length} modules — buy vs make, process, material, lead time.`,
+    {
+      x: MARGIN, y: 0.85, w: CONTENT_W, h: 0.3,
+      fontSize: 10,
+      fontFace: 'Helvetica Neue',
+      color: MID_TEXT,
+    },
+  )
+
+  const header: PptxGenJS.TableRow = [
+    { text: 'Part', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+    { text: 'Module', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+    { text: 'Type', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG }, align: 'center' as const } },
+    { text: 'Process', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+    { text: 'Material', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+    { text: 'Tol.', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG }, align: 'center' as const } },
+    { text: 'Lead', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG }, align: 'center' as const } },
+    { text: 'Conf.', options: { bold: true, fontSize: 8, color: MID_TEXT, fill: { color: LIGHT_BG }, align: 'center' as const } },
+  ]
+
+  // INTENT: Part-level metadata lives on classifiedParts; process/material/
+  // tolerance live on module diagnosticAnswers (module-level). Join them here.
+  const moduleByName = new Map(data.modules.map((m) => [m.name, m]))
+  const rows: PptxGenJS.TableRow[] = parts.slice(0, 14).map((p, i) => {
+    const mod = moduleByName.get(p.moduleName)
+    const diag = mod ? data.diagnosticAnswers[mod.id] : null
+    const rowFill = i % 2 === 0 ? WHITE : LIGHT_BG
+    const typeColor = p.type === 'buy' ? TEAL : ORANGE
+    return [
+      { text: truncate(p.partName, 28), options: { fontSize: 8, color: DARK_TEXT, fill: { color: rowFill } } },
+      { text: truncate(p.moduleName, 20), options: { fontSize: 8, color: DARK_TEXT, fill: { color: rowFill } } },
+      { text: p.type.toUpperCase(), options: { fontSize: 8, bold: true, color: typeColor, fill: { color: rowFill }, align: 'center' as const } },
+      { text: diag?.mfg_process ?? '—', options: { fontSize: 8, color: DARK_TEXT, fill: { color: rowFill } } },
+      { text: diag?.material ?? '—', options: { fontSize: 8, color: DARK_TEXT, fill: { color: rowFill } } },
+      { text: diag?.tolerance ?? '—', options: { fontSize: 8, color: DARK_TEXT, fill: { color: rowFill }, align: 'center' as const } },
+      { text: mod?.leadWeeks != null ? `${mod.leadWeeks}w` : '—', options: { fontSize: 8, color: DARK_TEXT, fill: { color: rowFill }, align: 'center' as const } },
+      { text: p.confidence, options: { fontSize: 8, color: MID_TEXT, fill: { color: rowFill }, align: 'center' as const } },
+    ]
+  })
+
+  slide.addTable([header, ...rows], {
+    x: MARGIN, y: 1.25, w: CONTENT_W,
+    colW: [1.6, 1.3, 0.65, 1.2, 1.4, 0.8, 0.65, 1.4],
+    border: { type: 'solid', pt: 0.5, color: CARD_BORDER },
+    rowH: 0.28,
+    fontFace: 'Helvetica Neue',
+  })
+
+  if (parts.length > 14) {
+    slide.addText(`Showing 14 of ${parts.length} parts — full list in the Word export.`, {
+      x: MARGIN, y: FOOTER_Y, w: CONTENT_W, h: 0.25,
+      fontSize: 8,
+      fontFace: 'Helvetica Neue',
+      italic: true,
+      color: MID_TEXT,
+    })
+  }
+}
+
+/** Injects the audience-specific headline slide right after the KPI callout.
+ *  Investor gets the mass-vs-lead bar chart; supplier gets the BOM table.
+ *  Engineer and marketing have no v1 headline slide — they rely on the
+ *  KPI callout + AI sections. */
+function buildAudienceHeadlineSlide(pres: PptxGenJS, data: DesignReportData): void {
+  const audience: ReportAudience = data.audience ?? DEFAULT_AUDIENCE
+  if (audience === 'investor') {
+    buildInvestorKpiChartSlide(pres, data)
+  } else if (audience === 'supplier') {
+    buildSupplierBomSlide(pres, data)
+  }
+}
+
 // ─── Public API ─────────────────────────────────────────────────────
 
 /**
@@ -329,6 +467,10 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
 
   // ── 1b. At-a-glance KPI slide (audience-aware, skipped if no data) ──
   buildKpiCalloutSlide(pres, data)
+
+  // ── 1c. Audience-specific headline slide ──
+  //       Investor → mass vs lead bar chart; Supplier → BOM table.
+  buildAudienceHeadlineSlide(pres, data)
 
   // ── 2. Executive Summary ──
   if (data.productOverview) {
@@ -1401,6 +1543,10 @@ async function buildAiPptx(data: DesignReportData): Promise<Blob> {
   // ── KPI callout slide (audience-aware, sits between cover and exec summary) ──
   buildKpiCalloutSlide(pres, data)
 
+  // ── Audience-specific headline slide ──
+  //     Investor → mass vs lead bar chart; Supplier → BOM table.
+  buildAudienceHeadlineSlide(pres, data)
+
   // ── Executive Summary Slide ──
   if (aiContent.executiveSummary) {
     const summarySlide = pres.addSlide()
@@ -1417,7 +1563,12 @@ async function buildAiPptx(data: DesignReportData): Promise<Blob> {
   }
 
   // ── AI Section Slides ──
-  for (const section of aiContent.sections) {
+  // INTENT: Reorder the Gemini-written sections per audience so the deck
+  // leads with what matters (investor: narrative → cost last; supplier:
+  // BOM first; engineer: specs/standards first; marketing: narrative-led).
+  const audience: ReportAudience = data.audience ?? DEFAULT_AUDIENCE
+  const orderedAiSections = reorderSectionsForAudience(aiContent.sections, audience)
+  for (const section of orderedAiSections) {
     // Skip executive-summary as it has its own slide above
     if (section.sectionType === 'executive-summary') continue
 

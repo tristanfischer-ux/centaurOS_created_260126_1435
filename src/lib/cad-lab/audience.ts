@@ -13,7 +13,7 @@
  * - src/app/(platform)/the-forge/cad-lab/components/design-report-dialog.tsx
  */
 
-import type { ReportStage } from './design-report-types'
+import type { ReportStage, ReportSectionType } from './design-report-types'
 
 export type ReportAudience = 'investor' | 'engineer' | 'supplier' | 'marketing'
 
@@ -115,4 +115,58 @@ export function isReportAudience(value: unknown): value is ReportAudience {
 
 export function getAudienceMeta(audience: ReportAudience): AudienceMeta {
   return AUDIENCE_META[audience]
+}
+
+// ─── Audience-aware section ordering ─────────────────────────────────
+
+// INTENT: Each audience wants the AI-written sections in a different
+// order. Investor/marketing want narrative first and cost buried; supplier
+// wants BOM + suppliers up front; engineer wants specs + standards early.
+// Sections not listed for a given audience fall to the end in their
+// original order so nothing gets silently dropped.
+export const SECTION_ORDER_BY_AUDIENCE: Record<ReportAudience, readonly ReportSectionType[]> = {
+  investor: [
+    'product-overview', 'research-findings', 'module-overview',
+    'module-detail', 'specifications', 'specialist-reviews',
+    'engineering-standards', 'supplier-analysis', 'assembly-logistics',
+    'cad-output', 'conclusions', 'cost-analysis',
+  ],
+  engineer: [
+    'module-overview', 'specifications', 'engineering-standards',
+    'module-detail', 'specialist-reviews', 'cost-analysis', 'cad-output',
+    'supplier-analysis', 'part-classification', 'assembly-logistics',
+    'product-overview', 'research-findings', 'conclusions',
+  ],
+  supplier: [
+    'part-classification', 'supplier-analysis', 'specifications',
+    'engineering-standards', 'cost-analysis', 'module-overview',
+    'module-detail', 'assembly-logistics', 'cad-output',
+    'product-overview', 'specialist-reviews', 'research-findings',
+    'conclusions',
+  ],
+  marketing: [
+    'product-overview', 'module-overview', 'module-detail',
+    'research-findings', 'specialist-reviews', 'conclusions',
+    'cad-output', 'assembly-logistics', 'supplier-analysis',
+    'part-classification', 'specifications', 'engineering-standards',
+    'cost-analysis',
+  ],
+}
+
+/** Reorder AI-written sections according to the audience's priority. Stable
+ *  — sections whose type is not in the priority list keep their relative
+ *  order and fall to the end. */
+export function reorderSectionsForAudience<T extends { sectionType: ReportSectionType }>(
+  sections: readonly T[],
+  audience: ReportAudience,
+): T[] {
+  const priority = SECTION_ORDER_BY_AUDIENCE[audience]
+  const priorityIndex = new Map<ReportSectionType, number>(
+    priority.map((t, i) => [t, i]),
+  )
+  return [...sections].sort((a, b) => {
+    const ai = priorityIndex.has(a.sectionType) ? priorityIndex.get(a.sectionType)! : Number.MAX_SAFE_INTEGER
+    const bi = priorityIndex.has(b.sectionType) ? priorityIndex.get(b.sectionType)! : Number.MAX_SAFE_INTEGER
+    return ai - bi
+  })
 }

@@ -38,7 +38,7 @@ import {
   bodyParagraph as mdBodyParagraph,
   bulletParagraph as mdBulletParagraph,
 } from '@/lib/reports/markdown-to-docx'
-import { AUDIENCE_META, DEFAULT_AUDIENCE } from '@/lib/cad-lab/audience'
+import { AUDIENCE_META, DEFAULT_AUDIENCE, reorderSectionsForAudience } from '@/lib/cad-lab/audience'
 import type { ReportAudience } from '@/lib/cad-lab/audience'
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -1317,7 +1317,12 @@ async function buildAiDocx(data: DesignReportData): Promise<Blob> {
   )
 
   // ── AI Sections ──
-  for (const section of aiContent.sections) {
+  // INTENT: Reorder the Gemini-written sections per audience so the reader
+  // sees what matters first (investor: narrative → cost last; supplier:
+  // BOM/classification first; engineer: specs/standards first; marketing:
+  // narrative-led with specs at the end).
+  const orderedSections = reorderSectionsForAudience(aiContent.sections, audience)
+  for (const section of orderedSections) {
     // GOTCHA: Executive summary already rendered above — skip duplicate
     if (section.sectionType === 'executive-summary') continue
 

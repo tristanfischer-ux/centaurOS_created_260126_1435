@@ -19,7 +19,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { FileDown, FileText, Presentation, Printer, Sparkles, Route, Briefcase, Wrench, Truck, Megaphone } from "lucide-react"
+import { FileDown, FileText, Presentation, Printer, Sparkles, Route, Briefcase, Wrench, Truck, Megaphone, Globe } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -74,8 +74,15 @@ const FORMAT_OPTIONS: {
     id: "pdf",
     label: "PDF",
     ext: "",
-    description: "Opens print dialog — use 'Save as PDF'",
+    description: "Typeset PDF — embedded fonts, magazine layout",
     icon: Printer,
+  },
+  {
+    id: "html",
+    label: "Web",
+    ext: ".html",
+    description: "Standalone webpage — print-ready, shareable link asset",
+    icon: Globe,
   },
 ]
 
@@ -265,7 +272,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     // Close dialog immediately — work continues in background
     onOpenChange(false)
 
-    const formatLabel = selectedFormat === "docx" ? "Word" : "Slides"
+    const formatLabel = selectedFormat === "docx" ? "Word" : selectedFormat === "pptx" ? "Slides" : "Web"
     const moduleCount = modules.length
     const useAi = aiEnabled
     const projectId = activeProjectId
@@ -327,9 +334,13 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         if (selectedFormat === "docx") {
           const { exportDesignReportAsDOCX } = await import("@/lib/cad-lab/export-design-report-docx")
           blob = await exportDesignReportAsDOCX(data)
-        } else {
+        } else if (selectedFormat === "pptx") {
           const { exportDesignReportAsPPTX } = await import("@/lib/cad-lab/export-design-report-pptx")
           blob = await exportDesignReportAsPPTX(data)
+        } else {
+          // html
+          const { exportDesignReportAsHTML } = await import("@/lib/cad-lab/export-design-report-html")
+          blob = await exportDesignReportAsHTML(data)
         }
 
         // Step 4: Upload to Supabase Storage for persistent re-download
@@ -337,19 +348,23 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         let storagePath: string | undefined
         let uploaded = false
         try {
-          const ext = selectedFormat === "docx" ? "docx" : "pptx"
+          const ext = selectedFormat === "docx" ? "docx" : selectedFormat === "pptx" ? "pptx" : "html"
           const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-") || "report"
           const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
           const uid = crypto.randomUUID().slice(0, 8)
           storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${selectedAudience}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.${ext}`
 
+          const contentType = ext === "docx"
+            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            : ext === "pptx"
+              ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              : "text/html; charset=utf-8"
+
           const supabase = createClient()
           const { error: uploadError } = await supabase.storage
             .from("report-exports")
             .upload(storagePath, blob, {
-              contentType: ext === "docx"
-                ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                : "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              contentType,
               upsert: true,
             })
 
@@ -370,7 +385,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           await saveReportDownload({
             reportName: data.projectName,
             reportSource: "cad-lab",
-            fileFormat: selectedFormat === "docx" ? "docx" : "pptx",
+            fileFormat: selectedFormat === "docx" ? "docx" : selectedFormat === "pptx" ? "pptx" : "html",
             fileSizeBytes: blob.size,
             storagePath: uploaded ? storagePath ?? null : null,
           })

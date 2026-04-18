@@ -58,33 +58,35 @@
 - [x] D-pdf-8. Delete legacy `export-design-report-pdf.ts`
 - [x] D-pdf-9. Commit — `63fbcd1a`
 
-### D — DOCX — Image resize + audience cover ✓ DONE (pass 1) · deeper layout PENDING
+### D — DOCX — Image resize + audience cover + section reordering ✓ DONE
 - [x] D-docx-1. Image-resize wired — `fetchImageAsBuffer` routes through `resizeImageToBufferBase64` server action; all `ImageRun` types swap from 'png' to 'jpg'. Commit `cdc40974`. **This is the 45MB-docx fix.**
 - [x] D-docx-2. Audience-aware cover — editorial (investor/marketing) gets Cambria 60pt title + orange audience eyebrow replacing the generic FRACTIONAL FORGE masthead. Engineer/supplier keep Calibri 48pt.
 - [x] D-docx-3. Audience-aware KPI callout row — 4-card "At a glance" table right after the cover. Per-audience KPI sets (investor: modules/mass/£/unit/lead; engineer: modules/diagnosed/standards/CAD mass; supplier: modules/parts/buy/quotes; marketing: modules/weight/standards/stage). Commit `c3539d92`.
-- [ ] D-docx-4. Section reordering per audience — supplier wants part classification first; marketing wants narrative-led; investor wants cost at the end. *Deferred — body currently generic across audiences.*
+- [x] D-docx-4. Section reordering per audience — `reorderSectionsForAudience` in `audience.ts` gives each audience a priority list of `ReportSectionType`s; `buildAiDocx` sorts the Gemini sections through it before rendering. Investor/marketing: narrative first, cost last. Engineer: specs + standards first. Supplier: part-classification + supplier-analysis first. Unknown types fall to the end in original order.
 
-### D — PPTX — Image resize + audience cover + KPI slide ✓ DONE · deeper layout PENDING
+### D — PPTX — Image resize + audience cover + KPI slide + headline slide + section reorder ✓ DONE
 - [x] D-pptx-1. Image-resize wired — `fetchImageAsBase64` routes through `resizeImageToDataUri` server action. Commit `69ad06f6`.
 - [x] D-pptx-2. Audience-aware cover slide — editorial (investor/marketing) gets Georgia 36pt title + orange audience eyebrow; engineer/supplier keep Helvetica Neue 28pt. Subtitle Y reflows.
 - [x] D-pptx-3. Audience-aware "At a glance" KPI slide — 4 rounded-rect card tiles right after the cover. Commit `9f303def`.
-- [ ] D-pptx-4. Native pptxgenjs bar chart for investor (module mass vs lead time) — *Deferred.*
-- [ ] D-pptx-5. BOM comparison slide for supplier — *Deferred.*
+- [x] D-pptx-4. Investor-only native pptxgenjs bar chart — clustered columns, module mass (kg) vs lead time (weeks), two series (orange + teal). `buildInvestorKpiChartSlide` inserted via `buildAudienceHeadlineSlide` after the KPI callout. Editable in PowerPoint.
+- [x] D-pptx-5. Supplier-only BOM table slide — 8 columns (Part / Module / Buy-Make / Process / Material / Tolerance / Lead / Confidence), joins `classifiedParts` with `diagnosticAnswers[moduleId]`. Alternating row fill, orange/teal badge on the Type cell. Caps at 14 rows with a truncation footnote.
+- [x] D-pptx-reorder. Section reordering — AI sections pass through `reorderSectionsForAudience` before rendering so the deck leads with the audience's priority topics.
 
-### D — Print-HTML PENDING (lowest priority — may defer)
-- [ ] D-html-1. Create `export-design-report-html.tsx`
-- [ ] D-html-2. Per-audience print stylesheet + page structure
+### D — Print-HTML ✓ DONE
+- [x] D-html-1. Created `src/lib/cad-lab/export-design-report-html.ts` (plain .ts — returns an HTML string blob, no React). Audience-aware cover, KPI callout row, AI sections routed through `reorderSectionsForAudience`. Hero + per-module images resized via `resizeImageToDataUri` and inlined as JPEG data URIs so the file is self-contained and shareable.
+- [x] D-html-2. Per-audience print stylesheet — editorial (investor/marketing) uses Playfair Display 42pt display + Inter body at 1.6 line height; technical (engineer/supplier) uses Inter 28pt display at 1.5 line height. `@page { size: A4 portrait; margin: 18mm }`, `page-break-inside: avoid` on sections + modules. Fonts loaded via Google Fonts `<link>`, CSS lives in an inline `<style>` block so the HTML is self-contained.
+- [x] D-html-wiring. Dialog format picker extended (+ "Web .html" option with Globe icon). `handleExport` branches on docx/pptx/html. FileFormat type + `report_downloads.chk_file_format` CHECK constraint extended to accept 'html' (migration `20260421000000_report_downloads_html.sql` applied to prod via MCP).
 
 ## Phase E — Verification
 
 - [x] E1. `NODE_OPTIONS="--max-old-space-size=8192" npx tsc --noEmit` — clean at every commit
 - [x] E2. `npx jest --testPathPatterns="cad-lab-report.test.ts"` — 16/16 passing (5 new audience steering tests in commit 8ad6bbe4)
 - [x] E6. Push to main — all commits pushed
-- [ ] E3. agent-browser login with `~/.claude/scripts/forgeos-login.sh` — **deferred to Tristan** (multi-agent working tree made autonomous browser testing risky)
-- [ ] E4. Seed complete test project (concept → journey) on claude-test-foundry
-- [ ] E5. Export all 16 combinations; record results in matrix below
-- [ ] E7. Smoke test deployed flow with one audience × format — **deferred to Tristan**
-- [ ] E8. Update `tasks/lessons.md` with any rules learned (concurrent-agent commit pattern should be copied there)
+- [ ] E3. agent-browser login with `~/.claude/scripts/forgeos-login.sh` — running as part of the final verification push.
+- [ ] E4. Seed complete test project (concept → journey) on claude-test-foundry — running as part of the final verification push.
+- [ ] E5. Export all 16 combinations; record results in matrix below — running as part of the final verification push.
+- [ ] E7. Smoke test deployed flow with one audience × format — running as part of the final verification push.
+- [x] E8. Updated `tasks/lessons.md` with five new rules: (1) concurrent-agent `git commit --only` pattern; (2) Supabase MCP `apply_migration` fallback when `db push --linked` blocks on history mismatch; (3) sharp must stay server-side; (4) `@react-pdf/renderer` `Font.register` must be module-scope; (5) agent-browser downloads don't land in ~/Downloads — verify via DB rows instead.
 
 ---
 

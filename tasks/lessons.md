@@ -327,6 +327,56 @@ ALWAYS: Check the full pre-conditions in the button's handler. If an upstream is
 REASON: After the morning heroReady-gate fix, users clicked "Generate Illustrations" on the Images tab and got only module images — the hero never regenerated because `handleRefreshModuleImages` was scoped to per-module images only, and the hero's retry button was nested inside a card that only rendered on status === "failed" (not the post-reload "idle" state). Fixed by (a) chaining `retryIllustrationRef.current?.()` from `handleRefreshModuleImages` when the hero URL is missing, and (b) adding a "Generate concept illustration" button to the Research tab's idle-state card when modules exist without a hero URL.
 RELATED: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx handleRefreshModuleImages + retryIllustrationRef; cad-lab/page.tsx idle-state hero card
 
+### 2026-04-18 - RULE: In multi-agent ForgeOS sessions, commit with `git add -N` + `git commit --only <files>` — never plain `git add` → `git commit`
+
+NEVER: Stage files with `git add <files>` then run `git commit` in a separate step when another Claude session is active in the same repo. Between the two commands, the concurrent session's pre-commit lint sweep rewrites the shared index with its own staged files, and `git commit` lands those instead of yours. Symptoms: empty commit, or a commit whose diff belongs to a completely different feature (e.g. `68561ba1` captured `design-iteration-generator.ts` when the intent was Phase A report scaffolding; `aaa99680` captured `node-inspector.tsx` + `learn-page.tsx`).
+
+ALWAYS: Use `git add -N <newfiles>` (intent-to-add for untracked) and `git commit --only <all files>` in a single shell chain. `--only` resets the index to HEAD before staging the listed files, so concurrent staging cannot infect your commit. Verify with `git show HEAD --stat` before pushing — if the filelist doesn't match your intent, `git reset --soft HEAD~1` and retry.
+
+REASON: Discovered during 2026-04-18 audience-aware report build. Three commits were hijacked before the pattern stabilised. The `--only` flag is designed exactly for this case and is the only mechanism that survives concurrent index mutations. Codified after the Phase A rescue commit `7fe11038` landed cleanly with this approach.
+
+RELATED: `tasks/TRACKER-audience-reports.md` Notes section; any multi-agent session in the CentaurOS worktree.
+
+### 2026-04-18 - RULE: When the Supabase CLI blocks `db push --linked` on history mismatch, use the Supabase MCP `apply_migration` directly
+
+NEVER: Give up and leave a migration file unapplied because `npx supabase db push --linked` errors with "Remote migration versions not found in local migrations directory". The CLI is trying to reconcile local history against remote history; in a trunk-based repo with multiple agents and squashed commits this will drift regularly.
+
+ALWAYS: Call `mcp__claude_ai_Supabase__apply_migration` with the project_id (`jyarhvinengfyrwgtskq` for prod ForgeOS) and the raw DDL. This writes to `supabase_migrations.schema_migrations` server-side without requiring local/remote parity. Keep the `supabase/migrations/NNN...sql` file in the repo as the source-of-truth artifact, but treat the MCP apply as the authoritative deploy path. Confirm with `execute_sql` after every DDL to verify the constraint/column/index actually exists.
+
+REASON: Phase A blocked on `illustration_style = 'photography'` CHECK because `db push` refused to run. Applied via MCP in one call; verified with `pg_get_constraintdef`; saved the migration file for the git record. Same pattern worked for `20260421000000_report_downloads_html.sql` (adds 'html' to chk_file_format) on 2026-04-18.
+
+RELATED: `supabase/migrations/20260420000000_illustration_style_photography.sql`, `supabase/migrations/20260421000000_report_downloads_html.sql`.
+
+### 2026-04-18 - RULE: `sharp` must stay server-side — client-bundled imports of `image-resize.ts` break the Vercel build
+
+NEVER: Import anything from `src/lib/cad-lab/image-resize.ts` (or any `sharp`-using module) from a file that ends up in the client bundle. Webpack tries to resolve `detect-libc`'s `fs` dependency and errors out: "Can't resolve 'fs'". This kills the Vercel build — not a runtime error, a build-time failure.
+
+ALWAYS: Expose Sharp through a thin `"use server"` action in `src/actions/image-resize-action.ts` (`resizeImageToDataUri`, `resizeImageToBufferBase64`). Put `import 'server-only'` at the top of `image-resize.ts`. Client exporters (docx, pptx, html) `await import('@/actions/image-resize-action')` inside their fetch helper — the dynamic import keeps the native binding off the client graph. Types for `ResizeOptions` etc. live in a separate `image-resize-types.ts` with NO sharp imports, so client code can reference the shapes freely.
+
+REASON: First docx-to-sharp wire-in dragged sharp's detect-libc dependency into the browser bundle via a type-only import that became a value import during transpilation. Broke Vercel Production on 2026-04-18 — caught by `npx vercel ls`. Fixed in commit `3d468edb` (parallel agent). This rule is the generalisation.
+
+RELATED: `src/lib/cad-lab/image-resize.ts`, `src/actions/image-resize-action.ts`, `src/lib/cad-lab/export-design-report-{docx,pptx,html}.ts`.
+
+### 2026-04-18 - RULE: `@react-pdf/renderer` `Font.register()` calls must be evaluated at module load, not lazily
+
+NEVER: Wrap `Font.register({ family, src })` in a lazy `useEffect` or a deferred helper called on first render — the PDFRenderer stringifies layout before those effects run, so registration races the first page render and the font silently falls back to Helvetica.
+
+ALWAYS: Call `Font.register` at module scope in `export-design-report-pdf.tsx`, once per family, pointing at Google Fonts TTF URLs (`https://fonts.gstatic.com/s/outfit/v11/...ttf`). Dynamic-import the exporter from the dialog (`await import('@/lib/cad-lab/export-design-report-pdf')`) so the module-load happens inside the browser at click time, not at Next.js build time (build-time fetch would fail on fonts.gstatic.com sandboxing).
+
+REASON: First PDF prototype used `useMemo(() => Font.register(...), [])` inside the component, which rendered with Helvetica until the second export. Pinned at module scope on 2026-04-18.
+
+RELATED: `src/lib/cad-lab/export-design-report-pdf.tsx`, `src/lib/constants/brand-tokens.ts` (GOOGLE_FONT_URLS registry).
+
+### 2026-04-18 - RULE: agent-browser (headless Chromium) does not route downloads to `~/Downloads` — verify via DB + BackgroundOps pill, never filesystem
+
+NEVER: After triggering an authenticated in-app download from an agent-browser session, assume the file will land in the user's `~/Downloads` folder. The headless Chromium sandbox writes downloads into an ephemeral profile directory and does not inherit the Mac user's download prefs. `ls ~/Downloads` will show nothing new, and you will chase phantom bugs.
+
+ALWAYS: Verify the download end-to-end via three signals: (1) the "N completed" pill in the BackgroundOps toaster confirming the in-page job finished, (2) a row in `public.report_downloads` for the user with the correct `file_format` and `file_size_bytes`, and (3) a matching row in `storage.objects` under the `report-exports` bucket at the expected `storage_path`. These three together prove the Blob was created client-side AND uploaded to Supabase Storage. The absence of a local file is expected, not a bug.
+
+REASON: First 45MB→1.7MB docx size regression verification assumed ~/Downloads would contain the proof. It didn't — verified via Supabase SQL instead, which was the right path all along. Codified 2026-04-18.
+
+RELATED: `~/.claude/scripts/forgeos-login.sh`, `src/app/(platform)/the-forge/cad-lab/components/design-report-dialog.tsx`, `public.report_downloads`.
+
 ### 2026-04-17 - RULE: createSignedUrl on a public bucket is cargo-cult security — use getPublicUrl for any URL you persist to the DB
 NEVER: Mix `createSignedUrl(path, 3600)` writes with a bucket where `public=true`. The signed URL's token expires in 1h but `/object/public/{bucket}/{path}` resolves forever regardless — signing adds no access control, only breaks persistence.
 ALWAYS: If the bucket is public, use `getPublicUrl`. If the file is actually confidential, flip the bucket to `public=false` AND re-sign on read (not write), so the URL can be refreshed every time the row is loaded.
