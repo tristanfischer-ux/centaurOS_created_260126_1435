@@ -689,6 +689,36 @@ export default function SourcePage(): React.ReactNode {
     }
   }, [setShortlistedSuppliers, activeProjectId])
 
+  // Phase 3 (2026-04-18): coarse-grained toggle used by the consolidated
+  // Supplier Intelligence card shortlist button. Clicking "Shortlist" on a
+  // candidate card is a supplier-level action, not per-module — so we pick
+  // the first matching module (if any) as the initial association when
+  // adding, and fully remove on toggle-off.
+  const handleToggleShortlistFromIntel = useCallback(
+    (supplier: CadLabSupplierMatch) => {
+      if (shortlistedSupplierIds.has(supplier.id)) {
+        handleRemoveFromShortlist(supplier.id)
+        return
+      }
+      // Find the first module this supplier matches on (from supplierMatches)
+      let firstModuleId: string | null = null
+      for (const [moduleId, matches] of supplierMatches.entries()) {
+        if (matches.some((m) => m.id === supplier.id)) {
+          firstModuleId = moduleId
+          break
+        }
+      }
+      if (!firstModuleId) {
+        // Fallback: no module mapping found — shouldn't happen because the
+        // card only renders for matched suppliers, but log and no-op.
+        console.warn("[SOURCE] toggleShortlist: no module mapping for", supplier.id)
+        return
+      }
+      handleShortlistSupplier(supplier, firstModuleId)
+    },
+    [shortlistedSupplierIds, supplierMatches, handleShortlistSupplier, handleRemoveFromShortlist],
+  )
+
   const handleMatchModule = useCallback(async (mod: CadLabModule) => {
     setLoadingModules((prev) => new Set(prev).add(mod.id))
     try {
@@ -1346,6 +1376,15 @@ export default function SourcePage(): React.ReactNode {
         {activeTab === "shortlist" && (
           <motion.div key="shortlist" role="tabpanel" id="source-panel-shortlist" aria-labelledby="source-tab-shortlist" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
 
+            {/* Phase 3 IA note: supplier SELECTION (which candidates make the
+                shortlist) now lives on the Supplier Intelligence tab — each
+                card has an inline Shortlist toggle. THIS tab is the ops view:
+                NDA discipline, ramp role, outreach log, RFQ creation per
+                category. Both views read the same DB-backed shortlist state. */}
+            <div className="rounded-md bg-muted/40 border border-border px-3 py-2.5 text-xs text-muted-foreground">
+              <strong className="text-foreground">Shortlist ops.</strong> Pick suppliers on the <span className="font-medium text-foreground">Supplier Intelligence</span> tab — this view manages NDA, ramp role, outreach log, and RFQ creation for the {shortlistedSupplierIds.size} shortlisted supplier{shortlistedSupplierIds.size !== 1 ? "s" : ""}.
+            </div>
+
             {/* ── NDA gate: required discipline before sharing designs with suppliers ── */}
             <NDAGate state={ndaState} onChange={setNdaState} />
 
@@ -1520,6 +1559,8 @@ export default function SourcePage(): React.ReactNode {
               diagnosticAnswers={diagnosticAnswers}
               supplierMatches={supplierMatches}
               companyReviews={sharedCompanyReviews}
+              shortlistedSupplierIds={shortlistedSupplierIds}
+              onToggleShortlist={handleToggleShortlistFromIntel}
             />
 
             {/* Phase 2D: Chase's per-supplier narrative review lives inside

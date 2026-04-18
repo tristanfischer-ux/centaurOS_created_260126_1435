@@ -6,12 +6,19 @@
  * @description Shows process capabilities matrix and per-supplier detail cards.
  * Data comes from the `processCapabilities` JSONB field on marketplace listings,
  * populated by Nightshift deep enrichment.
+ *
+ * Phase 3 (2026-04-18) — consolidation: each supplier card now carries an
+ * inline "Shortlist" toggle + module-fit chips. The separate Shortlist tab
+ * remains as the operational view (NDA/Ramp/Outreach/RFQ) but no longer owns
+ * supplier selection UX — one view lists candidates with an explicit
+ * "shortlisted?" state per card.
  */
 
 import { useState } from "react"
-import { Factory, CheckCircle2, Minus, ChevronDown, ChevronRight, Info } from "lucide-react"
+import { Factory, CheckCircle2, Minus, ChevronDown, ChevronRight, Info, Star } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
@@ -27,6 +34,13 @@ interface SupplierIntelligenceTabProps {
    * with matchScore as tiebreaker within each tier.
    */
   companyReviews?: CompanyReview[]
+  /**
+   * Phase 3 consolidation: when supplied, each card renders a shortlist
+   * toggle that maps onto the parent's DB-backed shortlist state. Absent
+   * = legacy render (read-only cards).
+   */
+  shortlistedSupplierIds?: Set<string>
+  onToggleShortlist?: (supplier: CadLabSupplierMatch) => void
 }
 
 const VERDICT_PRIORITY: Record<string, number> = {
@@ -81,6 +95,8 @@ export function SupplierIntelligenceTab({
   diagnosticAnswers,
   supplierMatches,
   companyReviews,
+  shortlistedSupplierIds,
+  onToggleShortlist,
 }: SupplierIntelligenceTabProps) {
   const [expandedSupplierId, setExpandedSupplierId] = useState<string | null>(null)
 
@@ -89,10 +105,27 @@ export function SupplierIntelligenceTab({
     for (const r of companyReviews) verdictByCompany.set(r.companyId, r.verdict)
   }
 
+  // Per-supplier: which modules did they match on? Used for inline "Fits M1, M3"
+  // chips so the founder can see supplier → module mapping at a glance.
+  const moduleNamesBySupplier = new Map<string, string[]>()
+  for (const [moduleId, matches] of supplierMatches.entries()) {
+    const moduleName = modules.find((m) => m.id === moduleId)?.name ?? ""
+    if (!moduleName) continue
+    for (const m of matches) {
+      const existing = moduleNamesBySupplier.get(m.id) ?? []
+      if (!existing.includes(moduleName)) {
+        existing.push(moduleName)
+        moduleNamesBySupplier.set(m.id, existing)
+      }
+    }
+  }
+
   const allSuppliers = getUniqueSuppliers(supplierMatches, verdictByCompany)
   const suppliersWithCaps = allSuppliers.filter((s) => s.processCapabilities && s.processCapabilities.length > 0)
   const moduleIds = modules.map((m) => m.id)
   const processes = getUniqueProcesses(diagnosticAnswers, moduleIds)
+  const shortlistEnabled = typeof onToggleShortlist === "function"
+  const shortlistedCount = shortlistedSupplierIds?.size ?? 0
 
   if (supplierMatches.size === 0) {
     return (
@@ -123,6 +156,9 @@ export function SupplierIntelligenceTab({
                 {allSuppliers.length} matched supplier{allSuppliers.length !== 1 ? "s" : ""} across {processes.length} process{processes.length !== 1 ? "es" : ""}
                 {suppliersWithCaps.length > 0 && (
                   <> &mdash; {suppliersWithCaps.length} with verified capabilities</>
+                )}
+                {shortlistEnabled && (
+                  <> &mdash; <span className="text-foreground font-medium">{shortlistedCount} shortlisted</span></>
                 )}
               </p>
             </div>
@@ -221,46 +257,82 @@ export function SupplierIntelligenceTab({
           const uniqueMaterials = [...new Set(allMaterials)]
           const tolerances = caps.map((c) => c.tolerance_value_mm).filter((t): t is number => t != null)
           const minTolerance = tolerances.length > 0 ? Math.min(...tolerances) : null
+          const fitModules = moduleNamesBySupplier.get(supplier.id) ?? []
+          const isShortlisted = shortlistedSupplierIds?.has(supplier.id) ?? false
 
           return (
-            <Card key={supplier.id}>
-              <button
-                onClick={() => setExpandedSupplierId(isExpanded ? null : supplier.id)}
-                className="w-full text-left"
-              >
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm font-medium text-foreground">{supplier.name}</span>
-                      {(() => {
-                        const verdict = verdictByCompany.get(supplier.id)
-                        const cfg = verdict ? VERDICT_LABEL[verdict] : null
-                        return cfg ? (
-                          <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
-                        ) : null
-                      })()}
-                      <Badge variant="secondary" className="text-[10px]">
-                        {supplier.matchScore}pt
-                      </Badge>
-                      {supplier.isVerified && (
-                        <Badge variant="info" className="text-[10px]">Verified</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {caps.length > 0 && (
-                        <Badge variant="success" className="text-[10px]">
-                          {caps.length} capabilit{caps.length !== 1 ? "ies" : "y"}
+            <Card key={supplier.id} className={isShortlisted ? "border-international-orange/50 shadow-sm" : undefined}>
+              <div className="flex items-stretch">
+                <button
+                  onClick={() => setExpandedSupplierId(isExpanded ? null : supplier.id)}
+                  className="flex-1 text-left"
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="text-sm font-medium text-foreground">{supplier.name}</span>
+                        {(() => {
+                          const verdict = verdictByCompany.get(supplier.id)
+                          const cfg = verdict ? VERDICT_LABEL[verdict] : null
+                          return cfg ? (
+                            <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
+                          ) : null
+                        })()}
+                        <Badge variant="secondary" className="text-[10px]">
+                          {supplier.matchScore}pt
                         </Badge>
-                      )}
+                        {supplier.isVerified && (
+                          <Badge variant="info" className="text-[10px]">Verified</Badge>
+                        )}
+                        {/* Module-fit chips: Phase 3 — show which modules this supplier matched on */}
+                        {fitModules.slice(0, 3).map((name) => (
+                          <span
+                            key={name}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                        {fitModules.length > 3 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            +{fitModules.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {caps.length > 0 && (
+                          <Badge variant="success" className="text-[10px]">
+                            {caps.length} capabilit{caps.length !== 1 ? "ies" : "y"}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
+                  </CardContent>
+                </button>
+                {shortlistEnabled && (
+                  <div className="flex items-center pr-4">
+                    <Button
+                      size="sm"
+                      variant={isShortlisted ? "default" : "outline"}
+                      className="gap-1 h-7 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleShortlist?.(supplier)
+                      }}
+                      aria-pressed={isShortlisted}
+                      aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+                    >
+                      <Star className={`h-3.5 w-3.5 ${isShortlisted ? "fill-current" : ""}`} />
+                      {isShortlisted ? "Shortlisted" : "Shortlist"}
+                    </Button>
                   </div>
-                </CardContent>
-              </button>
+                )}
+              </div>
 
               {/* Expanded detail */}
               {isExpanded && caps.length > 0 && (
