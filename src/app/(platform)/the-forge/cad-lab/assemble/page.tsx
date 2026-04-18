@@ -74,6 +74,7 @@ import type { OrderLineSummary } from "@/actions/assembly"
 import type { ShortlistedSupplier } from "../source/page"
 import { LaunchReadinessGauge, type AcceptedRisk } from "@/components/cad/launch-readiness-gauge"
 import { getProjectAcceptedRisks } from "@/actions/design-iterations"
+import { DesignIterationHost, type DesignIterationHostHandle } from "@/components/cad/design-iteration-host"
 import { FAIChecklist } from "@/components/cad/fai-checklist"
 import { BOMTraceabilityCard } from "@/components/cad/bom-traceability-card"
 import { CompliancePacket } from "@/components/cad/compliance-packet"
@@ -552,6 +553,8 @@ export default function AssemblePage(): React.ReactNode {
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [selectedAssembler, setSelectedAssembler] = useState<AssemblyCompanyMatch | null>(null)
   const assemblerDetailCache = useRef(new Map<string, SupplierDetail>())
+  // Design-iteration host ref — manual "Reconsider this" on Jian's briefing.
+  const designIterationHostRef = useRef<DesignIterationHostHandle | null>(null)
 
   // ── Compare selection ──
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set())
@@ -616,12 +619,33 @@ export default function AssemblePage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
+      {/* Design-iteration host — manual "Reconsider this" on Jian's briefing routes here. */}
+      {activeProjectId && (
+        <DesignIterationHost
+          ref={designIterationHostRef}
+          projectId={activeProjectId}
+          onApplied={() => {
+            toast.success("Design change applied — re-check your assembler match + compliance packet against the new spec.", { duration: 8000 })
+          }}
+        />
+      )}
+
       {/* ── Jian (VP Engineering) Assembly Review — stage owner ── */}
       <StageSpecialistCard
         specialistId={assembleMapping.specialistId}
         variant="entry"
         stageName="Assemble"
         briefing={assembleEntryText}
+        onReconsider={() => {
+          const q = typeof window !== "undefined"
+            ? window.prompt("What do you want to reconsider at the assembly stage?", "")
+            : null
+          if (q && q.trim().length >= 20) {
+            designIterationHostRef.current?.triggerManual(q.trim())
+          } else if (q !== null) {
+            toast.error("Tell us what you want to reconsider in at least 20 characters")
+          }
+        }}
       />
 
       {/* ── Launch Readiness Gauge (hero — top-level snapshot) ── */}

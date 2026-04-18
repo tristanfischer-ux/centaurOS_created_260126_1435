@@ -903,6 +903,16 @@ export default function SourcePage(): React.ReactNode {
         variant="entry"
         stageName="Source"
         briefing={sourceEntryBriefingText}
+        onReconsider={() => {
+          const q = typeof window !== "undefined"
+            ? window.prompt("What do you want to reconsider about the sourcing / design?", "")
+            : null
+          if (q && q.trim().length >= 20) {
+            designIterationHostRef.current?.triggerManual(q.trim())
+          } else if (q !== null) {
+            toast.error("Tell us what you want to reconsider in at least 20 characters")
+          }
+        }}
       />
 
       {/* ── Unresolved specialist warnings from Specify reviews ── */}

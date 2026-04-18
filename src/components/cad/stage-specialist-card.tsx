@@ -14,7 +14,7 @@
  */
 
 import Image from "next/image"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Sparkles } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -47,6 +47,10 @@ interface StageSpecialistCardProps {
     onProceed?: () => void
     /** For exit variant: custom proceed button label */
     proceedLabel?: string
+    /** When provided, renders a small "Reconsider this" button below the briefing.
+     *  Parent pages wire it to DesignIterationHost.triggerManual — opens a prompt
+     *  for the founder's question, then the manual-trigger flow. */
+    onReconsider?: () => void
 }
 
 export function StageSpecialistCard({
@@ -59,6 +63,7 @@ export function StageSpecialistCard({
     nextStageName,
     onProceed,
     proceedLabel,
+    onReconsider,
 }: StageSpecialistCardProps) {
     const specialist = getSpecialistById(specialistId)
     if (!specialist) return null
@@ -145,6 +150,19 @@ export function StageSpecialistCard({
                             <p className="text-xs text-muted-foreground italic pt-1">
                                 Final stage complete. Your product is ready.
                             </p>
+                        )}
+
+                        {/* Manual design-iteration trigger (Phase IV). Appears on any
+                         *  stage briefing when the parent wires it up — founder can
+                         *  ask for design alternatives at any point, not just when
+                         *  specialists have flagged infeasibility. */}
+                        {onReconsider && (
+                            <div className="pt-2">
+                                <Button size="sm" variant="ghost" onClick={onReconsider} className="gap-1.5 text-xs h-7">
+                                    <Sparkles className="h-3 w-3" />
+                                    Reconsider this
+                                </Button>
+                            </div>
                         )}
                     </div>
                 </div>
