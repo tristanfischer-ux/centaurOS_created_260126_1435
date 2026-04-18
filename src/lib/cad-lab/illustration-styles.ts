@@ -15,7 +15,7 @@
  * - UI selector: src/app/(platform)/the-forge/cad-lab/components/illustration-style-selector.tsx
  */
 
-export type IllustrationStyle = "blueprint" | "photoreal" | "isometric_vector"
+export type IllustrationStyle = "blueprint" | "photoreal" | "isometric_vector" | "photography"
 
 export const DEFAULT_ILLUSTRATION_STYLE: IllustrationStyle = "blueprint"
 
@@ -50,10 +50,21 @@ export const ILLUSTRATION_STYLES: readonly IllustrationStyleMeta[] = [
     description: "Flat SaaS-landing-page style, bright palette, crisp edges.",
     bestFor: "Public-facing marketing and non-technical audiences.",
   },
+  {
+    id: "photography",
+    label: "Editorial photography",
+    description: "Lifestyle product photography with real-world context and atmosphere.",
+    bestFor: "Press assets, brand campaigns, social share cards.",
+  },
 ] as const
 
 export function isIllustrationStyle(value: unknown): value is IllustrationStyle {
-  return value === "blueprint" || value === "photoreal" || value === "isometric_vector"
+  return (
+    value === "blueprint" ||
+    value === "photoreal" ||
+    value === "isometric_vector" ||
+    value === "photography"
+  )
 }
 
 export function getIllustrationStyleMeta(style: IllustrationStyle): IllustrationStyleMeta {
@@ -109,6 +120,20 @@ Every heroImagePrompt and perModuleImagePrompts entry MUST describe a flat isome
 - Semi-exploded composition with thin connecting lines is acceptable if it aids comprehension.
 - NO photorealistic textures, NO engineering blueprint conventions, NO text/labels.
 - Mirror pairs MUST share identical fill colours and vector shape.`
+
+    case "photography":
+      return `
+
+## Illustration Style: Editorial Photography (REQUESTED)
+Every heroImagePrompt and perModuleImagePrompts entry MUST describe a real-world editorial photograph:
+- Lifestyle context — product in-situ on a real surface (desk, workbench, studio floor, field location matching the product's deployment environment). NOT a blank cyclorama.
+- Natural or naturalistic lighting — soft window light, overcast diffused outdoor, or warm tungsten editorial. Realistic shadows. Avoid cold studio flash feel.
+- Photorealistic materials: convincing microsurface, dust, wear, real metal reflections, realistic plastic sheen. Surfaces should look touched, not perfect.
+- Shallow depth-of-field is encouraged — subject crisp, background gently falling off. Magazine editorial framing.
+- Hero composition follows the rule of thirds. Generous negative space for press crops.
+- Full colour, human-scale atmosphere — the image should feel publishable on a brand website or in a print magazine.
+- NO blueprint lines, NO engineering grid, NO exploded-view callouts, NO text/labels inside the image.
+- Mirror pairs MUST still share identical material + finish + colour.`
   }
 }
 
@@ -154,6 +179,22 @@ export function getRubricOverridesForStyle(style: IllustrationStyle): {
           "The render should use flat vector colours with gentle two-tone shading (NOT photorealistic gradients, NOT blueprint linework).",
           "A light pastel or soft white background is expected; do NOT penalise for not being a technical white-on-white blueprint.",
           "Mirror-pair parts MUST use identical fill colours and vector shapes.",
+        ],
+      }
+
+    case "photography":
+      return {
+        excludeClauses: [
+          "pure white background",
+          "thin precise lines",
+          "flat material colours",
+          "engineering grid",
+          "cyclorama background",
+        ],
+        extraClauses: [
+          "The photograph should feel editorial — natural or naturalistic lighting, real-world environmental context (desk, workbench, outdoor scene), and shallow depth-of-field are all desirable.",
+          "Convincing real-world materials (touched metal, worn plastic, dust, fingerprints on glass) are acceptable and expected — the goal is a publishable brand photograph, not a sterile product render.",
+          "Even in a lifestyle composition, mirror-pair parts MUST share identical material, finish, and colour.",
         ],
       }
   }

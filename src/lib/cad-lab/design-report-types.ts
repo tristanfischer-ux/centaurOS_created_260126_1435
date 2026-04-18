@@ -17,8 +17,9 @@
 import type { CadLabModule, AiCostEstimate, CadLabDesignBrief, SpecialistReview, CadLabResult } from '@/lib/cad-lab-types'
 import type { SupplierMatch } from '@/lib/rfq/matching'
 import type { TechniqueRecommendation } from '@/lib/cad-lab/technique-recommender'
+import type { ReportAudience } from '@/lib/cad-lab/audience'
 
-export type DesignReportFormat = 'docx' | 'pptx' | 'pdf'
+export type DesignReportFormat = 'docx' | 'pptx' | 'pdf' | 'html'
 
 export type ReportStage = 'concept' | 'specify' | 'source' | 'assemble' | 'cad' | 'journey'
 
@@ -41,6 +42,9 @@ export interface DesignReportData {
   generatedAt: string
   heroImageUrl: string | null
   stage: ReportStage
+  /** Which audience this report is being rendered for. Optional for
+   *  backward compatibility — unset callers are treated as `investor`. */
+  audience?: ReportAudience
 
   productOverview: string
   researchReport: string

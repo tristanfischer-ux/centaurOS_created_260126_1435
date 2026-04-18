@@ -17,7 +17,7 @@
  * - Registry + prompts: src/lib/cad-lab/illustration-styles.ts
  */
 
-import { Camera, Grid2x2, Layers, Loader2 } from "lucide-react"
+import { Camera, Grid2x2, Layers, Loader2, Newspaper } from "lucide-react"
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -33,6 +33,7 @@ const ICONS: Record<IllustrationStyle, (props: { className?: string }) => React.
   blueprint: ({ className }) => <Layers className={className} />,
   photoreal: ({ className }) => <Camera className={className} />,
   isometric_vector: ({ className }) => <Grid2x2 className={className} />,
+  photography: ({ className }) => <Newspaper className={className} />,
 }
 
 // ─── Selector ──────────────────────────────────────────────────────────
