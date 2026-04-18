@@ -86,16 +86,27 @@ Each of these is a dedicated session of its own; they're the biggest leverage it
 
 **Founder-impact note:** closes a silent-success gap. Previously, a founder saved a finished Forge design and got nothing back — the Product was created but invisible until they navigated to /products manually. Now a bell badge says exactly what happened.
 
-### 1.4 `convertBriefToForge` structural seeding
-**Founder unlock:** today brief fields (target_cost_pence, target_weight_kg, etc.) flatten into markdown inside `product_overview`. CAD Lab renders this as a text blob, losing structure. After this, CAD Lab stages see the brief as structured input.
+### 1.4 `convertBriefToForge` structural seeding — **done** (`0ed2ccf3`)
 
-**Plan:**
-- Add nullable columns to `cad_lab_projects`: `seeded_target_cost_pence`, `seeded_target_weight_kg`, `seeded_certifications text[]`, etc. (keep additive to avoid breaking the existing `product_overview` text render).
-- Update `convertBriefToForge` to write both structured fields + the existing markdown overview.
-- Add a small "Seeded from product brief" card on the CAD Lab Specify stage showing the structured constraints with a link back to the originating brief.
-- Visual verification: from a product, convert brief → new CAD Lab project → Specify page shows structured seed card.
+**Shipped:**
+- Migration `20260419020000_cad_lab_seeded_brief.sql`: nullable `seeded_brief_content jsonb` column on cad_lab_projects. Simpler than splaying brief fields across multiple columns + future-proof if brief shape changes. Rollback SQL in comment. Applied live.
+- `convertBriefToForge` in src/actions/products.ts: writes briefContent as-is into the new column alongside the existing flattened `product_overview` markdown (backward compat preserved — other readers still see the text blob).
+- New `SeededBriefCard` component at src/app/(platform)/the-forge/cad-lab/components/seeded-brief-card.tsx. Reads seeded_brief_content via browser supabase client on mount. Renders structured: target cost (pence → £), target weight, target dimensions, category, design priorities (badges), materials guidance / manufacturing constraints / certifications (bulleted lists), competitive benchmarks (named + price + specs). Returns null when absent — safe drop-in.
+- Specify page Overview tab: SeededBriefCard placed ABOVE the existing ProductOverviewCard in an international-orange-tinted treatment so it reads as the source-of-truth context panel for the design.
 
-**Status:** pending | **Visual:** — | **Commit:** —
+**Visual:** pending prod check — need a foundry where a founder has converted a brief to Forge.
+
+**Founder-impact note:** the CAD Lab Specify stage no longer has to parse a markdown blob to know the target cost or certification requirements — they render with structure + iconography. A founder pushing back on any seeded constraint now sees it as a row, not a bullet inside a prose dump.
+
+### Phase 1 closeout note (2026-04-18)
+
+Phase 1 is functionally complete at the infrastructure level:
+- 1.1A + 1.1B shipped; 1.1C deferred (needs objectives schema change)
+- 1.2A + 1.2B + 1.2C shipped; **1.2D added** for the generateReport service-role refactor that unlocks real email dispatch (cron currently marks rows 'skipped' with 'pending_dispatch')
+- 1.3 shipped
+- 1.4 shipped
+
+Next architectural chunk left in Phase 1: 1.2D only. Otherwise ready for Phase 2 (Tier A pages).
 
 ---
 
@@ -245,6 +256,7 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 1.2C | Reports Schedule: cron worker (infra only; dispatch deferred to 1.2D) | **partial done** | `03b00a0d` (included by hook artefact), follow-up `01ce63e1` | pending prod check | Migration + cron route + vercel.json entry + exported computeNextRunAt all live. Dispatch DEFERRED — generateReport needs a service-role refactor (Phase 1.2D) before cron can actually email. Cron currently logs status='skipped' with error='pending_dispatch' and advances next_run_at normally. Attribution quirk: my commit got folded under the other agent's "Opus 4.6→4.7 sweep" message via a pre-commit-hook artefact; the follow-up `01ce63e1` commit body documents it. Code is correct and live; just the git history reads oddly. |
 | 1.2D | Reports Schedule: generateReport service-role refactor + Resend dispatch | pending | — | — | — |
 | 1.3 | autoPromoteIfComplete notifications surface | **done** | `bcb3c748` | pending prod check | Forge → Products auto-promote now fires a notification instead of silent success. |
+| 1.4 | convertBriefToForge structural seeding | **done** | `0ed2ccf3` | pending prod check | Brief fields now travel to CAD Lab Specify as structured data (new seeded_brief_content jsonb + SeededBriefCard render), not a markdown blob. |
 | 1.3 | autoPromoteIfComplete surface | pending | — | — | — |
 | 1.4 | convertBriefToForge structural | pending | — | — | — |
 | 2.1 | /today | pending | — | — | — |
