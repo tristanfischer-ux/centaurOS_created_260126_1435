@@ -73,16 +73,18 @@ Each of these is a dedicated session of its own; they're the biggest leverage it
 
 **Status:** pending | **Visual:** — | **Commit:** —
 
-### 1.3 `autoPromoteIfComplete` user-visible surface
-**Founder unlock:** tonight a founder can finish a Forge design and have it silently promote to a Product (or fail silently). This adds a visible signal.
+### 1.3 `autoPromoteIfComplete` user-visible surface — **done** (`bcb3c748`)
 
-**Plan:**
-- New table `notifications (id, foundry_id, user_id, kind, title, body, link_url, created_at, read_at)`. Already may exist — check migrations.
-- In `autoPromoteIfComplete`, on success insert a notification with kind `'product.auto_promoted'` + link to the new product detail page. On duplicate/failure → dev-log only, no notification.
-- Sidebar bell icon with unread count (probably already present — verify). Click → notification drawer / /updates page.
-- Visual verification: complete a Forge design, see notification appear + landing link works.
+**Founder unlock delivered:** finishing a Forge design no longer silently promotes a Product with zero feedback — the founder now gets a notification in their bell with a direct link + next-step guidance.
 
-**Status:** pending | **Visual:** — | **Commit:** —
+**Shipped:**
+- `NotificationType` union extended with `'product_auto_promoted'` (src/actions/notifications.ts).
+- `autoPromoteIfComplete` in src/actions/products.ts: on success, dynamic-imports createNotification and fires a best-effort insert. `.catch()` absorbs any notifications-layer failure — a notification problem must never roll back the Product creation. Title: `"${product.name} is now a product"`. Body: `"Your completed Forge design has been added to Products. Set pricing, run a market assessment, and score fundability when you are ready."` Link: `/products/{id}`. Metadata carries cad_lab_project_id + product_id.
+- Infrastructure (notifications table, RPC, bell UI) already existed — this chunk just added a caller.
+
+**Visual:** pending prod check via agent-browser on a foundry that has an unread notification.
+
+**Founder-impact note:** closes a silent-success gap. Previously, a founder saved a finished Forge design and got nothing back — the Product was created but invisible until they navigated to /products manually. Now a bell badge says exactly what happened.
 
 ### 1.4 `convertBriefToForge` structural seeding
 **Founder unlock:** today brief fields (target_cost_pence, target_weight_kg, etc.) flatten into markdown inside `product_overview`. CAD Lab renders this as a text blob, losing structure. After this, CAD Lab stages see the brief as structured input.
@@ -240,7 +242,9 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 1.1C | Cash Burn: objective-driven spend seed (optional) | **deferred** | — | — | Objectives schema has no clean planned-spend column; only signal would be fragile description-parsing. Moved to backlog — revisit when adding `planned_monthly_spend_pence` + `spend_category` columns is its own dedicated change. |
 | 1.2A | Reports Schedule: migration (scheduled_reports table) | **done** | `4f9b97f7` | N/A (migration only — no UI yet) | Foundation for Reports Schedule feature. 14 cols, 4 indexes, 4 RLS policies mirroring Products. Zero risk — additive, no consumers yet. |
 | 1.2B | Reports Schedule: action + restored button | **done** | `da0ae154` | pending visual check post-deploy | Founder can now save a weekly/monthly schedule — row persists in scheduled_reports with their template + tone + detailLevel + sections. Toast is honest that no email arrives until 1.2C cron ships. |
-| 1.2C | Reports Schedule: cron worker + email dispatch | pending | — | — | — |
+| 1.2C | Reports Schedule: cron worker (infra only; dispatch deferred to 1.2D) | **partial done** | `03b00a0d` (included by hook artefact), follow-up `01ce63e1` | pending prod check | Migration + cron route + vercel.json entry + exported computeNextRunAt all live. Dispatch DEFERRED — generateReport needs a service-role refactor (Phase 1.2D) before cron can actually email. Cron currently logs status='skipped' with error='pending_dispatch' and advances next_run_at normally. Attribution quirk: my commit got folded under the other agent's "Opus 4.6→4.7 sweep" message via a pre-commit-hook artefact; the follow-up `01ce63e1` commit body documents it. Code is correct and live; just the git history reads oddly. |
+| 1.2D | Reports Schedule: generateReport service-role refactor + Resend dispatch | pending | — | — | — |
+| 1.3 | autoPromoteIfComplete notifications surface | **done** | `bcb3c748` | pending prod check | Forge → Products auto-promote now fires a notification instead of silent success. |
 | 1.3 | autoPromoteIfComplete surface | pending | — | — | — |
 | 1.4 | convertBriefToForge structural | pending | — | — | — |
 | 2.1 | /today | pending | — | — | — |
