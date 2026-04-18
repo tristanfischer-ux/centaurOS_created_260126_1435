@@ -354,16 +354,26 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           const uid = crypto.randomUUID().slice(0, 8)
           storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${selectedAudience}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.${ext}`
 
+          // GOTCHA: Supabase Storage bucket `report-exports` does exact-match
+          // MIME comparison against allowed_mime_types. Drop the "; charset"
+          // suffix on text/html so the upload passes the allow-list.
           const contentType = ext === "docx"
             ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             : ext === "pptx"
               ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-              : "text/html; charset=utf-8"
+              : "text/html"
+
+          // GOTCHA: Supabase Storage's allowed_mime_types check reads the
+          // Content-Type derived from the Blob's `.type` field, not just the
+          // `contentType` upload option. pptxgenjs returns a Blob with an
+          // empty `type`, so rewrap the blob with the explicit MIME string
+          // before upload to make sure the allow-list check passes.
+          const typedBlob = blob.type === contentType ? blob : new Blob([blob], { type: contentType })
 
           const supabase = createClient()
           const { error: uploadError } = await supabase.storage
             .from("report-exports")
-            .upload(storagePath, blob, {
+            .upload(storagePath, typedBlob, {
               contentType,
               upsert: true,
             })
