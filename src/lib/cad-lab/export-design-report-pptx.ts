@@ -186,6 +186,119 @@ function buildCoverSlide(pres: PptxGenJS, data: DesignReportData, heroBase64: st
   })
 }
 
+// ─── KPI callout slide (audience-aware) ─────────────────────────────
+
+interface PptxKpi { label: string; value: string; hint?: string }
+
+function extractKpisForAudiencePptx(data: DesignReportData, audience: ReportAudience): PptxKpi[] {
+  const kpis: PptxKpi[] = []
+  switch (audience) {
+    case 'investor': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length), hint: 'sub-assemblies' })
+      const massTotal = data.modules.reduce((sum, m) => sum + (m.estimatedMassKg ?? 0), 0)
+      if (massTotal > 0) kpis.push({ label: 'Mass', value: `${massTotal.toFixed(1)} kg`, hint: 'per unit' })
+      const costTotal = Object.values(data.aiCostEstimates).reduce((sum, e) => sum + (e.totalPerUnit ?? 0), 0)
+      if (costTotal > 0) kpis.push({ label: 'Unit cost', value: `£${Math.round(costTotal).toLocaleString('en-GB')}`, hint: 'early est.' })
+      const leadMax = Math.max(0, ...data.modules.map((m) => m.leadWeeks ?? 0))
+      if (leadMax > 0) kpis.push({ label: 'Lead time', value: `${leadMax} wks`, hint: 'longest' })
+      break
+    }
+    case 'engineer': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length) })
+      const diagCount = Object.keys(data.diagnosticAnswers).length
+      if (diagCount > 0) kpis.push({ label: 'Diagnosed', value: String(diagCount), hint: 'with specs' })
+      const stdCount = data.engineeringIntelligence?.standards.length ?? 0
+      if (stdCount > 0) kpis.push({ label: 'Standards', value: String(stdCount), hint: 'referenced' })
+      const cad = data.unifiedCadResult
+      if (cad?.success && cad.massGrams != null) kpis.push({ label: 'CAD mass', value: `${(cad.massGrams / 1000).toFixed(2)} kg` })
+      break
+    }
+    case 'supplier': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length) })
+      const parts = data.classifiedParts?.length ?? 0
+      if (parts > 0) kpis.push({ label: 'Parts', value: String(parts), hint: 'classified' })
+      const buyParts = data.classifiedParts?.filter((p) => p.type === 'buy').length ?? 0
+      if (parts > 0) kpis.push({ label: 'Buy', value: String(buyParts), hint: 'of ' + parts })
+      const quoteCount = data.rfqQuotes?.quotes.length ?? 0
+      if (quoteCount > 0) kpis.push({ label: 'Quotes', value: String(quoteCount) })
+      break
+    }
+    case 'marketing': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length), hint: 'sub-assemblies' })
+      const massTotal = data.modules.reduce((sum, m) => sum + (m.estimatedMassKg ?? 0), 0)
+      if (massTotal > 0) kpis.push({ label: 'Weight', value: `${massTotal.toFixed(1)} kg` })
+      const stdCount = data.engineeringIntelligence?.standards.length ?? 0
+      if (stdCount > 0) kpis.push({ label: 'Standards', value: String(stdCount), hint: 'compliant' })
+      kpis.push({ label: 'Stage', value: data.stage.charAt(0).toUpperCase() + data.stage.slice(1) })
+      break
+    }
+  }
+  return kpis.slice(0, 4)
+}
+
+/** Inject an "At a glance" KPI card slide right after the cover. Returns
+ *  silently without adding a slide if the audience has no KPIs for the
+ *  current data (prevents an empty slide on concept-stage supplier runs). */
+function buildKpiCalloutSlide(pres: PptxGenJS, data: DesignReportData): void {
+  const audience: ReportAudience = data.audience ?? DEFAULT_AUDIENCE
+  const kpis = extractKpisForAudiencePptx(data, audience)
+  if (kpis.length === 0) return
+
+  const slide = pres.addSlide()
+  addSectionTitle(slide, 'At a glance')
+
+  const cardWidth = 2.05
+  const cardGap = 0.15
+  const startX = MARGIN
+  const cardY = 1.3
+  const cardH = 1.85
+
+  kpis.forEach((kpi, i) => {
+    const x = startX + i * (cardWidth + cardGap)
+    // Card background
+    slide.addShape('roundRect', {
+      x, y: cardY, w: cardWidth, h: cardH,
+      fill: { color: LIGHT_BG },
+      line: { color: CARD_BORDER, width: 1 },
+      rectRadius: 0.06,
+    })
+    // Label (small caps)
+    slide.addText(kpi.label.toUpperCase(), {
+      x: x + 0.18, y: cardY + 0.15, w: cardWidth - 0.36, h: 0.3,
+      fontSize: 9,
+      fontFace: 'Helvetica Neue',
+      color: MID_TEXT,
+      bold: true,
+      charSpacing: 3,
+    })
+    // Value (big)
+    slide.addText(kpi.value, {
+      x: x + 0.18, y: cardY + 0.55, w: cardWidth - 0.36, h: 0.85,
+      fontSize: 32,
+      fontFace: 'Helvetica Neue',
+      color: DARK_TEXT,
+      bold: true,
+    })
+    // Hint (muted italic)
+    if (kpi.hint) {
+      slide.addText(kpi.hint, {
+        x: x + 0.18, y: cardY + cardH - 0.42, w: cardWidth - 0.36, h: 0.3,
+        fontSize: 9,
+        fontFace: 'Helvetica Neue',
+        color: MID_TEXT,
+        italic: true,
+      })
+    }
+  })
+
+  slide.addText(AUDIENCE_META[audience].label, {
+    x: MARGIN, y: FOOTER_Y, w: CONTENT_W, h: 0.25,
+    fontSize: 9,
+    fontFace: 'Helvetica Neue',
+    color: MID_TEXT,
+  })
+}
+
 // ─── Public API ─────────────────────────────────────────────────────
 
 /**
@@ -213,6 +326,9 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
 
   // ── 1. Cover Slide (shared helper) ──
   buildCoverSlide(pres, data, heroBase64)
+
+  // ── 1b. At-a-glance KPI slide (audience-aware, skipped if no data) ──
+  buildKpiCalloutSlide(pres, data)
 
   // ── 2. Executive Summary ──
   if (data.productOverview) {
@@ -1281,6 +1397,9 @@ async function buildAiPptx(data: DesignReportData): Promise<Blob> {
 
   // ── Cover Slide (shared helper) ──
   buildCoverSlide(pres, data, heroBase64)
+
+  // ── KPI callout slide (audience-aware, sits between cover and exec summary) ──
+  buildKpiCalloutSlide(pres, data)
 
   // ── Executive Summary Slide ──
   if (aiContent.executiveSummary) {
