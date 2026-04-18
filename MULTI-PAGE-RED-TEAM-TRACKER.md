@@ -332,5 +332,103 @@ Ordered roughly by leverage × effort. None are correctness bugs.
 Time budget: aim for ~2 hours end-to-end; if a single step blows past ~45 min, ship what's shipped and log the rest.
 
 ### 14. Products ↔ Objectives ↔ Tasks schema link
-_(in progress)_
+
+**Founder question closed:** *"Which product is this objective shipping? What tasks are blocking Product X?"*
+
+**Shipped as two commits:**
+
+**A. Foundation (commit `2fb04b0a`):**
+- Migration `20260418020000_objectives_tasks_product_link.sql` — nullable `product_id uuid REFERENCES products(id) ON DELETE SET NULL` on both `objectives` and `tasks`. Composite partial indexes `(foundry_id, product_id) WHERE product_id IS NOT NULL` so "everything for product X" is a fast scan. No backfill. Rollback SQL kept as a comment in the migration. Applied live in Supabase; columns + indexes verified in `information_schema` and `pg_indexes`.
+- New server action `getLinkedItemsForProduct(productId)` in `src/actions/products.ts` — returns `{objectives, tasks, objectiveCount, taskCount}`. UUID-gated, foundry-isolated. Parallel queries via `Promise.all`.
+- New client component `src/app/(platform)/products/[id]/linked-work-card.tsx` — renders on Product Overview tab between Unit Economics and Details. Counts + top-5 of each, hover accents, empty state invites tagging.
+- Types regenerated with `npx supabase gen types typescript --linked`.
+
+**B. Tagging UI (commit `8aa27ad7`):**
+- `lib/validations.ts`: `createObjectiveSchema` + `updateObjectiveSchema` accept optional `productId` (UUID). Zod enforces format before query.
+- `actions/objectives.ts`: `createObjective` reads `productId` from FormData, inserts into the new column; **playbook + AI-imported tasks created alongside an objective inherit the same product_id** so tagging the objective cascades the work (key founder-utility move).
+- `actions/objectives.ts`: `updateObjective` extended with optional `productId` (nullable for unlink). Uses `'productId' in updates` to distinguish "not provided" from "explicitly null".
+- `components/objectives/edit-objective-dialog.tsx`: new "Linked product" `<select>` below Extended Context, above Privacy. Loads via `getProducts()`. Hides when no products exist.
+
+**Deferred from this change:**
+- Standalone task-side selector (in the Create Task / Task detail panel). Most tasks inherit from objectives; backlog for later when someone asks for it.
+
+**Score (composite improvement on Products + Objectives):** Utility +1, Integration +2 across both pages.
+
+**Founder-impact note:** A founder can now tag an objective to a product once — the playbook tasks and AI-imported tasks inherit the same product — and see the whole block of work surface on that product's Overview page. Answers "what's blocking the Alpha build?" in one click. No more copying product names across the strategy + products silos.
+
+### 15. Pitch Prep — `/pitch-prep`
+
+**Founder question:** *"Am I ready for my next pitch — what do I need to prep, what am I missing, and can I generate the document?"*
+
+**Pass A findings:**
+1. **[P2]** 3× `border-slate-100` in `pitch-prep-list-view.tsx:59`, `[id]/pitch-prep-detail-view.tsx:88`, `loading.tsx:7`. [Fixed]
+2. **[P2 A11y]** Service + investor-type toggle buttons in `PitchPrepForm.tsx:558-600` had no `aria-pressed` — toggle state was silent to screen readers. [Fixed]
+3. **[P2 A11y]** Wizard step buttons at `PitchPrepForm.tsx:236` had no `aria-current="step"`. [Fixed]
+4. **[P1 Founder-UX] deferred** — Landing lacks a "3/5 sections complete" readiness signal. Needs calculated from pitch_prep_request data + a mini progress ring. Not a quick fix.
+5. **[P1 Integration] deferred** — Zero integration with Products (pre-fill product description), Investors (suggest target investor types), Objectives ("add to objectives" after submit). Architectural, not overnight-shippable.
+
+**Pass B shipped:** 3 token cleanups + 3 aria attributes across two files.
+
+**Score:** Utility 3 (no readiness signal) / Integration 2 / Voice 4 / Robustness 5 / A11y 5 (was 3) → **Composite 3.8**.
+
+**Founder-impact note:** Screen-reader users now hear which pitch service + investor type is selected and which wizard step is active. Design-token sweep moves three more surfaces into the semantic fold. The big founder wins (readiness signal, auto-pre-fill from Products/Investors) are on the backlog for a dedicated pass.
+
+### 16. Investors — `/investors`
+
+**Founder question:** *"Who do I reach out to next, what's our warm-intro path, who's in the pipeline?"*
+
+**Pass A findings:**
+1. **[P1 A11y]** `InvestorPageTabs.tsx:70` — 6-tab bar rendered as plain `<button>` with no `role="tablist"`, no `role="tab"`, no `aria-selected`, no `aria-controls`, no arrow-key keyboard nav. Same pattern I've been fixing all night. [Fixed]
+2. **[P3 Audit false-positive]** Flagged "AI-powered matching" strings — all JSDoc, not user-visible. No action.
+3. **[P2 Deferred]** Pipeline stage breadcrumb on `/investors/[id]` detail page — founder viewing an investor can't see its shortlist stage (warm lead / meeting / rejected) without navigating back. Needs a small lookup + chip on the detail page. Backlog.
+4. **[P2 Deferred]** View-cap banner copy ("You've used all X new views this month") — unclear whether library revisits count. Minor copy improvement.
+5. **[P1 Integration] deferred** — No cross-module pulls (runway doesn't suggest investor tier, active Products don't auto-filter sector). Architectural.
+
+**Pass B shipped:** WAI-ARIA tablist on the 6 tabs — `role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls`, roving `tabIndex`, ArrowLeft/ArrowRight nav with focus movement, `aria-labelledby` on each panel wrapper. Decorative icons get `aria-hidden="true"`.
+
+**Score:** Utility 4 / Integration 2 / Voice 5 / Robustness 5 / A11y 5 (was 3) → **Composite 4.2**.
+
+**Founder-impact note:** Keyboard + screen-reader users can now navigate the six investor views. A fundraising founder who lives in this page now actually gets to use it without a mouse.
+
+### 17. Team + Knowledge — `/team` + `/knowledge`
+
+Batched — small P2 fixes on each, same-flavour voice + token cleanups.
+
+**Founder questions:**
+- Team: *"Who's on my team, what are they doing, where are the gaps?"*
+- Knowledge: *"Where did I save that thing — and what does the rest of the playbook say?"*
+
+**Pass A findings:**
+1. **[P2]** `team/[id]/page.tsx:99,100` — hardcoded `border-slate-200` + `border-slate-50`. [Fixed]
+2. **[P2 Copy]** `team/[id]/page.tsx:79` — *"Profile metadata sync in progress. Please refresh in a moment."* Technical + assumes. [Fixed → "Profile is still loading. Refresh the page if this stays up for more than a few seconds."]
+3. **[P2]** `knowledge-vault-view.tsx:568,571,600` — 3× `bg-international-orange text-white` (hardcoded `text-white`). [Fixed → `text-primary-foreground`]
+4. **[P2 Voice]** `knowledge/page.tsx:10` — meta description *"the more you add, the smarter your specialists become"* reads as AI-marketing ("smarter" is the trigger word). [Fixed → "the richer the context for every decision"]
+5. **[P2 Deferred]** Foundry-ownership defence-in-depth on a few knowledge server actions — RLS already covers, but adding explicit `foundry_id` gates is cheap defence. Backlog.
+
+**Pass B shipped:** Four surgical fixes in one commit.
+
+**Score (batched):** Utility 4 / Integration 3 / Voice 5 (was 4 on Knowledge) / Robustness 5 / A11y 4 → **Composite 4.2**.
+
+**Founder-impact note:** Small but cumulative — the knowledge vault meta no longer promises "smarter specialists" (voice rule), and team profiles stay coherent under theme shifts. Team [id] loading copy stops assuming the founder knows what "metadata sync" means.
+
+---
+
+## Second-run handover (morning)
+
+**Commits tonight (on top of the overnight run one before):**
+- `2fb04b0a` feat(products/objectives/tasks): schema link foundation — migration + reverse lookup card on Products
+- `8aa27ad7` feat(objectives): tag an objective to a product + inherit on child tasks
+- `67524508` a11y+tokens(pitch-prep): aria-pressed on toggles, aria-current on step, border-slate-100 → border-border
+- `494b3c49` a11y(investors): WAI-ARIA tab bar with arrow-key navigation
+- _(pending this commit)_ chore(team+knowledge): token + voice cleanup + this handover
+
+**Deploys:** every push this run verified against the same `npx vercel ls` cadence, all `● Ready` except the final one still building at wrap-up.
+
+**What the morning queue looks like:**
+- Consume items 2+ from the earlier "Deferred / backlog" list — Cash Burn auto-sync from Products / Orders / Objectives is the highest-leverage architectural piece left. The schema link shipped tonight makes this easier: Cash Burn now has a real foreign key to follow back into Products for COGS and planned-revenue auto-seeding.
+- Or sweep the remaining unvisited pages: `/canvas`, `/retainers`, `/suppliers`, `/workshop`, `/playbooks`, `/orders`, `/me`, `/agents`, `/analytics`, `/time`, `/comms`, `/updates`.
+- Or tackle the standalone-task product-tagging UI (small, clean follow-up to tonight's schema work).
+
+Everything shipped this run is additive + rollback-safe (migration included). No Vercel errors. No merge conflicts — commits stacked linearly on `main`.
+
 

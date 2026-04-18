@@ -565,10 +565,10 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
 
               {/* View mode toggle */}
               <div className="flex items-center gap-1 rounded-md border border-input p-0.5">
-                <button onClick={() => setViewMode('grid')} className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors', viewMode === 'grid' ? 'bg-international-orange text-white' : 'text-muted-foreground hover:text-foreground')}>
+                <button onClick={() => setViewMode('grid')} className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors', viewMode === 'grid' ? 'bg-international-orange text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
                   <LayoutGrid className="h-3.5 w-3.5" /> Grid
                 </button>
-                <button onClick={() => setViewMode('clustered')} className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors', viewMode === 'clustered' ? 'bg-international-orange text-white' : 'text-muted-foreground hover:text-foreground')}>
+                <button onClick={() => setViewMode('clustered')} className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors', viewMode === 'clustered' ? 'bg-international-orange text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
                   <Layers className="h-3.5 w-3.5" /> Clustered
                 </button>
               </div>
@@ -597,7 +597,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
                     className={cn(
                       'inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-full text-xs font-medium transition-colors',
                       selectedTypes.includes(type)
-                        ? 'bg-international-orange text-white'
+                        ? 'bg-international-orange text-primary-foreground'
                         : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
                     )}
                   >

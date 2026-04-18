@@ -7,7 +7,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Knowledge',
-  description: 'Your team\'s collective intelligence — the more you add, the smarter your specialists become',
+  description: 'Your team\'s accumulated knowledge — the more you add, the richer the context for every decision.',
 }
 
 export const revalidate = 30

@@ -76,7 +76,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
 
     if (!currentMemberMetrics) {
         // Fallback if not found in the list (e.g. newly joined)
-        return <div className="p-8 text-status-warning bg-status-warning-light rounded-lg">Profile metadata sync in progress. Please refresh in a moment.</div>
+        return <div className="p-8 text-status-warning bg-status-warning-light rounded-lg">Profile is still loading. Refresh the page if this stays up for more than a few seconds.</div>
     }
 
     return (
@@ -96,8 +96,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
             </nav>
 
             {/* Header / Profile Card */}
-            <div className="bg-background border border-slate-200 rounded-xl p-8 shadow-sm flex items-start gap-8">
-                <div className="h-32 w-32 bg-muted rounded-full flex items-center justify-center text-4xl border-4 border-slate-50 shadow-inner">
+            <div className="bg-background border border-border rounded-xl p-8 shadow-sm flex items-start gap-8">
+                <div className="h-32 w-32 bg-muted rounded-full flex items-center justify-center text-4xl border-4 border-muted shadow-inner">
                     {profile.role === 'AI_Agent' ? '🤖' : '👤'}
                 </div>
                 <div className="flex-1">
