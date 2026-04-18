@@ -726,13 +726,13 @@ export function NodeInspector({
                                             onChange={(e) => handleOutputChange(e.target.value)}
                                             className={`min-h-[150px] text-xs leading-relaxed resize-y ${
                                                 status === "running" ? "opacity-80" : ""
-                                            } ${isReview ? "border-amber-200 bg-amber-50/30" : ""}`}
+                                            } ${isReview ? "border-status-warning/30 bg-status-warning-light/30" : ""}`}
                                             placeholder={status === "running" ? "Generating..." : "Output will appear here..."}
                                             readOnly={status === "running"}
                                         />
                                     ) : data.output ? (
                                         <div className={`rounded-lg border p-3 max-h-[400px] overflow-y-auto text-xs leading-relaxed ${
-                                            isReview ? "border-amber-200 bg-amber-50/30" : "bg-muted/30"
+                                            isReview ? "border-status-warning/30 bg-status-warning-light/30" : "bg-muted/30"
                                         }`}>
                                             <Markdown content={data.output} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:bg-muted [&_th]:font-semibold" />
                                         </div>

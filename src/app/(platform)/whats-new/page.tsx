@@ -187,10 +187,10 @@ export default function WhatsNewPage() {
             {/* New Features Highlight */}
             {newFeatures.length > 0 && (
                 <Card className="border overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-amber-50/80 to-transparent border-b border-border">
+                    <CardHeader className="bg-gradient-to-r from-status-warning-light/80 to-transparent border-b border-border">
                         <CardTitle className="flex items-center gap-2">
-                            <div className="p-2 bg-amber-100 rounded-lg">
-                                <Sparkles className="h-4 w-4 text-amber-600" />
+                            <div className="p-2 bg-status-warning-light rounded-lg">
+                                <Sparkles className="h-4 w-4 text-status-warning-dark" />
                             </div>
                             Recently Added
                         </CardTitle>

@@ -446,10 +446,10 @@ export function LearnPage({
                             {section.content}
                           </div>
                           {section.tips.length > 0 && (
-                            <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3 space-y-1.5">
+                            <div className="rounded-lg bg-status-warning-light/50 border border-status-warning/20 p-3 space-y-1.5">
                               {section.tips.map((tip, i) => (
                                 <p key={i} className="text-sm flex gap-2">
-                                  <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                  <Lightbulb className="h-4 w-4 text-status-warning-dark shrink-0 mt-0.5" />
                                   <span className="text-muted-foreground">{tip}</span>
                                 </p>
                               ))}
