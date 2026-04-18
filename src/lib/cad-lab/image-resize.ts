@@ -18,26 +18,18 @@
  * - src/lib/cad-lab/export-design-report-pdf.tsx
  */
 
+// SECURITY/BUNDLE: `server-only` triggers a build-time error if this module is
+// ever imported into a client component. Necessary because sharp pulls
+// detect-libc → fs (Node-only); previously the PDF exporter (client-bundled)
+// imported types from here and webpack pulled in sharp, failing the build
+// with "Can't resolve 'fs'". Types live in ./image-resize-types.ts so client
+// code can reference the shape without triggering the sharp import.
+import 'server-only'
 import sharp from 'sharp'
+import type { ResizedImage, ResizeOptions } from './image-resize-types'
 
-export interface ResizedImage {
-  /** For `docx` ImageRun — raw JPEG bytes. */
-  buffer: ArrayBuffer
-  /** For `pptxgenjs` / `@react-pdf/renderer` — `data:image/jpeg;base64,...`. */
-  dataUri: string
-  width: number
-  height: number
-  byteLength: number
-}
-
-export interface ResizeOptions {
-  /** Max edge length in pixels. Default 1600. */
-  maxEdge?: number
-  /** JPEG quality 1–100. Default 85. */
-  quality?: number
-  /** Abort the fetch after this many ms. Default 10,000. */
-  timeoutMs?: number
-}
+// Re-export for existing server callers that imported types from here.
+export type { ResizedImage, ResizeOptions } from './image-resize-types'
 
 /** Fetch + resize + re-encode to JPEG. Returns null on any failure (callers
  *  already degrade gracefully when images are missing). */

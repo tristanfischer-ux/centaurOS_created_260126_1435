@@ -26,7 +26,10 @@ import { Document, Page, View, Text, Image, StyleSheet, Font, pdf } from '@react
 
 import { BRAND_COLORS_CSS, FONT_URLS } from '@/lib/constants/brand-tokens'
 import { AUDIENCE_META, DEFAULT_AUDIENCE } from '@/lib/cad-lab/audience'
-import { fetchImageDataUriResized } from '@/lib/cad-lab/image-resize'
+// BUNDLE: route through a server action — image-resize.ts pulls sharp which
+// pulls native fs and fails the Next client bundle. Server action keeps sharp
+// server-side.
+import { resizeImageToDataUri } from '@/actions/image-resize-action'
 import type { DesignReportData } from '@/lib/cad-lab/design-report-types'
 import type { ReportAudience } from '@/lib/cad-lab/audience'
 
@@ -905,7 +908,7 @@ function ReportDocument({ data, heroDataUri }: { data: DesignReportData; heroDat
 /** Render the Design Journey Report to a PDF blob. Triggers a browser
  *  download and returns the blob so callers can persist it to Storage. */
 export async function exportDesignReportAsPDF(data: DesignReportData): Promise<Blob> {
-  const heroDataUri = data.heroImageUrl ? await fetchImageDataUriResized(data.heroImageUrl, { maxEdge: 1800, quality: 88 }) : null
+  const heroDataUri = data.heroImageUrl ? await resizeImageToDataUri(data.heroImageUrl, { maxEdge: 1800, quality: 88 }) : null
 
   const blob = await pdf(<ReportDocument data={data} heroDataUri={heroDataUri} />).toBlob()
 
