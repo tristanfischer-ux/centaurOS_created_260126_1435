@@ -72,7 +72,7 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
             <h1 className={typography.h1}>Strategic Planner</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            Set big goals with deadlines. AI builds the full plan.
+            Set big goals with deadlines. Get a full plan — phases, tasks, resource gaps — back for review.
           </p>
         </div>
         <Link href="/new-objectives?mode=strategic">

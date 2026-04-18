@@ -280,7 +280,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
         specialistName="Finn"
         specialistTitle="Finance"
         narrative={briefing.narrative}
-        fallbackMessage="Every pound out is either fixed (rent, salaries — hard to cut) or variable (tools, contractors — cuttable tomorrow). I separate them so you know your real floor. Check your subscriptions tab — most founders are leaking hundreds per month on tools nobody's using."
+        fallbackMessage="Every pound out is either fixed (rent, salaries — hard to cut) or variable (tools, contractors — cuttable tomorrow). I separate them so you know your real floor. The subscriptions tab is the first place I'd check — unused SaaS tends to hide there."
         isLoading={briefing.isLoading}
         severity={briefing.severity}
         context={{ type: 'general', title: 'Cash Out', description: 'Finn on cash out.', metadata: {} }}
