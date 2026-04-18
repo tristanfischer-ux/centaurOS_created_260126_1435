@@ -98,6 +98,7 @@ import { generateReport, saveReportSnapshot } from '@/actions/report-generator'
 import { generateBriefingAction } from '@/actions/strategic-briefing'
 import { createReportShareLink } from '@/actions/report-share'
 import { sendReportEmail } from '@/actions/report-email'
+import { scheduleReportDelivery } from '@/actions/scheduled-reports'
 import { ReportDocument } from '@/components/reports/ReportDocument'
 import { ReportInfographic } from '@/components/reports/ReportInfographic'
 import { SlideDeckRenderer } from '@/components/reports/SlideDeckRenderer'
@@ -336,6 +337,7 @@ export default function ReportsPage(): React.JSX.Element {
   const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState(1)
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(1)
   const [scheduleRecipients, setScheduleRecipients] = useState('')
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
 
   // Derived values
   const currentTemplate = useMemo(() => getTemplate(selectedTemplate), [selectedTemplate])
@@ -1515,14 +1517,20 @@ export default function ReportsPage(): React.JSX.Element {
                         Email
                       </Button>
                       {/*
-                        GOTCHA: Schedule button removed until the backend exists.
-                        The dialog collects frequency + recipients but the Save
-                        handler only fires a success toast — no persistence, no
-                        cron. Leaving the button in would lie to the founder
-                        (they'd think reports are being scheduled). Restore when
-                        scheduleReportDelivery() server action + cron ships.
-                        Tracked in MULTI-PAGE-RED-TEAM-TRACKER.md.
+                        Schedule button restored 1.2B (scheduleReportDelivery action now
+                        persists to public.scheduled_reports — migration 20260418200000).
+                        Cron worker + email dispatch still pending (1.2C) — the row is
+                        saved but no email will arrive until 1.2C ships. Toast will say
+                        "saved" but not "first email arriving X", which is honest.
                       */}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsScheduleDialogOpen(true)}
+                      >
+                        <Clock className="mr-1.5 h-3.5 w-3.5" />
+                        Schedule
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -1907,22 +1915,57 @@ export default function ReportsPage(): React.JSX.Element {
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                if (scheduleEnabled) {
-                  // GOTCHA: Match the same split pattern as handleSendEmail — users may use semicolons.
-                  const recipientCount = scheduleRecipients.split(/[,;]+/).map(s => s.trim()).filter(Boolean).length
-                  if (recipientCount === 0) {
-                    toast.error('Enter at least one recipient email address')
+              disabled={isSavingSchedule}
+              onClick={async () => {
+                if (!scheduleEnabled) {
+                  toast.success('Scheduling disabled')
+                  setIsScheduleDialogOpen(false)
+                  return
+                }
+                // GOTCHA: Match the same split pattern as handleSendEmail — users may use semicolons.
+                const recipients = scheduleRecipients.split(/[,;]+/).map((s) => s.trim()).filter(Boolean)
+                if (recipients.length === 0) {
+                  toast.error('Enter at least one recipient email address')
+                  return
+                }
+                setIsSavingSchedule(true)
+                try {
+                  const result = await scheduleReportDelivery({
+                    templateId: selectedTemplate,
+                    config: {
+                      tone: reportTone,
+                      detailLevel,
+                      sections: Array.from(enabledSections),
+                    },
+                    frequency: scheduleFrequency,
+                    dayOfWeek: scheduleFrequency === 'weekly' ? scheduleDayOfWeek : undefined,
+                    dayOfMonth: scheduleFrequency === 'monthly' ? scheduleDayOfMonth : undefined,
+                    recipients,
+                    enabled: true,
+                  })
+                  if (result.error || !result.data) {
+                    toast.error(result.error ?? 'Could not save schedule')
                     return
                   }
-                  toast.success(`Scheduled ${scheduleFrequency} delivery to ${recipientCount} recipient(s)`)
-                } else {
-                  toast.success('Scheduling disabled')
+                  const nextRun = new Date(result.data.nextRunAt)
+                  const nextRunLabel = nextRun.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                  toast.success(
+                    `Scheduled ${scheduleFrequency} delivery to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}. Row saved — first send once the worker is enabled (next scheduled ${nextRunLabel}).`,
+                  )
+                  setIsScheduleDialogOpen(false)
+                } catch (err) {
+                  console.error('[reports] scheduleReportDelivery failed:', err)
+                  toast.error('Schedule save failed — check server logs')
+                } finally {
+                  setIsSavingSchedule(false)
                 }
-                setIsScheduleDialogOpen(false)
               }}
             >
-              <Clock className="mr-2 h-4 w-4" />
+              {isSavingSchedule ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Clock className="mr-2 h-4 w-4" />
+              )}
               {scheduleEnabled ? 'Save Schedule' : 'Done'}
             </Button>
           </DialogFooter>
