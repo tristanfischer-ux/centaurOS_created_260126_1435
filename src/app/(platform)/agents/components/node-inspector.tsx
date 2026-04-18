@@ -714,7 +714,7 @@ export function NodeInspector({
                                 <div className="space-y-2">
                                     {data.error && (
                                         <div className="p-2.5 rounded-lg bg-status-error-light border border-destructive/20">
-                                            <p className="text-[11px] text-red-700">{data.error}</p>
+                                            <p className="text-[11px] text-status-error-dark">{data.error}</p>
                                         </div>
                                     )}
 

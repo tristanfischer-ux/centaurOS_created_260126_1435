@@ -300,7 +300,7 @@ export function WorkflowToolbar({
                                                             e.stopPropagation()
                                                             onDeleteWorkflow(wf.id)
                                                         }}
-                                                        className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0"
+                                                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0"
                                                         aria-label={`Delete ${wf.name}`}
                                                     >
                                                         <Trash2 className="w-3 h-3" />

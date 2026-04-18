@@ -113,10 +113,10 @@ function getOrderedNodeIds(nodes: Node[], edges: Edge[]): string[] {
 // ─── Status helpers ──────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; colorClass: string }> = {
-    approved: { icon: CheckCircle2, label: "Complete", colorClass: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-    review: { icon: Clock, label: "Needs review", colorClass: "text-amber-600 bg-amber-50 border-amber-200" },
-    running: { icon: Loader2, label: "Running", colorClass: "text-blue-600 bg-blue-50 border-blue-200" },
-    error: { icon: AlertCircle, label: "Error", colorClass: "text-red-600 bg-red-50 border-red-200" },
+    approved: { icon: CheckCircle2, label: "Complete", colorClass: "text-status-success-dark bg-status-success-light border-status-success/30" },
+    review: { icon: Clock, label: "Needs review", colorClass: "text-status-warning-dark bg-status-warning-light border-status-warning/30" },
+    running: { icon: Loader2, label: "Running", colorClass: "text-status-info-dark bg-status-info-light border-status-info/30" },
+    error: { icon: AlertCircle, label: "Error", colorClass: "text-status-error-dark bg-status-error-light border-status-error/30" },
     idle: { icon: FileText, label: "Not run", colorClass: "text-muted-foreground bg-muted border-muted" },
 }
 
