@@ -23,6 +23,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 import type { ReportDocument as ReportDocumentType } from '@/lib/reports/report-document-types'
 
@@ -83,6 +84,18 @@ export async function createReportShareLink(
 
     if (snapshot.foundry_id !== foundryId) {
       return { success: false, error: 'Report does not belong to your foundry' }
+    }
+
+    // SECURITY: Cap share-link generation at 10 links per user per report per
+    // 1-hour window. Each regenerate creates a new DB row; without this cap a
+    // malicious client could flood `shared_reports` with tokens.
+    const rateLimitError = await checkRateLimit(
+      'reportShareLink',
+      `${user.id}:${reportSnapshotId}`,
+      { limit: 10, window: 60 * 60 * 1000 },
+    )
+    if (rateLimitError) {
+      return { success: false, error: rateLimitError }
     }
 
     const token = crypto.randomUUID()
