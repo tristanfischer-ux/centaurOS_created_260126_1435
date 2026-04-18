@@ -154,6 +154,120 @@ const DIAG_LABELS: Record<string, string> = {
   environment: 'Environment',
 }
 
+// ─── KPI callout (audience-aware) ───────────────────────────────────
+
+interface DocxKpi { label: string; value: string; hint?: string }
+
+function extractKpisForAudience(data: DesignReportData, audience: ReportAudience): DocxKpi[] {
+  const kpis: DocxKpi[] = []
+  switch (audience) {
+    case 'investor': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length), hint: 'sub-assemblies' })
+      const massTotal = data.modules.reduce((sum, m) => sum + (m.estimatedMassKg ?? 0), 0)
+      if (massTotal > 0) kpis.push({ label: 'Mass', value: `${massTotal.toFixed(1)} kg`, hint: 'per unit' })
+      const costTotal = Object.values(data.aiCostEstimates).reduce((sum, e) => sum + (e.totalPerUnit ?? 0), 0)
+      if (costTotal > 0) kpis.push({ label: 'Unit cost', value: `£${Math.round(costTotal).toLocaleString('en-GB')}`, hint: 'early est.' })
+      const leadMax = Math.max(0, ...data.modules.map((m) => m.leadWeeks ?? 0))
+      if (leadMax > 0) kpis.push({ label: 'Lead time', value: `${leadMax} wks`, hint: 'longest' })
+      break
+    }
+    case 'engineer': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length) })
+      const diagCount = Object.keys(data.diagnosticAnswers).length
+      if (diagCount > 0) kpis.push({ label: 'Diagnosed', value: String(diagCount), hint: 'with specs' })
+      const stdCount = data.engineeringIntelligence?.standards.length ?? 0
+      if (stdCount > 0) kpis.push({ label: 'Standards', value: String(stdCount), hint: 'referenced' })
+      const cad = data.unifiedCadResult
+      if (cad?.success && cad.massGrams != null) kpis.push({ label: 'CAD mass', value: `${(cad.massGrams / 1000).toFixed(2)} kg` })
+      break
+    }
+    case 'supplier': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length) })
+      const parts = data.classifiedParts?.length ?? 0
+      if (parts > 0) kpis.push({ label: 'Parts', value: String(parts), hint: 'classified' })
+      const buyParts = data.classifiedParts?.filter((p) => p.type === 'buy').length ?? 0
+      if (parts > 0) kpis.push({ label: 'Buy', value: String(buyParts), hint: 'of ' + parts })
+      const quoteCount = data.rfqQuotes?.quotes.length ?? 0
+      if (quoteCount > 0) kpis.push({ label: 'Quotes', value: String(quoteCount) })
+      break
+    }
+    case 'marketing': {
+      kpis.push({ label: 'Modules', value: String(data.modules.length), hint: 'sub-assemblies' })
+      const massTotal = data.modules.reduce((sum, m) => sum + (m.estimatedMassKg ?? 0), 0)
+      if (massTotal > 0) kpis.push({ label: 'Weight', value: `${massTotal.toFixed(1)} kg` })
+      const stdCount = data.engineeringIntelligence?.standards.length ?? 0
+      if (stdCount > 0) kpis.push({ label: 'Standards', value: String(stdCount), hint: 'compliant' })
+      kpis.push({ label: 'Stage', value: data.stage.charAt(0).toUpperCase() + data.stage.slice(1) })
+      break
+    }
+  }
+  return kpis.slice(0, 4)
+}
+
+function kpiCell(kpi: DocxKpi): TableCell {
+  return new TableCell({
+    width: { size: 25, type: WidthType.PERCENTAGE },
+    margins: { top: 140, bottom: 140, left: 180, right: 180 },
+    shading: { fill: LIGHT_BG },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+      left: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+      right: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+    },
+    children: [
+      new Paragraph({
+        spacing: { after: 40 },
+        children: [
+          new TextRun({ text: kpi.label.toUpperCase(), size: 14, bold: true, color: MID_TEXT, characterSpacing: 40, font: 'Calibri' }),
+        ],
+      }),
+      new Paragraph({
+        spacing: { after: 0 },
+        children: [
+          new TextRun({ text: kpi.value, size: 36, bold: true, color: DARK_TEXT, font: 'Calibri' }),
+        ],
+      }),
+      ...(kpi.hint
+        ? [new Paragraph({
+            spacing: { before: 20 },
+            children: [new TextRun({ text: kpi.hint, size: 14, color: MID_TEXT, italics: true, font: 'Calibri' })],
+          })]
+        : []),
+    ],
+  })
+}
+
+/** Build a 4-cell KPI callout row. Returns null if the audience has no
+ *  meaningful KPIs for the current data (e.g. supplier at concept stage). */
+function buildKpiCallout(data: DesignReportData, audience: ReportAudience): Table | null {
+  const kpis = extractKpisForAudience(data, audience)
+  if (kpis.length === 0) return null
+  // Pad to 4 so the row width is consistent
+  const padded: (DocxKpi | null)[] = [...kpis, ...Array(4 - kpis.length).fill(null)]
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: padded.map((k) =>
+          k
+            ? kpiCell(k)
+            : new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+                  left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+                  right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+                },
+                children: [new Paragraph({ children: [new TextRun({ text: '' })] })],
+              }),
+        ),
+      }),
+    ],
+  })
+}
+
 // ─── Public API ─────────────────────────────────────────────────────
 
 /**
@@ -166,11 +280,20 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
     return buildAiDocx(data)
   }
 
+  const audience: ReportAudience = data.audience ?? DEFAULT_AUDIENCE
   const children: DocChild[] = []
 
   // ── 1. Cover page (shared helper) ──
   const coverChildren = await buildCoverPage(data)
   children.push(...coverChildren)
+
+  // ── 1b. KPI callout (4-card row, audience-aware) ──
+  const kpiCallout = buildKpiCallout(data, audience)
+  if (kpiCallout) {
+    children.push(sectionHeading('At a glance'))
+    children.push(kpiCallout)
+    children.push(textParagraph('', { after: 200 }))
+  }
 
   // ── 2. Product Overview ──
   if (data.productOverview) {
@@ -1164,11 +1287,20 @@ function buildDocxDocument(children: DocChild[], data: DesignReportData): Docume
 
 async function buildAiDocx(data: DesignReportData): Promise<Blob> {
   const aiContent = data.aiContent!
+  const audience: ReportAudience = data.audience ?? DEFAULT_AUDIENCE
   const children: DocChild[] = []
 
   // ── Cover page (shared helper) ──
   const coverChildren = await buildCoverPage(data)
   children.push(...coverChildren)
+
+  // ── KPI callout (audience-aware, sits between cover and exec summary) ──
+  const kpiCallout = buildKpiCallout(data, audience)
+  if (kpiCallout) {
+    children.push(sectionHeading('At a glance'))
+    children.push(kpiCallout)
+    children.push(textParagraph('', { after: 200 }))
+  }
 
   // ── Executive Summary ──
   if (aiContent.executiveSummary) {
