@@ -526,12 +526,12 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                             {mode === 'strategic' && "Create Strategic Goal"}
                         </DialogTitle>
                         <DialogDescription className="text-muted-foreground">
-                            {mode === 'guided' && "AI-guided creation to make your objective Specific, Measurable, Achievable, Relevant, and Time-bound."}
+                            {mode === 'guided' && "A guided walk-through to make your objective Specific, Measurable, Achievable, Relevant, and Time-bound."}
                             {mode === 'manual' && "Manually define your objective and success criteria."}
                             {mode === 'pack' && !selectedPack && "Choose a pre-configured template to jumpstart your strategy."}
                             {mode === 'pack' && selectedPack && `Review tasks included in the "${selectedPack.title}" pack.`}
                             {mode === 'import' && "Upload a business plan to automatically generate objectives."}
-                            {mode === 'strategic' && "Define a big goal with a deadline. AI will build a full plan with phases, tasks, dependencies, and resource recommendations."}
+                            {mode === 'strategic' && "Define a big goal with a deadline. Get back a full plan — phases, tasks, dependencies, and resource recommendations — to review."}
                         </DialogDescription>
                     </DialogHeader>
 

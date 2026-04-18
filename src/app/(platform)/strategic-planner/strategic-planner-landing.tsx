@@ -99,7 +99,7 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
       {goals.length === 0 ? (
         <EmptyState
           title="No strategic goals yet"
-          description="Create a strategic goal with a deadline to get started. AI will build a full plan with phases, tasks, and resource recommendations."
+          description="Create a strategic goal with a deadline to get started. You'll get back a full plan — phases, tasks, dependencies, and resource recommendations — to review."
           action={
             <Link href="/new-objectives?mode=strategic">
               <Button>
