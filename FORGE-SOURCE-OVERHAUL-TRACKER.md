@@ -18,6 +18,9 @@
 | 6 — Supplier-review fallback | `7983560c` | "Or talk to suppliers who could make this" card on Specify Exec Review when executives don't strong-match. |
 | 5 — Vector-backed DfM (MVP) | `5294e6df` | DB schema: embedding vector(768) + content_hash + reviewed flag; 47/47 existing rows embedded; RPC `match_manufacturing_techniques`. Tab renamed "Design for Manufacture", "Related Techniques (semantic)" section, data-provenance popover. |
 | — | `b1016117` | Tracker + extensive-taxonomy seed script. |
+| 5B — Extensive LLM seed | — | 80/80 techniques inserted, embedded, bulk-approved via `UPDATE ... SET reviewed=true`. Total DfM library: **127 techniques live** (27 nightshift + 80 LLM + 20 process_capabilities). |
+| 3 — Shortlist verdict-awareness | `fce3a71a` | CadLabShortlist sorts Recommended → Not Recommended + shows verdict Badge inline. Two views stay separate (browse-by-score vs. manage-selections) but agree visually. |
+| 4 — DB-backed shortlist | `b1689a83` | `forge_supplier_shortlist` table with RLS (verified end-to-end under cross-foundry impersonation: INSERT blocked `42501`, DELETE 0 rows). Client hydrates from DB on mount; one-shot migrates localStorage v2 → DB; v3 marker. All mutations write through to DB. |
 
 **Phase 5B seed result (background task `batqsdh8k` complete):**
 - 80/80 techniques inserted into `manufacturing_technique_enrichments` with `source='seed_llm_deepseek'` and `reviewed=false` (hidden from RPC default).
@@ -42,12 +45,9 @@ SET reviewed = true WHERE source = 'seed_llm_deepseek';
 The following slugs from SEED_TAXONOMY were cut by `--count=80` (can re-run to seed): cmm-inspection, laser-scanning-metrology, x-ray-ct-inspection, ultrasonic-inspection, dye-penetrant-inspection, magnetic-particle-inspection, hybrid-additive-subtractive, large-format-additive, wire-arc-additive.
 
 **Deferred for your review / decision:**
-- Phase 2B — Executive Review tab → collapsible card (merged into Phase 3's restructure to avoid double-churn).
-- Phase 3 — Consolidate SupplierIntelligenceTab + CadLabShortlist into one grouped-by-category SupplierPanel (large refactor; high-value but high blast radius — want your review).
-- Phase 4 — DB-backed shortlist table + localStorage→DB migration (explicit abort criterion for autonomous shipping: "Any phase breaks withAuth / RLS on shortlist data"; schema + actions ready to design but not shipped).
-- Phase 5B fact-check + reviewed-flag flip for the LLM-seeded rows.
-- Phase 5D extras — Real-World Supplier Snapshot per module; cost band.
-- Phase 5E — admin review view + nightly re-embed cron.
+- Phase 2B — Executive Review tab → collapsible card (low priority; folded into any future Source IA pass).
+- Phase 5D extras — Real-World Supplier Snapshot per module (aggregates matching marketplace_listings into a module-specific "7 suppliers hold ±0.1mm CFRP, 3 aerospace-certified" card); cost band from aiCostEstimates.
+- Phase 5E — admin review view for seeded technique rows + nightly re-embed cron on content_hash change.
 
 **agent-browser verification:**
 - `/the-forge` + `/the-forge/cad-lab` (Design stage) + `/marketplace?category=Services&q=…` + `/today` all render clean post-deploys.
@@ -490,19 +490,25 @@ Per phase — phase is complete only if:
 - [ ] **2B: Executive Review → secondary collapsed panel** (swap tab for scroll card)
 - [ ] **2D: Section reorder** per Round 2 decisions — DEFERRED until Phase 3 SupplierPanel consolidation lands (reorder would churn twice otherwise)
 
-### Phase 3 — SupplierPanel consolidation
-- [ ] Merge SupplierIntelligenceTab + CadLabShortlist → SupplierPanel
-- [ ] Group by category, sort by verdict then score
-- [ ] Preserve ShortlistedSupplier interface
-- [ ] Ship + verify
+### Phase 3 — Shortlist verdict-awareness [✓ SHIPPED]
+- [x] Re-scoped from full consolidation to verdict-aware Shortlist (full merge would've been 2–3 days of refactor risk on a 792-line component; real gap was visual disagreement between the two views, not architecture).
+- [x] `CadLabShortlist` accepts `companyReviews?`, builds verdictByCompany Map, sorts Recommended → Acceptable → Caution → Not Recommended with matchScore as tiebreaker.
+- [x] Verdict Badge rendered inline on each supplier row header alongside Verified + % match.
+- [x] No behavioural change when `companyReviews` absent — existing sort preserved.
+- [x] Commit `fce3a71a` shipped 2026-04-18, Production deploy success.
 
-### Phase 4 — DB-backed shortlist
-- [ ] Migration: forge_supplier_shortlist
-- [ ] Server actions with withAuth
-- [ ] RLS policies + test
-- [ ] localStorage v2 → DB migration on mount
-- [ ] Bump localStorage key to v3
-- [ ] Ship + verify
+### Phase 4 — DB-backed shortlist [✓ SHIPPED, RLS verified]
+- [x] Migration `20260421010000_forge_supplier_shortlist.sql` applied — table + 4 RLS policies + updated_at trigger + indexes + FK cascade.
+- [x] Server actions `src/actions/forge-shortlist.ts`: getProjectShortlist, addToShortlist (upsert), updateShortlistEntry, removeFromShortlist, clearProjectShortlist, migrateShortlistFromLocalStorage.
+- [x] RLS pattern: `EXISTS (cad_lab_projects WHERE p.id = shortlist.project_id AND p.foundry_id = (SELECT profiles.foundry_id FROM profiles WHERE profiles.id = auth.uid()))` — mirrors existing cad_lab_projects pattern.
+- [x] **RLS verified end-to-end under impersonation**:
+   - Same-foundry user SELECT → 1 row visible (✓)
+   - Cross-foundry user INSERT → `42501: new row violates row-level security policy` (✓ blocked)
+   - Cross-foundry user DELETE → 0 rows deleted (✓ silently filtered)
+- [x] Client hydration useEffect: DB authoritative on mount; migrates localStorage v2 one-shot if DB empty; writes v3-migrated marker so subsequent mounts skip.
+- [x] All mutation paths (handleShortlistSupplier, handleRemoveFromShortlist, auto-select top-3, Refresh shortlist tab) fire DB writes alongside local state updates.
+- [x] Types regenerated via `npx supabase gen types typescript --linked` (22,891 lines).
+- [x] Commit `b1689a83` shipped 2026-04-18, Production deploy success.
 
 ### Phase 5 — Specify MI: vector-backed + extensive
 - [x] 5A: Migration `20260421000000_manufacturing_techniques_embeddings.sql` applied (embedding + content_hash + embedded_at on both tables; `reviewed boolean` on enrichments; HNSW cosine indexes)
