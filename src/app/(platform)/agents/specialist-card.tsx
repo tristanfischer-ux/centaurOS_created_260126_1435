@@ -259,7 +259,7 @@ export function SpecialistCard({ specialist, onBrief, index = 0, activity }: Spe
                     <div className="flex items-center justify-end pt-4 border-t border-muted">
                         <Button
                             size="sm"
-                            className="bg-international-orange hover:bg-international-orange-hover text-white gap-1.5 group-hover:gap-2.5 transition-all"
+                            className="bg-international-orange hover:bg-international-orange-hover text-primary-foreground gap-1.5 group-hover:gap-2.5 transition-all"
                             onClick={(e) => {
                                 e.stopPropagation()
                                 onBrief(specialist.id)

@@ -435,7 +435,7 @@ export function SpecialistsLanding({
                     <div className="flex flex-col gap-2">
                         <div className="flex justify-center">
                             <div className="flex items-center gap-2">
-                                <div className="h-7 w-7 rounded-full bg-international-orange flex items-center justify-center text-white text-xs font-bold">
+                                <div className="h-7 w-7 rounded-full bg-international-orange flex items-center justify-center text-primary-foreground text-xs font-bold">
                                     CEO
                                 </div>
                             </div>
