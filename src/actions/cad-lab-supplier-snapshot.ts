@@ -22,6 +22,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { sanitizeFilterValue } from "@/lib/security/sanitize-filter"
 
 export interface SupplierSnapshotInput {
   /** Module identifier — echoed back for client-side mapping. */
@@ -151,14 +152,18 @@ export async function getSupplierSnapshotForModule(
   // Fetch a bounded candidate set matching either process OR material on the
   // free-text surface of the listing. We over-fetch (200 cap) then aggregate
   // in memory — marketplace_listings has ~10k rows so this is cheap.
-  const escaped = (s: string) => s.replace(/[,()*]/g, " ").trim()
+  //
+  // SECURITY: process + material come from user-controlled diagnostic answers,
+  // so sanitizeFilterValue() escapes ilike wildcards and strips PostgREST
+  // control chars. Prevents a crafted answer from breaking out of one ilike
+  // clause into an unintended OR branch.
   const orParts: string[] = []
   if (process) {
-    const p = escaped(process)
+    const p = sanitizeFilterValue(process)
     orParts.push(`title.ilike.%${p}%`, `description.ilike.%${p}%`, `subcategory.ilike.%${p}%`)
   }
   if (material) {
-    const m = escaped(material)
+    const m = sanitizeFilterValue(material)
     orParts.push(`title.ilike.%${m}%`, `description.ilike.%${m}%`)
   }
 

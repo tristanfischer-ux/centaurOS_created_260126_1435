@@ -242,7 +242,7 @@ const REGULATORY_CERTS: Record<string, string[]> = {
  * Infers project-level industry tags from free-text. Used as a fallback when
  * the caller doesn't supply explicit projectIndustries.
  */
-function inferIndustriesFromText(text: string): Set<string> {
+export function inferIndustriesFromText(text: string): Set<string> {
   const lower = text.toLowerCase()
   const matched = new Set<string>()
   for (const [key, terms] of Object.entries(INDUSTRY_KEYWORDS)) {

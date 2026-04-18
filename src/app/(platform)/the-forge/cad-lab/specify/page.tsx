@@ -95,6 +95,7 @@ import { matchManufacturingTechniques } from "@/actions/cad-lab-dfm-match"
 import type { ManufacturingTechniqueMatch } from "@/actions/cad-lab-dfm-match"
 import { getSupplierSnapshotForModule } from "@/actions/cad-lab-supplier-snapshot"
 import type { SupplierSnapshot } from "@/actions/cad-lab-supplier-snapshot"
+import { inferIndustriesFromText } from "@/actions/cad-lab-supplier-match"
 import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
@@ -300,16 +301,14 @@ export default function SpecifyPage(): React.ReactNode {
 
   useEffect(() => {
     // Infer project-level industries once from use case / purpose free-text,
-    // using the same keyword map as the matcher would. Keeping it light here
-    // to avoid an extra server round-trip.
-    const useCaseText = (designBrief?.useCase ?? "").toLowerCase()
-    const purposeText = modules.map((m) => `${m.name} ${m.purpose}`).join(" ").toLowerCase()
-    const haystack = `${useCaseText} ${purposeText}`
-    const industryGuess: string[] = []
-    if (/aerospace|aviation|uav|drone|haps|satellite|space|aircraft|avionics/.test(haystack)) industryGuess.push("aerospace")
-    if (/medical|implant|surgical|dental|orthopaedic|orthopedic/.test(haystack)) industryGuess.push("medical")
-    if (/automotive|vehicle|electric vehicle/.test(haystack)) industryGuess.push("automotive")
-    if (/defence|defense|military|tactical/.test(haystack)) industryGuess.push("defence")
+    // using the exported helper from cad-lab-supplier-match.ts so the
+    // snapshot uses the same industry taxonomy as the scorer and narrative
+    // layers. Single source of truth across surfaces.
+    const haystack = [
+      designBrief?.useCase ?? "",
+      ...modules.map((m) => `${m.name} ${m.purpose}`),
+    ].join(" ")
+    const industryGuess: string[] = [...inferIndustriesFromText(haystack)]
 
     for (const mod of modules) {
       const diag = diagnosticAnswers[mod.id]
