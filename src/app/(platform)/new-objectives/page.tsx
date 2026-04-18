@@ -40,9 +40,10 @@ export default async function NewObjectivesPage() {
 
   // Fetch all objectives (strategic + regular) in one query
   // Note: is_private may not be in generated types but exists in DB via migration
+  // product_id joins to products for the "Linked to Product X" reverse-link chip.
   const { data: rawObjectives, error } = await supabase
     .from('objectives')
-    .select('id, title, description, extended_description, status, progress, parent_objective_id, is_strategic_goal, is_demo, creator_id, foundry_id, created_at, updated_at, start_date, end_date, metadata')
+    .select('id, title, description, extended_description, status, progress, parent_objective_id, is_strategic_goal, is_demo, creator_id, foundry_id, created_at, updated_at, start_date, end_date, metadata, product_id, product:products(id, name)')
     .eq('foundry_id', profile.foundry_id)
     .eq('is_ghost', false)
     .is('deleted_at', null)
@@ -56,6 +57,9 @@ export default async function NewObjectivesPage() {
     start_date: string | null; end_date: string | null;
     is_private?: boolean; is_demo?: boolean;
     metadata?: Record<string, unknown> | null;
+    product_id?: string | null;
+    /** Supabase joins return an array for many-to-many but single row for FK. We coerce below. */
+    product?: { id: string; name: string } | { id: string; name: string }[] | null;
   }>
 
   // Separate strategic objectives (high-level pillars) from regular objectives
@@ -209,6 +213,12 @@ export default async function NewObjectivesPage() {
       ? strategyLookup.get(obj.parent_objective_id) ?? null
       : null
 
+    // Supabase returns joined 1:1 FKs as an array in some versions — coerce to
+    // the single-object shape ObjectiveWithTasks expects.
+    const productJoin = Array.isArray(obj.product)
+      ? (obj.product[0] ?? null)
+      : (obj.product ?? null)
+
     return {
       ...obj,
       tasks: objTasks,
@@ -218,6 +228,7 @@ export default async function NewObjectivesPage() {
       progress,
       health,
       strategy,
+      product: productJoin,
     }
   })
 

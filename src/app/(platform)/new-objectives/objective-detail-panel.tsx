@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
   X, ListChecks, AlertTriangle, Clock, CheckCircle2,
-  FileText, Circle, Waypoints, ChevronRight, MessageSquare, Pencil, Flame,
+  FileText, Circle, Waypoints, ChevronRight, MessageSquare, Pencil, Flame, Package,
 } from 'lucide-react'
 import Link from 'next/link'
 import { getStatusBadgeClass } from '@/lib/status-colors'
@@ -135,6 +135,18 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect, onEdit 
             >
               <Flame className="h-3 w-3" />
               Created from Forge
+            </Link>
+          )}
+          {/* Reverse-link chip: jump to linked product if the objective is bound to one.
+              Mirrors the LinkedProductChip pattern from CAD Lab. */}
+          {objective.product && (
+            <Link
+              href={`/products/${objective.product.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-international-orange/10 px-2.5 py-1 text-[11px] font-medium text-international-orange hover:bg-international-orange/15 transition-colors mt-0.5 max-w-full"
+              title={`Open product: ${objective.product.name}`}
+            >
+              <Package className="h-3 w-3 shrink-0" />
+              <span className="truncate">Product: {objective.product.name}</span>
             </Link>
           )}
         </div>

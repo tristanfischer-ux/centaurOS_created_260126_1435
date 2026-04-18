@@ -52,6 +52,10 @@ export interface ObjectiveWithTasks {
   health: 'on-track' | 'at-risk' | 'off-track' | 'completed' | 'not-started'
   /** Strategic pillar this objective belongs to (for cascade breadcrumbs) */
   strategy?: { id: string; title: string } | null
+  /** Linked product id (if the objective was promoted from, or explicitly bound to, a product). */
+  product_id?: string | null
+  /** Denormalised product name — populated by the new-objectives page query via join. */
+  product?: { id: string; name: string } | null
 }
 
 /** A high-level strategic objective pillar that regular objectives can be linked to */
