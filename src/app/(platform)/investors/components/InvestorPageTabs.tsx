@@ -59,30 +59,56 @@ export function InvestorPageTabs({
 
   const counts: Record<string, number | undefined> = { investorCount, contactCount, portfolioCount, grantsCount }
 
+  const enabledIds = TAB_CONFIG.map(({ id }) => id)
+
+  const handleArrowKey = (e: React.KeyboardEvent, currentId: TabId) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return
+    e.preventDefault()
+    const idx = enabledIds.indexOf(currentId)
+    if (idx === -1) return
+    const nextIdx = e.key === "ArrowRight"
+      ? (idx + 1) % enabledIds.length
+      : (idx - 1 + enabledIds.length) % enabledIds.length
+    const nextId = enabledIds[nextIdx]
+    setActiveTab(nextId)
+    document.getElementById(`investor-tab-${nextId}`)?.focus()
+  }
+
   return (
     <div className="space-y-6">
-      {/* Tab bar — scrollable on mobile */}
+      {/* Tab bar — WAI-ARIA tablist, scrollable on mobile, arrow-key navigable */}
       <div className="relative">
-        <div className="flex items-center gap-1 border-b border-border overflow-x-auto scrollbar-hide">
+        <div
+          className="flex items-center gap-1 border-b border-border overflow-x-auto scrollbar-hide"
+          role="tablist"
+          aria-label="Investor views"
+        >
           {TAB_CONFIG.map(({ id, label, icon: Icon, countKey }) => {
             const count = countKey ? counts[countKey] : undefined
+            const isActive = activeTab === id
             return (
               <button
                 key={id}
+                id={`investor-tab-${id}`}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`investor-tabpanel-${id}`}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(id)}
+                onKeyDown={(e) => handleArrowKey(e, id)}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap",
-                  activeTab === id
+                  isActive
                     ? "border-international-orange text-international-orange"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted",
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4" aria-hidden="true" />
                 {label}
                 {count != null && count > 0 && (
                   <span className={cn(
                     "text-xs tabular-nums",
-                    activeTab === id ? "text-international-orange/70" : "text-muted-foreground/60",
+                    isActive ? "text-international-orange/70" : "text-muted-foreground/60",
                   )}>
                     ({count.toLocaleString()})
                   </span>
@@ -91,16 +117,40 @@ export function InvestorPageTabs({
             )
           })}
         </div>
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden" />
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none sm:hidden" aria-hidden="true" />
       </div>
 
-      {/* Tab content */}
-      {activeTab === "overview" && (overviewContent ?? <div />)}
-      {activeTab === "for-you" && (forYouContent ?? <div />)}
-      {activeTab === "investors" && <div className="space-y-6">{investorsContent}</div>}
-      {activeTab === "grants" && (grantsContent ?? <TabPlaceholder label="Grants" />)}
-      {activeTab === "contacts" && (contactsContent ?? <TabPlaceholder label="Contacts" />)}
-      {activeTab === "portfolio" && (portfolioContent ?? <TabPlaceholder label="Portfolio" />)}
+      {/* Tab content — each wrapped as a proper tabpanel with aria-labelledby */}
+      {activeTab === "overview" && (
+        <div role="tabpanel" id="investor-tabpanel-overview" aria-labelledby="investor-tab-overview">
+          {overviewContent ?? <div />}
+        </div>
+      )}
+      {activeTab === "for-you" && (
+        <div role="tabpanel" id="investor-tabpanel-for-you" aria-labelledby="investor-tab-for-you">
+          {forYouContent ?? <div />}
+        </div>
+      )}
+      {activeTab === "investors" && (
+        <div className="space-y-6" role="tabpanel" id="investor-tabpanel-investors" aria-labelledby="investor-tab-investors">
+          {investorsContent}
+        </div>
+      )}
+      {activeTab === "grants" && (
+        <div role="tabpanel" id="investor-tabpanel-grants" aria-labelledby="investor-tab-grants">
+          {grantsContent ?? <TabPlaceholder label="Grants" />}
+        </div>
+      )}
+      {activeTab === "contacts" && (
+        <div role="tabpanel" id="investor-tabpanel-contacts" aria-labelledby="investor-tab-contacts">
+          {contactsContent ?? <TabPlaceholder label="Contacts" />}
+        </div>
+      )}
+      {activeTab === "portfolio" && (
+        <div role="tabpanel" id="investor-tabpanel-portfolio" aria-labelledby="investor-tab-portfolio">
+          {portfolioContent ?? <TabPlaceholder label="Portfolio" />}
+        </div>
+      )}
     </div>
   )
 }
