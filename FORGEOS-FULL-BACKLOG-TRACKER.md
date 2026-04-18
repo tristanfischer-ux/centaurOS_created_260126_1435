@@ -275,7 +275,7 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 5.5 | /plan | **done (audit clean)** | — | pending prod check | Passes check-design-tokens.sh. No voice violations. |
 | 5.6 | /pricing | **done (audit clean)** | — | pending prod check | Marketing page at `src/app/pricing/` (outside `(platform)` — public). Passes check-design-tokens.sh. Marketing copy follows Tristan's LinkedIn voice, not in-product CLAUDE.md rules. |
 | 5.7 | /settings/* (8 subtabs) | **done (audit clean)** | — | pending prod check | Checked: settings/account, billing, company, email, intelligence, integrations, audit-log, standards, privacy, help. 17 TSX files audited. Passes check-design-tokens.sh. No voice violations. |
-| 6.1 | Infrequent (9 items) | pending | — | — | — |
+| 6.1 | Infrequent (9 items) | **done (audit clean)** | — | pending prod check | Bulk audit 2026-04-18 across /time, /updates, /whats-new, /learn, /help, /browse, /provider-portal. All pass check-design-tokens.sh (provider-portal has 5 advisory warnings only, no blocking violations). Zero voice violations across all six platform directories. |
 | 6.2 | Admin | SKIP | — | — | Not founder-facing |
 | 6.3 | Supplier persona | separate initiative | — | — | Different user class |
 | 6.4 | Auth/marketing | partial / skip | — | — | Different voice rules |
