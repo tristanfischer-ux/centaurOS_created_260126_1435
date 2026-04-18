@@ -221,7 +221,7 @@ export const MarketCardV2 = memo(function MarketCardV2({
                         'min-w-[44px] min-h-[44px] w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
                         localSaved
                             ? 'bg-destructive text-destructive-foreground shadow-md'
-                            : 'bg-background/90 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 shadow-sm border'
+                            : 'bg-card text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 shadow-sm border'
                     )}
                     aria-label={localSaved ? 'Remove from saved' : 'Save for later'}
                 >
