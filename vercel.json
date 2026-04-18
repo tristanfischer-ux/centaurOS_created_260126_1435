@@ -13,6 +13,7 @@
     {"path": "/api/cron/onboarding-drip", "schedule": "0 * * * *"},
     {"path": "/api/cron/scheduled-reports", "schedule": "0 * * * *"},
     {"path": "/api/cron/morning-digest", "schedule": "0 8 * * *"},
-    {"path": "/api/cron/vest-referral-rewards", "schedule": "0 3 * * *"}
+    {"path": "/api/cron/vest-referral-rewards", "schedule": "0 3 * * *"},
+    {"path": "/api/cron/re-embed-techniques", "schedule": "0 4 * * *"}
   ]
 }

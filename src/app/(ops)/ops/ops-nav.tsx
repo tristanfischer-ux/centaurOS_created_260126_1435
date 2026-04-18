@@ -12,7 +12,8 @@ import {
     Shield,
     Settings,
     Info,
-    Flag
+    Flag,
+    Wrench
 } from "lucide-react"
 
 /**
@@ -29,6 +30,7 @@ const opsNavigation = [
     { name: "QA Testing", href: "/ops/qa", icon: FlaskConical },
     { name: "Analytics", href: "/ops/analytics", icon: BarChart3 },
     { name: "Supplier Corrections", href: "/ops/supplier-corrections", icon: Flag },
+    { name: "Techniques", href: "/ops/techniques", icon: Wrench },
     { name: "GDPR", href: "/ops/gdpr", icon: Shield },
     { name: "Settings", href: "/ops/settings", icon: Settings },
     { name: "About", href: "/ops/about", icon: Info },
