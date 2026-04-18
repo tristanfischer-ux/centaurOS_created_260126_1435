@@ -208,6 +208,10 @@ export async function createTask(formData: FormData) {
       const shareWithJson = formData.get('share_with') as string
       const rolloutId = (formData.get('rollout_id') as string)?.trim() || null
       const sourceThreadId = (formData.get('source_thread_id') as string)?.trim() || null
+      const productId = (formData.get('product_id') as string)?.trim() || null
+      if (productId && !isValidUUID(productId)) {
+          return { error: 'Invalid product ID' }
+      }
 
       // Parse multiple assignees (if provided)
       let assigneeIds: string[] = [assigneeId]
@@ -298,6 +302,7 @@ export async function createTask(formData: FormData) {
                   risk_level: riskLevel,
                   client_visible: false, // Always hidden initially
                   is_private: isPrivate,
+                  ...(productId ? { product_id: productId } : {}),
                   metadata: (rolloutId || sourceThreadId) ? {
                       ...(rolloutId ? { rollout_id: rolloutId } : {}),
                       ...(sourceThreadId ? { source_thread_id: sourceThreadId } : {}),
@@ -2260,8 +2265,11 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
  * @security Requires authenticated user with foundry membership
  */
 export async function getTaskComments(taskId: string) {
-    const invalid = requireValidUUID(taskId, 'task ID')
-    if (invalid) return invalid
+    // Match the withAuth branch's {data,error} shape so the discriminated union
+    // narrows correctly at callsites (task-detail-panel reads res.error then res.data).
+    if (!taskId || !isValidUUID(taskId)) {
+        return { data: null, error: 'Invalid task ID' }
+    }
     return withAuth(async ({ supabase, user, foundryId }) => {
         // AUTH: Check user can access this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)

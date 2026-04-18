@@ -48,6 +48,10 @@ interface CreateTaskDialogProps {
     externalOpen?: boolean
     /** Callback when open state changes externally */
     onExternalOpenChange?: (open: boolean) => void
+    /** Optional products for the "Tag to product" select. Omit or pass empty → select hidden. */
+    products?: { id: string; name: string }[]
+    /** Pre-fill the product ID */
+    prefillProductId?: string
 }
 
 const MAX_FILES = 5
@@ -60,7 +64,7 @@ const ALLOWED_TYPES = [
     'text/plain', 'text/csv'
 ]
 
-export function CreateTaskDialog({ objectives, members, teams = [], currentUserId, defaultObjectiveId, children, prefillTitle, prefillDescription, prefillObjectiveId, prefillContext, externalOpen, onExternalOpenChange }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ objectives, members, teams = [], currentUserId, defaultObjectiveId, children, prefillTitle, prefillDescription, prefillObjectiveId, prefillContext, externalOpen, onExternalOpenChange, products = [], prefillProductId }: CreateTaskDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false)
     const open = externalOpen !== undefined ? externalOpen : internalOpen
     const setOpenState = onExternalOpenChange || setInternalOpen
@@ -84,6 +88,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([currentUserId])
     // Default objective if provided
     const [selectedObjective, setSelectedObjective] = useState<string>(defaultObjectiveId || prefillObjectiveId || "")
+    const [selectedProductId, setSelectedProductId] = useState<string>(prefillProductId ?? "")
     const [objectiveOpen, setObjectiveOpen] = useState(false)
     const [files, setFiles] = useState<File[]>([])
     const [isDragging, setIsDragging] = useState(false)
@@ -214,6 +219,11 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             formData.set('assignee_id', selectedAssignees[0])
             // Also send full list for multi-assignee
             formData.set('assignee_ids', JSON.stringify(selectedAssignees))
+        }
+
+        // Append optional product tag
+        if (selectedProductId) {
+            formData.set('product_id', selectedProductId)
         }
 
         // Append privacy settings
@@ -555,6 +565,31 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 value={selectedObjective}
                             />
                         </div>
+
+                        {/* Optional product tag — mirrors the Edit Objective dialog pattern
+                            but hidden entirely when no products exist, so teams that don't
+                            use the Product Intelligence Layer never see a noisy control. */}
+                        {products.length > 0 && (
+                            <div>
+                                <Label className="text-sm font-medium text-foreground mb-1.5 block">
+                                    Tag to a product (optional)
+                                </Label>
+                                <select
+                                    value={selectedProductId}
+                                    onChange={(e) => setSelectedProductId(e.target.value)}
+                                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                    aria-label="Linked product"
+                                >
+                                    <option value="">— No product —</option>
+                                    {products.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Links this task to a product so it shows up alongside the product in reports + P&amp;L attribution.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Toggle Button */}
                         <div className="pt-4">

@@ -51,6 +51,8 @@ interface TasksCommandCenterProps {
   currentUserId: string
   currentUserRole: string | null
   initialTaskId?: string
+  /** Products available for the Create Task dialog's optional product tag. */
+  products?: { id: string; name: string }[]
 }
 
 type ViewMode = 'focus' | 'board' | 'list' | 'timeline'
@@ -65,6 +67,7 @@ export function TasksCommandCenter({
   currentUserId,
   currentUserRole,
   initialTaskId,
+  products = [],
 }: TasksCommandCenterProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('focus')
   const [quickFilter, setQuickFilter] = useState<string | null>(initialTaskId ? null : 'my-tasks')
@@ -391,6 +394,7 @@ export function TasksCommandCenter({
               currentUserId={currentUserId}
               externalOpen={createDialogOpen}
               onExternalOpenChange={setCreateDialogOpen}
+              products={products}
             />
           </div>
         </div>

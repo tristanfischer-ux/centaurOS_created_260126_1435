@@ -151,6 +151,15 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
 
   const strategicObjectivesList = (strategicGoals || []).map(sg => ({ id: sg.id, title: sg.title }))
 
+  // Fetch products for the Create Task dialog's optional "Tag to product"
+  // select. Hidden entirely when the foundry has no products, so teams that
+  // don't use the Product Intelligence Layer never see the control.
+  const { data: productsList } = await supabase
+    .from('products')
+    .select('id, name')
+    .eq('foundry_id', foundry_id)
+    .order('updated_at', { ascending: false })
+
   return (
     <TasksCommandCenter
       tasks={tasksWithData}
@@ -161,6 +170,7 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
       currentUserId={user.id}
       currentUserRole={userProfile?.role}
       initialTaskId={taskId}
+      products={productsList ?? []}
     />
   )
 }
