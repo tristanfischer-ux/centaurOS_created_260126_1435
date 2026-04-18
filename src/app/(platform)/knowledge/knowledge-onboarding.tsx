@@ -61,9 +61,9 @@ export function KnowledgeOnboarding({ onNoteCreated }: KnowledgeOnboardingProps)
           Your Knowledge Vault
         </h2>
         <p className="text-muted-foreground text-base leading-relaxed max-w-xl mx-auto">
-          The more your specialists know about your business, the better their advice
-          becomes. Every document you upload and every conversation you have builds your
-          team&apos;s collective intelligence.
+          Your specialists draw on everything here when they answer you. Upload the
+          documents you find yourself sending most often and add decisions as they&apos;re
+          made — each one gives the next answer more context.
         </p>
       </div>
 

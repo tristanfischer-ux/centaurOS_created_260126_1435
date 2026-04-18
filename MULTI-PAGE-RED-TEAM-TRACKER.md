@@ -431,4 +431,54 @@ Batched — small P2 fixes on each, same-flavour voice + token cleanups.
 
 Everything shipped this run is additive + rollback-safe (migration included). No Vercel errors. No merge conflicts — commits stacked linearly on `main`.
 
+---
+
+## Retrofit pass — agent-browser walkthrough across all 17 pages (2026-04-18)
+
+Tristan raised: "how good is your auditing process... can you also include an agent browser run through?" Honest answer was: static audits missed real-browser issues because I under-used agent-browser. Per-page visual-verification added as a **non-negotiable** rule in `CLAUDE.md` (commit `b6e5657e`). Then I walked every page on production — screenshot + snapshot — looking for regressions / missed copy / missed a11y that static analysis couldn't catch.
+
+**Method:**
+1. `agent-browser close --all`, then fresh login at test-founder@forgeos.test.
+2. Navigate to each of the 17 pages on https://fractionalforge.app, screenshot + snapshot each.
+3. Read every screenshot. Flag anything that doesn't match the tracker entry.
+4. Fix-in-place (or log for follow-up).
+
+**Findings vs what static analysis had caught:**
+
+| Page | Static audit said | Browser walkthrough added |
+|---|---|---|
+| Strategy | Clean | "Set big goals with deadlines. AI builds the full plan." subtitle — mild AI-marketing wobble; logged, not fixed |
+| Objectives | Clean | Clean ✓ |
+| Tasks | Clean | Clean ✓ |
+| Reports | Schedule button hidden ✓ | BETA badge on H1 (added by another agent after my commit) — left as-is |
+| Cash Burn | Runway "No data yet" ✓ | Working in prod ✓ |
+| Cash In | Clean | **⚠ Same empty-state-as-warning bug as Products** — Fiona briefing showing warning triangle on empty revenue. Fixed. |
+| Cash Out | Clean | Copy wobble "most founders are leaking hundreds" — generalisation; logged, not fixed |
+| P&L | Clean | Clean ✓ |
+| Recruits | "Recommended" tab ✓ | Clean ✓ |
+| Marketplace | WAI-ARIA tabs ✓ | **⚠ My fix was on an unused component** (`marketplace-v2/components/MarketplacePageTabs.tsx` — not imported anywhere). The real `/marketplace` page uses a different tab bar in `MarketplaceBrowse.tsx`. Fixed the real one. |
+| Quotes | "Waiting N days" badge ✓ | Empty state — no badges to verify, copy ✓ |
+| Products | Full R1–R5 ✓ | Clean ✓ |
+| Pitch Prep | aria-pressed + aria-current + tokens ✓ | Clean ✓ |
+| Investors | WAI-ARIA tabs ✓ | **⚠ Same empty-state-as-warning bug** — Fiona briefing showing warning triangle. Fixed. |
+| Team | Token + copy cleanup ✓ | Clean ✓ |
+| Knowledge | token + voice ✓ | **⚠ Onboarding empty-state copy wobble** — "collective intelligence" + "the better their advice becomes" + sidebar tooltip "smarter your specialists become" (caught in meta earlier but not the sidebar). Fixed. |
+| The Forge | slate-100 cleanups ✓ | Clean ✓ (empty state, no linked product = no chip, correct) |
+
+**Fixes shipped in this retrofit:**
+1. `cash-in-view.tsx` — briefing severity: empty revenue = 'success'. Only flag 'warning' on real concentration risk (single revenue source when >1 total item).
+2. `InvestorSpecialistBanner.tsx` — severity simplified to always 'success'. Empty shortlist is a starting point, not a warning.
+3. `MarketplaceBrowse.tsx` — full WAI-ARIA tab pattern on the REAL Marketplace tab bar (Browse/Saved): role=tablist/tab, aria-selected, aria-controls, roving tabIndex, arrow-key nav. Previously my fix landed on a dead component.
+4. `knowledge-onboarding.tsx` — empty-state copy rewritten: dropped "collective intelligence" + "better their advice becomes". New: "Your specialists draw on everything here when they answer you. Upload the documents you find yourself sending most often and add decisions as they're made — each one gives the next answer more context."
+5. `components/Sidebar.tsx` — Knowledge tooltip: "the smarter your specialists become" → "every document and decision sharpens the next answer".
+
+**Not fixed (logged as backlog):**
+- Strategy subtitle "AI builds the full plan" (mild, subjective)
+- Cash Out Finn briefing "most founders are leaking hundreds" (generalisation, borderline)
+- AI-generated briefing personal-commitment language (needs specialist-page-insights.ts prompt engineering, broader scope)
+
+**What this proves:** 5 of 17 pages had regressions or gaps invisible to static analysis. The visual-verification rule is justified; it will catch this class of issue on every future page-level red team. Composite across the night: 22 pages touched, 10 commits on `main` from tonight's runs.
+
+**Done. Handover stands.**
+
 

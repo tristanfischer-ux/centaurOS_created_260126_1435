@@ -147,7 +147,7 @@ const planNavigation = [
     { name: "Review", href: "/review", icon: ClipboardCheck, tooltip: "Content, tasks, and actions awaiting your approval" },
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
     { name: "Red Team", href: "/red-team", icon: Swords, tooltip: "Stress-test decisions with multi-LLM adversarial debate" },
-    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your team's collective intelligence — the more you add, the smarter your specialists become" },
+    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your team's accumulated knowledge — every document and decision sharpens the next answer" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────

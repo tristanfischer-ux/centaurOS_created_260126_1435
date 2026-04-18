@@ -63,10 +63,11 @@ export function InvestorSpecialistBanner({
     return parts.join('. ')
   }, [companyContext, investorStats, shortlistCount])
 
-  const severity = useMemo(() => {
-    if (shortlistCount === 0) return 'warning' as const
-    return 'success' as const
-  }, [shortlistCount])
+  // INTENT: Empty shortlist is a starting point, not a warning. 'warning'
+  // severity feeds failure framing into the AI briefing. Keep positive tone
+  // unless there's a real signal (e.g. existing shortlist went stale — TBD
+  // when we add last-contact tracking).
+  const severity = useMemo(() => 'success' as const, [])
 
   const briefing = usePageBriefing(
     () => generatePageBriefing('fundraising-advisor', briefingContext, severity),

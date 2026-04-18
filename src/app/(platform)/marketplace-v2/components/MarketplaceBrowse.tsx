@@ -373,14 +373,24 @@ export function MarketplaceBrowse({
                 />
             )}
 
-            {/* Tab navigation */}
-            <nav aria-label="Marketplace sections" data-tour="marketplace-tabs" className="flex items-center gap-1 border-b border-border">
+            {/* Tab navigation — WAI-ARIA tablist with arrow-key navigation */}
+            <nav
+                aria-label="Marketplace sections"
+                data-tour="marketplace-tabs"
+                className="flex items-center gap-1 border-b border-border"
+                role="tablist"
+            >
                 {TABS.map((tab) => {
                     const Icon = tab.icon
                     const isActive = activeTab === tab.id || (activeTab === 'compare' && tab.id === 'saved')
                     return (
                         <button
                             key={tab.id}
+                            id={`marketplace-tab-${tab.id}`}
+                            role="tab"
+                            aria-selected={isActive}
+                            aria-controls={`marketplace-tabpanel-${tab.id}`}
+                            tabIndex={isActive ? 0 : -1}
                             onClick={() => {
                                 if (tab.id === 'saved' && activeTab === 'compare') {
                                     handleBackFromCompare()
@@ -388,13 +398,23 @@ export function MarketplaceBrowse({
                                     setActiveTab(tab.id)
                                 }
                             }}
+                            onKeyDown={(e) => {
+                                if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+                                e.preventDefault()
+                                const idx = TABS.findIndex((t) => t.id === tab.id)
+                                const nextIdx = e.key === 'ArrowRight'
+                                    ? (idx + 1) % TABS.length
+                                    : (idx - 1 + TABS.length) % TABS.length
+                                const next = TABS[nextIdx]
+                                setActiveTab(next.id)
+                                document.getElementById(`marketplace-tab-${next.id}`)?.focus()
+                            }}
                             className={cn(
                                 'flex items-center gap-2 px-4 py-2.5 min-h-[44px] text-sm font-medium border-b-2 -mb-px transition-colors',
                                 isActive
                                     ? 'border-international-orange text-foreground'
                                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
                             )}
-                            aria-current={isActive ? 'page' : undefined}
                         >
                             <Icon className="w-4 h-4" aria-hidden />
                             {tab.label}
@@ -402,7 +422,7 @@ export function MarketplaceBrowse({
                                 <span className={cn(
                                     'inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-semibold',
                                     isActive
-                                        ? 'bg-international-orange text-white'
+                                        ? 'bg-international-orange text-primary-foreground'
                                         : 'bg-muted text-muted-foreground'
                                 )}>
                                     {state.savedIds.size}

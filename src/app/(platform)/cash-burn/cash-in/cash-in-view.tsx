@@ -166,9 +166,16 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
     return `Weekly total: £${weeklyTotal / 100}, Revenue: £${revenueTotal / 100}, Non-revenue: £${nonRevenueTotal / 100}, Source types: ${sourceTypes}`
   }, [weeklyTotal, items])
 
+  // INTENT: Empty revenue is a starting point, not a problem. Only escalate
+  // severity to 'warning' when there's a genuine exposure signal — e.g. a
+  // single dominant source. Empty-as-warning fed failure framing into the AI
+  // briefing on the Products page too; same pattern here.
   const briefingSeverity = useMemo(() => {
-    const hasRevenue = items.some(i => i.sourceType === 'revenue')
-    return hasRevenue ? 'success' as const : 'warning' as const
+    const revenueItems = items.filter(i => i.sourceType === 'revenue')
+    if (revenueItems.length === 0) return 'success' as const
+    // Single source covering 100% of revenue = real concentration risk worth flagging.
+    if (revenueItems.length === 1 && items.length > 1) return 'warning' as const
+    return 'success' as const
   }, [items])
 
   const briefing = usePageBriefing(
