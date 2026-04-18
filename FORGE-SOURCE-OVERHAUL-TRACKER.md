@@ -19,7 +19,27 @@
 | 5 — Vector-backed DfM (MVP) | `5294e6df` | DB schema: embedding vector(768) + content_hash + reviewed flag; 47/47 existing rows embedded; RPC `match_manufacturing_techniques`. Tab renamed "Design for Manufacture", "Related Techniques (semantic)" section, data-provenance popover. |
 | — | `b1016117` | Tracker + extensive-taxonomy seed script. |
 
-**In-flight while asleep:** Phase 5B LLM seed (`batqsdh8k` bg task). Progress at last check: 33/80 inserted, all embedded, all `reviewed=false` (hidden from RPC until human approval). Will complete autonomously; rows sit hidden until you flip reviewed=true on the ones you want.
+**Phase 5B seed result (background task `batqsdh8k` complete):**
+- 80/80 techniques inserted into `manufacturing_technique_enrichments` with `source='seed_llm_deepseek'` and `reviewed=false` (hidden from RPC default).
+- All 80 embedded via Nomic 768-dim.
+- Article body lengths 670–1,359 chars. 6–8 tips/row. 4–6 applications/row.
+- Sampled quality (friction-stir-welding, resin-transfer-moulding): factory-accurate engineering content; tolerance ranges realistic (0.1/0.5/2mm for FSW, 0.2/0.5/1.5mm for RTM).
+- Total DB state: **27 nightshift (reviewed=true) + 80 LLM-seeded (reviewed=false) + 20 process_capabilities** = 127 techniques indexed, 47 visible to UI until you approve the seeded batch.
+
+**To approve seeded rows in bulk (after review):**
+```sql
+UPDATE public.manufacturing_technique_enrichments
+SET reviewed = true
+WHERE source = 'seed_llm_deepseek'
+  AND technique_slug IN ('friction-stir-welding', 'resin-transfer-moulding', ...);
+```
+Or to approve everything at once (if you accept them all after spot-check):
+```sql
+UPDATE public.manufacturing_technique_enrichments
+SET reviewed = true WHERE source = 'seed_llm_deepseek';
+```
+
+The following slugs from SEED_TAXONOMY were cut by `--count=80` (can re-run to seed): cmm-inspection, laser-scanning-metrology, x-ray-ct-inspection, ultrasonic-inspection, dye-penetrant-inspection, magnetic-particle-inspection, hybrid-additive-subtractive, large-format-additive, wire-arc-additive.
 
 **Deferred for your review / decision:**
 - Phase 2B — Executive Review tab → collapsible card (merged into Phase 3's restructure to avoid double-churn).
@@ -497,7 +517,7 @@ Per phase — phase is complete only if:
 - [x] 5D: Inline "What's this data?" popover documenting the three data sources
 - [x] 5D: Slug-format tolerance on dialog open (snake ↔ kebab)
 - [x] 5D: Shipped commit `5294e6df`, deploy Production success
-- [ ] 5B: **In-flight (background task batqsdh8k)** — LLM-seeding ~80 more techniques from `SEED_TAXONOMY` via DeepSeek + Nomic embedding, writing with `reviewed=false` so hidden from UI until human approval. Progress: 20/80 inserted as of 14:35.
+- [x] 5B: **DONE** — 80/80 techniques LLM-seeded via DeepSeek + embedded via Nomic, all `reviewed=false`. Article lengths 670–1359 chars; sampled quality factory-accurate. Tristan to approve in bulk or per-slug (SQL in Session Summary block above).
 - [ ] 5B: Second-pass fact-check (defer — wait for Tristan review of seeded rows)
 - [ ] 5D: Real-World Supplier Snapshot per module (DEFERRED — needs cross-query to marketplace_listings; not urgent)
 - [ ] 5D: Cost band from aiCostEstimates (DEFERRED)
