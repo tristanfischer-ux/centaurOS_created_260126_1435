@@ -272,6 +272,43 @@ interface AcceptRiskInput {
 }
 
 /**
+ * Read + write founder's per-unit cost target — required before the
+ * cost-reduction iteration path can run (per Open Q1 answer).
+ */
+export async function getProjectTargetUnitCost(projectId: string) {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!isValidUUID(projectId)) return { error: "Invalid project ID" }
+    const { data, error } = await supabase
+      .from("cad_lab_projects")
+      .select("target_unit_cost_gbp")
+      .eq("id", projectId)
+      .eq("foundry_id", foundryId)
+      .maybeSingle()
+    if (error || !data) return { error: "Project not found" }
+    return { targetUnitCostGbp: data.target_unit_cost_gbp as number | null }
+  })
+}
+
+export async function setProjectTargetUnitCost(input: { projectId: string; targetUnitCostGbp: number | null }) {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!isValidUUID(input.projectId)) return { error: "Invalid project ID" }
+    if (input.targetUnitCostGbp !== null && !(input.targetUnitCostGbp > 0)) {
+      return { error: "Target must be > 0" }
+    }
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ target_unit_cost_gbp: input.targetUnitCostGbp })
+      .eq("id", input.projectId)
+      .eq("foundry_id", foundryId)
+    if (error) {
+      console.error("[design-iterations] setTarget failed:", error.message)
+      return { error: "Could not save target" }
+    }
+    return { targetUnitCostGbp: input.targetUnitCostGbp }
+  })
+}
+
+/**
  * Read the accepted-risk register for a project. Used by the Launch Readiness
  * Gauge to surface "here are the concerns the founder chose to accept rather
  * than iterate".

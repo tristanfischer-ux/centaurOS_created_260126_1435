@@ -51,6 +51,7 @@ import { SourceSpecialistInsights } from "@/components/cad/source-specialist-ins
 import { SupplierFitnessReview } from "@/components/cad/supplier-fitness-review"
 import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
 import { useStageBriefing } from "@/hooks/use-stage-briefing"
+import { useCompanyReview } from "@/hooks/use-company-review"
 import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
 import { SupplyRiskRadar } from "@/components/cad/supply-risk-radar"
 import { VolumeRampPlanner } from "@/components/cad/volume-ramp-planner"
@@ -61,6 +62,8 @@ import type { NDAState } from "@/components/cad/nda-gate"
 import { SupplierOutreachLog } from "@/components/cad/supplier-outreach-log"
 import type { OutreachLogState } from "@/components/cad/supplier-outreach-log"
 import { RFQBenchmarksCard } from "@/components/cad/rfq-benchmarks-card"
+import { CostReductionTrigger } from "@/components/cad/cost-reduction-trigger"
+import { DesignIterationHost, type DesignIterationHostHandle } from "@/components/cad/design-iteration-host"
 import { FileText } from "lucide-react"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
@@ -315,6 +318,9 @@ export default function SourcePage(): React.ReactNode {
   // DECISION: activeTab declared here (before effects that reference it) to avoid block-scoping TDZ error.
   const [activeTab, setActiveTab] = useState("suppliers")
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+  // Design-iteration host ref — cost-overrun trigger on Costs tab + future
+  // manual triggers on this page route through here.
+  const designIterationHostRef = useRef<DesignIterationHostHandle | null>(null)
 
   // ── Volume Ramp Planner state (per-project localStorage) ──
   const rampRolesKey = activeProjectId ? `forge-ramp-roles-${activeProjectId}` : null
@@ -820,10 +826,77 @@ export default function SourcePage(): React.ReactNode {
     enabled: manufacturingOrderCount > 0,
   })
 
+  // ── Company review context — shared verdict source for SupplierFitnessReview
+  // AND SupplierIntelligenceTab so the two surfaces agree on which supplier is
+  // Recommended vs Not Recommended. Both call useCompanyReview individually but
+  // share the localStorage cache via identical cache key, so only one fetch fires.
+  const companyReviewCompanyIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const matches of supplierMatches.values()) {
+      for (const m of matches) set.add(m.id)
+    }
+    return [...set]
+  }, [supplierMatches])
+
+  const companyReviewMatchContext = useMemo(() => {
+    const bestByCompany = new Map<string, CadLabSupplierMatch>()
+    for (const matches of supplierMatches.values()) {
+      for (const m of matches) {
+        const existing = bestByCompany.get(m.id)
+        if (!existing || m.matchScore > existing.matchScore) bestByCompany.set(m.id, m)
+      }
+    }
+    return companyReviewCompanyIds.map((id) => {
+      const m = bestByCompany.get(id)
+      return {
+        companyId: id,
+        matchScore: m ? Math.round(m.matchScore) : 0,
+        topReasons: m ? m.matchReasons.slice(0, 3) : [],
+      }
+    })
+  }, [companyReviewCompanyIds, supplierMatches])
+
+  const companyReviewModuleSpecs = useMemo(
+    () =>
+      eligibleModules.map((mod) => {
+        const diag = diagnosticAnswers[mod.id] ?? {}
+        return {
+          name: mod.name,
+          process: diag.mfg_process ?? "",
+          material: diag.material ?? "",
+          tolerance: diag.tolerance ?? "",
+          batchSize: diag.batch_size ?? "",
+          environment: diag.environment ?? "",
+        }
+      }),
+    [eligibleModules, diagnosticAnswers],
+  )
+
+  const { reviews: sharedCompanyReviews } = useCompanyReview({
+    stage: "source",
+    projectId: activeProjectId,
+    projectSubject: subject,
+    modules: companyReviewModuleSpecs,
+    companyIds: companyReviewCompanyIds,
+    matchContext: companyReviewMatchContext,
+    enabled: companyReviewCompanyIds.length > 0,
+  })
+
   if (!hasResearch || specifiedModuleCount === 0) return null
 
   return (
     <div className="space-y-6">
+      {/* Design-iteration host — cost-reduction trigger on Costs tab routes here. */}
+      {activeProjectId && (
+        <DesignIterationHost
+          ref={designIterationHostRef}
+          projectId={activeProjectId}
+          onApplied={() => {
+            toast.success("Design change applied — re-run supplier matching to see updated quotes.", { duration: 8000 })
+          }}
+        />
+      )}
+
       {/* ── Chase (VP Supply Chain) entry briefing ── */}
       <StageSpecialistCard
         specialistId={sourceMapping.specialistId}
@@ -1136,6 +1209,35 @@ export default function SourcePage(): React.ReactNode {
         {/* ═══ Costs tab ═══ */}
         {activeTab === "costs" && (
           <motion.div key="costs" role="tabpanel" id="source-panel-costs" aria-labelledby="source-tab-costs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            {/* ── Cost-reduction iteration trigger (Phase IV cost-overrun path) ── */}
+            {activeProjectId && (() => {
+              const total = aiCostEstimates
+                ? Object.values(aiCostEstimates).reduce((s, est) => s + (est.totalPerUnit ?? 0), 0)
+                : 0
+              const currentUnitCostGbp = total > 0 ? Math.round(total * 100) / 100 : null
+              const moduleCostBreakdown = aiCostEstimates
+                ? eligibleModules
+                    .map((m) => ({
+                      moduleId: m.id,
+                      moduleName: m.name,
+                      costGbp: aiCostEstimates[m.id]?.totalPerUnit ?? 0,
+                    }))
+                    .filter((x) => x.costGbp > 0)
+                : []
+              return (
+                <CostReductionTrigger
+                  projectId={activeProjectId}
+                  currentUnitCostGbp={currentUnitCostGbp}
+                  moduleCostBreakdown={moduleCostBreakdown}
+                  onTrigger={({ currentUnitCostGbp: c, targetUnitCostGbp, moduleCostBreakdown: b }) => {
+                    designIterationHostRef.current?.triggerCostReduction({
+                      currentUnitCostGbp: c, targetUnitCostGbp, moduleCostBreakdown: b,
+                    })
+                  }}
+                />
+              )
+            })()}
+
             {/* ── Benchmarks from historical RFQ responses (item #16) ── */}
             <RFQBenchmarksCard />
 
@@ -1185,6 +1287,7 @@ export default function SourcePage(): React.ReactNode {
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
               supplierMatches={supplierMatches}
+              companyReviews={sharedCompanyReviews}
             />
           </motion.div>
         )}
