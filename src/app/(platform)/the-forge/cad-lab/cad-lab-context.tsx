@@ -4165,21 +4165,36 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       checkpoints,
       researchReport: editableReport,
       projectSubject: subject,
-    }).then((revised) => {
+    }).then((result) => {
       // GOTCHA: withAIGate returns { error, limitReached } when quota exhausted —
-      // guard before iterating as module revisions (would corrupt state with fake IDs)
-      const revAsAny = revised as Record<string, unknown>
-      if (revAsAny && typeof revAsAny === "object" && "error" in revAsAny) {
-        toast.error(String(revAsAny.error))
+      // guard before reading the CheckpointRevisionResult shape.
+      const resAsAny = result as unknown as Record<string, unknown>
+      if (resAsAny && typeof resAsAny === "object" && "error" in resAsAny && !("revised" in resAsAny)) {
+        toast.error(String(resAsAny.error))
         setCheckpointAcknowledged(false) // allow retry
         return
       }
 
+      // INTENT: new action return shape — { revised, failedModuleIds, attempted,
+      // designLevelInfeasibility, infeasibilityEvidence }
+      const revised = result.revised
+      const failedIds = result.failedModuleIds ?? []
+      const attempted = result.attempted ?? Object.keys(revised).length
       const revisedIds = Object.keys(revised)
+
+      // Surface design-level infeasibility *first* — these are the "this won't work"
+      // concerns that no amount of module rewriting will fix.
+      if (result.designLevelInfeasibility) {
+        toast.warning("Design-level concern flagged — your wingspan / mass / power budget may not be buildable. Revise the research report before generating CAD.", { duration: 12_000 })
+      }
+
       if (revisedIds.length === 0) {
-        toast.error("Module revision failed — no modules were updated")
+        toast.error(`Module revision failed — ${failedIds.length} flagged module${failedIds.length === 1 ? "" : "s"} could not be rewritten. Try again or edit manually.`)
         setCheckpointAcknowledged(false) // allow retry
         return
+      }
+      if (failedIds.length > 0) {
+        toast.warning(`${revisedIds.length} of ${attempted} flagged modules revised. ${failedIds.length} failed — retry or edit manually: ${failedIds.join(", ")}`, { duration: 10_000 })
       }
 
       setModules((prev) =>
@@ -4226,7 +4241,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
 
       const hasImages = modulesRef.current.some(m => m.imageUrl)
-      toast.success(`${revisedIds.length} module${revisedIds.length === 1 ? "" : "s"} revised with specialist feedback${hasImages ? " — regenerating drawings..." : ""}`)
+      // INTENT: Only fire the "N revised" success toast when we actually revised
+      // all flagged modules. Partial-failure toast already shown above.
+      if (failedIds.length === 0) {
+        toast.success(`${revisedIds.length} module${revisedIds.length === 1 ? "" : "s"} revised with specialist feedback${hasImages ? " — regenerating drawings..." : ""}`)
+      }
 
       // INTENT: Auto-chain drawing regeneration after checkpoint revisions (same as review handler)
       if (hasImages) {

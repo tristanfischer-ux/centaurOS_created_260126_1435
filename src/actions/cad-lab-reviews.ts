@@ -917,15 +917,75 @@ export interface RevisionRequest {
  *
  * @returns Record of moduleId → revised fields, only for successfully revised modules
  */
+/**
+ * Richer return shape so the UI can surface partial failure + infeasibility
+ * warnings without having to re-parse the specialist concerns itself.
+ */
+export interface CheckpointRevisionResult {
+    /** Successful revisions keyed by module id */
+    revised: Record<string, RevisedModuleFields>
+    /** Modules that were flagged but whose revision call failed. UI should
+     *  prompt the founder to retry and not silently claim success. */
+    failedModuleIds: string[]
+    /** Count of flagged modules the caller tried to revise */
+    attempted: number
+    /**
+     * True if a specialist used language indicating the design itself won't
+     * work (e.g. "not manufacturable at stated wingspan"). This is a signal
+     * the RESEARCH REPORT needs to change, not just the module descriptions,
+     * and the UI should block proceeding to CAD generation until the founder
+     * decides what to do.
+     */
+    designLevelInfeasibility: boolean
+    /** Human-readable concerns that triggered the infeasibility flag */
+    infeasibilityEvidence: string[]
+}
+
+/**
+ * INTENT: Detect specialist language that signals "this design as specified
+ * cannot be built" vs. "this module needs tweaking". Module-level concerns
+ * are addressed by rewriting module text. DESIGN-level concerns (wingspan
+ * impossible, material not viable at scale, etc.) need the research report
+ * or top-level spec to change — the current revision pipeline can't do that.
+ */
+const DESIGN_INFEASIBILITY_PATTERNS: RegExp[] = [
+    /not\s+manufactur(?:able|ing)/i,
+    /is\s+not\s+achievable/i,
+    /is\s+infeasible/i,
+    /beyond\s+(?:the\s+)?state[-\s]of[-\s]the[-\s]art/i,
+    /is\s+not\s+physically\s+(?:possible|viable)/i,
+    /cannot\s+close\s+structurally/i,
+    /exceeds?\s+(?:the\s+)?(?:mass|weight|power|energy)\s+budget/i,
+    /violates?\s+(?:the\s+)?areal\s+density/i,
+]
+
+function detectDesignInfeasibility(checkpoints: Record<string, DecompositionCheckpoint>): { flagged: boolean; evidence: string[] } {
+    const evidence: string[] = []
+    for (const cp of Object.values(checkpoints)) {
+        const fulltext = `${cp.summary}\n${cp.suggestions.join("\n")}`
+        for (const pattern of DESIGN_INFEASIBILITY_PATTERNS) {
+            if (pattern.test(fulltext)) {
+                evidence.push(`${cp.specialistName}: ${cp.summary}`)
+                break
+            }
+        }
+    }
+    return { flagged: evidence.length > 0, evidence }
+}
+
 export async function reviseModulesFromCheckpoints(
     req: RevisionRequest,
-): Promise<Record<string, RevisedModuleFields>> {
+): Promise<CheckpointRevisionResult> {
+    const emptyResult: CheckpointRevisionResult = {
+        revised: {}, failedModuleIds: [], attempted: 0,
+        designLevelInfeasibility: false, infeasibilityEvidence: [],
+    }
     // SECURITY: Authenticate caller to prevent unauthenticated API credit burn
     return withAIGate('cad_lab_review', async () => {
         const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
         if (!apiKey) {
             console.error("[CAD-REVIEWS] No API key for module revision")
-            return {}
+            return emptyResult
         }
 
         // Collect flagged module IDs from all checkpoints
@@ -946,10 +1006,22 @@ export async function reviseModulesFromCheckpoints(
             }
         }
 
-        if (flaggedIds.size === 0) return {}
+        // INTENT: Detect design-level infeasibility regardless of flagged module outcome.
+        // Even if zero revisions succeed, the UI should see this signal.
+        const infeasibility = detectDesignInfeasibility(req.checkpoints)
+
+        if (flaggedIds.size === 0) return {
+            ...emptyResult,
+            designLevelInfeasibility: infeasibility.flagged,
+            infeasibilityEvidence: infeasibility.evidence,
+        }
 
         const flaggedModules = req.modules.filter((m) => flaggedIds.has(m.id))
-        if (flaggedModules.length === 0) return {}
+        if (flaggedModules.length === 0) return {
+            ...emptyResult,
+            designLevelInfeasibility: infeasibility.flagged,
+            infeasibilityEvidence: infeasibility.evidence,
+        }
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
         // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
@@ -959,22 +1031,27 @@ export async function reviseModulesFromCheckpoints(
         // surface the real cause. See forgeos-rules.md R4/R5.
         const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
-        const results = await Promise.allSettled(
-            flaggedModules.map(async (mod) => {
-                const concerns = concernsByModule.get(mod.id) ?? []
+        // INTENT: Stronger JSON contract. Previous prompt said "Return a JSON
+        // object with keys: ..." which Claude often violated by wrapping in
+        // ```json ...``` fences or adding a preamble. extractAndParseJson
+        // handles the fence case but validation still failed ~80% of the time
+        // in prod on this project ("1 of 6 revised" when 6 were flagged).
+        const systemPrompt = `You revise product module descriptions to address specialist concerns from a design checkpoint review.
 
-                const response = await client.messages.create({
-                    model: REVIEW_MODEL,
-                    max_tokens: 2048,
-                    system: `You revise product module descriptions to address specialist concerns from a design checkpoint review. Rules:
+Rules:
 - Preserve the original intent and level of detail
 - Only change what's needed to address the specific concerns raised
 - Keep the same writing style and tone
-- Return ALL fields (even unchanged ones) as valid JSON
-- Do NOT add disclaimers or meta-commentary — just return the revised content`,
-                    messages: [{
-                        role: "user",
-                        content: `Product: "${req.projectSubject}"
+- Address EVERY suggestion in the specialist feedback
+
+Output contract (STRICT):
+- Respond with ONLY a single JSON object. No markdown fences. No preamble. No meta-commentary.
+- Required keys (all must be present even if unchanged): purpose (string), description (string), keyParts (string[]), whyItMatters (string), failureModes (string[]), unknowns (string[])
+- Your first character MUST be { and your last character MUST be }.`
+
+        function buildUserContent(mod: RevisionModuleInput, extraHint: string): string {
+            const concerns = concernsByModule.get(mod.id) ?? []
+            return `Product: "${req.projectSubject}"
 
 Module: "${mod.name}" (id: ${mod.id})
 
@@ -991,49 +1068,74 @@ ${concerns.join("\n")}
 
 Research context (first 1500 chars):
 ${req.researchReport.slice(0, 1500)}
+${extraHint}
+Return the revised fields as a single JSON object now.`
+        }
 
-Revise the module fields to address the specialist concerns. Return a JSON object with keys: purpose, description, keyParts, whyItMatters, failureModes, unknowns.`,
-                    }],
-                })
+        function validateShape(parsed: Record<string, unknown>): boolean {
+            return (
+                typeof parsed.purpose === "string" &&
+                typeof parsed.description === "string" &&
+                Array.isArray(parsed.keyParts) && parsed.keyParts.every((s: unknown) => typeof s === "string") &&
+                typeof parsed.whyItMatters === "string" &&
+                Array.isArray(parsed.failureModes) && parsed.failureModes.every((s: unknown) => typeof s === "string") &&
+                Array.isArray(parsed.unknowns) && parsed.unknowns.every((s: unknown) => typeof s === "string")
+            )
+        }
 
-                const text = response.content
-                    .filter((b) => b.type === "text")
-                    .map((b) => b.type === "text" ? b.text : "")
-                    .join("")
-
-                // Extract JSON — find the outermost balanced braces to avoid greedy regex issues
-                const parsed = extractAndParseJson(text)
-                if (!parsed) {
-                    throw new Error(`No valid JSON found in revision response for module ${mod.id}`)
+        async function reviseOne(mod: RevisionModuleInput): Promise<{ moduleId: string; fields: RevisedModuleFields } | { moduleId: string; error: string }> {
+            // Try once, on parse/shape failure retry with a stricter nudge.
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const hint = attempt === 0
+                        ? ""
+                        : "\n\nIMPORTANT: Your previous response was not valid JSON matching the required shape. Output ONLY the JSON object this time, starting with { and ending with }. No prose.\n"
+                    const response = await client.messages.create({
+                        model: REVIEW_MODEL,
+                        max_tokens: 2048,
+                        system: systemPrompt,
+                        messages: [{ role: "user", content: buildUserContent(mod, hint) }],
+                    })
+                    const text = response.content
+                        .filter((b) => b.type === "text")
+                        .map((b) => b.type === "text" ? b.text : "")
+                        .join("")
+                    const parsed = extractAndParseJson(text)
+                    if (!parsed) {
+                        console.warn(`[CAD-REVIEWS] ${mod.id} attempt ${attempt + 1}: no JSON found`)
+                        continue
+                    }
+                    if (!validateShape(parsed)) {
+                        console.warn(`[CAD-REVIEWS] ${mod.id} attempt ${attempt + 1}: invalid shape`, { keys: Object.keys(parsed) })
+                        continue
+                    }
+                    return { moduleId: mod.id, fields: parsed as unknown as RevisedModuleFields }
+                } catch (err) {
+                    console.warn(`[CAD-REVIEWS] ${mod.id} attempt ${attempt + 1} errored:`, err instanceof Error ? err.message : err)
                 }
+            }
+            return { moduleId: mod.id, error: "Revision parse/shape failed after 2 attempts" }
+        }
 
-                // Validate required fields exist with correct types
-                if (
-                    typeof parsed.purpose !== "string" ||
-                    typeof parsed.description !== "string" ||
-                    !Array.isArray(parsed.keyParts) || !parsed.keyParts.every((s: unknown) => typeof s === "string") ||
-                    typeof parsed.whyItMatters !== "string" ||
-                    !Array.isArray(parsed.failureModes) || !parsed.failureModes.every((s: unknown) => typeof s === "string") ||
-                    !Array.isArray(parsed.unknowns) || !parsed.unknowns.every((s: unknown) => typeof s === "string")
-                ) {
-                    throw new Error(`Invalid revision shape for module ${mod.id}`)
-                }
+        const results = await Promise.all(flaggedModules.map((mod) => reviseOne(mod as RevisionModuleInput)))
 
-                return { moduleId: mod.id, fields: parsed as unknown as RevisedModuleFields }
-            }),
-        )
-
-        // Collect successful revisions
         const revised: Record<string, RevisedModuleFields> = {}
+        const failedModuleIds: string[] = []
         for (const result of results) {
-            if (result.status === "fulfilled") {
-                revised[result.value.moduleId] = result.value.fields
+            if ("fields" in result) {
+                revised[result.moduleId] = result.fields
             } else {
-                console.warn("[CAD-REVIEWS] Module revision failed:", result.reason)
+                failedModuleIds.push(result.moduleId)
             }
         }
 
-        return revised
+        return {
+            revised,
+            failedModuleIds,
+            attempted: flaggedModules.length,
+            designLevelInfeasibility: infeasibility.flagged,
+            infeasibilityEvidence: infeasibility.evidence,
+        }
     })
 }
 
