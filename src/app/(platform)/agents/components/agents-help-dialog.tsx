@@ -124,11 +124,11 @@ export function AgentsHelpDialog({ open, onOpenChange }: AgentsHelpDialogProps) 
                             Execution States
                         </h3>
                         <div className="space-y-2">
-                            <StateRow color="bg-slate-300" label="Idle" description="Not yet run" />
-                            <StateRow color="bg-blue-500" label="Running" description="Generating output" />
-                            <StateRow color="bg-amber-500" label="Review" description="Output ready for your approval" />
-                            <StateRow color="bg-emerald-500" label="Approved" description="You approved this step" />
-                            <StateRow color="bg-red-500" label="Error" description="Something went wrong" />
+                            <StateRow color="bg-muted-foreground/50" label="Idle" description="Not yet run" />
+                            <StateRow color="bg-status-info" label="Running" description="Generating output" />
+                            <StateRow color="bg-status-warning" label="Review" description="Output ready for your approval" />
+                            <StateRow color="bg-status-success" label="Approved" description="You approved this step" />
+                            <StateRow color="bg-status-error" label="Error" description="Something went wrong" />
                         </div>
                     </section>
 
