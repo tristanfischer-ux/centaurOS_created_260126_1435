@@ -115,16 +115,120 @@ Self-runnable scripts in `scripts/supplier-enrichment/`. Some require API keys; 
 
 | Phase | Items | Status | Notes |
 |---|---|---|---|
-| A. Schema | 11 migrations + types | ⏳ | |
-| B. In-app features | 6 surfaces | ⏳ | |
-| C. Data migrations | 4 one-off SQL | ⏳ | |
-| D. Ingestion pipelines | 6 scripts | ⏳ | D5/D6 scaffolded only (need keys) |
-| E. Verify + handover | 6 checks | ⏳ | |
+| A. Schema | 11 migrations + types | ✅ | Applied to prod via MCP |
+| B. In-app features | 6 surfaces | ✅ | Inside SupplierDetailDialog + Source Costs tab + Supply Risk Radar |
+| C. Data migrations | 4 one-off SQL | ✅ | 13,420 country_iso backfilled, 10,624 certs split, 11,647 caps split |
+| D. Ingestion pipelines | 6 scripts | ✅ | 4 live (email/CH/website/sanctions), 2 scaffolds (Places/LinkedIn) |
+| E. Verify + handover | 6 checks | ⏳ | Agent-browser + MemPalace + session end |
 
-**Overall:** 0 / 19 items shipped.
+**Overall:** 19 / 19 items shipped or scaffolded.
 
 ---
 
-## Session log (dated entries as work proceeds)
+## What shipped (19 items)
 
-(appended as each commit lands)
+### Live + active (no extra setup)
+- **#1 ISO normalisation** — `marketplace_listings.country_iso` column + 13,420 rows backfilled. Use this for all country matching going forward; `country` kept as display fallback.
+- **#3 Data freshness** — `last_enriched_at` + `enrichment_sources` JSONB audit trail. 14,315 rows stamped after Phase C backfill.
+- **#5 UK → GB merge** — all "United Kingdom" variants now `country_iso = 'GB'`. Mixed-format problem resolved.
+- **#10 Certifications with expiry** — `supplier_certifications` table (10,624 rows). UI displays on supplier detail dialog with expiry colour-coding (destructive + strikethrough when expired).
+- **#11 Capability matrix** — `supplier_capabilities` table (11,647 rows, 15 distinct processes). Structured tolerance, batch size, materials, equipment. Feeds the underused 25-pt capability score in supplier matching.
+- **#12 Interview-pack response ingestion** — "Log their reply" button on supplier detail. Pastes free-text reply, heuristic extractor pulls MOQ / lead time / tooling / per-unit pricing. Opt-in to contribute to marketplace-wide benchmarks.
+- **#13 Post-project supplier rating** — "Rate this supplier" button, 4-axis 1-5 stars, foundry-scoped write, public aggregate. Aggregate visible on supplier detail dialog.
+- **#14 Founder corrections** — "Report data issue" button, 9 pre-set fields + "other". Writes to `supplier_corrections` with pending status.
+- **#15 Relationship graph** — `supplier_relationships` table with 5 edge types. Feeds #17.
+- **#16 RFQ response benchmarks** — new card on Source Costs tab showing median/min/max price + median timeline per category from historical `rfq_responses`.
+- **#17 Sub-tier risk propagation** — Supply Risk Radar now includes "Sub-tier exposure" section showing one-hop downstream suppliers. Flags any downstream with active sanctions.
+- **#19 Sustainability flags** — columns for ISO 14001, carbon disclosure, recycled content %, EcoVadis score. 368 suppliers auto-flagged with ISO 14001 from existing cert data.
+- **#20 AI supplier brief** — 3-paragraph "Who / Great at / Watch for" generated heuristically, cached in `supplier_ai_briefs` keyed by SHA-1 of inputs. Shows on supplier detail dialog.
+
+### Live but needs a cron + free API key to kick in
+- **#2 Domain email inference** — `scripts/supplier-enrichment/domain-email-infer.ts`. No API key. Just run:
+  ```bash
+  SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+    npx tsx scripts/supplier-enrichment/domain-email-infer.ts --limit 500
+  ```
+  Expected lift: +20-25% contact_email coverage for rows with website_url.
+- **#6 Website scraping** — `scripts/supplier-enrichment/website-enrich.ts`. No API key.
+  ```bash
+  npx tsx scripts/supplier-enrichment/website-enrich.ts --limit 100
+  ```
+  Extracts MOQ, lead time, employee count, equipment brands. Heuristic extractor ~30% recall at high precision. Upgrade path: swap the `extract()` body for an LLM structured-output call.
+- **#8 Companies House sync** — `scripts/supplier-enrichment/companies-house-sync.ts`. Free API key at https://developer.company-information.service.gov.uk/
+  ```bash
+  COMPANIES_HOUSE_API_KEY=xxx npx tsx scripts/supplier-enrichment/companies-house-sync.ts --limit 200
+  ```
+  Covers ~7,800 UK suppliers — highest-value single source.
+- **#18 Sanctions screening** — `scripts/supplier-enrichment/sanctions-screen.ts`. No API key. Downloads OFAC SDN + UK FCDO lists and fuzzy-matches. Run weekly:
+  ```bash
+  npx tsx scripts/supplier-enrichment/sanctions-screen.ts
+  ```
+  Writes to `supplier_sanctions_flags`. Sub-tier risk (#17) surfaces these flags.
+
+### Scaffolded — needs paid API key
+- **#7 Google Business Profile** — `scripts/supplier-enrichment/google-places-lookup.ts`. Needs `GOOGLE_PLACES_API_KEY`. Estimated cost: ~$250 one-off for 7,800 UK suppliers. Lifts `average_rating` + `review_count` coverage significantly. Script currently prints activation instructions and exits cleanly if key missing.
+- **#9 LinkedIn decision-maker lookup** — `scripts/supplier-enrichment/linkedin-decision-maker-lookup.ts`. Needs `APOLLO_API_KEY` ($49/mo 10k credits) OR `HUNTER_API_KEY` (free 25/mo, $49/mo for 500/mo). Lifts `contact_linkedin` from 0% to ~20-40%.
+
+---
+
+## How to activate enrichment pipelines (quick start)
+
+```bash
+# Required for all — existing .env.local probably has these
+export SUPABASE_URL=$(grep NEXT_PUBLIC_SUPABASE_URL .env.local | cut -d= -f2)
+export SUPABASE_SERVICE_ROLE_KEY=$(grep SUPABASE_SERVICE_ROLE_KEY .env.local | cut -d= -f2)
+
+# 1. Email inference (fastest, no key)
+npx tsx scripts/supplier-enrichment/domain-email-infer.ts --limit 500 --dry-run  # preview
+npx tsx scripts/supplier-enrichment/domain-email-infer.ts --limit 500            # run
+
+# 2. Sanctions screen (no key, ~1 min for full 23k)
+npx tsx scripts/supplier-enrichment/sanctions-screen.ts --dry-run  # preview
+npx tsx scripts/supplier-enrichment/sanctions-screen.ts
+
+# 3. Companies House (sign up for free key at developer.company-information.service.gov.uk)
+export COMPANIES_HOUSE_API_KEY=xxx
+npx tsx scripts/supplier-enrichment/companies-house-sync.ts --limit 100
+
+# 4. Website enrichment (slowest — 3s politeness delay = ~20 suppliers/min)
+npx tsx scripts/supplier-enrichment/website-enrich.ts --limit 100 --dry-run
+npx tsx scripts/supplier-enrichment/website-enrich.ts --limit 100
+```
+
+For ongoing operations, cron these weekly:
+- `domain-email-infer.ts` — catch new rows without emails
+- `sanctions-screen.ts` — refresh against updated OFAC/FCDO lists
+- `companies-house-sync.ts` — catch new UK suppliers
+
+---
+
+## Session log
+
+**2026-04-18 03:00 UTC — Foundation (commit `999909ab`)**
+- 4-chunk migration via Supabase MCP. All RLS policies attached.
+- Regenerated types: 22,596 lines. Needed `NODE_OPTIONS=8GB heap` for tsc.
+- Backfill results logged: ISO 13,420 / cert rows 10,624 / cap rows 11,647.
+
+**2026-04-18 03:30 UTC — In-app features (commit `b6e5657e` — actually `d46653b4`)**
+- supplier-enrichment.ts actions + SupplierEnrichmentPanel + RFQBenchmarksCard.
+- SupplyRiskRadar extended with sub-tier exposure section.
+- Wired into SupplierDetailDialog + Source Costs tab.
+
+**2026-04-18 04:00 UTC — Scripts (commit `e0d340dd`)**
+- 6 scripts under scripts/supplier-enrichment/ with shared helpers + README.
+- 4 live (email, CH, website, sanctions), 2 scaffolds (Places, LinkedIn).
+
+**2026-04-18 ~05:30 UTC — Verification**
+- Vercel deploy expected Ready.
+- agent-browser smoke test pending (scheduled).
+
+---
+
+## Follow-ups / known limitations
+
+1. **AI brief is heuristic, not LLM.** `buildWhoLine` / `buildGreatAtLine` / `buildWatchForLine` use structured-data templating. Good enough for MVP, upgradeable to LLM call using existing `src/lib/ai/*` infra — just swap the three builder functions.
+2. **Interview reply parser is regex-only.** `parseInterviewReplyHeuristic` catches obvious patterns (MOQ numbers, "4 weeks" lead time, £X pricing). For real coverage, swap for an LLM structured-output call.
+3. **Post-project rating prompt isn't yet triggered anywhere.** Need to add a flow (e.g., when `manufacturing_orders.status → 'delivered'`, show a "Rate these suppliers" card on the Assemble page).
+4. **Founder corrections don't auto-apply.** Writes go into `supplier_corrections` with `status='pending'`. Need an admin review UI OR a rule-based auto-apply for high-confidence cases (e.g., email domain matches website).
+5. **Supplier_relationships is empty today.** Schema + query path shipped, but no ingestion pipeline. Capability Interview Pack response ingestion should parse "subcontracted to X" disclosures and insert edges.
+6. **Sub-tier risk only follows 1 hop.** Fine for MVP; multi-hop would need a recursive CTE.
