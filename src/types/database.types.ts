@@ -15815,6 +15815,57 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_reports: {
+        Row: {
+          config_json: Json
+          created_at: string
+          created_by: string
+          day_of_month: number | null
+          day_of_week: number | null
+          enabled: boolean
+          foundry_id: string
+          frequency: string
+          id: string
+          last_run_at: string | null
+          next_run_at: string
+          recipients: string[]
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          config_json?: Json
+          created_at?: string
+          created_by: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          enabled?: boolean
+          foundry_id: string
+          frequency: string
+          id?: string
+          last_run_at?: string | null
+          next_run_at: string
+          recipients?: string[]
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          config_json?: Json
+          created_at?: string
+          created_by?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          enabled?: boolean
+          foundry_id?: string
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          next_run_at?: string
+          recipients?: string[]
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sector_skills: {
         Row: {
           created_at: string | null
