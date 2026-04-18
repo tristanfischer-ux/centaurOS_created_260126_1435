@@ -21,6 +21,8 @@ import {
   getInvestorContacts,
   getSimilarInvestors,
   getCoInvestors,
+  getShortlistIds,
+  type ShortlistStage,
 } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
 import { formatFundSize } from '@/lib/format'
@@ -105,6 +107,21 @@ const PRIORITY_DESCRIPTIONS: Record<string, string> = {
   A: 'High priority — top-tier, actively deploying, most relevant firms',
   B: 'Medium priority — strong investors, good deployment history',
   C: 'Lower priority — secondary-tier or niche focus',
+}
+
+/**
+ * Label + container classes for each shortlist pipeline stage. Mirrors the
+ * columns on InvestorShortlistBoard (STAGES const) but rendered inline as a
+ * compact chip near the firm header so founders see pipeline position
+ * without bouncing back to the board.
+ */
+const SHORTLIST_STAGE_CONFIG: Record<ShortlistStage, { label: string; classes: string }> = {
+  researching: { label: 'Researching', classes: 'bg-muted text-foreground border-border' },
+  contacted: { label: 'Contacted', classes: 'bg-status-info-light text-status-info-dark border-status-info/30' },
+  meeting: { label: 'Meeting', classes: 'bg-status-warning-light text-status-warning-dark border-status-warning/30' },
+  in_discussion: { label: 'In Discussion', classes: 'bg-international-orange/10 text-international-orange border-international-orange/30' },
+  closed_won: { label: 'Closed Won', classes: 'bg-status-success-light text-status-success-dark border-status-success/30' },
+  closed_lost: { label: 'Closed Lost', classes: 'bg-status-error-light text-status-error-dark border-status-error/30' },
 }
 
 // ---------------------------------------------------------------------------
@@ -211,11 +228,12 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   }
 
   const attrs = firm.attributes
-  const [contactResult, similarResult, userSectorResult, coInvestorResult] = await Promise.allSettled([
+  const [contactResult, similarResult, userSectorResult, coInvestorResult, shortlistResult] = await Promise.allSettled([
     getInvestorContacts(id, access),
     getSimilarInvestors(id, 5, access),
     access.intelligenceAccess ? getUserSector() : Promise.resolve(null),
     access.contactsVisible ? getCoInvestors(id, access) : Promise.resolve({ coInvestors: [] }),
+    getShortlistIds(),
   ])
 
   const { contacts, access: contactAccess } = contactResult.status === 'fulfilled'
@@ -229,6 +247,10 @@ export default async function InvestorDetailPage({ params }: PageProps) {
     : {}
   const userSector = userSectorResult.status === 'fulfilled' ? userSectorResult.value : null
   const coInvestors = coInvestorResult.status === 'fulfilled' ? coInvestorResult.value.coInvestors : []
+  const shortlistStage: ShortlistStage | null = shortlistResult.status === 'fulfilled'
+    ? (shortlistResult.value[id] ?? null)
+    : null
+  const stageConfig = shortlistStage ? SHORTLIST_STAGE_CONFIG[shortlistStage] : null
 
   const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
   const aumLabel = formatFundSize(attrs.aum_gbp)
@@ -306,6 +328,22 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {stageConfig && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className={`cursor-help ${stageConfig.classes}`}
+                    >
+                      <Briefcase className="h-3 w-3 mr-1" />
+                      {stageConfig.label}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Your pipeline stage for this investor. Change on the Shortlist board.</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
               {attrs.outreach_priority && (
                 <Tooltip>
                   <TooltipTrigger asChild>
