@@ -418,7 +418,7 @@ export function UpdatesLayout({
   // ── Tab bar ─────────────────────────────────────────────────────────────
   const TabBar = (
     <Tabs value={activeView} onValueChange={(v) => setActiveView(v as CommsView)}>
-      <TabsList className="mx-4 sm:mx-6 lg:mx-8 my-2">
+      <TabsList className="mx-4 sm:mx-6 lg:mx-8 my-2" aria-label="Communication views">
         <TabsTrigger value="activity" className="gap-2 text-sm">
           <Activity className="h-3.5 w-3.5" />
           Activity
@@ -654,10 +654,10 @@ export function UpdatesLayout({
               specialistId="chief-of-staff"
               specialistName="Cal"
               specialistTitle="Chief of Staff"
-              narrative={null}
+              narrative={briefing.narrative}
               fallbackMessage="While you were away, things moved. I've sorted by what needs you versus what's just context — the items at the top are the ones someone's waiting on. Scan for anything flagged, respond to those first, and you're caught up in under two minutes."
-              isLoading={false}
-              severity="success"
+              isLoading={briefing.isLoading}
+              severity={briefing.severity}
               context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
               storageKey="comms"
             />
