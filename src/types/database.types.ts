@@ -11126,6 +11126,7 @@ export type Database = {
           milestone_order_index: number
           owner_agent_id: string | null
           parent_objective_id: string | null
+          product_id: string | null
           progress: number | null
           resource_suggestions: Json | null
           source_pack_id: string | null
@@ -11163,6 +11164,7 @@ export type Database = {
           milestone_order_index?: number
           owner_agent_id?: string | null
           parent_objective_id?: string | null
+          product_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
           source_pack_id?: string | null
@@ -11200,6 +11202,7 @@ export type Database = {
           milestone_order_index?: number
           owner_agent_id?: string | null
           parent_objective_id?: string | null
+          product_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
           source_pack_id?: string | null
@@ -11266,6 +11269,13 @@ export type Database = {
             columns: ["parent_objective_id"]
             isOneToOne: false
             referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objectives_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -17463,6 +17473,7 @@ export type Database = {
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
+          product_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           specialist_id: string | null
@@ -17503,6 +17514,7 @@ export type Database = {
           owner_agent_id?: string | null
           parent_task_id?: string | null
           plan_id?: string | null
+          product_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           specialist_id?: string | null
@@ -17543,6 +17555,7 @@ export type Database = {
           owner_agent_id?: string | null
           parent_task_id?: string | null
           plan_id?: string | null
+          product_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           specialist_id?: string | null
@@ -17630,6 +17643,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "execution_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -19573,6 +19593,7 @@ export type Database = {
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
+          product_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           specialist_id: string | null
@@ -19753,6 +19774,7 @@ export type Database = {
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
+          product_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           specialist_id: string | null
@@ -19943,6 +19965,7 @@ export type Database = {
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
+          product_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           specialist_id: string | null

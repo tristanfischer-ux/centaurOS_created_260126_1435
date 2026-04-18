@@ -214,6 +214,82 @@ export async function getProductByCadLabProjectId(
   })
 }
 
+// ─── getLinkedItemsForProduct ───────────────────────────────────────
+
+/**
+ * Reverse lookup: all objectives + tasks tagged to a given product.
+ *
+ * @description Powers the "linked work" card on the Product Overview tab.
+ * Scoped to the caller's foundry; RLS + the explicit foundry_id filter
+ * are defense in depth. Returns counts + top-5 lists so the UI stays
+ * fast without paginating.
+ *
+ * @param productId - Product UUID
+ */
+export async function getLinkedItemsForProduct(
+  productId: string,
+): Promise<ActionResult<{
+  objectives: { id: string; title: string; status: string | null }[]
+  tasks: { id: string; title: string; status: string | null; due_date: string | null }[]
+  objectiveCount: number
+  taskCount: number
+}>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!productId || typeof productId !== 'string' || !isValidUUID(productId)) {
+      return { error: 'Invalid product ID' }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const objQuery = (supabase as any)
+      .from('objectives')
+      .select('id, title, status', { count: 'exact' })
+      .eq('product_id', productId)
+      .eq('foundry_id', foundryId)
+      .order('updated_at', { ascending: false })
+      .limit(5)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const taskQuery = (supabase as any)
+      .from('tasks')
+      .select('id, title, status, due_date', { count: 'exact' })
+      .eq('product_id', productId)
+      .eq('foundry_id', foundryId)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(5)
+
+    const [objRes, taskRes] = await Promise.all([objQuery, taskQuery])
+
+    if (objRes.error) {
+      console.error('[getLinkedItemsForProduct] objectives query failed:', objRes.error.message)
+      return { error: objRes.error.message }
+    }
+    if (taskRes.error) {
+      console.error('[getLinkedItemsForProduct] tasks query failed:', taskRes.error.message)
+      return { error: taskRes.error.message }
+    }
+
+    return {
+      data: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        objectives: (objRes.data ?? []).map((o: any) => ({
+          id: o.id as string,
+          title: o.title as string,
+          status: (o.status ?? null) as string | null,
+        })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tasks: (taskRes.data ?? []).map((t: any) => ({
+          id: t.id as string,
+          title: t.title as string,
+          status: (t.status ?? null) as string | null,
+          due_date: (t.due_date ?? null) as string | null,
+        })),
+        objectiveCount: objRes.count ?? 0,
+        taskCount: taskRes.count ?? 0,
+      },
+    }
+  })
+}
+
 // ─── getProduct ─────────────────────────────────────────────────────
 
 /**

@@ -308,3 +308,29 @@ Ordered roughly by leverage × effort. None are correctness bugs.
 - If you want to keep sweeping pages: candidates not covered tonight include `/pitch-prep`, `/investors`, `/team`, `/canvas`, `/retainers`, `/suppliers`, `/workshop`, `/playbooks`, `/orders`, `/knowledge`, `/me`, `/agents`, `/analytics`. Strongly recommend starting with `/pitch-prep` or `/investors` next — those sit between the work shipped on Products and the strategy/reports pipeline, and a founder raising money will hit them hard.
 - All Vercel deploys from tonight reached `● Ready`. Last verified before sleep.
 
+---
+
+# Second overnight run — 2026-04-18 (Tristan back to sleep)
+
+**Scope:** (1) top backlog item — Products ↔ Objectives ↔ Tasks schema link — and (2) continue sweeping pages. Next candidates: Pitch Prep, Investors.
+
+**Abort criteria reminder:** destructive migration = stop. Clear rollback = safe. Per-commit scope stays small. Vercel verify each.
+
+**Plan for the schema link (item 1 from backlog):**
+
+1. **Migration** — add nullable `product_id` to `objectives` and `tasks`:
+   - `product_id uuid REFERENCES public.products(id) ON DELETE SET NULL`
+   - Index: `(foundry_id, product_id)` for "show me everything tagged to product X" queries.
+   - No backfill — all rows start with NULL, nothing breaks.
+   - Rollback: `DROP COLUMN product_id` — drop migration inverse kept in a comment.
+2. **Types regen** — `npx supabase gen types typescript --linked`.
+3. **Server actions** — extend `CreateObjectiveInput`, `UpdateObjectiveInput`, `CreateTaskInput`, `UpdateTaskInput` to accept optional `product_id`. New reverse-lookup action `getLinkedItemsForProduct(productId)`.
+4. **UI — objective side**: show a `LinkedProductChip` on the objective detail (same pattern as the CAD Lab chip shipped in Products R2). Product selector in the Create/Edit Objective dialog.
+5. **UI — task side**: same pattern. Product selector in Create Task. Chip on task detail panel.
+6. **UI — product side**: a new Overview-tab card "Linked objectives & tasks" with counts + quick links.
+
+Time budget: aim for ~2 hours end-to-end; if a single step blows past ~45 min, ship what's shipped and log the rest.
+
+### 14. Products ↔ Objectives ↔ Tasks schema link
+_(in progress)_
+

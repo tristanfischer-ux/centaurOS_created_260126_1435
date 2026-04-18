@@ -54,6 +54,7 @@ import { typography } from '@/lib/design-system'
 import { formatCurrency } from '@/types/payments'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
+import { LinkedWorkCard } from './linked-work-card'
 import {
   Package,
   Pencil,
@@ -1211,6 +1212,9 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                 </CardContent>
               </Card>
             )}
+
+            {/* Linked work — objectives + tasks tagged to this product */}
+            <LinkedWorkCard productId={product.id} />
 
             {/* Quick stats */}
             <Card>
