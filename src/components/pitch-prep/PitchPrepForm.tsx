@@ -241,6 +241,7 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
                   }
                 }}
                 disabled={index > currentStepIndex}
+                aria-current={isActive ? 'step' : undefined}
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-lg transition-all',
                   isActive && 'bg-accent text-accent-foreground',
@@ -560,6 +561,7 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
                         type="button"
                         onClick={() => toggleService(service)}
                         disabled={isPending}
+                        aria-pressed={isSelected}
                         className={cn(
                           'flex flex-col items-start p-4 rounded-lg border text-left transition-all',
                           isSelected
@@ -588,6 +590,7 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
                         type="button"
                         onClick={() => toggleInvestorType(type)}
                         disabled={isPending}
+                        aria-pressed={isSelected}
                         className={cn(
                           'px-3 py-1.5 rounded-full text-sm transition-all',
                           isSelected

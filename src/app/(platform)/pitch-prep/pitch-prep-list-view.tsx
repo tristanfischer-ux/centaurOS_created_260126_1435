@@ -56,7 +56,7 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />

@@ -4,7 +4,7 @@ export default function PitchPrepLoading() {
   return (
     <div className="space-y-6">
       {/* Header skeleton */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+      <div className="flex items-center justify-between pb-4 border-b border-border">
         <div>
           <Skeleton className="h-8 w-48 mb-2" />
           <Skeleton className="h-4 w-64" />
