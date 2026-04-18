@@ -27,6 +27,13 @@ import type {
   AiReportSection,
   ReportSectionOutline,
 } from "@/lib/cad-lab/design-report-types"
+import type { ReportAudience } from "@/lib/cad-lab/audience"
+import { DEFAULT_AUDIENCE } from "@/lib/cad-lab/audience"
+import {
+  getAudienceOpusContext,
+  getAudienceGeminiTone,
+  getAudienceImagePromptSuffix,
+} from "@/lib/cad-lab/prompts/audience-context"
 
 // ─── Payload Optimization ────────────────────────────────────────────
 
@@ -257,10 +264,13 @@ const STAGE_CONTEXT: Record<string, string> = {
  * Phase 1: Opus reads all design data and creates a structured report outline.
  *
  * @param data - The full DesignReportData assembled by the dialog
+ * @param audience - Target reader for this report — steers section order,
+ *   slide layouts, and emphasis. Defaults to `investor` for back-compat.
  * @returns ReportOutline — structured sections for Gemini to write
  */
 export async function structureReportOutline(
   rawData: DesignReportData,
+  audience: ReportAudience = DEFAULT_AUDIENCE,
 ): Promise<{ outline: ReportOutline; tokensIn: number; tokensOut: number }> {
   return withAIGate('cad_lab_report', async ({ trackUsage }) => {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
@@ -269,10 +279,13 @@ export async function structureReportOutline(
   const data = stripForServer(rawData)
   const dataSummary = buildDataSummary(data)
   const stageContext = STAGE_CONTEXT[data.stage] ?? ""
+  const audienceContext = getAudienceOpusContext(audience)
 
   const systemPrompt = `You are a senior engineering report architect at Fractional Forge. Your job is to read raw design data and create a visually compelling, narrative-driven report outline. Think like a McKinsey consultant designing a boardroom presentation — every slide should have a clear visual layout and tell part of a story.
 
 ${stageContext}
+
+${audienceContext}
 
 ## Slide Layout System
 
@@ -609,15 +622,18 @@ async function writeOneSection(
   section: ReportSectionOutline,
   data: DesignReportData,
   apiKey: string,
+  audience: ReportAudience,
 ): Promise<AiReportSection & { tokensIn: number; tokensOut: number }> {
   const dataSlice = buildSectionDataSlice(section, data)
+  const audienceTone = getAudienceGeminiTone(audience)
 
-  const systemPrompt = `You are a technical writer at Fractional Forge, writing a section of an engineering design report. Write polished, professional prose that a hardware engineer would expect to read.
+  const systemPrompt = `You are a technical writer at Fractional Forge, writing a section of a design report.
+
+${audienceTone}
 
 Rules:
 - Write 2-4 paragraphs of clear, factual prose
 - Reference specific numbers, dimensions, and data points from the provided data
-- Use professional engineering language — concise, authoritative, no fluff
 - Never mention that this was written by an AI or automated system
 - Do not use markdown headers — the section title is already handled
 - You may use **bold** for emphasis and bullet lists where appropriate`
@@ -685,12 +701,15 @@ ${dataSlice}`
  *
  * @param outline - The structured outline from Phase 1
  * @param data - The full DesignReportData
+ * @param opusTokens - Token counts from Phase 1 (threaded through to content)
+ * @param audience - Target reader — steers tone/register per section. Defaults to investor.
  * @returns AiReportContent — prose for each section, token usage
  */
 export async function writeReportSections(
   outline: ReportOutline,
   rawData: DesignReportData,
   opusTokens: { in: number; out: number },
+  audience: ReportAudience = DEFAULT_AUDIENCE,
 ): Promise<AiReportContent> {
   return withAIGate('cad_lab_report', async ({ trackUsage }) => {
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
@@ -708,7 +727,7 @@ export async function writeReportSections(
     const batch = outline.sections.slice(i, i + BATCH_SIZE)
     const batchResults = await Promise.allSettled(
       batch.map((section) =>
-        withRetry(() => writeOneSection(section, data, apiKey), {
+        withRetry(() => writeOneSection(section, data, apiKey, audience), {
           maxRetries: 3,
           baseDelay: 1000,
           shouldRetry: (error) => {
@@ -782,11 +801,14 @@ export async function writeReportSections(
  *
  * @param outline - The structured outline with imagePrompts from Phase 1
  * @param content - The written content from Phase 2 (modified in place with slideImageBase64)
+ * @param audience - Target reader — selects illustration style suffix (investor → photoreal,
+ *   engineer/supplier → blueprint, marketing → photography). Defaults to investor.
  * @returns The content with slideImageBase64 populated for relevant sections
  */
 export async function generateSlideImages(
   outline: ReportOutline,
   content: AiReportContent,
+  audience: ReportAudience = DEFAULT_AUDIENCE,
 ): Promise<AiReportContent> {
   return withAIGate('cad_lab_report', async () => {
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
@@ -806,15 +828,17 @@ export async function generateSlideImages(
 
   if (imageJobs.length === 0) return content
 
-  console.log(`[CAD-REPORT] Generating ${imageJobs.length} slide illustrations...`)
+  console.log(`[CAD-REPORT] Generating ${imageJobs.length} slide illustrations for audience=${audience}...`)
+
+  const styleSuffix = getAudienceImagePromptSuffix(audience)
 
   // INTENT: Generate all slide images in parallel for speed.
   // Each call is independent — one failure shouldn't block others.
   const results = await Promise.allSettled(
     imageJobs.map(async (job) => {
-      const NO_TEXT_SUFFIX = "\n\nCRITICAL RULES:\n- ZERO text, letters, words, labels, annotations, captions, or numbers anywhere in the image\n- Pure white background (#FFFFFF)\n- Full color, not grayscale\n- Clean, professional technical illustration style"
+      const NO_TEXT_SUFFIX = "\n\nCRITICAL RULES:\n- ZERO text, letters, words, labels, annotations, captions, or numbers anywhere in the image\n- Full color, not grayscale"
 
-      const fullPrompt = job.prompt + NO_TEXT_SUFFIX
+      const fullPrompt = job.prompt + styleSuffix + NO_TEXT_SUFFIX
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`
 
