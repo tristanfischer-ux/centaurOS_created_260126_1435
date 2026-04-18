@@ -139,6 +139,70 @@ export async function sendReportEmail(
   return { success: true, sentCount }
 }
 
+/**
+ * Cron-dispatch variant of sendReportEmail. Identical send logic but skips the
+ * user auth check (scheduled-reports cron has no cookies). Caller is expected
+ * to have already validated the recipients list came from a DB-stored schedule
+ * that was created by an authenticated user.
+ *
+ * @param recipients - Email addresses the schedule row specifies.
+ * @param document - The generated ReportDocument to send.
+ * @returns Count of successful sends + optional error summary.
+ */
+export async function sendReportEmailFromCron(
+  recipients: string[],
+  document: ReportDocument,
+): Promise<SendReportEmailResult> {
+  if (!recipients.length) {
+    return { success: false, error: 'At least one recipient is required' }
+  }
+
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const invalidEmails = recipients.filter((e) => !EMAIL_REGEX.test(e))
+  if (invalidEmails.length > 0) {
+    return { success: false, error: `Invalid email addresses: ${invalidEmails.join(', ')}` }
+  }
+
+  const subject = composeSubject(document)
+  const html = composeEmailHtml(document)
+
+  if (!resend) {
+    console.info('[ReportEmail:cron] No RESEND_API_KEY configured. Would send:', {
+      to: recipients,
+      subject,
+    })
+    return { success: true, sentCount: recipients.length }
+  }
+
+  let sentCount = 0
+  const errors: string[] = []
+
+  for (const recipient of recipients) {
+    const { error } = await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: [recipient],
+      subject,
+      html,
+    })
+    if (error) errors.push(`${recipient}: ${error.message}`)
+    else sentCount++
+  }
+
+  if (errors.length > 0) {
+    console.error('[ReportEmail:cron] Partial send failure:', {
+      sentCount,
+      failedCount: errors.length,
+      errors,
+    })
+  }
+
+  if (sentCount === 0) {
+    return { success: false, error: `Failed to send to all ${recipients.length} recipient(s)` }
+  }
+
+  return { success: true, sentCount }
+}
+
 // ========================
 // HTML Composition
 // ========================

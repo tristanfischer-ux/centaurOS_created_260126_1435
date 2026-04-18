@@ -18,7 +18,9 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
@@ -70,7 +72,41 @@ import type {
  * @returns The composed ReportDocument or an error
  */
 export async function generateReport(request: GenerateReportRequest): Promise<GenerateReportResponse> {
-  return withAIGate('report_generation', async ({ supabase, user, foundryId }) => {
+  return withAIGate('report_generation', async ({ supabase, foundryId }) => {
+    return generateReportCore(supabase, foundryId, request)
+  })
+}
+
+/**
+ * Cron-dispatch variant of generateReport. Uses the service-role admin client
+ * (no user auth, no withAIGate) and accepts foundryId explicitly — scheduled
+ * reports are pre-authorised by the founder's schedule row, so they bypass the
+ * per-call AI limit check. Usage tracking still happens inside the AI narrative
+ * + image helpers via their own integrations.
+ *
+ * @param foundryId - The foundry whose data should be reported on.
+ * @param request - Template + sections + date range (same as interactive flow).
+ * @returns The composed ReportDocument or an error.
+ */
+export async function generateReportForSchedule(
+  foundryId: string,
+  request: GenerateReportRequest,
+): Promise<GenerateReportResponse> {
+  const admin = createAdminClient() as unknown as SupabaseClient
+  return generateReportCore(admin, foundryId, request)
+}
+
+/**
+ * Context-agnostic core of report generation — fetches all requested sections,
+ * generates AI narratives, renders images, and returns a composed ReportDocument.
+ * Callers must supply the Supabase client (cookie-authed or service-role) and the
+ * foundry id. No auth/gate logic lives here.
+ */
+async function generateReportCore(
+  supabase: SupabaseClient,
+  foundryId: string,
+  request: GenerateReportRequest,
+): Promise<GenerateReportResponse> {
   try {
 
     const { data: foundry } = await supabase
@@ -360,7 +396,6 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
     console.error('[ReportGenerator] Failed to generate report:', error)
     return { success: false, error: sanitizeErrorMessage(error) }
   }
-  })
 }
 
 // ========================
