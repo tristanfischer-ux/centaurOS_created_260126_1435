@@ -18,72 +18,63 @@
 
 ---
 
-## Phase A — Foundation
+## Phase A — Foundation ✓ DONE
 
-- [ ] A1. Install `@react-pdf/renderer`; verify `sharp` is present
-- [ ] A2. Create `src/lib/constants/brand-tokens.ts`; migrate existing exporter hardcodes to import from it
-- [ ] A3. Create `src/lib/cad-lab/audience.ts` — type, `isAudienceViableAtStage()`, labels, descriptions, icon keys
-- [ ] A4. Add `audience` field to `DesignReportData` in `src/lib/cad-lab/design-report-types.ts`
-- [ ] A5. Add `photography` illustration style to `src/lib/cad-lab/illustration-styles.ts`
-- [ ] A6. Create `src/lib/cad-lab/image-resize.ts` (Sharp, 1600px wide, JPEG q85)
-- [ ] A7. Commit Phase A
+- [x] A1. Install `@react-pdf/renderer`; verify `sharp` is present — v4.5.1 added
+- [x] A2. Create `src/lib/constants/brand-tokens.ts`
+- [x] A3. Create `src/lib/cad-lab/audience.ts`
+- [x] A4. Add `audience` field to `DesignReportData`
+- [x] A5. Add `photography` illustration style (+ migration 20260420000000)
+- [x] A6. Create `src/lib/cad-lab/image-resize.ts`
+- [x] A7. Commit Phase A — commit `7fe11038` (rescue v3; earlier attempts were hijacked by concurrent agents; see Notes)
 
-## Phase B — AI narrative pipeline
+## Phase B — AI narrative pipeline ✓ DONE
 
-- [ ] B1. Write `src/lib/cad-lab/prompts/shared.ts` — structural guidance common to all outlines
-- [ ] B2. Write `src/lib/cad-lab/prompts/investor-outline.ts` — exec summary with KPIs, problem/solution, market, traction, risks, ask
-- [ ] B3. Write `src/lib/cad-lab/prompts/engineer-outline.ts` — module specs, standards refs, tolerance/material grids, CAD metrics, risk register
-- [ ] B4. Write `src/lib/cad-lab/prompts/supplier-outline.ts` — BOM with part classification, process/tolerance/finish grids, quantities, lead times
-- [ ] B5. Write `src/lib/cad-lab/prompts/marketing-outline.ts` — hero narrative, problem framing, product reveal, at-a-glance specs, CTA
-- [ ] B6. Extend `structureReportOutline(data, audience)` in `src/actions/cad-lab-report.ts`
-- [ ] B7. Extend `writeReportSections(outline, data, audience, opusTokens)` — audience register to Gemini
-- [ ] B8. Extend `generateSlideImages()` — audience-matched illustration style
-- [ ] B9. Commit Phase B
+- [x] B1-B5. Consolidated into a single `src/lib/cad-lab/prompts/audience-context.ts` — provides `getAudienceOpusContext`, `getAudienceGeminiTone`, `getAudienceImagePromptSuffix`
+- [x] B6. Extend `structureReportOutline(data, audience)` — optional param, defaults to `investor`
+- [x] B7. Extend `writeReportSections(outline, data, opusTokens, audience)` — tone register injected
+- [x] B8. Extend `generateSlideImages()` — audience-matched illustration style suffix
+- [x] B9. Commit Phase B — commit `dd77e293`
 
-## Phase C — Dialog UX
+## Phase C — Dialog UX ✓ DONE
 
-- [ ] C1. Add audience picker to `design-report-dialog.tsx` — four cards with icons (Briefcase / Wrench / Truck / Megaphone)
-- [ ] C2. Gating: `isAudienceViableAtStage(audience, stage)` — disable unviable with tooltip
-- [ ] C3. Thread `audience` through `structureReportOutline` + `writeReportSections` + exporter calls
-- [ ] C4. Filename includes audience: `{project}-{audience}-{stage}-{date}.{ext}`
-- [ ] C5. Copy compliance — no AI emphasis ("Investor edition" not "AI-powered investor report")
-- [ ] C6. Commit Phase C
+- [x] C1. Audience picker added — four cards with Briefcase / Wrench / Truck / Megaphone icons, 2×2 grid above format picker
+- [x] C2. Stage gating with tooltips for Supplier (needs source) and Engineer (needs specify); Journey mode unlocks everything
+- [x] C3. `audience` threaded through all three server actions
+- [x] C4. Filename includes audience slug
+- [x] C5. Copy compliant — no AI emphasis
+- [x] C6. Commit Phase C — commit `2433b679`
 
 ## Phase D — Renderers (build order: investor → marketing → engineer → supplier)
 
-### D — Investor
-- [ ] D-inv-1. Create shared report-section components (cover, exec-summary, KPI-cards, module-grid, spec-table, cost-table, standards-table, supplier-block, quote-block, press-hero)
-- [ ] D-inv-2. Refactor `export-design-report-docx.ts` — accept audience, use image-resize, investor layout
-- [ ] D-inv-3. Create `export-design-report-pdf.tsx` (@react-pdf/renderer) — investor layout with embedded Outfit/Playfair fonts
-- [ ] D-inv-4. Extend `export-design-report-pptx.ts` — investor with pptxgenjs native KPI charts
-- [ ] D-inv-5. Create `export-design-report-html.tsx` — investor print-stylesheet
-- [ ] D-inv-6. Delete legacy `export-design-report-pdf.ts`
-- [ ] D-inv-7. Visual spot-check via agent-browser (open each file, record in matrix)
-- [ ] D-inv-8. Commit Phase D investor
+### D — PDF (all four audiences) ✓ DONE
+- [x] D-pdf-1. Create `export-design-report-pdf.tsx` (@react-pdf/renderer) — full replacement of html2pdf.js
+- [x] D-pdf-2. Register Outfit / Playfair Display / Inter as embedded fonts via Google Fonts TTF URLs
+- [x] D-pdf-3. Shared magazine stylesheet — accent bars, eyebrow/title/subtitle typography, KPI cards, tables, verdict badges, pull-quotes, caution banners
+- [x] D-pdf-4. Hero image cover with 6pt orange accent bar and three-field meta row
+- [x] D-pdf-5. Audience-specific `InvestorBody` / `EngineerBody` / `SupplierBody` / `MarketingBody` page composers
+- [x] D-pdf-6. Audience-specific KPI extraction (investor: modules/mass/£/unit/lead; engineer: modules/diagnosed/standards/CAD mass; supplier: modules/parts/buy/quotes; marketing: modules/weight/standards/stage)
+- [x] D-pdf-7. Image resize helper used for the hero (1800px, JPEG q88)
+- [x] D-pdf-8. Delete legacy `export-design-report-pdf.ts`
+- [x] D-pdf-9. Commit — `63fbcd1a`
 
-### D — Marketing
-- [ ] D-mkt-1. Marketing docx layout
-- [ ] D-mkt-2. Marketing PDF layout
-- [ ] D-mkt-3. Marketing pptx layout
-- [ ] D-mkt-4. Marketing html layout
-- [ ] D-mkt-5. Visual spot-check
-- [ ] D-mkt-6. Commit Phase D marketing
+### D — DOCX (all four audiences) PENDING
+- [ ] D-docx-1. Refactor `export-design-report-docx.ts` — accept audience, use image-resize
+- [ ] D-docx-2. Investor docx branch — cover, KPI callouts, narrative-led section order
+- [ ] D-docx-3. Engineer docx branch — dense spec tables, every-module detail sections
+- [ ] D-docx-4. Supplier docx branch — BOM-first, part classification, supplier + quote tables
+- [ ] D-docx-5. Marketing docx branch — editorial cover, module grid, narrative blocks
 
-### D — Engineer
-- [ ] D-eng-1. Engineer docx layout
-- [ ] D-eng-2. Engineer PDF layout
-- [ ] D-eng-3. Engineer pptx layout
-- [ ] D-eng-4. Engineer html layout
-- [ ] D-eng-5. Visual spot-check
-- [ ] D-eng-6. Commit Phase D engineer
+### D — PPTX (all four audiences) PENDING
+- [ ] D-pptx-1. Refactor `export-design-report-pptx.ts` — accept audience, use image-resize
+- [ ] D-pptx-2. Investor pptx branch — pptxgenjs native KPI chart on slide 2
+- [ ] D-pptx-3. Engineer pptx branch — dense module-detail slide per module
+- [ ] D-pptx-4. Supplier pptx branch — BOM + supplier comparison slides
+- [ ] D-pptx-5. Marketing pptx branch — full-bleed hero cover + 3-5 feature slides
 
-### D — Supplier
-- [ ] D-sup-1. Supplier docx layout
-- [ ] D-sup-2. Supplier PDF layout
-- [ ] D-sup-3. Supplier pptx layout
-- [ ] D-sup-4. Supplier html layout
-- [ ] D-sup-5. Visual spot-check
-- [ ] D-sup-6. Commit Phase D supplier
+### D — Print-HTML (all four audiences) PENDING
+- [ ] D-html-1. Create `export-design-report-html.tsx`
+- [ ] D-html-2. Per-audience print stylesheet + page structure
 
 ## Phase E — Verification
 
@@ -135,4 +126,30 @@ Legend: ☐ pending · ✓ verified · ⚠ issue (note below)
 
 ## Notes / gotchas discovered during build
 
-(To be filled in as we go — anything surprising gets logged here and copied to `tasks/lessons.md` at the end.)
+- **Concurrent-agent interference (2026-04-18):** Multiple Claude sessions were
+  running against the same working tree during Phase A execution. Straight
+  `git add` → `git commit` repeatedly lost staged files between the add and
+  the commit — the shared index was being rewritten by the other session(s)
+  during the pre-commit lint pass, and whichever commit landed contained the
+  concurrent agent's work instead of mine. Observed in commit `2ad2c19c`
+  (empty), `aaa99680` (hijacked to node-inspector.tsx + learn-page.tsx + whats-new/page.tsx),
+  and `68561ba1` (hijacked to src/actions/design-iteration-generator.ts).
+  **Fix that worked:** `git add -N <files>` then `git commit --only <files>`
+  in a single shell chain. `--only` resets the index to HEAD before staging
+  the listed files, so concurrent staging can't infect the commit. Final
+  Phase A rescue `7fe11038` used this pattern. Worth codifying as a general
+  rule if multi-agent work continues.
+- **html2pdf.js → @react-pdf/renderer:** The legacy PDF pipeline was
+  html2pdf.js over ~15 lines of inline CSS. @react-pdf/renderer is dramatically
+  better for typography but requires a fully declarative layout — no HTML
+  reuse. Embedded Outfit / Playfair / Inter via `Font.register()` pointing at
+  Google Fonts TTF URLs. Registration runs at module load; make sure the
+  component is dynamically imported or server rendering will try to fetch
+  Google Fonts at build time.
+- **Supabase production push blocked:** `npx supabase db push --linked` was
+  denied by permission policy during Phase A. Migration file
+  `20260420000000_illustration_style_photography.sql` is in the repo but NOT
+  yet applied to prod. Any attempt to save `illustration_style = 'photography'`
+  from the UI will fail the CHECK constraint until the migration is applied.
+  Tristan (or a session with DB push permission) needs to run `npx supabase
+  db push --linked`.
