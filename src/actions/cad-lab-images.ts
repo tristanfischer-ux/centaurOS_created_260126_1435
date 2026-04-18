@@ -349,7 +349,7 @@ export async function generateCadLabSystemIllustrationAction(
   researchExcerpt?: string,
   heroPrompt?: string,
   referenceImageUrls?: string[],
-): Promise<{ url: string; confidence?: "high" | "low"; score?: number; issues?: string[] } | { error: string }> {
+): Promise<{ url: string; confidence?: "high" | "low" | "unavailable"; score?: number | null; issues?: string[] } | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     // SECURITY: hero illustration also writes to xray-images/<projectId>/.
     const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
@@ -362,9 +362,19 @@ export async function generateCadLabSystemIllustrationAction(
     // propellers, floating sub-assemblies) with no quality signal.
     const rubric = buildHeroQualityRubric(subject, moduleNames, modulePurposes)
 
-    let bestUrl: string | null = null
-    let bestScore = -1
-    let bestIssues: string[] = []
+    // INTENT: Track the best-scored attempt separately from the best unscored
+    // fallback, so we can distinguish "no attempt was ever scored" (→ score
+    // null, confidence omitted) from "every attempt scored legitimately but
+    // badly" (→ score is an actual 0-low-number, confidence "low"). The
+    // previous implementation collapsed both cases to score=0, producing a
+    // misleading "Hero scored 0/10" banner whenever the vision scorer was
+    // unavailable (API key missing, CDN fetch timeout, Sonnet returning a
+    // malformed JSON shape). Users saw the app declaring its render a total
+    // failure when actually the QA layer never ran.
+    let bestScoredUrl: string | null = null
+    let bestScoredScore = -1
+    let bestScoredIssues: string[] = []
+    let fallbackUrl: string | null = null // first successful gen, kept if no attempt is ever scored
 
     try {
       for (let attempt = 1; attempt <= HERO_MAX_ATTEMPTS; attempt++) {
@@ -378,6 +388,7 @@ export async function generateCadLabSystemIllustrationAction(
           heroPrompt,
           referenceImageUrls,
         )
+        if (!fallbackUrl) fallbackUrl = url
         // Fetch the rendered hero bytes and base64-encode for the scorer.
         // If the fetch fails (CDN hiccup, signed-URL oddity), skip scoring
         // rather than blocking the action — a working but unscored hero is
@@ -404,30 +415,41 @@ export async function generateCadLabSystemIllustrationAction(
               if (result.issues.length > 0) {
                 console.log(`[CAD-LAB-IMAGES] Hero issues: ${result.issues.join(" | ")}`)
               }
+            } else {
+              console.warn(`[CAD-LAB-IMAGES] Hero attempt ${attempt}: vision scorer returned null — QA skipped for this attempt`)
             }
+          } else {
+            console.warn(`[CAD-LAB-IMAGES] Hero attempt ${attempt}: image fetch returned ${res.status}, cannot score`)
           }
         } catch (scoreErr) {
           console.warn("[CAD-LAB-IMAGES] Hero vision scoring failed (non-fatal):", sanitizeErrorMessage(scoreErr))
         }
 
-        // Always keep the best-scoring attempt (unknown score counts as 0).
-        const effectiveScore = score ?? 0
-        if (effectiveScore > bestScore) {
-          bestUrl = url
-          bestScore = effectiveScore
-          bestIssues = issues
+        // Only count attempts that were actually scored toward best-scored tracking.
+        if (score !== null && score > bestScoredScore) {
+          bestScoredUrl = url
+          bestScoredScore = score
+          bestScoredIssues = issues
         }
 
         // Early-exit once we clear the threshold — don't pay for more attempts.
         if (score !== null && score >= HERO_QUALITY_THRESHOLD) break
       }
 
-      if (!bestUrl) {
+      const chosenUrl = bestScoredUrl ?? fallbackUrl
+      if (!chosenUrl) {
         return { error: "Hero generation failed after all attempts" }
       }
 
-      const confidence: "high" | "low" = bestScore >= HERO_QUALITY_THRESHOLD ? "high" : "low"
-      return { url: bestUrl, confidence, score: bestScore, issues: bestIssues }
+      if (bestScoredUrl === null) {
+        // Scoring never produced a result across any attempt. Surface this
+        // explicitly so the client can render "Quality check unavailable"
+        // instead of a bogus 0/10.
+        return { url: chosenUrl, confidence: "unavailable", score: null, issues: [] }
+      }
+
+      const confidence: "high" | "low" = bestScoredScore >= HERO_QUALITY_THRESHOLD ? "high" : "low"
+      return { url: chosenUrl, confidence, score: bestScoredScore, issues: bestScoredIssues }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.error("[CAD-LAB-IMAGES] Failed to generate system illustration:", errorMsg)

@@ -237,10 +237,11 @@ export interface CadLabContextValue {
   systemIllustrationUrl: string | null
   systemIllustrationStatus: "idle" | "generating" | "complete" | "failed"
   systemIllustrationError: string | null
-  /** Vision-QA confidence from the hero scorer: "high" if the rendered hero
-   *  scored ≥ 7/10, "low" if the best attempt still scored below threshold.
-   *  Null when no score is available (scoring skipped / not yet run). */
-  systemIllustrationConfidence: "high" | "low" | null
+  /** Vision-QA confidence from the hero scorer. "high" = scored ≥ 7/10.
+   *  "low" = scored below threshold even after retry. "unavailable" = scorer
+   *  returned null (API error, image fetch timeout) — we don't know whether
+   *  the hero is good; user should review manually. Null = not yet run. */
+  systemIllustrationConfidence: "high" | "low" | "unavailable" | null
   /** Issues surfaced by the vision scorer when confidence is low. Shown in
    *  the warning banner so the user knows WHY the hero was flagged. */
   systemIllustrationIssues: string[]
@@ -558,7 +559,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [systemIllustrationUrl, setSystemIllustrationUrl] = useState<string | null>(null)
   const [systemIllustrationStatus, setSystemIllustrationStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
   const [systemIllustrationError, setSystemIllustrationError] = useState<string | null>(null)
-  const [systemIllustrationConfidence, setSystemIllustrationConfidence] = useState<"high" | "low" | null>(null)
+  const [systemIllustrationConfidence, setSystemIllustrationConfidence] = useState<"high" | "low" | "unavailable" | null>(null)
   const [systemIllustrationIssues, setSystemIllustrationIssues] = useState<string[]>([])
 
   // ── Progress storytelling ──
@@ -1945,7 +1946,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             saveCadLabSystemIllustration(startProjectId!, illRes.url).catch((e) => console.error("[CAD-LAB] fire-and-forget save failed:", e))
             addProgressLine(
               illRes.confidence === "low"
-                ? `System illustration complete with a low-confidence score (${illRes.score ?? "?"}/10) — preparing module images...`
+                ? `System illustration complete with a low-confidence score (${illRes.score}/10) — preparing module images...`
+                : illRes.confidence === "unavailable"
+                ? "System illustration complete — quality check unavailable, please review manually before relying on it."
                 : "System illustration complete — preparing module image references...",
             )
           } else {
@@ -3221,8 +3224,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
           if (illRes.confidence === "low") {
             toast.warning(
-              `Hero scored ${illRes.score ?? "?"}/10 — review before using downstream.`,
+              `Hero scored ${illRes.score}/10 — review before using downstream.`,
               { description: illRes.issues?.slice(0, 2).join(" · ") || undefined, duration: 8000 },
+            )
+          } else if (illRes.confidence === "unavailable") {
+            toast.info(
+              "Hero quality check unavailable — review the render manually before using it.",
+              { duration: 8000 },
             )
           }
 

@@ -847,19 +847,27 @@ export default function CadLabResearchPage(): React.ReactNode {
               {/* System overview illustration — below modules so user reads text content first */}
               {hasResearch && (
                 <>
-                  {systemIllustrationUrl && systemIllustrationStatus === "complete" && systemIllustrationConfidence === "low" && (
-                    <Card className="border-warning/40 bg-warning/5">
+                  {systemIllustrationUrl && systemIllustrationStatus === "complete" && (systemIllustrationConfidence === "low" || systemIllustrationConfidence === "unavailable") && (
+                    <Card className={systemIllustrationConfidence === "low" ? "border-warning/40 bg-warning/5" : "border-info/40 bg-info/5"}>
                       <CardContent className="pt-4 pb-4">
                         <div className="flex items-start gap-3">
-                          <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                          {systemIllustrationConfidence === "low" ? (
+                            <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                          ) : (
+                            <Info className="h-5 w-5 text-info shrink-0 mt-0.5" />
+                          )}
                           <div className="flex-1 space-y-1.5">
                             <p className="text-sm font-medium text-foreground">
-                              Low-confidence concept illustration
+                              {systemIllustrationConfidence === "low"
+                                ? "Low-confidence concept illustration"
+                                : "Quality check unavailable"}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              A vision check flagged consistency or plausibility issues. Review before relying on this hero as a design reference.
+                              {systemIllustrationConfidence === "low"
+                                ? "A vision check flagged consistency or plausibility issues. Review before relying on this hero as a design reference."
+                                : "The vision-based quality check couldn't run for this hero (temporary API issue or image-fetch hiccup). Review the render yourself before relying on it."}
                             </p>
-                            {systemIllustrationIssues.length > 0 && (
+                            {systemIllustrationConfidence === "low" && systemIllustrationIssues.length > 0 && (
                               <ul className="text-xs text-muted-foreground list-disc ml-4 space-y-0.5">
                                 {systemIllustrationIssues.slice(0, 3).map((issue, i) => (
                                   <li key={i}>{issue}</li>
