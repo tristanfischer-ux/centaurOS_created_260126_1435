@@ -27,8 +27,8 @@ function TaskNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={`
-        bg-white rounded-lg border shadow-sm w-[220px] transition-all duration-200
-        ${selected ? 'border-international-orange shadow-md ring-2 ring-international-orange/20' : 'border-border hover:shadow-md hover:border-slate-300'}
+        bg-background rounded-lg border shadow-sm w-[220px] transition-all duration-200
+        ${selected ? 'border-international-orange shadow-md ring-2 ring-international-orange/20' : 'border-border hover:shadow-md hover:border-input'}
       `}
     >
       <div className="px-3 py-2.5">

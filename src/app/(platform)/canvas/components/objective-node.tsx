@@ -26,8 +26,8 @@ function ObjectiveNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={`
-        bg-white rounded-xl border-2 shadow-sm w-[280px] transition-all duration-200
-        ${selected ? 'border-international-orange shadow-lg ring-2 ring-international-orange/20' : 'border-border hover:shadow-md hover:border-slate-300'}
+        bg-background rounded-xl border-2 shadow-sm w-[280px] transition-all duration-200
+        ${selected ? 'border-international-orange shadow-lg ring-2 ring-international-orange/20' : 'border-border hover:shadow-md hover:border-input'}
       `}
     >
       {/* Header */}
