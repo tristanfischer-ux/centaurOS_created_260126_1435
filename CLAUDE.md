@@ -142,6 +142,31 @@ For major strategic decisions (business model, pricing, market entry, technology
 - Commit after each page's fixes are verified — not in a single batch
 - **Log every fix to memory** — after each commit (pass or fail), add an entry to `~/.claude/projects/-Users-tristanfischer/memory/forgeos-fix-log.md` with: what was changed, did it work, why, and any gotchas. This is part of the definition of done.
 
+### Per-Page Red-Team Visual Verification (NON-NEGOTIABLE)
+
+For every page-level red-team pass, the code audit + fix is only half the work. Static analysis (sub-agent code audit, `tsc --noEmit`, ESLint, grep sweeps) will miss:
+
+- Layout bugs (text overflow, cut-off content, awkward spacing)
+- Hover / focus state contrast that looks wrong in the actual browser
+- Loading / error states in motion (spinner placement, toast overlap)
+- Click-through friction — how many scrolls + clicks to the primary action
+- Regressions my own fix introduced
+
+**Before committing a page-level fix, do an `agent-browser` walkthrough on localhost (or the just-deployed Vercel preview) with these mandatory steps:**
+
+1. `agent-browser close --all` — avoid state collisions with other automated sessions.
+2. `agent-browser open <url> --headless --viewport 1440x900` — desktop baseline.
+3. `agent-browser snapshot` — read the accessibility tree; confirm the fix rendered.
+4. `agent-browser screenshot /tmp/<page>-desktop.png` — read the screenshot for layout / overflow / contrast issues.
+5. **If the change touched layout or mobile-specific code:** re-do at `--viewport 375x812` (iPhone SE width). Screenshot, read.
+6. **If the change touched tabs, buttons, dialogs, or forms:** keyboard-tab through — confirm WAI-ARIA changes work in the rendered DOM (focus ring visible, arrow keys work, aria-selected flips).
+
+**Log the result in the page's tracker entry as `Visual: ✓` or `Visual: ⚠ <issue found>`.** If ⚠, fix the issue in the same commit (or a fast follow-up) before moving to the next page.
+
+**Skip only when:** the change is pure back-end / migration / types with no rendered-surface impact. Otherwise this is mandatory.
+
+**Why:** `tsc` says the code compiles. ESLint says it parses. Only the browser says the founder will be delighted. The "Always Use agent-browser" rule in the global CLAUDE.md is easy to drift from mid-sweep — this project-level clause makes it explicit for page red-teams.
+
 ### Bug Fixing Strategy
 1. First attempt: analyze and try a direct fix
 2. If "still doesn't work": STOP. Switch to Plan Mode. Re-analyze assumptions. Create debugging plan. Write reproducing test. Prove fix works.
