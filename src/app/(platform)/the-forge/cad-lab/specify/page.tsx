@@ -91,6 +91,8 @@ import { ExecutiveReviewTab } from "@/components/cad/executive-review-tab"
 import { getTechniqueInsightsByProcess, getProcessRecommendations } from "@/actions/manufacturing-techniques"
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommender"
+import { matchManufacturingTechniques } from "@/actions/cad-lab-dfm-match"
+import type { ManufacturingTechniqueMatch } from "@/actions/cad-lab-dfm-match"
 import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
@@ -251,6 +253,38 @@ export default function SpecifyPage(): React.ReactNode {
           setTechniqueRecs((prev) => ({ ...prev, [mod.id]: recs }))
         }
       }).catch((err) => console.warn("[SPECIFY] Process recommendation fetch failed:", err))
+    }
+  }, [modules, diagnosticAnswers])
+
+  // ── Vector-backed DfM Matches — Phase 5 semantic retrieval per module ──
+  // Queries match_manufacturing_techniques RPC with a composite of module name,
+  // purpose, process, material, tolerance. Surfaces related techniques that a
+  // rigid keyword match (getProcessRecommendations) would miss — e.g. "sheet
+  // metal bending" also surfacing "laser cutting" for a 5-axis aluminum part.
+  const [semanticTechniqueMatches, setSemanticTechniqueMatches] = useState<Record<string, ManufacturingTechniqueMatch[]>>({})
+  const dfmFingerprintRef = useRef<Record<string, string>>({})
+
+  useEffect(() => {
+    for (const mod of modules) {
+      const diag = diagnosticAnswers[mod.id]
+      if (!diag?.mfg_process && !diag?.material) continue
+      const fp = `${diag.mfg_process ?? ""}|${diag.material ?? ""}|${diag.tolerance ?? ""}|${mod.name}`
+      if (dfmFingerprintRef.current[mod.id] === fp) continue
+      dfmFingerprintRef.current[mod.id] = fp
+      const queryParts = [
+        mod.name,
+        mod.purpose,
+        diag.mfg_process && `Process: ${diag.mfg_process}`,
+        diag.material && `Material: ${diag.material}`,
+        diag.tolerance && `Tolerance: ${diag.tolerance}`,
+      ].filter(Boolean)
+      matchManufacturingTechniques({ query: queryParts.join(". ") })
+        .then((results) => {
+          if (results.length > 0) {
+            setSemanticTechniqueMatches((prev) => ({ ...prev, [mod.id]: results }))
+          }
+        })
+        .catch((err) => console.warn("[SPECIFY] DfM semantic match failed:", err))
     }
   }, [modules, diagnosticAnswers])
 
@@ -1772,6 +1806,7 @@ export default function SpecifyPage(): React.ReactNode {
               diagnosticAnswers={diagnosticAnswers}
               processInsights={processInsights}
               techniqueRecs={techniqueRecs}
+              semanticTechniqueMatches={semanticTechniqueMatches}
             />
           </motion.div>
         )}
