@@ -23,8 +23,18 @@ const STATUS_BADGE: Record<string, { variant: 'default' | 'success' | 'warning' 
     cancelled: { variant: 'destructive', label: 'Cancelled' },
 }
 
+const STALLED_THRESHOLD_DAYS = 5
+
 export default async function QuoteRequestsPage() {
     const requests = await getMyQuoteRequests()
+
+    // Pre-compute stalled count for the header strap (>= STALLED_THRESHOLD_DAYS
+    // days since send, still in 'sent' status — these are what a founder should chase).
+    const stalledCount = requests.filter(r => {
+        if (r.status !== 'sent') return false
+        const days = Math.floor((Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24))
+        return days >= STALLED_THRESHOLD_DAYS
+    }).length
 
     return (
         <div className="space-y-6">
@@ -48,7 +58,16 @@ export default async function QuoteRequestsPage() {
             ) : (
                 <Card>
                     <CardHeader className="pb-2">
-                        <p className="text-sm text-muted-foreground">{requests.length} quote request{requests.length !== 1 ? 's' : ''}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm text-muted-foreground">
+                                {requests.length} quote request{requests.length !== 1 ? 's' : ''}
+                            </p>
+                            {stalledCount > 0 && (
+                                <Badge variant="warning" className="text-[10px]">
+                                    {stalledCount} waiting {STALLED_THRESHOLD_DAYS}+ days
+                                </Badge>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="divide-y divide-border">
@@ -60,7 +79,7 @@ export default async function QuoteRequestsPage() {
                                 const daysWaiting = req.status === 'sent'
                                     ? Math.floor((Date.now() - new Date(req.created_at).getTime()) / (1000 * 60 * 60 * 24))
                                     : null
-                                const isStalled = daysWaiting !== null && daysWaiting >= 7
+                                const isStalled = daysWaiting !== null && daysWaiting >= STALLED_THRESHOLD_DAYS
                                 return (
                                     <div key={req.id} className="flex items-center justify-between px-6 py-4 hover:bg-muted/50 transition-colors">
                                         <div className="min-w-0 flex-1">
