@@ -141,7 +141,7 @@ Items already surfaced by prior audits but explicitly deferred. Small, parallel,
 - [x] Strategy subtitle "AI builds the full plan" wobble — minor voice rewrite. (`75a69a82`, 2026-04-18 — replaced with "Get a full plan — phases, tasks, resource gaps — back for review.")
 - [ ] Pitch Prep landing readiness signal ("3/5 sections complete" + ring).
 - [ ] Pitch Prep pre-fill from Products / Investors / Objectives.
-- [ ] Investors: pipeline-stage chip on `/investors/[id]` so founder sees shortlist stage inside the detail.
+- [x] Investors: pipeline-stage chip on `/investors/[id]` so founder sees shortlist stage inside the detail. (`fe805358`, 2026-04-18 — inline Badge with stage-family tokens + tooltip pointing to the Shortlist board. Renders only when the investor is in the user's shortlist; `getShortlistIds()` joined the existing Promise.allSettled batch so no added latency.)
 - [ ] Quotes: enriched empty state ("N quotes waiting 5+ days" counter).
 - [x] Marketplace: `price_from` badge on list cards. (`2673c4f0`, 2026-04-18 — added "FROM" prefix on MarketCardV2 grid cards, MarketplaceListingGrid row view, and MarketplaceSavedView mobile + desktop cells. Unified getDisplayPrice on {amount, period} shape and extracted a renderPrice helper for reuse. Fixed-price listings unchanged.)
 - [ ] Reports: cross-timezone date handling test (UTC-12 / UTC+12).
