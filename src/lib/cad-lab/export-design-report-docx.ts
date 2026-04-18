@@ -38,6 +38,8 @@ import {
   bodyParagraph as mdBodyParagraph,
   bulletParagraph as mdBulletParagraph,
 } from '@/lib/reports/markdown-to-docx'
+import { AUDIENCE_META, DEFAULT_AUDIENCE } from '@/lib/cad-lab/audience'
+import type { ReportAudience } from '@/lib/cad-lab/audience'
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -48,14 +50,31 @@ const THIN_BORDER = {
   right: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
 } as const
 
+/** Decode a base64 JPEG string into an ArrayBuffer suitable for docx ImageRun.
+ *  Browser-safe — uses atob() rather than Node's Buffer. */
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64)
+  const len = binary.length
+  const bytes = new Uint8Array(len)
+  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+/** Fetch + resize a remote image via the server action (sharp lives server-side).
+ *  Returns JPEG bytes for docx ImageRun. Returns null on any failure — callers
+ *  already degrade gracefully when images are missing.
+ *
+ *  WHY: the docx export runs in the browser (dynamically imported into the
+ *  dialog). Before this change, images were embedded raw — a single project
+ *  could ship 45MB of unresized PNGs inside the docx. Routing through the
+ *  resize server action gives us Sharp compression (1600px, JPEG q85) while
+ *  keeping the native binding server-side. */
 async function fetchImageAsBuffer(url: string): Promise<ArrayBuffer | null> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10_000)
-    const response = await fetch(url, { signal: controller.signal })
-    clearTimeout(timeout)
-    if (!response.ok) return null
-    return await response.arrayBuffer()
+    const { resizeImageToBufferBase64 } = await import('@/actions/image-resize-action')
+    const b64 = await resizeImageToBufferBase64(url, { maxEdge: 1600, quality: 85 })
+    if (!b64) return null
+    return base64ToArrayBuffer(b64)
   } catch {
     return null
   }
@@ -251,7 +270,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
               new ImageRun({
                 data: imgBuffer,
                 transformation: { width: 400, height: 250 },
-                type: 'png',
+                type: 'jpg',
               }),
             ],
           }),
@@ -1017,26 +1036,55 @@ function buildCadOutputTable(data: DesignReportData): Table | null {
 
 /** Build the branded cover page elements — used by both legacy and AI paths. */
 async function buildCoverPage(data: DesignReportData): Promise<DocChild[]> {
+  const audience: ReportAudience = data.audience ?? DEFAULT_AUDIENCE
+  const audienceMeta = AUDIENCE_META[audience]
+
+  // INTENT: Investor + Marketing covers lean magazine-editorial (Cambria
+  // serif for the title, larger display size, audience label as eyebrow).
+  // Engineer + Supplier keep the tighter sans-serif cover — more like a
+  // technical report masthead. Cambria is a Word-bundled serif, so the
+  // docx renders faithfully on any machine that opens it.
+  const editorial = audience === 'investor' || audience === 'marketing'
+  const titleFont = editorial ? 'Cambria' : 'Calibri'
+  const titleSize = editorial ? 60 : 48
+
   const children: DocChild[] = []
 
+  // 1. Audience eyebrow (orange, spaced caps) — replaces the generic
+  // "FRACTIONAL FORGE" label so the reader immediately sees which edition
+  // they are looking at.
   children.push(
     new Paragraph({
-      spacing: { after: 400 },
+      spacing: { after: 120 },
       children: [
         new TextRun({
-          text: 'FRACTIONAL FORGE',
-          size: 28,
-          color: MID_TEXT,
+          text: audienceMeta.label.toUpperCase(),
+          size: 18,
+          bold: true,
+          color: ORANGE,
           characterSpacing: 80,
           font: 'Calibri',
         }),
       ],
     }),
     new Paragraph({
+      spacing: { after: 360 },
+      children: [
+        new TextRun({
+          text: 'FRACTIONAL FORGE',
+          size: 14,
+          color: MID_TEXT,
+          characterSpacing: 60,
+          font: 'Calibri',
+        }),
+      ],
+    }),
+    // 2. Title — serif/sans per audience
+    new Paragraph({
       heading: HeadingLevel.HEADING_1,
       spacing: { after: 200 },
       children: [
-        new TextRun({ text: data.projectName, bold: true, size: 48, color: DARK_TEXT, font: 'Calibri' }),
+        new TextRun({ text: data.projectName, bold: true, size: titleSize, color: DARK_TEXT, font: titleFont }),
       ],
     }),
     textParagraph(
@@ -1065,7 +1113,7 @@ async function buildCoverPage(data: DesignReportData): Promise<DocChild[]> {
             new ImageRun({
               data: heroBuffer,
               transformation: { width: 600, height: 340 },
-              type: 'png',
+              type: 'jpg',
             }),
           ],
         }),
@@ -1185,7 +1233,7 @@ async function buildAiDocx(data: DesignReportData): Promise<Blob> {
                 new ImageRun({
                   data: imgBuffer,
                   transformation: { width: 400, height: 250 },
-                  type: 'png',
+                  type: 'jpg',
                 }),
               ],
             }),
