@@ -29,9 +29,41 @@ export interface ClassifiedError {
     /** User-facing error message (safe to display) */
     message: string
     /** Machine-readable category for client-side logging */
-    category: "context_length" | "rate_limit" | "auth" | "overloaded" | "network" | "content_filter" | "unknown"
+    category: "context_length" | "rate_limit" | "auth" | "overloaded" | "network" | "content_filter" | "json_parse" | "empty_response" | "unknown"
     /** First 120 chars of raw error for client-side debugging (no secrets) */
     rawHint: string
+}
+
+/**
+ * Classifies a raw error from ANY AI call (streaming or not) into an actionable
+ * user-facing message. Thin wrapper over `classifyStreamError` that additionally
+ * handles JSON-parse failures and empty-response errors which don't come up in
+ * the SSE streaming path but do for one-shot `messages.create` calls (product
+ * analysis, fundability, market synthesis, etc.).
+ *
+ * Use this in any product/objective/brief action that catches errors from the
+ * Anthropic SDK — instead of `return { error: String(err) }`, return
+ * `{ error: classifyAIError(err).message }` so founders see a consistent,
+ * specific message per failure class instead of a raw SDK string.
+ */
+export function classifyAIError(rawError: unknown): ClassifiedError {
+    const raw = rawError instanceof Error ? rawError.message : String(rawError)
+    const lower = raw.toLowerCase()
+    const rawHint = raw.substring(0, 120)
+
+    // Specific cases that don't exist in classifyStreamError
+    if (lower.includes("json") && (lower.includes("parse") || lower.includes("unexpected token") || lower.includes("syntax"))) {
+        return { message: "The AI response wasn't valid JSON. This is usually transient — please try again.", category: "json_parse", rawHint }
+    }
+    if (lower.includes("empty response") || lower.includes("no content") || lower === "") {
+        return { message: "The AI returned an empty response. Please try again.", category: "empty_response", rawHint }
+    }
+    if (lower.includes("api_key") || lower.includes("api key") || lower.includes("anthropic_api_key") || lower.includes("not configured")) {
+        return { message: "The AI provider isn't configured on the platform. This is a server setup issue — please contact support.", category: "auth", rawHint }
+    }
+
+    // Everything else falls through to the streaming classifier
+    return classifyStreamError(raw)
 }
 
 /**

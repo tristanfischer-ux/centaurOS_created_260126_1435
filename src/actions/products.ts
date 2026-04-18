@@ -20,6 +20,7 @@ import { withAuth } from '@/lib/server-action-utils'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { isValidUUID } from '@/lib/validations'
+import { classifyAIError } from '@/lib/agents/error-classification'
 import type {
   Product,
   ProductSummary,
@@ -813,8 +814,8 @@ Provide your structured market assessment as JSON.`
       let parsed: Record<string, unknown>
       try {
         parsed = JSON.parse(cleaned)
-      } catch {
-        return { error: 'Failed to parse AI response as JSON' }
+      } catch (err) {
+        return { error: classifyAIError(err).message }
       }
 
       // INTENT: Build MarketAssessment with all fields set to ai_estimated
@@ -1553,8 +1554,8 @@ Produce the design brief JSON.`
       let parsed: Record<string, unknown>
       try {
         parsed = JSON.parse(cleaned)
-      } catch {
-        return { error: 'Failed to parse AI response as JSON' }
+      } catch (err) {
+        return { error: classifyAIError(err).message }
       }
 
       // INTENT: Build DesignBriefContent from parsed response
@@ -1739,8 +1740,8 @@ Generate the design brief JSON that will guide engineering changes to achieve th
       let parsed: Record<string, unknown>
       try {
         parsed = JSON.parse(cleaned)
-      } catch {
-        return { error: 'Failed to parse AI response as JSON' }
+      } catch (err) {
+        return { error: classifyAIError(err).message }
       }
 
       // INTENT: Build DesignBriefContent from parsed response
