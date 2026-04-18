@@ -569,7 +569,43 @@ export function getProductIdentityPrompt(): string {
 
 // ─── Design Reconciliation prompt (convergent refinement Phase 3) ─────
 
-const DESIGN_RECONCILIATION_SYSTEM_PROMPT = `You are a senior industrial designer reviewing all expanded modules for cross-module visual, dimensional, and material consistency. You have the complete product identity and all expanded modules.
+import type { IllustrationStyle as _IllustrationStyle } from "./illustration-styles"
+
+/** Style-specific rendering contract injected into the reconciliation prompt
+ *  at the heroImagePrompt + perModuleImagePrompts schema fields. REPLACING
+ *  these clauses (not appending) is the only way to stop Opus from producing
+ *  a blueprint-with-style-flavour compromise when the project picks photoreal
+ *  or isometric. Previous behaviour: append. Users got blueprints with
+ *  photoreal-ish texture. New behaviour: swap the entire rendering contract
+ *  based on illustration_style. */
+function heroImagePromptSchemaForStyle(style: _IllustrationStyle): string {
+  switch (style) {
+    case "blueprint":
+      return `"heroImagePrompt": "300-500 words. Complete self-contained image generation prompt for a TECHNICAL BLUEPRINT illustration. START with: 'On a pure white background, create a full-color technical illustration...'. Describe the product silhouette and form, then each major section by geometry and position WITHOUT module names. Use spatial language ('front-left quadrant contains...', 'centered on top surface...'). Specify VIVID, REALISTIC material colors per section using colorPalette (NOT grayscale, NOT monochrome). Include material rendering. Camera angle: 30-degree isometric, slightly above and right. Describe exploded or semi-transparent view. End with: pure white background (#FFFFFF), full color rendering, thin precise lines, engineering grid, NO text/labels/annotations. CRITICAL: NEVER request dark backgrounds or grayscale."`
+    case "photoreal":
+      return `"heroImagePrompt": "300-500 words. Complete self-contained PHOTOREALISTIC STUDIO PRODUCT PHOTOGRAPHY prompt. Write as a studio-photography brief for a professional 3D render — NOT an engineering drawing. START with: 'Photorealistic studio product photograph, professional 3D render, hyperreal materials...'. Describe the FULLY ASSEMBLED product as a single cohesive machine — NO exploded view, NO semi-transparent cutaways, NO callout leader lines. Describe materials with PHYSICAL SPECIFICITY: brushed aluminium, anodised finishes, carbon-fibre weave, matte polymer, glass, rubber. Assign one realistic material-and-finish per logical part — do NOT colour-code parts in blueprint fashion. Studio lighting: three-point setup (key + fill + rim), soft realistic shadows, subtle contact shadow on the ground plane. Camera: 30-degree 3/4 hero angle, medium focal length (50-85mm equivalent). Background: seamless cyclorama, neutral light-grey or off-white — NEVER pure white, NEVER engineering grid. End with: photorealistic render, physically-based materials, studio lighting, optional shallow depth-of-field, NO blueprint lines, NO engineering grid, NO callout annotations, NO text/labels. Mirror-pair parts MUST share identical material, finish, colour, surface detail. If the product has wings, propellers, or symmetric limbs, they render as true mirror copies of each other."`
+    case "isometric_vector":
+      return `"heroImagePrompt": "300-500 words. Complete self-contained FLAT ISOMETRIC VECTOR ILLUSTRATION prompt. Write as a brief for a tech-company landing-page illustration in the modern SaaS aesthetic (Stripe / Vercel / Linear). START with: 'Flat isometric vector illustration, bright optimistic palette, crisp vector edges...'. True 30°/30° isometric projection with NO perspective distortion. Vibrant flat colours with gentle TWO-TONE shading only (NOT photorealistic gradients, NOT blueprint linework). Solid fills, minimal outlines — suggest detail through shape and colour, not line weight. Background: light pastel or soft white, NEVER engineering grid, NEVER photorealistic cyclorama. Soft drop shadow beneath the product. A gently-exploded composition with thin connecting guides is acceptable if it aids comprehension. End with: flat vector render, two-tone shading, crisp edges, NO photorealistic textures, NO blueprint conventions, NO text/labels/annotations. Mirror-pair parts MUST use identical fill colours and vector shapes."`
+  }
+}
+
+function perModuleImagePromptSchemaForStyle(style: _IllustrationStyle): string {
+  switch (style) {
+    case "blueprint":
+      return `"module-id": "150-200 words. START with: 'On a pure white background, create a full-color zoomed-in detail view...'. Reference the same product context and visual language as the hero. Describe the module's geometry, materials, key visible components, and spatial relationship to adjacent modules. Use VIVID, REALISTIC material colors from colorPalette (NOT grayscale, NOT monochrome). Use consistent color coding from visualStyle. Specify: isometric perspective, pure white background (#FFFFFF), full color, engineering aesthetic, ZERO text/labels/annotations. CRITICAL: NEVER dark backgrounds or grayscale."`
+    case "photoreal":
+      return `"module-id": "150-200 words. START with: 'Photorealistic close-up product render, studio lighting, hyperreal materials...'. Describe this module as part of the SAME assembled product as the hero — same material palette, same finish, same lighting. Zoomed-in detail on the module's geometry and surface detail. Physical materials (brushed aluminium, anodised finish, carbon-fibre weave, etc.) with realistic shadows and reflections. Background: seamless cyclorama, light-grey or off-white. Camera: 30-degree 3/4 close-up. NO exploded view, NO blueprint lines, NO engineering grid, NO text/labels/annotations. Mirror-pair modules MUST get IDENTICAL prompt text."`
+    case "isometric_vector":
+      return `"module-id": "150-200 words. START with: 'Flat isometric vector detail illustration matching the hero style...'. Zoomed-in view of this module. Same flat palette, same two-tone shading, same crisp vector edges as the hero. Light pastel background, soft drop shadow. NO photorealistic textures, NO blueprint linework, NO text/labels. Mirror-pair modules MUST get IDENTICAL prompt text."`
+  }
+}
+
+/** Builds the full reconciliation system prompt with the chosen illustration
+ *  style's rendering contract baked into the JSON schema. Callers pass their
+ *  project's illustrationStyle; existing callers that don't will receive
+ *  the blueprint default via getDesignReconciliationPrompt's parameter. */
+function buildDesignReconciliationPrompt(style: _IllustrationStyle): string {
+  return `You are a senior industrial designer reviewing all expanded modules for cross-module visual, dimensional, and material consistency. You have the complete product identity and all expanded modules.
 
 Your job: (1) correct any cross-module inconsistencies, (2) produce a unified visual style, (3) craft a hero image prompt, and (4) craft per-module image prompts — all TOGETHER so they share one visual language.
 
@@ -589,7 +625,7 @@ Output STRICTLY as JSON with exactly these 3 top-level fields:
     "unifyingContext": "Short phrase framing every module as part of one system",
     "productFormDescription": "150-300 words. Purely geometric description of the complete product shape.",
     "moduleGeometryMap": { "Module Name": "50-100 words of visible geometry description" },
-    "heroImagePrompt": "300-500 words. Complete self-contained image generation prompt for a hero illustration. START with: 'On a pure white background, create a full-color technical illustration...'. Describe the product silhouette and form, then each major section by geometry and position WITHOUT module names. Use spatial language ('front-left quadrant contains...', 'centered on top surface...'). Specify VIVID, REALISTIC material colors per section using colorPalette (NOT grayscale, NOT monochrome). Include material rendering. Camera angle: 30-degree isometric, slightly above and right. Describe exploded or semi-transparent view. End with: pure white background (#FFFFFF), full color rendering, thin precise lines, engineering grid, NO text/labels/annotations. CRITICAL: NEVER request dark backgrounds or grayscale.",
+    ${heroImagePromptSchemaForStyle(style)},
     "cadGeometryPrompt": "300-500 words. A complete prompt for a CAD generation AI that generates parametric STEP/B-Rep geometry. Structure it as a RECIPE of CAD operations, not a description. Start with the overall envelope dimensions (ALWAYS provide concrete mm values — estimate from the product type if not in source data). Then describe each major body as a sequence of CAD operations: 'Extrude a 350×280mm rectangle to 95mm height. Shell to 2mm wall thickness. Cut a 120×80mm pocket 40mm deep centered on the top face. Add 4× M5 through-holes on 60mm bolt circle at the corners.' Specify: (1) which bodies are separate parts vs features of the same solid, (2) how parts mate (bolt patterns with hole diameters and spacing, press fits with tolerances, clearance gaps in mm), (3) wall thicknesses, fillet radii, chamfer dimensions. CRITICAL: Every feature MUST have explicit dimensions in mm. The CAD AI cannot work with vague language like 'appropriately sized' or 'standard connector'. If exact dimensions are unknown, estimate reasonable values for the product type (e.g. a drone frame chassis is typically 300-500mm, wall thickness 2-3mm, M3-M5 fasteners). Do NOT include rendering instructions, colors, or visual styling — focus purely on parametric shape definition.",
     "overallDimensionsMm": "W × D × H mm — ALWAYS provide a value, estimate if not in source data",
     "moduleDimensionNotes": { "Module Name": "Absolute dims + proportional relationship to whole" },
@@ -598,7 +634,7 @@ Output STRICTLY as JSON with exactly these 3 top-level fields:
     "spatialPrinciples": ["Spatial arrangement principles"]
   },
   "perModuleImagePrompts": {
-    "module-id": "150-200 words. START with: 'On a pure white background, create a full-color zoomed-in detail view...'. Reference the same product context and visual language as the hero. Describe the module's geometry, materials, key visible components, and spatial relationship to adjacent modules. Use VIVID, REALISTIC material colors from colorPalette (NOT grayscale, NOT monochrome). Use consistent color coding from visualStyle. Specify: isometric perspective, pure white background (#FFFFFF), full color, engineering aesthetic, ZERO text/labels/annotations. CRITICAL: NEVER dark backgrounds or grayscale."
+    ${perModuleImagePromptSchemaForStyle(style)}
   }
 }
 
@@ -619,7 +655,9 @@ RULES:
   1. perModuleImagePrompts: For modules that are mirror pairs (one has mirrorOf pointing to the other, or they follow a Left/Right / Port/Starboard naming pattern like "Left Drive Module" / "Right Drive Module"), generate ONE shared per-module image prompt and assign the IDENTICAL prompt text to BOTH module IDs. Describe the geometry from a neutral perspective — avoid left/right directives since the overlay label distinguishes them. This guarantees visually identical illustrations for symmetric pairs.
   2. heroImagePrompt: Mirror pairs MUST share IDENTICAL colour, material, surface detail, and geometry in the hero narrative. Do NOT assign different colours to the two halves of a mirror pair (e.g. NOT "blue left wing, green right wing"; NOT "yellow port propulsion, orange starboard propulsion"). Describe the pair using one colour + one material, and where spatial positioning matters, describe it symmetrically ("wings of identical span and cell layout extending left and right from the fuselage, both rendered in <colour>"). The vision-QA gate on the hero will mark left/right colour asymmetry as a fail, so ensure the narrative commits to symmetric rendering.
 - AIRCRAFT / UAV / DRONE HERO (apply when the product is a fixed-wing, rotary-wing, glider, HAPS, quadcopter, VTOL, airship, or other aerial vehicle — detect from subject text): the heroImagePrompt MUST describe a SINGLE coherent airframe. Propellers face FORWARD along the flight axis (not sideways off the wing tips). Propeller count must be plausible (typically 2 or 4 on a fixed-wing UAV; no odd extra pod-mounted engine). The empennage (tail) must be explicitly attached to the fuselage directly or via a visible tail boom — never floating detached. Wings attach to the fuselage at a wing root. Each part should appear exactly once (do NOT describe e.g. a battery pack both inside the fuselage AND outside as a separate module). These constraints align with the server-side vision-QA rubric; ignoring them will produce low-confidence heroes that fail QA.
-- DIMENSIONAL DATA: Use dimensions from source data when available. When dimensions are NOT in the source data, ESTIMATE reasonable engineering dimensions based on the product type, industry standards, and common component sizes. The cadGeometryPrompt MUST contain explicit mm dimensions for every feature — vague proportional descriptions produce unusable CAD output.`
+- DIMENSIONAL DATA: Use dimensions from source data when available. When dimensions are NOT in the source data, ESTIMATE reasonable engineering dimensions based on the product type, industry standards, and common component sizes. The cadGeometryPrompt MUST contain explicit mm dimensions for every feature — vague proportional descriptions produce unusable CAD output.
+- ILLUSTRATION STYLE: This project is on the "${style}" illustration style. Respect the style contract inside the heroImagePrompt and perModuleImagePrompts schema entries above — do NOT emit text that contradicts them (e.g. do NOT say "pure white background with engineering grid" if the style is photoreal, and do NOT say "studio lighting with brushed aluminium" if the style is blueprint). The rendering contract baked into those fields is the SINGLE SOURCE OF TRUTH for style — the model should produce prompts fully committed to that style, not blended.`
+}
 
 /**
  * Returns the system prompt for cross-module design reconciliation.
@@ -627,10 +665,14 @@ RULES:
  * @description Used in Phase 3 (after all modules are expanded) to reconcile
  * cross-module inconsistencies and craft unified image prompts. Replaces the
  * old design synthesis step with a more comprehensive reconciliation that also
- * produces per-module image prompts for visual consistency.
+ * produces per-module image prompts for visual consistency. Accepts the
+ * project's illustration_style so the heroImagePrompt + perModuleImagePrompts
+ * rendering contract embedded in the schema is SWAPPED (not appended to) per
+ * style. Default 'blueprint' preserves the historical prompt exactly for
+ * projects that haven't set a style.
  */
-export function getDesignReconciliationPrompt(): string {
-  return DESIGN_RECONCILIATION_SYSTEM_PROMPT
+export function getDesignReconciliationPrompt(style: _IllustrationStyle = "blueprint"): string {
+  return buildDesignReconciliationPrompt(style)
 }
 
 // ─── Diagnostics pre-fill prompts ─────────────────────────────────────

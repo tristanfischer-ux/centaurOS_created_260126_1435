@@ -992,7 +992,12 @@ export async function reconcileDesignAction(
           body: JSON.stringify({
             model: "claude-opus-4-6",
             max_tokens: 16384,
-            system: getDesignReconciliationPrompt(),
+            // GOTCHA: Pass the project's illustration_style so the schema's
+            // heroImagePrompt + perModuleImagePrompts rendering contract is
+            // swapped at the system-prompt level rather than merely appended
+            // via the user-message directives (which Opus was blending into
+            // a blueprint-with-style-flavour compromise).
+            system: getDesignReconciliationPrompt(illustrationStyle),
             messages: [{ role: "user", content: userMessage }],
           }),
         },

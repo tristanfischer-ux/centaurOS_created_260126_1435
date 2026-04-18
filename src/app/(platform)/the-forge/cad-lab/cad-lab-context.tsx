@@ -3266,6 +3266,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         if ("url" in illRes) {
           setSystemIllustrationUrl(illRes.url)
           setSystemIllustrationStatus("complete")
+          systemIllustrationStatusRef.current = "complete"
           setSystemIllustrationConfidence(illRes.confidence ?? null)
           setSystemIllustrationIssues(illRes.issues ?? [])
           setAppliedIllustrationStyle(illustrationStyleRef.current)
@@ -3309,13 +3310,29 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         } else {
           console.error("[CAD-LAB] System illustration retry failed:", "error" in illRes ? illRes.error : "unknown")
           setSystemIllustrationStatus("failed")
+          systemIllustrationStatusRef.current = "failed"
           setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
         }
       })
       .catch((e) => {
         console.error("[CAD-LAB] System illustration retry failed:", e)
         setSystemIllustrationStatus("failed")
+        systemIllustrationStatusRef.current = "failed"
         setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
+      })
+      // INTENT: Belt-and-braces — the double-click guard (line ~3245) reads
+      // systemIllustrationStatusRef. The useEffect sync runs after render, so
+      // if the promise resolves and the NEXT Regenerate click fires before
+      // React's render flush, the ref could still read "generating" and the
+      // click is silently dropped. Force the ref back to a non-generating
+      // state in the .then/.catch above, and ALSO finally — so any exit path
+      // (including throws in the regen-module-images branch above) clears
+      // the guard. The earlier broken state: retry promise rejects in a non-
+      // .catch path → ref stays "generating" → Regenerate button dead.
+      .finally(() => {
+        if (systemIllustrationStatusRef.current === "generating") {
+          systemIllustrationStatusRef.current = "failed"
+        }
       })
   }, [activeProjectId, subject, modules, visualStyle, handleGenerateModuleImages])
 
@@ -3905,17 +3922,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Restore provider A/B comparison results
       setProviderResults(p.providerResults ?? {})
 
-      // Restore Tripo preview from provider results if available
-      const tripoResult = (p.providerResults ?? {})["tripo"]
-      if (tripoResult?.status === "completed" && tripoResult.glbUrl) {
-        setTripoPreviewUrl(tripoResult.glbUrl)
-        setTripoPreviewStatus("complete")
-        setTripoPreviewError(null)
-      } else {
-        setTripoPreviewUrl(null)
-        setTripoPreviewStatus("idle")
-        setTripoPreviewError(null)
-      }
+      // Tripo preview — always load into "idle" even when providerResults has
+      // a stored completed URL. The stored URL is a SIGNED URL with finite
+      // expiry (default 7d now, was 1h previously — either way it eventually
+      // goes stale). If we hydrate tripoPreviewUrl+status="complete" directly
+      // from the DB on load, the "toggle to 3D fires refresh" effect is
+      // gated on status !== "complete" and therefore never fires, so the
+      // stale URL goes straight to ModelViewer, which 400s and throws.
+      // That throw then hits a hook-order mismatch in the error boundary and
+      // produces React error #310 which cascades up and 500s the client-
+      // side RSC fetch for the whole page. Leaving status="idle" here means
+      // the first 3D toggle calls handleGenerateTripoPreview, which reads
+      // providerResults["tripo"].glbUrl and re-signs via refreshCadLab-
+      // AssetUrlAction before handing a URL to the viewer. See drawer
+      // b87ebe4c7ec1267a (gotchas/2026-04-18).
+      setTripoPreviewUrl(null)
+      setTripoPreviewStatus("idle")
+      setTripoPreviewError(null)
 
       // INTENT: Revoke old blob URLs before loading new project's images to prevent memory leak.
       // handleReset does this too, but handleLoadProject doesn't call handleReset.
