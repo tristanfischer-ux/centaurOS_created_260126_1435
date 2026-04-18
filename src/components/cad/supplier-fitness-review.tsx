@@ -56,13 +56,33 @@ export function SupplierFitnessReview({
     [modules, diagnosticAnswers, supplierMatches],
   )
 
-  // Collect unique company IDs for AI review
-  const allCompanyIds = useMemo(() => {
-    const ids = new Set<string>()
+  // Collect unique companies + their best matchScore for the AI review context.
+  // The matchContext lets Chase reconcile narrative with score (e.g., naming
+  // aerospace certs when scoring low on generic match).
+  const { allCompanyIds, matchContext, matchScoreIndex } = useMemo(() => {
+    const idSet = new Set<string>()
+    const bestByCompany = new Map<string, CadLabSupplierMatch>()
     for (const matches of supplierMatches.values()) {
-      for (const m of matches) ids.add(m.id)
+      for (const m of matches) {
+        idSet.add(m.id)
+        const existing = bestByCompany.get(m.id)
+        if (!existing || m.matchScore > existing.matchScore) {
+          bestByCompany.set(m.id, m)
+        }
+      }
     }
-    return [...ids]
+    const ids = [...idSet]
+    const ctx = ids.map((id) => {
+      const m = bestByCompany.get(id)
+      return {
+        companyId: id,
+        matchScore: m ? Math.round(m.matchScore) : 0,
+        topReasons: m ? m.matchReasons.slice(0, 3) : [],
+      }
+    })
+    const scoreIndex = new Map<string, number>()
+    for (const [id, m] of bestByCompany) scoreIndex.set(id, m.matchScore)
+    return { allCompanyIds: ids, matchContext: ctx, matchScoreIndex: scoreIndex }
   }, [supplierMatches])
 
   // Build module specs for AI review
@@ -89,8 +109,30 @@ export function SupplierFitnessReview({
     projectSubject: subject,
     modules: moduleSpecs,
     companyIds: allCompanyIds,
+    matchContext,
     enabled: allCompanyIds.length > 0,
   })
+
+  // Sort reviews: Recommended → Acceptable → Caution → Not Recommended.
+  // Within each tier, highest matchScore first so the reader sees the
+  // supplier-landing order that best matches procurement intuition.
+  const VERDICT_PRIORITY: Record<string, number> = {
+    recommended: 0,
+    acceptable: 1,
+    caution: 2,
+    not_recommended: 3,
+  }
+  const sortedReviews = useMemo(() => {
+    return [...reviews].sort((a, b) => {
+      const va = VERDICT_PRIORITY[a.verdict] ?? 99
+      const vb = VERDICT_PRIORITY[b.verdict] ?? 99
+      if (va !== vb) return va - vb
+      const sa = matchScoreIndex.get(a.companyId) ?? 0
+      const sb = matchScoreIndex.get(b.companyId) ?? 0
+      return sb - sa
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviews, matchScoreIndex])
 
   // Self-hide when no matches
   if (supplierMatches.size === 0) return null
@@ -174,8 +216,12 @@ export function SupplierFitnessReview({
                   <p className="text-xs text-muted-foreground italic">{summary}</p>
                 )}
                 <div className="space-y-3">
-                  {reviews.map((review) => (
-                    <CompanyReviewCard key={review.companyId} review={review} />
+                  {sortedReviews.map((review) => (
+                    <CompanyReviewCard
+                      key={review.companyId}
+                      review={review}
+                      matchScore={matchScoreIndex.get(review.companyId)}
+                    />
                   ))}
                 </div>
               </>
@@ -187,16 +233,29 @@ export function SupplierFitnessReview({
   )
 }
 
-function CompanyReviewCard({ review }: { review: CompanyReview }) {
+function CompanyReviewCard({
+  review,
+  matchScore,
+}: {
+  review: CompanyReview
+  matchScore?: number
+}) {
   const config = VERDICT_CONFIG[review.verdict] ?? VERDICT_CONFIG.acceptable
 
   return (
     <div className="rounded-md border border-border p-3 space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">{review.companyName}</p>
-        <Badge variant={config.variant} className="text-[10px]">
-          {config.label}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          {matchScore != null && (
+            <span className="text-[10px] font-mono text-muted-foreground" title="Match score (0-100) from the scoring engine — see reconciliation note if it disagrees with the verdict">
+              {Math.round(matchScore)}pt
+            </span>
+          )}
+          <Badge variant={config.variant} className="text-[10px]">
+            {config.label}
+          </Badge>
+        </div>
       </div>
 
       {review.strengths.length > 0 && (

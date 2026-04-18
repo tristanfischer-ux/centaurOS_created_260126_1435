@@ -15,16 +15,41 @@ import { Badge } from "@/components/ui/badge"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
+import type { CompanyReview } from "@/actions/company-review"
 
 interface SupplierIntelligenceTabProps {
   modules: CadLabModule[]
   diagnosticAnswers: DiagnosticAnswers
   supplierMatches: Map<string, CadLabSupplierMatch[]>
+  /**
+   * Per-company verdict from Chase's assessment. When supplied, drives the
+   * primary sort order: Recommended → Acceptable → Caution → Not Recommended,
+   * with matchScore as tiebreaker within each tier.
+   */
+  companyReviews?: CompanyReview[]
 }
 
-// INTENT: Flatten all unique suppliers across module matches into a single list
-// so we can show a unified capability matrix.
-function getUniqueSuppliers(supplierMatches: Map<string, CadLabSupplierMatch[]>): CadLabSupplierMatch[] {
+const VERDICT_PRIORITY: Record<string, number> = {
+  recommended: 0,
+  acceptable: 1,
+  caution: 2,
+  not_recommended: 3,
+}
+
+const VERDICT_LABEL: Record<string, { label: string; variant: "success" | "secondary" | "warning" | "destructive" }> = {
+  recommended: { label: "Recommended", variant: "success" },
+  acceptable: { label: "Acceptable", variant: "secondary" },
+  caution: { label: "Caution", variant: "warning" },
+  not_recommended: { label: "Not Recommended", variant: "destructive" },
+}
+
+// INTENT: Flatten all unique suppliers across module matches into a single list.
+// Sort by verdict (if reviews present) then by matchScore descending. When no
+// reviews are available, falls back to pure matchScore sort.
+function getUniqueSuppliers(
+  supplierMatches: Map<string, CadLabSupplierMatch[]>,
+  verdictByCompany: Map<string, string>,
+): CadLabSupplierMatch[] {
   const seen = new Map<string, CadLabSupplierMatch>()
   for (const matches of supplierMatches.values()) {
     for (const match of matches) {
@@ -34,7 +59,12 @@ function getUniqueSuppliers(supplierMatches: Map<string, CadLabSupplierMatch[]>)
       }
     }
   }
-  return Array.from(seen.values()).sort((a, b) => b.matchScore - a.matchScore)
+  return Array.from(seen.values()).sort((a, b) => {
+    const va = VERDICT_PRIORITY[verdictByCompany.get(a.id) ?? ""] ?? 99
+    const vb = VERDICT_PRIORITY[verdictByCompany.get(b.id) ?? ""] ?? 99
+    if (va !== vb) return va - vb
+    return b.matchScore - a.matchScore
+  })
 }
 
 function getUniqueProcesses(diagnosticAnswers: DiagnosticAnswers, moduleIds: string[]): string[] {
@@ -50,10 +80,16 @@ export function SupplierIntelligenceTab({
   modules,
   diagnosticAnswers,
   supplierMatches,
+  companyReviews,
 }: SupplierIntelligenceTabProps) {
   const [expandedSupplierId, setExpandedSupplierId] = useState<string | null>(null)
 
-  const allSuppliers = getUniqueSuppliers(supplierMatches)
+  const verdictByCompany = new Map<string, string>()
+  if (companyReviews) {
+    for (const r of companyReviews) verdictByCompany.set(r.companyId, r.verdict)
+  }
+
+  const allSuppliers = getUniqueSuppliers(supplierMatches, verdictByCompany)
   const suppliersWithCaps = allSuppliers.filter((s) => s.processCapabilities && s.processCapabilities.length > 0)
   const moduleIds = modules.map((m) => m.id)
   const processes = getUniqueProcesses(diagnosticAnswers, moduleIds)
@@ -201,6 +237,13 @@ export function SupplierIntelligenceTab({
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium text-foreground">{supplier.name}</span>
+                      {(() => {
+                        const verdict = verdictByCompany.get(supplier.id)
+                        const cfg = verdict ? VERDICT_LABEL[verdict] : null
+                        return cfg ? (
+                          <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
+                        ) : null
+                      })()}
                       <Badge variant="secondary" className="text-[10px]">
                         {supplier.matchScore}pt
                       </Badge>

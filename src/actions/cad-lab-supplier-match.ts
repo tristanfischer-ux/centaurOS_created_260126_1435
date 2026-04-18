@@ -2,19 +2,32 @@
  * @file cad-lab-supplier-match.ts — Multi-factor supplier matching for CadLab modules.
  *
  * @description Server action that matches CadLab modules to marketplace listings
- * using a 6-factor scoring system (100pts total):
+ * using a 9-factor scoring system (100pts total):
  *
- * | Factor            | Max | Source                                      |
- * |-------------------|-----|---------------------------------------------|
- * | Semantic relevance| 30  | match_marketplace_listings RPC (cosine sim)  |
- * | Capability match  | 25  | process_capabilities JSONB (Nightshift data) |
- * | Process match     | 15  | attributes JSONB + subcategory               |
- * | Material match    | 10  | attributes JSONB                             |
- * | Quality & trust   | 10  | is_verified flag                             |
- * | Keyword relevance | 10  | text matching on title/description/categories |
+ * | Factor             | Max | Source                                             |
+ * |--------------------|-----|----------------------------------------------------|
+ * | Semantic relevance | 30  | match_marketplace_listings RPC (cosine sim)         |
+ * | Process match      | 15  | listing text + subcategory                          |
+ * | Material match     | 10  | listing materials + text                            |
+ * | Industry match     | 10  | listing industries vs inferred project industry     |
+ * | Certifications     | 10  | listing certifications (regulated-industry aligned) |
+ * | Keyword relevance  | 10  | text matching on title/description/categories       |
+ * | Specialties match  | 7   | listing specialties vs search terms                 |
+ * | Capability match   | 5   | process_capabilities JSONB (sparse: 13.7% coverage) |
+ * | Quality & trust    | 3   | is_verified flag (sparse: 0.2% coverage)            |
  *
- * When process, material, or capabilities are unavailable, their points
+ * REWEIGHT 2026-04-18: Previous weighting (capability 25 + quality 10) produced
+ * all scores in the 21–31 range because capability JSONB is only 13.7% populated
+ * and is_verified is 0.2%. Added industry/certifications/specialties which read
+ * well-populated attribute fields (79–97%), restoring meaningful score spread.
+ *
+ * When process or material are unavailable on the module input, their points
  * redistribute to semantic + keyword so the total always sums to 100.
+ *
+ * ATTRIBUTE FALLBACK: top-level columns (industries/specialties/materials/
+ * key_equipment) are sparsely populated on `marketplace_listings` (0.8% / 35% /
+ * 11% / 5%), but the SAME fields in `attributes` JSONB hit 84%. The scoring pass
+ * reads top-level first, then falls back to attributes JSONB.
  *
  * Falls back to keyword-only scoring when embedding is unavailable.
  *
@@ -41,6 +54,13 @@ export interface CadLabModuleInput {
   material?: string | null
   toleranceMm?: number | null
   batchSize?: string | null
+  /**
+   * Optional industry tags inferred from the whole project (e.g. ["aerospace"]
+   * for a HAPS UAV). When provided, enables industry + certification alignment
+   * scoring. When absent, the action infers from the module's own fields
+   * (name/purpose/description/keyParts) which is weaker signal.
+   */
+  projectIndustries?: string[]
 }
 
 export interface ScoreBreakdown {
@@ -50,6 +70,9 @@ export interface ScoreBreakdown {
   quality: number
   keyword: number
   capability: number
+  industry: number
+  certifications: number
+  specialties: number
   total: number
 }
 
@@ -145,14 +168,17 @@ function normalizeToCategories(
 
 // ─── Scoring Helpers ────────────────────────────────────────────────
 
-/** Base weights (when both process and material are specified) */
+/** Base weights (when both process and material are specified). Sum = 100. */
 const BASE_WEIGHTS = {
   semantic: 30,
   process: 15,
   material: 10,
-  quality: 10,
   keyword: 10,
-  capability: 25,
+  industry: 10,
+  certifications: 10,
+  specialties: 7,
+  capability: 5,
+  quality: 3,
 } as const
 
 const MIN_SCORE_THRESHOLD = 15
@@ -174,10 +200,105 @@ function computeWeights(
     semantic: BASE_WEIGHTS.semantic + Math.round(redistributable * 0.6),
     process: hasProcess ? BASE_WEIGHTS.process : 0,
     material: hasMaterial ? BASE_WEIGHTS.material : 0,
-    quality: BASE_WEIGHTS.quality,
     keyword: BASE_WEIGHTS.keyword + Math.round(redistributable * 0.4),
+    industry: BASE_WEIGHTS.industry,
+    certifications: BASE_WEIGHTS.certifications,
+    specialties: BASE_WEIGHTS.specialties,
     capability: BASE_WEIGHTS.capability,
+    quality: BASE_WEIGHTS.quality,
   }
+}
+
+// ─── Industry / Certification Alignment ──────────────────────────────
+//
+// Why: regulated-industry projects (aerospace, medical, defence) demand
+// specific certifications (AS9100, ISO 13485, ITAR). The six original
+// factors didn't read these signals, so a supplier holding AS9100 for an
+// aerospace UAV project scored below a generic CNC shop. This aligns
+// scoring with how procurement decisions actually get made.
+
+const INDUSTRY_KEYWORDS: Record<string, string[]> = {
+  aerospace: ["aerospace", "aviation", "uav", "drone", "haps", "satellite", "space", "aircraft", "avionics"],
+  medical: ["medical", "implant", "surgical", "biomedical", "dental", "orthopaedic", "orthopedic"],
+  automotive: ["automotive", "vehicle", "ev ", "electric vehicle", "ecu"],
+  defence: ["defence", "defense", "military", "tactical", "weapons"],
+  energy: ["turbine", "nuclear", "reactor", "wind turbine"],
+  consumer: ["consumer electronics", "wearable", "gadget"],
+  industrial: ["machine tool", "factory automation", "industrial automation"],
+  marine: ["marine", "naval", "submarine"],
+}
+
+/** Regulated-industry certification fingerprints. Lower-case substring match. */
+const REGULATORY_CERTS: Record<string, string[]> = {
+  aerospace: ["as9100", "as 9100", "nadcap", "easa part"],
+  medical: ["iso 13485", "iso13485", "fda registered", "ce medical", "mdr"],
+  automotive: ["iatf 16949", "iatf16949", "ts 16949", "ts16949"],
+  defence: ["itar", "cmmc", "mil-std", "di-mil", "ds ", "dfars"],
+  nuclear: ["nqa-1", "asme nqa"],
+  food: ["haccp", "fssc 22000", "brc"],
+}
+
+/**
+ * Infers project-level industry tags from free-text. Used as a fallback when
+ * the caller doesn't supply explicit projectIndustries.
+ */
+function inferIndustriesFromText(text: string): Set<string> {
+  const lower = text.toLowerCase()
+  const matched = new Set<string>()
+  for (const [key, terms] of Object.entries(INDUSTRY_KEYWORDS)) {
+    if (terms.some((t) => lower.includes(t))) matched.add(key)
+  }
+  return matched
+}
+
+function scoreIndustryMatch(
+  listingIndustries: string[],
+  projectIndustries: Set<string>,
+): number {
+  if (projectIndustries.size === 0 || listingIndustries.length === 0) return 0
+  const lowerList = listingIndustries.map((i) => i.toLowerCase())
+  let hits = 0
+  for (const proj of projectIndustries) {
+    const terms = INDUSTRY_KEYWORDS[proj] ?? [proj]
+    if (lowerList.some((l) => terms.some((t) => l.includes(t)))) hits++
+  }
+  return Math.min(hits / projectIndustries.size, 1.0)
+}
+
+function scoreCertificationAlignment(
+  listingCerts: string[],
+  projectIndustries: Set<string>,
+): number {
+  if (listingCerts.length === 0) return 0
+  const lowerCerts = listingCerts.map((c) => c.toLowerCase())
+  // Base signal: generic quality cert = partial credit
+  let base = 0
+  if (lowerCerts.some((c) => c.includes("iso 9001") || c.includes("iso9001"))) base = 0.3
+  // Industry-aligned regulated cert = full credit
+  if (projectIndustries.size > 0) {
+    for (const ind of projectIndustries) {
+      const regCerts = REGULATORY_CERTS[ind] ?? []
+      if (regCerts.some((rc) => lowerCerts.some((lc) => lc.includes(rc)))) {
+        return 1.0
+      }
+    }
+  }
+  return base
+}
+
+function scoreSpecialtiesMatch(
+  listingSpecialties: string[],
+  searchTerms: string[],
+): number {
+  if (listingSpecialties.length === 0 || searchTerms.length === 0) return 0
+  const joined = listingSpecialties.map((s) => s.toLowerCase()).join(" ")
+  const meaningful = searchTerms.filter((t) => t.length >= 4).slice(0, 10)
+  if (meaningful.length === 0) return 0
+  let hits = 0
+  for (const term of meaningful) {
+    if (joined.includes(term)) hits++
+  }
+  return Math.min(hits / meaningful.length, 1.0)
 }
 
 /**
@@ -491,29 +612,56 @@ export async function matchCadLabModuleSuppliers(
 
   // ── Step 3: Score marketplace listings ──
 
+  // Resolve project-level industry tags once, before the scoring loop.
+  // Prefer caller-supplied projectIndustries; fall back to inference from
+  // the module's own fields (name/purpose/description/keyParts/material).
+  const projectIndustries: Set<string> = input.projectIndustries && input.projectIndustries.length > 0
+    ? new Set(input.projectIndustries.map((i) => i.toLowerCase()))
+    : inferIndustriesFromText(
+        [input.name, input.purpose, input.description ?? "", input.material ?? "", ...input.keyParts].join(" "),
+      )
+
   if (listings) {
     for (const listing of listings) {
-      // INTENT: Build scoring text from ALL data sources — title, description,
-      // subcategory, AND top-level enrichment columns that Nightshift writes.
-      // This ensures process/material scoring sees the full enrichment picture.
+      // INTENT: Read enrichment arrays with fallback to attributes JSONB.
+      // Top-level columns are sparsely populated (industries 0.8%, materials
+      // 11%, specialties 35%, key_equipment 5%), but the same fields in
+      // attributes JSONB hit ~84% coverage. Falling back restores matching
+      // power without requiring a data migration.
+      const baseAttrs = (listing.attributes as Record<string, unknown>) || {}
+      const pickArray = (topLevel: unknown, attrKey: string): string[] => {
+        if (Array.isArray(topLevel) && topLevel.length > 0) {
+          return topLevel.filter((v): v is string => typeof v === "string")
+        }
+        const fromAttrs = baseAttrs[attrKey]
+        if (Array.isArray(fromAttrs)) {
+          return fromAttrs.filter((v): v is string => typeof v === "string")
+        }
+        return []
+      }
+      const certsList = pickArray(listing.certifications, "certifications")
+      const materialsList = pickArray(listing.materials, "materials")
+      const industriesList = pickArray(listing.industries, "industries")
+      const keyEquipmentList = pickArray(listing.key_equipment, "key_equipment")
+      const specialtiesList = pickArray(listing.specialties, "specialties")
+
       const enrichmentParts = [
-        ...(Array.isArray(listing.certifications) ? listing.certifications : []),
-        ...(Array.isArray(listing.materials) ? listing.materials : []),
-        ...(Array.isArray(listing.industries) ? listing.industries : []),
-        ...(Array.isArray(listing.key_equipment) ? listing.key_equipment : []),
-        ...(Array.isArray(listing.specialties) ? listing.specialties : []),
+        ...certsList,
+        ...materialsList,
+        ...industriesList,
+        ...keyEquipmentList,
+        ...specialtiesList,
       ].join(" ")
       const listingText = `${listing.title || ""} ${listing.description || ""} ${listing.subcategory || ""} ${enrichmentParts}`.toLowerCase()
 
-      // Merge top-level columns into attrs so scoreStructuredMatch sees them
-      const baseAttrs = (listing.attributes as Record<string, unknown>) || {}
+      // Merge top-level + attrs-fallback into attrs so scoreStructuredMatch sees them
       const attrs: Record<string, unknown> = {
         ...baseAttrs,
-        ...(listing.certifications != null && { certifications: listing.certifications }),
-        ...(listing.materials != null && { materials: listing.materials }),
-        ...(listing.industries != null && { industries: listing.industries }),
-        ...(listing.key_equipment != null && { key_equipment: listing.key_equipment }),
-        ...(listing.specialties != null && { specialties: listing.specialties }),
+        certifications: certsList,
+        materials: materialsList,
+        industries: industriesList,
+        key_equipment: keyEquipmentList,
+        specialties: specialtiesList,
       }
 
       // Factor 1: Semantic
@@ -528,7 +676,8 @@ export async function matchCadLabModuleSuppliers(
         inputMaterialKeys,
       )
 
-      // Factor 4: Quality (listings use is_verified, no community_rating)
+      // Factor 4: Quality (is_verified only — is_verified=true is 0.2% of listings,
+      // so this factor intentionally scored low at weight=3)
       let qualityRaw = scoreQuality(
         listing.is_verified ? "verified" : "unverified",
         null,
@@ -537,7 +686,7 @@ export async function matchCadLabModuleSuppliers(
       // Factor 5: Keyword (with keyParts for higher-value term matching)
       let { score: keywordRaw } = scoreKeywords(searchTerms, listingText, input.keyParts)
 
-      // Factor 6: Capability (from process_capabilities JSONB)
+      // Factor 6: Capability (from process_capabilities JSONB — 13.7% populated)
       const caps = (listing.process_capabilities ?? []) as ProcessCapability[]
       const capabilityRaw = scoreCapabilityMatch(
         caps,
@@ -547,33 +696,45 @@ export async function matchCadLabModuleSuppliers(
         input.batchSize,
       )
 
-      // Relevance gate (same logic as suppliers above)
-      const hasRelevance = semanticRaw >= 0.3 || processScore >= 1.0 || materialScore >= 1.0 || capabilityRaw > 0
+      // Factor 7: Industry match (listing industries vs inferred project industries)
+      const industryRaw = scoreIndustryMatch(industriesList, projectIndustries)
+
+      // Factor 8: Certification alignment (regulated-industry cert match)
+      const certificationsRaw = scoreCertificationAlignment(certsList, projectIndustries)
+
+      // Factor 9: Specialties match (listing specialties vs search terms)
+      const specialtiesRaw = scoreSpecialtiesMatch(specialtiesList, searchTerms)
+
+      // Relevance gate. Now includes industry + cert alignment — an aerospace
+      // shop with AS9100 but weak semantic overlap still surfaces.
+      const hasRelevance =
+        semanticRaw >= 0.3 ||
+        processScore >= 1.0 ||
+        materialScore >= 1.0 ||
+        capabilityRaw > 0 ||
+        industryRaw >= 0.5 ||
+        certificationsRaw >= 1.0
       if (!hasRelevance) {
         qualityRaw = 0
         keywordRaw = 0
       }
 
-      // INTENT: When a listing has no process_capabilities, redistribute its
-      // capability points to semantic (60%) + keyword (40%) — same pattern as
-      // missing process/material.
-      const hasCapabilities = caps.length > 0
-      const effectiveCapWeight = hasCapabilities ? weights.capability : 0
-      const capRedist = hasCapabilities ? 0 : weights.capability
-      const effectiveSemanticWeight = weights.semantic + Math.round(capRedist * 0.6)
-      const effectiveKeywordWeight = weights.keyword + Math.round(capRedist * 0.4)
-
       const breakdown: ScoreBreakdown = {
-        semantic: Math.round(semanticRaw * effectiveSemanticWeight * 10) / 10,
+        semantic: Math.round(semanticRaw * weights.semantic * 10) / 10,
         process: Math.round(processScore * weights.process * 10) / 10,
         material: Math.round(materialScore * weights.material * 10) / 10,
         quality: Math.round(qualityRaw * weights.quality * 10) / 10,
-        keyword: Math.round(keywordRaw * effectiveKeywordWeight * 10) / 10,
-        capability: Math.round(capabilityRaw * effectiveCapWeight * 10) / 10,
+        keyword: Math.round(keywordRaw * weights.keyword * 10) / 10,
+        capability: Math.round(capabilityRaw * weights.capability * 10) / 10,
+        industry: Math.round(industryRaw * weights.industry * 10) / 10,
+        certifications: Math.round(certificationsRaw * weights.certifications * 10) / 10,
+        specialties: Math.round(specialtiesRaw * weights.specialties * 10) / 10,
         total: 0,
       }
       breakdown.total = Math.round(
-        (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality + breakdown.keyword + breakdown.capability) * 10,
+        (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality +
+         breakdown.keyword + breakdown.capability + breakdown.industry +
+         breakdown.certifications + breakdown.specialties) * 10,
       ) / 10
 
       if (breakdown.total >= MIN_SCORE_THRESHOLD) {
@@ -581,14 +742,16 @@ export async function matchCadLabModuleSuppliers(
         if (breakdown.semantic >= weights.semantic * 0.5) reasons.push("Semantic match")
         if (processScore >= 1.0 && input.process) reasons.push(`Process: ${input.process}`)
         if (materialScore >= 1.0 && input.material) reasons.push(`Material: ${input.material}`)
+        if (industryRaw >= 0.5 && projectIndustries.size > 0) {
+          const tag = [...projectIndustries][0]
+          reasons.push(`Industry: ${tag.charAt(0).toUpperCase() + tag.slice(1)}`)
+        }
+        if (certificationsRaw >= 1.0) reasons.push("Regulated-industry certs")
         if (capabilityRaw >= 0.4) reasons.push("Verified capabilities")
         if (listing.subcategory) reasons.push(listing.subcategory)
 
-        // INTENT: Coerce JSONB arrays to string[] for UI consumption.
-        // security_clearances + certifications are stored as JSONB arrays.
-        const certsArr = Array.isArray(listing.certifications)
-          ? (listing.certifications as unknown[]).filter((c): c is string => typeof c === "string")
-          : null
+        // Coerce for UI consumption — certsList already includes attributes-JSONB fallback.
+        const certsArr = certsList.length > 0 ? certsList : null
         const clearancesArr = Array.isArray(listing.security_clearances)
           ? (listing.security_clearances as unknown[]).filter((c): c is string => typeof c === "string")
           : null

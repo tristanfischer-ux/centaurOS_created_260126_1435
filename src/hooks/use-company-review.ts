@@ -29,6 +29,12 @@ interface UseCompanyReviewOptions {
     environment: string
   }>
   companyIds: string[]
+  /** Per-company match-score context enabling narrative reconciliation in the prompt. */
+  matchContext?: Array<{
+    companyId: string
+    matchScore: number
+    topReasons: string[]
+  }>
   enabled?: boolean
 }
 
@@ -47,8 +53,10 @@ function hashCompanyIds(ids: string[]): string {
   return String(Math.abs(hash))
 }
 
+// v2 cache suffix: bumped 2026-04-18 when matchContext reconciliation was added
+// to the prompt, so old cached reviews without reconciliation language expire.
 function getCacheKey(projectId: string, stage: string, idsHash: string): string {
-  return `forge-company-review-${projectId}-${stage}-${idsHash}`
+  return `forge-company-review-v2-${projectId}-${stage}-${idsHash}`
 }
 
 // INTENT: Cap localStorage review entries to prevent unbounded growth
@@ -119,6 +127,7 @@ export function useCompanyReview(opts: UseCompanyReviewOptions): UseCompanyRevie
       projectSubject: opts.projectSubject,
       modules: opts.modules,
       companyIds: opts.companyIds,
+      matchContext: opts.matchContext,
     })
       .then((result) => {
         if (generationRef.current !== generation) return
