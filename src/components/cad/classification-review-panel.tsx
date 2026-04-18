@@ -63,7 +63,10 @@ export function ClassificationReviewPanel({
   onOverride,
   onClearOverride,
 }: ClassificationReviewPanelProps): React.ReactNode {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  // Tri-state: null = auto (collapsed when nothing needs review, expanded otherwise);
+  // true/false = user has explicitly toggled. Prevents visual flash from useEffect and
+  // keeps UI quiet when every part auto-classified cleanly.
+  const [userCollapsed, setUserCollapsed] = useState<boolean | null>(null)
   const [isAutoClassifying, setIsAutoClassifying] = useState(false)
   const [aiReasonings, setAiReasonings] = useState<Map<string, string>>(new Map())
   const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set())
@@ -207,11 +210,15 @@ export function ClassificationReviewPanel({
 
   if (classifiedParts.length === 0) return null
 
+  // Auto-collapse when nothing needs review; user toggle wins over default.
+  const isCollapsed = userCollapsed ?? (needsReviewCount === 0)
+  const isAutoCollapsed = userCollapsed === null && needsReviewCount === 0
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={() => setUserCollapsed(!isCollapsed)}
           className="flex items-center justify-between w-full text-left"
         >
           <div className="flex items-center gap-2">
@@ -221,14 +228,20 @@ export function ClassificationReviewPanel({
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             )}
             <h3 className="text-sm font-semibold text-foreground">Classification Review</h3>
-            {needsReviewCount > 0 && (
+            {needsReviewCount > 0 ? (
               <Badge variant="warning" className="text-xs">
                 {needsReviewCount} need review
+              </Badge>
+            ) : (
+              <Badge variant="success" className="text-xs">
+                All {classifiedParts.length} classified
               </Badge>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Review part classifications before viewing supplier matches
+            {isAutoCollapsed
+              ? "Every part auto-classified with confidence — expand to review."
+              : "Review part classifications before viewing supplier matches."}
           </p>
         </button>
 
@@ -430,7 +443,7 @@ export function ClassificationReviewPanel({
                       onOverride(part.partKey, { type: part.type })
                     }
                   }
-                  setIsCollapsed(true)
+                  setUserCollapsed(true)
                 }}
               >
                 Accept All & Continue
