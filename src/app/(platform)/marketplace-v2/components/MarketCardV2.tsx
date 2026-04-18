@@ -343,6 +343,9 @@ export const MarketCardV2 = memo(function MarketCardV2({
                     <div>
                         {price ? (
                             <span>
+                                {price.period && (
+                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">from</span>
+                                )}
                                 <span className="text-lg font-bold text-foreground">
                                     {price.amount.startsWith('£') || price.amount.startsWith('$') || price.amount.startsWith('€')
                                         ? price.amount

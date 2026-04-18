@@ -48,8 +48,38 @@ function getAIIcon(subcategory: string): React.ComponentType<{ className?: strin
     }
 }
 
-function getDisplayPrice(attrs: Record<string, unknown>): string | null {
-    return (attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null) as string | null
+function getDisplayPrice(attrs: Record<string, unknown>): { amount: string; period: string | null } | null {
+    const rawValue = attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null
+    if (!rawValue) return null
+    const raw = String(rawValue)
+    const periodMatch = raw.match(/\/(day|month|hr|hour|week|year)$/i)
+    const amount = periodMatch ? raw.slice(0, periodMatch.index) : raw
+    const period = periodMatch ? periodMatch[1].toLowerCase() : null
+    return { amount, period }
+}
+
+/** Render a compact price pill with optional "from" prefix when a period is known. */
+function renderPrice(
+    price: { amount: string; period: string | null } | null,
+    { showFallback = true }: { showFallback?: boolean } = {},
+) {
+    if (!price) {
+        return showFallback ? <span className="text-xs text-muted-foreground">On request</span> : null
+    }
+    const amountStr = price.amount.startsWith('£') || price.amount.startsWith('$') || price.amount.startsWith('€')
+        ? price.amount
+        : `£${price.amount}`
+    return (
+        <span className="text-sm">
+            {price.period && (
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">from</span>
+            )}
+            <span className="font-semibold text-foreground">{amountStr}</span>
+            {price.period && (
+                <span className="text-xs text-muted-foreground ml-0.5">/{price.period}</span>
+            )}
+        </span>
+    )
 }
 
 function getRating(attrs: Record<string, unknown>): { average: number; count: number } | null {
@@ -271,7 +301,7 @@ export function MarketplaceSavedView({
                                         >
                                             {listing.subcategory}
                                         </Badge>
-                                        {price && <span className="font-semibold text-foreground">£{price}</span>}
+                                        {renderPrice(price, { showFallback: false })}
                                         {rating && (
                                             <span className="flex items-center gap-0.5">
                                                 <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -297,11 +327,7 @@ export function MarketplaceSavedView({
 
                             {/* Price - desktop only */}
                             <div className="hidden md:block">
-                                {price ? (
-                                    <span className="text-sm font-semibold text-foreground">£{price}</span>
-                                ) : (
-                                    <span className="text-xs text-muted-foreground">On request</span>
-                                )}
+                                {renderPrice(price)}
                             </div>
 
                             {/* Rating - desktop only */}

@@ -75,8 +75,14 @@ function getAIIcon(subcategory: string): React.ComponentType<{ className?: strin
     }
 }
 
-function getDisplayPrice(attrs: Record<string, unknown>): string | null {
-    return (attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null) as string | null
+function getDisplayPrice(attrs: Record<string, unknown>): { amount: string; period: string | null } | null {
+    const rawValue = attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null
+    if (!rawValue) return null
+    const raw = String(rawValue)
+    const periodMatch = raw.match(/\/(day|month|hr|hour|week|year)$/i)
+    const amount = periodMatch ? raw.slice(0, periodMatch.index) : raw
+    const period = periodMatch ? periodMatch[1].toLowerCase() : null
+    return { amount, period }
 }
 
 function getRating(attrs: Record<string, unknown>): { average: number; count: number } | null {
@@ -275,7 +281,19 @@ function ListRow({
             <div className="flex items-center gap-2 shrink-0">
                 <div className="text-right">
                     {price ? (
-                        <span className="text-sm font-bold text-foreground">£{price}</span>
+                        <span className="text-sm">
+                            {price.period && (
+                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">from</span>
+                            )}
+                            <span className="font-bold text-foreground">
+                                {price.amount.startsWith('£') || price.amount.startsWith('$') || price.amount.startsWith('€')
+                                    ? price.amount
+                                    : `£${price.amount}`}
+                            </span>
+                            {price.period && (
+                                <span className="text-xs text-muted-foreground ml-0.5">/{price.period}</span>
+                            )}
+                        </span>
                     ) : (
                         <span className="text-xs text-muted-foreground">Request pricing</span>
                     )}
