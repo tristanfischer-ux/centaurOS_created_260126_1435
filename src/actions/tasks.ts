@@ -8,8 +8,21 @@ import { checkAILimit } from '@/lib/ai/limit-check'
 import { trackAIUsage } from '@/lib/ai/usage-tracking'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { logTaskHistory } from '@/lib/audit'
-import { createTaskSchema, updateTaskDatesSchema, addCommentSchema, validate } from '@/lib/validations'
+import { createTaskSchema, updateTaskDatesSchema, addCommentSchema, validate, isValidUUID } from '@/lib/validations'
 import { withRetry } from '@/lib/retry'
+
+/**
+ * Defence-in-depth UUID check for action inputs. RLS is the real boundary —
+ * a malformed id can never bypass RLS — but validating up-front prevents
+ * Postgres UUID-parse errors from bubbling up as raw server errors.
+ * Returns null if valid, an ActionResult error if not.
+ */
+function requireValidUUID(id: string | undefined | null, label: string): { error: string } | null {
+    if (!id || typeof id !== 'string' || !isValidUUID(id)) {
+        return { error: `Invalid ${label}` }
+    }
+    return null
+}
 import { sanitizeFileName, sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { syncTaskCommentToMessages } from '@/lib/messaging/comment-sync'
 import { syncTaskToCalendar } from '@/actions/google-calendar'
@@ -458,6 +471,8 @@ export async function createTask(formData: FormData) {
  * @audit Logs status change to task_history and task_comments (system log)
  */
 export async function acceptTask(taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // AUTH: Verify user is an assignee (primary or multi-assignee) and task belongs to their foundry
         const { data: task, error: fetchError } = await supabase
@@ -538,6 +553,8 @@ export async function acceptTask(taskId: string) {
  * @audit Logs rejection reason to task_history and task_comments (system log)
  */
 export async function rejectTask(taskId: string, reason: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!reason) return { error: 'Reason required for rejection' }
         if (reason.length > 5_000) return { error: 'Reason too long (max 5,000 characters)' }
@@ -601,6 +618,8 @@ export async function rejectTask(taskId: string, reason: string) {
  * @audit Logs forwarding event with previous/new assignee to task_history
  */
 export async function forwardTask(taskId: string, newAssigneeId: string, reason: string) {
+    const invalid = requireValidUUID(taskId, 'task ID') ?? requireValidUUID(newAssigneeId, 'assignee ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!reason) return { error: 'Reason required for forwarding' }
 
@@ -740,6 +759,8 @@ export async function amendTask(taskId: string, updates: {
     end_date?: string,
     amendment_notes: string
 }) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!updates.amendment_notes) return { error: 'Amendment notes required' }
         if (updates.amendment_notes.length > 5_000) return { error: 'Amendment notes too long (max 5,000 characters)' }
@@ -798,6 +819,8 @@ export async function amendTask(taskId: string, updates: {
  * @audit Logs status transition to task_history and task_comments (system log)
  */
 export async function approveAmendment(taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Security: Verify user has permission to approve amendments
         // Should be the task creator or assignee who requested the amendment
@@ -850,6 +873,8 @@ export async function approveAmendment(taskId: string) {
  * @audit Comment is persisted in task_comments and synced to messages table
  */
 export async function addTaskComment(taskId: string, content: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Validate using Zod schema
         const validation = validate(addCommentSchema, { taskId, content })
@@ -969,6 +994,8 @@ export async function addTaskComment(taskId: string, content: string) {
  * @audit Logs status transition and risk level to task_history
  */
 export async function completeTask(taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Fetch user's role
         const { data: userProfile } = await supabase
@@ -1064,6 +1091,8 @@ export async function completeTask(taskId: string) {
  * @audit Logs approver role and approval event to task_history
  */
 export async function approveTask(taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Fetch task (from user's foundry only) and user profile checks
         const { data: task } = await supabase.from('tasks')
@@ -1189,6 +1218,9 @@ export async function getPendingApprovals() {
  * @audit Logs batch approval event to task_history for each task
  */
 export async function batchApproveTasks(taskIds: string[]) {
+    if (!Array.isArray(taskIds) || taskIds.some(id => !isValidUUID(id))) {
+        return { error: 'Invalid task IDs' }
+    }
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
         if (taskIds.length > 100) return { error: 'Cannot batch approve more than 100 tasks at once' }
@@ -1249,6 +1281,9 @@ export async function batchApproveTasks(taskIds: string[]) {
  * @audit Logs batch rejection reason to task_history for each task
  */
 export async function batchRejectTasks(taskIds: string[], reason: string) {
+    if (!Array.isArray(taskIds) || taskIds.some(id => !isValidUUID(id))) {
+        return { error: 'Invalid task IDs' }
+    }
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
         if (taskIds.length > 100) return { error: 'Cannot batch reject more than 100 tasks at once' }
@@ -1296,6 +1331,8 @@ export async function batchRejectTasks(taskIds: string[], reason: string) {
 }
 
 export async function nudgeTask(taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Verify user has access to the task's foundry
         const { data: task, error: taskError } = await supabase
@@ -1407,6 +1444,8 @@ export async function getPulseMetrics() {
  * @audit Logs date changes to task_history
  */
 export async function updateTaskDates(taskId: string, startDate: string, endDate: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         try {
             // Verify user has access to the task's foundry
@@ -1507,6 +1546,8 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
  * @security Requires authenticated user. Verifies task belongs to user's foundry.
  */
 export async function triggerAIWorker(taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // SECURITY: Fetch task with foundry_id filter for defense-in-depth
         const { data: task } = await supabase
@@ -1571,6 +1612,8 @@ export async function triggerAIWorker(taskId: string) {
  *   or Executive/Founder role).
  */
 export async function updateTaskProgress(taskId: string, progress: number) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Security: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
@@ -1617,6 +1660,8 @@ export async function updateTaskProgress(taskId: string, progress: number) {
  * @audit Logs CREATED event with source=DUPLICATION to task_history
  */
 export async function duplicateTask(originalTaskId: string) {
+    const invalid = requireValidUUID(originalTaskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // 1. Fetch original task
         const { data: originalTask, error: fetchError } = await supabase
@@ -1712,6 +1757,8 @@ export async function duplicateTask(originalTaskId: string) {
  * @audit Logs UPDATED event with changed fields to task_history
  */
 export async function updateTaskDetails(taskId: string, updates: { title?: string, description?: string }) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!updates.title && updates.description === undefined) return { success: true } // Nothing to update
 
@@ -1787,6 +1834,11 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
  * @audit Logs ASSIGNED event with new assignee list to task_history
  */
 export async function updateTaskAssignees(taskId: string, assigneeIds: string[]) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
+    if (!Array.isArray(assigneeIds) || assigneeIds.some(id => !isValidUUID(id))) {
+        return { error: 'Invalid assignee IDs' }
+    }
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (assigneeIds.length === 0) return { error: 'Must have at least one assignee' }
 
@@ -1899,6 +1951,7 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
  *   or Executive/Founder role).
  * @audit Logs status and/or risk level changes to task_history
  */
+// UUID guard below. Signature follows multi-line args, so we can't one-line-append.
 export async function updateTaskStatusAndRisk(
     taskId: string,
     updates: {
@@ -1906,6 +1959,8 @@ export async function updateTaskStatusAndRisk(
         risk_level?: 'low' | 'medium' | 'high' | 'critical'
     }
 ) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Security: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
@@ -1972,10 +2027,13 @@ export async function updateTaskStatusAndRisk(
  * @security Requires task modify permission via canModifyTask
  * @audit Logs status change to task_history
  */
+// UUID guard inside the body — multi-line signature prevents one-liner append.
 export async function updateTaskStatus(
     taskId: string,
     newStatus: string
 ) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // AUTH: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
@@ -2072,6 +2130,8 @@ export async function updateTaskStatus(
  * @audit Logs attachment event to task_comments (system log)
  */
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Security: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
@@ -2135,6 +2195,8 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
  * @audit Logs attachment removal to task_comments (system log)
  */
 export async function deleteTaskAttachment(fileId: string, filePath: string, taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID') ?? requireValidUUID(fileId, 'file ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Security: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
@@ -2198,6 +2260,8 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
  * @security Requires authenticated user with foundry membership
  */
 export async function getTaskComments(taskId: string) {
+    const invalid = requireValidUUID(taskId, 'task ID')
+    if (invalid) return invalid
     return withAuth(async ({ supabase, user, foundryId }) => {
         // AUTH: Check user can access this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
