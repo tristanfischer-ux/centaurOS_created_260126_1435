@@ -310,6 +310,80 @@ describe('writeReportSections', () => {
   })
 })
 
+describe('audience steering', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
+    process.env.GOOGLE_AI_API_KEY = 'test-google-key'
+  })
+
+  afterEach(() => {
+    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.GOOGLE_AI_API_KEY
+  })
+
+  function extractSystemPrompt(callArgs: unknown[]): string {
+    // fetchWithTimeout signature: (url, init, timeoutMs)
+    const init = callArgs[1] as { body?: string } | undefined
+    if (!init?.body) return ''
+    try {
+      const payload = JSON.parse(init.body)
+      return (payload.system as string) ?? (payload.system_instruction?.parts?.[0]?.text as string) ?? ''
+    } catch {
+      return ''
+    }
+  }
+
+  it('structureReportOutline defaults to investor context when audience is omitted', async () => {
+    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+
+    await structureReportOutline(FIXTURE_DATA)
+
+    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    expect(sysPrompt).toContain('Investor / Executive reader')
+  })
+
+  it('structureReportOutline injects engineer context when audience=engineer', async () => {
+    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+
+    await structureReportOutline(FIXTURE_DATA, 'engineer')
+
+    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    expect(sysPrompt).toContain('Engineer / Technical reviewer')
+    expect(sysPrompt).not.toContain('Investor / Executive reader')
+  })
+
+  it('structureReportOutline injects supplier context when audience=supplier', async () => {
+    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+
+    await structureReportOutline(FIXTURE_DATA, 'supplier')
+
+    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    expect(sysPrompt).toContain('Supplier / Procurement reader')
+  })
+
+  it('structureReportOutline injects marketing context when audience=marketing', async () => {
+    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+
+    await structureReportOutline(FIXTURE_DATA, 'marketing')
+
+    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    expect(sysPrompt).toContain('Marketing press asset')
+  })
+
+  it('writeReportSections threads audience tone register to the Gemini writer', async () => {
+    mockFetchWithTimeout
+      .mockResolvedValueOnce(mockGeminiResponse('Exec prose.'))
+      .mockResolvedValueOnce(mockGeminiResponse('Module prose.'))
+
+    await writeReportSections(VALID_OUTLINE, FIXTURE_DATA, { in: 500, out: 300 }, 'engineer')
+
+    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    // Engineer tone is terse/technical; the word "terse" is distinctive to that register.
+    expect(sysPrompt.toLowerCase()).toContain('terse')
+  })
+})
+
 describe('extractJson (via structureReportOutline)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
