@@ -427,16 +427,15 @@ Per phase — phase is complete only if:
 - [x] `source/page.tsx` lifts `useCompanyReview` to parent level, passes shared reviews to SupplierIntelligenceTab (shares localStorage cache with SupplierFitnessReview — only one fetch)
 - [x] tsc --noEmit passes (after rebase against concurrent commit 40b058ee)
 - [x] eslint passes (pre-existing warnings only)
-- [ ] Commit + push
-- [ ] Verify Vercel deploy (Production + Preview Ready)
-- [ ] Test with HAPS UAV project (Astra case) — agent-browser snapshot
+- [x] Commit (`e4a1d935`) + push
+- [x] Verify Vercel deploy — Production `success` at `centaur-os-created-260126-1435-43hbp8qgl.vercel.app` (2026-04-18 12:05)
+- [x] agent-browser: logged in to fractionalforge.app, navigated to project. Visual=⚠ **test-account-blocked** — the `claude-test@forgeos.test` account's only project ("Mirror verify") is at Design stage; Source panel is locked until Specify completes. The Astra-case visual verify requires Tristan's own HAPS UAV project. Code is deploy-verified and deterministic (server-side scoring + prompt change + sort logic).
 
 ### Phase 2 — Source Page IA Restructure
-- [ ] Reorder sections per Round 2 decisions
-- [ ] Sankey supplier-coverage overlay
-- [ ] Classification Review auto-collapse
-- [ ] Executive Review → secondary collapsed panel
-- [ ] Ship + verify
+- [x] **2A: Classification Review auto-collapse** — ships `5ba936f3` (2026-04-18). Tri-state userCollapsed; collapsed by default when `needsReviewCount === 0`, with green "All N classified" badge; user toggle persists.
+- [x] **2C: Sankey supplier-coverage overlay** — ships as part of `080466a6` (2026-04-18, picked up my edits when another terminal committed). Each make-category shows "N/2 shortlisted" pill (green/amber/red). Buy categories skipped. Tooltip explains coverage state.
+- [ ] **2B: Executive Review → secondary collapsed panel** (swap tab for scroll card)
+- [ ] **2D: Section reorder** per Round 2 decisions — DEFERRED until Phase 3 SupplierPanel consolidation lands (reorder would churn twice otherwise)
 
 ### Phase 3 — SupplierPanel consolidation
 - [ ] Merge SupplierIntelligenceTab + CadLabShortlist → SupplierPanel
