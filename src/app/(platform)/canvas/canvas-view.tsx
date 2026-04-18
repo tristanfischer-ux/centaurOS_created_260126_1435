@@ -271,14 +271,14 @@ function CanvasInner({
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-border flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-background border-b border-border flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Filter className="w-3.5 h-3.5 text-muted-foreground" />
             <select
               value={filter.health}
               onChange={(e) => setFilter(f => ({ ...f, health: e.target.value as FilterState['health'] }))}
-              className="text-xs border border-border rounded-md px-2 py-1.5 bg-white text-foreground focus:outline-none focus:ring-1 focus:ring-international-orange"
+              className="text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-international-orange"
               aria-label="Filter by health"
             >
               {HEALTH_OPTIONS.map(opt => (
@@ -288,7 +288,7 @@ function CanvasInner({
             <select
               value={filter.taskStatus}
               onChange={(e) => setFilter(f => ({ ...f, taskStatus: e.target.value }))}
-              className="text-xs border border-border rounded-md px-2 py-1.5 bg-white text-foreground focus:outline-none focus:ring-1 focus:ring-international-orange"
+              className="text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-international-orange"
               aria-label="Filter by task status"
             >
               {STATUS_OPTIONS.map(opt => (
@@ -329,16 +329,16 @@ function CanvasInner({
               animated: false,
               style: { stroke: '#e2e8f0', strokeWidth: 1.5 },
             }}
-            className="bg-slate-50/50"
+            className="bg-muted/50"
             minZoom={0.1}
             maxZoom={2}
           >
             <Controls
-              className="!bg-white !border-border !shadow-sm"
+              className="!bg-background !border-border !shadow-sm"
               showInteractive={false}
             />
             <MiniMap
-              className="!bg-white !border-border !shadow-sm"
+              className="!bg-background !border-border !shadow-sm"
               maskColor="rgba(248, 250, 252, 0.7)"
               nodeColor={miniMapNodeColor}
             />

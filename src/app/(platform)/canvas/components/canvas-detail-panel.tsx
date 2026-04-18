@@ -31,7 +31,7 @@ export function CanvasDetailPanel({ nodeType, data, onClose }: CanvasDetailPanel
     const health = HEALTH_CONFIG[objData.health] || HEALTH_CONFIG['not-started']
 
     return (
-      <div className="w-80 bg-white border-l border-border flex flex-col h-full overflow-hidden">
+      <div className="w-80 bg-background border-l border-border flex flex-col h-full overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">

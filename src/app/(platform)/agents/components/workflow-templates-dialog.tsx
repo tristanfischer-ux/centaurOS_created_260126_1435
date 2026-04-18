@@ -194,7 +194,7 @@ function TemplateCard({
     const chainPreview = template.nodes.map((n) => n.data.label).filter(Boolean)
 
     return (
-        <div className="group border border-border rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all">
+        <div className="group border border-border rounded-xl p-4 hover:border-input hover:shadow-sm transition-all">
             <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div
@@ -248,7 +248,7 @@ function TemplateCard({
                                             {label}
                                         </span>
                                         {i < chainPreview.length - 1 && (
-                                            <ArrowRight className="w-3 h-3 text-slate-300 flex-shrink-0" />
+                                            <ArrowRight className="w-3 h-3 text-muted-foreground/60 flex-shrink-0" />
                                         )}
                                     </React.Fragment>
                                 )

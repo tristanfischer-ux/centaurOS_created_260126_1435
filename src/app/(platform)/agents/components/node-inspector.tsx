@@ -317,7 +317,7 @@ function MediaOutput({ data }: {
                         <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
                             {deck.slides.map((s, i) => (
                                 <div key={i} className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-                                    <span className="w-4 h-4 rounded bg-white border border-orange-200 flex items-center justify-center text-[8px] font-medium flex-shrink-0">
+                                    <span className="w-4 h-4 rounded bg-background border border-orange-200 flex items-center justify-center text-[8px] font-medium flex-shrink-0">
                                         {i + 1}
                                     </span>
                                     <span className="truncate">{s.title}</span>

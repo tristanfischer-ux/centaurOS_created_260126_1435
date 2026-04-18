@@ -135,7 +135,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                         className={cn(
                             "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
                             activeCategory === "all"
-                                ? "bg-slate-900 text-white"
+                                ? "bg-primary text-primary-foreground"
                                 : "bg-muted text-muted-foreground hover:bg-muted"
                         )}
                     >

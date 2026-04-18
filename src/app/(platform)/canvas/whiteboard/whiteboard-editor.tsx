@@ -333,7 +333,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
       </div>
 
       {/* Excalidraw canvas */}
-      <div className="flex-1 bg-white">
+      <div className="flex-1 bg-background">
         <Excalidraw
           ref={excalidrawRef}
           initialData={{
