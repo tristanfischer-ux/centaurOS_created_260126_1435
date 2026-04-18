@@ -8,9 +8,11 @@
  * the server action file and the cron route.
  */
 
-import type { Database } from '@/types/database.types'
-
-export type ScheduledReportFrequency = Database['public']['Enums']['scheduled_report_frequency']
+// GOTCHA: scheduled_reports.frequency is a plain text column with a CHECK
+// constraint, not a Postgres enum — so there's no Database['Enums']
+// counterpart to lift. Hardcode the union to match the CHECK values from
+// migration 20260418200000_scheduled_reports.sql.
+export type ScheduledReportFrequency = 'weekly' | 'monthly'
 
 // INTENT: Delivery anchored to 09:00 UTC — founder in London gets 9/10am depending
 // on BST, founder in SF gets 1/2am. Configurable per-schedule delivery hour is a

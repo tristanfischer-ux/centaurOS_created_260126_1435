@@ -1482,15 +1482,27 @@ function StrategySpotlightSection({ items }: StrategySpotlightSectionProps): Rea
                             'completed': 'bg-status-success',
                             'not-started': 'bg-muted-foreground',
                         }[item.health]
+                        const healthLabel = {
+                            'on-track': 'On track',
+                            'at-risk': 'At risk',
+                            'off-track': 'Off track',
+                            'completed': 'Completed',
+                            'not-started': 'Not started',
+                        }[item.health]
 
                         return (
                             <Link
                                 key={item.id}
                                 href="/strategy"
                                 className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                                aria-label={`${item.title} — ${healthLabel}, ${item.progress}% complete`}
                             >
-                                {/* Health dot */}
-                                <div className={cn("w-2 h-2 rounded-full shrink-0", healthColor)} />
+                                {/* Health dot — aria-hidden; accessible label on the parent Link carries the status for screen readers + colourblind users. */}
+                                <div
+                                    className={cn("w-2 h-2 rounded-full shrink-0", healthColor)}
+                                    role="img"
+                                    aria-label={healthLabel}
+                                />
                                 {/* Title & metadata */}
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium text-foreground group-hover:text-international-orange transition-colors truncate">
@@ -1547,9 +1559,9 @@ function InsightsSection({ pulse }: InsightsSectionProps): React.ReactElement | 
                 <SectionHeader icon={BarChart3} label="Insights" color="text-electric-blue" />
                 <Card className="rounded-xl border shadow-sm">
                     <CardContent className="py-6 flex items-center gap-3">
-                        <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
                         <p className="text-sm text-muted-foreground">
-                            Check back tomorrow for fresh insights.
+                            Insights appear once there&apos;s activity to read — finish a task, tag an objective, or log a decision, and the next pulse will start surfacing patterns.
                         </p>
                     </CardContent>
                 </Card>
