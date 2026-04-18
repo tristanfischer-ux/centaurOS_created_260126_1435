@@ -142,6 +142,7 @@ export function SupplierSearchClient({
             <button
               onClick={() => setShowStats(false)}
               className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Hide supplier insights"
             >
               <ChevronDown className="h-4 w-4 rotate-180" />
             </button>
@@ -175,11 +176,13 @@ export function SupplierSearchClient({
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
           placeholder="Describe what you need... e.g. CNC machining for titanium aerospace brackets"
           className="flex-1 rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-international-orange focus:outline-none focus:ring-1 focus:ring-international-orange transition-colors"
+          aria-label="Describe the supplier capability you need"
         />
         <button
           onClick={handleSearch}
           disabled={isPending}
           className="rounded-lg bg-international-orange px-6 py-3 text-sm font-medium text-foreground hover:bg-international-orange/90 disabled:opacity-50 transition-colors"
+          aria-label={isPending ? 'Searching — please wait' : 'Run supplier search'}
         >
           {isPending ? 'Searching...' : 'Search'}
         </button>
