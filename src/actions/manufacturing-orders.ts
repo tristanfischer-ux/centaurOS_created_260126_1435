@@ -101,3 +101,55 @@ export async function getProjectOrders(
     return { orders }
   })
 }
+
+/**
+ * Project-scoped rating-prompt status: how many delivered orders exist on a
+ * project, when the most recent was delivered, and which shortlisted supplier
+ * listings have already been rated for that project. UI uses this to surface
+ * the post-project rating prompt only when (a) at least one order delivered
+ * AND (b) at least one shortlisted supplier is still unrated for the project.
+ *
+ * The "delivered" signal is read from manufacturing_orders.status; the updated_at
+ * timestamp is treated as the delivery moment (the enum transitions drive
+ * updated_at via the standard Supabase trigger).
+ */
+export async function getProjectRatingPromptStatus(projectId: string): Promise<
+  | { error: string }
+  | {
+      deliveredOrderCount: number
+      latestDeliveredAt: string | null
+      ratedListingIds: string[]
+    }
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const [ordersRes, ratingsRes] = await Promise.all([
+      supabase
+        .from("manufacturing_orders")
+        .select("id, status, updated_at")
+        .eq("foundry_id", foundryId)
+        .eq("cad_lab_project_id", projectId)
+        .eq("status", "delivered")
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("supplier_ratings")
+        .select("listing_id")
+        .eq("foundry_id", foundryId)
+        .eq("project_id", projectId),
+    ])
+
+    if (ordersRes.error) {
+      console.error("[MFG-ORDERS] rating-prompt orders lookup failed:", ordersRes.error.message)
+      return { error: "Could not read orders" }
+    }
+    if (ratingsRes.error) {
+      console.error("[MFG-ORDERS] rating-prompt ratings lookup failed:", ratingsRes.error.message)
+      return { error: "Could not read ratings" }
+    }
+
+    return {
+      deliveredOrderCount: ordersRes.data?.length ?? 0,
+      latestDeliveredAt: ordersRes.data?.[0]?.updated_at ?? null,
+      ratedListingIds: (ratingsRes.data ?? []).map((r) => r.listing_id),
+    }
+  })
+}

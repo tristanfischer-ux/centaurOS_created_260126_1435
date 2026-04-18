@@ -87,6 +87,13 @@ function tokenJaccard(a: string, b: string): number {
   const aTok = new Set(a.split(" ").filter(Boolean))
   const bTok = new Set(b.split(" ").filter(Boolean))
   if (aTok.size === 0 || bTok.size === 0) return 0
+  // Minimum-tokens guard: single-word company names ("Vanguard", "Omni",
+  // "Hyperion", "Premier") collide at Jaccard=1.0 against same-word OFAC
+  // entries that happen to share the dictionary word. The overwhelming
+  // majority of these are false positives — legitimate UK manufacturers
+  // named after a common English/mythology word. Require at least 2 tokens
+  // on BOTH sides before a match is eligible.
+  if (aTok.size < 2 || bTok.size < 2) return 0
   let overlap = 0
   for (const t of aTok) if (bTok.has(t)) overlap++
   return overlap / new Set([...aTok, ...bTok]).size

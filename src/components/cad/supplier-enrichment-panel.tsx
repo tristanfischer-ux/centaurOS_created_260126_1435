@@ -213,7 +213,7 @@ function RatingAggregateCard({ listingId }: { listingId: string }) {
 
 // ─── Rating dialog ──────────────────────────────────────────────────
 
-function RatingDialog({ open, onOpenChange, listingId, supplierName, projectId }: { open: boolean; onOpenChange: (v: boolean) => void; listingId: string; supplierName: string; projectId?: string | null }) {
+export function RatingDialog({ open, onOpenChange, listingId, supplierName, projectId, onRated }: { open: boolean; onOpenChange: (v: boolean) => void; listingId: string; supplierName: string; projectId?: string | null; onRated?: () => void }) {
   const [onTime, setOnTime] = useState(0)
   const [quality, setQuality] = useState(0)
   const [responsiveness, setResponsiveness] = useState(0)
@@ -231,6 +231,7 @@ function RatingDialog({ open, onOpenChange, listingId, supplierName, projectId }
     else {
       toast.success(`Rated ${supplierName}`)
       onOpenChange(false)
+      onRated?.()
     }
   }
 

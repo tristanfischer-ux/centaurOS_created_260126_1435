@@ -55,6 +55,39 @@ export async function hashConcern(concernText: string): Promise<string> {
   return createHash("sha1").update(normalised).digest("hex").slice(0, 16)
 }
 
+/**
+ * Emit a design-iteration telemetry event into activity_events. Fire-and-forget:
+ * telemetry failures are logged but never propagated to the caller. Mirrors the
+ * Cad Lab telemetry pattern (event_type='feature_use' with `event_data.feature`
+ * carrying the specific action).
+ */
+async function emitIterationEvent(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  args: {
+    userId: string
+    foundryId: string
+    feature:
+      | "design_iteration_proposed"
+      | "design_iteration_decision"
+      | "design_iteration_risk_accepted"
+      | "design_iteration_cap_blocked"
+    payload: Record<string, unknown>
+  },
+): Promise<void> {
+  try {
+    const { error } = await supabase.from("activity_events").insert({
+      user_id: args.userId,
+      foundry_id: args.foundryId,
+      event_type: "feature_use",
+      event_data: { feature: args.feature, ...args.payload },
+    })
+    if (error) console.warn("[design-iterations] telemetry insert failed:", error.message)
+  } catch (err) {
+    console.warn("[design-iterations] telemetry threw:", err instanceof Error ? err.message : err)
+  }
+}
+
 // ─── Record a new iteration ───────────────────────────────────────
 
 /**
@@ -87,6 +120,17 @@ export async function recordDesignIteration(input: RecordIterationInput) {
     // Hard cap checks
     const capCheck = await checkIterationCaps(input.projectId, concernHash, supabase)
     if (capCheck.blocked) {
+      await emitIterationEvent(supabase, {
+        userId: user.id,
+        foundryId,
+        feature: "design_iteration_cap_blocked",
+        payload: {
+          projectId: input.projectId,
+          trigger: input.triggeredBy,
+          concernHash,
+          scope: capCheck.overrideAllowed ? "project_cap" : "concern_cap",
+        },
+      })
       return {
         error: capCheck.reason,
         capBlocked: true,
@@ -113,6 +157,26 @@ export async function recordDesignIteration(input: RecordIterationInput) {
       console.error("[design-iterations] Record failed:", error.message)
       return { error: "Could not record iteration" }
     }
+
+    await emitIterationEvent(supabase, {
+      userId: user.id,
+      foundryId,
+      feature: "design_iteration_proposed",
+      payload: {
+        projectId: input.projectId,
+        iterationId: data.id,
+        trigger: input.triggeredBy,
+        concernHash,
+        alternativesCount: input.alternativesPresented.length,
+        hasRecommended: input.alternativesPresented.some((a) => a.recommended),
+        severityFlags: {
+          exportControls: input.alternativesPresented.some((a) => a.severity?.exportControls),
+          featureDescope: input.alternativesPresented.some((a) => a.severity?.featureDescope),
+          supplyCommitmentBreak: input.alternativesPresented.some((a) => a.severity?.supplyCommitmentBreak),
+        },
+      },
+    })
+
     return { iteration: data }
   })
 }
@@ -235,7 +299,7 @@ interface CommitIterationDecisionInput {
 }
 
 export async function commitIterationDecision(input: CommitIterationDecisionInput) {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
     if (!isValidUUID(input.iterationId)) return { error: "Invalid iteration ID" }
     if (![0, 1, 2, -1, -2].includes(input.chosenOptionIndex)) {
       return { error: "chosenOptionIndex must be 0-2 (pick), -1 (reject), or -2 (abandon)" }
@@ -258,6 +322,25 @@ export async function commitIterationDecision(input: CommitIterationDecisionInpu
       console.error("[design-iterations] Commit failed:", error.message)
       return { error: "Could not commit decision" }
     }
+
+    const outcome: "picked" | "rejected" | "abandoned" =
+      input.chosenOptionIndex >= 0 ? "picked" : input.chosenOptionIndex === -1 ? "rejected" : "abandoned"
+    await emitIterationEvent(supabase, {
+      userId: user.id,
+      foundryId,
+      feature: "design_iteration_decision",
+      payload: {
+        iterationId: input.iterationId,
+        projectId: data.project_id,
+        trigger: data.triggered_by,
+        concernHash: data.concern_hash,
+        chosenOptionIndex: input.chosenOptionIndex,
+        outcome,
+        hasOverrideReason: Boolean(input.overrideReason?.trim()),
+        hasFounderNotes: Boolean(input.founderNotes?.trim()),
+      },
+    })
+
     return { iteration: data }
   })
 }
@@ -369,6 +452,18 @@ export async function acceptDesignRisk(input: AcceptRiskInput) {
       console.error("[design-iterations] Accept risk failed:", error.message)
       return { error: "Could not accept risk" }
     }
+
+    await emitIterationEvent(supabase, {
+      userId: user.id,
+      foundryId,
+      feature: "design_iteration_risk_accepted",
+      payload: {
+        projectId: input.projectId,
+        concernHash: input.concernHash,
+        reasonLength: input.reason.trim().length,
+      },
+    })
+
     return { acceptedRisks: updated }
   })
 }

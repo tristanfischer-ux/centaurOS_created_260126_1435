@@ -3,15 +3,16 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { 
-    LayoutDashboard, 
-    ClipboardList, 
-    Activity, 
+import {
+    LayoutDashboard,
+    ClipboardList,
+    Activity,
     FlaskConical,
     BarChart3,
     Shield,
     Settings,
-    Info
+    Info,
+    Flag
 } from "lucide-react"
 
 /**
@@ -27,6 +28,7 @@ const opsNavigation = [
     { name: "Platform Health", href: "/ops/health", icon: Activity },
     { name: "QA Testing", href: "/ops/qa", icon: FlaskConical },
     { name: "Analytics", href: "/ops/analytics", icon: BarChart3 },
+    { name: "Supplier Corrections", href: "/ops/supplier-corrections", icon: Flag },
     { name: "GDPR", href: "/ops/gdpr", icon: Shield },
     { name: "Settings", href: "/ops/settings", icon: Settings },
     { name: "About", href: "/ops/about", icon: Info },

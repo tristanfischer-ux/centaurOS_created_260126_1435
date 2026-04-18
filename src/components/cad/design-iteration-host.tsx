@@ -42,6 +42,17 @@ export interface DesignIterationHostHandle {
     moduleCostBreakdown?: Array<{ moduleId: string; moduleName: string; costGbp: number }>
   }): Promise<void>
   triggerManual(concernText: string): Promise<void>
+  /**
+   * Phase VII auto-triggered constraint iterations: compliance, lead-time, MOQ.
+   * Each reuses the infeasibility generator (structural alternatives) but
+   * records a distinct `triggered_by` value so analytics can distinguish them.
+   */
+  triggerConstraint(args: {
+    trigger: "compliance_miss" | "lead_time_exceeded" | "moq_mismatch"
+    concernText: string
+    flaggingSpecialists: string[]
+    triggerContext?: Record<string, unknown>
+  }): Promise<void>
 }
 
 interface Props {
@@ -171,6 +182,27 @@ export const DesignIterationHost = forwardRef<DesignIterationHostHandle, Props>(
         await startFlow({
           trigger: "manual",
           concernText,
+          alternatives: res.alternatives,
+        })
+      } finally { setLoading(false) }
+    },
+    async triggerConstraint({ trigger: constraintTrigger, concernText, flaggingSpecialists, triggerContext }) {
+      setLoading(true)
+      setTrigger(constraintTrigger)
+      setConcernText(concernText)
+      try {
+        const res = await generateInfeasibilityAlternatives({
+          projectId, concernText, flaggingSpecialists,
+        })
+        if (res.error || res.alternatives.length === 0) {
+          toast.error(res.error ?? "Could not generate alternatives")
+          return
+        }
+        setAlternatives(res.alternatives)
+        await startFlow({
+          trigger: constraintTrigger,
+          concernText,
+          triggerContext: { flaggingSpecialists, ...(triggerContext ?? {}) },
           alternatives: res.alternatives,
         })
       } finally { setLoading(false) }

@@ -28,6 +28,12 @@ import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { ChevronDown, Users as UsersIcon } from "lucide-react"
 import { SupplierProcurementFlow } from "@/components/cad/supplier-procurement-flow"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { CadLabShortlist } from "@/components/cad/cad-lab-shortlist"
@@ -71,6 +77,8 @@ import type { OutreachLogState } from "@/components/cad/supplier-outreach-log"
 import { RFQBenchmarksCard } from "@/components/cad/rfq-benchmarks-card"
 import { CostReductionTrigger } from "@/components/cad/cost-reduction-trigger"
 import { DesignIterationHost, type DesignIterationHostHandle } from "@/components/cad/design-iteration-host"
+import { DesignConstraintBanners } from "@/components/cad/design-constraint-banners"
+import { ProjectRatingPrompt } from "@/components/cad/project-rating-prompt"
 import { FileText } from "lucide-react"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
@@ -428,6 +436,7 @@ export default function SourcePage(): React.ReactNode {
 
   // DECISION: activeTab declared here (before effects that reference it) to avoid block-scoping TDZ error.
   const [activeTab, setActiveTab] = useState("suppliers")
+  const [execReviewOpen, setExecReviewOpen] = useState(false)
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   // Design-iteration host ref — cost-overrun trigger on Costs tab + future
   // manual triggers on this page route through here.
@@ -834,7 +843,6 @@ export default function SourcePage(): React.ReactNode {
       { id: "shortlist", label: "Shortlist" },
       { id: "costs", label: "Costs" },
       { id: "supplier_intelligence", label: "Supplier Intelligence" },
-      { id: "executive_review", label: "Executive Review" },
     ],
     [],
   )
@@ -843,8 +851,12 @@ export default function SourcePage(): React.ReactNode {
   // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
   useEffect(() => {
     let param = searchParams.get("tab")
-    // INTENT: Legacy redirect — "proposals" was renamed to "shortlist"
+    // INTENT: Legacy redirects
+    //   - "proposals" → renamed to "shortlist"
+    //   - "executive_review" → removed as standalone tab in Phase 2B (2026-04-18),
+    //     folded into the Supplier Intelligence tab as a collapsed secondary card.
     if (param === "proposals") param = "shortlist"
+    if (param === "executive_review") param = "supplier_intelligence"
     if (param && TABS.some((t) => t.id === param)) {
       setActiveTab(param)
     }
@@ -1079,6 +1091,31 @@ export default function SourcePage(): React.ReactNode {
           onApplied={() => {
             toast.success("Design change applied — re-run supplier matching to see updated quotes.", { duration: 8000 })
           }}
+        />
+      )}
+
+      {/* ── Phase VII: compliance / lead-time / MOQ constraint alerts ── */}
+      {shortlistedSupplierIds.size > 0 && (
+        <DesignConstraintBanners
+          supplierMatches={supplierMatches}
+          shortlistedSupplierIds={shortlistedSupplierIds}
+          targetMarket={targetMarket}
+          batchSizeText={(() => {
+            for (const diag of Object.values(diagnosticAnswers)) {
+              const bs = (diag as { batch_size?: string | null })?.batch_size
+              if (bs && String(bs).trim().length > 0) return String(bs)
+            }
+            return null
+          })()}
+          hostRef={designIterationHostRef}
+        />
+      )}
+
+      {/* ── Task H: Post-project rating nudge (surfaces on delivered order) ── */}
+      {activeProjectId && shortlistedSuppliers.size > 0 && (
+        <ProjectRatingPrompt
+          projectId={activeProjectId}
+          shortlistedSuppliers={[...shortlistedSuppliers.values()].map((s) => ({ id: s.id, name: s.name }))}
         />
       )}
 
@@ -1486,18 +1523,43 @@ export default function SourcePage(): React.ReactNode {
               supplierMatches={supplierMatches}
               companyReviews={sharedCompanyReviews}
             />
-          </motion.div>
-        )}
 
-        {/* ═══ Executive Review tab ═══ */}
-        {activeTab === "executive_review" && (
-          <motion.div key="executive_review" role="tabpanel" id="source-panel-executive_review" aria-labelledby="source-tab-executive_review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-            <ExecutiveReviewTab
-              modules={eligibleModules}
-              diagnosticAnswers={diagnosticAnswers}
-              context="sourcing"
-              useCase={designBrief?.useCase}
-            />
+            {/* Phase 2B: Executive Review moved from standalone tab to a
+                collapsed secondary card. Rationale: the primary decisions on
+                Source are supplier-facing. Exec review stays accessible but
+                no longer competes for tab-bar space. */}
+            <Collapsible
+              open={execReviewOpen}
+              onOpenChange={setExecReviewOpen}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs w-full sm:w-auto justify-between"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <UsersIcon className="h-3.5 w-3.5 text-international-orange" />
+                    Executive Review (optional)
+                    <span className="text-muted-foreground font-normal">— expert eyes on your sourcing plan</span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-3.5 w-3.5 transition-transform",
+                      execReviewOpen && "rotate-180",
+                    )}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <ExecutiveReviewTab
+                  modules={eligibleModules}
+                  diagnosticAnswers={diagnosticAnswers}
+                  context="sourcing"
+                  useCase={designBrief?.useCase}
+                />
+              </CollapsibleContent>
+            </Collapsible>
           </motion.div>
         )}
       </AnimatePresence>
