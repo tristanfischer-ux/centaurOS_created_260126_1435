@@ -53,6 +53,9 @@ interface PitchPrepFormProps {
   onSuccess?: (id: string) => void
   onCancel?: () => void
   className?: string
+  /** Optional pre-fill values (e.g. company_name from foundry profile, product_description
+   * from most recent product). Any field omitted falls back to the form default below. */
+  initialValues?: Partial<CreatePitchPrepParams>
 }
 
 type FormStep = 'company' | 'product' | 'traction' | 'services' | 'review'
@@ -65,13 +68,13 @@ const STEPS: { id: FormStep; title: string; icon: React.ComponentType<{ classNam
   { id: 'review', title: 'Review', icon: CheckCircle2 },
 ]
 
-export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormProps) {
+export function PitchPrepForm({ onSuccess, onCancel, className, initialValues }: PitchPrepFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [currentStep, setCurrentStep] = useState<FormStep>('company')
   const [error, setError] = useState<string | null>(null)
 
-  // Form state
+  // Form state — initialValues (if provided) override the empty defaults below.
   const [formData, setFormData] = useState<Partial<CreatePitchPrepParams>>({
     company_name: '',
     company_website: '',
@@ -92,6 +95,7 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
     services_requested: [],
     target_investor_types: [],
     specific_questions: '',
+    ...initialValues,
   })
 
   const updateField = <K extends keyof CreatePitchPrepParams>(
