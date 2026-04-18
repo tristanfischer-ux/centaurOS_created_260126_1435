@@ -53,27 +53,23 @@ Each of these is a dedicated session of its own; they're the biggest leverage it
 ### 1.1 Cash Burn auto-sync from Products / Orders / Objectives
 **Founder unlock:** today Cash Burn is a standalone calculator. After this, COGS + monthly-revenue forecast + planned spend flow in automatically. The Products ↔ Objectives ↔ Tasks schema link shipped 2026-04-18 (commit `2fb04b0a`) is the foundation; this is its payoff.
 
-**Split into 5 shippable sub-steps:**
+**Split into 3 realistic chunks (~45–60 min each):**
 
-- **1.1a — Migration:** nullable `auto_sync_source text`, `auto_sync_source_id uuid` columns on `cash_in_items` + `cash_out_items`, with partial indexes on `(foundry_id, auto_sync_source_id) WHERE auto_sync_source IS NOT NULL`. Tracks which seed created each row for idempotent updates. Rollback SQL in comment.
-- **1.1b — Read-only lookup action:** `getProductsSeedPreview()` returns list of products in the foundry with `unit_price_pence` + `target_monthly_units` set, plus the candidate revenue/COGS rows that would be created. No writes. Foundry-isolated, UUID-gated. Just enables the preview UI.
-- **1.1c — Revenue seed action + button:** `seedCashInFromProducts()` upserts `cash_in_items` by `(foundry_id, auto_sync_source='product', auto_sync_source_id=product.id)`. New button on Cash In page: "Seed revenue from Products" → preview dialog → confirm. Existing rows updated, not duplicated.
-- **1.1d — COGS seed action + button:** `seedCashOutCogsFromProducts()` same pattern but for `cash_out_items` with `pnl_category='cogs'`. Button on Cash Out page.
-- **1.1e — Objective-driven planned spend seed:** `seedCashOutFromObjectives()` — harder because objective metadata for "hiring budget" / "capex" isn't a dedicated column. Parse hints from `extended_description` OR add new optional `planned_monthly_spend_pence` + `spend_category` columns on objectives first. Defer to its own audit unless easy.
+- **1.1A — Migration + revenue seed:** add nullable `auto_sync_source text` + `auto_sync_source_id uuid` columns on `cash_in_items` + `cash_out_items`, partial composite indexes on `(foundry_id, auto_sync_source_id) WHERE auto_sync_source IS NOT NULL`, rollback SQL in comment. Ship the `seedCashInFromProducts()` action (upsert by auto_sync keys — idempotent) and a "Seed revenue from Products" button on the Cash In page.
+- **1.1B — COGS seed:** `seedCashOutCogsFromProducts()` writing `cash_out_items` with `pnl_category='cogs'`, idempotent via same auto_sync columns. "Seed COGS from Products" button on the Cash Out page.
+- **1.1C — Objective-driven planned spend (optional):** only if the existing objectives schema (`extended_description` text, or a clean addition of `planned_monthly_spend_pence` + `spend_category`) gives enough signal to seed meaningful planned-spend rows. If parsing is fragile, defer to backlog as its own architectural item.
 
-**Each sub-step ships, pushes, deploys, visually verifies, moves to next.**
+**Each chunk ships, pushes, deploys, visually verifies, moves to next.**
 
 **Status:** pending | **Visual:** — | **Commit:** —
 
 ### 1.2 Reports → Schedule backend
 **Founder unlock:** tonight I hid a Potemkin Schedule button. Restoring it for real = weekly board packs arrive in inboxes.
 
-**Plan:**
-- Migration: new table `scheduled_reports (id, foundry_id, created_by, template_id, config_json, frequency {weekly,monthly}, day_of_week int?, day_of_month int?, recipients text[], created_at, last_run_at, next_run_at, enabled bool)`.
-- Server action `scheduleReportDelivery(input)` — UUID-gated, foundry-isolated, returns `{id}`.
-- Cron worker: Vercel cron route `/api/cron/scheduled-reports` runs every hour, finds rows where `next_run_at <= now() AND enabled`, generates the report, emails via Resend, updates `last_run_at` + next `next_run_at`.
-- Restore the Schedule button in `reports/page.tsx`; dialog already exists — wire the `Save Schedule` handler to the new action.
-- Visual verification: trigger dialog, save schedule, confirm DB row + next_run_at set.
+**Split into 3 chunks:**
+- **1.2A — Migration only:** new `scheduled_reports` table (id, foundry_id, created_by, template_id, config_json jsonb, frequency text check, day_of_week int?, day_of_month int?, recipients text[], created_at, last_run_at tz?, next_run_at tz, enabled bool). Indexes on `(enabled, next_run_at)` for the cron scan. Rollback SQL in comment. No code yet — pure schema.
+- **1.2B — Server action + restored button + dialog wiring:** `scheduleReportDelivery(input)` validates + upserts by `(foundry_id, created_by, template_id, frequency)`. `cancelScheduledReport(id)`. Restore the Schedule button + wire the dialog's Save handler. Visual verify: dialog saves → DB row exists.
+- **1.2C — Cron worker + email dispatch:** `/api/cron/scheduled-reports` route (Vercel cron `0 * * * *`), finds due rows, generates report via existing report generator, emails via Resend, updates last_run_at + next_run_at, handles failures. Log `scheduled_report_runs` table row per attempt.
 
 **Status:** pending | **Visual:** — | **Commit:** —
 
@@ -239,12 +235,12 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 
 | Phase | Item | Status | Commit | Visual | Founder-impact notes |
 |---|---|---|---|---|---|
-| 1.1a | Cash Burn: auto-sync tracking columns (migration) | pending | — | — | — |
-| 1.1b | Cash Burn: product-seed preview (read-only) | pending | — | — | — |
-| 1.1c | Cash Burn: revenue seed action + button | pending | — | — | — |
-| 1.1d | Cash Burn: COGS seed action + button | pending | — | — | — |
-| 1.1e | Cash Burn: objective-driven spend seed | pending | — | — | — |
-| 1.2 | Reports Schedule backend | pending | — | — | — |
+| 1.1A | Cash Burn: migration + revenue seed (Cash In button) | **done** | `07395016` | ✓ (conditional-empty verified on prod; retrofit green-check also live as bonus) | A founder with priced products can one-click seed monthly revenue rows into Cash In at 50% probability. Idempotent re-runs. |
+| 1.1B | Cash Burn: COGS seed (Cash Out button) | **done** | `3fec72bd` | pending (will verify post-deploy) | Founder with priced products + COGS estimates can one-click seed monthly COGS rows into Cash Out. Mirrors 1.1A idempotency. |
+| 1.1C | Cash Burn: objective-driven spend seed (optional) | **deferred** | — | — | Objectives schema has no clean planned-spend column; only signal would be fragile description-parsing. Moved to backlog — revisit when adding `planned_monthly_spend_pence` + `spend_category` columns is its own dedicated change. |
+| 1.2A | Reports Schedule: migration (scheduled_reports table) | pending | — | — | — |
+| 1.2B | Reports Schedule: action + restored button | pending | — | — | — |
+| 1.2C | Reports Schedule: cron worker + email dispatch | pending | — | — | — |
 | 1.3 | autoPromoteIfComplete surface | pending | — | — | — |
 | 1.4 | convertBriefToForge structural | pending | — | — | — |
 | 2.1 | /today | pending | — | — | — |
