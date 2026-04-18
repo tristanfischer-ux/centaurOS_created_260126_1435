@@ -2434,6 +2434,7 @@ function buildUnitEconomicsFromEstimates(
   if (entries.length === 0) return null
 
   let totalCogsPence = 0
+  let totalToolingPence = 0
   const breakdown: Array<{ category: string; amount_pence: number; pct: number }> = []
 
   for (const estimate of entries) {
@@ -2447,6 +2448,13 @@ function buildUnitEconomicsFromEstimates(
         amount_pence: cost,
         pct: 0, // computed below
       })
+    }
+    // Tooling investment — one-off NRE (non-recurring engineering) costs such as
+    // mould tooling, fixtures, and dies. Present per-module in ai_cost_estimates
+    // as tooling_investment_pence or tooling_cost_pence. Sum across modules.
+    const tooling = estimate.tooling_investment_pence ?? estimate.tooling_cost_pence ?? 0
+    if (typeof tooling === 'number' && tooling > 0) {
+      totalToolingPence += tooling
     }
   }
 
@@ -2463,7 +2471,7 @@ function buildUnitEconomicsFromEstimates(
     gross_margin_pct: null,
     contribution_margin_pence: null,
     breakeven_units: null,
-    tooling_investment_pence: null,
+    tooling_investment_pence: totalToolingPence > 0 ? totalToolingPence : null,
     cogs_breakdown: breakdown,
     last_synced_from_cad_at: new Date().toISOString(),
     cogs_confidence: 'low',
