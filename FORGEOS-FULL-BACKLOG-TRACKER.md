@@ -259,7 +259,7 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 1.4 | convertBriefToForge structural seeding | **done** | `0ed2ccf3` | pending prod check | Brief fields now travel to CAD Lab Specify as structured data (new seeded_brief_content jsonb + SeededBriefCard render), not a markdown blob. |
 | 1.3 | autoPromoteIfComplete surface | pending | — | — | — |
 | 1.4 | convertBriefToForge structural | pending | — | — | — |
-| 2.1 | /today | pending | — | — | — |
+| 2.1 | /today | **done** | `8d8ec577` | pending prod check | Strategy pillar health now readable by colourblind + screen-reader users (aria-label + role=img on dot, richer aria-label on the Link). Insights empty-state stops saying "check back tomorrow" and gives three concrete actions that unblock the pulse. Plus collateral fix to scheduled-reports/frequency.ts type — lib referenced a Postgres enum that was actually a plain text+CHECK column; hardcoded the union. |
 | 2.2 | /agents | pending | — | — | — |
 | 2.3 | /comms | pending | — | — | — |
 | 2.4 | /knowledge/[id] | pending | — | — | — |
