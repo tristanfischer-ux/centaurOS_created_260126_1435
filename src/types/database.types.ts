@@ -9548,6 +9548,7 @@ export type Database = {
           approved_by: string | null
           attributes: Json | null
           average_rating: number | null
+          carbon_disclosed: boolean | null
           category: Database["public"]["Enums"]["marketplace_category"]
           certifications: Json | null
           city: string | null
@@ -9560,14 +9561,17 @@ export type Database = {
           contact_source: string | null
           contact_title: string | null
           country: string | null
+          country_iso: string | null
           created_at: string | null
           created_by_provider_id: string | null
           currency: string | null
           data_quality_score: number
           description: string | null
+          ecovadis_score: number | null
           embedding: string | null
           employee_count_exact: number | null
           enrichment_quality: number | null
+          enrichment_sources: Json | null
           export_controls: string | null
           financial_health: string | null
           founded_year: number | null
@@ -9577,9 +9581,11 @@ export type Database = {
           is_demo: boolean
           is_self_created: boolean | null
           is_verified: boolean | null
+          iso_14001: boolean | null
           key_equipment: Json | null
           key_people: Json | null
           last_contacted_at: string | null
+          last_enriched_at: string | null
           lead_time: string | null
           materials: Json | null
           minimum_order: string | null
@@ -9591,12 +9597,14 @@ export type Database = {
           production_capacity: string | null
           products: Json | null
           quality_systems: string | null
+          recycled_content_percent: number | null
           relevance_score: number | null
           review_count: number | null
           search_vector: unknown
           security_clearances: Json | null
           specialties: Json | null
           subcategory: string
+          sustainability_notes: string | null
           title: string
           verification_tier: Database["public"]["Enums"]["verification_tier"]
           website_url: string | null
@@ -9609,6 +9617,7 @@ export type Database = {
           approved_by?: string | null
           attributes?: Json | null
           average_rating?: number | null
+          carbon_disclosed?: boolean | null
           category: Database["public"]["Enums"]["marketplace_category"]
           certifications?: Json | null
           city?: string | null
@@ -9621,14 +9630,17 @@ export type Database = {
           contact_source?: string | null
           contact_title?: string | null
           country?: string | null
+          country_iso?: string | null
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
           data_quality_score?: number
           description?: string | null
+          ecovadis_score?: number | null
           embedding?: string | null
           employee_count_exact?: number | null
           enrichment_quality?: number | null
+          enrichment_sources?: Json | null
           export_controls?: string | null
           financial_health?: string | null
           founded_year?: number | null
@@ -9638,9 +9650,11 @@ export type Database = {
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          iso_14001?: boolean | null
           key_equipment?: Json | null
           key_people?: Json | null
           last_contacted_at?: string | null
+          last_enriched_at?: string | null
           lead_time?: string | null
           materials?: Json | null
           minimum_order?: string | null
@@ -9652,12 +9666,14 @@ export type Database = {
           production_capacity?: string | null
           products?: Json | null
           quality_systems?: string | null
+          recycled_content_percent?: number | null
           relevance_score?: number | null
           review_count?: number | null
           search_vector?: unknown
           security_clearances?: Json | null
           specialties?: Json | null
           subcategory: string
+          sustainability_notes?: string | null
           title: string
           verification_tier?: Database["public"]["Enums"]["verification_tier"]
           website_url?: string | null
@@ -9670,6 +9686,7 @@ export type Database = {
           approved_by?: string | null
           attributes?: Json | null
           average_rating?: number | null
+          carbon_disclosed?: boolean | null
           category?: Database["public"]["Enums"]["marketplace_category"]
           certifications?: Json | null
           city?: string | null
@@ -9682,14 +9699,17 @@ export type Database = {
           contact_source?: string | null
           contact_title?: string | null
           country?: string | null
+          country_iso?: string | null
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
           data_quality_score?: number
           description?: string | null
+          ecovadis_score?: number | null
           embedding?: string | null
           employee_count_exact?: number | null
           enrichment_quality?: number | null
+          enrichment_sources?: Json | null
           export_controls?: string | null
           financial_health?: string | null
           founded_year?: number | null
@@ -9699,9 +9719,11 @@ export type Database = {
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          iso_14001?: boolean | null
           key_equipment?: Json | null
           key_people?: Json | null
           last_contacted_at?: string | null
+          last_enriched_at?: string | null
           lead_time?: string | null
           materials?: Json | null
           minimum_order?: string | null
@@ -9713,12 +9735,14 @@ export type Database = {
           production_capacity?: string | null
           products?: Json | null
           quality_systems?: string | null
+          recycled_content_percent?: number | null
           relevance_score?: number | null
           review_count?: number | null
           search_vector?: unknown
           security_clearances?: Json | null
           specialties?: Json | null
           subcategory?: string
+          sustainability_notes?: string | null
           title?: string
           verification_tier?: Database["public"]["Enums"]["verification_tier"]
           website_url?: string | null
@@ -16845,6 +16869,478 @@ export type Database = {
           },
         ]
       }
+      supplier_ai_briefs: {
+        Row: {
+          brief_markdown: string
+          generated_at: string
+          generated_model: string | null
+          great_at_line: string | null
+          input_hash: string
+          listing_id: string
+          watch_for_line: string | null
+          who_line: string | null
+        }
+        Insert: {
+          brief_markdown: string
+          generated_at?: string
+          generated_model?: string | null
+          great_at_line?: string | null
+          input_hash: string
+          listing_id: string
+          watch_for_line?: string | null
+          who_line?: string | null
+        }
+        Update: {
+          brief_markdown?: string
+          generated_at?: string
+          generated_model?: string | null
+          great_at_line?: string | null
+          input_hash?: string
+          listing_id?: string
+          watch_for_line?: string | null
+          who_line?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_ai_briefs_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_ai_briefs_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      supplier_capabilities: {
+        Row: {
+          batch_max: number | null
+          batch_min: number | null
+          created_at: string
+          equipment: string[] | null
+          evidence_url: string | null
+          id: string
+          listing_id: string
+          materials: string[] | null
+          process_category: string
+          tolerance_max_mm: number | null
+          tolerance_min_mm: number | null
+          updated_at: string
+          verified: boolean
+        }
+        Insert: {
+          batch_max?: number | null
+          batch_min?: number | null
+          created_at?: string
+          equipment?: string[] | null
+          evidence_url?: string | null
+          id?: string
+          listing_id: string
+          materials?: string[] | null
+          process_category: string
+          tolerance_max_mm?: number | null
+          tolerance_min_mm?: number | null
+          updated_at?: string
+          verified?: boolean
+        }
+        Update: {
+          batch_max?: number | null
+          batch_min?: number | null
+          created_at?: string
+          equipment?: string[] | null
+          evidence_url?: string | null
+          id?: string
+          listing_id?: string
+          materials?: string[] | null
+          process_category?: string
+          tolerance_max_mm?: number | null
+          tolerance_min_mm?: number | null
+          updated_at?: string
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_capabilities_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_capabilities_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      supplier_certifications: {
+        Row: {
+          cert_code: string
+          cert_label: string
+          created_at: string
+          evidence_url: string | null
+          expires_at: string | null
+          id: string
+          issued_at: string | null
+          issuer: string | null
+          listing_id: string
+          updated_at: string
+          verified: boolean
+          verified_by: string | null
+        }
+        Insert: {
+          cert_code: string
+          cert_label: string
+          created_at?: string
+          evidence_url?: string | null
+          expires_at?: string | null
+          id?: string
+          issued_at?: string | null
+          issuer?: string | null
+          listing_id: string
+          updated_at?: string
+          verified?: boolean
+          verified_by?: string | null
+        }
+        Update: {
+          cert_code?: string
+          cert_label?: string
+          created_at?: string
+          evidence_url?: string | null
+          expires_at?: string | null
+          id?: string
+          issued_at?: string | null
+          issuer?: string | null
+          listing_id?: string
+          updated_at?: string
+          verified?: boolean
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_certifications_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_certifications_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      supplier_corrections: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          current_value: string | null
+          field_name: string
+          foundry_id: string
+          id: string
+          listing_id: string
+          proposed_value: string
+          reason: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_by: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          current_value?: string | null
+          field_name: string
+          foundry_id: string
+          id?: string
+          listing_id: string
+          proposed_value: string
+          reason?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_by?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          current_value?: string | null
+          field_name?: string
+          foundry_id?: string
+          id?: string
+          listing_id?: string
+          proposed_value?: string
+          reason?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_corrections_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_corrections_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_corrections_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      supplier_interview_responses: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          lead_time_days: number | null
+          listing_id: string
+          moq_max: number | null
+          moq_min: number | null
+          parse_error: string | null
+          parsed: Json | null
+          payment_terms: string | null
+          project_id: string | null
+          raw_reply: string
+          share_publicly: boolean
+          submitted_by: string | null
+          tooling_cost_max_gbp: number | null
+          tooling_cost_min_gbp: number | null
+          unit_price_at_100_gbp: number | null
+          unit_price_at_1000_gbp: number | null
+          unit_price_at_10000_gbp: number | null
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          lead_time_days?: number | null
+          listing_id: string
+          moq_max?: number | null
+          moq_min?: number | null
+          parse_error?: string | null
+          parsed?: Json | null
+          payment_terms?: string | null
+          project_id?: string | null
+          raw_reply: string
+          share_publicly?: boolean
+          submitted_by?: string | null
+          tooling_cost_max_gbp?: number | null
+          tooling_cost_min_gbp?: number | null
+          unit_price_at_100_gbp?: number | null
+          unit_price_at_1000_gbp?: number | null
+          unit_price_at_10000_gbp?: number | null
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          lead_time_days?: number | null
+          listing_id?: string
+          moq_max?: number | null
+          moq_min?: number | null
+          parse_error?: string | null
+          parsed?: Json | null
+          payment_terms?: string | null
+          project_id?: string | null
+          raw_reply?: string
+          share_publicly?: boolean
+          submitted_by?: string | null
+          tooling_cost_max_gbp?: number | null
+          tooling_cost_min_gbp?: number | null
+          unit_price_at_100_gbp?: number | null
+          unit_price_at_1000_gbp?: number | null
+          unit_price_at_10000_gbp?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_interview_responses_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_interview_responses_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_interview_responses_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "supplier_interview_responses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_ratings: {
+        Row: {
+          commercial_fairness: number | null
+          created_at: string
+          foundry_id: string
+          id: string
+          is_public: boolean
+          listing_id: string
+          notes: string | null
+          on_time: number | null
+          project_id: string | null
+          quality: number | null
+          rated_by: string | null
+          responsiveness: number | null
+        }
+        Insert: {
+          commercial_fairness?: number | null
+          created_at?: string
+          foundry_id: string
+          id?: string
+          is_public?: boolean
+          listing_id: string
+          notes?: string | null
+          on_time?: number | null
+          project_id?: string | null
+          quality?: number | null
+          rated_by?: string | null
+          responsiveness?: number | null
+        }
+        Update: {
+          commercial_fairness?: number | null
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          is_public?: boolean
+          listing_id?: string
+          notes?: string | null
+          on_time?: number | null
+          project_id?: string | null
+          quality?: number | null
+          rated_by?: string | null
+          responsiveness?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_ratings_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_ratings_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_ratings_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "supplier_ratings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_relationships: {
+        Row: {
+          child_listing_id: string
+          confidence: number | null
+          created_at: string
+          evidence_url: string | null
+          id: string
+          parent_listing_id: string
+          relationship_type: string
+          source: string | null
+          verified: boolean
+        }
+        Insert: {
+          child_listing_id: string
+          confidence?: number | null
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          parent_listing_id: string
+          relationship_type: string
+          source?: string | null
+          verified?: boolean
+        }
+        Update: {
+          child_listing_id?: string
+          confidence?: number | null
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          parent_listing_id?: string
+          relationship_type?: string
+          source?: string | null
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_relationships_child_listing_id_fkey"
+            columns: ["child_listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_relationships_child_listing_id_fkey"
+            columns: ["child_listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "supplier_relationships_parent_listing_id_fkey"
+            columns: ["parent_listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_relationships_parent_listing_id_fkey"
+            columns: ["parent_listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       supplier_reviews: {
         Row: {
           cons: string[] | null
@@ -16922,6 +17418,60 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "suppliers"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_sanctions_flags: {
+        Row: {
+          active: boolean
+          checked_at: string
+          id: string
+          list_entry_ref: string | null
+          list_name: string
+          listing_id: string
+          match_score: number | null
+          reason: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          checked_at?: string
+          id?: string
+          list_entry_ref?: string | null
+          list_name: string
+          listing_id: string
+          match_score?: number | null
+          reason?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          checked_at?: string
+          id?: string
+          list_entry_ref?: string | null
+          list_name?: string
+          listing_id?: string
+          match_score?: number | null
+          reason?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_sanctions_flags_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_sanctions_flags_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
           },
         ]
       }
