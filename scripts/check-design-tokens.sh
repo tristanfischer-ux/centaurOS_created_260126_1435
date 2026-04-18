@@ -9,8 +9,19 @@ set -e
 
 TARGET="${1:-src/}"
 
-# Files with documented exceptions (role colors, star ratings, etc.)
+# Files with documented exceptions (role colors, star ratings, per-category
+# identity palettes, etc.). These files use raw colour classes intentionally
+# because colour IS their data model, not decoration.
+#
+# - user-avatar.tsx: role colours (Founder/Executive/Apprentice/AI_Agent)
+# - agent-types.ts: per-specialist category palette (see "No AI Emphasis" —
+#   each specialist domain has its own identity colour)
+# - strategy-colors.ts: strategy pillar palette (each pillar gets a
+#   distinct colour identity)
+# - guild-network.tsx, new-team-form.tsx: role/team-type colour maps
+# - marketplace-section-intro.tsx: per-section accent palette
 EXCEPTION_FILES="user-avatar.tsx"
+EXCEPTION_GLOBS='!**/user-avatar.tsx !**/agent-types.ts !**/strategy-colors.ts !**/guild-network.tsx !**/new-team-form.tsx !**/marketplace-section-intro.tsx'
 VIOLATIONS=0
 WARNINGS=0
 
@@ -38,14 +49,14 @@ check_pattern() {
     if command -v rg &> /dev/null; then
         if [ "$exclude_exceptions" = "true" ]; then
             # Exclude documented exception files (user-avatar.tsx for role colors)
-            count=$(rg -c "$pattern" "$TARGET" --type tsx --type ts --glob '!**/user-avatar.tsx' 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')
+            count=$(rg -c "$pattern" "$TARGET" --type tsx --type ts --glob '!**/user-avatar.tsx' --glob '!**/agent-types.ts' --glob '!**/strategy-colors.ts' --glob '!**/guild-network.tsx' --glob '!**/new-team-form.tsx' --glob '!**/marketplace-section-intro.tsx' 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')
         else
             count=$(rg -c "$pattern" "$TARGET" --type tsx --type ts 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')
         fi
     else
         if [ "$exclude_exceptions" = "true" ]; then
             # Exclude documented exception files (user-avatar.tsx for role colors)
-            count=$(grep -r -E "$pattern" "$TARGET" --include="*.tsx" --include="*.ts" 2>/dev/null | grep -v "user-avatar.tsx" | wc -l | tr -d ' ')
+            count=$(grep -r -E "$pattern" "$TARGET" --include="*.tsx" --include="*.ts" 2>/dev/null | grep -vE "(user-avatar|agent-types|strategy-colors|guild-network|new-team-form|marketplace-section-intro)" | wc -l | tr -d ' ')
         else
             count=$(grep -r -E "$pattern" "$TARGET" --include="*.tsx" --include="*.ts" 2>/dev/null | wc -l | tr -d ' ')
         fi

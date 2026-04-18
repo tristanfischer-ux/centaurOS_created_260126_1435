@@ -147,7 +147,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
             <Handle
                 type="target"
                 position={Position.Top}
-                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-top-1.5"
+                className="!w-3 !h-3 !bg-status-info !border-2 !border-background !-top-1.5"
             />
 
             <div className="p-3">
@@ -260,7 +260,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Bottom}
-                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-bottom-1.5"
+                className="!w-3 !h-3 !bg-status-info !border-2 !border-background !-bottom-1.5"
             />
         </div>
     )
@@ -333,7 +333,7 @@ function HumanTaskNodeComponent({ data, selected }: NodeProps) {
             <Handle
                 type="target"
                 position={Position.Top}
-                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-top-1.5"
+                className="!w-3 !h-3 !bg-status-info !border-2 !border-background !-top-1.5"
             />
 
             <div className="p-3">
@@ -384,7 +384,7 @@ function HumanTaskNodeComponent({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Bottom}
-                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-bottom-1.5"
+                className="!w-3 !h-3 !bg-status-info !border-2 !border-background !-bottom-1.5"
             />
         </div>
     )

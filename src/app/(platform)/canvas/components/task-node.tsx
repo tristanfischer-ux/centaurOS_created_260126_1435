@@ -76,12 +76,12 @@ function TaskNodeComponent({ data, selected }: NodeProps) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-2 !h-2 !bg-slate-400 !border-2 !border-white"
+        className="!w-2 !h-2 !bg-muted-foreground !border-2 !border-background"
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-2 !h-2 !bg-slate-400 !border-2 !border-white"
+        className="!w-2 !h-2 !bg-muted-foreground !border-2 !border-background"
       />
     </div>
   )

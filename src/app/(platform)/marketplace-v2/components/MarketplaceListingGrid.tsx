@@ -195,7 +195,7 @@ function ListRow({
                             availability.toLowerCase().includes('full-time') || availability.toLowerCase().includes('available')
                                 ? 'bg-status-success'
                                 : availability.toLowerCase().includes('part') || availability.toLowerCase().includes('day')
-                                    ? 'bg-amber-400'
+                                    ? 'bg-status-warning'
                                     : 'bg-muted-foreground'
                         )}
                         title={availability}
