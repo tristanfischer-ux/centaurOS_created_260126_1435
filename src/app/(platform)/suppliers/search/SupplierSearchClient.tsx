@@ -240,7 +240,7 @@ export function SupplierSearchClient({
                   className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                     certifications.includes(cert)
                       ? 'bg-international-orange text-foreground'
-                      : 'bg-background border border-border text-muted-foreground hover:bg-background/80'
+                      : 'bg-background border border-border text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {cert}

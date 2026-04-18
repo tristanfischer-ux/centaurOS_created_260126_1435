@@ -352,7 +352,7 @@ export function SpecialistsLanding({
                                             onClick={() => {
                                                 if (specialist) handleBrief(specialist.id)
                                             }}
-                                            className="flex items-start gap-2.5 w-full text-left p-2 rounded-md hover:bg-background/60 transition-colors group"
+                                            className="flex items-start gap-2.5 w-full text-left p-2 rounded-md hover:bg-muted transition-colors group"
                                         >
                                             <div className={cn(
                                                 "h-2 w-2 rounded-full mt-1.5 flex-shrink-0",

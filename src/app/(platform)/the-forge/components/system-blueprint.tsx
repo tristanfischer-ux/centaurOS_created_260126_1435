@@ -268,7 +268,7 @@ export function SystemBlueprint({
             <div className="relative rounded-xl overflow-hidden">
               <Skeleton className="h-[400px] w-full" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex items-center gap-3 bg-background/90 rounded-full px-5 py-2.5 shadow-sm">
+                <div className="flex items-center gap-3 bg-card rounded-full px-5 py-2.5 shadow-sm">
                   <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
                   <span className="text-sm font-medium text-foreground">Generating system blueprint...</span>
                 </div>
@@ -397,7 +397,7 @@ export function SystemBlueprint({
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute top-3 right-3 z-10 bg-background/90 hover:bg-background shadow-sm"
+                className="absolute top-3 right-3 z-10 bg-card hover:bg-muted shadow-sm"
                 onClick={() => setLightboxOpen(false)}
                 aria-label="Close"
               >

@@ -1366,7 +1366,7 @@ export function TeamPageView({
                     </div>
                     {/* ── Bottom Info Bar ── */}
                     <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none z-10">
-                        <div className="pointer-events-auto flex items-center gap-2.5 bg-background/80 backdrop-blur-sm border border-muted rounded-full px-5 py-2.5 shadow-lg">
+                        <div className="pointer-events-auto flex items-center gap-2.5 bg-card border border-muted rounded-full px-5 py-2.5 shadow-lg">
                             <div className="flex items-center gap-1.5">
                                 <Users className="h-3.5 w-3.5 text-international-orange" />
                                 <span className="font-semibold text-foreground text-sm">{totalPeople}</span>

@@ -414,7 +414,7 @@ export function XRaySchematic({ spec, onOpenDiagnostic }: XRaySchematicProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 z-10 bg-background/80 hover:bg-background"
+              className="absolute top-2 right-2 z-10 bg-card hover:bg-muted shadow-sm"
               onClick={() => setSystemImageDialogOpen(false)}
             >
               <X className="h-4 w-4" />

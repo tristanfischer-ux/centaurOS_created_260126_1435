@@ -192,7 +192,7 @@ export function InvestorInsightsPanel({ stats, filteredCount, grantsCount = 0, p
             const BAR_MARGIN = { top: 8, right: 16, bottom: 8, left: 8 }
             const Y_AXIS_WIDTH = 110
             const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-              <div className="rounded-lg border border-border bg-background/40 p-4 space-y-3">
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                 <p className="text-xs font-medium text-muted-foreground tracking-wide">{title}</p>
                 <div className={CHART_HEIGHT}>
                   <ResponsiveContainer width="100%" height="100%">

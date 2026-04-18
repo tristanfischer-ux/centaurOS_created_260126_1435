@@ -541,7 +541,7 @@ export function MarketplaceListingGrid({
                         <Button
                             size="sm"
                             onClick={onCompare}
-                            className="gap-1.5 h-9 rounded-xl bg-background text-international-orange hover:bg-background/90 font-semibold"
+                            className="gap-1.5 h-9 rounded-xl bg-background text-international-orange hover:bg-muted font-semibold"
                         >
                             Compare Now
                             <ArrowRight className="w-4 h-4" />

@@ -580,7 +580,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                 const StatusIcon = statusConfig.icon
 
                                                     return (
-                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-background/80 transition-colors duration-150">
+                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-muted transition-colors duration-150">
                                                         <div title={task.status?.replace('_', ' ') || 'Pending'}>
                                                             <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
                                                         </div>

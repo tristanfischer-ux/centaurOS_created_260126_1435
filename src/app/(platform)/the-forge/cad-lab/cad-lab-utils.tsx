@@ -303,7 +303,7 @@ export function FullscreenOverlay({
   const svgSrc = svgMap[view]
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-8" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-8" onClick={onClose}>
       <button
         className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors text-sm font-mono"
         onClick={onClose}

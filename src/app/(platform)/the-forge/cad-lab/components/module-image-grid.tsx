@@ -203,7 +203,7 @@ function ModuleDetailDialog({
           {/* INTENT: Full-content loading overlay when reloading — makes it obvious
               that data is being refreshed, not just the tiny button spinner */}
           {isReloading && (
-            <div className="absolute inset-0 z-10 bg-background/60 flex flex-col items-center justify-center gap-2 rounded-lg">
+            <div className="absolute inset-0 z-10 bg-black/40 flex flex-col items-center justify-center gap-2 rounded-lg">
               <Loader2 className="h-6 w-6 animate-spin text-international-orange" />
               <p className="text-sm font-medium text-foreground">Fetching full module specifications…</p>
               <p className="text-xs text-muted-foreground">This typically takes 10–20 seconds</p>
@@ -225,7 +225,7 @@ function ModuleDetailDialog({
                       className="w-full h-auto object-contain"
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
-                      <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-background/90 rounded-full p-2 shadow-sm">
+                      <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-card rounded-full p-2 shadow-sm">
                         <Maximize2 className="h-4 w-4 text-foreground" />
                       </div>
                     </div>
@@ -502,7 +502,7 @@ function ModuleDetailDialog({
             <Button
               variant="ghost"
               size="icon"
-              className="bg-background/90 hover:bg-background shadow-sm"
+              className="bg-card hover:bg-muted shadow-sm"
               onClick={handleDownload}
               aria-label="Download"
             >
@@ -511,7 +511,7 @@ function ModuleDetailDialog({
             <Button
               variant="ghost"
               size="icon"
-              className="bg-background/90 hover:bg-background shadow-sm"
+              className="bg-card hover:bg-muted shadow-sm"
               onClick={() => setLightboxOpen(false)}
               aria-label="Close"
             >

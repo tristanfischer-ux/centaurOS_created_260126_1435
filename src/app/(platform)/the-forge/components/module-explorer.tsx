@@ -374,7 +374,7 @@ function ExpandedModuleDetail({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute top-3 right-3 z-10 bg-background/90 hover:bg-background shadow-sm"
+                  className="absolute top-3 right-3 z-10 bg-card hover:bg-muted shadow-sm"
                   onClick={() => setLightboxOpen(false)}
                   aria-label="Close"
                 >
