@@ -135,9 +135,9 @@ Note detail page. Landing was touched already; the detail view wasn't. Audit edi
 Items already surfaced by prior audits but explicitly deferred. Small, parallel, batchable.
 
 - [ ] Standalone task product-tagging UI (the Create Task dialog / Task detail panel gets a product `<select>`, mirroring the Edit Objective dialog shipped 2026-04-18).
-- [ ] Objectives detail: reverse link chip `Linked to Product X` (mirror of the `LinkedProductChip` shipped on CAD Lab; reuse the pattern).
+- [ ] Objectives detail: reverse link chip `Linked to Product X` (mirror of the `LinkedProductChip` shipped on CAD Lab; reuse the pattern). *(Note: /objectives/[id] is a legacy redirect; this item still open for the Product-link variant. The strategic-pillar variant (line 140) shipped as an inline row chip on objectives-list-view instead.)*
 - [ ] Tasks actions UUID validation across 12+ server actions (defence in depth — RLS is the real boundary).
-- [ ] Strategy: reverse link task → strategic goal on objective detail.
+- [x] Strategy: reverse link task → strategic goal on objective detail. (`4b04abbe`, 2026-04-18 — /objectives/[id] is a legacy redirect so the chip lives inline on the objectives-list-view row: outline Badge with Map icon + "Part of {parent title}" linking to /strategic-planner/{parent id}. Renders only on children of an is_strategic_goal parent.)
 - [x] Strategy subtitle "AI builds the full plan" wobble — minor voice rewrite. (`75a69a82`, 2026-04-18 — replaced with "Get a full plan — phases, tasks, resource gaps — back for review.")
 - [ ] Pitch Prep landing readiness signal ("3/5 sections complete" + ring).
 - [ ] Pitch Prep pre-fill from Products / Investors / Objectives.
