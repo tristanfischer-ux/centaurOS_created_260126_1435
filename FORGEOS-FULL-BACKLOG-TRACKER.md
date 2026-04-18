@@ -138,7 +138,7 @@ Items already surfaced by prior audits but explicitly deferred. Small, parallel,
 - [ ] Objectives detail: reverse link chip `Linked to Product X` (mirror of the `LinkedProductChip` shipped on CAD Lab; reuse the pattern).
 - [ ] Tasks actions UUID validation across 12+ server actions (defence in depth — RLS is the real boundary).
 - [ ] Strategy: reverse link task → strategic goal on objective detail.
-- [ ] Strategy subtitle "AI builds the full plan" wobble — minor voice rewrite.
+- [x] Strategy subtitle "AI builds the full plan" wobble — minor voice rewrite. (`75a69a82`, 2026-04-18 — replaced with "Get a full plan — phases, tasks, resource gaps — back for review.")
 - [ ] Pitch Prep landing readiness signal ("3/5 sections complete" + ring).
 - [ ] Pitch Prep pre-fill from Products / Investors / Objectives.
 - [ ] Investors: pipeline-stage chip on `/investors/[id]` so founder sees shortlist stage inside the detail.
@@ -146,7 +146,7 @@ Items already surfaced by prior audits but explicitly deferred. Small, parallel,
 - [ ] Marketplace: `price_from` badge on list cards.
 - [ ] Reports: cross-timezone date handling test (UTC-12 / UTC+12).
 - [ ] Reports: share-link rate limiting (10/user/report).
-- [ ] Cash Out Finn briefing: "most founders are leaking" generalisation wobble.
+- [x] Cash Out Finn briefing: "most founders are leaking" generalisation wobble. (`75a69a82`, 2026-04-18 — neutralised to "The subscriptions tab is the first place I'd check — unused SaaS tends to hide there.")
 - [ ] Cash In: surface `probabilityPct` on rows (or stop fetching).
 - [ ] P&L: NULL `pnlCategory` handling — either default-backfill or explicit warn.
 - [ ] AI-generated briefing personal-commitment language — `specialist-page-insights.ts` prompt engineering: forbid "I'll …" / "Want me to …" framings, prefer specific action suggestions that don't make personal commitments.
@@ -263,7 +263,7 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 2.2 | /agents | **done** | `39047c26` | pending prod check | Audit found the page genuinely solid — real `<button>`s on Key Leaders row, no voice violations, no dead routes, all server actions RLS-gated. Only shipped two token-hygiene fixes (text-white → text-primary-foreground on CEO circle + specialist-card CTA). |
 | 2.3 | /comms (routes to `/updates`) | **done** | `1f5c06e9` | pending prod check | Mobile was dropping Cal's AI-generated briefing and falling back to static copy — now mobile + desktop both render `briefing.narrative`. TabsList gets aria-label. Page was otherwise solid (Radix tabs, voice-clean, tokens valid). |
 | 2.4 | Knowledge note detail dialog (no `/knowledge/[id]` route — detail is a dialog) | **done** | `f8e3b1b8` | pending prod check | Shadcn Dialog primitive already provides focus trap + aria + keyboard — only issue was one hardcoded border-slate-100 on the footer divider, swapped to border-border. |
-| 3.* | Polish sprint | pending (22 items) | — | — | — |
+| 3.* | Polish sprint | in progress (2/22 + border sweep done) | `75a69a82`, `67a48768` | pending prod check | Voice wobbles on strategic-planner subtitle + Finn cash-out fallback fixed (items 141, 149). Founder-surface `border-slate-*` → `border-border` token sweep across 61 files — item 153 partially addressed (slate only; gray-*/text-white/bg-white still open). |
 | 4.1 | /orders | pending | — | — | — |
 | 4.2 | /suppliers + /[id] | pending | — | — | — |
 | 4.3 | /retainers + subs | pending | — | — | — |
