@@ -32,6 +32,13 @@ export interface SupplierProcurementFlowProps {
   modules: CadLabModule[]
   diagnosticAnswers?: DiagnosticAnswers
   aiCostEstimates?: Record<string, AiCostEstimate>
+  /**
+   * Shortlist coverage per category key. When supplied, each category node
+   * shows an inline "N/target" pill — green when met, amber when short. Target
+   * defaults to 2 (Round 2 decision: dual-source each category for redundancy).
+   * Buy-type categories aren't gated the same way and are skipped.
+   */
+  coverageByCategory?: Map<string, { shortlisted: number; target: number }>
 }
 
 // ─── SVG layout constants ────────────────────────────────────────────
@@ -176,6 +183,7 @@ export function SupplierProcurementFlow({
   modules,
   diagnosticAnswers,
   aiCostEstimates,
+  coverageByCategory,
 }: SupplierProcurementFlowProps): React.ReactNode {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
@@ -379,6 +387,50 @@ export function SupplierProcurementFlow({
                     {truncate(c.label, 120)}
                     <title>{c.label} — {c.partCount} part{c.partCount !== 1 ? "s" : ""}</title>
                   </text>
+                  {/* Coverage pill: shortlisted suppliers vs. target for this category.
+                      Buy categories skipped (no supplier shortlisting expected). */}
+                  {coverageByCategory && c.type === "make" && (() => {
+                    const cov = coverageByCategory.get(c.id)
+                    const shortlisted = cov?.shortlisted ?? 0
+                    const target = cov?.target ?? 2
+                    const met = shortlisted >= target
+                    const pillX = c.x + SANKEY.LABEL_OFFSET_RIGHT + 360
+                    const pillY = c.y + 3
+                    const pillFill = met ? "#22c55e" : shortlisted > 0 ? "#f59e0b" : "#ef4444"
+                    const pillText = `${shortlisted}/${target} shortlisted`
+                    return (
+                      <g opacity={getOpacity(catId)} className="transition-opacity duration-200">
+                        <rect
+                          x={pillX}
+                          y={pillY}
+                          width={88}
+                          height={13}
+                          rx={6}
+                          fill={pillFill}
+                          fillOpacity={0.18}
+                          stroke={pillFill}
+                          strokeWidth={0.75}
+                        />
+                        <text
+                          x={pillX + 44}
+                          y={pillY + 9}
+                          fontSize={8}
+                          fontWeight={600}
+                          fill={pillFill}
+                          textAnchor="middle"
+                        >
+                          {pillText}
+                          <title>
+                            {met
+                              ? `Coverage met: ${shortlisted}/${target} suppliers shortlisted for redundancy.`
+                              : shortlisted > 0
+                              ? `Coverage thin: add ${target - shortlisted} more supplier${target - shortlisted !== 1 ? "s" : ""} to hit dual-source target.`
+                              : `No supplier shortlisted yet — single-source risk.`}
+                          </title>
+                        </text>
+                      </g>
+                    )
+                  })()}
                   {/* Inline parts with colored dots */}
                   {c.parts.map((part, pi) => {
                     const modColor = moduleColorMap.get(part.moduleId) ?? "#94a3b8"

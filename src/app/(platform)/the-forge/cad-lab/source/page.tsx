@@ -830,6 +830,18 @@ export default function SourcePage(): React.ReactNode {
   // AND SupplierIntelligenceTab so the two surfaces agree on which supplier is
   // Recommended vs Not Recommended. Both call useCompanyReview individually but
   // share the localStorage cache via identical cache key, so only one fetch fires.
+  // Sankey coverage map — category id → shortlisted vs target. Target 2 reflects
+  // the dual-source rule (Phase 2 Round 2 decision). Used by SupplierProcurementFlow
+  // to render per-category coverage pills so single-source risks are visible up-front.
+  const sankeyCoverage = useMemo(() => {
+    const map = new Map<string, { shortlisted: number; target: number }>()
+    for (const [catKey, rankedIds] of categoryRankings) {
+      const shortlisted = rankedIds.filter((id) => shortlistedSuppliers.has(id)).length
+      map.set(catKey, { shortlisted, target: 2 })
+    }
+    return map
+  }, [categoryRankings, shortlistedSuppliers])
+
   const companyReviewCompanyIds = useMemo(() => {
     const set = new Set<string>()
     for (const matches of supplierMatches.values()) {
@@ -1074,6 +1086,7 @@ export default function SourcePage(): React.ReactNode {
                   modules={eligibleModules}
                   diagnosticAnswers={diagnosticAnswers}
                   aiCostEstimates={aiCostEstimates}
+                  coverageByCategory={sankeyCoverage}
                 />
 
                 {/* Link to marketplace for broader supplier discovery */}

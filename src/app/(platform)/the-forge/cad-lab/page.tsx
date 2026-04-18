@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 import {
   Loader2,
   ArrowRight,
@@ -454,6 +455,16 @@ export default function CadLabResearchPage(): React.ReactNode {
         stageName="Design"
         briefing={entryBriefing}
         isLoading={entryLoading}
+        onReconsider={() => {
+          const q = typeof window !== "undefined"
+            ? window.prompt("What do you want to reconsider about the design?", "")
+            : null
+          if (q && q.trim().length >= 20) {
+            designIterationHostRef.current?.triggerManual(q.trim())
+          } else if (q !== null) {
+            toast.error("Tell us what you want to reconsider in at least 20 characters")
+          }
+        }}
       />
 
       {/* ── Design brief interview (Max CTO guided Q&A) ── */}
