@@ -1379,6 +1379,10 @@ export async function convertBriefToForge(
         name: `${product.name} (v${versionNumber})`,
         subject: keyReqs,
         product_overview: formattedOverview,
+        // 1.4 — structural seed: CAD Lab Specify reads this to show the brief
+        // fields as a structured card instead of just parsing the markdown blob.
+        // Shape matches DesignBriefContent in src/types/product.ts.
+        seeded_brief_content: briefContent,
       })
       .select('id')
       .single()

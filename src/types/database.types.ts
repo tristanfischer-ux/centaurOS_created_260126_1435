@@ -4156,6 +4156,7 @@ export type Database = {
           result: Json | null
           review_skipped: boolean | null
           reviews: Json | null
+          seeded_brief_content: Json | null
           stage: string
           status: string
           subject: string
@@ -4201,6 +4202,7 @@ export type Database = {
           result?: Json | null
           review_skipped?: boolean | null
           reviews?: Json | null
+          seeded_brief_content?: Json | null
           stage?: string
           status?: string
           subject: string
@@ -4246,6 +4248,7 @@ export type Database = {
           result?: Json | null
           review_skipped?: boolean | null
           reviews?: Json | null
+          seeded_brief_content?: Json | null
           stage?: string
           status?: string
           subject?: string

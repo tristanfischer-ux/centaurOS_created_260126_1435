@@ -68,6 +68,7 @@ import {
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
 import { ModuleFlowCanvas } from "../components/module-flow-canvas"
 import { ProductOverviewCard } from "../components/product-overview-card"
+import { SeededBriefCard } from "../components/seeded-brief-card"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import {
@@ -719,6 +720,12 @@ export default function SpecifyPage(): React.ReactNode {
         {/* ═══ Overview tab ═══ */}
         {activeTab === "overview" && (
           <motion.div key="overview" role="tabpanel" id="specify-panel-overview" aria-labelledby="specify-tab-overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            {/* Seeded from product brief — 1.4. Renders structured constraints
+                when this project was created via convertBriefToForge. Returns
+                null when seeded_brief_content is absent, so it's safe to drop
+                unconditionally. */}
+            <SeededBriefCard projectId={activeProjectId} />
+
             {/* Product overview card — always visible so user can add/edit */}
             <ProductOverviewCard
               overview={productOverview}
