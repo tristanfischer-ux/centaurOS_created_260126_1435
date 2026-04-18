@@ -45,9 +45,16 @@ SET reviewed = true WHERE source = 'seed_llm_deepseek';
 The following slugs from SEED_TAXONOMY were cut by `--count=80` (can re-run to seed): cmm-inspection, laser-scanning-metrology, x-ray-ct-inspection, ultrasonic-inspection, dye-penetrant-inspection, magnetic-particle-inspection, hybrid-additive-subtractive, large-format-additive, wire-arc-additive.
 
 **Deferred for your review / decision:**
-- Phase 2B — Executive Review tab → collapsible card (low priority; folded into any future Source IA pass).
-- Phase 5D extras — Real-World Supplier Snapshot per module (aggregates matching marketplace_listings into a module-specific "7 suppliers hold ±0.1mm CFRP, 3 aerospace-certified" card); cost band from aiCostEstimates.
-- Phase 5E — admin review view for seeded technique rows + nightly re-embed cron on content_hash change.
+- ~~Phase 2B — Executive Review tab → collapsible card~~ ✓ SHIPPED (commit `c688044e`, picked up my edits into a concurrent terminal's commit).
+- ~~Phase 5D extras — Real-World Supplier Snapshot + cost band~~ ✓ SHIPPED (commit `d9564833`).
+- ~~Phase 5E — admin review view + re-embed cron~~ ✓ SHIPPED (commit `23b6e5d8`).
+
+**2026-04-18 (continuation) — all remaining phases shipped:**
+| Phase | Commit | What |
+|---|---|---|
+| 2B | `c688044e` (picked up) + confirmed present | Executive Review removed from Source tab bar; now a Collapsible secondary card below Supplier Intelligence. `executive_review` URL param redirects to `supplier_intelligence`. |
+| 5D | `d9564833` | New server action `getSupplierSnapshotForModule` aggregates marketplace_listings (total / verified / regulated-cert count / lead-time band / top region) per module. MI tab renders two inline panels: Real-World Supplier Snapshot + Cost Band (±15/30/50% around `aiCostEstimates` per confidence). Popover updated with new data sources. |
+| 5E | `23b6e5d8` | `/ops/techniques` admin page with Pending/Live tabs + per-row Approve/Reject + bulk-approve. Server actions: `listAdminTechniques`, `approveTechnique`, `rejectTechnique`, `approveAllSeededTechniques`. Ops nav link (Wrench icon). Cron `/api/cron/re-embed-techniques` runs daily at 04:00 UTC: walks both technique tables, re-embeds rows whose SHA-256 content hash differs, capped at 200 rows/run. CRON_SECRET gated; fails closed when NOMIC_API_KEY absent. |
 
 **agent-browser verification:**
 - `/the-forge` + `/the-forge/cad-lab` (Design stage) + `/marketplace?category=Services&q=…` + `/today` all render clean post-deploys.
@@ -486,8 +493,8 @@ Per phase — phase is complete only if:
 
 ### Phase 2 — Source Page IA Restructure
 - [x] **2A: Classification Review auto-collapse** — ships `5ba936f3` (2026-04-18). Tri-state userCollapsed; collapsed by default when `needsReviewCount === 0`, with green "All N classified" badge; user toggle persists.
+- [x] **2B: Executive Review → secondary collapsed panel** — ships `c688044e` (picked up from concurrent terminal's git add) + post-push-verify. Removed from `TABS` array; rendered as a `Collapsible` card at the bottom of the Supplier Intelligence tab with "Executive Review (optional) — expert eyes on your sourcing plan" trigger. URL param `tab=executive_review` redirects to `supplier_intelligence`. Specify untouched (design context keeps it as a first-class tab).
 - [x] **2C: Sankey supplier-coverage overlay** — ships as part of `080466a6` (2026-04-18, picked up my edits when another terminal committed). Each make-category shows "N/2 shortlisted" pill (green/amber/red). Buy categories skipped. Tooltip explains coverage state.
-- [ ] **2B: Executive Review → secondary collapsed panel** (swap tab for scroll card)
 - [ ] **2D: Section reorder** per Round 2 decisions — DEFERRED until Phase 3 SupplierPanel consolidation lands (reorder would churn twice otherwise)
 
 ### Phase 3 — Shortlist verdict-awareness [✓ SHIPPED]
@@ -525,9 +532,10 @@ Per phase — phase is complete only if:
 - [x] 5D: Shipped commit `5294e6df`, deploy Production success
 - [x] 5B: **DONE** — 80/80 techniques LLM-seeded via DeepSeek + embedded via Nomic, all `reviewed=false`. Article lengths 670–1359 chars; sampled quality factory-accurate. Tristan to approve in bulk or per-slug (SQL in Session Summary block above).
 - [ ] 5B: Second-pass fact-check (defer — wait for Tristan review of seeded rows)
-- [ ] 5D: Real-World Supplier Snapshot per module (DEFERRED — needs cross-query to marketplace_listings; not urgent)
-- [ ] 5D: Cost band from aiCostEstimates (DEFERRED)
-- [ ] 5E: Admin review view + nightly re-embed cron (DEFERRED until 5B completes + Tristan approves batch)
+- [x] 5D: Real-World Supplier Snapshot per module (commit `d9564833`). Server action `getSupplierSnapshotForModule` aggregates marketplace_listings matching process + material: total/verified/regulated-cert count (aligned to project industry via REGULATORY_CERTS), lead-time band (20th/80th percentile from parsed free-text), top region. Rendered inline on MI tab.
+- [x] 5D: Cost band from aiCostEstimates (commit `d9564833`). Confidence-banded range (±15/30/50% for high/medium/low) shown when an estimate exists. Labelled clearly as "estimated", not a quote.
+- [x] 5E: Admin review view at `/ops/techniques` (commit `23b6e5d8`). Pending/Live tabs, per-row approve/reject, bulk-approve all seed_llm_deepseek rows. `requireAdmin()`-gated.
+- [x] 5E: Nightly re-embed cron at `/api/cron/re-embed-techniques` (commit `23b6e5d8`). 04:00 UTC daily via vercel.json. Hashes current row content, re-embeds any where hash differs or embedding is null. Capped at 200/run, 10/batch. CRON_SECRET gate; fails closed without NOMIC_API_KEY.
 
 ### Phase 6 — Specify Executive Review extension [✓ SHIPPED 2026-04-18]
 - [x] Secondary "Or talk to suppliers who could make this" card (commit `7983560c`)
