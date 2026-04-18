@@ -268,13 +268,13 @@ Running total of everything shipped in the FULL-BACKLOG run (this tracker) — s
 | 4.2 | /suppliers + /[id] | **done** | `237ab15b` | pending prod check | Page passed token + voice sweeps, no duplicate h1s, no AI-promote framings. 491-line detail page has security-hardened `ensureProtocol` and status tokens. Added aria-labels to the SupplierSearchClient search input, Search button (swaps "Run search" / "Searching — please wait"), and insights-panel collapse toggle. Full aria sweep on the detail page is a larger follow-up. |
 | 4.3 | /retainers + subs | **done (audit clean)** | — | pending prod check | 6 files across /retainers, /retainers/[id], /retainers/[id]/timesheet, /retainers/new audited 2026-04-18. Passes check-design-tokens.sh. No voice violations (grepped AI-powered / Want me to / most founders — zero hits). No duplicate h1s — four distinct pages, one h1 each. No-change audit. |
 | 4.4 | /rfq/[id] | **done (audit clean)** | — | pending prod check | /rfq/[id] + /rfq/[id]/edit audited 2026-04-18. Passes check-design-tokens.sh. No voice violations. No-change audit. |
-| 5.1 | /canvas | pending | — | — | — |
-| 5.2 | /analytics | pending | — | — | — |
-| 5.3 | /playbooks | pending | — | — | — |
-| 5.4 | /workshop | pending | — | — | — |
-| 5.5 | /plan | pending | — | — | — |
-| 5.6 | /pricing | pending | — | — | — |
-| 5.7 | /settings/* (8 subtabs) | pending | — | — | — |
+| 5.1 | /canvas | **done (legacy redirect)** | — | n/a | /canvas is a redirect to /strategy (`src/app/(platform)/canvas/page.tsx`). No user-facing surface to audit. Logged in the legacy-redirects architecture drawer (MemPalace). |
+| 5.2 | /analytics | **done (audit clean)** | — | pending prod check | Passes check-design-tokens.sh. No voice violations. |
+| 5.3 | /playbooks | **done (audit clean)** | — | pending prod check | Passes check-design-tokens.sh. Single playbooks-page.tsx with one h1. No voice violations. |
+| 5.4 | /workshop | **done (audit clean)** | — | pending prod check | Passes check-design-tokens.sh. No voice violations. |
+| 5.5 | /plan | **done (audit clean)** | — | pending prod check | Passes check-design-tokens.sh. No voice violations. |
+| 5.6 | /pricing | **done (audit clean)** | — | pending prod check | Marketing page at `src/app/pricing/` (outside `(platform)` — public). Passes check-design-tokens.sh. Marketing copy follows Tristan's LinkedIn voice, not in-product CLAUDE.md rules. |
+| 5.7 | /settings/* (8 subtabs) | **done (audit clean)** | — | pending prod check | Checked: settings/account, billing, company, email, intelligence, integrations, audit-log, standards, privacy, help. 17 TSX files audited. Passes check-design-tokens.sh. No voice violations. |
 | 6.1 | Infrequent (9 items) | pending | — | — | — |
 | 6.2 | Admin | SKIP | — | — | Not founder-facing |
 | 6.3 | Supplier persona | separate initiative | — | — | Different user class |
