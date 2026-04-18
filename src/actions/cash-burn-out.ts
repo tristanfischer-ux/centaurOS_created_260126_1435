@@ -297,6 +297,151 @@ export async function deleteCashOutItem(id: string): Promise<ActionResult> {
 }
 
 // ============================================================
+// Seed from Products — 1.1B
+// ============================================================
+
+/**
+ * Seed COGS cash-out rows from Products that have cogs_per_unit_pence + target monthly volume set.
+ *
+ * @description For each eligible product (needs unit_economics.cogs_per_unit_pence > 0
+ * AND target_monthly_units > 0), upsert one `cash_out_items` row marked with
+ * `source='product_seed'`, `pnl_category='cogs'`, and the product's id. Re-running
+ * is safe: rows are updated in place by (foundry_id, product_id, source='product_seed').
+ * Uses category='manufacturing' + cost_type='variable' as sensible COGS defaults —
+ * founder can adjust after.
+ */
+export async function seedCashOutCogsFromProducts(): Promise<
+  ActionResult<{ seeded: number; updated: number; skipped: number }>
+> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Not authenticated' }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: products, error: productsErr } = await (supabase as any)
+      .from('products')
+      .select('id, name, target_monthly_units, unit_economics')
+      .eq('foundry_id', foundryId)
+
+    if (productsErr) {
+      console.error('[CashBurn] seedCashOutCogsFromProducts: products fetch failed:', productsErr)
+      return { data: null, error: 'Could not read products' }
+    }
+
+    type EligibleProduct = { id: string; name: string; target_monthly_units: number; cogs_per_unit_pence: number }
+    const eligible: EligibleProduct[] = []
+    let totalSkipped = 0
+    for (const p of (products ?? []) as Array<{
+      id: string
+      name: string
+      target_monthly_units: number | null
+      unit_economics: { cogs_per_unit_pence?: number | null } | null
+    }>) {
+      const cogs = p.unit_economics?.cogs_per_unit_pence
+      if (p.target_monthly_units != null && p.target_monthly_units > 0 && cogs != null && cogs > 0) {
+        eligible.push({
+          id: p.id,
+          name: p.name,
+          target_monthly_units: p.target_monthly_units,
+          cogs_per_unit_pence: cogs,
+        })
+      } else {
+        totalSkipped++
+      }
+    }
+
+    if (eligible.length === 0) {
+      return { data: { seeded: 0, updated: 0, skipped: totalSkipped }, error: null }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing, error: existingErr } = await (supabase as any)
+      .from('cash_out_items')
+      .select('id, product_id')
+      .eq('foundry_id', foundryId)
+      .eq('source', 'product_seed')
+      .eq('pnl_category', 'cogs')
+      .in('product_id', eligible.map((p) => p.id))
+
+    if (existingErr) {
+      console.error('[CashBurn] seedCashOutCogsFromProducts: existing lookup failed:', existingErr)
+      return { data: null, error: 'Could not read existing seed rows' }
+    }
+
+    const existingByProduct = new Map<string, string>(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (existing ?? []).map((r: any) => [r.product_id as string, r.id as string]),
+    )
+
+    let created = 0
+    let updated = 0
+
+    for (const p of eligible) {
+      const monthlyAmount = p.cogs_per_unit_pence * p.target_monthly_units
+      const noteToday = new Date().toISOString().slice(0, 10)
+      const existingId = existingByProduct.get(p.id)
+
+      if (existingId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: updateErr } = await (supabase as any)
+          .from('cash_out_items')
+          .update({
+            name: `${p.name} — COGS`,
+            amount: monthlyAmount,
+            frequency: 'monthly',
+            category: 'manufacturing',
+            cost_type: 'variable',
+            pnl_category: 'cogs',
+            notes: `Seeded from product on ${noteToday}. Revise as your unit economics firm up.`,
+            is_active: true,
+          })
+          .eq('id', existingId)
+          .eq('foundry_id', foundryId)
+        if (updateErr) {
+          console.error('[CashBurn] seedCashOutCogsFromProducts: update failed for', p.id, updateErr)
+          continue
+        }
+        updated++
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: insertErr } = await (supabase as any)
+          .from('cash_out_items')
+          .insert({
+            foundry_id: foundryId,
+            created_by: user.id,
+            name: `${p.name} — COGS`,
+            category: 'manufacturing',
+            cost_type: 'variable',
+            pnl_category: 'cogs',
+            amount: monthlyAmount,
+            frequency: 'monthly',
+            effective_from: new Date().toISOString().slice(0, 10),
+            notes: `Seeded from product on ${noteToday}. Revise as your unit economics firm up.`,
+            product_id: p.id,
+            source: 'product_seed',
+          })
+        if (insertErr) {
+          console.error('[CashBurn] seedCashOutCogsFromProducts: insert failed for', p.id, insertErr)
+          continue
+        }
+        created++
+      }
+    }
+
+    revalidatePath('/cash-burn')
+    revalidatePath('/cash-burn/cash-out')
+    return { data: { seeded: created, updated, skipped: totalSkipped }, error: null }
+  } catch (err) {
+    console.error('[CashBurn] seedCashOutCogsFromProducts failed:', err)
+    return { data: null, error: 'Seed failed — check server logs' }
+  }
+}
+
+// ============================================================
 // Mapper
 // ============================================================
 

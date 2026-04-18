@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { TrendingDown, AlertTriangle, Zap, Upload } from 'lucide-react'
+import { TrendingDown, AlertTriangle, Zap, Upload, Package, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +31,9 @@ import {
   createCashOutItem,
   updateCashOutItem,
   deleteCashOutItem,
+  seedCashOutCogsFromProducts,
 } from '@/actions/cash-burn-out'
+import { toast } from 'sonner'
 import { getProducts } from '@/actions/products'
 import type { CashOutItem, CreateCashOutInput } from '@/types/cash-burn'
 import type { WizardProfile, WizardCompanyContext } from '@/actions/cash-burn-out'
@@ -51,6 +53,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   const [editingItem, setEditingItem] = useState<CashOutItem | null>(null)
   const [defaultCostType, setDefaultCostType] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
+  const [isSeeding, setIsSeeding] = useState(false)
   const [startDate] = useState(() => new Date())
 
   // INTENT: Fetch products for product-name badges and filter dropdown
@@ -214,6 +217,50 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             Quick Setup
           </Button>
+          {Object.keys(productNameMap).length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isSeeding}
+              onClick={async () => {
+                setIsSeeding(true)
+                try {
+                  const result = await seedCashOutCogsFromProducts()
+                  if (result.error) {
+                    toast.error(result.error)
+                    return
+                  }
+                  const d = result.data
+                  if (!d) { toast.error('Seed returned no data'); return }
+                  const total = d.seeded + d.updated
+                  if (total === 0) {
+                    toast.info(d.skipped > 0
+                      ? `No products had both COGS and target monthly volume set. Add unit economics on ${d.skipped} product${d.skipped === 1 ? '' : 's'} in The Forge or Products page to seed COGS rows.`
+                      : 'No products with COGS to seed from.')
+                  } else {
+                    const parts = []
+                    if (d.seeded > 0) parts.push(`${d.seeded} new COGS row${d.seeded === 1 ? '' : 's'}`)
+                    if (d.updated > 0) parts.push(`${d.updated} existing row${d.updated === 1 ? '' : 's'} refreshed`)
+                    toast.success(`Seeded from Products — ${parts.join(', ')}. Revise category + cost type as your unit economics firm up.`)
+                  }
+                  router.refresh()
+                } catch (err) {
+                  console.error('[CashOut] seed COGS from products failed:', err)
+                  toast.error('Seed failed — check server logs')
+                } finally {
+                  setIsSeeding(false)
+                }
+              }}
+              title="Create (or refresh) monthly COGS rows from every product with cogs_per_unit_pence + target monthly volume set"
+            >
+              {isSeeding ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Package className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Seed COGS from Products
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
