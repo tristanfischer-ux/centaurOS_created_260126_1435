@@ -274,6 +274,11 @@ export interface CadLabContextValue {
   revisedModuleIds: Set<string>
   checkpointAcknowledged: boolean
   handleAcknowledgeCheckpoints: () => void
+  /** Populated when specialist checkpoint flagged design-level infeasibility
+   *  (e.g. "not manufacturable at stated wingspan"). UI should offer a
+   *  "Revise the design" path that opens the DesignIterationDialog. */
+  designInfeasibility: { flagged: boolean; evidence: string[] } | null
+  clearDesignInfeasibility: () => void
 
   // Product overview (editable executive summary)
   productOverview: string
@@ -635,6 +640,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Decomposition checkpoints ──
   const [checkpoints, setCheckpoints] = useState<Record<string, DecompositionCheckpoint> | null>(null)
+  const [designInfeasibility, setDesignInfeasibility] = useState<{ flagged: boolean; evidence: string[] } | null>(null)
+  const clearDesignInfeasibility = useCallback(() => setDesignInfeasibility(null), [])
   const [isCheckpointing, setIsCheckpointing] = useState(false)
 
   // P9: Early cost estimates keyed by moduleId
@@ -4183,9 +4190,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       const revisedIds = Object.keys(revised)
 
       // Surface design-level infeasibility *first* — these are the "this won't work"
-      // concerns that no amount of module rewriting will fix.
+      // concerns that no amount of module rewriting will fix. Also capture the
+      // concern in state so the "Revise the design" CTA can open the iteration
+      // dialog (Phase IV wiring).
       if (result.designLevelInfeasibility) {
-        toast.warning("Design-level concern flagged — your wingspan / mass / power budget may not be buildable. Revise the research report before generating CAD.", { duration: 12_000 })
+        setDesignInfeasibility({ flagged: true, evidence: result.infeasibilityEvidence ?? [] })
+        toast.warning("Design-level concern flagged — your wingspan / mass / power budget may not be buildable. Click 'Revise the design' to see alternatives.", { duration: 12_000 })
       }
 
       if (revisedIds.length === 0) {
@@ -4905,6 +4915,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, integrationAssemblyCode, setIntegrationError, handleGenerateIntegration,
     checkpoints, isCheckpointing,
     isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
+    designInfeasibility, clearDesignInfeasibility,
     productOverview, setProductOverview: setProductOverviewAndSave,
     handleUpdateModule,
     earlyCostEstimates,

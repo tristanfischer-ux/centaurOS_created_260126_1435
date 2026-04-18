@@ -16,74 +16,32 @@
 
 "use server"
 
+// GOTCHA: This file has the 'use server' directive, which means ONLY async
+// function exports are allowed. Types + constants live in
+// @/lib/cad-lab/design-iteration-types so both the server action layer and
+// the client UI can reference the shared shape. Re-exporting types here
+// would fail the Turbopack build ("Server Actions must be async functions").
+
 import { createHash } from "node:crypto"
 import { withAuth } from "@/lib/server-action-utils"
 import { isValidUUID } from "@/lib/validations"
 import type { Json } from "@/types/database.types"
+import type {
+  IterationTrigger, DesignAlternative,
+} from "@/lib/cad-lab/design-iteration-types"
+import {
+  MAX_ITERATIONS_PER_PROJECT, MAX_ITERATIONS_PER_CONCERN,
+} from "@/lib/cad-lab/design-iteration-types"
 
-// ─── Types ─────────────────────────────────────────────────────────
+// ─── Local action-input types (not re-exported to avoid 'use server' errors) ──
 
-export type IterationTrigger =
-  | "specialist_infeasibility"
-  | "cost_overrun"
-  | "compliance_miss"
-  | "lead_time_exceeded"
-  | "moq_mismatch"
-  | "manual"
-
-/**
- * One design alternative as presented to the founder. Shape stays stable
- * across trigger types; trigger-specific fields live in `changes` (JSONB)
- * so the generator can emit wingspan + mass deltas for infeasibility or
- * material-substitution paths for cost reduction.
- */
-export interface DesignAlternative {
-  headline: string
-  /** Why this addresses the concern — references the concern explicitly */
-  rationale: string
-  /** Plain-English "what this means for you" — for first-time founders */
-  plainEnglish: string
-  /** Structured field changes to apply if this alternative is picked */
-  changes: Record<string, unknown>
-  /** 3-5 labelled trade-off dimensions (mass, power, cost, complexity, schedule, risk) */
-  tradeOffs: Array<{ dimension: string; delta: string }>
-  /** Confidence: low | medium | high */
-  confidence: "low" | "medium" | "high"
-  /** Severity flags when the alternative breaks something the founder should see */
-  severity: {
-    exportControls?: boolean
-    featureDescope?: boolean
-    supplyCommitmentBreak?: boolean
-  }
-  /** One alternative per set should be flagged "recommended" */
-  recommended: boolean
-}
-
-export interface RecordIterationInput {
+interface RecordIterationInput {
   projectId: string
   triggeredBy: IterationTrigger
   concernText: string
   triggerContext?: Record<string, unknown>
   alternativesPresented: DesignAlternative[]
 }
-
-export interface IterationHistoryEntry {
-  id: string
-  triggeredBy: IterationTrigger
-  concernHash: string
-  concernText: string
-  triggerContext: Record<string, unknown>
-  alternativesPresented: DesignAlternative[]
-  chosenOptionIndex: number | null
-  founderNotes: string | null
-  overrideReason: string | null
-  appliedAt: string | null
-  createdAt: string
-}
-
-// Limits from Plan Phase VI
-export const MAX_ITERATIONS_PER_PROJECT = 5
-export const MAX_ITERATIONS_PER_CONCERN = 3
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -269,7 +227,7 @@ export async function getIterationStatsForProject(projectId: string) {
 
 // ─── Commit founder decision (rejected / picked / abandoned) ─────
 
-export interface CommitIterationDecisionInput {
+interface CommitIterationDecisionInput {
   iterationId: string
   chosenOptionIndex: number /* 0..2 pick | -1 rejected (keep as-is) | -2 abandoned */
   founderNotes?: string
@@ -306,7 +264,7 @@ export async function commitIterationDecision(input: CommitIterationDecisionInpu
 
 // ─── Add a concern to the accepted-risk register (abandon path) ─
 
-export interface AcceptRiskInput {
+interface AcceptRiskInput {
   projectId: string
   concernHash: string
   concernText: string

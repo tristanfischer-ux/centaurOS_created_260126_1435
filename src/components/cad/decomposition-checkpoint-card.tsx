@@ -24,6 +24,7 @@ import {
     AlertTriangle,
     AlertOctagon,
     Info,
+    Sparkles,
 } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -56,6 +57,13 @@ interface DecompositionCheckpointCardProps {
     isRevising?: boolean
     /** Number of modules that were revised */
     revisedModuleCount?: number
+    /** When a specialist flagged the design as not buildable-as-specified, the
+     *  founder should see a "Revise the design" CTA that opens the iteration
+     *  dialog with alternative research-level changes (wider wingspan, split
+     *  module, etc.). Evidence array has the specialist quotes that matched. */
+    designInfeasibility?: { flagged: boolean; evidence: string[] } | null
+    /** Opens the DesignIterationHost's infeasibility flow. */
+    onReviseDesign?: (concernText: string, specialists: string[]) => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────
@@ -67,6 +75,8 @@ export function DecompositionCheckpointCard({
     acknowledged = false,
     isRevising = false,
     revisedModuleCount = 0,
+    designInfeasibility = null,
+    onReviseDesign,
 }: DecompositionCheckpointCardProps) {
     const [isExpanded, setIsExpanded] = useState(true)
 
@@ -124,6 +134,35 @@ export function DecompositionCheckpointCard({
                             <p className="text-xs text-muted-foreground">
                                 Flagged modules will have specialist feedback applied during CAD generation.
                             </p>
+                        </div>
+                    )}
+
+                    {/* Design-level infeasibility CTA (Phase IV). Shown when
+                     *  detectDesignInfeasibility matched on the checkpoint results —
+                     *  i.e. a specialist said "this design won't work at stated X".
+                     *  Leads the founder into the iteration flow rather than letting
+                     *  them continue with a broken design. */}
+                    {designInfeasibility?.flagged && onReviseDesign && (
+                        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-warning/10 border border-warning/30">
+                            <AlertOctagon className="h-4 w-4 mt-0.5 flex-shrink-0 text-warning" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-foreground">
+                                    Design-level concern flagged
+                                </p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">
+                                    One or more specialists said the design as specified may not be buildable. Rewriting module text won&apos;t fix this — the research-level parameters (wingspan, mass budget, power budget) need to change.
+                                </p>
+                                <Button
+                                    size="sm"
+                                    onClick={() => onReviseDesign(
+                                        designInfeasibility.evidence.join("\n\n") || "Design-level concern flagged by specialists.",
+                                        [],
+                                    )}
+                                >
+                                    <Sparkles className="h-3 w-3 mr-1.5" />
+                                    Revise the design
+                                </Button>
+                            </div>
                         </div>
                     )}
 

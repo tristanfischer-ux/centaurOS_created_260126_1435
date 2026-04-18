@@ -26,7 +26,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import type { DesignAlternative, IterationHistoryEntry, IterationTrigger } from "@/actions/design-iterations"
+import type {
+  DesignAlternative, IterationHistoryEntry, IterationTrigger,
+} from "@/lib/cad-lab/design-iteration-types"
 import {
   commitIterationDecision,
   acceptDesignRisk,

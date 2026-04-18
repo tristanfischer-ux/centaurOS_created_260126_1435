@@ -21,7 +21,7 @@
 import { withAIGate } from "@/lib/ai/with-ai-gate"
 import { createClient } from "@/lib/supabase/server"
 import { isValidUUID } from "@/lib/validations"
-import type { DesignAlternative } from "@/actions/design-iterations"
+import type { DesignAlternative } from "@/lib/cad-lab/design-iteration-types"
 
 // Use the latest Opus for reasoning quality on design trade-offs.
 const GENERATOR_MODEL = "claude-opus-4-7"

@@ -62,6 +62,7 @@ import { ModuleFlowCanvas } from "./components/module-flow-canvas"
 import { ProductOverviewCard } from "./components/product-overview-card"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { DecompositionCheckpointCard } from "@/components/cad/decomposition-checkpoint-card"
+import { DesignIterationHost, type DesignIterationHostHandle } from "@/components/cad/design-iteration-host"
 import { CheckpointRevisionDiffs } from "./components/checkpoint-revision-diffs"
 import { DesignReportDialog } from "./components/design-report-dialog"
 import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
@@ -88,6 +89,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     progressLines,
     checkpoints, isCheckpointing,
     isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
+    designInfeasibility, clearDesignInfeasibility,
     productOverview, setProductOverview,
     saveError,
     handleUpdateModule,
@@ -102,6 +104,12 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+
+  // ── Design iteration host ref — Phase IV wiring.
+  // Exposes triggerInfeasibility / triggerCostReduction / triggerManual so the
+  // "Revise the design" button on the checkpoint card + any other trigger can
+  // kick off the full generate→record→dialog→apply flow.
+  const designIterationHostRef = useRef<DesignIterationHostHandle | null>(null)
   const [heroView, setHeroView] = useState<"2d" | "3d">("2d")
   const [overviewApproved, setOverviewApproved] = useState(false)
 
@@ -1238,6 +1246,28 @@ export default function CadLabResearchPage(): React.ReactNode {
                   acknowledged={checkpointAcknowledged}
                   isRevising={isRevising}
                   revisedModuleCount={revisedModuleIds.size}
+                  designInfeasibility={designInfeasibility}
+                  onReviseDesign={(concernText, specialists) => {
+                    designIterationHostRef.current?.triggerInfeasibility(concernText, specialists)
+                  }}
+                />
+              )}
+
+              {/* Design iteration host — mounted here so it can be invoked from
+                  the checkpoint card above + any future trigger surfaces. */}
+              {activeProjectId && (
+                <DesignIterationHost
+                  ref={designIterationHostRef}
+                  projectId={activeProjectId}
+                  onApplied={() => {
+                    // After apply: clear the infeasibility flag so the CTA
+                    // disappears. The context's design_revision bump + image
+                    // staleness handling happens server-side inside
+                    // applyDesignIteration, so no further client state change
+                    // is required beyond re-running whichever checkpoint step
+                    // the founder next triggers.
+                    clearDesignInfeasibility()
+                  }}
                 />
               )}
 
