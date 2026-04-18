@@ -1083,6 +1083,44 @@ export default function SourcePage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
+      {/* Phase 2D (2026-04-18): section order follows Round 2 red-team:
+          Header → constraint banners → specialist framing → Classification Review
+          → Tabs (Suppliers / Shortlist / Costs / Supplier Intelligence + Chase
+          + Exec Review as collapsed inside Supplier Intelligence). Chase's
+          SupplierFitnessReview moved into the Supplier Intelligence tab where
+          it belongs contextually. Page header moved to the top. */}
+
+      {/* ── Page header (top of scroll) ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-international-orange" />
+            Source
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Match suppliers, create RFQs, and compare quotes.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabSpecify)}>
+            <ArrowLeft className="h-4 w-4 mr-1.5" />
+            Specify
+          </Button>
+          <GetQuoteButton
+            projectId={activeProjectId}
+            pipelineStage="source"
+            modules={modules}
+            diagnosticAnswers={diagnosticAnswers}
+            designBrief={designBrief}
+            assumptionNotes={assumptionNotes}
+            projectName={subject}
+            linkedRfqId={linkedRfqId}
+            onRfqLinked={linkRfqToProject}
+            size="sm"
+          />
+        </div>
+      </div>
+
       {/* Design-iteration host — cost-reduction trigger on Costs tab routes here. */}
       {activeProjectId && (
         <DesignIterationHost
@@ -1144,16 +1182,7 @@ export default function SourcePage(): React.ReactNode {
         revisedModuleIds={revisedModuleIds}
       />
 
-      {/* ── Supplier fitness checks + AI company review ── */}
-      <SupplierFitnessReview
-        modules={eligibleModules}
-        diagnosticAnswers={diagnosticAnswers}
-        supplierMatches={supplierMatches}
-        activeProjectId={activeProjectId}
-        subject={subject}
-      />
-
-      {/* ── Supply Risk Radar (always visible once suppliers shortlisted) ── */}
+      {/* ── Supply Risk Radar (framing before supplier picks) ── */}
       <SupplyRiskRadar
         shortlistedSuppliers={shortlistedSuppliers}
         categoryRankings={categoryRankings}
@@ -1162,37 +1191,6 @@ export default function SourcePage(): React.ReactNode {
         targetMarket={targetMarket}
         onTargetMarketChange={setTargetMarket}
       />
-
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5 text-international-orange" />
-            Source
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Match suppliers, create RFQs, and compare quotes.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabSpecify)}>
-            <ArrowLeft className="h-4 w-4 mr-1.5" />
-            Specify
-          </Button>
-          <GetQuoteButton
-            projectId={activeProjectId}
-            pipelineStage="source"
-            modules={modules}
-            diagnosticAnswers={diagnosticAnswers}
-            designBrief={designBrief}
-            assumptionNotes={assumptionNotes}
-            projectName={subject}
-            linkedRfqId={linkedRfqId}
-            onRfqLinked={linkRfqToProject}
-            size="sm"
-          />
-        </div>
-      </div>
 
       {/* ── Classification review panel ── */}
       <ClassificationReviewPanel
@@ -1522,6 +1520,18 @@ export default function SourcePage(): React.ReactNode {
               diagnosticAnswers={diagnosticAnswers}
               supplierMatches={supplierMatches}
               companyReviews={sharedCompanyReviews}
+            />
+
+            {/* Phase 2D: Chase's per-supplier narrative review lives inside
+                Supplier Intelligence — same context (matched suppliers), same
+                scoring pool. Previously rendered above the tab bar where it
+                competed with the page header for primary attention. */}
+            <SupplierFitnessReview
+              modules={eligibleModules}
+              diagnosticAnswers={diagnosticAnswers}
+              supplierMatches={supplierMatches}
+              activeProjectId={activeProjectId}
+              subject={subject}
             />
 
             {/* Phase 2B: Executive Review moved from standalone tab to a
