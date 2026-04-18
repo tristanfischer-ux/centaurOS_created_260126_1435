@@ -452,21 +452,23 @@ Per phase — phase is complete only if:
 - [ ] Ship + verify
 
 ### Phase 5 — Specify MI: vector-backed + extensive
-- [ ] 5A: Migration — manufacturing_techniques + related tables
-- [ ] 5A: Bootstrap seed from static library (feature parity)
-- [ ] 5B: LLM-seed 200+ techniques via batched generation
-- [ ] 5B: Second-pass fact-check + mark reviewed
-- [ ] 5C: Add embedding columns + HNSW indexes
-- [ ] 5C: Embed all reviewed rows
-- [ ] 5C: Create match_manufacturing_techniques RPC
-- [ ] 5D: Rewrite `matchManufacturingTechniques()` action
-- [ ] 5D: Swap UI to vector-backed retrieval
-- [ ] 5D: Rename tab → "Design for Manufacture"
-- [ ] 5D: Inline data-provenance popover
-- [ ] 5D: Real-World Supplier Snapshot per module
-- [ ] 5D: Cost band from aiCostEstimates
-- [ ] 5E: Admin review view + nightly re-embed cron
-- [ ] Ship + verify
+- [x] 5A: Migration `20260421000000_manufacturing_techniques_embeddings.sql` applied (embedding + content_hash + embedded_at on both tables; `reviewed boolean` on enrichments; HNSW cosine indexes)
+- [x] 5A: Bootstrap via backfill script — 47/47 existing rows embedded (20 process_capabilities + 27 enrichments) with nomic-embed-text-v1.5 at 768 dims
+- [x] 5C: `match_manufacturing_techniques(query_embedding, match_threshold, match_count, only_reviewed)` RPC created with FULL OUTER JOIN across both tables
+- [x] 5C: Smoke test passes — cnc_milling → cnc_turning 0.93, laser_cutting 0.84, sheet_metal_bending 0.83 …
+- [x] 5C: Nightshift rows (curated) flipped to `reviewed=true` post-migration so they surface by default
+- [x] 5D: `src/actions/cad-lab-dfm-match.ts` — `matchManufacturingTechniques()` action
+- [x] 5D: Specify page fetches per-module via `semanticTechniqueMatches` state
+- [x] 5D: MI tab renders "Related Techniques (semantic)" section with similarity %
+- [x] 5D: Tab renamed "Design for Manufacture"
+- [x] 5D: Inline "What's this data?" popover documenting the three data sources
+- [x] 5D: Slug-format tolerance on dialog open (snake ↔ kebab)
+- [x] 5D: Shipped commit `5294e6df`, deploy Production success
+- [ ] 5B: **In-flight (background task batqsdh8k)** — LLM-seeding ~80 more techniques from `SEED_TAXONOMY` via DeepSeek + Nomic embedding, writing with `reviewed=false` so hidden from UI until human approval. Progress: 20/80 inserted as of 14:35.
+- [ ] 5B: Second-pass fact-check (defer — wait for Tristan review of seeded rows)
+- [ ] 5D: Real-World Supplier Snapshot per module (DEFERRED — needs cross-query to marketplace_listings; not urgent)
+- [ ] 5D: Cost band from aiCostEstimates (DEFERRED)
+- [ ] 5E: Admin review view + nightly re-embed cron (DEFERRED until 5B completes + Tristan approves batch)
 
 ### Phase 6 — Specify Executive Review extension [✓ SHIPPED 2026-04-18]
 - [x] Secondary "Or talk to suppliers who could make this" card (commit `7983560c`)
