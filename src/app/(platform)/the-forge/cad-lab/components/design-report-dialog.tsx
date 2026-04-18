@@ -19,7 +19,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { FileDown, FileText, Presentation, Printer, Sparkles, Route } from "lucide-react"
+import { FileDown, FileText, Presentation, Printer, Sparkles, Route, Briefcase, Wrench, Truck, Megaphone } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -33,11 +33,14 @@ import {
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 import { useCadLab } from "../cad-lab-context"
 import { useBackgroundOp } from "@/hooks/useBackgroundOp"
 import { createClient } from "@/lib/supabase/client"
 import type { DesignReportFormat, DesignReportData, ReportStage } from "@/lib/cad-lab/design-report-types"
+import type { ReportAudience } from "@/lib/cad-lab/audience"
+import { AUDIENCE_META, DEFAULT_AUDIENCE, REPORT_AUDIENCES, isAudienceViableAtStage } from "@/lib/cad-lab/audience"
 
 interface DesignReportDialogProps {
   open: boolean
@@ -85,11 +88,24 @@ const STAGE_LABELS: Record<ReportStage, string> = {
   journey: 'Design Journey',
 }
 
+const AUDIENCE_ICONS: Record<ReportAudience, typeof Briefcase> = {
+  investor: Briefcase,
+  engineer: Wrench,
+  supplier: Truck,
+  marketing: Megaphone,
+}
+
 export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stageData }: DesignReportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<DesignReportFormat | null>(null)
+  const [selectedAudience, setSelectedAudience] = useState<ReportAudience>(DEFAULT_AUDIENCE)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [journeyMode, setJourneyMode] = useState(false)
   const exportStartedRef = useRef(false)
+
+  // Stage used for audience gating — journey mode unlocks all audiences even
+  // if the user is on an early page, matching the "full chronological narrative"
+  // semantics of journey mode elsewhere in this dialog.
+  const effectiveStageForGating: ReportStage = journeyMode ? 'journey' : stage
 
   // Reset guard when dialog reopens
   useEffect(() => {
@@ -158,6 +174,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       generatedAt: new Date().toISOString(),
       heroImageUrl: systemIllustrationUrl ?? null,
       stage: effectiveStage,
+      audience: selectedAudience,
       productOverview: productOverview || "",
       researchReport: editableReport || "",
       sources,
@@ -175,7 +192,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     subject, editableReport, researchResult, modules, diagnosticAnswers,
     aiCostEstimates, productOverview, designBrief, systemIllustrationUrl,
     researchModelUsed, decompositionModelUsed, stage, stageData, journeyMode,
-    moduleReviews, reviewSkipped,
+    moduleReviews, reviewSkipped, selectedAudience,
   ])
 
   const handleExport = useCallback(async () => {
@@ -203,7 +220,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-") || "report"
             const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
             const uid = crypto.randomUUID().slice(0, 8)
-            storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.pdf`
+            storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${selectedAudience}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.pdf`
 
             const supabase = createClient()
             const { error: uploadError } = await supabase.storage
@@ -268,10 +285,10 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           try {
             update({ stepLabel: `AI: Structuring outline (${moduleCount} modules)...`, progress: 15 })
             const { structureReportOutline, writeReportSections, generateSlideImages } = await import("@/actions/cad-lab-report")
-            const { outline, tokensIn, tokensOut } = await structureReportOutline(data)
+            const { outline, tokensIn, tokensOut } = await structureReportOutline(data, selectedAudience)
 
             update({ stepLabel: `AI: Writing ${moduleCount} sections...`, progress: 35 })
-            let aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut })
+            let aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut }, selectedAudience)
 
             // Phase 2.5: Generate custom slide illustrations
             // GOTCHA: Server actions return data via React Flight — large base64 images
@@ -281,7 +298,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             if (imageCount > 0 && selectedFormat === "pptx") {
               try {
                 update({ stepLabel: `Generating ${imageCount} slide illustrations...`, progress: 60 })
-                aiContent = await generateSlideImages(outline, aiContent)
+                aiContent = await generateSlideImages(outline, aiContent, selectedAudience)
               } catch (imgErr) {
                 console.warn("[DesignReport] Slide image generation failed (non-fatal):", imgErr)
               }
@@ -324,7 +341,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-") || "report"
           const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
           const uid = crypto.randomUUID().slice(0, 8)
-          storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.${ext}`
+          storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${selectedAudience}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.${ext}`
 
           const supabase = createClient()
           const { error: uploadError } = await supabase.storage
@@ -365,7 +382,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       },
       { successMessage: `${formatLabel} report ready — downloaded` },
     )
-  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, journeyMode, modules.length, stage, activeProjectId, runInBackground])
+  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, journeyMode, modules.length, stage, activeProjectId, runInBackground, selectedAudience])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -380,35 +397,93 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 py-2">
-          {FORMAT_OPTIONS.map((opt) => {
-            const Icon = opt.icon
-            const isSelected = selectedFormat === opt.id
-            return (
-              <button
-                key={opt.id}
-                onClick={() => setSelectedFormat(opt.id)}
-                className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                  isSelected
-                    ? "border-international-orange bg-international-orange/5"
-                    : "border-border hover:border-muted-foreground/30"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 rounded-md p-1.5 ${isSelected ? "bg-international-orange/10" : "bg-muted"}`}>
-                    <Icon className={`h-4 w-4 ${isSelected ? "text-international-orange" : "text-muted-foreground"}`} />
+        {/* Audience picker — four cards, top of dialog */}
+        <TooltipProvider delayDuration={150}>
+          <div className="space-y-1.5 pt-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Audience</p>
+            <div className="grid grid-cols-2 gap-2">
+              {REPORT_AUDIENCES.map((audId) => {
+                const meta = AUDIENCE_META[audId]
+                const Icon = AUDIENCE_ICONS[audId]
+                const isSelected = selectedAudience === audId
+                const isViable = isAudienceViableAtStage(audId, effectiveStageForGating)
+
+                const card = (
+                  <button
+                    key={audId}
+                    type="button"
+                    disabled={!isViable}
+                    onClick={() => { if (isViable) setSelectedAudience(audId) }}
+                    className={`w-full text-left p-2.5 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? "border-international-orange bg-international-orange/5"
+                        : isViable
+                          ? "border-border hover:border-muted-foreground/30"
+                          : "border-border/60 opacity-50 cursor-not-allowed"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className={`mt-0.5 rounded-md p-1 ${isSelected ? "bg-international-orange/10" : "bg-muted"}`}>
+                        <Icon className={`h-3.5 w-3.5 ${isSelected ? "text-international-orange" : "text-muted-foreground"}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground leading-tight">{meta.label}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug line-clamp-2">{meta.description}</p>
+                      </div>
+                    </div>
+                  </button>
+                )
+
+                if (!isViable && meta.minStageReason) {
+                  return (
+                    <Tooltip key={audId}>
+                      <TooltipTrigger asChild>
+                        <div className="w-full">{card}</div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">
+                        {meta.minStageReason}
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                }
+                return card
+              })}
+            </div>
+          </div>
+        </TooltipProvider>
+
+        <div className="space-y-1.5 pt-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Format</p>
+          <div className="space-y-2">
+            {FORMAT_OPTIONS.map((opt) => {
+              const Icon = opt.icon
+              const isSelected = selectedFormat === opt.id
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => setSelectedFormat(opt.id)}
+                  className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                    isSelected
+                      ? "border-international-orange bg-international-orange/5"
+                      : "border-border hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 rounded-md p-1.5 ${isSelected ? "bg-international-orange/10" : "bg-muted"}`}>
+                      <Icon className={`h-4 w-4 ${isSelected ? "text-international-orange" : "text-muted-foreground"}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {opt.label}
+                        {opt.ext && <span className="text-muted-foreground font-normal"> ({opt.ext})</span>}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {opt.label}
-                      {opt.ext && <span className="text-muted-foreground font-normal"> ({opt.ext})</span>}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
-                  </div>
-                </div>
-              </button>
-            )
-          })}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Professional narration toggle */}
