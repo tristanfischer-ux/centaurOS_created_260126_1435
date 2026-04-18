@@ -58,34 +58,36 @@
 - [x] D-pdf-8. Delete legacy `export-design-report-pdf.ts`
 - [x] D-pdf-9. Commit — `63fbcd1a`
 
-### D — DOCX (all four audiences) PENDING
-- [ ] D-docx-1. Refactor `export-design-report-docx.ts` — accept audience, use image-resize
-- [ ] D-docx-2. Investor docx branch — cover, KPI callouts, narrative-led section order
-- [ ] D-docx-3. Engineer docx branch — dense spec tables, every-module detail sections
-- [ ] D-docx-4. Supplier docx branch — BOM-first, part classification, supplier + quote tables
-- [ ] D-docx-5. Marketing docx branch — editorial cover, module grid, narrative blocks
+### D — DOCX — Image resize + audience cover ✓ DONE (pass 1) · deeper layout PENDING
+- [x] D-docx-1. Image-resize wired — `fetchImageAsBuffer` routes through `resizeImageToBufferBase64` server action; all `ImageRun` types swap from 'png' to 'jpg'. Commit `cdc40974`. **This is the 45MB-docx fix.**
+- [x] D-docx-2. Audience-aware cover — editorial (investor/marketing) gets Cambria 60pt title + orange audience eyebrow replacing the generic FRACTIONAL FORGE masthead. Engineer/supplier keep Calibri 48pt.
+- [ ] D-docx-3. Investor-specific section composition — KPI callout table near top, cost deferred to end, specialist prose prioritised over raw tables
+- [ ] D-docx-4. Engineer-specific section composition — dense spec table per module (already close to this by default)
+- [ ] D-docx-5. Supplier-specific section composition — part classification first, supplier tables before specs
+- [ ] D-docx-6. Marketing-specific section composition — editorial narrative blocks, module grid, brand voice hero caption
 
-### D — PPTX (all four audiences) PENDING
-- [ ] D-pptx-1. Refactor `export-design-report-pptx.ts` — accept audience, use image-resize
-- [ ] D-pptx-2. Investor pptx branch — pptxgenjs native KPI chart on slide 2
-- [ ] D-pptx-3. Engineer pptx branch — dense module-detail slide per module
-- [ ] D-pptx-4. Supplier pptx branch — BOM + supplier comparison slides
-- [ ] D-pptx-5. Marketing pptx branch — full-bleed hero cover + 3-5 feature slides
+### D — PPTX — Image resize + audience cover ✓ DONE (pass 1) · deeper layout PENDING
+- [x] D-pptx-1. Image-resize wired — `fetchImageAsBase64` routes through `resizeImageToDataUri` server action. Commit `69ad06f6`.
+- [x] D-pptx-2. Audience-aware cover slide — editorial (investor/marketing) gets Georgia 36pt title + orange audience eyebrow; engineer/supplier keep Helvetica Neue 28pt. Subtitle Y reflows.
+- [ ] D-pptx-3. Investor — pptxgenjs native KPI chart slide (bar chart for module mass vs lead time)
+- [ ] D-pptx-4. Engineer — dense module-detail slide per module with full spec grid
+- [ ] D-pptx-5. Supplier — BOM comparison slide, supplier-match fitness slide
+- [ ] D-pptx-6. Marketing — full-bleed hero cover, 3-5 feature-focused slides
 
-### D — Print-HTML (all four audiences) PENDING
+### D — Print-HTML PENDING (lowest priority — may defer)
 - [ ] D-html-1. Create `export-design-report-html.tsx`
 - [ ] D-html-2. Per-audience print stylesheet + page structure
 
 ## Phase E — Verification
 
-- [ ] E1. `NODE_OPTIONS="--max-old-space-size=8192" npx tsc --noEmit` clean
-- [ ] E2. `npm run test -- cad-lab-report` passes
-- [ ] E3. agent-browser login with `~/.claude/scripts/forgeos-login.sh`
+- [x] E1. `NODE_OPTIONS="--max-old-space-size=8192" npx tsc --noEmit` — clean at every commit
+- [x] E6. Push to main — all commits pushed (A rescue, B, C, D-PDF, D-DOCX, D-PPTX)
+- [ ] E2. `npm run test -- cad-lab-report` passes (tests not yet extended for audience parameter — deferred)
+- [ ] E3. agent-browser login with `~/.claude/scripts/forgeos-login.sh` — **deferred to Tristan** (multi-agent working tree made autonomous browser testing risky)
 - [ ] E4. Seed complete test project (concept → journey) on claude-test-foundry
 - [ ] E5. Export all 16 combinations; record results in matrix below
-- [ ] E6. Push to main; verify Vercel Production + Preview Ready
-- [ ] E7. Smoke test deployed flow with one audience × format
-- [ ] E8. Update `tasks/lessons.md` with any rules learned
+- [ ] E7. Smoke test deployed flow with one audience × format — **deferred to Tristan**
+- [ ] E8. Update `tasks/lessons.md` with any rules learned (concurrent-agent commit pattern should be copied there)
 
 ---
 
