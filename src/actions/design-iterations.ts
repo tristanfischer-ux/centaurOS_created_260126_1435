@@ -27,7 +27,7 @@ import { withAuth } from "@/lib/server-action-utils"
 import { isValidUUID } from "@/lib/validations"
 import type { Json } from "@/types/database.types"
 import type {
-  IterationTrigger, DesignAlternative,
+  IterationTrigger, DesignAlternative, IterationHistoryEntry,
 } from "@/lib/cad-lab/design-iteration-types"
 import {
   MAX_ITERATIONS_PER_PROJECT, MAX_ITERATIONS_PER_CONCERN,
@@ -269,6 +269,32 @@ interface AcceptRiskInput {
   concernHash: string
   concernText: string
   reason: string
+}
+
+/**
+ * Read the accepted-risk register for a project. Used by the Launch Readiness
+ * Gauge to surface "here are the concerns the founder chose to accept rather
+ * than iterate".
+ */
+export async function getProjectAcceptedRisks(projectId: string) {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!isValidUUID(projectId)) return { error: "Invalid project ID" }
+    const { data, error } = await supabase
+      .from("cad_lab_projects")
+      .select("accepted_risks")
+      .eq("id", projectId)
+      .eq("foundry_id", foundryId)
+      .maybeSingle()
+    if (error || !data) return { error: "Project not found" }
+    const arr = Array.isArray(data.accepted_risks) ? data.accepted_risks : []
+    return { acceptedRisks: arr as unknown as Array<{
+      concern_hash: string
+      concern_text: string
+      accepted_by?: string | null
+      accepted_at: string
+      reason: string
+    }> }
+  })
 }
 
 export async function acceptDesignRisk(input: AcceptRiskInput) {

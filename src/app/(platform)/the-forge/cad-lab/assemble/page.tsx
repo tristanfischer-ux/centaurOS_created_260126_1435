@@ -72,7 +72,8 @@ import type { CategoryInput } from "@/lib/cad-lab/assembly-capability-map"
 import type { OrderTrackingStep } from "@/lib/assembly-utils"
 import type { OrderLineSummary } from "@/actions/assembly"
 import type { ShortlistedSupplier } from "../source/page"
-import { LaunchReadinessGauge } from "@/components/cad/launch-readiness-gauge"
+import { LaunchReadinessGauge, type AcceptedRisk } from "@/components/cad/launch-readiness-gauge"
+import { getProjectAcceptedRisks } from "@/actions/design-iterations"
 import { FAIChecklist } from "@/components/cad/fai-checklist"
 import { BOMTraceabilityCard } from "@/components/cad/bom-traceability-card"
 import { CompliancePacket } from "@/components/cad/compliance-packet"
@@ -300,6 +301,18 @@ export default function AssemblePage(): React.ReactNode {
     () => !!(shipping.fulfilmentModel && shipping.shippingAddress?.country),
     [shipping],
   )
+
+  // Accepted-risks register for Launch Readiness surface (Phase VI).
+  const [acceptedRisks, setAcceptedRisks] = useState<AcceptedRisk[]>([])
+  useEffect(() => {
+    if (!activeProjectId) { setAcceptedRisks([]); return }
+    let cancelled = false
+    getProjectAcceptedRisks(activeProjectId).then((res) => {
+      if (cancelled) return
+      if ("acceptedRisks" in res) setAcceptedRisks(res.acceptedRisks as AcceptedRisk[])
+    })
+    return () => { cancelled = true }
+  }, [activeProjectId])
 
   const launchReadinessReport = useMemo(
     () => computeLaunchReadiness({
@@ -612,7 +625,7 @@ export default function AssemblePage(): React.ReactNode {
       />
 
       {/* ── Launch Readiness Gauge (hero — top-level snapshot) ── */}
-      <LaunchReadinessGauge report={launchReadinessReport} />
+      <LaunchReadinessGauge report={launchReadinessReport} acceptedRisks={acceptedRisks} />
 
       {/* ── Assembler fitness checks + AI company review ── */}
       <AssemblerFitnessReview

@@ -16,12 +16,28 @@
 import React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Rocket, CheckCircle2, CircleDot, AlertTriangle, XCircle } from "lucide-react"
+import { Rocket, CheckCircle2, CircleDot, AlertTriangle, XCircle, Flag } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LaunchReadinessReport } from "@/lib/cad-lab/launch-readiness"
 
+/**
+ * Accepted-risk entry as stored in cad_lab_projects.accepted_risks JSONB.
+ * Written by acceptDesignRisk() in src/actions/design-iterations.ts.
+ */
+export interface AcceptedRisk {
+  concern_hash: string
+  concern_text: string
+  accepted_by?: string | null
+  accepted_at: string
+  reason: string
+}
+
 interface LaunchReadinessGaugeProps {
   report: LaunchReadinessReport
+  /** Concerns the founder chose to accept during design iteration. Shown as a
+   *  sub-panel so investors + reviewers can see what's been acknowledged but
+   *  not fixed. Read from project.accepted_risks by the parent page. */
+  acceptedRisks?: AcceptedRisk[]
 }
 
 const STATUS_CONFIG: Record<LaunchReadinessReport["status"], { label: string; colorToken: string; badge: "success" | "warning" | "destructive" | "secondary"; icon: React.ComponentType<{ className?: string }> }> = {
@@ -31,7 +47,7 @@ const STATUS_CONFIG: Record<LaunchReadinessReport["status"], { label: string; co
   critical: { label: "Not ready", colorToken: "text-destructive", badge: "destructive", icon: XCircle },
 }
 
-export function LaunchReadinessGauge({ report }: LaunchReadinessGaugeProps) {
+export function LaunchReadinessGauge({ report, acceptedRisks = [] }: LaunchReadinessGaugeProps) {
   const status = STATUS_CONFIG[report.status]
   const StatusIcon = status.icon
   const percent = Math.max(0, Math.min(100, report.percent))
@@ -137,6 +153,41 @@ export function LaunchReadinessGauge({ report }: LaunchReadinessGaugeProps) {
             })}
           </div>
         </div>
+
+        {/* ── Accepted-risk register (Phase VI) ── */}
+        {acceptedRisks.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Flag className="h-3.5 w-3.5 text-warning" />
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Accepted risks ({acceptedRisks.length})
+              </p>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-3">
+              Concerns the founder has explicitly chosen to accept rather than iterate. Visible here so investors + reviewers can see what&apos;s been acknowledged but not fixed.
+            </p>
+            <ul className="space-y-2">
+              {acceptedRisks.slice(0, 10).map((risk, i) => (
+                <li key={risk.concern_hash ?? i} className="text-xs border border-warning/30 bg-warning/5 rounded-lg px-3 py-2">
+                  <p className="font-medium text-foreground truncate" title={risk.concern_text}>
+                    {risk.concern_text.length > 180 ? risk.concern_text.slice(0, 180) + "…" : risk.concern_text}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    <span className="font-medium">Reason:</span> {risk.reason}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Accepted {new Date(risk.accepted_at).toLocaleDateString()}
+                  </p>
+                </li>
+              ))}
+              {acceptedRisks.length > 10 && (
+                <li className="text-[11px] text-muted-foreground">
+                  + {acceptedRisks.length - 10} more
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
