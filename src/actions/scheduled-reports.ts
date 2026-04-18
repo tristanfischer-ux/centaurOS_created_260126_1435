@@ -22,6 +22,11 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { isValidUUID } from '@/lib/validations'
 import { revalidatePath } from 'next/cache'
+// INTENT: computeNextRunAt lives outside this "use server" file because server
+// action modules can only export async functions (Next 16 / Turbopack enforces
+// this at build time; non-async exports fail the build). The cron route also
+// imports directly from the lib module.
+import { computeNextRunAt } from '@/lib/scheduled-reports/frequency'
 
 type ActionResult<T> = { data: T; error?: undefined } | { data?: undefined; error: string }
 
@@ -72,44 +77,6 @@ function validateRecipients(recipients: string[]): { ok: true; cleaned: string[]
 }
 
 // GOTCHA: next_run_at calc stays in UTC-only arithmetic to avoid DST flips.
-// We anchor delivery to 09:00 UTC — a founder in London gets 9/10am depending
-// on BST, a founder in SF gets 1/2am; configurable per-schedule delivery hour
-// is a future upgrade (add a delivery_hour_utc column and thread it through).
-const DELIVERY_HOUR_UTC = 9
-
-function daysInMonth(year: number, monthZeroBased: number): number {
-  return new Date(Date.UTC(year, monthZeroBased + 1, 0)).getUTCDate()
-}
-
-export function computeNextRunAt(frequency: ScheduledReportFrequency, dayOfWeek: number | undefined, dayOfMonth: number | undefined, from: Date = new Date()): Date {
-  const nowUtc = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate(), from.getUTCHours(), from.getUTCMinutes()))
-  if (frequency === 'weekly') {
-    const targetDow = dayOfWeek ?? 1
-    // Today's DOW in UTC (0..6)
-    const todayDow = nowUtc.getUTCDay()
-    let daysAhead = (targetDow - todayDow + 7) % 7
-    // If the target day is today but we've already passed delivery hour, push to next week.
-    if (daysAhead === 0 && nowUtc.getUTCHours() >= DELIVERY_HOUR_UTC) daysAhead = 7
-    // If daysAhead stayed 0 (target is today, before delivery hour), deliver today at 09:00 UTC.
-    const next = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate() + daysAhead, DELIVERY_HOUR_UTC, 0, 0, 0))
-    return next
-  }
-  // monthly
-  const targetDom = dayOfMonth ?? 1
-  let year = nowUtc.getUTCFullYear()
-  let month = nowUtc.getUTCMonth()
-  const clamp = (y: number, m: number, d: number) => Math.min(d, daysInMonth(y, m))
-  let day = clamp(year, month, targetDom)
-  // If we've already passed the target day-time this month, roll to next month.
-  const thisMonthMs = Date.UTC(year, month, day, DELIVERY_HOUR_UTC, 0, 0, 0)
-  if (thisMonthMs <= nowUtc.getTime()) {
-    month += 1
-    if (month > 11) { month = 0; year += 1 }
-    day = clamp(year, month, targetDom)
-  }
-  return new Date(Date.UTC(year, month, day, DELIVERY_HOUR_UTC, 0, 0, 0))
-}
-
 // ────────────────────────────────────────────────────────────────
 // Actions
 // ────────────────────────────────────────────────────────────────

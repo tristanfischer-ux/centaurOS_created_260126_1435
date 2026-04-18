@@ -29,7 +29,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 import { verifyCronSecret } from '@/lib/security/cron-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { computeNextRunAt } from '@/actions/scheduled-reports'
+import { computeNextRunAt } from '@/lib/scheduled-reports/frequency'
 
 interface DueRow {
   id: string
