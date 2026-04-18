@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { getSupplierDetail, type SupplierDetail } from "@/actions/cad-lab-supplier-detail"
+import { SupplierEnrichmentPanel } from "@/components/cad/supplier-enrichment-panel"
 
 // ─── Props ───────────────────────────────────────────────────────────
 
@@ -196,6 +197,14 @@ export function SupplierDetailDialog({
             {detail.keyEquipment.length > 0 && (
               <PillGroup label="Key Equipment" items={detail.keyEquipment} pillClassName="bg-muted text-muted-foreground" />
             )}
+
+            {/* ── Enrichment panel: brief, certs, ratings, rate/correct/interview actions ── */}
+            <div className="pt-2 border-t border-border">
+              <SupplierEnrichmentPanel
+                listingId={detail.id}
+                supplierName={detail.name ?? supplierName ?? "this supplier"}
+              />
+            </div>
           </div>
         )}
       </DialogContent>

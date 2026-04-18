@@ -60,6 +60,7 @@ import { NDAGate } from "@/components/cad/nda-gate"
 import type { NDAState } from "@/components/cad/nda-gate"
 import { SupplierOutreachLog } from "@/components/cad/supplier-outreach-log"
 import type { OutreachLogState } from "@/components/cad/supplier-outreach-log"
+import { RFQBenchmarksCard } from "@/components/cad/rfq-benchmarks-card"
 import { FileText } from "lucide-react"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
@@ -1135,6 +1136,9 @@ export default function SourcePage(): React.ReactNode {
         {/* ═══ Costs tab ═══ */}
         {activeTab === "costs" && (
           <motion.div key="costs" role="tabpanel" id="source-panel-costs" aria-labelledby="source-tab-costs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            {/* ── Benchmarks from historical RFQ responses (item #16) ── */}
+            <RFQBenchmarksCard />
+
             <CadLabCostEstimate
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
