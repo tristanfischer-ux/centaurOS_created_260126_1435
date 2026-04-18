@@ -7283,6 +7283,68 @@ export type Database = {
           },
         ]
       }
+      forge_supplier_shortlist: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          all_match_reasons: string[]
+          best_match_score: number | null
+          best_score_breakdown: Json | null
+          id: string
+          is_verified: boolean
+          module_ids: string[]
+          notes: string | null
+          project_id: string
+          ramp_role: string
+          supplier_id: string
+          supplier_name: string
+          supplier_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          all_match_reasons?: string[]
+          best_match_score?: number | null
+          best_score_breakdown?: Json | null
+          id?: string
+          is_verified?: boolean
+          module_ids?: string[]
+          notes?: string | null
+          project_id: string
+          ramp_role?: string
+          supplier_id: string
+          supplier_name: string
+          supplier_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          all_match_reasons?: string[]
+          best_match_score?: number | null
+          best_score_breakdown?: Json | null
+          id?: string
+          is_verified?: boolean
+          module_ids?: string[]
+          notes?: string | null
+          project_id?: string
+          ramp_role?: string
+          supplier_id?: string
+          supplier_name?: string
+          supplier_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forge_supplier_shortlist_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       founder_preferences: {
         Row: {
           celebration_style: string | null
@@ -9567,12 +9629,16 @@ export type Database = {
         Row: {
           article_markdown: string | null
           common_applications: Json | null
+          content_hash: string | null
           created_at: string | null
+          embedded_at: string | null
+          embedding: string | null
           id: string
           real_world_equipment: Json | null
           real_world_materials: Json | null
           real_world_surface_finishes: Json | null
           real_world_tolerances: Json | null
+          reviewed: boolean
           source: string | null
           source_company_ids: Json | null
           supplier_count: number | null
@@ -9584,12 +9650,16 @@ export type Database = {
         Insert: {
           article_markdown?: string | null
           common_applications?: Json | null
+          content_hash?: string | null
           created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           real_world_equipment?: Json | null
           real_world_materials?: Json | null
           real_world_surface_finishes?: Json | null
           real_world_tolerances?: Json | null
+          reviewed?: boolean
           source?: string | null
           source_company_ids?: Json | null
           supplier_count?: number | null
@@ -9601,12 +9671,16 @@ export type Database = {
         Update: {
           article_markdown?: string | null
           common_applications?: Json | null
+          content_hash?: string | null
           created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           real_world_equipment?: Json | null
           real_world_materials?: Json | null
           real_world_surface_finishes?: Json | null
           real_world_tolerances?: Json | null
+          reviewed?: boolean
           source?: string | null
           source_company_ids?: Json | null
           supplier_count?: number | null
@@ -13186,8 +13260,11 @@ export type Database = {
       }
       process_capabilities: {
         Row: {
+          content_hash: string | null
           created_at: string | null
           display_name: string
+          embedded_at: string | null
+          embedding: string | null
           id: string
           max_part_size_x_mm: number | null
           max_part_size_y_mm: number | null
@@ -13213,8 +13290,11 @@ export type Database = {
           verified: boolean | null
         }
         Insert: {
+          content_hash?: string | null
           created_at?: string | null
           display_name: string
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           max_part_size_x_mm?: number | null
           max_part_size_y_mm?: number | null
@@ -13240,8 +13320,11 @@ export type Database = {
           verified?: boolean | null
         }
         Update: {
+          content_hash?: string | null
           created_at?: string | null
           display_name?: string
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           max_part_size_x_mm?: number | null
           max_part_size_y_mm?: number | null
@@ -21200,6 +21283,34 @@ export type Database = {
           title: string
         }[]
       }
+      match_manufacturing_techniques: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          only_reviewed?: boolean
+          query_embedding: string
+        }
+        Returns: {
+          article_markdown: string
+          common_applications: Json
+          display_name: string
+          real_world_equipment: Json
+          real_world_materials: Json
+          real_world_tolerances: Json
+          reviewed: boolean
+          similarity: number
+          source: string
+          suitable_materials: string[]
+          supplier_count: number
+          technique_slug: string
+          tips_and_insights: Json
+          tolerance_max_mm: number
+          tolerance_min_mm: number
+          tolerance_typical_mm: number
+          typical_lead_time_days: number
+          unsuitable_materials: string[]
+        }[]
+      }
       match_marketplace_listings: {
         Args: {
           match_count?: number
@@ -22160,6 +22271,17 @@ export type Database = {
           total_score: number
           user_id: string
           workload_score: number
+        }[]
+      }
+      supplier_subtier_traversal: {
+        Args: { p_max_depth?: number; p_root_ids: string[] }
+        Returns: {
+          depth: number
+          listing_id: string
+          listing_title: string
+          path: string[]
+          relationship_types: string[]
+          root_id: string
         }[]
       }
       switch_active_foundry: {

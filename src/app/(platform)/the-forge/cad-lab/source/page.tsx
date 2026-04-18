@@ -52,6 +52,13 @@ import { SupplierFitnessReview } from "@/components/cad/supplier-fitness-review"
 import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
 import { useStageBriefing } from "@/hooks/use-stage-briefing"
 import { useCompanyReview } from "@/hooks/use-company-review"
+import {
+  getProjectShortlist,
+  addToShortlist as addToShortlistAction,
+  removeFromShortlist as removeFromShortlistAction,
+  migrateShortlistFromLocalStorage,
+  clearProjectShortlist,
+} from "@/actions/forge-shortlist"
 import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
 import { SupplyRiskRadar } from "@/components/cad/supply-risk-radar"
 import { VolumeRampPlanner } from "@/components/cad/volume-ramp-planner"
@@ -209,6 +216,104 @@ export default function SourcePage(): React.ReactNode {
     () => new Set(shortlistedSuppliers.keys()),
     [shortlistedSuppliers],
   )
+
+  // ── Phase 4: DB-backed shortlist hydration ────────────────────────
+  // On mount (or project change), DB is authoritative. Migration path:
+  //   1. Fetch DB rows via getProjectShortlist(projectId).
+  //   2. If DB has rows → replace local Map with DB state (cross-device sync).
+  //   3. If DB empty AND localStorage v2 has entries → migrate to DB, then
+  //      refetch and apply. Bump v3 marker so we don't re-migrate.
+  //   4. Local mutations still write localStorage for offline cache; DB
+  //      writes happen fire-and-forget alongside.
+  // Safe to fail: if DB read errors, we keep the localStorage-hydrated Map.
+  const shortlistMigratedKey = activeProjectId ? `forge-supplier-shortlist-v3-migrated-${activeProjectId}` : null
+  const hydratedProjectRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!activeProjectId || typeof window === "undefined") return
+    if (hydratedProjectRef.current === activeProjectId) return
+    hydratedProjectRef.current = activeProjectId
+
+    const doHydrate = async () => {
+      try {
+        const dbRows = await getProjectShortlist(activeProjectId)
+
+        if (dbRows.length > 0) {
+          // DB authoritative
+          setShortlistedSuppliersRaw(new Map(
+            dbRows.map((r) => [r.supplierId, {
+              id: r.supplierId,
+              name: r.name,
+              isVerified: r.isVerified,
+              supplierType: r.supplierType,
+              moduleIds: r.moduleIds,
+              bestMatchScore: r.bestMatchScore,
+              bestScoreBreakdown: r.bestScoreBreakdown,
+              allMatchReasons: r.allMatchReasons,
+            } satisfies ShortlistedSupplier]),
+          ))
+          return
+        }
+
+        // DB empty — check localStorage v2 for one-shot migration
+        const alreadyMigrated = shortlistMigratedKey ? localStorage.getItem(shortlistMigratedKey) : null
+        if (alreadyMigrated) return
+
+        const v2 = shortlistKey ? localStorage.getItem(shortlistKey) : null
+        if (!v2) {
+          if (shortlistMigratedKey) localStorage.setItem(shortlistMigratedKey, new Date().toISOString())
+          return
+        }
+
+        let entries: [string, ShortlistedSupplier][] = []
+        try {
+          entries = JSON.parse(v2) as [string, ShortlistedSupplier][]
+        } catch {
+          return
+        }
+        if (entries.length === 0) {
+          if (shortlistMigratedKey) localStorage.setItem(shortlistMigratedKey, new Date().toISOString())
+          return
+        }
+
+        const result = await migrateShortlistFromLocalStorage({
+          projectId: activeProjectId,
+          entries: entries.map(([, s]) => ({
+            supplierId: s.id,
+            name: s.name,
+            isVerified: s.isVerified,
+            supplierType: s.supplierType,
+            moduleIds: s.moduleIds,
+            bestMatchScore: s.bestMatchScore,
+            bestScoreBreakdown: s.bestScoreBreakdown,
+            allMatchReasons: s.allMatchReasons,
+          })),
+        })
+        if (result.migrated > 0 && shortlistMigratedKey) {
+          localStorage.setItem(shortlistMigratedKey, new Date().toISOString())
+          // Refetch from DB so the Map reflects server-side state (with added_at etc.)
+          const refetched = await getProjectShortlist(activeProjectId)
+          if (refetched.length > 0) {
+            setShortlistedSuppliersRaw(new Map(
+              refetched.map((r) => [r.supplierId, {
+                id: r.supplierId,
+                name: r.name,
+                isVerified: r.isVerified,
+                supplierType: r.supplierType,
+                moduleIds: r.moduleIds,
+                bestMatchScore: r.bestMatchScore,
+                bestScoreBreakdown: r.bestScoreBreakdown,
+                allMatchReasons: r.allMatchReasons,
+              } satisfies ShortlistedSupplier]),
+            ))
+          }
+        }
+      } catch (err) {
+        console.warn("[SOURCE] shortlist hydration failed:", err instanceof Error ? err.message : err)
+      }
+    }
+    doHydrate()
+  }, [activeProjectId, shortlistKey, shortlistMigratedKey])
 
   const eligibleModules = useMemo(
     () => modules.filter((m) => m.status === "specified" || m.status === "generated"),
@@ -509,14 +614,32 @@ export default function SourcePage(): React.ReactNode {
         // If already shortlisted from this module, remove the module association
         const remainingModules = existing.moduleIds.filter((id) => id !== moduleId)
         if (remainingModules.length === 0) {
-          // Fully remove from shortlist
           next.delete(supplier.id)
+          // DB: fire-and-forget removal. Failures logged server-side; local
+          // state owns the optimistic update.
+          if (activeProjectId) {
+            removeFromShortlistAction(activeProjectId, supplier.id).catch((e) =>
+              console.warn("[SOURCE] remove shortlist DB sync failed:", e))
+          }
         } else {
           next.set(supplier.id, { ...existing, moduleIds: remainingModules })
+          if (activeProjectId) {
+            addToShortlistAction({
+              projectId: activeProjectId,
+              supplierId: supplier.id,
+              name: existing.name,
+              isVerified: existing.isVerified,
+              supplierType: existing.supplierType,
+              moduleIds: remainingModules,
+              bestMatchScore: existing.bestMatchScore,
+              bestScoreBreakdown: existing.bestScoreBreakdown,
+              allMatchReasons: existing.allMatchReasons,
+            }).catch((e) => console.warn("[SOURCE] update shortlist DB sync failed:", e))
+          }
         }
       } else {
         // Add to shortlist
-        next.set(supplier.id, {
+        const newEntry: ShortlistedSupplier = {
           id: supplier.id,
           name: supplier.name,
           isVerified: supplier.isVerified,
@@ -525,11 +648,25 @@ export default function SourcePage(): React.ReactNode {
           bestMatchScore: supplier.matchScore,
           bestScoreBreakdown: supplier.scoreBreakdown,
           allMatchReasons: [...supplier.matchReasons],
-        })
+        }
+        next.set(supplier.id, newEntry)
+        if (activeProjectId) {
+          addToShortlistAction({
+            projectId: activeProjectId,
+            supplierId: supplier.id,
+            name: newEntry.name,
+            isVerified: newEntry.isVerified,
+            supplierType: newEntry.supplierType,
+            moduleIds: newEntry.moduleIds,
+            bestMatchScore: newEntry.bestMatchScore,
+            bestScoreBreakdown: newEntry.bestScoreBreakdown,
+            allMatchReasons: newEntry.allMatchReasons,
+          }).catch((e) => console.warn("[SOURCE] add shortlist DB sync failed:", e))
+        }
       }
       return next
     })
-  }, [setShortlistedSuppliers])
+  }, [setShortlistedSuppliers, activeProjectId])
 
   const handleRemoveFromShortlist = useCallback((supplierId: string) => {
     setShortlistedSuppliers((prev) => {
@@ -537,7 +674,11 @@ export default function SourcePage(): React.ReactNode {
       next.delete(supplierId)
       return next
     })
-  }, [setShortlistedSuppliers])
+    if (activeProjectId) {
+      removeFromShortlistAction(activeProjectId, supplierId).catch((e) =>
+        console.warn("[SOURCE] remove shortlist DB sync failed:", e))
+    }
+  }, [setShortlistedSuppliers, activeProjectId])
 
   const handleMatchModule = useCallback(async (mod: CadLabModule) => {
     setLoadingModules((prev) => new Set(prev).add(mod.id))
@@ -593,6 +734,12 @@ export default function SourcePage(): React.ReactNode {
       setShortlistedSuppliers(() => new Map())
       setCategoryRankings(() => new Map())
       autoSelectKeyRef.current = ""
+      // DB sync: wipe persisted shortlist for this project so next mount
+      // doesn't re-hydrate yesterday's shortlist over a fresh match run.
+      if (activeProjectId) {
+        clearProjectShortlist(activeProjectId).catch((e) =>
+          console.warn("[SOURCE] refresh wipe shortlist DB sync failed:", e))
+      }
       handleMatchAll()
       toast.info("Refreshing shortlist…")
     } else if (activeTab === "costs") {
@@ -622,11 +769,12 @@ export default function SourcePage(): React.ReactNode {
     // INTENT: Use setShortlistedSuppliers directly (stable ref) to avoid
     // re-triggering this effect via shortlistedSupplierIds / handleShortlistSupplier.
     const top3 = uniqueSuppliers.slice(0, 3)
+    const newlyAdded: ShortlistedSupplier[] = []
     setShortlistedSuppliers((prev) => {
       const next = new Map(prev)
       for (const sup of top3) {
         if (!next.has(sup.id)) {
-          next.set(sup.id, {
+          const entry: ShortlistedSupplier = {
             id: sup.id,
             name: sup.name,
             isVerified: sup.isVerified,
@@ -635,11 +783,30 @@ export default function SourcePage(): React.ReactNode {
             bestMatchScore: sup.bestScore,
             bestScoreBreakdown: sup.originalMatch.scoreBreakdown,
             allMatchReasons: [...sup.originalMatch.matchReasons],
-          })
+          }
+          next.set(sup.id, entry)
+          newlyAdded.push(entry)
         }
       }
       return next
     })
+
+    // DB sync: persist newly auto-added top-3 suppliers for this project.
+    if (activeProjectId && newlyAdded.length > 0) {
+      for (const entry of newlyAdded) {
+        addToShortlistAction({
+          projectId: activeProjectId,
+          supplierId: entry.id,
+          name: entry.name,
+          isVerified: entry.isVerified,
+          supplierType: entry.supplierType,
+          moduleIds: entry.moduleIds,
+          bestMatchScore: entry.bestMatchScore,
+          bestScoreBreakdown: entry.bestScoreBreakdown,
+          allMatchReasons: entry.allMatchReasons,
+        }).catch((e) => console.warn("[SOURCE] auto-select DB sync failed:", e))
+      }
+    }
 
     // INTENT: Auto-populate per-category rankings with top 3 per category.
     // Also prune stale supplier IDs that no longer exist in the current match results.
