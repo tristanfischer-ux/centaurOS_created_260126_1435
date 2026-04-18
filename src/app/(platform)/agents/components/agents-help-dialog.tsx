@@ -90,9 +90,9 @@ export function AgentsHelpDialog({ open, onOpenChange }: AgentsHelpDialogProps) 
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-blue-50 border border-blue-100">
-                                <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 bg-blue-100 mt-0.5">
-                                    <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                            <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-status-info-light border border-status-info/30">
+                                <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 bg-status-info-light mt-0.5">
+                                    <UserCheck className="w-3.5 h-3.5 text-status-info-dark" />
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium text-foreground">People steps</p>

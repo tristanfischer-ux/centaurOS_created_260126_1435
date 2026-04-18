@@ -174,7 +174,7 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
                     relative border-2 border-dashed rounded-lg transition-all cursor-pointer
                     ${compact ? "p-2" : "p-4"}
                     ${isDragging
-                        ? "border-blue-400 bg-blue-50"
+                        ? "border-status-info bg-status-info-light"
                         : "border-border hover:border-input hover:bg-muted"
                     }
                 `}
