@@ -12,7 +12,7 @@
 |---|---|---|---|---|---|
 | 1 | Forge | PR #1 merged, PR #1.5 in flight | `feat/forge-visual-rebuild` | `HANDOVER-pr1-5-build.md` | 2026-04-19 |
 | Pre | Products Coming Soon sidecar | Not started | `feat/products-coming-soon` (planned) | `PHASE-PLAN.md` §Pre-Phase | 2026-04-19 |
-| 2 | Money | Prep pending | — | (awaits `HANDOVER-money.md`) | — |
+| 2 | Money | prep shipped — awaiting review | — | `HANDOVER-money.md` | 2026-04-19 |
 | 3 | Plan | Prep pending | — | (awaits `HANDOVER-plan.md`) | — |
 | 4 | Products | prep shipped — awaiting review | — | `HANDOVER-products.md` | 2026-04-19 |
 
@@ -25,6 +25,7 @@
 - ✅ 2026-04-19 — Phase order revised: Forge → Money → Plan → Products (was Forge → Products → Plan → Money). Products Coming Soon sidecar planned as pre-phase.
 - ✅ 2026-04-19 — Parallelisation decision locked: prep docs parallel (3 terminals), code builds sequential. See MemPalace `drawer_forgeos_decisions_9cafddb3415ab00b`.
 - ✅ 2026-04-19 — Products prep shipped (Phase 4): PRODUCTS-SCHEMA.md + PRODUCTS-MOCKUP-INDEX.html + PRODUCTS-MOCKUP-GAP-AUDIT.html + HANDOVER-products.md. 18 gaps (6 MUST) + 5 red-team critiques (2 CRIT / 2 HIGH / 1 MED). Awaiting Tristan red-team review → reply `locked` to unblock build.
+- ✅ 2026-04-19 — Money prep shipped (Phase 2): MONEY-SCHEMA.md v0.3 (~880 lines, 20 tables + ai_credits family + Today signal contract + 9-role matrix + §5 data preservation with confirmed legacy table names) + MONEY-MOCKUP-GAP-AUDIT.html refresh (47 gaps now hierarchically numbered 1.1/1.2/C.N + post-schema red-team banner with 3 HIGH must-fix) + HANDOVER-money.md. Red-team surfaced 7 findings (3 HIGH: parallel-data-model, specialist-cost-metering, RLS-role-enum-mismatch) — 2 resolved in v0.2/v0.3, 1 awaiting Tristan choice (role enum strategy). Awaiting Tristan red-team review → reply `locked` to unblock build.
 
 ---
 

@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Money — Gap audit + red team (pre-code)</title>
+<link rel="stylesheet" href="forge-mockup.css">
+<link rel="stylesheet" href="money-mockup.css">
+<style>
+  .ga-head { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: var(--shadow-xs); position: relative; overflow: hidden; }
+  .ga-head::after { content: ""; position: absolute; top: 0; right: 0; width: 400px; height: 100%; background: radial-gradient(ellipse at top right, var(--brand-soft) 0%, transparent 60%); pointer-events: none; }
+  .ga-head > * { position: relative; }
+  .ga-head h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 8px; }
+  .ga-head .sub { font-size: 14px; color: var(--fg-muted); max-width: 820px; line-height: 1.55; }
+  .ga-head .sub strong { color: var(--fg); font-weight: 700; }
+
+  .ga-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-soft); }
+  .ga-stats .tile .lab { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--fg-muted); }
+  .ga-stats .tile .val { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-top: 3px; }
+  .ga-stats .tile .val.brand { color: var(--brand); }
+  .ga-stats .tile .val.bad { color: var(--danger); }
+  .ga-stats .tile .val.good { color: var(--success); }
+  .ga-stats .tile .sub { font-size: 11.5px; color: var(--fg-muted); margin-top: 2px; }
+
+  .section-block { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: var(--shadow-xs); }
+  .section-block h2 { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+  .section-block .block-sub { font-size: 13px; color: var(--fg-muted); margin-bottom: 18px; max-width: 760px; line-height: 1.55; }
+  .section-block h2 .tag { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 3px 8px; border-radius: 4px; background: var(--brand-soft); color: var(--brand); vertical-align: middle; margin-left: 10px; }
+
+  /* Parent-page gap cards. Hierarchical numbering via CSS counters so Tristan
+     can reference gaps by number in conversation (e.g. "gap 3.2" = Raise, 2nd row).
+     Main section uses gap-card-num + gap-row. Cross-cutting uses "C." + gap-row. */
+  .section-block#inv { counter-reset: gap-card-num; }
+  .section-block#inv .gap-card { counter-increment: gap-card-num; counter-reset: gap-row; }
+  .section-block#inv .gap-row::before { content: counter(gap-card-num) "." counter(gap-row); }
+  .section-block#cross .gap-card { counter-reset: gap-row; }
+  .section-block#cross .gap-row::before { content: "C." counter(gap-row); }
+  .gap-card { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .gap-head { padding: 14px 18px; background: var(--surface-soft); display: grid; grid-template-columns: auto 1fr auto auto; gap: 14px; align-items: center; border-bottom: 1px solid var(--border); }
+  .gap-head .p-num { font-size: 16px; font-weight: 800; color: var(--brand); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .gap-head h3 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+  .gap-head h3 small { font-weight: 500; color: var(--fg-muted); margin-left: 8px; font-size: 11.5px; }
+  .gap-head .count-pills { display: flex; gap: 6px; }
+  .gap-head .cp { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .gap-head .cp.must { background: var(--danger-soft); color: var(--danger); }
+  .gap-head .cp.nice { background: var(--warning-soft); color: var(--warning); }
+  .gap-head .cp.defer { background: var(--surface-muted); color: var(--fg-muted); }
+  .gap-head .view-btn { font-size: 11.5px; color: var(--brand); text-decoration: none; font-weight: 600; }
+
+  .gap-row { display: grid; grid-template-columns: 46px 100px 1fr 200px 90px 120px; gap: 14px; padding: 10px 18px; border-top: 1px solid var(--border-soft); font-size: 12.5px; align-items: center; counter-increment: gap-row; position: relative; }
+  .gap-row:first-of-type { border-top: none; }
+  .gap-row::before { font-size: 11px; font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .gap-row .g-trigger { font-size: 11.5px; color: var(--fg-muted); font-family: ui-monospace, monospace; }
+  .gap-row .g-what { font-weight: 600; }
+  .gap-row .g-what small { display: block; font-size: 11px; color: var(--fg-muted); font-weight: 400; margin-top: 2px; line-height: 1.4; }
+  .gap-row .g-state { font-size: 11px; color: var(--fg-muted); }
+  .gap-row .g-state.empty { color: var(--info); }
+  .gap-row .g-state.error { color: var(--warning); }
+  .gap-row .g-state.missing { color: var(--danger); }
+  .gap-row .g-pri { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-align: center; text-transform: uppercase; letter-spacing: 0.4px; }
+  .gap-row .g-pri.must { background: var(--danger-soft); color: var(--danger); }
+  .gap-row .g-pri.nice { background: var(--warning-soft); color: var(--warning); }
+  .gap-row .g-pri.defer { background: var(--surface-muted); color: var(--fg-muted); }
+  .gap-row .g-effort { font-size: 11px; text-align: right; color: var(--fg-muted); font-weight: 500; }
+
+  .gap-head-row { display: grid; grid-template-columns: 46px 100px 1fr 200px 90px 120px; gap: 14px; padding: 8px 18px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--fg-muted); background: var(--surface-muted); }
+  .gap-head-row .g-num-head { text-align: left; }
+
+  /* Red team critique */
+  .rt-card { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; overflow: hidden; box-shadow: var(--shadow-xs); }
+  .rt-head { padding: 16px 22px; background: var(--danger-soft); border-bottom: 1px solid var(--danger-dim); display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+  .rt-head .rt-num { width: 36px; height: 36px; border-radius: 100%; background: var(--danger); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+  .rt-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: #7c2d12; letter-spacing: -0.02em; }
+  .rt-head h3 small { display: block; font-weight: 500; color: #9a3412; margin-top: 2px; font-size: 11.5px; letter-spacing: 0; }
+  .rt-head .severity { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 4px 9px; border-radius: 4px; background: #7c2d12; color: white; }
+  .rt-head .severity.med { background: #ca8a04; }
+  .rt-head .severity.low { background: #65a30d; }
+
+  .rt-body { padding: 18px 22px; background: var(--surface); }
+  .rt-body .rt-claim { font-size: 14px; line-height: 1.6; margin-bottom: 12px; color: var(--fg); }
+  .rt-body .rt-claim strong { font-weight: 700; }
+  .rt-body .rt-evidence { margin: 0 0 14px; padding: 12px 16px; background: var(--surface-soft); border-left: 3px solid var(--border-strong); border-radius: 0 6px 6px 0; font-size: 12.5px; line-height: 1.6; color: var(--fg-muted); }
+  .rt-body .rt-evidence strong { color: var(--fg); font-weight: 700; }
+  .rt-body h4 { margin: 14px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg-muted); }
+  .rt-body ul { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
+  .rt-body li { margin: 3px 0; color: var(--fg); }
+  .rt-body li strong { font-weight: 700; }
+
+  .rt-mit { background: var(--success-soft); border: 1px solid var(--success-dim); border-radius: 8px; padding: 12px 16px; margin-top: 14px; font-size: 13px; line-height: 1.6; color: #14532d; }
+  .rt-mit strong { color: #064e3b; font-weight: 700; }
+
+  /* Proposed plan */
+  .plan-band { background: var(--brand-soft); border: 1px solid var(--brand-dim); border-radius: 12px; padding: 18px 22px; margin-bottom: 16px; }
+  .plan-band h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; color: #7c2d12; letter-spacing: -0.01em; }
+  .plan-band p { margin: 0 0 8px; font-size: 13px; color: #9a3412; line-height: 1.6; }
+  .plan-band p strong { color: #7c2d12; font-weight: 700; }
+
+  .next-row { display: grid; grid-template-columns: 36px 1fr 110px 110px; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border-soft); align-items: center; font-size: 13px; }
+  .next-row:last-child { border-bottom: none; }
+  .next-row .n-num { font-weight: 800; color: var(--brand); font-size: 15px; text-align: center; }
+  .next-row .n-what { font-weight: 600; }
+  .next-row .n-what small { display: block; font-size: 11px; color: var(--fg-muted); font-weight: 400; margin-top: 2px; line-height: 1.4; }
+  .next-row .n-parent { font-size: 11.5px; color: var(--fg-muted); }
+  .next-row .n-effort { font-size: 11px; text-align: right; font-weight: 600; color: var(--fg); }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; box-shadow: var(--shadow-xs); }
+  .toc h3 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--fg-muted); }
+  .toc ol { margin: 0; padding-left: 22px; font-size: 13px; line-height: 1.8; }
+  .toc li a { color: var(--fg); text-decoration: none; font-weight: 500; }
+  .toc li a:hover { color: var(--brand); }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <a href="MONEY-MOCKUP-INDEX.html" class="sidebar-brand"><span class="logo-dot"></span> ForgeOS</a>
+      <div class="icons"><a href="#">+</a><a href="#">⌕</a></div>
+    </div>
+    <div class="foundry-pill"><div class="foundry-icon">NR</div><div class="foundry-name">NIMBUS RO…<small>forge-nimbus</small></div><span class="switch">⇅</span></div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-head">ME <span class="notif-dot"></span><span class="chev">⌄</span></div>
+      <a href="#" class="sidebar-item"><span class="ic">☉</span><span>Today</span></a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-head" style="color: var(--brand);">MONEY <span class="tag-beta">V2</span></div>
+      <a href="MONEY-MOCKUP-COCKPIT.html" class="sidebar-item"><span class="ic">⎈</span><span>Cockpit</span></a>
+      <a href="MONEY-MOCKUP-PLAN.html" class="sidebar-item"><span class="ic">◰</span><span>Plan</span></a>
+      <a href="MONEY-MOCKUP-RAISE.html" class="sidebar-item"><span class="ic">◎</span><span>Raise</span></a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-head">AUDIT</div>
+      <a href="MONEY-MOCKUP-GAP-AUDIT.html" class="sidebar-item active"><span class="ic">△</span><span>Gap audit</span></a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-head">WORKSHOP <span class="chev">⌄</span></div>
+      <a href="#" class="sidebar-item"><span class="ic">◆</span><span>The Forge</span><span class="tag-beta">BETA</span></a>
+    </div>
+    <div class="sidebar-progress">
+      <div class="pr-row"><div class="pr-ring"><div class="pr-ring-inner"></div></div><div class="pr-name">Getting Started</div><div class="pr-count">0/6</div></div>
+    </div>
+    <div class="sidebar-foot"><a href="#">£ Pricing</a><a href="#">⚙ Settings</a><a href="#">↗ Sign Out</a></div>
+    <div class="sidebar-tier"><span><strong>Enterprise</strong> 204/10000</span><span style="color: var(--success);">+1075</span></div>
+  </aside>
+
+  <main class="content-main">
+
+    <div class="page-head">
+      <div class="crumbs">
+        <a href="MONEY-MOCKUP-INDEX.html">Money</a>
+        <span class="sep">›</span>
+        <span class="current">Gap audit + red team</span>
+      </div>
+      <div class="ctx-chips">
+        <a href="MONEY-MOCKUP-INDEX.html" class="btn sm">← Back to mockup index</a>
+      </div>
+    </div>
+
+    <!-- HEADER -->
+    <div class="ga-head">
+      <h1>Pre-code audit &amp; red team</h1>
+      <div class="sub"><strong>Goal:</strong> find every drill-down, edge case, and structural weakness NOW so we don't discover them mid-implementation. Output is a prioritised list of what still needs mocking, a critique of what's built, and a proposal for the next (and final) mockup round before code. <strong>Refreshed 2026-04-19 (Phase 2 prep)</strong> — gap rows now hierarchically numbered (1.1 / 1.2 / C.N) so you can reference any gap by ID in conversation; post-schema red-team findings added below.</div>
+      <div class="ga-stats">
+        <div class="tile"><div class="lab">Pages built</div><div class="val">19</div><div class="sub">+ shared CSS</div></div>
+        <div class="tile"><div class="lab">Gaps found</div><div class="val brand">47</div><div class="sub">Unmocked flows/states</div></div>
+        <div class="tile"><div class="lab">Must mock before code</div><div class="val bad">14</div><div class="sub">Block coding if missed</div></div>
+        <div class="tile"><div class="lab">Red team issues</div><div class="val">12</div><div class="sub">5 original + 7 post-schema</div></div>
+      </div>
+    </div>
+
+    <!-- POST-SCHEMA RED-TEAM REFRESH BANNER -->
+    <div class="section-block" style="border-left: 4px solid var(--danger); background: linear-gradient(to right, var(--danger-soft) 0%, var(--surface) 35%);">
+      <h2 style="color: var(--danger);">⚠ Post-schema red-team refresh <span class="tag" style="background: var(--danger); color: white;">3 must-fix before build</span></h2>
+      <div class="block-sub">After MONEY-SCHEMA.md v0.2 landed, a second adversarial review surfaced 7 build-derail risks. <strong>Top 3 are HIGH severity</strong> — they block the Phase 2 build until resolved. Full findings with evidence/mitigation are in <strong>HANDOVER-money.md §Post-schema red-team</strong>.</div>
+      <ol style="font-size: 13.5px; line-height: 1.7; padding-left: 22px; margin: 4px 0 0;">
+        <li><strong>Parallel data model contradiction.</strong> PHASE-PLAN promises "same tables, re-surfaced". MONEY-SCHEMA introduces 15 greenfield tables with no relationship to live <code>cash_burn_*</code> / <code>investors</code> / <code>finance_*</code> tables. <strong>Fix:</strong> pick migrate / view / greenfield, write MONEY-DATA-PRESERVATION.md before any migration runs. Legacy audit in HANDOVER-money.md §Legacy inventory lists the real table names.</li>
+        <li><strong>Specialist cost metering was self-contradicting (now resolved in v0.2).</strong> SHARED-SCHEMA §6 Q5 said <code>ai_credits</code> owned by Money; MONEY-SCHEMA §Open #2 reopened with a different name. MONEY-SCHEMA v0.2 adds the <code>ai_credits_cost_rules</code> / <code>ai_credits_ledger</code> / <code>ai_credits_budget</code> family + trigger on SHARED <code>audit_log</code>. <strong>Outstanding:</strong> confirm Phase 1 Forge is actually writing <code>specialist_call</code> events to <code>audit_log</code>, or ship a Phase 1 backfill PR before Money build starts.</li>
+        <li><strong>RLS role whitelists reference enum values that don't exist.</strong> MONEY-SCHEMA uses <code>role IN ('founder', 'co_founder')</code> — the production enum only ships <code>'Founder' / 'Executive' / 'Apprentice' / 'AI_Agent' / 'Supplier'</code> (CapitalCase, 5 values). MONEY-SCHEMA §0.1 proposes a "coarse compile" collapse but the 9-role matrix in §7 names roles that don't yet exist. <strong>Fix:</strong> either promote the 5→9 enum PR ahead of Money build, OR rewrite every per-table whitelist to use the 5 CapitalCase values + <code>permission_override</code>.</li>
+      </ol>
+      <p style="font-size: 12px; color: var(--fg-muted); margin: 14px 0 0;">The remaining 4 findings (event_log thrashing, Xero single-org PK trap, cold-start persistence, mockup-schema drift) are MED severity and documented in HANDOVER-money.md. The <strong>5 original</strong> pre-schema red-team critiques below remain valid — they cover scope-creep, cold-start (HIGH), copy-voice, data-model (now partially resolved by MONEY-SCHEMA.md), and feature-balance (scenarios simplified in V1 cuts).</p>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc">
+      <h3>What's in this audit</h3>
+      <ol>
+        <li><a href="#inv">Gap inventory — remaining drills per parent page</a></li>
+        <li><a href="#cross">Cross-cutting surfaces not owned by any page (onboarding, settings, errors, empty states)</a></li>
+        <li><a href="#redteam">Red team · 5 critiques</a></li>
+        <li><a href="#plan">Proposed final mockup round</a></li>
+      </ol>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 1: GAP INVENTORY -->
+    <!-- ============================================ -->
+    <div class="section-block" id="inv">
+      <h2>1 · Gap inventory <span class="tag">47 items across 19 pages</span></h2>
+      <div class="block-sub">Every button, link, or state that is currently undefined in the mockup set. <strong>MUST</strong> = structural, blocks coding. <strong>NICE</strong> = shapes the schema, worth mocking for clarity. <strong>DEFER</strong> = safe to decide at implementation time.</div>
+
+      <!-- COCKPIT -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">1</div>
+          <h3>Cockpit <small>/money</small></h3>
+          <div class="count-pills"><span class="cp must">3 must</span><span class="cp nice">2 nice</span><span class="cp defer">1 defer</span></div>
+          <a href="MONEY-MOCKUP-COCKPIT.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">"Log expense" btn</div>
+          <div class="g-what">Quick expense entry modal/page<small>Top-of-funnel · the most-clicked cockpit action on day 1</small></div>
+          <div class="g-state missing">No destination</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">"Send invoice" btn</div>
+          <div class="g-what">Invoice builder<small>Quick-send invoice · reuses finance-invoices.ts (already exists)</small></div>
+          <div class="g-state missing">No destination</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">M · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">First-run UX</div>
+          <div class="g-what">Empty-state Cockpit<small>Brand-new foundry, no Xero, no plan, no raise. What does hero say? What's the first CTA?</small></div>
+          <div class="g-state empty">Not mocked</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Commitment click</div>
+          <div class="g-what">Commitment detail (VAT, rent)<small>Click an upcoming commitment → see amount breakdown, pay button, HMRC reference</small></div>
+          <div class="g-state missing">Inline only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Runway tag</div>
+          <div class="g-what">Runway method explainer<small>Click "Healthy · 18+ weeks" → show how we counted verbal commits, probability-weights, etc.</small></div>
+          <div class="g-state missing">Inline only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Xero sync fail</div>
+          <div class="g-what">Sync error state on Cockpit<small>Source-pill turns red, what does the hero show? Fallback to manual?</small></div>
+          <div class="g-state error">Not mocked</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+      <!-- PLAN -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">2</div>
+          <h3>Plan <small>/money/plan</small></h3>
+          <div class="count-pills"><span class="cp must">2 must</span><span class="cp nice">4 nice</span></div>
+          <a href="MONEY-MOCKUP-PLAN.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">CSV import</div>
+          <div class="g-what">CSV upload + column mapping<small>cash-burn-import.ts (378 lines) exists but surface doesn't — founders migrate from spreadsheets on day 1</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">M · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Empty Plan</div>
+          <div class="g-what">Day-1 Plan with zero line items<small>No Xero, no CSV, nothing imported. Show quick-add helpers + templates</small></div>
+          <div class="g-state empty">Not mocked</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Bulk select</div>
+          <div class="g-what">Multi-row select + bulk action<small>Select 3 cost items → duplicate to scenario / archive / change category</small></div>
+          <div class="g-state missing">No pattern</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Scenario compare</div>
+          <div class="g-what">Side-by-side 2+ scenarios<small>Visible in forecast chart overlay · but not as a standalone view</small></div>
+          <div class="g-state missing">Partial</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">M · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Line hover</div>
+          <div class="g-what">Inline quick-edit (amount only)<small>Hover a row, click the amount, edit in place — faster than full editor</small></div>
+          <div class="g-state missing">No pattern</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Annual uplift</div>
+          <div class="g-what">When uplift fires<small>UI for the 4% 1 Jan uplift — preview what will change on the Jan 2027 boundary</small></div>
+          <div class="g-state missing">Inline hint only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+      <!-- RAISE -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">3</div>
+          <h3>Raise <small>/money/raise</small></h3>
+          <div class="count-pills"><span class="cp must">2 must</span><span class="cp nice">3 nice</span><span class="cp defer">1 defer</span></div>
+          <a href="MONEY-MOCKUP-RAISE.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Empty Raise</div>
+          <div class="g-what">First-time raise setup<small>No round defined, no thesis yet, zero investors. What's the opening state? "Create your round →"</small></div>
+          <div class="g-state empty">Not mocked</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Create round</div>
+          <div class="g-what">Define the round (target, instrument, cap, close date)<small>Prerequisite for everything else on Raise · not shown in any mockup</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Firm click</div>
+          <div class="g-what">Firm profile (not partner)<small>Click "Octopus Ventures" → firm page: fund size, portfolio, all partners, historic cheque range, recent activity</small></div>
+          <div class="g-state missing">Partial in investor detail rail</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">M · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Kanban drag</div>
+          <div class="g-what">Drag card between columns<small>Alternative to opening the Move page · opens a mini inline form</small></div>
+          <div class="g-state missing">No pattern</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Round close</div>
+          <div class="g-what">Close the round event<small>When final SAFE signs, what ritual happens? Lock round? Archive? Victory screen? Celebrate publicly?</small></div>
+          <div class="g-state missing">No flow</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Next round setup</div>
+          <div class="g-what">After close, start next round<small>Roll committed investors to "Portfolio" (existing holders), fresh pipeline for Seed</small></div>
+          <div class="g-state missing">No flow</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">M</div>
+        </div>
+      </div>
+
+      <!-- INVESTOR DETAIL -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">4</div>
+          <h3>Investor detail <small>/money/raise/investor/:id</small></h3>
+          <div class="count-pills"><span class="cp must">1 must</span><span class="cp nice">3 nice</span><span class="cp defer">2 defer</span></div>
+          <a href="MONEY-MOCKUP-INVESTOR-DETAIL.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">"Move → Pass"</div>
+          <div class="g-what">Pass flow · reason capture<small>Passed investors inform thesis refinement. Reasons: too early, wrong sector, cheque too small, silence, lost to competitor. Different form than forward moves.</small></div>
+          <div class="g-state missing">Points to pipeline-move</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S · variant page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Analyst click</div>
+          <div class="g-what">Person profile (Claire Walsh)<small>Individuals at a firm may matter more than the firm · their LinkedIn history, deal authority, relationship to you</small></div>
+          <div class="g-state missing">Inline only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Doc vault</div>
+          <div class="g-what">Documents shared (NDA, deck, data room)<small>Per-investor doc tracking · who has what access · who opened what</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">M · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Reference calls</div>
+          <div class="g-what">Reference-call coordination<small>When investor asks for customer refs, who did we ask? How did the call go? Not just "touches" — a structured ref-check log</small></div>
+          <div class="g-state missing">Merged into touches</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">History deep</div>
+          <div class="g-what">Full touches archive (paginated)<small>Investor detail shows 6 touches; after 50 touches in a long raise you need paginated archive + search</small></div>
+          <div class="g-state missing">Visible top 6 only</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Co-investor graph</div>
+          <div class="g-what">Who else has Simon co-invested with<small>Useful for knowing who a successful close brings with them</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">M</div>
+        </div>
+      </div>
+
+      <!-- THESIS BUILDER -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">5</div>
+          <h3>Thesis builder <small>/money/raise/thesis</small></h3>
+          <div class="count-pills"><span class="cp must">1 must</span><span class="cp nice">2 nice</span></div>
+          <a href="MONEY-MOCKUP-THESIS-BUILDER.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Onboarding</div>
+          <div class="g-what">First-time thesis creation<small>No Strategy/Objectives yet · pure manual input · 3-question guided flow to get enough to match</small></div>
+          <div class="g-state empty">Assumes context exists</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Keyword engine</div>
+          <div class="g-what">"Regenerate" keywords<small>See WHICH docs produced WHICH keywords · edit source docs · exclude a doc from fingerprint</small></div>
+          <div class="g-state missing">Black-box</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">No-go editor</div>
+          <div class="g-what">Add a rule (e.g. "no board seat")<small>Rule builder · target field · match value · negate · preview excluded count</small></div>
+          <div class="g-state missing">Chips only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+      <!-- PITCH SECTION + SLIDE EDITOR -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">6</div>
+          <h3>Pitch section + slide editor <small>/money/raise/pitch/*</small></h3>
+          <div class="count-pills"><span class="cp must">1 must</span><span class="cp nice">3 nice</span><span class="cp defer">2 defer</span></div>
+          <a href="MONEY-MOCKUP-PITCH-SECTION.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Deck overview</div>
+          <div class="g-what">All 16 slides grid view<small>See the whole deck at once · reorder by drag · bulk export · much faster than slide-by-slide</small></div>
+          <div class="g-state missing">No view</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">M</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Image upload</div>
+          <div class="g-what">Add / crop / position an image<small>Product photos, team headshots, chart screenshots</small></div>
+          <div class="g-state missing">Not supported</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Chart binding</div>
+          <div class="g-what">Chart source picker<small>Picking which Plan series binds to the chart · axes · time range · formatting</small></div>
+          <div class="g-state missing">Inline only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Co-founder review</div>
+          <div class="g-what">Share draft for review<small>Send slide/section to a co-founder for comment · track their edits</small></div>
+          <div class="g-state missing">No flow</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Present mode</div>
+          <div class="g-what">Full-screen presenter view<small>Deck plays with speaker notes · timer · slide advance</small></div>
+          <div class="g-state missing">Not supported</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">M</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Theme editor</div>
+          <div class="g-what">Colors / fonts editor<small>Custom brand · not just the one default</small></div>
+          <div class="g-state missing">Not supported</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">M</div>
+        </div>
+      </div>
+
+      <!-- BOARD PACK -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">7</div>
+          <h3>Board pack / investor update <small>/money/raise/update</small></h3>
+          <div class="count-pills"><span class="cp must">1 must</span><span class="cp nice">2 nice</span></div>
+          <a href="MONEY-MOCKUP-BOARDPACK.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Send confirm</div>
+          <div class="g-what">Send flow + preview as investor<small>What do recipients see? Subject line, preview text, HTML vs PDF choice, BCC yourself</small></div>
+          <div class="g-state missing">"Send" button has no flow</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Past update click</div>
+          <div class="g-what">Open-rate tracking detail<small>Click "Mar '26 · 12 recipients · 11 opens" → who opened, who clicked which link, who replied, who didn't open</small></div>
+          <div class="g-state missing">Stats only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">M</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Reply inbox</div>
+          <div class="g-what">Replies from investors<small>When an investor replies to an update, where does it surface? · Thread view · Quick reply</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">M</div>
+        </div>
+      </div>
+
+      <!-- COST + LINE EDITOR -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">8</div>
+          <h3>Cost detail + line editor <small>/money/plan/item/:id</small></h3>
+          <div class="count-pills"><span class="cp nice">3 nice</span></div>
+          <a href="MONEY-MOCKUP-COST-DETAIL.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Formula help</div>
+          <div class="g-what">Formula syntax + variable picker<small>Popover listing available variables, operators, examples · currently the formula box is freetext</small></div>
+          <div class="g-state missing">Unsupported</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Impact preview</div>
+          <div class="g-what">Which scenarios are affected<small>Before saving the edit, show "this line is referenced in 4 scenarios · preview changes"</small></div>
+          <div class="g-state missing">Brief hint only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Approval gate</div>
+          <div class="g-what">Co-founder approval for big changes<small>If change &gt;£5k/mo, prompt "this is significant · request co-founder sign-off"</small></div>
+          <div class="g-state missing">No gate</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+      <!-- SCENARIO -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">9</div>
+          <h3>Scenario detail + new <small>/money/plan/scenario/*</small></h3>
+          <div class="count-pills"><span class="cp nice">2 nice</span></div>
+          <a href="MONEY-MOCKUP-SCENARIO-DETAIL.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Decision journal</div>
+          <div class="g-what">Discussion thread on a scenario<small>Tristan + Finn + co-founder comment on "should we actually hire 2?" — captures the decision narrative</small></div>
+          <div class="g-state missing">No thread</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Publish scenario</div>
+          <div class="g-what">Mark scenario as "board-approved"<small>Flag one scenario as canonical for a quarter · used in investor reporting and default forecasts</small></div>
+          <div class="g-state missing">No status</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+      <!-- VARIANCE + TX DRILL -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">10</div>
+          <h3>Variance + transaction drill <small>/money/plan/variance</small></h3>
+          <div class="count-pills"><span class="cp nice">3 nice</span></div>
+          <a href="MONEY-MOCKUP-VARIANCE.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Single tx click</div>
+          <div class="g-what">Single-transaction detail<small>Open in Xero · full Xero record · attachments · bank ref · VAT status</small></div>
+          <div class="g-state missing">Inline only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Rule engine</div>
+          <div class="g-what">Create auto-categorisation rule<small>"All JLCPCB vendors → Materials/PCB" rule — applies to future imports automatically</small></div>
+          <div class="g-state missing">Manual per-tx</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">M</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Month close</div>
+          <div class="g-what">"Close the month" lock<small>When accountant closes Feb, lock Feb variance · later Xero changes flag as "post-close adjustments"</small></div>
+          <div class="g-state missing">No locking</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+      <!-- PNL -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">11</div>
+          <h3>Full P&amp;L <small>/money/plan/pnl</small></h3>
+          <div class="count-pills"><span class="cp nice">2 nice</span><span class="cp defer">1 defer</span></div>
+          <a href="MONEY-MOCKUP-PNL.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Cell click</div>
+          <div class="g-what">Per-cell drill<small>Click any P&amp;L cell → see the constituent line items rolling into it · matches how accountants think</small></div>
+          <div class="g-state missing">No drill</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Annotate</div>
+          <div class="g-what">Add a note to a quarter<small>"Q4 '26 — Agri-Foods pilot kicks in" · shown as footnote on export</small></div>
+          <div class="g-state missing">No notes</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Format switch</div>
+          <div class="g-what">GAAP / UK GAAP / management<small>Accountants want structured formats · founders want management view</small></div>
+          <div class="g-state missing">Management only</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">M</div>
+        </div>
+      </div>
+
+      <!-- CONNECT XERO -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">12</div>
+          <h3>Connect Xero <small>/money/cockpit/connect</small></h3>
+          <div class="count-pills"><span class="cp must">1 must</span><span class="cp nice">2 nice</span></div>
+          <a href="MONEY-MOCKUP-CONNECT-XERO.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">"Run dry-run" btn</div>
+          <div class="g-what">Dry-run preview<small>Show what WOULD import before actually importing · sample 10 tx per category + totals · build confidence</small></div>
+          <div class="g-state missing">Button exists, no destination</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">OAuth fail</div>
+          <div class="g-what">Auth error state<small>"Xero rejected your auth, please try again" · plus troubleshooting</small></div>
+          <div class="g-state error">Not mocked</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Invite accountant</div>
+          <div class="g-what">Read-only accountant session<small>Teaser says "your accountant can map too"; mock the invite flow</small></div>
+          <div class="g-state missing">Mentioned, not mocked</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+      <!-- LOG TOUCH -->
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">13</div>
+          <h3>Log touch <small>/money/raise/touch/new</small></h3>
+          <div class="count-pills"><span class="cp must">1 must</span><span class="cp defer">2 defer</span></div>
+          <a href="MONEY-MOCKUP-LOG-TOUCH.html" class="view-btn">View ↗</a>
+        </div>
+        <div class="gap-head-row"><div class="g-num-head">ID</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Gmail import</div>
+          <div class="g-what">Import email thread<small>Paste Gmail URL or forward-to-inbox address · auto-parse into a touch · OAuth connect · schema for inbound mail</small></div>
+          <div class="g-state missing">Type chip only</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">M</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Audio upload</div>
+          <div class="g-what">Recording → transcript<small>Otter-style upload + auto-transcribe · feeds the notes field</small></div>
+          <div class="g-state missing">Placeholder</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">M</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Template library</div>
+          <div class="g-what">Save common email templates<small>Post-meeting thank-yous · follow-ups · re-engagement</small></div>
+          <div class="g-state missing">No feature</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">S</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 2: CROSS-CUTTING SURFACES -->
+    <!-- ============================================ -->
+    <div class="section-block" id="cross">
+      <h2>2 · Cross-cutting surfaces <span class="tag">not owned by any page</span></h2>
+      <div class="block-sub">Surfaces that serve all three main pages. Easy to forget because they're nobody's "child" — but they're needed on day 1.</div>
+
+      <div class="gap-card">
+        <div class="gap-head">
+          <div class="p-num">×</div>
+          <h3>Cross-cutting <small>global</small></h3>
+          <div class="count-pills"><span class="cp must">4 must</span><span class="cp nice">5 nice</span><span class="cp defer">3 defer</span></div>
+        </div>
+        <div class="gap-head-row"><div>Domain</div><div>Unmocked surface</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+        <div class="gap-row">
+          <div class="g-trigger">Onboarding</div>
+          <div class="g-what">First-run onboarding flow<small>New foundry · 6-step guided setup: connect accounting? → add plan lines → define thesis → set round → invite team? → first cockpit tour</small></div>
+          <div class="g-state empty">Critical · Day 1 UX</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">L · 4-6 pages</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Settings</div>
+          <div class="g-what">Money settings page<small>Currency, fiscal year, alerts thresholds, specialist behaviour (on/off/quiet), data retention, fiscal year start month</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">M · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Permissions</div>
+          <div class="g-what">Team + role management<small>Who can see raise? Who can edit Plan? Accountant = read-only on Plan, write on Xero mapping. Co-founder = equal. Contractor = tasks only.</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">M · 1 page</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Audit log</div>
+          <div class="g-what">Who changed what, when<small>For investors: "show me the pipeline history". For compliance: mandatory on £5k+ changes.</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri must">MUST</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Search</div>
+          <div class="g-what">Global search across Money<small>Find a cost item, an investor, a scenario · cmd-K style</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">M</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Notifications</div>
+          <div class="g-what">Alert centre<small>"Xero sync failed", "investor update opened", "VAT due in 3 days"</small></div>
+          <div class="g-state missing">Red dot in sidebar only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Error states</div>
+          <div class="g-what">Standard error page(s)<small>LLM offline · Xero connection lost · rate-limited · 500</small></div>
+          <div class="g-state error">Not mocked</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Export centre</div>
+          <div class="g-what">All export history<small>Past board packs, Plan snapshots, P&amp;L exports · re-download</small></div>
+          <div class="g-state missing">Per-page only</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Specialist off</div>
+          <div class="g-what">When Finn/Fiona is unavailable<small>LLM outage · tier downgraded (free tier no specialists) · rate-limit hit · what does Cockpit show?</small></div>
+          <div class="g-state error">Not mocked</div>
+          <div class="g-pri nice">NICE</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Mobile</div>
+          <div class="g-what">Responsive / mobile layouts<small>Cockpit on phone, quick expense entry on phone · the rest desktop-first</small></div>
+          <div class="g-state missing">Desktop only</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">L</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Keyboard</div>
+          <div class="g-what">Shortcuts modal<small>? to show · gp/gm/gr for page nav · e to edit · etc.</small></div>
+          <div class="g-state missing">No shortcuts</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">S</div>
+        </div>
+        <div class="gap-row">
+          <div class="g-trigger">Command palette</div>
+          <div class="g-what">⌘K picker<small>Post-MVP · cross-section nav</small></div>
+          <div class="g-state missing">No surface</div>
+          <div class="g-pri defer">DEFER</div>
+          <div class="g-effort">M</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 3: RED TEAM -->
+    <!-- ============================================ -->
+    <div class="section-block" id="redteam">
+      <h2>3 · Red team <span class="tag">5 critiques</span></h2>
+      <div class="block-sub">Sharp honest analysis of what's been built. These are the arguments that would come up in a design review — addressing them BEFORE code is cheaper than after.</div>
+
+      <!-- CRITIQUE 1 -->
+      <div class="rt-card">
+        <div class="rt-head">
+          <div class="rt-num">1</div>
+          <h3>We're building four products, not one<small>Scope-creep critique</small></h3>
+          <div class="severity">High</div>
+        </div>
+        <div class="rt-body">
+          <div class="rt-claim">The Money section has become a <strong>CRM (Raise) + financial model (Plan) + bookkeeping integration (Xero) + pitch deck editor (Slides) + document tracker (Vault) + email marketing tool (Board pack sending)</strong>. Each of those is a standalone product with a dedicated category leader. ForgeOS would be competing simultaneously with HubSpot, Carta, Xero, Pitch, DocSend, and Mailchimp.</div>
+          <div class="rt-evidence">
+            <strong>Evidence from the mockups:</strong> 19 pages built, 47 additional gaps identified, total ≥ 66 surfaces before code. A specialist tool typically has 20-30 surfaces.
+          </div>
+          <h4>Why this happened</h4>
+          <ul>
+            <li><strong>Every founder-facing question</strong> expanded to its own detail page rather than integrating into an existing surface</li>
+            <li><strong>"The more we mock up the better"</strong> drove breadth rather than depth</li>
+            <li>The product vision is genuinely ambitious — one operational OS for hardware founders — but the Money section should not own the full fundraise CRM, pitch editor, and accounting system</li>
+          </ul>
+          <h4>What could break</h4>
+          <ul>
+            <li>Building all 66 surfaces to the quality bar = 6-12 months of engineering. Money is one of 5+ ForgeOS sections.</li>
+            <li>Each surface has a better specialist competitor. Founder dropout risk: "I'll use this for Cockpit but I have my real CRM in HubSpot."</li>
+            <li>Schema complexity balloons — investors, firms, touches, docs, pitches, slides, scenarios, line items, transactions all interconnect. Migration pain is real.</li>
+          </ul>
+          <div class="rt-mit">
+            <strong>Mitigation (suggest):</strong>
+            <br>• <strong>Ship MVP without</strong>: document vault, slide editor, theme editor, present mode, co-founder review threads, reply inbox, open-rate tracking. Defer to V2.
+            <br>• <strong>Integrate rather than build</strong>: Gmail for touches (OAuth read), Google Slides for deck export (replace slide editor), DocSend for doc tracking (webhook only).
+            <br>• <strong>MVP surface count: 12-14 pages.</strong> Ship Cockpit, Plan (grid + forecast + variance), Raise (kanban + pitch readiness + board pack), and 3 key drills (thesis, pipeline move, log touch). Everything else comes later based on real usage.
+          </div>
+        </div>
+      </div>
+
+      <!-- CRITIQUE 2 -->
+      <div class="rt-card">
+        <div class="rt-head">
+          <div class="rt-num">2</div>
+          <h3>Most value depends on data the founder doesn't have yet<small>Cold-start critique</small></h3>
+          <div class="severity">High</div>
+        </div>
+        <div class="rt-body">
+          <div class="rt-claim">The mockups assume <strong>Xero is connected, Plan is populated, Strategy is written, Objectives are tracked, and the ForgeOS network has warm intros</strong>. A founder on day 1 has NONE of this. They see empty states nowhere in our 19 pages.</div>
+          <div class="rt-evidence">
+            <strong>Evidence:</strong> Cockpit hero says "£312k · 26 weeks runway". Thesis Builder has "keyword fingerprint" pulled from docs. Board Pack auto-populates from Cockpit. Warm intro chips reference "via Max". Every number is populated — nobody has ever seen an empty Money section mocked.
+          </div>
+          <h4>What the founder actually does on day 1</h4>
+          <ol>
+            <li>Lands on Cockpit → sees a stub — "Welcome to your Cockpit. Connect accounting or enter your first cost →"</li>
+            <li>Opens Plan → blank grid with "Import from CSV" or "Start from template" or "Link Xero" as only CTAs</li>
+            <li>Opens Raise → "Create your round" wizard before any pipeline exists</li>
+            <li>Opens Thesis builder → manual 3-field fill (stage, sector, cheque range) since no Strategy exists yet</li>
+          </ol>
+          <h4>What could break</h4>
+          <ul>
+            <li>Founder signs up · opens Cockpit · sees something that doesn't match their reality · churns within 30 seconds</li>
+            <li>Empty states are often where product quality is weakest — every mockup shows the end state, not the journey</li>
+            <li>Onboarding has no mockup. That's a ~4-6 page flow that MUST exist before code</li>
+          </ul>
+          <div class="rt-mit">
+            <strong>Mitigation:</strong>
+            <br>• <strong>Build the onboarding mockup</strong> — 6 pages covering: welcome, connect accounting (skip OK), add 1 plan line (starter templates: "UK pre-seed with 4 engineers"), set thesis (3 questions), set round (optional), first cockpit tour
+            <br>• <strong>Build empty-state mockups</strong> for Cockpit, Plan, Raise (at minimum) — these are the first impressions
+            <br>• <strong>Time-boxed starter data</strong>: the first 7 days, Finn/Fiona help the founder populate — guided rather than empty
+          </div>
+        </div>
+      </div>
+
+      <!-- CRITIQUE 3 -->
+      <div class="rt-card">
+        <div class="rt-head">
+          <div class="rt-num">3</div>
+          <h3>Specialist callouts are AI-branded — violates your own CLAUDE.md rule<small>Copy-voice critique</small></h3>
+          <div class="severity">Medium</div>
+        </div>
+        <div class="rt-body">
+          <div class="rt-claim">The mockups lean heavily on "Finn / Fiona / Harper pre-briefs" as UX primitives. The CLAUDE.md rule says: <strong>"No AI-powered", "AI-generated", "Smart", "Intelligent" labels</strong> · <strong>Test: Would this description make sense without mentioning AI?</strong> The specialist callouts fail this test — each one IS the AI agent.</div>
+          <div class="rt-evidence">
+            <strong>Evidence:</strong> "Fiona · your fundraising lead: I've drafted the outline." · "Finn · your finance lead: I've done this automatically." · "Harper · HR: I've drafted both [payroll scenarios]." These cards explicitly highlight AI-driven work as the specialist's contribution. They read as AI-agent branding.
+          </div>
+          <h4>Secondary issue — voice drift</h4>
+          <ul>
+            <li><strong>Silicon Valley cadence</strong>: "Two things to watch", "Highest-leverage move this week", "Killer feature".</li>
+            <li><strong>Not Tristan's voice</strong>: British, understated, specific numbers, one clear next action. The rule from global CLAUDE.md.</li>
+            <li><strong>Risk</strong>: when we build this in production, the LLM will generate copy matching our mockups' Silicon Valley voice — not Tristan's. Baking the wrong voice into 13 specialists is expensive to unwind.</li>
+          </ul>
+          <div class="rt-mit">
+            <strong>Mitigation:</strong>
+            <br>• <strong>Rewrite specialist callouts</strong>: remove the anthropomorphic framing ("I've drafted"), swap for direct imperatives ("Draft financial model · 3hr estimate"). Specialist avatar stays; "I did X" language goes.
+            <br>• <strong>Frame specialists as roles, not characters</strong>: "Finance · Next action" rather than "Finn · your finance lead". Still useful for routing; less AI-branded.
+            <br>• <strong>Voice sample</strong>: before writing production copy, pull 3-5 of Tristan's LinkedIn posts and investor emails as reference. Rewrite 5 existing specialist callouts in that voice. If they feel right, that's the style guide for the whole section.
+          </div>
+        </div>
+      </div>
+
+      <!-- CRITIQUE 4 -->
+      <div class="rt-card">
+        <div class="rt-head">
+          <div class="rt-num">4</div>
+          <h3>The data model is underspecified — engineering notes are prose, not schema<small>Tech-readiness critique</small></h3>
+          <div class="severity">High</div>
+        </div>
+        <div class="rt-body">
+          <div class="rt-claim">Each drill page has an "engineering note" at the bottom, but they are <strong>written as casual English</strong>. "Scenario schema: <code>{name, question, visibility, ...}</code>" is not the same as a migration SQL file or a TypeScript interface. When we start coding, we'll rediscover ambiguities that should have been resolved here.</div>
+          <div class="rt-evidence">
+            <strong>Specific ambiguities I notice right now:</strong>
+            <ul style="margin: 8px 0 0; padding-left: 20px;">
+              <li><strong>Source of truth</strong>: when Xero says payroll was £34.2k and Plan says £34.0k, which wins on Cockpit? Mockups show Xero-connected Cockpit and manual-entry Plan as if they're the same surface.</li>
+              <li><strong>Scenario overrides</strong>: stored as <em>diffs</em> (flexible, recursive) or as <em>full copies</em> (simple, redundant)? Mockup says diff, doesn't specify conflict handling if base line item is deleted while scenario references it.</li>
+              <li><strong>Pipeline events</strong>: described as an event log (good), but what's the consistency model? If two users move the same investor simultaneously, last-write-wins? Event-sourced? Mockup implies the former, schema should confirm.</li>
+              <li><strong>Thesis versioning</strong>: mockup shows v3 history. Is each scoring run against the <em>current</em> thesis or the version <em>at touch-time</em>? Affects re-ranking semantics.</li>
+              <li><strong>RLS</strong>: ForgeOS multi-tenancy is foundry_id-scoped. Every new table needs RLS policy spelled out. Zero mockups discuss this.</li>
+            </ul>
+          </div>
+          <h4>What could break</h4>
+          <ul>
+            <li><strong>Wasted engineering time</strong> — discovering schema issues mid-implementation is 5x slower than before.</li>
+            <li><strong>Migration pain</strong> — shipping v1 with the wrong shape means painful v2 migration.</li>
+            <li><strong>Security gaps</strong> — RLS is easy to miss; foundry-isolation bugs are the worst kind in multi-tenant SaaS.</li>
+          </ul>
+          <div class="rt-mit">
+            <strong>Mitigation:</strong>
+            <br>• <strong>Before coding, write a proper SCHEMA.md</strong>: one markdown file per table covering columns, types, FKs, indexes, RLS policy, event log membership, soft-delete or hard-delete, versioning. ~15 tables for Money. 2-3 days of work. Pays for itself in a week of coding.
+            <br>• <strong>Resolve the 5 specific ambiguities above</strong> — each deserves a 2-paragraph decision note.
+            <br>• <strong>Write server action signatures</strong>: every action in <code>src/actions/money-*.ts</code> gets a typed signature before implementation. Prevents "what does this return?" loops.
+          </div>
+        </div>
+      </div>
+
+      <!-- CRITIQUE 5 -->
+      <div class="rt-card">
+        <div class="rt-head">
+          <div class="rt-num">5</div>
+          <h3>We're over-engineering scenarios and under-engineering close<small>Feature balance critique</small></h3>
+          <div class="severity">Medium</div>
+        </div>
+        <div class="rt-body">
+          <div class="rt-claim">Scenarios have become a Monte Carlo simulation engine (formulas, probability weights, triggered actions, versions, diff-based storage) — but <strong>the actual fundraise close has no mockup at all</strong>. The moment a SAFE is signed and money wires in is the most important event in a founder's year, and we haven't mocked it.</div>
+          <div class="rt-evidence">
+            <strong>Evidence:</strong> 3 scenario mockups (detail, new, wizard with 8 templates). 0 mockups for "SAFE signed · round closed · money wired · what happens next". The kanban has a "Closed" column with 1 investor (Founders Factory £180k) but there's no ritual, no status transition, no portfolio view.
+          </div>
+          <h4>Real founder usage</h4>
+          <ul>
+            <li>Most founders create <strong>2-3 scenarios ever</strong> (default / bear / bull). A Monte Carlo engine is over-engineered.</li>
+            <li>Every founder goes through <strong>1-3 round closes per year</strong>. That's where the emotional moment is. Where's the confetti?</li>
+            <li>Post-close, the investor becomes a <strong>portfolio relationship</strong> (updates, rights, info requests). We haven't modelled this.</li>
+          </ul>
+          <div class="rt-mit">
+            <strong>Mitigation:</strong>
+            <br>• <strong>Simplify scenario model</strong>: kill formulas-inside-scenarios (just overrides), kill trigger actions (defer), kill global parameters (defer). Scenario = set of line-level overrides. Ship basic, add when users ask.
+            <br>• <strong>Add round-close flow</strong>: after moving an investor to Closed, 2-step close: (1) mark round closed (lock target, record actual), (2) convert close investors into portfolio-holders (ongoing updates, info rights, anti-dilution if applicable). Mock it.
+            <br>• <strong>Portfolio view</strong>: one more surface — "your existing investors (portfolio)". Distinct from the pipeline. How they get their updates, voting, cap-table view. MUST-mock.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 4: PROPOSED NEXT ROUND -->
+    <!-- ============================================ -->
+    <div class="section-block" id="plan">
+      <h2>4 · Proposed final mockup round <span class="tag">before coding</span></h2>
+      <div class="block-sub">What to mock in round 4 (last round before code starts). Combines the "must" gap items + red-team fixes. Estimated effort: 1 focused session.</div>
+
+      <div class="plan-band">
+        <h3>Design principle for this round</h3>
+        <p><strong>Simplify AND fill gaps.</strong> Not just "more mockups" — also cutting features that the red-team critique surfaced as over-scoped. This round should make the existing set <em>tighter</em>, not just <em>larger</em>.</p>
+      </div>
+
+      <h3 style="margin: 20px 0 10px; font-size: 16px; font-weight: 800;">Round 4 — proposed build list</h3>
+
+      <div class="next-row">
+        <div class="n-num">1</div>
+        <div class="n-what">Onboarding flow · 5 pages<small>Welcome → Connect accounting (skip OK) → First plan line (templates: UK pre-seed · US pre-seed · bootstrapped · custom) → Define thesis (3 questions) → Cockpit first-run tour</small></div>
+        <div class="n-parent">Cross-cutting</div>
+        <div class="n-effort">L · 4-5 pages</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">2</div>
+        <div class="n-what">Empty states for Cockpit / Plan / Raise<small>What do the main pages look like on day 1 before any data? Merged into existing pages as toggle view; 3 screenshots.</small></div>
+        <div class="n-parent">Main pages</div>
+        <div class="n-effort">S · 3 states</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">3</div>
+        <div class="n-what">Quick actions — log expense + send invoice<small>Cockpit's most-clicked buttons. Two mini pages.</small></div>
+        <div class="n-parent">Cockpit</div>
+        <div class="n-effort">M · 2 pages</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">4</div>
+        <div class="n-what">CSV import flow<small>Migration path from spreadsheets — Plan's day-1 entry point for founders without Xero. 2 pages: upload/map + review.</small></div>
+        <div class="n-parent">Plan</div>
+        <div class="n-effort">M · 2 pages</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">5</div>
+        <div class="n-what">Create round wizard<small>Prerequisite for all of Raise. Target, instrument, cap, close date, tier-structure. 1 page.</small></div>
+        <div class="n-parent">Raise</div>
+        <div class="n-effort">S · 1 page</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">6</div>
+        <div class="n-what">Pass-investor flow + portfolio view<small>Passing an investor (reason capture, schema for thesis feedback) + post-close portfolio surface (what happens after an investor becomes a shareholder).</small></div>
+        <div class="n-parent">Raise</div>
+        <div class="n-effort">M · 2 pages</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">7</div>
+        <div class="n-what">Dry-run Xero preview<small>What gets imported before hitting go. 1 page.</small></div>
+        <div class="n-parent">Connect Xero</div>
+        <div class="n-effort">S · 1 page</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">8</div>
+        <div class="n-what">Settings + permissions + audit log<small>Three cross-cutting surfaces, 3 pages.</small></div>
+        <div class="n-parent">Cross-cutting</div>
+        <div class="n-effort">M · 3 pages</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">9</div>
+        <div class="n-what">Gmail import for touches<small>OAuth + schema for inbound email parsing. 1 page.</small></div>
+        <div class="n-parent">Log touch</div>
+        <div class="n-effort">S · 1 page</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">10</div>
+        <div class="n-what">Investor-update send preview<small>What recipients see + actual send confirmation. 1 page.</small></div>
+        <div class="n-parent">Board pack</div>
+        <div class="n-effort">S · 1 page</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">11</div>
+        <div class="n-what">Rewrite all specialist callouts<small>Critique 3 fix — no "I've drafted" language, no anthropomorphism. Updates across ~8 existing pages.</small></div>
+        <div class="n-parent">Voice / all</div>
+        <div class="n-effort">M · many edits</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">12</div>
+        <div class="n-what">Write SCHEMA.md<small>Not a mockup — a pre-code document. Every table, column, FK, RLS policy. ~15 tables for Money.</small></div>
+        <div class="n-parent">Pre-code</div>
+        <div class="n-effort">L · 2-3 days</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">13</div>
+        <div class="n-what">Simplify scenario spec<small>Critique 5 fix — strip formulas/triggers/global-params from scenarios. Update SCENARIO-DETAIL and NEW-SCENARIO mockups.</small></div>
+        <div class="n-parent">Scenarios</div>
+        <div class="n-effort">S · 2 edits</div>
+      </div>
+      <div class="next-row">
+        <div class="n-num">14</div>
+        <div class="n-what">Scope-cut note in INDEX<small>Explicit list of V1-cut features (doc vault, slide editor, present mode, etc.). Sets MVP expectation before code begins.</small></div>
+        <div class="n-parent">Index</div>
+        <div class="n-effort">S</div>
+      </div>
+
+      <div class="plan-band" style="background: var(--info-soft); border-color: var(--info-dim); margin-top: 20px;">
+        <h3 style="color: #1e40af;">Total for round 4</h3>
+        <p style="color: #1e3a8a;">Approximately <strong>12-15 new pages + 5-8 edits to existing pages + 1 pre-code schema document</strong>. This should be the final mockup round. After round 4, we have ≥ 31 pages covering every MVP surface + documented schema. Coding can start with confidence.</p>
+      </div>
+
+      <h3 style="margin: 24px 0 10px; font-size: 16px; font-weight: 800;">What we are EXPLICITLY cutting (MVP-excluded)</h3>
+      <div style="background: var(--surface-soft); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 13px; line-height: 1.7; color: var(--fg-muted);">
+        <p style="margin: 0 0 8px; color: var(--fg);"><strong>Not shipping in V1 · moved to later release:</strong></p>
+        <ul style="margin: 0; padding-left: 22px;">
+          <li>Document vault on investor (use DocSend webhook instead)</li>
+          <li>Full slide editor (auto-generate slides only; editing happens in Google Slides after export)</li>
+          <li>Present mode + theme editor in slides</li>
+          <li>Audio transcription on log-touch</li>
+          <li>Email template library (just saved drafts)</li>
+          <li>Rule engine for transaction reclassification (manual only in V1)</li>
+          <li>Co-founder review threads on scenarios / pitch sections (use Slack / email out-of-band)</li>
+          <li>Mobile responsive layouts (desktop-only V1; mobile V2)</li>
+          <li>Global keyboard shortcuts + command palette</li>
+          <li>Formulas inside scenarios (keep only line-level overrides)</li>
+          <li>Trigger-action scheduling on scenarios</li>
+          <li>Global revenue-delay / cost-delay scenario parameters (line overrides only)</li>
+          <li>Multi-Xero-org support (single org per foundry V1)</li>
+          <li>Open-rate detail analytics + reply inbox (aggregate stats only in V1)</li>
+          <li>Co-investor graph / analyst profile pages (firm profile only)</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="annot">
+      <strong>Before the next round</strong>
+      Walk this audit. Agree / disagree on: (a) the priority calls (MUST / NICE / DEFER), (b) the 5 red-team critiques and their mitigations, (c) the round-4 scope, (d) the explicit cuts list. Once that's agreed, I'll build round 4 in one pass and then we're ready to write code. If you push back on scope (e.g. "no, I want the slide editor in V1"), we revise before building — not after.
+    </div>
+
+  </main>
+</div>
+
+<button class="annot-toggle" onclick="document.body.classList.toggle('annot-hidden')">
+  <span class="dot"></span> Toggle design notes
+</button>
+
+</body>
+</html>
