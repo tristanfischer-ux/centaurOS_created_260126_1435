@@ -693,9 +693,9 @@ Revised from the earlier draft; each item now has a recommended default for buil
 
 6. **Objective assumptions shape.** **Resolved for Phase 3:** `objectives.metadata->>'assumptions' text[]`. Migration to dedicated `objective_assumptions` table deferred to post-V1 focused PR if demand emerges.
 
-7. **External viewers (board members on reports).** **OPEN — defer to post-V1.** Phase 3 V1 ships without `read_only_observer` / `external_viewers` surface; the Send-as-link feature writes `reports_sent.external_share_url` with a server-side token-gated read route only. Full observer permissions wait for a later PR.
+7. **External viewers (board members on reports). Resolved 2026-04-19:** not in V1. Phase 3 V1 ships without `read_only_observer` / `external_viewers` surface; Send-as-link writes `reports_sent.external_share_url` with a server-side token-gated read route only. Full observer permissions wait for a later PR (no schedule).
 
-8. **9-role enum expansion.** **OPEN — separate focused PR before Phase 3 coding begins (or graceful degradation).** Build terminal: if the enum has been expanded, use full matrix from §16.1. If not, collapse to the 5-role mapping in §16 and surface a note in the Settings > Permissions page: "expanded roles coming in a follow-up release."
+8. **9-role enum expansion. Resolved 2026-04-19:** degrade + access-change audit (NOT a prerequisite PR). Phase 3 ships against the current 5-role `member_role` enum AND implements §16.3 access-change audit. Settings > Permissions tab shows per-member delta and requires an explicit "Apply Phase 3 role matrix" founder click before any role-scoped RLS change bites. Full 9-role expansion stays its own focused PR (no schedule).
 
 9. **Legacy `report_snapshots` rows with `report_type='red-team-debate'` — migrate or dual-read?** **Resolved:** one-time script backfills into `pressure_test_sessions` with `legacy_report_snapshot_id` link. Legacy rows retained; SELECT queries use a view that UNIONs both.
 

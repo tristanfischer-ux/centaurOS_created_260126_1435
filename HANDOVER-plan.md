@@ -108,17 +108,25 @@ Don't combine chunks into a single PR. The sidebar (B) is the riskier surface; l
 
 ---
 
-## Open questions Tristan needs to answer during build
+## Decisions locked — no open questions
 
-Defaults are the recommended answer — if Tristan doesn't push back, use the default and note it in the PR body.
+Tristan delegated these 7 calls to the prep terminal 2026-04-19: *"I don't really have a massive view on the issues which have been raised. Make the decisions."* All defaults are now firm. Build terminal does not need to re-surface any of these.
 
-1. **9-role enum expansion — separate PR before Phase 3 coding, or degrade?** Default: **degrade + access-change audit** (NOT silent degrade). Phase 3 ships against the current 5-role `member_role` enum AND implements the §16.3 access-change audit. Settings > Permissions tab requires a founder to click "Apply Phase 3 role matrix" with the per-member access delta visible — no role-scoped policy change takes effect until that click lands. Existing users keep permissive legacy access until the founder confirms. The 9-role expansion stays its own focused PR.
-2. **External viewers (observers on shared reports) in V1?** Default: **no**. Ship Send-as-link via server-side token on `reports_sent.external_share_url` without a full `external_viewers` table. Revisit post-V1.
-3. **Legacy `knowledge_notes` destructive backfill into `history_entries`?** Default: **no destructive backfill**. History search UNIONs both at read time; writes go to `history_entries` only. Knowledge-decay cron keeps running untouched.
-4. **Rollback UX if flag flips back off?** Default: **banner only**. No bespoke "view new-experience data in old UI" link. Rollback is a last-resort operational action; we communicate via maintenance banner not product UX.
-5. **Pressure-test inline modal vs standalone route?** Default: **inline modal** (already the gap-audit's MVP cut). Legacy `/red-team` 301-redirects to `/plan` and opens the modal. Past debates reachable at `/plan/history?type=pressure_test`.
-6. **Custom report target in V1?** Default: **no**. Ship Weekly · Monthly · Quarterly. Custom deferred to V2 per gap audit cuts list.
-7. **Fractional invite full vs minimal?** Default: **minimal**. V1 invites ask email + role + goals only; retainer + capacity + working-style editable via Settings after invite accepted. `PLAN-MOCKUP-ADD-FRACTIONAL.html` shows the full flow — trim for V1.
+1. **9-role enum expansion — LOCKED: degrade + access-change audit.** Phase 3 ships against the current 5-role `member_role` enum AND implements the §16.3 access-change audit. Settings > Permissions tab requires a founder to click "Apply Phase 3 role matrix" with the per-member access delta visible — no role-scoped policy change takes effect until that click lands. Existing users keep permissive legacy access until the founder confirms. The 9-role expansion stays its own focused PR, unscheduled.
+
+2. **External viewers (observers on shared reports) — LOCKED: not in V1.** Ship Send-as-link via server-side token on `reports_sent.external_share_url`. No `external_viewers` table. Revisit post-V1.
+
+3. **Legacy `knowledge_notes` backfill — LOCKED: no destructive backfill.** History search UNIONs `knowledge_notes` + `history_entries` at read time. Writes go to `history_entries` only. Knowledge-decay and re-embed crons keep running untouched.
+
+4. **Rollback UX if flag flips back off — LOCKED: maintenance banner only.** No bespoke "view new-experience data in old UI" link. Rollback is a last-resort operational action, communicated via banner not product UX.
+
+5. **Pressure-test inline modal vs standalone route — LOCKED: inline modal.** Legacy `/red-team` 301-redirects to `/plan` and opens the modal. Past debates reachable at `/plan/history?type=pressure_test`. Per gap-audit V1 cuts list.
+
+6. **Custom report target in V1 — LOCKED: no.** Ship Weekly Team · Monthly Investor · Quarterly Board only. Custom deferred to V2 per gap audit cuts list.
+
+7. **Fractional invite full vs minimal — LOCKED: minimal.** V1 invite captures email + role + goals only. Retainer, capacity, working-style editable via Settings after the fractional accepts. `PLAN-MOCKUP-ADD-FRACTIONAL.html` shows the full flow — trim for V1.
+
+**If the build terminal hits a NEW ambiguity not in this list:** surface to Tristan via iMessage banner and wait. Don't invent a new default silently.
 
 ---
 
