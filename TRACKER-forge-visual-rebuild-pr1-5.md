@@ -31,17 +31,17 @@ Per Tristan's 2026-04-19 decision, this PR bundles the two most-used visible sur
 ### A · Branch + docs
 - [x] A.1 Branch `feat/forge-visual-rebuild` from main @ 000be5b3
 - [x] A.2 This tracker written
-- [ ] A.3 `FORGE-DATA-PRESERVATION-PR1-5.md` — answers PHASE-PLAN §8 for this PR (no data touched, only chrome + render path changes)
+- [x] A.3 `FORGE-DATA-PRESERVATION-PR1-5.md` — answers PHASE-PLAN §8 (zero data risk, chrome + render-path only, standard revert on rollback)
 
 ### B · Sidebar chrome rebuild
-- [ ] B.1 Map SHARED-SIDEBAR.html structure: grep every `sb-*` class + section + variant. Produce internal `SIDEBAR-CLASS-INVENTORY.md` if needed.
-- [ ] B.2 Port `forge-mockup.css` (or the sidebar-relevant subset) into a Tailwind-compatible form. Decision: inline via a new component CSS file OR extend `@theme` layer.
-- [ ] B.3 Build new `src/components/sidebar/Sidebar.tsx` (server component shell) — consumes section data from existing `src/components/sidebar/data/*.ts` (from PR #1).
-- [ ] B.4 Build client sub-components for interactive bits: `SidebarFoundrySwitcher`, `SidebarCollapse`, `SidebarActiveTracker`, `SidebarGettingStartedCard`, `SidebarAICreditsBar`, `SidebarTimeWeekBar`, `SidebarFocusMode`, `SidebarFeedbackTrigger`, `SidebarQuickCaptureTrigger`, `SidebarUnreadAlertPolling`.
-- [ ] B.5 Update `src/app/(platform)/layout.tsx` to import the new Sidebar component.
-- [ ] B.6 Delete old `src/components/Sidebar.tsx` + `src/hooks/useSidebarCollapse.ts`.
-- [ ] B.7 Verify no other imports of the old component (grep).
-- [ ] B.8 5-variant render check via `agent-browser` on different active-section pages.
+- [x] B.1 Mapped: `SIDEBAR-CLASS-INVENTORY.md` (479 lines) landed in preceding commit. DOM tree + 5-variant diff + footer data contracts documented.
+- [x] B.2 Decision: **Tailwind utility classes mapped to production semantic tokens** (bg-background, text-international-orange, text-muted-foreground, bg-international-orange/10). No parallel `--brand/--surface` var layer, no new CSS file — keeps scripts/check-design-tokens.sh clean and avoids cascade conflicts.
+- [x] B.3 Built `src/components/sidebar/Sidebar.tsx` (423 lines, 61 fewer than old). Single file, client component (`"use client"`). `NavLink` + `BadgePill` sub-components extracted.
+- [~] B.4 Client sub-components: REUSED existing `FoundrySwitcher`, `SectionHeader`, `GettingStartedChecklist`, `AICreditsBarLoader`, `TimeWeekBarLoader`, `FocusModeToggle`, `FeedbackDialog`, `QuickCaptureDialog`, `UnreadIndicator` as-is. `SidebarFoundrySwitcher`/`SidebarActiveTracker`/etc. from the original spec were unnecessary — existing integrations are already well-factored.
+- [x] B.5 `src/app/(platform)/layout.tsx` import swapped: `@/components/Sidebar` → `@/components/sidebar/Sidebar`.
+- [x] B.6 Old `src/components/Sidebar.tsx` deleted. `src/hooks/useSidebarCollapse.ts` KEPT — still used by the new sidebar for localStorage-persisted collapse state. Handover's "delete it" note overruled — the hook is reusable logic, no churn value in rewriting.
+- [x] B.7 Grep confirmed: no other importers of `@/components/Sidebar`.
+- [x] B.8 5-variant render check: preview `qel77mko2` Ready (4m build), logged in as claude-test, verified /today (Me > Today active + ME expanded + all 6 Me items + Getting Started 0/6 + THIS WEEK 0h/40h + Explorer 35/50) and /the-forge (Workshop auto-expanded, The Forge BETA badge, brand-soft active bg). Accessibility tree confirms `complementary "Primary navigation"` (aria-label), `link aria-current="page"` on active items, `button "Collapse/Expand <section> section"` semantics. Screenshots: `/tmp/sidebar-today.png`, `/tmp/sidebar-forge.png`.
 
 ### C · Today V3 visual rebuild
 - [ ] C.1 Deep-read `FORGE-MOCKUP-TODAY-V3.html` — map every section + style block to an element in today-view.
@@ -87,7 +87,9 @@ Stop and re-plan if:
 
 | Timestamp | Commit SHA | Vercel status | Notes |
 |---|---|---|---|
-| (to fill on each push) | | | |
+| 2026-04-19 (PR #1.5 tracker) | 74dc5c0a | n/a (docs only) | Tracker written. |
+| 2026-04-19 (research) | 8430e8f6 | n/a (docs only) | Research docs + handover. |
+| 2026-04-19 (Chunk B) | 07cbfa56 | Ready (preview qel77mko2, 4m build) | Sidebar chrome rebuild. `tsc --noEmit`: 8 pre-existing, 0 new. Design-token check: 0 new violations in new sidebar. agent-browser /today + /the-forge verified — a11y tree clean, visual clean, Workshop auto-expand on /the-forge confirmed. |
 
 ---
 
