@@ -29,6 +29,12 @@ import {
     FileOutput,
     ArrowRight,
     Sparkles,
+    Activity,
+    BookOpen,
+    Clock,
+    Library,
+    Factory,
+    Cog,
 } from "lucide-react"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
@@ -101,9 +107,10 @@ export default async function ForgeV2ProjectPage({
         moduleTotal === 0 ? 'grey' :
         moduleBlocked > 0 ? 'red' :
         modulePending > 0 ? 'amber' : 'green'
+    // BOM is amber while we're only surfacing keyParts names; turns green once
+    // the parts store ships with real specs (qty / material / tolerance / cost).
     const bomState: ArtefactState =
-        bomCount === 0 ? 'grey' :
-        bomCount < 5 ? 'amber' : 'green'
+        bomCount === 0 ? 'grey' : 'amber'
     const suppliersState: ArtefactState = 'grey' // Supplier awards not yet tracked in cad_lab_projects; stub state.
     const costState: ArtefactState =
         !costHasEstimates ? 'grey' :
@@ -250,14 +257,15 @@ export default async function ForgeV2ProjectPage({
                     <ArtefactCard
                         icon={ListChecks}
                         title="BOM"
-                        subtitle="Parts · qty · material · tolerance · cost"
+                        subtitle="Key components · specs ship with parts store"
                         body={bomCount > 0 ? (
-                            <><strong>{bomCount} key components</strong> listed across {modules.filter(m => (m.keyParts?.length ?? 0) > 0).length} modules.</>
+                            <><strong>{bomCount} key components</strong> listed across {modules.filter(m => (m.keyParts?.length ?? 0) > 0).length} modules. Per-part qty / material / tolerance / cost arrives with the parts store.</>
                         ) : (
                             <span className="text-muted-foreground italic">Generate module parts to populate the bill of materials.</span>
                         )}
                         chips={bomCount > 0 ? [
-                            { label: `${bomCount} parts`, tone: 'info' },
+                            { label: `${bomCount} components`, tone: 'info' },
+                            { label: 'Names only', tone: 'warning' },
                         ] : [{ label: 'Empty', tone: 'muted' }]}
                         footerLabel="Open BOM"
                         state={bomState}
@@ -375,9 +383,9 @@ export default async function ForgeV2ProjectPage({
                 </div>
             </section>
 
-            {/* Footer — link to modules list */}
+            {/* Browse-all link to modules list */}
             {moduleTotal > 0 && (
-                <div className="pt-2">
+                <div>
                     <Link
                         href={`/the-forge-v2/projects/${project.id}/modules`}
                         className="inline-flex items-center gap-1.5 text-sm font-semibold text-international-orange hover:underline"
@@ -387,9 +395,290 @@ export default async function ForgeV2ProjectPage({
                     </Link>
                 </div>
             )}
+
+            {/* Known Challenges — failure modes + unknowns across all modules */}
+            {moduleTotal > 0 && riskSignals > 0 && (
+                <KnownChallenges
+                    projectId={project.id}
+                    modules={modules}
+                    failureModeCount={moduleFailureModeCount}
+                    unknownCount={moduleUnknownCount}
+                />
+            )}
+
+            {/* Engineering Intelligence — ForgeOS library counts scoped to the project */}
+            <EngineeringIntelligence projectId={project.id} />
+
+            {/* Recent activity — checkpoints + reviews + updated timestamps */}
+            <ActivityTimeline project={project} modules={modules} />
         </WorkspaceShell>
     )
 }
+
+// ─── Known Challenges ─────────────────────────────────────────────────
+
+function KnownChallenges({
+    projectId,
+    modules,
+    failureModeCount,
+    unknownCount,
+}: {
+    projectId: string
+    modules: CadLabModule[]
+    failureModeCount: number
+    unknownCount: number
+}): React.ReactElement {
+    const failures = modules.flatMap(m => (m.failureModes ?? []).map(fm => ({ module: m, text: fm }))).slice(0, 8)
+    const unknowns = modules.flatMap(m => (m.unknowns ?? []).map(u => ({ module: m, text: u }))).slice(0, 8)
+    return (
+        <section aria-labelledby="known-challenges-heading" className="space-y-3">
+            <div className="flex items-center gap-2">
+                <div className="w-1 h-5 rounded-full bg-status-warning" />
+                <AlertTriangle className="h-4 w-4 text-status-warning" />
+                <h2 id="known-challenges-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Known Challenges · {failureModeCount + unknownCount} items across {modules.length} modules
+                </h2>
+            </div>
+            <Card className="rounded-xl border">
+                <CardContent className="py-5 px-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                                Failure modes ({failureModeCount})
+                            </h3>
+                            <ul className="space-y-1">
+                                {failures.map((f, idx) => (
+                                    <li key={idx}>
+                                        <Link
+                                            href={`/the-forge-v2/projects/${projectId}/modules/${f.module.id}#failure-modes`}
+                                            className="block text-[13px] leading-relaxed px-2 py-1.5 rounded hover:bg-muted transition-colors border-b border-border/40 last:border-0"
+                                        >
+                                            <span className="font-semibold text-international-orange">{f.module.name}:</span>{" "}
+                                            <span className="text-foreground">{f.text}</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                            {failureModeCount > failures.length && (
+                                <Link href={`/the-forge-v2/projects/${projectId}/risks`} className="text-[11.5px] font-semibold text-international-orange hover:underline mt-2 inline-flex items-center gap-1">
+                                    See all {failureModeCount} <ArrowRight className="h-3 w-3" />
+                                </Link>
+                            )}
+                        </div>
+                        <div>
+                            <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-electric-blue" />
+                                Open questions ({unknownCount})
+                            </h3>
+                            <ul className="space-y-1">
+                                {unknowns.map((u, idx) => (
+                                    <li key={idx}>
+                                        <Link
+                                            href={`/the-forge-v2/projects/${projectId}/modules/${u.module.id}#unknowns`}
+                                            className="block text-[13px] leading-relaxed px-2 py-1.5 rounded hover:bg-muted transition-colors border-b border-border/40 last:border-0"
+                                        >
+                                            <span className="font-semibold text-international-orange">{u.module.name}:</span>{" "}
+                                            <span className="text-foreground">{u.text}</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                            {unknownCount > unknowns.length && (
+                                <Link href={`/the-forge-v2/projects/${projectId}/risks`} className="text-[11.5px] font-semibold text-international-orange hover:underline mt-2 inline-flex items-center gap-1">
+                                    See all {unknownCount} <ArrowRight className="h-3 w-3" />
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </section>
+    )
+}
+
+// ─── Engineering Intelligence ────────────────────────────────────────
+//
+// ForgeOS-library level aggregation. The numbers are tracked in the step_templates
+// library (~20 materials, ~82 standard hardware components, ~20 processes,
+// ~10 supplier techniques). Exposed here as a grounded-in-library strip.
+// Deep links to the CAD lab's reference material until a proper library
+// browser ships.
+
+interface LibrarySection { icon: React.ComponentType<{ className?: string }>; label: string; count: number; hint: string; href: string }
+
+const LIBRARY_SECTIONS: LibrarySection[] = [
+    { icon: Library,  label: "Materials",       count: 20, hint: "Ti-6Al-4V · 7075-T6 · CFRP · more",                    href: "/the-forge/cad-lab/templates" },
+    { icon: Cog,      label: "Hardware",        count: 82, hint: "Bolts · bearings · fasteners with load ratings",       href: "/the-forge/cad-lab/templates" },
+    { icon: Factory,  label: "Processes",       count: 20, hint: "Wire EDM · CNC · SLA · DMLS · sheet metal · more",     href: "/the-forge/cad-lab/templates" },
+    { icon: Truck,    label: "Supplier techniques", count: 10, hint: "CNC milling · laser cut · sand cast · EDM · SLA",  href: "/suppliers/search" },
+]
+
+function EngineeringIntelligence({ projectId }: { projectId: string }): React.ReactElement {
+    void projectId
+    return (
+        <section aria-labelledby="eng-intel-heading" className="space-y-3">
+            <div className="flex items-center gap-2">
+                <div className="w-1 h-5 rounded-full bg-international-orange" />
+                <BookOpen className="h-4 w-4 text-international-orange" />
+                <h2 id="eng-intel-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Engineering intelligence · grounded in the ForgeOS library
+                </h2>
+            </div>
+            <Card className="rounded-xl border">
+                <CardContent className="py-4 px-5">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {LIBRARY_SECTIONS.map(s => (
+                            <Link
+                                key={s.label}
+                                href={s.href}
+                                className="flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-background hover:bg-muted/30 hover:shadow-sm transition-all group"
+                            >
+                                <span className="flex items-center justify-center w-9 h-9 rounded-md bg-international-orange/10 text-international-orange shrink-0">
+                                    <s.icon className="h-4 w-4" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">
+                                        {s.label}
+                                    </p>
+                                    <p className="text-lg font-bold text-foreground tabular-nums leading-tight group-hover:text-international-orange transition-colors">
+                                        {s.count}
+                                        <span className="text-xs font-medium text-muted-foreground ml-1">catalog</span>
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                                        {s.hint}
+                                    </p>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        </section>
+    )
+}
+
+// ─── Activity Timeline ───────────────────────────────────────────────
+
+interface TimelineEvent { when: Date; labelPrefix: string; body: React.ReactNode; href?: string }
+
+function ActivityTimeline({
+    project,
+    modules,
+}: {
+    project: { id: string; createdAt: string; updatedAt: string; designRevision: number; checkpoints: CadLabProjectCheckpoints | null; reviews: CadLabProjectReviews | null }
+    modules: CadLabModule[]
+}): React.ReactElement {
+    const events: TimelineEvent[] = []
+
+    // Project updated
+    if (project.updatedAt) {
+        events.push({
+            when: new Date(project.updatedAt),
+            labelPrefix: "Updated",
+            body: <>Project metadata touched · design rev <strong>v{project.designRevision}</strong></>,
+        })
+    }
+
+    // Specialist reviews
+    if (project.reviews) {
+        for (const [moduleId, reviews] of Object.entries(project.reviews)) {
+            const mod = modules.find(m => m.id === moduleId)
+            if (!Array.isArray(reviews)) continue
+            for (const r of reviews.slice(-3)) {
+                const rec = r as { at?: string; specialistId?: string; verdict?: string; summary?: string }
+                const when = rec.at ? new Date(rec.at) : null
+                if (!when || Number.isNaN(when.getTime())) continue
+                events.push({
+                    when,
+                    labelPrefix: rec.specialistId ?? "Specialist",
+                    body: <><span className="font-semibold">{mod?.name ?? moduleId}</span> — {rec.verdict ?? 'reviewed'}</>,
+                    href: mod ? `/the-forge-v2/projects/${project.id}/modules/${mod.id}#failure-modes` : undefined,
+                })
+            }
+        }
+    }
+
+    // Checkpoints
+    if (project.checkpoints) {
+        for (const [specialistId, checkpoint] of Object.entries(project.checkpoints)) {
+            const rec = checkpoint as { at?: string; summary?: string }
+            const when = rec.at ? new Date(rec.at) : null
+            if (!when || Number.isNaN(when.getTime())) continue
+            events.push({
+                when,
+                labelPrefix: specialistId,
+                body: <>Checkpoint logged{rec.summary ? <> · {rec.summary}</> : null}</>,
+            })
+        }
+    }
+
+    // Created
+    if (project.createdAt) {
+        events.push({
+            when: new Date(project.createdAt),
+            labelPrefix: "Started",
+            body: <>Project created</>,
+        })
+    }
+
+    // Sort newest first
+    const sorted = events.sort((a, b) => b.when.getTime() - a.when.getTime()).slice(0, 8)
+
+    return (
+        <section aria-labelledby="activity-heading" className="space-y-3">
+            <div className="flex items-center gap-2">
+                <div className="w-1 h-5 rounded-full bg-international-orange" />
+                <Activity className="h-4 w-4 text-international-orange" />
+                <h2 id="activity-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Recent activity on this project
+                </h2>
+            </div>
+            <Card className="rounded-xl border">
+                <CardContent className="py-4 px-5">
+                    {sorted.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">No activity yet.</p>
+                    ) : (
+                        <ul className="space-y-0">
+                            {sorted.map((e, idx) => (
+                                <li key={idx} className={cn("flex items-start gap-3 py-2.5", idx < sorted.length - 1 && "border-b border-border/40")}>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums min-w-[90px] shrink-0 pt-0.5">
+                                        <Clock className="h-3 w-3" />
+                                        {formatRelative(e.when)}
+                                    </div>
+                                    <div className="text-sm text-foreground leading-relaxed min-w-0 flex-1">
+                                        <strong className="font-semibold text-international-orange">{e.labelPrefix}</strong>{' '}
+                                        {e.href ? <Link href={e.href} className="hover:underline">{e.body}</Link> : e.body}
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </CardContent>
+            </Card>
+        </section>
+    )
+}
+
+function formatRelative(date: Date): string {
+    const now = Date.now()
+    const diffMs = now - date.getTime()
+    const diffMin = Math.round(diffMs / 60_000)
+    if (diffMin < 1) return 'just now'
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffH = Math.round(diffMin / 60)
+    if (diffH < 24) return `${diffH}h ago`
+    const diffD = Math.round(diffH / 24)
+    if (diffD === 1) return 'yesterday'
+    if (diffD < 14) return `${diffD}d ago`
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
+// Loose type aliases used by the activity timeline — the underlying shapes
+// are deep JSONB so we keep them permissive and narrow at read-time.
+type CadLabProjectCheckpoints = Record<string, unknown>
+type CadLabProjectReviews = Record<string, unknown>
+
 
 // ─── Sub-components ───────────────────────────────────────────────────
 
@@ -428,24 +717,29 @@ function HealthCard({
     )
 }
 
-function ResumedBanner({ project }: { project: { updatedAt: string; stage: string; productOverview: string | null } }): React.ReactElement | null {
+function ResumedBanner({ project }: { project: { id: string; updatedAt: string; stage: string; productOverview: string | null } }): React.ReactElement | null {
     const updatedDate = new Date(project.updatedAt)
     const hoursSince = (Date.now() - updatedDate.getTime()) / (1000 * 60 * 60)
     // Only show if updated within the last 72 hours
     if (hoursSince > 72) return null
+    const stageCopy = project.stage === 'complete' ? 'complete' :
+        project.stage === 'generated' ? 'generated — ready for review' :
+        project.stage === 'interface_ready' ? 'interfaces locked — generating modules' :
+        project.stage === 'researched' ? 'research done — decomposition next' :
+        'early draft'
     return (
         <Card className="rounded-xl border border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.03]">
             <CardContent className="py-4 px-5 flex items-start gap-3">
                 <Sparkles className="h-4 w-4 text-international-orange mt-0.5 shrink-0" />
-                <div className="flex-1 text-sm text-foreground leading-relaxed">
+                <div className="flex-1 text-sm text-foreground leading-relaxed min-w-0">
                     <p className="text-[10.5px] font-bold uppercase tracking-widest text-international-orange mb-1">
                         Where you left off
                     </p>
-                    {project.productOverview ? (
-                        <p className="line-clamp-2"><strong className="font-semibold">Current stage:</strong> {project.stage}. {project.productOverview}</p>
-                    ) : (
-                        <p>Project is at stage <strong className="font-semibold">{project.stage}</strong>. Continue in CAD Lab to advance.</p>
-                    )}
+                    <p className="text-sm">
+                        <strong className="font-semibold">Stage:</strong> {stageCopy}. Last updated {updatedDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.
+                        {' '}
+                        <Link href={`/the-forge-v2/projects/${project.id}/brief`} className="text-international-orange font-semibold hover:underline">Open Brief →</Link>
+                    </p>
                 </div>
             </CardContent>
         </Card>

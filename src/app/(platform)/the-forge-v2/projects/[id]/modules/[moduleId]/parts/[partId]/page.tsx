@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 import { WorkspaceShell } from "../../../../../../_components/workspace-shell"
+import { shortenPartName, partDescription } from "../../../../../../_components/part-name"
 
 export const dynamic = "force-dynamic"
 
@@ -27,7 +28,7 @@ export async function generateMetadata(
     const { id, partId } = await params
     const result = await loadCadLabProject(id)
     if ("error" in result) return { title: "Part · The Forge" }
-    return { title: `${decodeURIComponent(partId)} · ${result.project.name}` }
+    return { title: `${shortenPartName(decodeURIComponent(partId))} · ${result.project.name}` }
 }
 
 export default async function ForgeV2PartDetailPage({
@@ -42,19 +43,20 @@ export default async function ForgeV2PartDetailPage({
     const mod = (project.modules ?? []).find(m => m.id === moduleId)
     if (!mod) notFound()
 
-    const partName = decodeURIComponent(partId)
+    const rawPartName = decodeURIComponent(partId)
+    const displayName = shortenPartName(rawPartName)
+    const fullDescription = partDescription(rawPartName) ?? (rawPartName !== displayName ? rawPartName : null)
     // INTENT: module-level parts aren't persisted on cad_lab_projects yet. This
     // route shows a stub derived from the part name in the URL. When the parts
-    // store ships (future PR), swap to a real lookup.
+    // store ships (future PR), swap to a real lookup. For now the full spec
+    // from keyParts goes into the description slot, and the short display name
+    // is the headline.
     const part = {
-        name: partName,
+        name: displayName,
+        description: fullDescription,
         qty: null as number | null,
         material: null as string | null,
         process: null as string | null,
-        dims: null as string | null,
-        tolerance: null as string | null,
-        finish: null as string | null,
-        notes: null as string | null,
     }
 
     return (
@@ -64,9 +66,9 @@ export default async function ForgeV2PartDetailPage({
                 { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
                 { label: "Modules", href: `/the-forge-v2/projects/${project.id}/modules` },
                 { label: mod.name, href: `/the-forge-v2/projects/${project.id}/modules/${mod.id}` },
-                { label: part.name ?? "Part" },
+                { label: part.name },
             ]}
-            subtitle={`Part within ${mod.name}`}
+            subtitle={part.description ?? `Part within ${mod.name}`}
             primaryCta={{
                 label: "Open in CAD Lab",
                 href: `/the-forge/cad-lab?project=${project.id}&module=${mod.id}`,
@@ -82,8 +84,8 @@ export default async function ForgeV2PartDetailPage({
                 <SpecCell label="Lead time" value={mod.leadWeeks ? `${mod.leadWeeks} wk` : '—'} />
             </div>
 
-            {/* Why this part matters */}
-            <section aria-label="Purpose" className="space-y-3">
+            {/* About this part */}
+            <section aria-label="About this part" className="space-y-3">
                 <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-international-orange" />
                     <h2 className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">About this part</h2>
@@ -101,10 +103,10 @@ export default async function ForgeV2PartDetailPage({
                             </Link>
                             <p className="text-xs text-muted-foreground mt-1">{mod.purpose}</p>
                         </div>
-                        {part.notes && (
+                        {part.description && (
                             <div className="pt-3 border-t border-border/50">
-                                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Notes</p>
-                                <p className="text-sm text-foreground leading-relaxed">{part.notes}</p>
+                                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Full specification</p>
+                                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{part.description}</p>
                             </div>
                         )}
                     </CardContent>
