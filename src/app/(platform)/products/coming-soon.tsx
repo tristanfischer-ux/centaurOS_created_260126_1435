@@ -85,6 +85,9 @@ export async function ProductsComingSoon() {
           <Badge variant="brand" size="sm" className="ml-1 uppercase tracking-wide">
             Coming Soon
           </Badge>
+          <Badge variant="outline" size="sm" className="uppercase tracking-wide">
+            Beta
+          </Badge>
         </div>
         <p className={typography.pageSubtitle}>
           A new market-validation workbench is on the way.
