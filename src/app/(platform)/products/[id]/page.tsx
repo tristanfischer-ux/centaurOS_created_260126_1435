@@ -1,24 +1,36 @@
 /**
- * @file page.tsx — /products/[id] detail page (Pre-Phase stub).
+ * @file page.tsx — /products/[id] deep-link redirect (Pre-Phase).
  *
- * @description During the Pre-Phase Coming Soon period, this page's output is
- * replaced by the ProductsLayout's route gate — any deep link under
- * /products/* lands on the Coming Soon bridge. This stub therefore returns
- * null; the layout renders everything visible.
+ * @description During the Pre-Phase Coming Soon period, any deep link to
+ * /products/[id] (from CAD Lab, Fundraise, P&L product-column, Objectives,
+ * notifications, etc.) redirects server-side to the read-only legacy view at
+ * /products/legacy/[id]. Founders who click a "view linked product" link
+ * from elsewhere in the app land on their actual data, not on the Coming
+ * Soon bridge.
  *
- * Founders can still reach their data via /products/legacy/[id], which is
- * explicitly allowed through the layout guard.
+ * If the id does not resolve to a product the user has access to, the legacy
+ * detail page handles the 404 / not-found path.
  *
- * When Phase 4 ships, the Coming Soon sidecar is removed and this file is
- * restored to the real detail view implementation.
+ * Server-side redirect via `next/navigation#redirect` throws a NEXT_REDIRECT
+ * error that Next.js catches and converts to a 307 before the layout tree
+ * renders — no Coming Soon flash.
+ *
+ * When Phase 4 ships, this file is restored to the real detail view
+ * implementation.
  *
  * @related
- * - src/app/(platform)/products/layout.tsx — route gate (renders Coming Soon)
- * - src/app/(platform)/products/legacy/[id]/page.tsx — read-only archive
+ * - src/app/(platform)/products/layout.tsx — route gate (renders Coming Soon for non-legacy paths)
+ * - src/app/(platform)/products/legacy/[id]/page.tsx — read-only destination
+ * - Red-team R3 finding P2 (2026-04-19) — 8 cross-section links would have dead-ended on Coming Soon
  */
 
-export default function ProductDetailPage() {
-  // INTENT: Layout gate renders the Coming Soon bridge in place of this stub.
-  // Returning null keeps the page segment mounted without double-rendering.
-  return null
+import { redirect } from 'next/navigation'
+
+export default async function ProductDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  redirect(`/products/legacy/${id}`)
 }

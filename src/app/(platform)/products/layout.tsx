@@ -34,7 +34,10 @@ import { ProductsRouteGate } from './products-route-gate'
 export const metadata: Metadata = {
   title: 'Products | ForgeOS',
   description:
-    'Products is being redesigned — a market-validation workbench covering hypothesis testing, TAM/SAM/SOM, evidence logs, unit economics, and investor-readiness.',
+    'Market-validation workbench — hypothesis testing, TAM/SAM/SOM, evidence logs, unit economics, and investor-readiness.',
+  // Platform is auth-gated so crawlers should not reach here, but belt-and-braces
+  // while the page is in beta (Red-team R3 finding P3, 2026-04-19).
+  robots: { index: false, follow: false },
 }
 
 export default async function ProductsLayout({
