@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FileText } from 'lucide-react'
-import type { PitchOverview, PitchSectionKey, PitchSectionStatus } from '@/actions/money-pitch'
+import type { PitchOverview } from '@/actions/money-pitch'
+import type { PitchSectionKey, PitchSectionStatus } from '@/lib/money/pitch-keys'
 
 const SECTION_LABELS: Record<PitchSectionKey, string> = {
   company: 'Company',

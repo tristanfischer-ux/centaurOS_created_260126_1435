@@ -29,11 +29,13 @@ import { toast } from 'sonner'
 import {
   grantCapabilityOverride,
   revokeCapabilityOverride,
-  PERMISSION_CAPABILITIES,
   type MemberWithOverrides,
-  type PermissionCapability,
   type PermissionOverrideRow,
 } from '@/actions/money-permissions'
+import {
+  PERMISSION_CAPABILITIES,
+  type PermissionCapability,
+} from '@/lib/money/permission-capabilities'
 
 const CAPABILITY_LABEL: Record<PermissionCapability, string> = {
   raise_read: 'Raise · Read',

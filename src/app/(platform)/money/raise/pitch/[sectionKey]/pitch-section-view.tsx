@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { updatePitchSection, type PitchSectionRow, type PitchSectionStatus, type PitchSectionKey } from '@/actions/money-pitch'
+import { updatePitchSection, type PitchSectionRow } from '@/actions/money-pitch'
+import type { PitchSectionKey, PitchSectionStatus } from '@/lib/money/pitch-keys'
 import { toast } from 'sonner'
 
 const SECTION_FIELDS: Record<PitchSectionKey, Array<{ key: string; label: string; type: 'text' | 'long' }>> = {

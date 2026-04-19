@@ -10,21 +10,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
-
-export const PITCH_SECTION_KEYS = [
-  'company',
-  'market',
-  'problem',
-  'traction',
-  'team',
-  'ask',
-  'financial_model',
-  'cap_table',
-] as const
-
-export type PitchSectionKey = (typeof PITCH_SECTION_KEYS)[number]
-
-export type PitchSectionStatus = 'not_started' | 'in_progress' | 'done'
+import {
+  PITCH_SECTION_KEYS,
+  type PitchSectionKey,
+  type PitchSectionStatus,
+} from '@/lib/money/pitch-keys'
+// Consumers of PITCH_SECTION_KEYS / PitchSectionKey / PitchSectionStatus import
+// directly from @/lib/money/pitch-keys — re-export forbidden in "use server" modules.
 
 export type PitchSectionRow = {
   id: string

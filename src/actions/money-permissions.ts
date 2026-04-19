@@ -22,47 +22,15 @@
 import { revalidatePath } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
 import type { Database } from '@/types/database.types'
+import {
+  PERMISSION_CAPABILITIES,
+  type PermissionCapability,
+} from '@/lib/money/permission-capabilities'
 
 type MemberRole = Database['public']['Enums']['member_role']
-
-export type PermissionCapability =
-  | 'raise_read'
-  | 'raise_write'
-  | 'raise_lock'
-  | 'raise_send_update'
-  | 'plan_read'
-  | 'plan_write'
-  | 'plan_lock'
-  | 'cockpit_read'
-  | 'xero_connect'
-  | 'xero_disconnect'
-  | 'credits_read'
-  | 'credits_budget_edit'
-  | 'settings_read'
-  | 'settings_write'
-  | 'permissions_edit'
-  | 'audit_read'
-  | 'audit_export'
-
-export const PERMISSION_CAPABILITIES: readonly PermissionCapability[] = [
-  'raise_read',
-  'raise_write',
-  'raise_lock',
-  'raise_send_update',
-  'plan_read',
-  'plan_write',
-  'plan_lock',
-  'cockpit_read',
-  'xero_connect',
-  'xero_disconnect',
-  'credits_read',
-  'credits_budget_edit',
-  'settings_read',
-  'settings_write',
-  'permissions_edit',
-  'audit_read',
-  'audit_export',
-] as const
+// Consumers import PERMISSION_CAPABILITIES + PermissionCapability from
+// @/lib/money/permission-capabilities directly — "use server" forbids
+// non-async value exports and re-exports.
 
 export type PermissionOverrideRow = {
   id: string
