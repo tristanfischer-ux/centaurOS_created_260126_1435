@@ -41,6 +41,16 @@ import { FLAG_NEW_FORGE_EXPERIENCE } from "@/lib/features/keys";
 // image generation) called from platform pages need up to 240s per invocation.
 export const maxDuration = 300
 
+// Platform pages are authenticated per-user surfaces — the layout itself calls
+// supabase.auth.getUser() + getFeatureFlag() on every request, which means
+// nothing under (platform) can be statically prerendered. Declaring
+// force-dynamic at the layout level is the idempotent way to say "every page
+// below this is rendered at request time" and fixes pre-existing prerender
+// failures (build-time createClient() throws in Vercel's Export step when
+// env vars aren't visible to static analysis). Matches the MEMORY gotcha on
+// "Build-time Supabase calls — use force-dynamic or try/catch".
+export const dynamic = 'force-dynamic'
+
 export default async function PlatformLayout({
     children,
 }: Readonly<{
