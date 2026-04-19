@@ -1,0 +1,35 @@
+-- scripts/flip-flag.sql
+-- Flip a per-user feature flag in profiles.feature_flags.
+--
+-- Flags live as a JSONB bag per profile. This script updates one key for one
+-- user without disturbing other keys.
+--
+-- Usage via Supabase SQL editor (substitute the placeholders):
+--
+--   -- Flip ON
+--   UPDATE public.profiles
+--   SET feature_flags = COALESCE(feature_flags, '{}'::jsonb)
+--                    || jsonb_build_object('new_forge_experience', true)
+--   WHERE id = '<user-uuid>';
+--
+--   -- Flip OFF (remove key entirely — treated as false on read)
+--   UPDATE public.profiles
+--   SET feature_flags = feature_flags - 'new_forge_experience'
+--   WHERE id = '<user-uuid>';
+--
+--   -- Flip ON for the whole foundry (all active members)
+--   UPDATE public.profiles p
+--   SET feature_flags = COALESCE(p.feature_flags, '{}'::jsonb)
+--                    || jsonb_build_object('new_forge_experience', true)
+--   FROM public.foundry_memberships fm
+--   WHERE fm.user_id = p.id
+--     AND fm.foundry_id = '<foundry-id>'
+--     AND fm.active = true;
+--
+--   -- Inspect who has a flag on
+--   SELECT p.id, p.email, p.feature_flags
+--   FROM public.profiles p
+--   WHERE (p.feature_flags ->> 'new_forge_experience')::boolean = true;
+--
+-- Valid keys: new_forge_experience, new_products_experience,
+--             new_plan_experience, new_money_experience.

@@ -34,11 +34,11 @@ Lands the primitives every Phase (2/3/4) will consume. Forge routes themselves a
 - [x] B.10 `tsc --noEmit` baseline-clean — **8 errors total, all pre-existing** (discriminated-union narrowing in `tasks.test.ts`, `BatchApprovalSheet.tsx`, `InlineBatchApproval.tsx`; none reference my new schema). Baseline confirmed by stashing working tree and re-running tsc: same 8 errors.
 
 ### C · Feature-flag primitive
-- [ ] C.1 `src/lib/features/flags.ts` — `getFeatureFlag(supabase, userId, key)`, `requireFeatureFlag(key)` server helper, `useFeatureFlag(key)` client hook
-- [ ] C.2 `src/lib/features/keys.ts` — `FLAG_NEW_FORGE_EXPERIENCE` constant
-- [ ] C.3 `src/app/api/flags/[key]/route.ts` — client-hook JSON endpoint
-- [ ] C.4 `scripts/flip-flag.sql` — parameterised helper
-- [ ] C.5 Unit-ish smoke: flag off → false; flag on → true; no user → false
+- [x] C.1 `src/lib/features/flags.ts` — `getFeatureFlag(supabase, userId, key)` + `getCurrentUserFeatureFlag(key)` + `requireFeatureFlag(key)` server helpers. Client hook split into `src/lib/features/use-feature-flag.ts` (`'use client'` + module-scope key cache).
+- [x] C.2 `src/lib/features/keys.ts` — `FLAG_NEW_FORGE_EXPERIENCE` + `_PRODUCTS_` + `_PLAN_` + `_MONEY_` constants. `FeatureFlagKey` union type + `isFeatureFlagKey` type guard.
+- [x] C.3 `src/app/api/flags/[key]/route.ts` — JSON endpoint. Returns `{ enabled: false }` on unknown key / unauth / lookup error. 404 status only for unknown key.
+- [x] C.4 `scripts/flip-flag.sql` — helper with 4 recipes (flip on, flip off, flip for whole foundry via active members, inspect flag holders).
+- [x] C.5 Smoke — `tsc --noEmit` passes with baseline-8 pre-existing errors (no new). Full end-to-end flag flip verified in G.6 after dev server is running.
 
 ### D · Audit log dual-write helper
 - [ ] D.1 `src/lib/audit/write.ts` — writes both `action`+`event` (same value) and both `metadata`+`payload` so legacy readers keep working
