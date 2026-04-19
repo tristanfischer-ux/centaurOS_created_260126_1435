@@ -2733,32 +2733,47 @@ export type Database = {
       audit_log: {
         Row: {
           action: string
+          actor_specialist: string | null
+          actor_user_id: string | null
           created_at: string
           entity_id: string | null
           entity_type: string | null
+          event: string | null
           foundry_id: string
           id: string
           metadata: Json | null
+          payload: Json | null
+          section: string | null
           user_id: string
         }
         Insert: {
           action: string
+          actor_specialist?: string | null
+          actor_user_id?: string | null
           created_at?: string
           entity_id?: string | null
           entity_type?: string | null
+          event?: string | null
           foundry_id: string
           id?: string
           metadata?: Json | null
+          payload?: Json | null
+          section?: string | null
           user_id: string
         }
         Update: {
           action?: string
+          actor_specialist?: string | null
+          actor_user_id?: string | null
           created_at?: string
           entity_id?: string | null
           entity_type?: string | null
+          event?: string | null
           foundry_id?: string
           id?: string
           metadata?: Json | null
+          payload?: Json | null
+          section?: string | null
           user_id?: string
         }
         Relationships: [
@@ -6250,6 +6265,74 @@ export type Database = {
           },
         ]
       }
+      event_log: {
+        Row: {
+          assigned_to: string | null
+          body: string | null
+          consequence_weight: number | null
+          created_at: string
+          cta_href: string | null
+          cta_label: string | null
+          decay_rate: string | null
+          expires_at: string | null
+          foundry_id: string
+          id: number
+          resolved_at: string | null
+          section: string
+          source_entity_id: string
+          source_entity_type: string
+          title: string
+          updated_at: string
+          urgency: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          body?: string | null
+          consequence_weight?: number | null
+          created_at?: string
+          cta_href?: string | null
+          cta_label?: string | null
+          decay_rate?: string | null
+          expires_at?: string | null
+          foundry_id: string
+          id?: number
+          resolved_at?: string | null
+          section: string
+          source_entity_id: string
+          source_entity_type: string
+          title: string
+          updated_at?: string
+          urgency: string
+        }
+        Update: {
+          assigned_to?: string | null
+          body?: string | null
+          consequence_weight?: number | null
+          created_at?: string
+          cta_href?: string | null
+          cta_label?: string | null
+          decay_rate?: string | null
+          expires_at?: string | null
+          foundry_id?: string
+          id?: number
+          resolved_at?: string | null
+          section?: string
+          source_entity_id?: string
+          source_entity_type?: string
+          title?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_log_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       execution_plans: {
         Row: {
           created_at: string
@@ -7419,6 +7502,7 @@ export type Database = {
           industry: string | null
           is_sandbox: boolean
           logo_url: string | null
+          member_count_cached: number
           name: string
           owner_id: string | null
           purpose_data: Json | null
@@ -7427,6 +7511,8 @@ export type Database = {
           sector: string | null
           slug: string | null
           stage: string | null
+          tier: string | null
+          updated_at: string
         }
         Insert: {
           company_intel?: Json | null
@@ -7436,6 +7522,7 @@ export type Database = {
           industry?: string | null
           is_sandbox?: boolean
           logo_url?: string | null
+          member_count_cached?: number
           name: string
           owner_id?: string | null
           purpose_data?: Json | null
@@ -7444,6 +7531,8 @@ export type Database = {
           sector?: string | null
           slug?: string | null
           stage?: string | null
+          tier?: string | null
+          updated_at?: string
         }
         Update: {
           company_intel?: Json | null
@@ -7453,6 +7542,7 @@ export type Database = {
           industry?: string | null
           is_sandbox?: boolean
           logo_url?: string | null
+          member_count_cached?: number
           name?: string
           owner_id?: string | null
           purpose_data?: Json | null
@@ -7461,6 +7551,8 @@ export type Database = {
           sector?: string | null
           slug?: string | null
           stage?: string | null
+          tier?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -7808,30 +7900,39 @@ export type Database = {
       }
       foundry_memberships: {
         Row: {
+          active: boolean
+          active_at: string | null
           foundry_id: string
           id: string
           invited_by: string | null
           is_primary: boolean | null
           joined_at: string | null
           role: Database["public"]["Enums"]["member_role"]
+          updated_at: string
           user_id: string
         }
         Insert: {
+          active?: boolean
+          active_at?: string | null
           foundry_id: string
           id?: string
           invited_by?: string | null
           is_primary?: boolean | null
           joined_at?: string | null
           role?: Database["public"]["Enums"]["member_role"]
+          updated_at?: string
           user_id: string
         }
         Update: {
+          active?: boolean
+          active_at?: string | null
           foundry_id?: string
           id?: string
           invited_by?: string | null
           is_primary?: boolean | null
           joined_at?: string | null
           role?: Database["public"]["Enums"]["member_role"]
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -13613,6 +13714,7 @@ export type Database = {
           email: string
           executive_onboarding_completed: boolean | null
           expertise_areas: string[] | null
+          feature_flags: Json
           founding_member_number: number | null
           foundry_id: string
           full_name: string | null
@@ -13658,6 +13760,7 @@ export type Database = {
           email: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
+          feature_flags?: Json
           founding_member_number?: number | null
           foundry_id: string
           full_name?: string | null
@@ -13703,6 +13806,7 @@ export type Database = {
           email?: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
+          feature_flags?: Json
           founding_member_number?: number | null
           foundry_id?: string
           full_name?: string | null
@@ -13999,6 +14103,110 @@ export type Database = {
           tools_required?: string[] | null
         }
         Relationships: []
+      }
+      project_transitions: {
+        Row: {
+          carried_over_ids: Json
+          created_at: string
+          foundry_id: string
+          from_stage: string | null
+          id: string
+          project_id: string
+          reason: string | null
+          to_stage: string
+          triggered_by_user_id: string | null
+        }
+        Insert: {
+          carried_over_ids?: Json
+          created_at?: string
+          foundry_id: string
+          from_stage?: string | null
+          id?: string
+          project_id: string
+          reason?: string | null
+          to_stage: string
+          triggered_by_user_id?: string | null
+        }
+        Update: {
+          carried_over_ids?: Json
+          created_at?: string
+          foundry_id?: string
+          from_stage?: string | null
+          id?: string
+          project_id?: string
+          reason?: string | null
+          to_stage?: string
+          triggered_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_transitions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_transitions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          archived_at: string | null
+          brief_locked_at: string | null
+          canonical_surface: string
+          created_at: string
+          foundry_id: string
+          hypothesis_id: string | null
+          id: string
+          lifecycle_stage: string
+          name: string
+          shipped_at: string | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          brief_locked_at?: string | null
+          canonical_surface?: string
+          created_at?: string
+          foundry_id: string
+          hypothesis_id?: string | null
+          id?: string
+          lifecycle_stage?: string
+          name: string
+          shipped_at?: string | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          brief_locked_at?: string | null
+          canonical_surface?: string
+          created_at?: string
+          foundry_id?: string
+          hypothesis_id?: string | null
+          id?: string
+          lifecycle_stage?: string
+          name?: string
+          shipped_at?: string | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       provider_applications: {
         Row: {

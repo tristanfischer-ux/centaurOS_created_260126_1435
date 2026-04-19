@@ -8,6 +8,11 @@ export const metadata = {
   description: 'Select the workspace you want to work in.',
 }
 
+// Calls createClient() + getUserFoundries() at page entry → can't be statically
+// prerendered. Fixes build-time "Missing Supabase environment variables" error
+// in Vercel's Export step.
+export const dynamic = 'force-dynamic'
+
 export default async function WorkspacePickerPage() {
   const supabase = await createClient()
 

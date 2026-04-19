@@ -26,52 +26,19 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-    Users,
-    CheckSquare,
-    Store,
-    Target,
-    ShoppingBag,
-    UsersRound,
-    FileOutput,
-    Sparkles,
-    Waypoints,
-    Flame,
-    Hammer,
-    MessageSquarePlus,
     Plus,
-    GraduationCap,
-    BookOpen,
-    UserCircle,
-    UserSearch,
     Settings,
     LogOut,
-    CalendarDays,
-    AppWindow,
-    Globe,
-    Brain,
-    MessageCircle,
     PoundSterling,
-    FileText,
-    Map,
-    BellRing,
-    Activity,
-    BarChart3,
-    PiggyBank,
-    FolderKanban,
-    Receipt,
-    Landmark,
-    Link2,
-    Building2,
-    TrendingDown,
-    TrendingUp,
-    Sprout,
-    ScrollText,
-    Clock,
-    Swords,
-    Package,
-    ClipboardCheck,
-    Compass,
 } from "lucide-react"
+// Section-owned navigation data. One file per section so Phase 2/3/4
+// terminals can swap their section data in isolation.
+import { welcomeNavItem, todayNavItem, meNavigation } from "@/components/sidebar/data/me"
+import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
+import { planNavigation } from "@/components/sidebar/data/plan"
+import { moneyLegacyNavigation } from "@/components/sidebar/data/money"
+import { getWorkshopNavigation } from "@/components/sidebar/data/workshop"
+import { marketplacePeopleNavigation, marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
 import { FocusModeToggle } from "@/components/FocusModeToggle"
@@ -109,106 +76,11 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Keep in sync with package.json version
 const APP_VERSION = "0.9.0"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Section 1: "Me" — Personal pages
-// ─────────────────────────────────────────────────────────────────────────────
-const welcomeNavItem = { name: "Welcome", href: "/welcome", icon: Compass, tooltip: "A tour of ForgeOS from Tristan — the sections, the specialists, and where to start" }
-const todayNavItem = { name: "Today", href: "/today", icon: CalendarDays, tooltip: "Your personalized daily focus — tasks, risks, and wins" }
-
-const meNavigation = [
-    { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
-    { name: "Comms", href: "/updates", icon: MessageCircle, tooltip: "Activity feed, conversations, and direct messages" },
-    { name: "Time", href: "/time", icon: Clock, tooltip: "Track hours across your projects and tasks" },
-    // DECISION: Knowledge moved to Plan section — it's organizational, not personal
-    { name: "Google Apps", href: "/google-apps", icon: AppWindow, tooltip: "Your Google Drive, Docs, Calendar, and Email" },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section 1b: "Supplier Portal" — visible when profiles.is_supplier = true
-// Sits between "Me" and "Plan". Rehomed 2026-04-16 from the standalone
-// (supplier-portal) route group into the main platform shell.
-// ─────────────────────────────────────────────────────────────────────────────
-const supplierNavigation = [
-    { name: "Dashboard", href: "/supplier", icon: Store, tooltip: "Your supplier dashboard — listing activity, orders, and earnings" },
-    { name: "My Listing", href: "/supplier/listing", icon: Package, tooltip: "Create and edit your marketplace listing" },
-    { name: "Orders", href: "/supplier/orders", icon: ShoppingBag, tooltip: "Orders from founders on the platform" },
-    { name: "RFQs", href: "/supplier/rfqs", icon: FileText, tooltip: "Inbound requests for quote" },
-    { name: "Analytics", href: "/supplier/analytics", icon: BarChart3, tooltip: "Listing views, contact rate, conversion" },
-    { name: "Settings", href: "/supplier/settings", icon: Settings, tooltip: "Stripe Connect, availability, notifications" },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section 2: "Plan" — Strategy and execution
-// ─────────────────────────────────────────────────────────────────────────────
-const planNavigation = [
-    { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
-    { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
-    { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
-    { name: "Review", href: "/review", icon: ClipboardCheck, tooltip: "Content, tasks, and actions awaiting your approval" },
-    { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
-    { name: "Red Team", href: "/red-team", icon: Swords, tooltip: "Stress-test decisions with multi-LLM adversarial debate" },
-    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your team's accumulated knowledge — every document and decision sharpens the next answer" },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section 3: "Finance" — Hidden for now, may be restored later
-// ─────────────────────────────────────────────────────────────────────────────
-// const financeNavigation = [
-//     { name: "Overview", href: "/finance", icon: PoundSterling, tooltip: "Your unified financial dashboard — revenue, expenses, cash flow, and invoices" },
-//     { name: "Money Map", href: "/finance/money-map", icon: Map, tooltip: "Visualise revenue streams, costs, and profitability" },
-//     { name: "Invoices", href: "/finance/invoices", icon: FileText, tooltip: "Track outstanding payments and aging buckets" },
-//     { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity, tooltip: "Forward-looking cash flow projections with scenario modeling" },
-//     { name: "Reports", href: "/finance/reports", icon: BarChart3, tooltip: "Generate P&L, VAT, and Cash Flow Statement reports" },
-//     { name: "Budgets", href: "/finance/budgets", icon: PiggyBank, tooltip: "Track budget allocations vs actual spend with variance analysis" },
-//     { name: "Projects", href: "/finance/projects", icon: FolderKanban, tooltip: "Per-project profitability tracking and P&L" },
-//     { name: "Expenses", href: "/finance/expenses", icon: Receipt, tooltip: "Track and manage business expenses" },
-//     { name: "Funding", href: "/finance/funding", icon: Landmark, tooltip: "Track funding opportunities and grant applications" },
-//     { name: "Integrations", href: "/finance/integrations", icon: Link2, tooltip: "Connect Xero, QuickBooks, or FreeAgent" },
-//     { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
-// ]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section 3b: "Cash Burn" — Runway and scenario planning
-// ─────────────────────────────────────────────────────────────────────────────
-const cashBurnNavigation = [
-    { name: "Cash Burn", href: "/cash-burn", icon: Flame, tooltip: "52-week runway analysis with scenario modelling" },
-    { name: "Cash Out", href: "/cash-burn/cash-out", icon: TrendingDown, tooltip: "Fixed and variable cost management" },
-    { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp, tooltip: "Revenue, loans, equity, and grants" },
-    { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3, tooltip: "Projected Income Statement and Balance Sheet" },
-    { name: "Investors", href: "/investors", icon: Building2, tooltip: "Browse 600 UK VC and PE firms — search, filter, and track outreach" },
-    { name: "Fundraise", href: "/fundraise", icon: Sprout, tooltip: "Track your fundraise pipeline — shortlisted investors, outreach, and coverage" },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section 4: "Workshop" — Where the work happens
-// ─────────────────────────────────────────────────────────────────────────────
-const workshopNavigation = [
-    { name: "The Forge", href: "/the-forge", icon: Hammer, tooltip: "Explore materials, manufacturing approaches, and find suppliers" },
-    { name: "Products", href: "/products", icon: Package, tooltip: "Your hardware products — from concept to market" },
-    { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
-    { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "13 specialists — strategy, engineering, finance, legal, hiring, and more" },
-    { name: "Outputs", href: "/agents/artifacts", icon: FileOutput, tooltip: "Documents, decks, and analysis generated by your specialists" },
-    { name: "Browse", href: "/browse", icon: Globe, tooltip: "Browse the web with your specialist — get real-time guidance and analysis" },
-    { name: "Inspiration", href: "/learn", icon: BookOpen, tooltip: "Techniques, tutorials, and expert guidance to level up your skills" },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section 4: "Marketplace" — Recruits and supplies
-// ─────────────────────────────────────────────────────────────────────────────
-const marketplacePeopleNavigation = [
-    { name: "Recruits", href: "/recruits", icon: UserSearch, tooltip: "Find expert talent — fractional executives, specialists, and consultants" },
-    { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, apprentice pool" },
-    { name: "Apprenticeship", href: "/apprenticeship", icon: ScrollText, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
-]
-
-// DECISION: Playbooks content moved into the Objectives page as "Other ideas for
-// you to be getting on with". Learn/educational content moved to Workshop as
-// "Inspiration". This mirrors the Team page pattern (your stuff + marketplace).
-const marketplaceSuppliesNavigation = [
-    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
-    { name: "Quotes", href: "/marketplace/quotes", icon: MessageSquarePlus, tooltip: "Track your quote requests to suppliers" },
-    { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
-]
+// Section navigation data lives in ./sidebar/data/* — see the imports above.
+// Phase 3 (Plan) and Phase 4 (Money) will swap their respective data files
+// in isolation; the sidebar component here stays unchanged across those
+// phases. PR #1 only makes Workshop's Forge entry flag-aware — everything
+// else is legacy content in new homes.
 
 interface FoundryInfo {
     foundryId: string
@@ -238,9 +110,16 @@ interface SidebarProps {
     onboardingData?: Record<string, unknown>
     /** Reveals the "Supplier Portal" sidebar section. Set from profiles.is_supplier. */
     isSupplier?: boolean
+    /**
+     * Phase 1 flag — when true, Workshop's "The Forge" nav item routes to
+     * /the-forge-v2 instead of /the-forge. Read server-side in
+     * (platform)/layout.tsx via getCurrentUserFeatureFlag(FLAG_NEW_FORGE_EXPERIENCE).
+     * Default false so flag-off users keep the current experience.
+     */
+    newForgeExperienceEnabled?: boolean
 }
 
-export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandbox, userName, userRole, userFoundries, onboardingData, isSupplier }: SidebarProps) {
+export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandbox, userName, userRole, userFoundries, onboardingData, isSupplier, newForgeExperienceEnabled = false }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -479,7 +358,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandb
                 <SectionHeader label="Cash Burn" introRoute="/cash-burn" isOpen={openSections.cashBurn} onToggle={() => toggleSection("cashBurn")} />
                 <Collapsible open={openSections.cashBurn}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {cashBurnNavigation.map(renderNavItem)}
+                        {moneyLegacyNavigation.map(renderNavItem)}
                     </CollapsibleContent>
                 </Collapsible>
 
@@ -491,7 +370,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandb
                 <SectionHeader label="Workshop" introRoute="/workshop" hasNew={badges.workshop} isOpen={openSections.workshop} onToggle={() => toggleSection("workshop")} />
                 <Collapsible open={openSections.workshop}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {workshopNavigation.map(renderNavItem)}
+                        {getWorkshopNavigation(newForgeExperienceEnabled).map(renderNavItem)}
                     </CollapsibleContent>
                 </Collapsible>
 
