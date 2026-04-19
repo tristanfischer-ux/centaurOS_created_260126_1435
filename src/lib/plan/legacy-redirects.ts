@@ -248,6 +248,10 @@ async function readNewPlanFlag(request: NextRequest): Promise<boolean> {
  * Main entry — returns a redirect response when the path is a legacy Plan
  * route AND the caller has `new_plan_experience` ON. Returns `null`
  * otherwise so the caller can fall through to updateSession.
+ *
+ * Side-effect: on a match-but-skip (spec found, flag off), attaches a
+ * diagnostic to the plan-diag global so middleware.ts can emit the reason
+ * via x-plan-redirect-skipped. Debug-only — ignored in production paths.
  */
 export async function maybeRedirectLegacyPlan(
     request: NextRequest,
@@ -258,9 +262,55 @@ export async function maybeRedirectLegacyPlan(
     const spec = findSpec(pathname)
     if (!spec) return null
 
-    const flagOn = await readNewPlanFlag(request)
-    if (!flagOn) return null
+    const flagResult = await readNewPlanFlagWithReason(request)
+    if (!flagResult.on) {
+        // Attach to the request so middleware.ts can set x-plan-redirect-skipped
+        ;(request as unknown as { __planDiag?: string }).__planDiag = flagResult.reason
+        return null
+    }
 
     const target = spec.build(request.nextUrl)
     return NextResponse.redirect(target, 301)
+}
+
+/**
+ * Reason-annotated flag read — same shape as `readNewPlanFlag` but returns
+ * a discriminated result so middleware debug can surface WHY the redirect
+ * was skipped.
+ */
+async function readNewPlanFlagWithReason(
+    request: NextRequest,
+): Promise<{ on: boolean; reason: string }> {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) return { on: false, reason: 'missing-env' }
+
+    const supabase = createServerClient<Database>(url, key, {
+        cookies: {
+            getAll() {
+                return request.cookies.getAll()
+            },
+            setAll() {
+                /* noop */
+            },
+        },
+    })
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { on: false, reason: 'anon' }
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('feature_flags')
+        .eq('id', user.id)
+        .maybeSingle()
+
+    if (error) return { on: false, reason: `profile-err:${error.code ?? 'unknown'}` }
+    if (!data) return { on: false, reason: 'profile-missing' }
+
+    const flags = (data.feature_flags ?? {}) as Record<string, unknown>
+    if (flags[FLAG_NEW_PLAN_EXPERIENCE] === true) return { on: true, reason: 'flag-on' }
+    return { on: false, reason: 'flag-off' }
 }

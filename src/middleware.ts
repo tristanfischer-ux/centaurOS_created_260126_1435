@@ -78,10 +78,19 @@ export async function middleware(request: NextRequest) {
     // the user has new_plan_experience=true. Flag OFF users keep rendering
     // legacy pages untouched.
     const planRedirect = await maybeRedirectLegacyPlan(request)
-    if (planRedirect) return planRedirect
+    if (planRedirect) {
+        planRedirect.headers.set('x-plan-redirect', 'fired')
+        return planRedirect
+    }
 
     // Continue with auth middleware
-    return await updateSession(request)
+    const response = await updateSession(request)
+    // DEBUG: always-on header so we can confirm middleware ran.
+    response.headers.set('x-plan-middleware', 'ran')
+    response.headers.set('x-plan-path', pathname)
+    const diag = (request as unknown as { __planDiag?: string }).__planDiag
+    if (diag) response.headers.set('x-plan-redirect-skipped', diag)
+    return response
 }
 
 export const config = {
