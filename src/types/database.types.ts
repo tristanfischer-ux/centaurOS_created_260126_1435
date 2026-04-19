@@ -1760,6 +1760,179 @@ export type Database = {
           },
         ]
       }
+      ai_credits_budget: {
+        Row: {
+          breach_behaviour: string
+          cap_cents: number
+          created_at: string
+          foundry_id: string
+          id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          tier_seeded: boolean
+          updated_at: string
+          warning_threshold_pct: number
+        }
+        Insert: {
+          breach_behaviour?: string
+          cap_cents: number
+          created_at?: string
+          foundry_id: string
+          id?: string
+          period_end: string
+          period_start: string
+          period_type: string
+          tier_seeded?: boolean
+          updated_at?: string
+          warning_threshold_pct?: number
+        }
+        Update: {
+          breach_behaviour?: string
+          cap_cents?: number
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          tier_seeded?: boolean
+          updated_at?: string
+          warning_threshold_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credits_budget_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_credits_cost_rules: {
+        Row: {
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          foundry_id: string | null
+          id: string
+          input_cost_per_mtoken_cents: number
+          margin_multiplier: number
+          model_id: string
+          output_cost_per_mtoken_cents: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          foundry_id?: string | null
+          id?: string
+          input_cost_per_mtoken_cents: number
+          margin_multiplier?: number
+          model_id: string
+          output_cost_per_mtoken_cents: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          foundry_id?: string | null
+          id?: string
+          input_cost_per_mtoken_cents?: number
+          margin_multiplier?: number
+          model_id?: string
+          output_cost_per_mtoken_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credits_cost_rules_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_credits_ledger: {
+        Row: {
+          audit_log_id: string
+          billable_cost_cents: number
+          cost_cents: number
+          created_at: string
+          duration_ms: number | null
+          foundry_id: string
+          id: string
+          input_tokens: number
+          invocation_id: string | null
+          invoked_at: string
+          invoked_by_user_id: string | null
+          model_id: string
+          output_tokens: number
+          section: string
+          specialist_id: string
+        }
+        Insert: {
+          audit_log_id: string
+          billable_cost_cents: number
+          cost_cents: number
+          created_at?: string
+          duration_ms?: number | null
+          foundry_id: string
+          id?: string
+          input_tokens: number
+          invocation_id?: string | null
+          invoked_at: string
+          invoked_by_user_id?: string | null
+          model_id: string
+          output_tokens: number
+          section: string
+          specialist_id: string
+        }
+        Update: {
+          audit_log_id?: string
+          billable_cost_cents?: number
+          cost_cents?: number
+          created_at?: string
+          duration_ms?: number | null
+          foundry_id?: string
+          id?: string
+          input_tokens?: number
+          invocation_id?: string | null
+          invoked_at?: string
+          invoked_by_user_id?: string | null
+          model_id?: string
+          output_tokens?: number
+          section?: string
+          specialist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credits_ledger_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_credits_ledger_invoked_by_user_id_fkey"
+            columns: ["invoked_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "ai_credits_ledger_invoked_by_user_id_fkey"
+            columns: ["invoked_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_provider_keys: {
         Row: {
           created_at: string
@@ -2741,9 +2914,11 @@ export type Database = {
           event: string | null
           foundry_id: string
           id: string
+          ip_address: unknown
           metadata: Json | null
           payload: Json | null
           section: string | null
+          user_agent: string | null
           user_id: string
         }
         Insert: {
@@ -2756,9 +2931,11 @@ export type Database = {
           event?: string | null
           foundry_id: string
           id?: string
+          ip_address?: unknown
           metadata?: Json | null
           payload?: Json | null
           section?: string | null
+          user_agent?: string | null
           user_id: string
         }
         Update: {
@@ -2771,9 +2948,11 @@ export type Database = {
           event?: string | null
           foundry_id?: string
           id?: string
+          ip_address?: unknown
           metadata?: Json | null
           payload?: Json | null
           section?: string | null
+          user_agent?: string | null
           user_id?: string
         }
         Relationships: [
@@ -7495,6 +7674,7 @@ export type Database = {
       }
       foundries: {
         Row: {
+          active_thesis_id: string | null
           company_intel: Json | null
           company_profile: Json | null
           created_at: string | null
@@ -7515,6 +7695,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_thesis_id?: string | null
           company_intel?: Json | null
           company_profile?: Json | null
           created_at?: string | null
@@ -7535,6 +7716,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_thesis_id?: string | null
           company_intel?: Json | null
           company_profile?: Json | null
           created_at?: string | null
@@ -7555,6 +7737,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "foundries_active_thesis_id_fkey"
+            columns: ["active_thesis_id"]
+            isOneToOne: false
+            referencedRelation: "investor_thesis"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "foundries_owner_id_fkey"
             columns: ["owner_id"]
@@ -8806,6 +8995,175 @@ export type Database = {
           },
         ]
       }
+      investor_pipeline_events: {
+        Row: {
+          actor_user_id: string | null
+          backdated_to: string | null
+          created_at: string
+          event_type: string
+          foundry_id: string
+          from_stage: string | null
+          id: string
+          payload: Json
+          pipeline_state_id: string
+          to_stage: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          backdated_to?: string | null
+          created_at?: string
+          event_type: string
+          foundry_id: string
+          from_stage?: string | null
+          id?: string
+          payload?: Json
+          pipeline_state_id: string
+          to_stage?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          backdated_to?: string | null
+          created_at?: string
+          event_type?: string
+          foundry_id?: string
+          from_stage?: string | null
+          id?: string
+          payload?: Json
+          pipeline_state_id?: string
+          to_stage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_pipeline_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "investor_pipeline_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_pipeline_events_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_pipeline_events_pipeline_state_id_fkey"
+            columns: ["pipeline_state_id"]
+            isOneToOne: false
+            referencedRelation: "investor_pipeline_state"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investor_pipeline_state: {
+        Row: {
+          archived_at: string | null
+          commit_amount_cents: number | null
+          created_at: string
+          current_stage: string
+          foundry_id: string
+          id: string
+          investor_firm_id: string | null
+          investor_person_id: string | null
+          lead_role: string | null
+          legacy_source_id: string | null
+          legacy_source_table: string | null
+          marketplace_listing_id: string | null
+          match_score_cached: number | null
+          match_score_computed_at: string | null
+          match_score_thesis_version: number | null
+          pass_reason: string | null
+          probability_pct: number | null
+          round_id: string | null
+          stage_entered_at: string
+          updated_at: string
+          warm_intro_via_user_id: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          commit_amount_cents?: number | null
+          created_at?: string
+          current_stage: string
+          foundry_id: string
+          id?: string
+          investor_firm_id?: string | null
+          investor_person_id?: string | null
+          lead_role?: string | null
+          legacy_source_id?: string | null
+          legacy_source_table?: string | null
+          marketplace_listing_id?: string | null
+          match_score_cached?: number | null
+          match_score_computed_at?: string | null
+          match_score_thesis_version?: number | null
+          pass_reason?: string | null
+          probability_pct?: number | null
+          round_id?: string | null
+          stage_entered_at?: string
+          updated_at?: string
+          warm_intro_via_user_id?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          commit_amount_cents?: number | null
+          created_at?: string
+          current_stage?: string
+          foundry_id?: string
+          id?: string
+          investor_firm_id?: string | null
+          investor_person_id?: string | null
+          lead_role?: string | null
+          legacy_source_id?: string | null
+          legacy_source_table?: string | null
+          marketplace_listing_id?: string | null
+          match_score_cached?: number | null
+          match_score_computed_at?: string | null
+          match_score_thesis_version?: number | null
+          pass_reason?: string | null
+          probability_pct?: number | null
+          round_id?: string | null
+          stage_entered_at?: string
+          updated_at?: string
+          warm_intro_via_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_pipeline_state_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_pipeline_state_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "investor_round"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_pipeline_state_warm_intro_via_user_id_fkey"
+            columns: ["warm_intro_via_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "investor_pipeline_state_warm_intro_via_user_id_fkey"
+            columns: ["warm_intro_via_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investor_portfolio_companies: {
         Row: {
           amount_usd: number | null
@@ -8869,6 +9227,89 @@ export type Database = {
           },
         ]
       }
+      investor_round: {
+        Row: {
+          archived_at: string | null
+          cap_cents: number | null
+          cheque_max_cents: number | null
+          cheque_min_cents: number | null
+          close_date: string
+          close_style: string
+          closed_at: string | null
+          created_at: string
+          currency: string
+          discount_pct: number | null
+          foundry_id: string
+          id: string
+          instrument: string
+          is_legacy_migrated: boolean
+          lead_structure: string
+          name: string
+          opened_at: string | null
+          stage: string
+          state: string
+          syndicate_narrative: string | null
+          target_cents: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          cap_cents?: number | null
+          cheque_max_cents?: number | null
+          cheque_min_cents?: number | null
+          close_date: string
+          close_style?: string
+          closed_at?: string | null
+          created_at?: string
+          currency?: string
+          discount_pct?: number | null
+          foundry_id: string
+          id?: string
+          instrument: string
+          is_legacy_migrated?: boolean
+          lead_structure?: string
+          name: string
+          opened_at?: string | null
+          stage: string
+          state?: string
+          syndicate_narrative?: string | null
+          target_cents: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          cap_cents?: number | null
+          cheque_max_cents?: number | null
+          cheque_min_cents?: number | null
+          close_date?: string
+          close_style?: string
+          closed_at?: string | null
+          created_at?: string
+          currency?: string
+          discount_pct?: number | null
+          foundry_id?: string
+          id?: string
+          instrument?: string
+          is_legacy_migrated?: boolean
+          lead_structure?: string
+          name?: string
+          opened_at?: string | null
+          stage?: string
+          state?: string
+          syndicate_narrative?: string | null
+          target_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_round_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investor_shortlist: {
         Row: {
           created_at: string
@@ -8911,6 +9352,265 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      investor_thesis: {
+        Row: {
+          archived_at: string | null
+          cheque_max_cents: number | null
+          cheque_min_cents: number | null
+          created_at: string
+          created_by: string | null
+          data_sources: Json
+          decision_speed_max_weeks: number | null
+          foundry_id: string
+          geography: string[]
+          id: string
+          keywords: string[]
+          lead_follower_pref: string
+          no_go_rules: Json
+          preferred_instrument: string[]
+          sector_tags: string[]
+          stage_tags: string[]
+          version: number
+          weights: Json
+        }
+        Insert: {
+          archived_at?: string | null
+          cheque_max_cents?: number | null
+          cheque_min_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_sources?: Json
+          decision_speed_max_weeks?: number | null
+          foundry_id: string
+          geography?: string[]
+          id?: string
+          keywords?: string[]
+          lead_follower_pref?: string
+          no_go_rules?: Json
+          preferred_instrument?: string[]
+          sector_tags?: string[]
+          stage_tags?: string[]
+          version: number
+          weights?: Json
+        }
+        Update: {
+          archived_at?: string | null
+          cheque_max_cents?: number | null
+          cheque_min_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_sources?: Json
+          decision_speed_max_weeks?: number | null
+          foundry_id?: string
+          geography?: string[]
+          id?: string
+          keywords?: string[]
+          lead_follower_pref?: string
+          no_go_rules?: Json
+          preferred_instrument?: string[]
+          sector_tags?: string[]
+          stage_tags?: string[]
+          version?: number
+          weights?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_thesis_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "investor_thesis_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_thesis_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investor_update: {
+        Row: {
+          aggregate_bounced: number
+          aggregate_clicked: number
+          aggregate_delivered: number
+          aggregate_opened: number
+          aggregate_replied: number
+          body_html: string
+          body_sections: Json
+          created_at: string
+          foundry_id: string
+          headline_quote: string | null
+          id: string
+          month_label: string
+          round_id: string | null
+          scheduled_for: string | null
+          send_method: string
+          sent_at: string | null
+          sent_by_user_id: string | null
+          state: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          aggregate_bounced?: number
+          aggregate_clicked?: number
+          aggregate_delivered?: number
+          aggregate_opened?: number
+          aggregate_replied?: number
+          body_html: string
+          body_sections?: Json
+          created_at?: string
+          foundry_id: string
+          headline_quote?: string | null
+          id?: string
+          month_label: string
+          round_id?: string | null
+          scheduled_for?: string | null
+          send_method?: string
+          sent_at?: string | null
+          sent_by_user_id?: string | null
+          state?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          aggregate_bounced?: number
+          aggregate_clicked?: number
+          aggregate_delivered?: number
+          aggregate_opened?: number
+          aggregate_replied?: number
+          body_html?: string
+          body_sections?: Json
+          created_at?: string
+          foundry_id?: string
+          headline_quote?: string | null
+          id?: string
+          month_label?: string
+          round_id?: string | null
+          scheduled_for?: string | null
+          send_method?: string
+          sent_at?: string | null
+          sent_by_user_id?: string | null
+          state?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_update_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_update_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "investor_round"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_update_sent_by_user_id_fkey"
+            columns: ["sent_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "investor_update_sent_by_user_id_fkey"
+            columns: ["sent_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investor_update_recipient: {
+        Row: {
+          bounced_at: string | null
+          clicked_count: number
+          created_at: string
+          delivered_at: string | null
+          email: string
+          foundry_id: string
+          id: string
+          name: string | null
+          opened_count: number
+          opened_first_at: string | null
+          opened_last_at: string | null
+          pipeline_state_id: string | null
+          replied_at: string | null
+          stage_at_send: string | null
+          update_id: string
+        }
+        Insert: {
+          bounced_at?: string | null
+          clicked_count?: number
+          created_at?: string
+          delivered_at?: string | null
+          email: string
+          foundry_id: string
+          id?: string
+          name?: string | null
+          opened_count?: number
+          opened_first_at?: string | null
+          opened_last_at?: string | null
+          pipeline_state_id?: string | null
+          replied_at?: string | null
+          stage_at_send?: string | null
+          update_id: string
+        }
+        Update: {
+          bounced_at?: string | null
+          clicked_count?: number
+          created_at?: string
+          delivered_at?: string | null
+          email?: string
+          foundry_id?: string
+          id?: string
+          name?: string | null
+          opened_count?: number
+          opened_first_at?: string | null
+          opened_last_at?: string | null
+          pipeline_state_id?: string | null
+          replied_at?: string | null
+          stage_at_send?: string | null
+          update_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_update_recipient_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_update_recipient_pipeline_state_id_fkey"
+            columns: ["pipeline_state_id"]
+            isOneToOne: false
+            referencedRelation: "investor_pipeline_state"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_update_recipient_update_id_fkey"
+            columns: ["update_id"]
+            isOneToOne: false
+            referencedRelation: "investor_update"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -10938,6 +11638,197 @@ export type Database = {
           },
         ]
       }
+      money_scenario_overrides: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          foundry_id: string
+          id: string
+          line_item_id: string | null
+          note: string | null
+          override_amount_cents: number | null
+          override_effective_from: string | null
+          override_effective_to: string | null
+          override_frequency: string | null
+          override_probability_pct: number | null
+          scenario_id: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          foundry_id: string
+          id?: string
+          line_item_id?: string | null
+          note?: string | null
+          override_amount_cents?: number | null
+          override_effective_from?: string | null
+          override_effective_to?: string | null
+          override_frequency?: string | null
+          override_probability_pct?: number | null
+          scenario_id: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          line_item_id?: string | null
+          note?: string | null
+          override_amount_cents?: number | null
+          override_effective_from?: string | null
+          override_effective_to?: string | null
+          override_frequency?: string | null
+          override_probability_pct?: number | null
+          scenario_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "money_scenario_overrides_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "money_scenario_overrides_line_item_id_fkey"
+            columns: ["line_item_id"]
+            isOneToOne: false
+            referencedRelation: "plan_line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "money_scenario_overrides_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "money_scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      money_scenarios: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          foundry_id: string
+          id: string
+          is_default: boolean
+          legacy_source_id: string | null
+          name: string
+          question: string | null
+          template_source: string | null
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          foundry_id: string
+          id?: string
+          is_default?: boolean
+          legacy_source_id?: string | null
+          name: string
+          question?: string | null
+          template_source?: string | null
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          is_default?: boolean
+          legacy_source_id?: string | null
+          name?: string
+          question?: string | null
+          template_source?: string | null
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "money_scenarios_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      money_settings: {
+        Row: {
+          created_at: string
+          credits_cap_cents: number | null
+          currency: string
+          digest_schedule: string
+          fiscal_year_start_month: number
+          foundry_id: string
+          large_expense_threshold_cents: number
+          number_format: string
+          onboarding_progress: Json
+          retention_years: number
+          runway_cached_at: string | null
+          runway_danger_weeks: number
+          runway_healthy_weeks: number
+          runway_months_cached: number | null
+          specialist_model_tier: string
+          specialists_enabled: Json
+          updated_at: string
+          variance_alert_pct: number
+        }
+        Insert: {
+          created_at?: string
+          credits_cap_cents?: number | null
+          currency?: string
+          digest_schedule?: string
+          fiscal_year_start_month?: number
+          foundry_id: string
+          large_expense_threshold_cents?: number
+          number_format?: string
+          onboarding_progress?: Json
+          retention_years?: number
+          runway_cached_at?: string | null
+          runway_danger_weeks?: number
+          runway_healthy_weeks?: number
+          runway_months_cached?: number | null
+          specialist_model_tier?: string
+          specialists_enabled?: Json
+          updated_at?: string
+          variance_alert_pct?: number
+        }
+        Update: {
+          created_at?: string
+          credits_cap_cents?: number | null
+          currency?: string
+          digest_schedule?: string
+          fiscal_year_start_month?: number
+          foundry_id?: string
+          large_expense_threshold_cents?: number
+          number_format?: string
+          onboarding_progress?: Json
+          retention_years?: number
+          runway_cached_at?: string | null
+          runway_danger_weeks?: number
+          runway_healthy_weeks?: number
+          runway_months_cached?: number | null
+          specialist_model_tier?: string
+          specialists_enabled?: Json
+          updated_at?: string
+          variance_alert_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "money_settings_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: true
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mounting_standards: {
         Row: {
           created_at: string | null
@@ -12800,6 +13691,81 @@ export type Database = {
           },
         ]
       }
+      permission_override: {
+        Row: {
+          capability: string
+          created_at: string
+          expires_at: string | null
+          foundry_id: string
+          granted: boolean
+          granted_by_user_id: string | null
+          id: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          capability: string
+          created_at?: string
+          expires_at?: string | null
+          foundry_id: string
+          granted?: boolean
+          granted_by_user_id?: string | null
+          id?: string
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          capability?: string
+          created_at?: string
+          expires_at?: string | null
+          foundry_id?: string
+          granted?: boolean
+          granted_by_user_id?: string | null
+          id?: string
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_override_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_override_granted_by_user_id_fkey"
+            columns: ["granted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "permission_override_granted_by_user_id_fkey"
+            columns: ["granted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_override_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "permission_override_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pinned_messages: {
         Row: {
           conversation_id: string
@@ -12974,6 +13940,137 @@ export type Database = {
           },
         ]
       }
+      pitch_prep_section: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          last_edited_at: string | null
+          last_edited_by_user_id: string | null
+          narrative_fields: Json
+          round_id: string
+          section_key: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          last_edited_at?: string | null
+          last_edited_by_user_id?: string | null
+          narrative_fields?: Json
+          round_id: string
+          section_key: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          last_edited_at?: string | null
+          last_edited_by_user_id?: string | null
+          narrative_fields?: Json
+          round_id?: string
+          section_key?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_prep_section_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pitch_prep_section_last_edited_by_user_id_fkey"
+            columns: ["last_edited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "pitch_prep_section_last_edited_by_user_id_fkey"
+            columns: ["last_edited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pitch_prep_section_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "investor_round"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pitch_prep_slide: {
+        Row: {
+          archived_at: string | null
+          body_elements: Json
+          created_at: string
+          data_bindings: Json
+          foundry_id: string
+          id: string
+          layout: string
+          position: number
+          section_id: string
+          speaker_notes_md: string | null
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          body_elements?: Json
+          created_at?: string
+          data_bindings?: Json
+          foundry_id: string
+          id?: string
+          layout: string
+          position: number
+          section_id: string
+          speaker_notes_md?: string | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          body_elements?: Json
+          created_at?: string
+          data_bindings?: Json
+          foundry_id?: string
+          id?: string
+          layout?: string
+          position?: number
+          section_id?: string
+          speaker_notes_md?: string | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_prep_slide_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pitch_prep_slide_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "pitch_prep_section"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       placed_components: {
         Row: {
           assembly_id: string
@@ -13037,6 +14134,157 @@ export type Database = {
             referencedColumns: ["slug"]
           },
         ]
+      }
+      plan_line_items: {
+        Row: {
+          accounting_tags: string[]
+          amount_cents: number
+          annual_uplift_pct: number
+          archived_at: string | null
+          category: string
+          created_at: string
+          currency: string
+          direction: string
+          effective_from: string
+          effective_to: string | null
+          formula: string | null
+          formula_variables: Json | null
+          foundry_id: string
+          frequency: string
+          id: string
+          legacy_source_id: string | null
+          legacy_source_table: string | null
+          name: string
+          notes: string | null
+          owner_user_id: string | null
+          probability_pct: number
+          project_allocation: string | null
+          sensitivity_pct: number
+          source: string
+          updated_at: string
+          vat_treatment: string
+          xero_account_code: string | null
+        }
+        Insert: {
+          accounting_tags?: string[]
+          amount_cents: number
+          annual_uplift_pct?: number
+          archived_at?: string | null
+          category: string
+          created_at?: string
+          currency?: string
+          direction: string
+          effective_from: string
+          effective_to?: string | null
+          formula?: string | null
+          formula_variables?: Json | null
+          foundry_id: string
+          frequency: string
+          id?: string
+          legacy_source_id?: string | null
+          legacy_source_table?: string | null
+          name: string
+          notes?: string | null
+          owner_user_id?: string | null
+          probability_pct?: number
+          project_allocation?: string | null
+          sensitivity_pct?: number
+          source?: string
+          updated_at?: string
+          vat_treatment?: string
+          xero_account_code?: string | null
+        }
+        Update: {
+          accounting_tags?: string[]
+          amount_cents?: number
+          annual_uplift_pct?: number
+          archived_at?: string | null
+          category?: string
+          created_at?: string
+          currency?: string
+          direction?: string
+          effective_from?: string
+          effective_to?: string | null
+          formula?: string | null
+          formula_variables?: Json | null
+          foundry_id?: string
+          frequency?: string
+          id?: string
+          legacy_source_id?: string | null
+          legacy_source_table?: string | null
+          name?: string
+          notes?: string | null
+          owner_user_id?: string | null
+          probability_pct?: number
+          project_allocation?: string | null
+          sensitivity_pct?: number
+          source?: string
+          updated_at?: string
+          vat_treatment?: string
+          xero_account_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_line_items_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_line_items_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "plan_line_items_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          label: string
+          line_items_seed: Json
+          region: string
+          sort_order: number
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id: string
+          label: string
+          line_items_seed?: Json
+          region: string
+          sort_order?: number
+          stage: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+          line_items_seed?: Json
+          region?: string
+          sort_order?: number
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       platform_discounts: {
         Row: {
@@ -19951,6 +21199,214 @@ export type Database = {
           to_item_type?: string
         }
         Relationships: []
+      }
+      xero_account_mapping: {
+        Row: {
+          confidence_pct: number
+          created_at: string
+          forgeos_category: string
+          foundry_id: string
+          id: string
+          updated_at: string
+          user_confirmed: boolean
+          user_confirmed_at: string | null
+          user_confirmed_by_user_id: string | null
+          xero_account_code: string
+          xero_account_name: string
+        }
+        Insert: {
+          confidence_pct?: number
+          created_at?: string
+          forgeos_category: string
+          foundry_id: string
+          id?: string
+          updated_at?: string
+          user_confirmed?: boolean
+          user_confirmed_at?: string | null
+          user_confirmed_by_user_id?: string | null
+          xero_account_code: string
+          xero_account_name: string
+        }
+        Update: {
+          confidence_pct?: number
+          created_at?: string
+          forgeos_category?: string
+          foundry_id?: string
+          id?: string
+          updated_at?: string
+          user_confirmed?: boolean
+          user_confirmed_at?: string | null
+          user_confirmed_by_user_id?: string | null
+          xero_account_code?: string
+          xero_account_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xero_account_mapping_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xero_account_mapping_user_confirmed_by_user_id_fkey"
+            columns: ["user_confirmed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "xero_account_mapping_user_confirmed_by_user_id_fkey"
+            columns: ["user_confirmed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      xero_connection: {
+        Row: {
+          access_token_encrypted: string
+          connected_at: string
+          connected_by_user_id: string
+          created_at: string
+          foundry_id: string
+          last_error_message: string | null
+          last_sync_at: string | null
+          organisation_id: string
+          organisation_name: string
+          refresh_token_encrypted: string
+          scopes: string[]
+          sync_frequency: string
+          sync_state: string
+          token_expires_at: string
+          updated_at: string
+          webhook_enabled: boolean
+        }
+        Insert: {
+          access_token_encrypted: string
+          connected_at?: string
+          connected_by_user_id: string
+          created_at?: string
+          foundry_id: string
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          organisation_id: string
+          organisation_name: string
+          refresh_token_encrypted: string
+          scopes?: string[]
+          sync_frequency?: string
+          sync_state?: string
+          token_expires_at: string
+          updated_at?: string
+          webhook_enabled?: boolean
+        }
+        Update: {
+          access_token_encrypted?: string
+          connected_at?: string
+          connected_by_user_id?: string
+          created_at?: string
+          foundry_id?: string
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          organisation_id?: string
+          organisation_name?: string
+          refresh_token_encrypted?: string
+          scopes?: string[]
+          sync_frequency?: string
+          sync_state?: string
+          token_expires_at?: string
+          updated_at?: string
+          webhook_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xero_connection_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: true
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      xero_transaction: {
+        Row: {
+          amount_cents: number
+          assigned_category: string
+          category_override: string | null
+          category_override_by_user_id: string | null
+          created_at: string
+          currency: string
+          description: string
+          flagged: string | null
+          foundry_id: string
+          id: string
+          synced_at: string
+          transaction_date: string
+          updated_at: string
+          vendor_name: string | null
+          xero_account_code: string
+          xero_transaction_id: string
+        }
+        Insert: {
+          amount_cents: number
+          assigned_category: string
+          category_override?: string | null
+          category_override_by_user_id?: string | null
+          created_at?: string
+          currency?: string
+          description: string
+          flagged?: string | null
+          foundry_id: string
+          id?: string
+          synced_at?: string
+          transaction_date: string
+          updated_at?: string
+          vendor_name?: string | null
+          xero_account_code: string
+          xero_transaction_id: string
+        }
+        Update: {
+          amount_cents?: number
+          assigned_category?: string
+          category_override?: string | null
+          category_override_by_user_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string
+          flagged?: string | null
+          foundry_id?: string
+          id?: string
+          synced_at?: string
+          transaction_date?: string
+          updated_at?: string
+          vendor_name?: string | null
+          xero_account_code?: string
+          xero_transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xero_transaction_category_override_by_user_id_fkey"
+            columns: ["category_override_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "xero_transaction_category_override_by_user_id_fkey"
+            columns: ["category_override_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xero_transaction_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       xray_scans: {
         Row: {

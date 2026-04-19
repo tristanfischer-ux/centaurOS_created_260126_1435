@@ -174,7 +174,7 @@ CREATE POLICY ai_credits_budget_foundry_write
 CREATE TABLE IF NOT EXISTS public.ai_credits_ledger (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   foundry_id            text NOT NULL REFERENCES public.foundries(id) ON DELETE CASCADE,
-  audit_log_id          bigint NOT NULL,
+  audit_log_id          uuid NOT NULL,
   specialist_id         text NOT NULL,
   section               text NOT NULL
                           CHECK (section IN ('forge','products','plan','money','meta')),
