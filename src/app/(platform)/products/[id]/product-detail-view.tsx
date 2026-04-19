@@ -135,11 +135,16 @@ function formatPence(pence: number): string {
 
 interface ProductDetailViewProps {
   product: Product
+  // READ-ONLY: When true, all edit, delete, and mutation controls are hidden
+  // or disabled. Used by /products/legacy/[id] during the Pre-Phase Coming
+  // Soon period so founders can still inspect data without being able to
+  // mutate it.
+  readOnly?: boolean
 }
 
 // ─── Component ──────────────────────────────────────────────────────
 
-export function ProductDetailView({ product: initialProduct }: ProductDetailViewProps) {
+export function ProductDetailView({ product: initialProduct, readOnly = false }: ProductDetailViewProps) {
   const router = useRouter()
   const [product, setProduct] = React.useState(initialProduct)
   const [activeTab, setActiveTab] = React.useState('overview')
@@ -204,6 +209,9 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   // FLOW: Check if linked Forge project has completed and auto-sync COGS
   React.useEffect(() => {
     if (!product.cad_lab_project_id) return
+    // READ-ONLY: checkForgeCompletionAndSync writes COGS back to the product;
+    // skip entirely in legacy view so data stays frozen.
+    if (readOnly) return
     let cancelled = false
     async function checkForge() {
       const result = await checkForgeCompletionAndSync(product.id)
@@ -231,7 +239,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
     checkForge()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product.id, product.cad_lab_project_id])
+  }, [product.id, product.cad_lab_project_id, readOnly])
 
   // ── AI Briefing ──────────────────────────────────────────────────
   const briefingContext = React.useMemo(() => {
@@ -711,12 +719,26 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
 
   const lifecycleIndex = LIFECYCLE_ORDER.indexOf(product.lifecycle)
 
+  // ROUTING: In read-only mode, the back link returns to the legacy list; in
+  // live mode it points at the main Products surface.
+  const backHref = readOnly ? '/products/legacy' : '/products'
+
   return (
     <div className="space-y-6">
+      {/* READ-ONLY banner */}
+      {readOnly && (
+        <div className="rounded-md border border-international-orange/30 bg-international-orange/5 px-4 py-3">
+          <p className="text-sm text-foreground">
+            <span className="font-medium">Read-only mode</span> — editing resumes in
+            the new Products experience (coming soon).
+          </p>
+        </div>
+      )}
+
       {/* Back link + header */}
       <div>
         <Link
-          href="/products"
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -733,26 +755,29 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
               </Badge>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              <Pencil className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete
-            </Button>
-          </div>
+          {/* Header actions — hidden in read-only mode. */}
+          {!readOnly && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -825,6 +850,13 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
           })}
         </div>
       </div>
+
+      {/* READ-ONLY: everything below the tab bar lives inside a fieldset that
+          is disabled when readOnly is true. Browsers natively disable all
+          descendant <button>, <input>, <textarea>, and <select> elements,
+          which covers every edit / save / mutate control in the tab panels,
+          forms, and nested dialogs without us having to tag each one. */}
+      <fieldset disabled={readOnly} className="contents">
 
       {/* Tab content: Overview */}
       {activeTab === 'overview' && (
@@ -2681,6 +2713,8 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      </fieldset>
     </div>
   )
 }

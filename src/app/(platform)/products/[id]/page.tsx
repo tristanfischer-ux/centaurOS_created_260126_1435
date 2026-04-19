@@ -1,43 +1,24 @@
 /**
- * @file page.tsx — Server component for the /products/[id] detail page.
+ * @file page.tsx — /products/[id] detail page (Pre-Phase stub).
  *
- * @description Authenticates the user, fetches the product by ID,
- * and delegates rendering to the ProductDetailView client component.
+ * @description During the Pre-Phase Coming Soon period, this page's output is
+ * replaced by the ProductsLayout's route gate — any deep link under
+ * /products/* lands on the Coming Soon bridge. This stub therefore returns
+ * null; the layout renders everything visible.
+ *
+ * Founders can still reach their data via /products/legacy/[id], which is
+ * explicitly allowed through the layout guard.
+ *
+ * When Phase 4 ships, the Coming Soon sidecar is removed and this file is
+ * restored to the real detail view implementation.
  *
  * @related
- * - src/app/(platform)/products/[id]/product-detail-view.tsx — Client component
- * - src/actions/products.ts — Server actions
+ * - src/app/(platform)/products/layout.tsx — route gate (renders Coming Soon)
+ * - src/app/(platform)/products/legacy/[id]/page.tsx — read-only archive
  */
 
-import { redirect } from 'next/navigation'
-import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { getProduct } from '@/actions/products'
-import { ProductDetailView } from './product-detail-view'
-
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const result = await getProduct(id)
-  return {
-    title: result.data ? `${result.data.name} | Products` : 'Product',
-  }
-}
-
-export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const foundryId = await getFoundryIdCached()
-  if (!foundryId) redirect('/today')
-
-  const { id } = await params
-  const result = await getProduct(id)
-
-  if (result.error || !result.data) {
-    notFound()
-  }
-
-  return <ProductDetailView product={result.data} />
+export default function ProductDetailPage() {
+  // INTENT: Layout gate renders the Coming Soon bridge in place of this stub.
+  // Returning null keeps the page segment mounted without double-rendering.
+  return null
 }
