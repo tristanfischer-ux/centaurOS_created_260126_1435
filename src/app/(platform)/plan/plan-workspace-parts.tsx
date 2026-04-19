@@ -9,6 +9,7 @@
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { MigratedPill } from "@/components/plan/MigratedPill"
 import {
     Sparkles,
     Target,
@@ -190,6 +191,14 @@ export function PinnedGoalCard({
                     <h3 className="mt-2 text-base font-semibold text-foreground line-clamp-2 group-hover:text-international-orange transition-colors">
                         {goal.title}
                     </h3>
+                    {goal.source_objective_id ? (
+                        <div className="mt-1.5">
+                            <MigratedPill
+                                sourceObjectiveId={goal.source_objective_id}
+                                createdAt={goal.created_at}
+                            />
+                        </div>
+                    ) : null}
 
                     {sorted.length > 0 && (
                         <ul className="mt-3 space-y-1.5" aria-label="Disprove assumptions">

@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { MigratedPill } from "@/components/plan/MigratedPill"
 import type {
     AssumptionState,
     GoalState,
@@ -159,6 +160,10 @@ export function GoalHeroHeader({
                                     Pinned #{goal.pin_order}
                                 </Badge>
                             ) : null}
+                            <MigratedPill
+                                sourceObjectiveId={goal.source_objective_id}
+                                createdAt={goal.created_at}
+                            />
                         </div>
                         <CardTitle className="text-2xl sm:text-3xl">{goal.title}</CardTitle>
                         {goal.description ? (
