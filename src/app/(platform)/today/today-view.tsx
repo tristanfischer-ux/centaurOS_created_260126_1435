@@ -1,11 +1,25 @@
 /**
- * TodayView — Personalized daily briefing page.
+ * TodayView — V3 triage surface (PR #1.5 rebuild).
  *
- * @description The first screen a user sees each day. Combines morning
- * briefing intelligence with daily pulse data to present a hero narrative,
- * focus tasks, blockers, pending approvals, at-risk objectives, insights,
- * and celebration moments. Designed to feel like a hand-crafted daily
- * briefing — optimistic, human-first, and actionable.
+ * @description The 8am "open-it-to-get-oriented" screen. Not a duplicate of
+ * Money's Cockpit (which is a 2-minute finance deep-dive) — Today is the
+ * across-the-whole-business triage that ranks signals by consequence × decay.
+ *
+ * Layout frame per FORGE-MOCKUP-TODAY-V3.html:
+ *   V1  Greeting h1 ("Morning, {name}")
+ *   V2  Chip row — weekday/time + danger/warning/info counts + streak
+ *   V3  Headline grid — Priority slab (left) + Runway stub (right)
+ *   V4  Minigrid — 3 tiles (Forge cost · Money pipeline · Plan tasks)
+ *   V5  Waiting-on-you inbox — approvals + blockers (+ Send-standup nudge)
+ *   V6  Mid-grid — ranked queue (filters + decay/section toggle) + Calendar peek
+ *   V7  14-day risk horizon stub
+ *   V8  Section label
+ *   V9  4-section signals strip (Forge · Products · Money · Plan)
+ *   V10 App-signals footer (Comms · Time · Review · Knowledge pills)
+ *
+ * Every MUST-preserve signal from TODAY-V3-SIGNAL-PORTING-MAP.md §8 is
+ * rendered somewhere on this page. DROP-WITH-APPROVAL items (C2d/C8/C13/C15/C16)
+ * applied per Tristan's 2026-04-19 confirmation — defaults noted in PR body.
  *
  * @component
  */
@@ -14,7 +28,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import Link from "next/link"
-import { motion, useMotionValue, useTransform, animate } from "framer-motion"
+import Image from "next/image"
+import { motion } from "framer-motion"
 import {
     Sun,
     Moon,
@@ -22,35 +37,34 @@ import {
     Target,
     AlertTriangle,
     CheckCircle2,
-    Clock,
     ArrowRight,
-    BarChart3,
-    ListChecks,
     RefreshCw,
     TrendingUp,
     TrendingDown,
-    ShieldAlert,
-    ClipboardCheck,
-    Calendar,
-    Lightbulb,
-    MessageCircle,
     Waypoints,
     Building2,
     Users,
     X,
+    ChevronDown,
+    ChevronRight,
+    Calendar,
+    Flame,
+    Activity,
+    MessageSquare,
+    FileCheck2,
+    BookOpen,
+    Megaphone,
 } from "lucide-react"
 
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getMorningBriefing, type MorningBriefing } from "@/actions/nudges"
 import { getMyDailyPulse, type DailyPulseResult } from "@/actions/reports"
 import { getStrategyHealthSummary, type StrategyHealthItem } from "@/actions/canvas"
 import { getUnreadCount } from "@/actions/messaging"
-import { typography } from "@/lib/design-system"
 import { StreakBadge } from "@/components/celebrations/StreakBadge"
 import { ReferralNudgeBanner } from "@/components/ui/referral-nudge-banner"
 import { useCelebration } from "@/hooks/useCelebration"
@@ -71,7 +85,9 @@ import { SpecialistInsightCard } from "@/components/specialists/specialist-insig
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { CHECKLIST_ITEMS } from "@/components/onboarding/GettingStartedChecklist"
 import type { TodayInsightInput } from "@/actions/specialist-page-insights"
-import Image from "next/image"
+import { useTodayForgeFeed } from "@/hooks/useTodayForgeFeed"
+import type { TodaySignal, TodaySignalSection } from "@/types/today"
+import { DECAY_RATE_RANK } from "@/types/today"
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -83,27 +99,60 @@ interface TodayViewProps {
     initialBriefingError: boolean
     initialPulseError: boolean
     initialOnboardingData?: OnboardingData & { _userRole?: string; _isSandbox?: boolean }
-    /** Render the "List yourself as a fractional executive" promo card.
-     *  True when the user is past onboarding but has is_fractional_executive=false. */
+    /** Render the "List yourself as a fractional executive" promo card. */
     showFractionalExecPrompt?: boolean
+    /** Active foundry for the useTodayForgeFeed Realtime subscription. Null = hook skips subscribe. */
+    foundryId: string | null
 }
 
 // ─── Constants ────────────────────────────────────────────────────
 
-/** Streak day counts that trigger a celebration on page load */
 const STREAK_MILESTONES = [3, 7, 14, 30] as const
-
-/** Shared easing curve for all entrance animations */
 const EASE_CURVE = [0.22, 1, 0.36, 1] as const
+
+// ─── Source-tag palette ───────────────────────────────────────────
+// Mockup uses 7 source colours; map each to semantic / permitted palette tokens
+// (international-orange, electric-blue, status-*, sky/lime/purple/teal are not
+// in check-design-tokens.sh's forbidden set). No hardcoded hex.
+
+type QueueSource = TodaySignalSection | 'compliance' | 'comms' | 'people'
+
+const SOURCE_LABEL: Record<QueueSource, string> = {
+    forge: 'Forge',
+    products: 'Products',
+    plan: 'Plan',
+    money: 'Money',
+    meta: 'Meta',
+    compliance: 'Compliance',
+    comms: 'Comms',
+    people: 'People',
+}
+
+const SOURCE_CLASS: Record<QueueSource, string> = {
+    forge:       'bg-international-orange/10 text-international-orange border border-international-orange/20',
+    products:    'bg-sky-50 text-sky-700 border border-sky-200',
+    plan:        'bg-lime-50 text-lime-700 border border-lime-200',
+    money:       'bg-purple-50 text-purple-700 border border-purple-200',
+    meta:        'bg-muted text-muted-foreground border border-border',
+    compliance:  'bg-status-warning-light text-status-warning border border-status-warning/30',
+    comms:       'bg-teal-50 text-teal-700 border border-teal-200',
+    people:      'bg-sky-100 text-sky-700 border border-sky-200',
+}
+
+function SourceTag({ source, className }: { source: QueueSource; className?: string }): React.ReactElement {
+    return (
+        <span className={cn(
+            "inline-flex items-center gap-1 rounded text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5",
+            SOURCE_CLASS[source],
+            className,
+        )}>
+            {SOURCE_LABEL[source]}
+        </span>
+    )
+}
 
 // ─── Time-of-day helpers ─────────────────────────────────────────
 
-/**
- * Returns the appropriate icon for the current time of day.
- *
- * @param size - Tailwind size class (default "h-5 w-5")
- * @returns Sun (5–12), CloudSun (12–17), or Moon (17–5)
- */
 function getTimeIcon(size = "h-5 w-5"): React.ReactElement {
     const hour = new Date().getHours()
     if (hour >= 5 && hour < 12) return <Sun className={`${size} text-status-warning`} />
@@ -111,17 +160,237 @@ function getTimeIcon(size = "h-5 w-5"): React.ReactElement {
     return <Moon className={`${size} text-electric-blue`} />
 }
 
-/**
- * Returns a time-appropriate greeting label.
- *
- * @param name - The user's first name
- * @returns "Good morning, {name}" / "Good afternoon, {name}" / "Good evening, {name}"
- */
 function getTimeGreeting(name: string): string {
     const hour = new Date().getHours()
     if (hour >= 5 && hour < 12) return `Good morning, ${name}`
     if (hour >= 12 && hour < 17) return `Good afternoon, ${name}`
     return `Good evening, ${name}`
+}
+
+function formatWeekdayDate(now: Date): string {
+    return now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+function formatClock(now: Date): string {
+    return now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+// ─── Queue signal normalization ──────────────────────────────────
+
+interface QueueItem {
+    key: string
+    label: string
+    sub?: string
+    source: QueueSource
+    decayLabel: string
+    decayTone: 'overdue' | 'warn' | 'normal'
+    decayRank: number       // 0 = immediate, higher = later
+    consequenceWeight: number
+    ctaHref: string
+    ctaLabel: string
+}
+
+function daysBetween(from: Date, toISO: string | null | undefined): number | null {
+    if (!toISO) return null
+    const to = new Date(toISO)
+    if (Number.isNaN(to.getTime())) return null
+    const MS_PER_DAY = 86_400_000
+    return Math.round((to.getTime() - from.getTime()) / MS_PER_DAY)
+}
+
+function formatDecayFromDays(days: number): { label: string; tone: QueueItem['decayTone']; rank: number } {
+    if (days < 0) return { label: `${days} days`, tone: 'overdue', rank: -days }
+    if (days <= 3) return { label: `${days} days`, tone: 'warn', rank: 10 + days }
+    if (days <= 14) return { label: `${days} days`, tone: 'warn', rank: 20 + days }
+    return { label: `${days} days`, tone: 'normal', rank: 100 + days }
+}
+
+function buildQueueItems(params: {
+    briefing: MorningBriefing | null
+    pulseInsights: FormattedReport['insights'] | null
+    forgeFeedSignals: TodaySignal[]
+}): QueueItem[] {
+    const { briefing, pulseInsights, forgeFeedSignals } = params
+    const now = new Date()
+    const items: QueueItem[] = []
+
+    // topTasks → plan rows
+    briefing?.topTasks?.forEach((task) => {
+        const days = daysBetween(now, task.dueDate)
+        const decay = days !== null
+            ? formatDecayFromDays(days)
+            : task.isOverdue
+                ? { label: 'Overdue', tone: 'overdue' as const, rank: 0 }
+                : { label: 'Due today', tone: 'warn' as const, rank: 10 }
+        items.push({
+            key: `task-${task.id}`,
+            label: task.title,
+            sub: task.objectiveTitle ?? undefined,
+            source: 'plan',
+            decayLabel: decay.label,
+            decayTone: decay.tone,
+            decayRank: decay.rank,
+            consequenceWeight: task.isOverdue ? 2 : 1,
+            ctaHref: '/new-tasks',
+            ctaLabel: 'Open',
+        })
+    })
+
+    // atRiskObjectives → plan rows
+    briefing?.atRiskObjectives?.forEach((obj) => {
+        const days = obj.daysUntilDeadline ?? null
+        const decay = days !== null
+            ? formatDecayFromDays(days)
+            : { label: obj.reason, tone: 'warn' as const, rank: 15 }
+        items.push({
+            key: `obj-${obj.id}`,
+            label: obj.title,
+            sub: obj.reason ? `${obj.progress}% · ${obj.reason}` : `${obj.progress}%`,
+            source: 'plan',
+            decayLabel: decay.label,
+            decayTone: decay.tone,
+            decayRank: decay.rank,
+            consequenceWeight: 1.5,
+            ctaHref: '/new-objectives',
+            ctaLabel: 'Review',
+        })
+    })
+
+    // briefing.nudges → meta rows (every nudge preserved)
+    briefing?.nudges?.forEach((nudge, idx) => {
+        const toneByType: Record<MorningBriefing['nudges'][number]['type'], QueueItem['decayTone']> = {
+            overdue: 'overdue',
+            at_risk: 'warn',
+            stale: 'warn',
+            momentum: 'normal',
+        }
+        const rankByType: Record<MorningBriefing['nudges'][number]['type'], number> = {
+            overdue: 1,
+            at_risk: 12,
+            stale: 25,
+            momentum: 50,
+        }
+        items.push({
+            key: `nudge-${idx}`,
+            label: nudge.message,
+            source: 'meta',
+            decayLabel: nudge.type.replace('_', ' '),
+            decayTone: toneByType[nudge.type],
+            decayRank: rankByType[nudge.type],
+            consequenceWeight: nudge.type === 'overdue' ? 1.5 : 0.8,
+            ctaHref: nudge.actionHref ?? '#',
+            ctaLabel: nudge.actionLabel ?? 'Open',
+        })
+    })
+
+    // pulse.insights (warning + suggestion) → meta rows (celebration folded into hero chip)
+    pulseInsights?.forEach((insight) => {
+        if (insight.type === 'celebration') return
+        items.push({
+            key: `pi-${insight.id}`,
+            label: insight.title,
+            sub: insight.description,
+            source: 'meta',
+            decayLabel: insight.type,
+            decayTone: insight.type === 'warning' ? 'warn' : 'normal',
+            decayRank: insight.type === 'warning' ? 18 : 40,
+            consequenceWeight: insight.type === 'warning' ? 1.2 : 0.6,
+            ctaHref: insight.action?.href ?? '#',
+            ctaLabel: insight.action?.label ?? 'Open',
+        })
+    })
+
+    // useTodayForgeFeed signals → section rows (forge / products / plan / money / meta)
+    forgeFeedSignals.forEach((sig) => {
+        const rank = sig.decayRate ? DECAY_RATE_RANK[sig.decayRate] : 100
+        const tone: QueueItem['decayTone'] =
+            sig.decayRate === 'immediate' ? 'overdue' :
+            sig.decayRate === '1d' || sig.decayRate === '3d' ? 'warn' :
+            'normal'
+        const decayLabel =
+            sig.decayRate === 'immediate' ? 'Now' :
+            sig.decayRate === '1d' ? '1 day' :
+            sig.decayRate === '3d' ? '3 days' :
+            sig.decayRate === '7d' ? '7 days' :
+            sig.decayRate === '30d' ? '30 days' :
+            'open'
+        items.push({
+            key: `forge-${sig.id}`,
+            label: sig.title,
+            sub: sig.body ?? undefined,
+            source: sig.section,
+            decayLabel,
+            decayTone: tone,
+            decayRank: rank,
+            consequenceWeight: sig.consequenceWeight ?? 1,
+            ctaHref: sig.ctaHref ?? '#',
+            ctaLabel: sig.ctaLabel ?? 'Open',
+        })
+    })
+
+    // Sort: decayRank asc, then consequence desc, then key for stability
+    return items.sort((a, b) => {
+        if (a.decayRank !== b.decayRank) return a.decayRank - b.decayRank
+        if (a.consequenceWeight !== b.consequenceWeight) return b.consequenceWeight - a.consequenceWeight
+        return a.key.localeCompare(b.key)
+    })
+}
+
+// ─── Waiting-on-you items ────────────────────────────────────────
+
+interface WaitingItem {
+    key: string
+    initials: string           // avatar letters
+    who: string                // "Jian · Engineering"
+    ask: string                // body sentence
+    meta: string               // "Queued X · {source-tag} · reason"
+    source: QueueSource
+    ctaPrimary: { label: string; href: string }
+    ctaAsk?: { label: string; onClick?: () => void; href?: string }
+    ctaDismiss?: { label: string; onClick?: () => void; href?: string }
+}
+
+function initials(name: string | undefined | null): string {
+    if (!name) return '??'
+    const parts = name.trim().split(/\s+/)
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return (parts[0][0] ?? '').concat(parts[parts.length - 1][0] ?? '').toUpperCase()
+}
+
+function buildWaitingItems(params: {
+    approvals: DailyPulseData['pending_approvals']
+    blockers: DailyPulseData['blockers']
+}): WaitingItem[] {
+    const items: WaitingItem[] = []
+    params.approvals.forEach((ap) => {
+        items.push({
+            key: `ap-${ap.task_id}`,
+            initials: initials(ap.assignee_name ?? undefined),
+            who: ap.assignee_name ? `${ap.assignee_name} · Review` : 'Review request',
+            ask: `— approve ${ap.title}?`,
+            meta: 'Pending approval',
+            source: 'plan',
+            ctaPrimary: { label: 'Approve', href: '/new-tasks' },
+            ctaAsk: { label: 'Ask', href: '/new-tasks' },
+            ctaDismiss: { label: 'Reject', href: '/new-tasks' },
+        })
+    })
+    params.blockers.forEach((bl, idx) => {
+        const severity = bl.severity ?? 'normal'
+        const sevLabel = severity === 'high' || severity === 'critical' ? ` · ${severity}` : ''
+        items.push({
+            key: `bl-${idx}-${bl.user_name ?? 'anon'}`,
+            initials: initials(bl.user_name ?? undefined),
+            who: bl.user_name ? `${bl.user_name} · Blocker` : 'Team blocker',
+            ask: `— ${bl.blocker}`,
+            meta: `Blocker${sevLabel}`,
+            source: 'plan',
+            ctaPrimary: { label: 'View', href: '/new-tasks' },
+            ctaAsk: { label: 'Ask', href: '/new-tasks' },
+            ctaDismiss: { label: 'Dismiss', href: '/new-tasks' },
+        })
+    })
+    return items
 }
 
 // ─── Component ────────────────────────────────────────────────────
@@ -135,6 +404,7 @@ export function TodayView({
     initialPulseError,
     initialOnboardingData,
     showFractionalExecPrompt = false,
+    foundryId,
 }: TodayViewProps): React.ReactElement {
     const [briefing, setBriefing] = useState<MorningBriefing | null>(initialBriefing)
     const [pulse, setPulse] = useState<FormattedReport | null>(initialPulse)
@@ -146,7 +416,12 @@ export function TodayView({
     const [sandboxBannerDismissed, setSandboxBannerDismissed] = useState(initialOnboardingData?.sandbox_banner_dismissed === true)
     const [showCreateCompany, setShowCreateCompany] = useState(false)
 
-    // Migrated users went through old onboarding (no intent_selection) but are now in sandbox
+    // Queue UI state
+    const [queueFilter, setQueueFilter] = useState<'all' | QueueSource>('all')
+    const [queueView, setQueueView] = useState<'decay' | 'section'>('decay')
+    const [teamBriefOpen, setTeamBriefOpen] = useState(false)
+
+    // Migrated users went through old onboarding but are now in sandbox
     const isMigratedUser = !!(initialOnboardingData?._isSandbox && !initialOnboardingData?.intent_selection && initialOnboardingData?.has_completed_onboarding)
 
     const handleDismissSandboxBanner = useCallback(() => {
@@ -172,24 +447,17 @@ export function TodayView({
             getUnreadCount().catch(() => ({ count: 0 })),
         ])
 
-        if (briefingResult.data) {
-            setBriefing(briefingResult.data)
-        } else {
-            setBriefingError(true)
-        }
+        if (briefingResult.data) setBriefing(briefingResult.data)
+        else setBriefingError(true)
 
-        if (pulseResult.success && pulseResult.data) {
-            setPulse(pulseResult.data)
-        } else {
-            setPulseError(true)
-        }
+        if (pulseResult.success && pulseResult.data) setPulse(pulseResult.data)
+        else setPulseError(true)
 
         if ('data' in strategyResult && strategyResult.data) {
             setStrategyHealth(strategyResult.data)
         }
 
         setUnreadCount(unreadResult?.count ?? 0)
-
         setIsLoading(false)
     }, [])
 
@@ -203,72 +471,16 @@ export function TodayView({
             const url = `${window.location.origin}/join?ref=${info.referralCode}`
             await navigator.clipboard.writeText(url)
             toast.success('Referral link copied to clipboard!')
-            // Mark checklist item complete
             await updateOnboardingData({ checklist_friend_invited: true })
         } catch {
             toast.error('Failed to copy referral link.')
         }
     }, [])
 
-    // Register screen context so specialists know what the user is viewing
-    useRegisterScreenContext(useMemo(() => {
-        if (isLoading) return null
-        const pulseData = pulse?.data as DailyPulseData | undefined
-        const parts: string[] = ['Viewing the daily briefing page.']
-        if (briefing?.narrative) parts.push(briefing.narrative)
-        if (pulseData?.personal && Array.isArray(pulseData.blockers) && Array.isArray(pulseData.pending_approvals)) {
-            parts.push(`${pulseData.personal.tasks_due_today ?? 0} tasks due today, ${pulseData.blockers.length} blockers, ${pulseData.pending_approvals.length} pending approvals.`)
-        }
-        if (strategyHealth.length > 0) {
-            const atRisk = strategyHealth.filter(s => s.health === 'at-risk').length
-            const offTrack = strategyHealth.filter(s => s.health === 'off-track').length
-            if (atRisk > 0 || offTrack > 0) parts.push(`Strategy: ${atRisk} at risk, ${offTrack} off track.`)
-        }
-        return {
-            pageTitle: 'Today (Daily Briefing)',
-            summary: parts.join(' '),
-            entities: strategyHealth.map(s => ({
-                type: 'strategy-pillar',
-                title: s.title,
-                status: s.health,
-                progress: s.progress,
-            })),
-        }
-    }, [isLoading, briefing, pulse, strategyHealth]))
-
-    // ─── Celebration effects ──────────────────────────────────────
-
-    useEffect(() => {
-        if (!briefing || isLoading) return
-
-        // Streak milestone celebration
-        if (
-            !streakCelebratedRef.current &&
-            STREAK_MILESTONES.includes(briefing.streak as typeof STREAK_MILESTONES[number])
-        ) {
-            streakCelebratedRef.current = true
-            celebrateStreak(briefing.streak)
-        }
-
-        // All-clear confetti: no focus tasks AND no overdue items
-        if (
-            !confettiFiredRef.current &&
-            briefing.topTasks.length === 0 &&
-            briefing.overdueCount === 0
-        ) {
-            confettiFiredRef.current = true
-            fireConfetti()
-        }
-    }, [briefing, isLoading, celebrateStreak, fireConfetti])
-
     // ─── Derived data ─────────────────────────────────────────────
 
     const pulseData = pulse?.data as DailyPulseData | undefined
     const bothFailed = briefingError && pulseError
-
-    // ─── Cal's daily briefing ───────────────────────────────────
-    // CRITICAL: All hooks must be called before any early returns
-    // to satisfy React's Rules of Hooks (same order every render).
 
     const isNewUser = !!initialOnboardingData && !initialOnboardingData.checklist_dismissed
     const onboardingStepsRemaining = isNewUser
@@ -300,7 +512,7 @@ export function TodayView({
             velocityTrend: briefing.velocityTrend ?? 0,
             teamCompletionRate: pulseData?.team?.completion_rate ?? 0,
         }
-    }, [briefing, pulse, strategyHealth, unreadCount])
+    }, [briefing, pulseData, strategyHealth, unreadCount])
 
     const { calNarrative, calInsights, isCalLoading, dismissInsight, refreshBriefing } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
 
@@ -309,72 +521,111 @@ export function TodayView({
         openPanel(specialistId, { handoffContext: context, contextLabel: 'Today' })
     }
 
-    // ─── Loading state ────────────────────────────────────────────
+    // ─── Forge feed (Supabase Realtime) ──────────────────────────
 
-    if (isLoading) {
-        return <TodayViewSkeleton />
-    }
+    const forgeFeed = useTodayForgeFeed({ foundryId })
 
-    // ─── Welcome state for new users / full error state ──────────
+    // ─── Queue items (merged + sorted) ────────────────────────────
+
+    const allQueueItems = useMemo(() => buildQueueItems({
+        briefing,
+        pulseInsights: pulse?.insights ?? null,
+        forgeFeedSignals: forgeFeed.signals,
+    }), [briefing, pulse, forgeFeed.signals])
+
+    const visibleQueueItems = useMemo(() => {
+        const filtered = queueFilter === 'all'
+            ? allQueueItems
+            : allQueueItems.filter(i => i.source === queueFilter)
+        if (queueView === 'section') {
+            return [...filtered].sort((a, b) => a.source.localeCompare(b.source) || a.decayRank - b.decayRank)
+        }
+        return filtered
+    }, [allQueueItems, queueFilter, queueView])
+
+    const waitingItems = useMemo(() => buildWaitingItems({
+        approvals: pulseData?.pending_approvals ?? [],
+        blockers: pulseData?.blockers ?? [],
+    }), [pulseData])
+
+    // ─── Hero chips counts ───────────────────────────────────────
+
+    const celebrations = useMemo(() => (pulse?.insights ?? []).filter(i => i.type === 'celebration'), [pulse])
+    const overdueCount = briefing?.overdueCount ?? 0
+    const waitingOnYouCount = waitingItems.length
+
+    // ─── Screen context registration (for AdvisorPanel) ──────────
+
+    useRegisterScreenContext(useMemo(() => {
+        if (isLoading) return null
+        const parts: string[] = ['Viewing the Today V3 triage surface.']
+        if (briefing?.narrative) parts.push(briefing.narrative)
+        if (pulseData?.personal && Array.isArray(pulseData.blockers) && Array.isArray(pulseData.pending_approvals)) {
+            parts.push(`${pulseData.personal.tasks_due_today ?? 0} tasks due today, ${pulseData.blockers.length} blockers, ${pulseData.pending_approvals.length} pending approvals.`)
+        }
+        parts.push(`Waiting-on-you: ${waitingOnYouCount}. Queue total: ${allQueueItems.length}.`)
+        if (strategyHealth.length > 0) {
+            const atRisk = strategyHealth.filter(s => s.health === 'at-risk').length
+            const offTrack = strategyHealth.filter(s => s.health === 'off-track').length
+            if (atRisk > 0 || offTrack > 0) parts.push(`Strategy: ${atRisk} at risk, ${offTrack} off track.`)
+        }
+        return {
+            pageTitle: 'Today (V3 triage)',
+            summary: parts.join(' '),
+            entities: strategyHealth.map(s => ({
+                type: 'strategy-pillar',
+                title: s.title,
+                status: s.health,
+                progress: s.progress,
+            })),
+        }
+    }, [isLoading, briefing, pulseData, strategyHealth, waitingOnYouCount, allQueueItems.length]))
+
+    // ─── Celebration effects ──────────────────────────────────────
+
+    useEffect(() => {
+        if (!briefing || isLoading) return
+
+        if (
+            !streakCelebratedRef.current &&
+            STREAK_MILESTONES.includes(briefing.streak as typeof STREAK_MILESTONES[number])
+        ) {
+            streakCelebratedRef.current = true
+            celebrateStreak(briefing.streak)
+        }
+
+        if (
+            !confettiFiredRef.current &&
+            briefing.topTasks.length === 0 &&
+            briefing.overdueCount === 0
+        ) {
+            confettiFiredRef.current = true
+            fireConfetti()
+        }
+    }, [briefing, isLoading, celebrateStreak, fireConfetti])
+
+    // ─── Loading ─────────────────────────────────────────────────
+
+    if (isLoading) return <TodayViewSkeleton />
+
+    // ─── Error-branch "welcome" view (preserved verbatim) ────────
 
     if (bothFailed) {
         const userRole = initialOnboardingData?._userRole
         return (
             <div className="max-w-5xl space-y-8">
-                <PageHeader />
-
-                {/* Retroactive opt-in card for users past onboarding who haven't
-                    listed themselves as fractional executives (Phase 5). */}
                 <FractionalExecPromoCard visible={showFractionalExecPrompt} />
 
-                {/* Getting Started Hero — shown for new users even in empty state */}
                 {initialOnboardingData && (
                     <GettingStartedHero onboardingData={initialOnboardingData} userRole={userRole} onShareReferral={handleShareReferral} />
                 )}
 
-                {/* Sandbox Welcome Banner — shown for sandbox users */}
                 {initialOnboardingData?._isSandbox && !sandboxBannerDismissed && (
-                    <Card className="rounded-xl border-2 border-electric-blue/20 shadow-sm bg-gradient-to-br from-electric-blue/[0.03] to-background">
-                        <CardContent className="pt-6 pb-6">
-                            <div className="flex items-start justify-between mb-4">
-                                <div>
-                                    <h3 className="text-lg font-semibold text-foreground">
-                                        {isMigratedUser ? "We\u2019ve moved you to your own private workspace" : "Welcome to your personal workspace"}
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        {isMigratedUser
-                                            ? "Your data is now fully private \u2014 no one else can see it. When you\u2019re ready, you have two paths:"
-                                            : "This is your private space to explore ForgeOS. When you\u2019re ready, you have two paths:"}
-                                    </p>
-                                </div>
-                                <button onClick={handleDismissSandboxBanner} className="text-muted-foreground hover:text-foreground transition-colors p-1 -mt-1 -mr-1" aria-label="Dismiss banner">
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="p-4 rounded-lg border bg-card hover:border-electric-blue/30 transition-colors">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-9 h-9 rounded-full bg-electric-blue/10 flex items-center justify-center flex-shrink-0">
-                                            <Building2 className="w-4.5 h-4.5 text-electric-blue" />
-                                        </div>
-                                        <h4 className="text-sm font-semibold text-foreground">Set up a company</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed mb-3">Create your company workspace, build your team, and manage your venture.</p>
-                                    <Button size="sm" onClick={() => setShowCreateCompany(true)} className="bg-electric-blue hover:bg-electric-blue/90 text-white">Create Company</Button>
-                                </div>
-                                <div className="p-4 rounded-lg border bg-card hover:border-international-orange/30 transition-colors">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-9 h-9 rounded-full bg-international-orange/10 flex items-center justify-center flex-shrink-0">
-                                            <Users className="w-4.5 h-4.5 text-international-orange" />
-                                        </div>
-                                        <h4 className="text-sm font-semibold text-foreground">Get found as a fractional executive</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed mb-3">Complete your profile so companies can discover you on the Recruits page and invite you to their teams.</p>
-                                    <Button size="sm" variant="outline" asChild className="gap-1.5"><Link href="/my-profile">Complete Profile</Link></Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <SandboxWelcomeBanner
+                        isMigratedUser={isMigratedUser}
+                        onDismiss={handleDismissSandboxBanner}
+                        onCreateCompany={() => setShowCreateCompany(true)}
+                    />
                 )}
                 <CreateCompanyDialog open={showCreateCompany} onOpenChange={setShowCreateCompany} />
 
@@ -385,81 +636,11 @@ export function TodayView({
                         </div>
 
                         {userRole === 'Executive' ? (
-                            <>
-                                <div className="space-y-2 max-w-md">
-                                    <p className="text-xl font-bold text-foreground">
-                                        Ventures are looking for executives like you.
-                                    </p>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Complete your profile so ventures can find you, then browse what&apos;s available in the marketplace.
-                                    </p>
-                                </div>
-                                <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
-                                    <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                        <Link href="/my-profile">
-                                            <Target className="h-3.5 w-3.5" />
-                                            Complete your profile
-                                        </Link>
-                                    </Button>
-                                    <Button variant="outline" size="sm" asChild className="gap-1.5">
-                                        <Link href="/marketplace">
-                                            <Waypoints className="h-3.5 w-3.5" />
-                                            Browse the marketplace
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </>
+                            <ErrorBranchExecutive />
                         ) : userRole === 'Apprentice' ? (
-                            <>
-                                <div className="space-y-2 max-w-md">
-                                    <p className="text-xl font-bold text-foreground">
-                                        Your training toolkit is ready.
-                                    </p>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Start your first training objective and explore the tools that will make you 10x more productive.
-                                    </p>
-                                </div>
-                                <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
-                                    <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                        <Link href="/objectives">
-                                            <Target className="h-3.5 w-3.5" />
-                                            Start your training
-                                        </Link>
-                                    </Button>
-                                    <Button variant="outline" size="sm" asChild className="gap-1.5">
-                                        <Link href="/the-forge">
-                                            <Waypoints className="h-3.5 w-3.5" />
-                                            Explore the toolkit
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </>
+                            <ErrorBranchApprentice />
                         ) : (
-                            <>
-                                <div className="space-y-2 max-w-md">
-                                    <p className="text-xl font-bold text-foreground">
-                                        Welcome to ForgeOS
-                                    </p>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Your daily briefing will appear here once you start creating objectives and tasks.
-                                        Get started by setting up your first goal.
-                                    </p>
-                                </div>
-                                <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
-                                    <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                        <Link href="/new-objectives">
-                                            <Target className="h-3.5 w-3.5" />
-                                            Create your first objective
-                                        </Link>
-                                    </Button>
-                                    <Button variant="outline" size="sm" asChild className="gap-1.5">
-                                        <Link href="/strategy">
-                                            <Waypoints className="h-3.5 w-3.5" />
-                                            Explore strategy
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </>
+                            <ErrorBranchDefault />
                         )}
 
                         <Button onClick={loadData} variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
@@ -472,250 +653,188 @@ export function TodayView({
         )
     }
 
-    // ─── Hero greeting text ───────────────────────────────────────
+    // ─── Greeting text ────────────────────────────────────────────
 
-    const greetingLabel = briefing?.userName
-        ? getTimeGreeting(briefing.userName)
-        : briefing?.greeting ?? "Welcome back"
-
-    // FLOW: Cal's narrative replaces the old Gemini narrative. DB greeting is the instant fallback.
+    const firstName = briefing?.userName ?? 'there'
+    const greetingLabel = briefing?.userName ? getTimeGreeting(briefing.userName) : briefing?.greeting ?? "Welcome back"
     const heroNarrative = calNarrative || briefing?.narrative || briefing?.greeting || ""
+    const now = new Date()
 
-    // ─── Main render ──────────────────────────────────────────────
+    // ─── Priority slab content (stubbed per §9 open-question 1) ──
+    const prioritySlab = pickPrioritySlab(allQueueItems, briefing, waitingItems)
+
+    // ─── Minigrid derivations ────────────────────────────────────
+
+    const dueToday = pulseData?.personal?.tasks_due_today ?? 0
+    const tasksOverdue = pulseData?.personal?.tasks_overdue ?? 0
+    const atRiskCount = briefing?.atRiskObjectives?.length ?? 0
+    const onTrackCount = strategyHealth.filter(s => s.health === 'on-track').length
+    const pillarTotal = strategyHealth.length
+
+    // ─── Main render — V3 frame ──────────────────────────────────
 
     return (
-        <div className="max-w-5xl space-y-8">
-            <PageHeader />
-
-            {/* Retroactive opt-in card for users past onboarding who haven't
-                listed themselves as fractional executives (Phase 5). */}
+        <div className="max-w-5xl space-y-6">
+            {/* Above-V1: dismissible/onboarding banners (preserved) */}
             <FractionalExecPromoCard visible={showFractionalExecPrompt} />
 
-            {/* Hero Narrative Card — Cal's briefing is ALWAYS first */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: EASE_CURVE }}
-                data-tour="today-briefing"
-            >
-                <Card className="rounded-xl border shadow-sm bg-gradient-to-br from-background to-international-orange/[0.03] overflow-hidden">
-                    <CardContent className="pt-6 pb-5">
-                        {/* Cal identity + Greeting + Streak */}
-                        <div className="flex items-start justify-between gap-3 mb-5">
-                            <div className="flex items-start gap-3 min-w-0">
-                                <div className="relative shrink-0">
-                                    <Image
-                                        src="/images/specialists/chief-of-staff.png"
-                                        alt="Cal"
-                                        width={40}
-                                        height={40}
-                                        className="rounded-xl"
-                                    />
-                                    <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-status-warning-light border border-background">
-                                        {getTimeIcon("h-2.5 w-2.5")}
-                                    </div>
-                                </div>
-                                <div className="min-w-0" aria-live="polite">
-                                    <p className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wide">
-                                        Cal, Chief of Staff
-                                    </p>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                        {greetingLabel}
-                                    </p>
-                                    {isCalLoading ? (
-                                        <p className="text-sm italic text-muted-foreground/60 mt-1" aria-label="Loading Cal's briefing">
-                                            Scanning your workstreams...
-                                        </p>
-                                    ) : heroNarrative ? (
-                                        <>
-                                            <motion.p
-                                                className="text-base font-semibold text-foreground leading-relaxed mt-1"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ duration: 0.4, ease: EASE_CURVE }}
-                                            >
-                                                {heroNarrative}
-                                            </motion.p>
-                                            <motion.div
-                                                className="mt-2"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ duration: 0.3, delay: 0.3, ease: EASE_CURVE }}
-                                            >
-                                                <AskSpecialistButton
-                                                    context={{
-                                                        type: 'general',
-                                                        title: 'Daily Briefing Follow-up',
-                                                        description: `Cal's briefing: "${heroNarrative}" — continue this conversation.`,
-                                                        metadata: {
-                                                            notes: calInput
-                                                                ? [
-                                                                    `Overdue: ${calInput.overdueCount}, Due today: ${calInput.dueToday}, Completed: ${calInput.completedToday}, Blockers: ${calInput.blockerCount}`,
-                                                                    ...(calInput.strategyPillars ?? []).map(p => `Pillar "${p.title}": ${p.health}, ${p.progress}%`),
-                                                                ].join('. ')
-                                                                : undefined,
-                                                        },
-                                                    }}
-                                                    specialistId="chief-of-staff"
-                                                    specialistName="Cal"
-                                                    variant="chip"
-                                                    label="Reply to Cal"
-                                                />
-                                            </motion.div>
-                                        </>
-                                    ) : null}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                {briefing && <StreakBadge streak={briefing.streak} className="shrink-0" />}
-                                {calNarrative && (
-                                    <button
-                                        onClick={refreshBriefing}
-                                        disabled={isCalLoading}
-                                        className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-colors disabled:opacity-30"
-                                        title="Refresh briefing"
-                                        aria-label="Refresh Cal's briefing"
-                                    >
-                                        <RefreshCw className={cn("h-3.5 w-3.5", isCalLoading && "animate-spin")} />
-                                    </button>
-                                )}
-                            </div>
+            {initialOnboardingData && (
+                <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} onShareReferral={handleShareReferral} />
+            )}
+
+            {initialOnboardingData?._isSandbox && !sandboxBannerDismissed && (
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE_CURVE }}>
+                    <SandboxWelcomeBanner
+                        isMigratedUser={isMigratedUser}
+                        onDismiss={handleDismissSandboxBanner}
+                        onCreateCompany={() => setShowCreateCompany(true)}
+                    />
+                </motion.div>
+            )}
+            <CreateCompanyDialog open={showCreateCompany} onOpenChange={setShowCreateCompany} />
+
+            {/* V1 + V2 — greeting + chip row + Cal narrative line */}
+            <section data-tour="today-briefing" aria-label="Today greeting">
+                <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight mb-1">
+                    {firstName === 'there' ? 'Welcome back' : `Morning, ${firstName}`}
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                        {getTimeIcon("h-3.5 w-3.5")}
+                        {formatWeekdayDate(now)} · {formatClock(now)}
+                    </span>
+                    {tasksOverdue > 0 && (
+                        <Chip tone="danger" label={`${tasksOverdue} overdue`} />
+                    )}
+                    {overdueCount > 0 && tasksOverdue === 0 && (
+                        <Chip tone="warning" label={`${overdueCount} overdue`} />
+                    )}
+                    {waitingOnYouCount > 0 && (
+                        <Chip tone="info" label={`${waitingOnYouCount} waiting on you`} />
+                    )}
+                    {briefing && briefing.streak > 0 && (
+                        <StreakBadge streak={briefing.streak} />
+                    )}
+                </div>
+
+                {/* Cal's narrative line */}
+                <div className="mt-3 flex items-start gap-2.5 text-sm">
+                    <Image
+                        src="/images/specialists/chief-of-staff.png"
+                        alt=""
+                        width={28}
+                        height={28}
+                        className="rounded-lg shrink-0"
+                    />
+                    <div className="flex-1 min-w-0" aria-live="polite">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground/70 font-medium">
+                            Cal says · {greetingLabel}
+                        </p>
+                        {isCalLoading ? (
+                            <p className="text-sm italic text-muted-foreground/60" aria-label="Loading Cal's briefing">
+                                Scanning your workstreams…
+                            </p>
+                        ) : heroNarrative ? (
+                            <motion.p
+                                className="text-sm font-medium text-foreground leading-relaxed"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.4, ease: EASE_CURVE }}
+                            >
+                                {heroNarrative}
+                            </motion.p>
+                        ) : null}
+                        <div className="flex items-center gap-2 mt-1.5">
+                            <AskSpecialistButton
+                                context={{
+                                    type: 'general',
+                                    title: 'Daily Briefing Follow-up',
+                                    description: `Cal's briefing: "${heroNarrative}" — continue this conversation.`,
+                                    metadata: {
+                                        notes: calInput
+                                            ? [
+                                                `Overdue: ${calInput.overdueCount}, Due today: ${calInput.dueToday}, Completed: ${calInput.completedToday}, Blockers: ${calInput.blockerCount}`,
+                                                ...(calInput.strategyPillars ?? []).map(p => `Pillar "${p.title}": ${p.health}, ${p.progress}%`),
+                                            ].join('. ')
+                                            : undefined,
+                                    },
+                                }}
+                                specialistId="chief-of-staff"
+                                specialistName="Cal"
+                                variant="chip"
+                                label="Reply to Cal"
+                            />
+                            {calNarrative && (
+                                <button
+                                    onClick={refreshBriefing}
+                                    disabled={isCalLoading}
+                                    className="p-1.5 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-colors disabled:opacity-30"
+                                    title="Refresh briefing"
+                                    aria-label="Refresh Cal's briefing"
+                                >
+                                    <RefreshCw className={cn("h-3 w-3", isCalLoading && "animate-spin")} />
+                                </button>
+                            )}
+                            {celebrations.length > 0 && (
+                                <span className="inline-flex items-center gap-1 text-xs text-status-success">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    {celebrations[0].title}
+                                </span>
+                            )}
                         </div>
 
-                        {/* Quick Stats with Trends */}
-                        {pulseData?.personal && (
-                            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-                                <AnimatedStatCard
-                                    label="Completed"
-                                    value={pulseData.personal.tasks_completed_count}
-                                    previousValue={pulseData.trends.personal_completed_yesterday}
-                                    color="text-status-success"
-                                    delay={0}
-                                />
-                                <AnimatedStatCard
-                                    label="Due today"
-                                    value={pulseData.personal.tasks_due_today}
-                                    color="text-electric-blue"
-                                    delay={0.05}
-                                />
-                                {pulseData.personal.tasks_overdue > 0 && (
-                                    <AnimatedStatCard
-                                        label="Overdue"
-                                        value={pulseData.personal.tasks_overdue}
-                                        color="text-destructive"
-                                        delay={0.1}
-                                    />
-                                )}
-                                {pulseData.team.total_completed > 0 && (
-                                    <AnimatedStatCard
-                                        label="Team completed"
-                                        value={pulseData.team.total_completed}
-                                        previousValue={pulseData.trends.completed_yesterday}
-                                        color="text-muted-foreground"
-                                        delay={0.15}
-                                    />
-                                )}
-                                <TodayTimeCard />
-                            </div>
-                        )}
-
-                        {/* Smart Nudges */}
-                        {(briefing?.nudges?.length ?? 0) > 0 || unreadCount > 0 ? (
-                            <div className="space-y-1.5">
-                                {briefing?.nudges.map((nudge, i) => (
-                                    <div
-                                        key={i}
-                                        className="flex items-center gap-2 text-xs"
-                                    >
-                                        <div className={cn(
-                                            "w-1 h-4 rounded-full shrink-0",
-                                            nudge.type === "overdue" && "bg-destructive",
-                                            nudge.type === "at_risk" && "bg-status-warning",
-                                            nudge.type === "momentum" && "bg-status-success",
-                                            nudge.type === "stale" && "bg-muted-foreground",
-                                        )} />
-                                        <span className="text-muted-foreground flex-1">
-                                            {nudge.message}
-                                        </span>
-                                        {nudge.actionHref && (
-                                            <Link
-                                                href={nudge.actionHref}
-                                                className="text-international-orange hover:underline shrink-0 flex items-center gap-0.5"
-                                            >
-                                                {nudge.actionLabel}
-                                                <ArrowRight className="h-3 w-3" />
-                                            </Link>
-                                        )}
-                                    </div>
-                                ))}
-
-                                {unreadCount > 0 && (
-                                    <div className="flex items-center gap-2 text-xs">
-                                        <div className="w-1 h-4 rounded-full shrink-0 bg-status-info" />
-                                        <span className="text-muted-foreground flex-1">
-                                            You have {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
-                                        </span>
-                                        <Link
-                                            href="/updates"
-                                            className="text-international-orange hover:underline shrink-0 flex items-center gap-0.5"
-                                        >
-                                            View messages
-                                            <ArrowRight className="h-3 w-3" />
-                                        </Link>
-                                    </div>
-                                )}
-                            </div>
-                        ) : null}
-
-                        {/* Intelligence Signal — shows how long the system has been learning */}
+                        {/* C2d quiet caption — gated days>7 per Tristan's confirmed default */}
                         {briefing && briefing.intelligenceDaysOfData > 7 && (
-                            <div className="flex items-start gap-2 mt-4 pt-3 border-t text-xs text-muted-foreground">
-                                <Lightbulb className="h-3.5 w-3.5 shrink-0 text-status-warning mt-0.5" />
-                                <span className="flex-1">
-                                    Based on {briefing.intelligenceDaysOfData} days of activity
-                                    {briefing.bestProductivityDay && (
-                                        <span className="text-foreground/70">
-                                            {' · '}Best day: {briefing.bestProductivityDay}
-                                        </span>
-                                    )}
-                                    {briefing.velocityTrend !== 0 && (
-                                        <span className={cn(
-                                            briefing.velocityTrend > 0 ? "text-status-success" : "text-status-warning"
-                                        )}>
-                                            {' · '}Velocity {briefing.velocityTrend > 0 ? '+' : ''}{briefing.velocityTrend}%
-                                        </span>
-                                    )}
-                                </span>
-                            </div>
+                            <p className="text-[11px] text-muted-foreground/70 mt-1.5">
+                                Based on {briefing.intelligenceDaysOfData} days
+                                {briefing.bestProductivityDay && ` · best day ${briefing.bestProductivityDay}`}
+                                {briefing.velocityTrend !== 0 && ` · velocity ${briefing.velocityTrend > 0 ? '+' : ''}${briefing.velocityTrend}%`}
+                            </p>
                         )}
+                    </div>
+                </div>
 
-                        {/* Partial data warning */}
-                        {pulseError && !briefingError && (
-                            <div className="flex items-center gap-2 mt-4 pt-3 border-t text-xs text-muted-foreground">
-                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                <span className="flex-1">Some data unavailable</span>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs gap-1"
-                                    onClick={loadData}
-                                >
-                                    <RefreshCw className="h-3 w-3" />
-                                    Retry
-                                </Button>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </motion.div>
+                {/* Partial data warning */}
+                {pulseError && !briefingError && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        <span className="flex-1">Some data unavailable</span>
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={loadData}>
+                            <RefreshCw className="h-3 w-3" /> Retry
+                        </Button>
+                    </div>
+                )}
+            </section>
 
-            {/* Cal's Urgency-Triaged Insights */}
+            {/* V3 — Headline grid: Priority slab + Runway stub */}
+            <div className="grid grid-cols-1 lg:grid-cols-[2.2fr_1fr] gap-4">
+                <PrioritySlab item={prioritySlab} />
+                <RunwayStub />
+            </div>
+
+            {/* V4 — Minigrid: Forge cost · Money pipeline · Plan tasks */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <ForgeCostTile signals={forgeFeed.signals} />
+                <MoneyPipelineTile />
+                <PlanTasksTile
+                    onTrack={onTrackCount}
+                    pillarTotal={pillarTotal}
+                    atRisk={atRiskCount}
+                    dueToday={dueToday}
+                    completedYesterday={pulseData?.trends?.personal_completed_yesterday ?? 0}
+                    completedToday={pulseData?.personal?.tasks_completed_count ?? 0}
+                    teamTotalCompleted={pulseData?.team?.total_completed ?? 0}
+                />
+            </div>
+
+            {/* Cal's Urgency-Triaged Insights — preserved as compact block */}
             {calInsights.length > 0 && (
                 <motion.div
                     className="space-y-3"
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, ease: EASE_CURVE }}
+                    aria-label="Cal's insights"
                 >
                     {calInsights.map((insight) => (
                         <SpecialistInsightCard
@@ -729,272 +848,135 @@ export function TodayView({
                 </motion.div>
             )}
 
-            {/* Getting Started Hero Checklist — shown for new users */}
-            {initialOnboardingData && (
-                <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} onShareReferral={handleShareReferral} />
+            {/* V5 — Waiting-on-you inbox */}
+            {waitingItems.length > 0 && (
+                <WaitingOnYouCard items={waitingItems} />
             )}
 
-            {/* Sandbox Welcome Banner — for sandbox users who haven't dismissed */}
-            {initialOnboardingData?._isSandbox && !sandboxBannerDismissed && (
-                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE_CURVE }}>
-                    <Card className="rounded-xl border-2 border-electric-blue/20 shadow-sm bg-gradient-to-br from-electric-blue/[0.03] to-background">
-                        <CardContent className="pt-6 pb-6">
-                            <div className="flex items-start justify-between mb-4">
-                                <div>
-                                    <h3 className="text-lg font-semibold text-foreground">
-                                        {isMigratedUser ? "We\u2019ve moved you to your own private workspace" : "Welcome to your personal workspace"}
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        {isMigratedUser
-                                            ? "Your data is now fully private \u2014 no one else can see it. When you\u2019re ready, you have two paths:"
-                                            : "This is your private space to explore ForgeOS. When you\u2019re ready, you have two paths:"}
-                                    </p>
-                                </div>
-                                <button onClick={handleDismissSandboxBanner} className="text-muted-foreground hover:text-foreground transition-colors p-1 -mt-1 -mr-1" aria-label="Dismiss banner">
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="p-4 rounded-lg border bg-card hover:border-electric-blue/30 transition-colors">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-9 h-9 rounded-full bg-electric-blue/10 flex items-center justify-center flex-shrink-0">
-                                            <Building2 className="w-4.5 h-4.5 text-electric-blue" />
-                                        </div>
-                                        <h4 className="text-sm font-semibold text-foreground">Set up a company</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed mb-3">Create your company workspace, build your team, and manage your venture.</p>
-                                    <Button size="sm" onClick={() => setShowCreateCompany(true)} className="bg-electric-blue hover:bg-electric-blue/90 text-white">Create Company</Button>
-                                </div>
-                                <div className="p-4 rounded-lg border bg-card hover:border-international-orange/30 transition-colors">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-9 h-9 rounded-full bg-international-orange/10 flex items-center justify-center flex-shrink-0">
-                                            <Users className="w-4.5 h-4.5 text-international-orange" />
-                                        </div>
-                                        <h4 className="text-sm font-semibold text-foreground">Get found as a fractional executive</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed mb-3">Complete your profile so companies can discover you on the Recruits page and invite you to their teams.</p>
-                                    <Button size="sm" variant="outline" asChild className="gap-1.5"><Link href="/my-profile">Complete Profile</Link></Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </motion.div>
-            )}
-
-            {/* Running Low on AI Tasks — Referral Nudge */}
-            <ReferralNudgeBanner />
-
-            {/* Focus Tasks Section */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1, ease: EASE_CURVE }}
-                data-tour="today-focus"
-            >
-                <FocusTasksSection
-                    briefing={briefing}
-                    overdueCount={briefing?.overdueCount ?? 0}
+            {/* V6 — Mid-grid: ranked queue + calendar peek */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4" data-tour="today-focus">
+                <QueueCard
+                    items={visibleQueueItems}
+                    total={allQueueItems.length}
+                    filter={queueFilter}
+                    onFilterChange={setQueueFilter}
+                    view={queueView}
+                    onViewChange={setQueueView}
                 />
-            </motion.div>
+                <CalendarPeekStub />
+            </div>
 
-            {/* Unread Messages Section */}
-            {unreadCount > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.12, ease: EASE_CURVE }}
-                >
-                    <SectionHeader icon={MessageCircle} label="Unread Messages" color="text-status-info" />
-                    <Card className="rounded-xl border">
-                        <CardContent className="pt-4 pb-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-status-info-light shrink-0">
-                                        <MessageCircle className="h-4 w-4 text-status-info" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-foreground">
-                                            {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            Conversations waiting for your response
-                                        </p>
-                                    </div>
-                                </div>
-                                <Button variant="outline" size="sm" asChild className="gap-1.5 w-full sm:w-auto shrink-0">
-                                    <Link href="/updates">
-                                        View messages
-                                        <ArrowRight className="h-3.5 w-3.5" />
-                                    </Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </motion.div>
-            )}
+            {/* V7 — 14-day horizon stub */}
+            <HorizonStub />
 
-            {/* Blockers Section */}
-            {pulseData && Array.isArray(pulseData.blockers) && pulseData.blockers.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.15, ease: EASE_CURVE }}
-                >
-                    <BlockersSection blockers={pulseData.blockers} />
-                </motion.div>
-            )}
+            {/* V8 — section label */}
+            <div className="flex items-baseline justify-between pt-2">
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Where you stand · 4 sections at a glance
+                </h3>
+                <span className="text-[11px] text-muted-foreground/70">
+                    Each card links to its section
+                </span>
+            </div>
 
-            {/* Pending Approvals Section */}
-            {pulseData && Array.isArray(pulseData.pending_approvals) && pulseData.pending_approvals.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.2, ease: EASE_CURVE }}
-                >
-                    <PendingApprovalsSection approvals={pulseData.pending_approvals} />
-                </motion.div>
-            )}
+            {/* V9 — 4-section signals strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <ForgeSignalCard forgeSignals={forgeFeed.signals} />
+                <ProductsSignalCard />
+                <MoneySignalCard />
+                <PlanSignalCard
+                    onTrack={onTrackCount}
+                    pillarTotal={pillarTotal}
+                    atRisk={atRiskCount}
+                    dueThisWeek={dueToday}
+                />
+            </div>
 
-            {/* At-Risk Objectives Section */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.25, ease: EASE_CURVE }}
-            >
-                <AtRiskObjectivesSection briefing={briefing} />
-            </motion.div>
-
-            {/* Strategy Spotlight Section */}
+            {/* Strategy spotlight — preserved below V9 per map §3 row 22 */}
             {strategyHealth.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.28, ease: EASE_CURVE }}
+                    transition={{ duration: 0.4, ease: EASE_CURVE }}
                 >
                     <StrategySpotlightSection items={strategyHealth} />
                 </motion.div>
             )}
 
-            {/* Team Intelligence — proactive insights from your 13 specialists */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.28, ease: EASE_CURVE }}
-                data-tour="today-insights"
-            >
-                <SectionHeader icon={Waypoints} label="Your Team" color="text-international-orange" />
-                <p className="text-xs text-muted-foreground -mt-3 mb-4 ml-7">
-                    Proactive insights from your 13 specialists — they&apos;re always analyzing your business.
-                </p>
-                <div className="space-y-6">
-                    <WeeklyBrief />
-                    <InsightFeed />
-                </div>
-            </motion.div>
+            {/* Team brief — C13 collapsed-by-default per Tristan's default */}
+            <section aria-label="Team brief" data-tour="today-insights">
+                <button
+                    type="button"
+                    onClick={() => setTeamBriefOpen(v => !v)}
+                    className="flex items-center gap-2 w-full text-left py-2 px-3 rounded-lg border border-border hover:bg-muted/40 transition-colors"
+                    aria-expanded={teamBriefOpen}
+                >
+                    {teamBriefOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    <Waypoints className="h-4 w-4 text-international-orange" />
+                    <span className="text-sm font-semibold text-foreground">Team brief</span>
+                    <span className="text-xs text-muted-foreground">· Proactive insights from your 13 specialists</span>
+                </button>
+                {teamBriefOpen && (
+                    <div className="mt-3 space-y-6">
+                        <WeeklyBrief />
+                        <InsightFeed />
+                    </div>
+                )}
+            </section>
 
-            {/* Insights Section */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.3, ease: EASE_CURVE }}
-            >
-                <InsightsSection pulse={pulse} />
-            </motion.div>
+            {/* V10 — App-signals footer pill row */}
+            <AppSignalsFooter
+                unreadCount={unreadCount}
+                reviewCount={pulseData?.pending_approvals?.length ?? 0}
+            />
 
-            {/* Specialist Quick Access */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.32, ease: EASE_CURVE }}
-            >
-                <Card className="rounded-xl border bg-muted/30">
-                    <CardContent className="pt-5 pb-4">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Lightbulb className="h-4 w-4 text-international-orange" />
-                            <span className="text-sm font-semibold text-foreground">Brief Your Team</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-3">
-                            Ask any of your 13 specialists for advice, analysis, or action plans. They remember your past conversations and can create objectives and tasks for you.
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                            <AskSpecialistButton
-                                context={{
-                                    type: 'general',
-                                    title: 'Daily Planning',
-                                    description: "Help me prioritize today's work and identify what matters most.",
-                                    metadata: {
-                                        notes: pulse?.data && 'blockers' in pulse.data
-                                            ? `Today: ${(pulse.data as DailyPulseData).personal.tasks_due_today} tasks due, ${(pulse.data as DailyPulseData).blockers.length} blockers, ${(pulse.data as DailyPulseData).pending_approvals.length} pending approvals`
-                                            : 'Starting a new day — help me plan.',
-                                    },
-                                }}
-                                specialistId="chief-of-staff"
-                                specialistName="Cal"
-                                variant="chip"
-                                label="Plan my day with Cal"
-                            />
-                            <AskSpecialistButton
-                                context={{
-                                    type: 'strategy',
-                                    title: 'Strategy Check-in',
-                                    description: 'Quick strategy pulse — where should I focus?',
-                                }}
-                                specialistId="strategist"
-                                specialistName="Sage"
-                                variant="chip"
-                                label="Strategy with Sage"
-                            />
-                            <AskSpecialistButton
-                                context={{
-                                    type: 'general',
-                                    title: 'General Consultation',
-                                    description: 'Open-ended discussion about any business challenge.',
-                                }}
-                                variant="chip"
-                                label="Choose Specialist"
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-            </motion.div>
+            {/* C15 demoted — thin chip row below V10 */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] uppercase tracking-wider text-muted-foreground/70 font-medium pr-1">
+                    Brief a specialist
+                </span>
+                <AskSpecialistButton
+                    context={{
+                        type: 'general',
+                        title: 'Daily Planning',
+                        description: "Help me prioritize today's work and identify what matters most.",
+                        metadata: {
+                            notes: pulseData
+                                ? `Today: ${pulseData.personal.tasks_due_today} tasks due, ${pulseData.blockers.length} blockers, ${pulseData.pending_approvals.length} pending approvals`
+                                : 'Starting a new day — help me plan.',
+                        },
+                    }}
+                    specialistId="chief-of-staff"
+                    specialistName="Cal"
+                    variant="chip"
+                    label="Plan with Cal"
+                />
+                <AskSpecialistButton
+                    context={{
+                        type: 'strategy',
+                        title: 'Strategy Check-in',
+                        description: 'Quick strategy pulse — where should I focus?',
+                    }}
+                    specialistId="strategist"
+                    specialistName="Sage"
+                    variant="chip"
+                    label="Strategy with Sage"
+                />
+                <AskSpecialistButton
+                    context={{
+                        type: 'general',
+                        title: 'General Consultation',
+                        description: 'Open-ended discussion about any business challenge.',
+                    }}
+                    variant="chip"
+                    label="Choose specialist"
+                />
+            </div>
 
-            {/* Quick Actions */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.35, ease: EASE_CURVE }}
-                className="flex flex-wrap gap-3 pb-8"
-            >
-                <Button variant="outline" size="sm" asChild>
-                    <Link href="/new-tasks" className="gap-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        View all tasks
-                    </Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                    <Link href="/new-objectives" className="gap-1.5">
-                        <Target className="h-3.5 w-3.5" />
-                        View objectives
-                    </Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                    <Link href="/strategy" className="gap-1.5">
-                        <Waypoints className="h-3.5 w-3.5" />
-                        View strategy
-                    </Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                    <Link href="/plan" className="gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
-                        Plan something new
-                    </Link>
-                </Button>
-            </motion.div>
+            {/* Referral nudge — NICE, below footer */}
+            <ReferralNudgeBanner />
 
-            {/* Tour only starts when the onboarding hero is no longer visible.
-                GettingStartedHero hides itself when completedCount >= 3 OR dismissed.
-                We replicate that check here to avoid starting the tour over the
-                onboarding screen. */}
+            {/* PageTour — only once onboarding hero is gone */}
             {(() => {
                 if (!initialOnboardingData) return <PageTour page="today" />
                 const d = initialOnboardingData
@@ -1012,459 +994,657 @@ export function TodayView({
     )
 }
 
-// ─── Page Header ──────────────────────────────────────────────────
+// ─── Priority slab selector ──────────────────────────────────────
 
-/**
- * Renders the standardized "Today" page header with orange accent bar.
- */
-function PageHeader(): React.ReactElement {
+function pickPrioritySlab(
+    items: QueueItem[],
+    briefing: MorningBriefing | null,
+    waitingItems: WaitingItem[],
+): QueueItem | null {
+    // Highest-urgency from merged queue OR waiting-on-you as fallback
+    if (items.length > 0) return items[0]
+    if (waitingItems.length > 0) {
+        const first = waitingItems[0]
+        return {
+            key: first.key,
+            label: first.ask.replace(/^—\s*/, ''),
+            sub: first.who,
+            source: first.source,
+            decayLabel: first.meta,
+            decayTone: 'warn',
+            decayRank: 5,
+            consequenceWeight: 1.5,
+            ctaHref: first.ctaPrimary.href,
+            ctaLabel: first.ctaPrimary.label,
+        }
+    }
+    if (briefing && briefing.greeting) {
+        return {
+            key: 'default',
+            label: "You're all caught up — time to plan your next move.",
+            sub: "No overdue tasks, no waiting items. Pick a Q2 objective to push.",
+            source: 'meta',
+            decayLabel: 'today',
+            decayTone: 'normal',
+            decayRank: 999,
+            consequenceWeight: 0,
+            ctaHref: '/strategy',
+            ctaLabel: 'Open Strategy',
+        }
+    }
+    return null
+}
+
+// ─── Chip ────────────────────────────────────────────────────────
+
+function Chip({ tone, label }: { tone: 'danger' | 'warning' | 'info'; label: string }): React.ReactElement {
+    const classMap = {
+        danger: 'bg-destructive/10 text-destructive border-destructive/30',
+        warning: 'bg-status-warning-light text-status-warning border-status-warning/30',
+        info: 'bg-status-info-light text-status-info border-status-info/30',
+    } as const
     return (
-        <div>
-            <div className={typography.pageHeader}>
-                <div className={typography.pageHeaderAccent} />
-                <h1 className={typography.h1}>Today</h1>
-            </div>
-        </div>
+        <span className={cn("inline-flex items-center gap-1.5 rounded-full text-[11px] font-medium px-2 py-0.5 border", classMap[tone])}>
+            <span className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                tone === 'danger' ? 'bg-destructive' : tone === 'warning' ? 'bg-status-warning' : 'bg-status-info',
+            )} />
+            {label}
+        </span>
     )
 }
 
-// ─── Skeleton Loading State ───────────────────────────────────────
+// ─── V3a — Priority slab ─────────────────────────────────────────
 
-/**
- * Full-page skeleton displayed while briefing + pulse data load.
- *
- * @description Mimics the layout of the loaded page: greeting card with
- * narrative text and stat blocks, three task card placeholders, and
- * two objective card placeholders.
- */
-function TodayViewSkeleton(): React.ReactElement {
-    return (
-        <div className="max-w-5xl space-y-8">
-            <PageHeader />
-
-            {/* Greeting card skeleton */}
-            <Card className="rounded-xl border shadow-sm overflow-hidden">
-                <CardContent className="pt-6 pb-5 space-y-5">
-                    {/* Greeting row */}
-                    <div className="flex items-start gap-3">
-                        <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
-                        <div className="space-y-2 flex-1">
-                            <Skeleton className="h-4 w-40" />
-                            <Skeleton className="h-5 w-full max-w-md" />
-                            <Skeleton className="h-5 w-3/4 max-w-sm" />
-                        </div>
+function PrioritySlab({ item }: { item: QueueItem | null }): React.ReactElement {
+    if (!item) {
+        return (
+            <Card className="rounded-xl border bg-gradient-to-br from-background to-international-orange/[0.03]">
+                <CardContent className="py-8 flex flex-col items-center gap-3 text-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-status-success-light">
+                        <CheckCircle2 className="h-5 w-5 text-status-success" />
                     </div>
-                    {/* Stat blocks */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-16 rounded-lg" />
-                        ))}
-                    </div>
+                    <p className="text-sm font-semibold text-foreground">You&apos;re all caught up</p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                        No triage items today. Good time to work on something proactive.
+                    </p>
                 </CardContent>
             </Card>
-
-            {/* Focus tasks skeleton */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                    <Skeleton className="w-1 h-5 rounded-full" />
-                    <Skeleton className="h-4 w-24" />
+        )
+    }
+    const isBlocking = item.decayTone === 'overdue'
+    return (
+        <Card className="rounded-xl border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.03]">
+            <CardContent className="pt-5 pb-5">
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="text-[10.5px] font-bold uppercase tracking-widest text-international-orange">
+                        {isBlocking ? '🔴 Blocking — #1 today' : "Today's focus"}
+                    </span>
+                    <SourceTag source={item.source} />
                 </div>
-                {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-14 rounded-xl" />
-                ))}
-            </div>
-
-            {/* Objectives skeleton */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                    <Skeleton className="w-1 h-5 rounded-full" />
-                    <Skeleton className="h-4 w-20" />
+                <h2 className="text-lg font-semibold text-foreground leading-snug tracking-tight mb-2">
+                    {item.label}
+                </h2>
+                {item.sub && (
+                    <p className="text-sm text-foreground/80 mb-3">{item.sub}</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                    <Button size="sm" asChild className="bg-international-orange hover:bg-international-orange/90 text-white">
+                        <Link href={item.ctaHref}>{item.ctaLabel}</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/strategy" className="gap-1.5">
+                            See all open risks
+                            <ArrowRight className="h-3 w-3" />
+                        </Link>
+                    </Button>
                 </div>
-                {Array.from({ length: 2 }).map((_, i) => (
-                    <Skeleton key={i} className="h-14 rounded-xl" />
-                ))}
+            </CardContent>
+        </Card>
+    )
+}
+
+// ─── V3b — Runway card (Connect Cash/Burn stub) ──────────────────
+
+function RunwayStub(): React.ReactElement {
+    return (
+        <Card className="rounded-xl border relative">
+            <CardContent className="pt-5 pb-5">
+                <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                    Cash runway
+                </p>
+                <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-2xl font-bold text-muted-foreground/70 tabular-nums">—</span>
+                    <span className="text-xs text-muted-foreground">months</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                    Connect your finances to see runway here.
+                </p>
+                <Button size="sm" variant="outline" asChild className="w-full">
+                    <Link href="/money" className="gap-1.5">
+                        <Building2 className="h-3.5 w-3.5" />
+                        Connect Cash/Burn
+                    </Link>
+                </Button>
+                <p className="text-[10px] text-muted-foreground/70 italic mt-2">
+                    Coming in Phase 2 · Money
+                </p>
+            </CardContent>
+        </Card>
+    )
+}
+
+// ─── V4 — Minigrid tiles ─────────────────────────────────────────
+
+function ForgeCostTile({ signals }: { signals: TodaySignal[] }): React.ReactElement {
+    const topForge = signals.find(s => s.section === 'forge')
+    return (
+        <Link
+            href="/the-forge"
+            className="block rounded-xl border bg-background p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+        >
+            <div className="flex items-center justify-between mb-2">
+                <SourceTag source="forge" />
+                <span className="text-[10px] text-muted-foreground">today</span>
             </div>
+            {topForge ? (
+                <>
+                    <div className="text-xl font-bold text-foreground tabular-nums">{topForge.title}</div>
+                    {topForge.body && <div className="text-xs text-muted-foreground mt-1">{topForge.body}</div>}
+                </>
+            ) : (
+                <>
+                    <div className="text-xl font-bold text-muted-foreground/70 tabular-nums">—</div>
+                    <div className="text-xs text-muted-foreground mt-1">No Forge breaches today.</div>
+                </>
+            )}
+        </Link>
+    )
+}
+
+function MoneyPipelineTile(): React.ReactElement {
+    return (
+        <div className="block rounded-xl border bg-background p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+                <SourceTag source="money" />
+                <span className="text-[10px] text-muted-foreground">this week</span>
+            </div>
+            <div className="text-xl font-bold text-muted-foreground/70 tabular-nums">—</div>
+            <div className="text-xs text-muted-foreground mt-1">Coming in Phase 2 · Money</div>
         </div>
     )
 }
 
-// ─── Animated Stat Card ───────────────────────────────────────────
-
-interface AnimatedStatCardProps {
-    /** Display label (e.g. "Completed") */
-    label: string
-    /** Current numeric value */
-    value: number
-    /** Yesterday's value for trend calculation */
-    previousValue?: number
-    /** Color token for the numeric value */
-    color: string
-    /** Staggered entrance delay in seconds */
-    delay: number
-}
-
-/**
- * A small stat card that counts up the number on mount and optionally
- * shows a trend arrow comparing today vs yesterday.
- */
-function AnimatedStatCard({
-    label,
-    value,
-    previousValue,
-    color,
-    delay,
-}: AnimatedStatCardProps): React.ReactElement {
-    const motionValue = useMotionValue(0)
-    const rounded = useTransform(motionValue, (v) => Math.round(v))
-
-    useEffect(() => {
-        const controls = animate(motionValue, value, {
-            duration: 0.6,
-            delay: delay + 0.2,
-            ease: "easeOut",
-        })
-        return controls.stop
-    }, [motionValue, value, delay])
-
-    const delta = previousValue !== undefined ? value - previousValue : null
-    const showTrend = delta !== null && delta !== 0
-
+function PlanTasksTile(props: {
+    onTrack: number
+    pillarTotal: number
+    atRisk: number
+    dueToday: number
+    completedYesterday: number
+    completedToday: number
+    teamTotalCompleted: number
+}): React.ReactElement {
+    const { onTrack, pillarTotal, atRisk, dueToday, completedYesterday, completedToday, teamTotalCompleted } = props
+    const delta = completedToday - completedYesterday
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay, ease: EASE_CURVE }}
-            className="rounded-lg border bg-background p-3 space-y-1"
+        <Link
+            href="/strategy"
+            className="block rounded-xl border bg-background p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
         >
-            <p className="text-xs text-muted-foreground truncate">{label}</p>
-            <div className="flex items-baseline gap-1.5">
-                <motion.span className={cn("text-xl font-bold tabular-nums", color)}>
-                    {rounded}
-                </motion.span>
-                {showTrend && (
-                    <span
-                        className={cn(
-                            "flex items-center text-xs font-medium",
-                            delta > 0 ? "text-status-success" : "text-destructive"
-                        )}
-                    >
-                        {delta > 0 ? (
-                            <TrendingUp className="h-3 w-3 mr-0.5" />
-                        ) : (
-                            <TrendingDown className="h-3 w-3 mr-0.5" />
-                        )}
+            <div className="flex items-center justify-between mb-2">
+                <SourceTag source="plan" />
+                <span className="text-[10px] text-muted-foreground">Q2</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+                <span className="text-xl font-bold text-foreground tabular-nums">
+                    {onTrack}/{pillarTotal || 0}
+                </span>
+                <span className="text-xs text-muted-foreground">on-track</span>
+                {delta !== 0 && pillarTotal > 0 && (
+                    <span className={cn(
+                        "flex items-center text-[11px] font-medium ml-1",
+                        delta > 0 ? "text-status-success" : "text-destructive",
+                    )}>
+                        {delta > 0 ? <TrendingUp className="h-3 w-3 mr-0.5" /> : <TrendingDown className="h-3 w-3 mr-0.5" />}
                         {Math.abs(delta)}
                     </span>
                 )}
             </div>
-        </motion.div>
+            <div className="text-xs text-muted-foreground mt-1">
+                <strong className="text-foreground font-semibold">{atRisk} at risk</strong> · {dueToday} due today
+                {teamTotalCompleted > 0 && ` · team ${teamTotalCompleted}`}
+            </div>
+        </Link>
     )
 }
 
-// ─── Focus Tasks Section ──────────────────────────────────────────
+// ─── V5 — Waiting-on-you card ───────────────────────────────────
 
-interface FocusTasksSectionProps {
-    briefing: MorningBriefing | null
-    overdueCount: number
+function WaitingOnYouCard({ items }: { items: WaitingItem[] }): React.ReactElement {
+    return (
+        <Card className="rounded-xl border overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+                <div className="text-sm font-semibold text-foreground">
+                    Waiting on you
+                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full bg-international-orange text-white text-[11px] font-bold tabular-nums">
+                        {items.length}
+                    </span>
+                </div>
+                <Link
+                    href="/updates"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-international-orange hover:bg-international-orange/10 border border-international-orange/30 rounded-md px-2.5 py-1"
+                >
+                    <Megaphone className="h-3 w-3" />
+                    Send standup
+                </Link>
+            </div>
+            <div>
+                {items.map((item, idx) => (
+                    <div
+                        key={item.key}
+                        className={cn(
+                            "grid grid-cols-[28px_1fr_auto] gap-3 px-5 py-3.5 items-start",
+                            idx < items.length - 1 && "border-b border-border/50",
+                        )}
+                    >
+                        <div className="w-7 h-7 rounded-full bg-electric-blue/10 flex items-center justify-center text-[11px] font-bold text-electric-blue">
+                            {item.initials}
+                        </div>
+                        <div className="text-sm leading-relaxed min-w-0">
+                            <span className="font-semibold text-foreground">{item.who}</span>
+                            <span className="text-foreground/90"> {item.ask}</span>
+                            <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
+                                {item.meta}
+                                <SourceTag source={item.source} />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                            <Button size="sm" variant="outline" asChild className="h-7 text-xs bg-status-success-light border-status-success/30 text-status-success hover:bg-status-success hover:text-white">
+                                <Link href={item.ctaPrimary.href}>{item.ctaPrimary.label}</Link>
+                            </Button>
+                            {item.ctaAsk && (
+                                <Button size="sm" variant="outline" asChild className="h-7 text-xs">
+                                    <Link href={item.ctaAsk.href ?? '#'}>{item.ctaAsk.label}</Link>
+                                </Button>
+                            )}
+                            {item.ctaDismiss && (
+                                <Button size="sm" variant="outline" asChild className="h-7 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30">
+                                    <Link href={item.ctaDismiss.href ?? '#'}>{item.ctaDismiss.label}</Link>
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </Card>
+    )
 }
 
-/**
- * Renders the "Focus Today" section with task cards, or an appropriate
- * empty state depending on whether there are overdue tasks.
- */
-function FocusTasksSection({ briefing, overdueCount }: FocusTasksSectionProps): React.ReactElement | null {
-    if (!briefing) return null
+// ─── V6a — Queue card ───────────────────────────────────────────
 
-    const hasTasks = briefing.topTasks.length > 0
+function QueueCard({
+    items,
+    total,
+    filter,
+    onFilterChange,
+    view,
+    onViewChange,
+}: {
+    items: QueueItem[]
+    total: number
+    filter: 'all' | QueueSource
+    onFilterChange: (f: 'all' | QueueSource) => void
+    view: 'decay' | 'section'
+    onViewChange: (v: 'decay' | 'section') => void
+}): React.ReactElement {
+    const filters: Array<{ key: 'all' | QueueSource; label: string }> = [
+        { key: 'all', label: 'All' },
+        { key: 'forge', label: 'Forge' },
+        { key: 'products', label: 'Products' },
+        { key: 'plan', label: 'Plan' },
+        { key: 'money', label: 'Money' },
+        { key: 'compliance', label: 'Compliance' },
+    ]
 
-    // All caught up — celebration empty state
-    if (!hasTasks && overdueCount === 0) {
-        return (
-            <div>
-                <SectionHeader icon={ListChecks} label="Focus Today" color="text-international-orange" />
-                <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="py-8 flex flex-col items-center gap-3 text-center">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-status-success-light">
-                            <CheckCircle2 className="h-5 w-5 text-status-success" />
-                        </div>
-                        <p className="text-sm font-semibold text-foreground">
-                            You&apos;re all caught up!
-                        </p>
-                        <p className="text-xs text-muted-foreground max-w-xs">
-                            No tasks due and nothing overdue. Time to plan your next move.
-                        </p>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/plan" className="gap-1.5">
-                                <Calendar className="h-3.5 w-3.5" />
-                                Go to Plan
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
+    return (
+        <Card className="rounded-xl border overflow-hidden">
+            <div className="px-5 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <span className="text-sm font-semibold text-foreground">Today</span>
+                    <span className="ml-2 text-[11px] text-muted-foreground">
+                        · {total} items · ordered by consequence × decay
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex gap-0.5 p-0.5 bg-muted rounded-md text-[11px]">
+                        {filters.map(f => (
+                            <button
+                                key={f.key}
+                                type="button"
+                                onClick={() => onFilterChange(f.key)}
+                                className={cn(
+                                    "px-2 py-0.5 rounded font-medium transition-colors",
+                                    filter === f.key
+                                        ? "bg-background text-foreground font-semibold shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground",
+                                )}
+                                aria-pressed={filter === f.key}
+                            >
+                                {f.label}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex border border-border rounded-md overflow-hidden text-[10.5px]">
+                        <button
+                            type="button"
+                            onClick={() => onViewChange('decay')}
+                            className={cn(
+                                "px-2 py-1 font-bold uppercase tracking-wide transition-colors",
+                                view === 'decay'
+                                    ? "bg-international-orange text-white"
+                                    : "text-muted-foreground hover:bg-muted",
+                            )}
+                            aria-pressed={view === 'decay'}
+                        >
+                            By decay
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onViewChange('section')}
+                            className={cn(
+                                "px-2 py-1 font-bold uppercase tracking-wide transition-colors",
+                                view === 'section'
+                                    ? "bg-international-orange text-white"
+                                    : "text-muted-foreground hover:bg-muted",
+                            )}
+                            aria-pressed={view === 'section'}
+                        >
+                            By section
+                        </button>
+                    </div>
+                </div>
             </div>
-        )
-    }
-
-    // No tasks due today, but overdue exist
-    if (!hasTasks && overdueCount > 0) {
-        return (
-            <div>
-                <SectionHeader icon={ListChecks} label="Focus Today" color="text-international-orange" />
-                <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="py-6 flex flex-col sm:flex-row sm:items-center gap-3">
-                        <div className="flex items-center gap-3">
-                            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <p className="text-sm text-muted-foreground">
-                                No tasks scheduled for today, but you have {overdueCount} overdue{" "}
-                                {overdueCount === 1 ? "item" : "items"}.
-                            </p>
-                        </div>
-                        <Button variant="outline" size="sm" asChild className="shrink-0 sm:ml-auto self-start sm:self-auto">
-                            <Link href="/new-tasks" className="gap-1.5">
-                                View tasks
+            {items.length === 0 ? (
+                <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+                    {total === 0
+                        ? "You're all caught up — time to plan your next move."
+                        : "No items match this filter."}
+                </div>
+            ) : (
+                <div>
+                    {items.map((item, idx) => (
+                        <div
+                            key={item.key}
+                            className={cn(
+                                "grid grid-cols-[28px_1fr_auto_auto] gap-3 px-5 py-3 items-center text-sm",
+                                idx < items.length - 1 && "border-b border-border/50",
+                                "hover:bg-muted/30 transition-colors",
+                            )}
+                        >
+                            <div className="text-[11px] font-bold text-muted-foreground/70 tabular-nums text-center">
+                                {idx + 1}
+                            </div>
+                            <div className="min-w-0">
+                                <div className="font-medium text-foreground truncate">{item.label}</div>
+                                <div className="text-[11px] text-muted-foreground truncate mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                    <SourceTag source={item.source} />
+                                    {item.sub && <span>· {item.sub}</span>}
+                                </div>
+                            </div>
+                            <div className={cn(
+                                "text-[11px] tabular-nums text-right min-w-[72px]",
+                                item.decayTone === 'overdue' && "text-destructive font-semibold",
+                                item.decayTone === 'warn' && "text-status-warning font-medium",
+                                item.decayTone === 'normal' && "text-muted-foreground",
+                            )}>
+                                {item.decayLabel}
+                            </div>
+                            <Link
+                                href={item.ctaHref}
+                                className="text-[11px] font-semibold px-2.5 py-1 rounded-md border border-border bg-background hover:bg-international-orange hover:text-white hover:border-international-orange transition-colors inline-flex items-center gap-1"
+                            >
+                                {item.ctaLabel}
                                 <ArrowRight className="h-3 w-3" />
                             </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        )
-    }
-
-    return (
-        <div>
-            <SectionHeader icon={ListChecks} label="Focus Today" color="text-international-orange" />
-            <div className="space-y-2">
-                {briefing.topTasks.map((task) => (
-                    <Link
-                        key={task.id}
-                        href="/new-tasks"
-                        className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
-                    >
-                        {task.isOverdue ? (
-                            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-                        ) : (
-                            <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                            <p className={cn(
-                                "text-sm font-medium text-foreground group-hover:text-international-orange transition-colors truncate",
-                                task.isOverdue && "text-destructive"
-                            )}>
-                                {task.title}
-                            </p>
-                            {task.objectiveTitle && (
-                                <p className="text-xs text-muted-foreground truncate">
-                                    {task.objectiveTitle}
-                                </p>
-                            )}
                         </div>
-                        {task.dueDate && (
-                            <Badge
-                                variant="outline"
-                                className={cn(
-                                    "text-xs shrink-0",
-                                    task.isOverdue && "text-destructive border-destructive/30"
-                                )}
-                            >
-                                <Clock className="h-3 w-3 mr-1" />
-                                {task.isOverdue
-                                    ? "Overdue"
-                                    : new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                            </Badge>
-                        )}
+                    ))}
+                </div>
+            )}
+        </Card>
+    )
+}
+
+// ─── V6b — Calendar peek stub ────────────────────────────────────
+
+function CalendarPeekStub(): React.ReactElement {
+    return (
+        <Card className="rounded-xl border">
+            <CardContent className="pt-5 pb-5">
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                    Today&apos;s calendar
+                </h3>
+                <div className="flex flex-col items-center text-center py-6 gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        Connect your calendar to see today&apos;s calls here.
+                    </p>
+                    <Button size="sm" variant="outline" asChild>
+                        <Link href="/settings" className="gap-1.5">
+                            Connect calendar
+                        </Link>
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
+// ─── V7 — Horizon stub ───────────────────────────────────────────
+
+function HorizonStub(): React.ReactElement {
+    return (
+        <Card className="rounded-xl border">
+            <CardContent className="pt-5 pb-5">
+                <div className="flex items-baseline justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-foreground">14-day risk horizon</h3>
+                    <span className="text-xs text-muted-foreground">Anchor: first flight window</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <Flame className="h-4 w-4 text-international-orange shrink-0" />
+                    <span className="flex-1">
+                        Timeline view arrives with Plan — it maps every upcoming milestone across Forge, Products, Money, Plan and Compliance onto a 14-day window.
+                    </span>
+                    <Link href="/strategy" className="text-international-orange hover:underline shrink-0 inline-flex items-center gap-0.5 font-semibold">
+                        Open Strategy
+                        <ArrowRight className="h-3 w-3" />
                     </Link>
-                ))}
-            </div>
-        </div>
+                </div>
+            </CardContent>
+        </Card>
     )
 }
 
-// ─── Blockers Section ─────────────────────────────────────────────
+// ─── V9 — Signal strip cards ─────────────────────────────────────
 
-interface BlockersSectionProps {
-    blockers: DailyPulseData["blockers"]
-}
-
-/**
- * Displays team blockers flagged in the daily pulse.
- * Only rendered when blockers exist.
- */
-function BlockersSection({ blockers }: BlockersSectionProps): React.ReactElement {
+function SignalCard({
+    source,
+    href,
+    body,
+    tag,
+}: {
+    source: QueueSource
+    href: string
+    body: React.ReactNode
+    tag: string
+}): React.ReactElement {
     return (
-        <div>
-            <SectionHeader icon={ShieldAlert} label="Blockers" color="text-destructive" />
-            <div className="space-y-2">
-                {blockers.map((blocker, i) => (
-                    <Card key={i} className="rounded-xl border shadow-sm">
-                        <CardContent className="py-3 px-4 flex items-start gap-3">
-                            <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <p className="text-sm font-medium text-foreground">
-                                        {blocker.user_name}
-                                    </p>
-                                    {(blocker.severity === "high" || blocker.severity === "critical") && (
-                                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                                            {blocker.severity}
-                                        </Badge>
-                                    )}
-                                </div>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                    {blocker.blocker}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+        <Link
+            href={href}
+            className="block rounded-xl border bg-background p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+        >
+            <div className="flex items-center justify-between mb-3">
+                <span className="text-[10.5px] font-bold uppercase tracking-widest text-international-orange">
+                    {SOURCE_LABEL[source]}
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/70" />
             </div>
-        </div>
+            <div className="text-xs text-foreground leading-relaxed">{body}</div>
+            <div className="mt-2">
+                <SourceTag source={source} className="text-[9.5px]" />
+                <span className="text-[10px] text-muted-foreground ml-1.5">{tag}</span>
+            </div>
+        </Link>
     )
 }
 
-// ─── Pending Approvals Section ────────────────────────────────────
-
-interface PendingApprovalsSectionProps {
-    approvals: DailyPulseData["pending_approvals"]
-}
-
-/**
- * Displays tasks awaiting the user's review/approval.
- * Only rendered when pending approvals exist.
- */
-function PendingApprovalsSection({ approvals }: PendingApprovalsSectionProps): React.ReactElement {
+function ForgeSignalCard({ forgeSignals }: { forgeSignals: TodaySignal[] }): React.ReactElement {
+    const criticalCount = forgeSignals.filter(s => s.decayRate === 'immediate' || s.decayRate === '1d').length
     return (
-        <div>
-            <SectionHeader icon={ClipboardCheck} label="Awaiting Your Review" color="text-status-warning" />
-            <div className="space-y-2">
-                {approvals.map((approval) => (
-                    <Link
-                        key={approval.task_id}
-                        href="/new-tasks"
-                        className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
-                    >
-                        <ClipboardCheck className="h-4 w-4 text-status-warning shrink-0" />
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground group-hover:text-international-orange transition-colors truncate">
-                                {approval.title}
-                            </p>
-                            {approval.assignee_name && (
-                                <p className="text-xs text-muted-foreground truncate">
-                                    from {approval.assignee_name}
-                                </p>
-                            )}
-                        </div>
-                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange transition-colors shrink-0" />
-                    </Link>
-                ))}
-            </div>
-        </div>
+        <SignalCard
+            source="forge"
+            href="/the-forge"
+            body={
+                forgeSignals.length === 0
+                    ? <>No active Forge signals<br />Builds populate here as events land</>
+                    : <><strong>{forgeSignals.length} active</strong>{criticalCount > 0 && <> · <span className="text-destructive font-bold">{criticalCount} critical</span></>}</>
+            }
+            tag="Workshop › Forge"
+        />
     )
 }
 
-// ─── At-Risk Objectives Section ───────────────────────────────────
-
-interface AtRiskObjectivesSectionProps {
-    briefing: MorningBriefing | null
-}
-
-/**
- * Renders the "At Risk" section or a positive empty state when
- * all objectives are on track.
- */
-function AtRiskObjectivesSection({ briefing }: AtRiskObjectivesSectionProps): React.ReactElement | null {
-    if (!briefing) return null
-
-    const hasAtRisk = briefing.atRiskObjectives.length > 0
-
-    if (!hasAtRisk) {
-        return (
-            <div>
-                <SectionHeader icon={Target} label="Objectives" color="text-status-success" />
-                <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="py-6 flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-status-success-light shrink-0">
-                            <CheckCircle2 className="h-4 w-4 text-status-success" />
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                            All objectives on track. Keep the momentum going!
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-        )
-    }
-
+function ProductsSignalCard(): React.ReactElement {
     return (
-        <div>
-            <SectionHeader icon={Target} label="At Risk" color="text-status-warning" />
-            <div className="space-y-2">
-                {briefing.atRiskObjectives.map((obj) => (
-                    <Link
-                        key={obj.id}
-                        href="/new-objectives"
-                        className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
-                    >
-                        <div className="relative shrink-0">
-                            <Target className="h-4 w-4 text-status-warning" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground group-hover:text-international-orange transition-colors truncate">
-                                {obj.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {obj.reason}
-                            </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                            <p className="text-sm font-semibold text-foreground">{obj.progress}%</p>
-                            {obj.daysUntilDeadline !== null && (
-                                <p className="text-xs text-muted-foreground">
-                                    {obj.daysUntilDeadline < 0
-                                        ? `${Math.abs(obj.daysUntilDeadline)}d overdue`
-                                        : `${obj.daysUntilDeadline}d left`}
-                                </p>
-                            )}
-                        </div>
-                    </Link>
-                ))}
-            </div>
+        <SignalCard
+            source="products"
+            href="/products"
+            body={<>Products module<br />Coming in Phase 4</>}
+            tag="Workshop › Products"
+        />
+    )
+}
+
+function MoneySignalCard(): React.ReactElement {
+    return (
+        <SignalCard
+            source="money"
+            href="/money"
+            body={<>Cash &amp; runway<br />Connect finances to see raise status</>}
+            tag="Money › Cockpit"
+        />
+    )
+}
+
+function PlanSignalCard({
+    onTrack,
+    pillarTotal,
+    atRisk,
+    dueThisWeek,
+}: {
+    onTrack: number
+    pillarTotal: number
+    atRisk: number
+    dueThisWeek: number
+}): React.ReactElement {
+    return (
+        <SignalCard
+            source="plan"
+            href="/strategy"
+            body={
+                <>
+                    Q2 <strong>{onTrack}/{pillarTotal || 0}</strong> on-track
+                    {atRisk > 0 && <> · <strong>{atRisk} at risk</strong></>}
+                    <br />{dueThisWeek} tasks due this week
+                </>
+            }
+            tag="Plan › Strategy"
+        />
+    )
+}
+
+// ─── V10 — App signals footer ────────────────────────────────────
+
+function AppSignalsFooter({ unreadCount, reviewCount }: { unreadCount: number; reviewCount: number }): React.ReactElement {
+    return (
+        <div className="flex flex-wrap items-center gap-2 bg-background border border-border rounded-xl px-4 py-3">
+            <span className="text-[10.5px] uppercase tracking-widest font-bold text-muted-foreground pr-2 border-r border-border mr-1">
+                App signals
+            </span>
+            <AppSignalPill href="/updates" icon={MessageSquare} label="Comms" count={unreadCount} countLabel="unread" tone={unreadCount > 0 ? 'active' : 'quiet'} />
+            <AppSignalPill href="/time-tracking" icon={Activity} label="Time" count={null} countLabel={<TimePillBody />} tone="quiet" />
+            <AppSignalPill href="/new-tasks" icon={FileCheck2} label="Review" count={reviewCount} countLabel="to approve" tone={reviewCount > 0 ? 'active' : 'quiet'} />
+            <AppSignalPill href="/updates" icon={BookOpen} label="Knowledge" count={0} countLabel="digest" tone="quiet" />
+            <span className="flex-1" />
+            <span className="text-[10px] text-muted-foreground/70 italic">untouched surfaces · unchanged UI</span>
         </div>
     )
 }
 
-// ─── Strategy Spotlight Section ───────────────────────────────────
-
-interface StrategySpotlightSectionProps {
-    items: StrategyHealthItem[]
+function AppSignalPill({
+    href,
+    icon: Icon,
+    label,
+    count,
+    countLabel,
+    tone,
+}: {
+    href: string
+    icon: React.ComponentType<{ className?: string }>
+    label: string
+    count: number | null
+    countLabel: React.ReactNode
+    tone: 'active' | 'quiet'
+}): React.ReactElement {
+    return (
+        <Link
+            href={href}
+            className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 border border-border/60 text-[11px] font-medium transition-colors",
+                "hover:bg-international-orange/10 hover:border-international-orange/30 hover:text-international-orange",
+            )}
+        >
+            <Icon className="h-3 w-3 opacity-70" />
+            <span className="text-foreground">{label}</span>
+            <span className={cn(
+                "tabular-nums font-bold",
+                tone === 'active' ? 'text-international-orange' : 'text-muted-foreground',
+            )}>
+                · {count !== null ? count : countLabel}
+            </span>
+            {count !== null && <span className="text-muted-foreground">{countLabel}</span>}
+        </Link>
+    )
 }
 
-/**
- * Compact strategy health overview for the Today page.
- *
- * @description Shows each strategic pillar with a colored health dot,
- * progress bar, and key metric (overdue count or objective count).
- * Taps link to the strategy dashboard.
- */
-function StrategySpotlightSection({ items }: StrategySpotlightSectionProps): React.ReactElement {
+function TimePillBody(): React.ReactElement {
+    return <TodayTimeCard />
+}
+
+// ─── Strategy spotlight (preserved from pre-V3) ──────────────────
+
+function StrategySpotlightSection({ items }: { items: StrategyHealthItem[] }): React.ReactElement {
     const needsAttention = items.filter(i => i.health === 'off-track' || i.health === 'at-risk')
     const allHealthy = needsAttention.length === 0
 
-    return (
-        <div>
-            <SectionHeader icon={Waypoints} label="Strategy" color="text-international-orange" />
-            {allHealthy ? (
+    if (allHealthy) {
+        return (
+            <div>
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-1 h-5 rounded-full bg-status-success" />
+                    <Waypoints className="h-4 w-4 text-status-success" />
+                    <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Strategy</p>
+                </div>
                 <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="py-6 flex items-center gap-3">
+                    <CardContent className="py-5 flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-status-success-light shrink-0">
                             <Waypoints className="h-4 w-4 text-status-success" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm text-muted-foreground">
-                                All {items.length} strategic {items.length === 1 ? 'pillar' : 'pillars'} on track.
-                            </p>
-                        </div>
-                        <Button variant="ghost" size="sm" asChild className="shrink-0">
+                        <p className="text-sm text-muted-foreground flex-1">
+                            All {items.length} strategic {items.length === 1 ? 'pillar' : 'pillars'} on track.
+                        </p>
+                        <Button variant="ghost" size="sm" asChild>
                             <Link href="/strategy" className="gap-1 text-xs">
                                 Details
                                 <ArrowRight className="h-3 w-3" />
@@ -1472,165 +1652,234 @@ function StrategySpotlightSection({ items }: StrategySpotlightSectionProps): Rea
                         </Button>
                     </CardContent>
                 </Card>
-            ) : (
-                <div className="space-y-2">
-                    {items.map((item) => {
-                        const healthColor = {
-                            'on-track': 'bg-status-success',
-                            'at-risk': 'bg-status-warning',
-                            'off-track': 'bg-destructive',
-                            'completed': 'bg-status-success',
-                            'not-started': 'bg-muted-foreground',
-                        }[item.health]
-                        const healthLabel = {
-                            'on-track': 'On track',
-                            'at-risk': 'At risk',
-                            'off-track': 'Off track',
-                            'completed': 'Completed',
-                            'not-started': 'Not started',
-                        }[item.health]
-
-                        return (
-                            <Link
-                                key={item.id}
-                                href="/strategy"
-                                className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
-                                aria-label={`${item.title} — ${healthLabel}, ${item.progress}% complete`}
-                            >
-                                {/* Health dot — aria-hidden; accessible label on the parent Link carries the status for screen readers + colourblind users. */}
-                                <div
-                                    className={cn("w-2 h-2 rounded-full shrink-0", healthColor)}
-                                    role="img"
-                                    aria-label={healthLabel}
-                                />
-                                {/* Title & metadata */}
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-foreground group-hover:text-international-orange transition-colors truncate">
-                                        {item.title}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-xs text-muted-foreground">
-                                            {item.objectiveCount} {item.objectiveCount === 1 ? 'objective' : 'objectives'}
-                                        </span>
-                                        {item.overdueTaskCount > 0 && (
-                                            <span className="text-xs text-destructive font-medium">
-                                                {item.overdueTaskCount} overdue
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                {/* Progress */}
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <div className="hidden sm:block w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                                        <div
-                                            className={cn("h-full rounded-full transition-all", healthColor)}
-                                            style={{ width: `${item.progress}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-xs font-semibold text-foreground tabular-nums w-8 text-right">
-                                        {item.progress}%
-                                    </span>
-                                </div>
-                            </Link>
-                        )
-                    })}
-                </div>
-            )}
-        </div>
-    )
-}
-
-// ─── Insights Section ─────────────────────────────────────────────
-
-interface InsightsSectionProps {
-    pulse: FormattedReport | null
-}
-
-/**
- * Renders the "Insights" section from the daily pulse, or a gentle
- * empty state when no insights are available.
- */
-function InsightsSection({ pulse }: InsightsSectionProps): React.ReactElement | null {
-    const hasInsights = pulse && pulse.insights.length > 0
-
-    if (!hasInsights) {
-        return (
-            <div>
-                <SectionHeader icon={BarChart3} label="Insights" color="text-electric-blue" />
-                <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="py-6 flex items-center gap-3">
-                        <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                        <p className="text-sm text-muted-foreground">
-                            Insights appear once there&apos;s activity to read — finish a task, tag an objective, or log a decision, and the next pulse will start surfacing patterns.
-                        </p>
-                    </CardContent>
-                </Card>
             </div>
         )
     }
 
     return (
         <div>
-            <SectionHeader icon={BarChart3} label="Insights" color="text-electric-blue" />
+            <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-5 rounded-full bg-international-orange" />
+                <Waypoints className="h-4 w-4 text-international-orange" />
+                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Strategy pillars</p>
+            </div>
             <div className="space-y-2">
-                {pulse.insights.slice(0, 4).map((insight) => (
-                    <div
-                        key={insight.id}
-                        className={cn(
-                            "flex items-start gap-3 p-3 rounded-xl border shadow-sm",
-                            insight.type === "celebration" && "bg-status-success-light/30",
-                            insight.type === "warning" && "bg-status-warning-light/30",
-                            insight.type === "suggestion" && "bg-status-info-light/30",
-                        )}
-                    >
-                        <div className="shrink-0 mt-0.5">
-                            {insight.type === "celebration" && <CheckCircle2 className="h-4 w-4 text-status-success" />}
-                            {insight.type === "warning" && <AlertTriangle className="h-4 w-4 text-status-warning" />}
-                            {insight.type === "suggestion" && <Lightbulb className="h-4 w-4 text-status-info" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground">{insight.title}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{insight.description}</p>
-                        </div>
-                        {insight.action && (
-                            <Link
-                                href={insight.action.href}
-                                className="text-xs text-international-orange hover:underline shrink-0 flex items-center gap-0.5"
-                            >
-                                {insight.action.label}
-                                <ArrowRight className="h-3 w-3" />
-                            </Link>
-                        )}
-                    </div>
-                ))}
+                {items.map((item) => {
+                    const healthColor = {
+                        'on-track': 'bg-status-success',
+                        'at-risk': 'bg-status-warning',
+                        'off-track': 'bg-destructive',
+                        'completed': 'bg-status-success',
+                        'not-started': 'bg-muted-foreground',
+                    }[item.health]
+                    const healthLabel = {
+                        'on-track': 'On track',
+                        'at-risk': 'At risk',
+                        'off-track': 'Off track',
+                        'completed': 'Completed',
+                        'not-started': 'Not started',
+                    }[item.health]
+
+                    return (
+                        <Link
+                            key={item.id}
+                            href="/strategy"
+                            className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                            aria-label={`${item.title} — ${healthLabel}, ${item.progress}% complete`}
+                        >
+                            <div
+                                className={cn("w-2 h-2 rounded-full shrink-0", healthColor)}
+                                role="img"
+                                aria-label={healthLabel}
+                            />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-foreground group-hover:text-international-orange transition-colors truncate">
+                                    {item.title}
+                                </p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-xs text-muted-foreground">
+                                        {item.objectiveCount} {item.objectiveCount === 1 ? 'objective' : 'objectives'}
+                                    </span>
+                                    {item.overdueTaskCount > 0 && (
+                                        <span className="text-xs text-destructive font-medium">
+                                            {item.overdueTaskCount} overdue
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="hidden sm:block w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                                    <div className={cn("h-full rounded-full transition-all", healthColor)} style={{ width: `${item.progress}%` }} />
+                                </div>
+                                <span className="text-xs font-semibold text-foreground tabular-nums w-8 text-right">
+                                    {item.progress}%
+                                </span>
+                            </div>
+                        </Link>
+                    )
+                })}
             </div>
         </div>
     )
 }
 
-// ─── Section Header ───────────────────────────────────────────────
+// ─── Sandbox welcome banner (extracted — used by main + error branch) ────
 
-interface SectionHeaderProps {
-    /** Lucide icon component */
-    icon: React.ComponentType<{ className?: string }>
-    /** Section label text */
-    label: string
-    /** Text color token (e.g. "text-international-orange") */
-    color: string
+function SandboxWelcomeBanner({
+    isMigratedUser,
+    onDismiss,
+    onCreateCompany,
+}: {
+    isMigratedUser: boolean
+    onDismiss: () => void
+    onCreateCompany: () => void
+}): React.ReactElement {
+    return (
+        <Card className="rounded-xl border-2 border-electric-blue/20 shadow-sm bg-gradient-to-br from-electric-blue/[0.03] to-background">
+            <CardContent className="pt-6 pb-6">
+                <div className="flex items-start justify-between mb-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-foreground">
+                            {isMigratedUser ? "We\u2019ve moved you to your own private workspace" : "Welcome to your personal workspace"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            {isMigratedUser
+                                ? "Your data is now fully private \u2014 no one else can see it. When you\u2019re ready, you have two paths:"
+                                : "This is your private space to explore ForgeOS. When you\u2019re ready, you have two paths:"}
+                        </p>
+                    </div>
+                    <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground transition-colors p-1 -mt-1 -mr-1" aria-label="Dismiss banner">
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-lg border bg-card hover:border-electric-blue/30 transition-colors">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-9 h-9 rounded-full bg-electric-blue/10 flex items-center justify-center flex-shrink-0">
+                                <Building2 className="w-[18px] h-[18px] text-electric-blue" />
+                            </div>
+                            <h4 className="text-sm font-semibold text-foreground">Set up a company</h4>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">Create your company workspace, build your team, and manage your venture.</p>
+                        <Button size="sm" onClick={onCreateCompany} className="bg-electric-blue hover:bg-electric-blue/90 text-white">Create Company</Button>
+                    </div>
+                    <div className="p-4 rounded-lg border bg-card hover:border-international-orange/30 transition-colors">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-9 h-9 rounded-full bg-international-orange/10 flex items-center justify-center flex-shrink-0">
+                                <Users className="w-[18px] h-[18px] text-international-orange" />
+                            </div>
+                            <h4 className="text-sm font-semibold text-foreground">Get found as a fractional executive</h4>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">Complete your profile so companies can discover you on the Recruits page and invite you to their teams.</p>
+                        <Button size="sm" variant="outline" asChild className="gap-1.5"><Link href="/my-profile">Complete Profile</Link></Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    )
 }
 
-/**
- * Consistent section header with a colored accent bar, icon, and
- * uppercase monospace label.
- */
-function SectionHeader({ icon: Icon, label, color }: SectionHeaderProps): React.ReactElement {
+// ─── Error-branch role-aware hero variants ──────────────────────
+
+function ErrorBranchExecutive(): React.ReactElement {
     return (
-        <div className="flex items-center gap-2 mb-3">
-            <div className={cn("w-1 h-5 rounded-full", color.replace("text-", "bg-"))} />
-            <Icon className={cn("h-4 w-4", color)} />
-            <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                {label}
-            </p>
+        <>
+            <div className="space-y-2 max-w-md">
+                <p className="text-xl font-bold text-foreground">Ventures are looking for executives like you.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Complete your profile so ventures can find you, then browse what&apos;s available in the marketplace.
+                </p>
+            </div>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
+                <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
+                    <Link href="/my-profile"><Target className="h-3.5 w-3.5" /> Complete your profile</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                    <Link href="/marketplace"><Waypoints className="h-3.5 w-3.5" /> Browse the marketplace</Link>
+                </Button>
+            </div>
+        </>
+    )
+}
+
+function ErrorBranchApprentice(): React.ReactElement {
+    return (
+        <>
+            <div className="space-y-2 max-w-md">
+                <p className="text-xl font-bold text-foreground">Your training toolkit is ready.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Start your first training objective and explore the tools that will make you 10x more productive.
+                </p>
+            </div>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
+                <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
+                    <Link href="/objectives"><Target className="h-3.5 w-3.5" /> Start your training</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                    <Link href="/the-forge"><Waypoints className="h-3.5 w-3.5" /> Explore the toolkit</Link>
+                </Button>
+            </div>
+        </>
+    )
+}
+
+function ErrorBranchDefault(): React.ReactElement {
+    return (
+        <>
+            <div className="space-y-2 max-w-md">
+                <p className="text-xl font-bold text-foreground">Welcome to ForgeOS</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Your daily briefing will appear here once you start creating objectives and tasks. Get started by setting up your first goal.
+                </p>
+            </div>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
+                <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
+                    <Link href="/new-objectives"><Target className="h-3.5 w-3.5" /> Create your first objective</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                    <Link href="/strategy"><Waypoints className="h-3.5 w-3.5" /> Explore strategy</Link>
+                </Button>
+            </div>
+        </>
+    )
+}
+
+// ─── Skeleton — rewritten for V3 grid ────────────────────────────
+
+function TodayViewSkeleton(): React.ReactElement {
+    return (
+        <div className="max-w-5xl space-y-6">
+            {/* Greeting + chips */}
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-56" />
+                <div className="flex gap-2">
+                    <Skeleton className="h-5 w-40 rounded-full" />
+                    <Skeleton className="h-5 w-28 rounded-full" />
+                    <Skeleton className="h-5 w-32 rounded-full" />
+                </div>
+                <Skeleton className="h-12 w-full max-w-xl" />
+            </div>
+            {/* V3 headline grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-[2.2fr_1fr] gap-4">
+                <Skeleton className="h-40 rounded-xl" />
+                <Skeleton className="h-40 rounded-xl" />
+            </div>
+            {/* V4 minigrid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+            </div>
+            {/* V5 waiting */}
+            <Skeleton className="h-48 rounded-xl" />
+            {/* V6 mid-grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4">
+                <Skeleton className="h-64 rounded-xl" />
+                <Skeleton className="h-64 rounded-xl" />
+            </div>
+            {/* V9 signals strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+            </div>
         </div>
     )
 }
+
