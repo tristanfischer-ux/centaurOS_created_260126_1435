@@ -138,7 +138,11 @@ Each pass is an independent reviewer persona looking at the ForgeV2 surface with
 
 | ID | RT pass | Severity | Page/file | Finding | Fix status |
 |---|---|---|---|---|---|
-| B1 | — | — | — | (to be filled) | — |
+| B1 | RT.1 | P0 | `brief/page.tsx:63` | `initialLockedAt` hardcoded to `null` — BriefEditor never sees real lock state even though the column and action shipped in PR #71. | ✅ Pass `project.briefLockedAt`. |
+| B2 | RT.1 | P0 | `brief-editor.tsx` | `handleLock` / `handleUnlock` only flip local state; the real `lockCadLabBrief` / `unlockCadLabBrief` server actions are never called from the inline authoring surface. (Only `/brief-lock` page persists.) | ✅ Rewired both to call the real actions via `useTransition`. |
+| B3 | RT.1 | P0 | `saveCadLabProductOverview` | No server-side lock check — the textarea disables locally but a script/stale tab can still save over a locked brief. Advisory-only lock. | ✅ Added a pre-update `SELECT brief_locked_at` check; rejects with "Brief is locked — unlock before editing" when non-null. |
+| B4 | RT.1 | P1 | `lockCadLabBrief`, `unlockCadLabBrief`, `archiveCadLabProject`, `exportProjectHandoffMarkdown`, `saveCadLabProductOverview` | Relied entirely on RLS for foundry isolation. Works in theory, but no defence in depth — any RLS regression becomes a cross-foundry bug. | ✅ Added explicit `.eq("foundry_id", foundryId)` on every update / select. RLS + explicit filter = belt-and-braces. |
+| B5 | RT.1 | P1 | `createCadLabPart` | Didn't validate that the `moduleId` existed on the project's `modules` array. Allowed orphaned parts (rows pointing at a module that no longer exists on the JSONB). Also didn't verify project belonged to caller's foundry beyond RLS. | ✅ Pre-insert: `SELECT id, modules FROM cad_lab_projects WHERE id = ? AND foundry_id = ?`, then verify the moduleId is in the returned modules array. Rejects with "Module 'X' not found on project" if orphan. |
 
 ---
 
