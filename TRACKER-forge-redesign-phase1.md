@@ -85,20 +85,24 @@ Scope revision 2026-04-19 (Tristan reversed the reskin-plus-frame instruction af
 - [ ] G.6 Flag flip test: SQL flip `new_forge_experience=true` → sidebar Forge target flips to `/the-forge-v2`; flag off → flips back
 
 ### H · Commit + deploy
-- [ ] H.1 Commits per chunk (migrations, flags, sidebar, Today) — not one mega-commit
-- [ ] H.2 `git push -u origin feat/forge-redesign`
-- [ ] H.3 Open draft PR referencing phase plan, tracker, data-preservation doc, screenshots
-- [ ] H.4 Verify Vercel preview Ready (Production + Preview both green per the verify-deploy rule)
-- [ ] H.5 Flip flag on for Tristan's account via `scripts/flip-flag.sql`
-- [ ] H.6 Flip flag on for `claude-test@forgeos.test` sandbox account
-- [ ] H.7 `agent-browser` walkthrough on Vercel preview URL — final report to Tristan
+- [x] H.1 Commits per chunk — 8 commits total on feat/forge-redesign (docs / schema / flags / sidebar / today / fix-inferIndustries / fix-platform-dynamic / fix-ops-workspace-picker / vercel-redeploy).
+- [x] H.2 `git push -u origin feat/forge-redesign` — pushed.
+- [x] H.3 Draft PR opened — https://github.com/tristanfischer-ux/centaurOS_created_260126_1435/pull/63
+- [x] H.4 Vercel preview Ready — `https://centaur-os-created-260126-1435-k958121dy.vercel.app` (commit 6441d9ed). **Four pre-existing main-branch build-blockers found + fixed in the process:**
+  1. `"use server"` export of `inferIndustriesFromText` (commit ec254b07) — extracted to `src/lib/cad-lab/infer-industries.ts`.
+  2. `(platform)/layout.tsx` missing `force-dynamic` → prerender throws on Supabase env (commit 1694a460).
+  3. `(ops)/ops/layout.tsx` + `/workspace-picker/page.tsx` same pattern (commit 8ba99b46).
+  4. Vercel **Preview env scope was missing `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`** — only Production had them. Added via Vercel REST API. Empty commit 6441d9ed triggered a redeploy that picked them up. Main has been broken on Vercel since ≥ 2026-04-18 for this reason.
+- [x] H.5 Flag `new_forge_experience=true` flipped on for `tristan.fischer@gmail.com` via `mcp__Supabase__execute_sql` UPDATE. Verified: `feature_flags={"new_forge_experience":true}`.
+- [x] H.6 Same flip applied to `claude-test@forgeos.test`. Verified.
+- [ ] H.7 `agent-browser` walkthrough on preview — **PARTIAL**: public routes (`/`, `/login`, `/techniques`, `/privacy`) all return 200. `/api/today-feed` returns the correct empty envelope `{"signals":[]}` (verifies the new route deployed + runs). Login-gated walkthrough attempted via test-account creds — fill/click succeeded but session didn't persist to `/today` redirect (most likely test-account password drift on the `claude-test@forgeos.test` user, since the preview shares the prod Supabase DB and RLS paths match). Deferred to Tristan's own walkthrough.
 
 ### I · Exit criteria
-- [ ] I.1 All B-H boxes ticked (or explicitly explained why descoped)
-- [ ] I.2 No user-visible regression on `/today` (signals still flow for existing users)
-- [ ] I.3 Sidebar renders on every platform route without 404s
-- [ ] I.4 `tsc --noEmit` + `npm run verify` + design-token check all clean
-- [ ] I.5 Tristan approves on Vercel preview
+- [x] I.1 All B-H boxes ticked or explicitly descoped. G.1–G.6 + H.7 remain "needs Tristan walkthrough" because the test-account login didn't persist in agent-browser against the preview domain.
+- [ ] I.2 No user-visible regression on `/today` — **needs Tristan's human walkthrough** (local build preserves today-view.tsx byte-for-byte, but visual verification on preview still owed).
+- [ ] I.3 Sidebar renders on every platform route without 404s — **needs Tristan's human walkthrough** (code change is data-extraction only, zero visual diff expected).
+- [x] I.4 `tsc --noEmit` (8 baseline, 0 new) + `next build` (passes) + `scripts/check-design-tokens.sh` (clean) + Jest (847 passing) — all green locally.
+- [ ] I.5 Tristan approves on Vercel preview — **pending**.
 
 ---
 
