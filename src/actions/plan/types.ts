@@ -392,3 +392,62 @@ export const inviteFractionalInputSchema = z.object({
 })
 
 export type InviteFractionalInput = z.infer<typeof inviteFractionalInputSchema>
+
+// ──────────────────────────────────────────────────────────────────────────
+// 10 · Reports — input schemas (PLAN-SCHEMA §12)
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Report target enum schema — imported from src/types/plan.ts rather than
+ * regenerated here. Mirrors the DB enum `report_target` exactly.
+ */
+export const reportTargetSchema = z.enum([
+  'weekly_team',
+  'monthly_investor',
+  'quarterly_board',
+  'custom',
+])
+
+const reportSentViaSchema = z.enum(['email', 'slack', 'link'])
+
+const reportRecipientSchema = z.object({
+  email: z.string().email(),
+  name: z.string().max(200).optional(),
+  to_cc_bcc: z.enum(['to', 'cc', 'bcc']).default('to'),
+})
+
+/**
+ * Draft-from-live-data input. V1 does NOT persist drafts — draftReport
+ * returns the assembled markdown synchronously so the composer can render
+ * it client-side. sendReport is what finally writes a reports_sent row.
+ */
+export const draftReportInputSchema = z.object({
+  target: reportTargetSchema,
+  pullFromGoalIds: z.array(z.string().uuid()).optional(),
+})
+
+export type DraftReportInput = z.infer<typeof draftReportInputSchema>
+
+/**
+ * sendReport input — persists a reports_sent row. V1 does not actually
+ * dispatch email (no Resend/SMTP wiring); sent_via defaults to `['link']`
+ * so the record represents "saved + shareable via external_share_url".
+ */
+export const sendReportInputSchema = z.object({
+  target_type: reportTargetSchema,
+  subject_line: z
+    .string()
+    .min(1, 'Subject line is required')
+    .max(300, 'Subject line must be 300 characters or less'),
+  body_markdown: z
+    .string()
+    .min(1, 'Update body cannot be empty')
+    .max(200_000, 'Update is too long'),
+  recipients: z.array(reportRecipientSchema).max(100).optional().default([]),
+  pressure_tested_before_send: z.boolean().optional().default(false),
+  pressure_test_session_id: z.string().uuid().nullable().optional(),
+  sent_via: z.array(reportSentViaSchema).optional(),
+  pulled_from_goal_ids: z.array(z.string().uuid()).optional(),
+})
+
+export type SendReportInput = z.infer<typeof sendReportInputSchema>

@@ -16,6 +16,7 @@ import { revalidatePath } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { logAudit } from '@/actions/audit'
+import { emitPlanEvent, resolvePlanEvents } from '@/lib/plan/emit-event'
 
 import {
   completeTaskInputSchema,
@@ -143,6 +144,11 @@ export async function createTask(
       if (data.strategicGoalId) {
         revalidatePath(`/plan/goal/${data.strategicGoalId}`)
       }
+
+      // Chunk E cron: emit event_log §14.1 row 5 (task.due_date overdue > 3
+      // days) and row 6 (pinned this-week not done on Friday) from the
+      // nightly sweep — not feasible to detect inside a server action.
+
       return { success: true, data: task as TaskRowShape }
     },
   )
@@ -304,8 +310,21 @@ export async function delegateTaskToSpecialist(
         },
       })
 
-      // TODO(Chunk D): emit event_log row per §14.1 — specialist_rec with
-      // confidence IN ('high','very_high') → medium urgency, 3d decay.
+      // PLAN-SCHEMA §14.1 — specialist_recommendation with confidence in
+      // ('high','very_high') is attention-worthy. We always create this rec
+      // at confidence='high' (see insert above), so the trigger always fires.
+      await emitPlanEvent({
+        foundryId,
+        sourceEntityType: 'specialist_recommendation',
+        sourceEntityId: rec.id,
+        urgency: 'medium',
+        decayRate: '3d',
+        title: `Specialist recommendation: ${task.title}`,
+        body: parsed.data.brief.slice(0, 280),
+        ctaLabel: 'See recommendation',
+        ctaHref: `plan:rec:${rec.id}`,
+        assignedTo: null, // recs fan out to whoever's viewing
+      })
 
       revalidatePath('/plan')
       revalidatePath(`/plan/task/${taskId}`)
@@ -401,8 +420,14 @@ export async function completeTask(
         },
       })
 
-      // TODO(Chunk D): emit event_log resolve per §14.4 — task→done
-      // resolves any prior overdue / pin events for this task.
+      // PLAN-SCHEMA §14.4 — task → done resolves any prior overdue / pin
+      // event_log rows for this task. (Emitting overdue itself is Chunk E's
+      // nightly sweep — see §14.1 row 5/6.)
+      await resolvePlanEvents({
+        foundryId,
+        sourceEntityType: 'task',
+        sourceEntityId: taskId,
+      })
 
       revalidatePath('/plan')
       revalidatePath(`/plan/task/${taskId}`)

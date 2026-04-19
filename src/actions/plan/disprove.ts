@@ -17,6 +17,7 @@ import { revalidatePath } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { logAudit } from '@/actions/audit'
+import { emitPlanEvent } from '@/lib/plan/emit-event'
 
 import {
   setAssumptionStateInputSchema,
@@ -124,9 +125,24 @@ export async function setAssumptionState(
         },
       })
 
-      // TODO(Chunk D): §14.1 — if state transitioned to 'broken', emit
-      // event_log row with cta "Pressure-test goal" → plan:goal:<id>
-      // ?modal=pressure-test, high urgency, 3d decay.
+      // PLAN-SCHEMA §14.1 — assumption.current_state transitioning to
+      // 'broken' is attention-worthy. CTA opens the pressure-test modal on
+      // the goal page. Only emit on the transition INTO broken (not repeat
+      // writes while already broken).
+      if (data.state === 'broken' && existing.current_state !== 'broken') {
+        await emitPlanEvent({
+          foundryId,
+          sourceEntityType: 'disprove_assumption',
+          sourceEntityId: data.assumptionId,
+          urgency: 'high',
+          decayRate: '3d',
+          title: 'Disprove assumption broken',
+          body: 'An assumption on this goal has been disproved — pressure-test recommended.',
+          ctaLabel: 'Pressure-test goal',
+          ctaHref: `plan:goal:${existing.goal_id}?modal=pressure-test`,
+          assignedTo: null,
+        })
+      }
 
       revalidatePath(`/plan/goal/${existing.goal_id}`)
       return { success: true, data: updated as DisproveRow }

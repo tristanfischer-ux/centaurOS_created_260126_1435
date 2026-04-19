@@ -17,6 +17,7 @@ import { revalidatePath } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { logAudit } from '@/actions/audit'
+import { emitPlanEvent, resolvePlanEvents } from '@/lib/plan/emit-event'
 
 import { killGoal } from './goals'
 import {
@@ -80,7 +81,7 @@ export async function fireGutcheckIfDue(
       // Verify goal exists in this foundry.
       const { data: goal, error: goalErr } = await supabase
         .from('strategic_goals')
-        .select('id')
+        .select('id, title, lead_user_id')
         .eq('id', goalId)
         .eq('foundry_id', foundryId)
         .maybeSingle()
@@ -151,8 +152,21 @@ export async function fireGutcheckIfDue(
         metadata: { goal_id: goalId, assumption_count: snapshot.length },
       })
 
-      // TODO(Chunk D): emit event_log row per §14.1 — gutcheck fired →
-      // high urgency, 1d decay, cta "Make the call".
+      // PLAN-SCHEMA §14.1 — gutcheck fired ⇒ high urgency, 1d decay, cta
+      // "Make the call". Token carries both goal_id and session_id so the
+      // route resolver can open the gutcheck modal on the goal page.
+      await emitPlanEvent({
+        foundryId,
+        sourceEntityType: 'gutcheck_session',
+        sourceEntityId: session.id,
+        urgency: 'high',
+        decayRate: '1d',
+        title: `Gutcheck: ${goal.title}`,
+        body: `${snapshot.length} assumption${snapshot.length === 1 ? '' : 's'} snapshotted — founder must decide.`,
+        ctaLabel: 'Make the call',
+        ctaHref: `plan:goal:${goalId}?gutcheck=${session.id}`,
+        assignedTo: goal.lead_user_id ?? null,
+      })
 
       revalidatePath(`/plan/goal/${goalId}`)
       return { success: true, data: session as GutcheckRow }
@@ -269,8 +283,13 @@ export async function decideGutcheck(
         },
       })
 
-      // TODO(Chunk D): §14.4 — decision NOT NULL resolves the original
-      // gutcheck event_log row.
+      // PLAN-SCHEMA §14.4 — decision NOT NULL resolves the originating
+      // gutcheck_session event_log row (scoped by source_entity_id).
+      await resolvePlanEvents({
+        foundryId,
+        sourceEntityType: 'gutcheck_session',
+        sourceEntityId: sessionId,
+      })
 
       revalidatePath(`/plan/goal/${session.goal_id}`)
       revalidatePath('/plan')

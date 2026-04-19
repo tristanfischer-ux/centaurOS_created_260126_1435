@@ -25,6 +25,7 @@
 import { z } from "zod"
 import { withAuth } from "@/lib/server-action-utils"
 import { logAudit } from "@/actions/audit"
+import { emitPlanEvent } from "@/lib/plan/emit-event"
 import type {
   PressureSubjectType,
   PressureVerdict,
@@ -254,6 +255,25 @@ export async function closePressureTest(
       userId: user.id,
       foundryId,
     })
+
+    // 4 · PLAN-SCHEMA §14.1 — verdict reached + unacknowledged ⇒ medium
+    // urgency, 7d decay. CTA points at the history entry so the founder
+    // can read the full verdict. Resolution flips on view (Chunk E read-
+    // receipt) — for now the 30-day cron sweeps stale rows.
+    if (historyEntryId) {
+      await emitPlanEvent({
+        foundryId,
+        sourceEntityType: "pressure_test_session",
+        sourceEntityId: typedSession.id,
+        urgency: "medium",
+        decayRate: "7d",
+        title: `Pressure-test verdict: ${labelForVerdict(verdictParsed.data)}`,
+        body: verdictBody.slice(0, 280),
+        ctaLabel: "Read verdict",
+        ctaHref: `plan:history:${historyEntryId}`,
+        assignedTo: null,
+      })
+    }
 
     return { success: true, data: { historyEntryId } }
   })

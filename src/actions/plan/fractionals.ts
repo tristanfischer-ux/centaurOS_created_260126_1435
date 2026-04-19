@@ -19,6 +19,7 @@ import type {
 } from "@/types/plan"
 import { withAuth } from "@/lib/server-action-utils"
 import { logAudit } from "@/actions/audit"
+import { emitPlanEvent } from "@/lib/plan/emit-event"
 
 const DEFAULT_HOURS_PER_WEEK = 6
 const DEFAULT_RETAINER_MONTHLY = 2500 // GBP; overridable at Settings time
@@ -214,6 +215,22 @@ export async function endEngagement(
       metadata: { reason },
     })
 
+    // PLAN-SCHEMA §14.1 — fractional_engagement.ended_on within 14 days.
+    // Ending today trivially falls inside the 14-day window; emit so the
+    // founder is prompted to plan the handover. high urgency, 7d decay.
+    await emitPlanEvent({
+      foundryId,
+      sourceEntityType: "fractional_engagement",
+      sourceEntityId: engagementId,
+      urgency: "high",
+      decayRate: "7d",
+      title: "Fractional engagement ended",
+      body: reason.slice(0, 280),
+      ctaLabel: "Plan handover",
+      ctaHref: `plan:team:${engagementId}`,
+      assignedTo: null,
+    })
+
     return entry as HistoryEntryRow
   })
 }
@@ -237,6 +254,7 @@ export async function updateCapacity(
     const anySb = supabase as unknown as {
       from: (t: string) => {
         update: (r: Record<string, unknown>) => { eq: (k: string, v: unknown) => Promise<{ error: unknown }> }
+        select: (c: string) => { eq: (k: string, v: unknown) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } }
       }
     }
     await anySb.from("fractional_engagements")
@@ -251,5 +269,34 @@ export async function updateCapacity(
       entityId: engagementId,
       metadata: { hours_used_this_week: hoursUsedThisWeek },
     })
+
+    // PLAN-SCHEMA §14.1 — hours_used_this_week > hours_per_week * 0.9
+    // ⇒ low urgency, 1d decay. Read the engagement's hours_per_week to
+    // decide whether to emit.
+    try {
+      const { data: eng } = await anySb
+        .from("fractional_engagements")
+        .select("hours_per_week, fractional_id")
+        .eq("id", engagementId)
+        .maybeSingle()
+      const row = eng as { hours_per_week: number | null; fractional_id: string | null } | null
+      const hpw = row?.hours_per_week ?? 0
+      if (hpw > 0 && hoursUsedThisWeek > hpw * 0.9) {
+        await emitPlanEvent({
+          foundryId,
+          sourceEntityType: "fractional_engagement",
+          sourceEntityId: engagementId,
+          urgency: "low",
+          decayRate: "1d",
+          title: "Fractional capacity near limit",
+          body: `${hoursUsedThisWeek}h used of ${hpw}h/wk.`,
+          ctaLabel: "Review capacity",
+          ctaHref: `plan:team:${engagementId}`,
+          assignedTo: null,
+        })
+      }
+    } catch {
+      // Non-fatal — capacity write already persisted.
+    }
   })
 }

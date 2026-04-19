@@ -11,7 +11,7 @@
  *   3. plan_can() RPC permissions check against §16.1 matrix
  *   4. audit_log row on success
  *   5. history_entries row when PLAN-SCHEMA §9 says so
- *   6. TODO(Chunk D): event_log row per §14.1 trigger — left as comments here
+ *   6. event_log row per §14.1 trigger (Chunk D) via emitPlanEvent / resolvePlanEvents
  *
  * @security Every function is foundry-scoped; we never trust client-supplied
  * goalId without an `eq('foundry_id', foundryId)` filter on the lookup.
@@ -23,6 +23,7 @@ import { withAuth } from '@/lib/server-action-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { logAudit } from '@/actions/audit'
+import { emitPlanEvent, resolvePlanEvents } from '@/lib/plan/emit-event'
 
 import {
   createGoalInputSchema,
@@ -206,8 +207,29 @@ export async function createStrategicGoal(
         })
       }
 
-      // TODO(Chunk D): emit event_log row per PLAN-SCHEMA §14.1 — only if
-      // milestone_date is within 7 days of creation.
+      // PLAN-SCHEMA §14.1 — goal milestone_date within 7 days + state != completed.
+      // On creation we only emit if the milestone is within the 7-day window;
+      // later-date milestones are picked up by the Chunk E nightly sweep.
+      if (data.milestoneDate) {
+        const msToMilestone =
+          new Date(data.milestoneDate).getTime() - Date.now()
+        const withinSevenDays =
+          msToMilestone >= 0 && msToMilestone <= 7 * 24 * 60 * 60 * 1000
+        if (withinSevenDays) {
+          await emitPlanEvent({
+            foundryId,
+            sourceEntityType: 'strategic_goal',
+            sourceEntityId: goal.id,
+            urgency: 'medium',
+            decayRate: '1d',
+            title: `Milestone imminent: ${goal.title}`,
+            body: `Milestone date ${data.milestoneDate} is within 7 days.`,
+            ctaLabel: 'Check goal',
+            ctaHref: `plan:goal:${goal.id}`,
+            assignedTo: goal.lead_user_id ?? null,
+          })
+        }
+      }
 
       revalidatePath('/plan')
       revalidatePath(`/plan/goal/${goal.id}`)
@@ -307,8 +329,8 @@ export async function pinGoal(
         metadata: { slot },
       })
 
-      // TODO(Chunk D): no event_log row — pin is not an "attention-worthy"
-      // event per §14.2. Today signal comes from state transitions, not pins.
+      // §14.2 — pin is NOT attention-worthy. Today signal comes from state
+      // transitions + milestone proximity, never from pin/unpin. No emit here.
 
       revalidatePath('/plan')
       revalidatePath(`/plan/goal/${updated.id}`)
@@ -407,7 +429,7 @@ export async function setGoalState(
 
       const { data: current, error: readErr } = await supabase
         .from('strategic_goals')
-        .select('id, title, state')
+        .select('id, title, state, lead_user_id')
         .eq('id', goalId)
         .eq('foundry_id', foundryId)
         .maybeSingle()
@@ -459,8 +481,34 @@ export async function setGoalState(
         },
       })
 
-      // TODO(Chunk D): emit event_log row per §14.1 if transition is
-      // on_track→at_risk or at_risk→off_track.
+      // PLAN-SCHEMA §14.1 — goal state transitions.
+      // Emit: on_track → at_risk  OR  at_risk → off_track  ⇒ high urgency · 3d decay.
+      // Resolve: any transition back to on_track clears prior at_risk/off_track rows (§14.4).
+      const from = current.state as string
+      const to = parsed.data.state as string
+      const isAttentionTransition =
+        (from === 'on_track' && to === 'at_risk') ||
+        (from === 'at_risk' && to === 'off_track')
+      if (isAttentionTransition) {
+        await emitPlanEvent({
+          foundryId,
+          sourceEntityType: 'strategic_goal',
+          sourceEntityId: goalId,
+          urgency: 'high',
+          decayRate: '3d',
+          title: `Goal ${to.replace(/_/g, ' ')}: ${current.title}`,
+          body: reason,
+          ctaLabel: 'Review goal',
+          ctaHref: `plan:goal:${goalId}`,
+          assignedTo: current.lead_user_id ?? null,
+        })
+      } else if (to === 'on_track') {
+        await resolvePlanEvents({
+          foundryId,
+          sourceEntityType: 'strategic_goal',
+          sourceEntityId: goalId,
+        })
+      }
 
       revalidatePath('/plan')
       revalidatePath(`/plan/goal/${goalId}`)
@@ -624,8 +672,15 @@ export async function killGoal(
         metadata: { reason, previous_state: goal.state },
       })
 
-      // TODO(Chunk D): emit event_log row per §14.1 — kill auto-resolves any
-      // prior at_risk/off_track rows for this goal.
+      // PLAN-SCHEMA §14.4 — killing a goal auto-resolves any prior at_risk
+      // /off_track event_log rows for this goal. Kill itself is NOT an
+      // attention-worthy event (§14.2) — the decision is already captured
+      // in history_entries.
+      await resolvePlanEvents({
+        foundryId,
+        sourceEntityType: 'strategic_goal',
+        sourceEntityId: goalId,
+      })
 
       revalidatePath('/plan')
       revalidatePath(`/plan/goal/${goalId}`)
