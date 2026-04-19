@@ -36,6 +36,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { Markdown } from "@/components/ui/markdown"
 import {
   getInsightFeed,
   markInsightRead,
@@ -400,9 +401,9 @@ function InsightCard({
               </div>
 
               {/* Body */}
-              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                {insight.body}
-              </p>
+              <div className="text-sm mt-1.5">
+                <Markdown content={insight.body} />
+              </div>
 
               {/* Actions */}
               {insight.suggested_actions && insight.suggested_actions.length > 0 && (

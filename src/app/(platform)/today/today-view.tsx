@@ -37,6 +37,7 @@ import {
     Target,
     AlertTriangle,
     CheckCircle2,
+    Clock,
     ArrowRight,
     RefreshCw,
     TrendingUp,
@@ -49,7 +50,6 @@ import {
     ChevronRight,
     Calendar,
     Flame,
-    Activity,
     MessageSquare,
     FileCheck2,
     BookOpen,
@@ -79,7 +79,7 @@ import { CreateCompanyDialog } from "@/components/create-company-dialog"
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import { getMyReferralInfo } from "@/actions/referrals"
-import { TodayTimeCard } from "@/components/time/today-time-card"
+import { useWeeklyTime } from "@/hooks/use-weekly-time"
 import { useCalBriefing } from "./use-cal-briefing"
 import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
@@ -1047,8 +1047,13 @@ function pickPrioritySlab(
     briefing: MorningBriefing | null,
     waitingItems: WaitingItem[],
 ): QueueItem | null {
-    // Highest-urgency from merged queue OR waiting-on-you as fallback
-    if (items.length > 0) return items[0]
+    // Skip meta/nudge items — the priority slab should promote real priorities
+    // (forge / products / plan / money / compliance), not echo a nudge that
+    // already renders in the queue. Otherwise the same signal sits in two
+    // surfaces — exactly the "one signal, two surfaces" bug the V3 annotations
+    // warn against.
+    const realPriority = items.find(i => i.source !== 'meta')
+    if (realPriority) return realPriority
     if (waitingItems.length > 0) {
         const first = waitingItems[0]
         return {
@@ -1064,20 +1069,10 @@ function pickPrioritySlab(
             ctaLabel: first.ctaPrimary.label,
         }
     }
-    if (briefing && briefing.greeting) {
-        return {
-            key: 'default',
-            label: "You're all caught up — time to plan your next move.",
-            sub: "No overdue tasks, no waiting items. Pick a Q2 objective to push.",
-            source: 'meta',
-            decayLabel: 'today',
-            decayTone: 'normal',
-            decayRank: 999,
-            consequenceWeight: 0,
-            ctaHref: '/strategy',
-            ctaLabel: 'Open Strategy',
-        }
-    }
+    // No real priorities and no waiting items → return null so PrioritySlab
+    // renders its empty-state branch (green check + "all caught up" copy).
+    // Meta nudges still render in the queue card below.
+    void briefing
     return null
 }
 
@@ -1279,10 +1274,13 @@ function ForgeCostTile({ signals }: { signals: TodaySignal[] }): React.ReactElem
                     {topForge.body && <div className="text-xs text-muted-foreground mt-1">{topForge.body}</div>}
                 </>
             ) : (
-                <>
-                    <div className="text-xl font-bold text-muted-foreground/70 tabular-nums">—</div>
-                    <div className="text-xs text-muted-foreground mt-1">No Forge breaches today.</div>
-                </>
+                <div className="flex items-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-status-success-light text-status-success">
+                        <CheckCircle2 className="h-3 w-3" />
+                        All clear
+                    </span>
+                    <span className="text-xs text-muted-foreground">No Forge breaches today</span>
+                </div>
             )}
         </Link>
     )
@@ -1601,14 +1599,13 @@ function CalendarPeekStub(): React.ReactElement {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
                         <Calendar className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                        Connect your calendar to see today&apos;s calls here.
+                    <p className="text-sm text-muted-foreground max-w-[14rem]">
+                        Google Calendar peek arrives in a future release. For now, keep calls in your own calendar.
                     </p>
-                    <Button size="sm" variant="outline" asChild>
-                        <Link href="/settings" className="gap-1.5">
-                            Connect calendar
-                        </Link>
-                    </Button>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        Coming soon
+                    </span>
                 </div>
             </CardContent>
         </Card>
@@ -1777,17 +1774,19 @@ function PlanSignalCard({
 // ─── V10 — App signals footer ────────────────────────────────────
 
 function AppSignalsFooter({ unreadCount, reviewCount }: { unreadCount: number; reviewCount: number }): React.ReactElement {
+    const weeklyTime = useWeeklyTime()
+    const weeklyHours = weeklyTime ? Math.round(weeklyTime.totalMinutes / 60) : null
     return (
         <div className="flex flex-wrap items-center gap-2 bg-background border border-border rounded-xl px-4 py-3">
             <span className="text-[10.5px] uppercase tracking-widest font-bold text-muted-foreground pr-2 border-r border-border mr-1">
-                App signals
+                Elsewhere in ForgeOS
             </span>
             <AppSignalPill href="/updates" icon={MessageSquare} label="Comms" count={unreadCount} countLabel="unread" tone={unreadCount > 0 ? 'active' : 'quiet'} />
-            <AppSignalPill href="/time-tracking" icon={Activity} label="Time" count={null} countLabel={<TimePillBody />} tone="quiet" />
+            <AppSignalPill href="/time" icon={Clock} label="Time" count={weeklyHours} countLabel={weeklyHours !== null ? `/ 40h this week` : 'this week'} tone="quiet" />
             <AppSignalPill href="/new-tasks" icon={FileCheck2} label="Review" count={reviewCount} countLabel="to approve" tone={reviewCount > 0 ? 'active' : 'quiet'} />
             <AppSignalPill href="/updates" icon={BookOpen} label="Knowledge" count={0} countLabel="digest" tone="quiet" />
             <span className="flex-1" />
-            <span className="text-[10px] text-muted-foreground/70 italic">untouched surfaces · unchanged UI</span>
+            <span className="text-[10px] text-muted-foreground/70 italic hidden sm:inline">Pills link to their full pages — counts update live</span>
         </div>
     )
 }
@@ -1811,25 +1810,24 @@ function AppSignalPill({
         <Link
             href={href}
             className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 border border-border/60 text-[11px] font-medium transition-colors",
+                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted/60 border border-border/60 text-[11px] font-medium transition-colors",
                 "hover:bg-international-orange/10 hover:border-international-orange/30 hover:text-international-orange",
             )}
         >
             <Icon className="h-3 w-3 opacity-70" />
             <span className="text-foreground">{label}</span>
-            <span className={cn(
-                "tabular-nums font-bold",
-                tone === 'active' ? 'text-international-orange' : 'text-muted-foreground',
-            )}>
-                · {count !== null ? count : countLabel}
-            </span>
-            {count !== null && <span className="text-muted-foreground">{countLabel}</span>}
+            <span className="text-muted-foreground">·</span>
+            {count !== null && (
+                <span className={cn(
+                    "tabular-nums font-bold",
+                    tone === 'active' ? 'text-international-orange' : 'text-muted-foreground',
+                )}>
+                    {count}
+                </span>
+            )}
+            <span className="text-muted-foreground">{countLabel}</span>
         </Link>
     )
-}
-
-function TimePillBody(): React.ReactElement {
-    return <TodayTimeCard />
 }
 
 // ─── Strategy spotlight (preserved from pre-V3) ──────────────────
