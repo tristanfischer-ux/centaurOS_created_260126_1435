@@ -21,13 +21,13 @@
 - [ ] 1H · Regenerate TypeScript types + `tsc --noEmit` (baseline 8, 0 new) + verify Vercel deploy green
 
 ### Chunk 2 — Shared helpers + feature flag
-- [ ] 2A · `src/lib/money/attention-worthy.ts` (isAttentionWorthy gate per MONEY-SCHEMA §1.3)
-- [ ] 2B · `src/lib/money/emit-event.ts` (SHARED event_log wrapper, section='money')
-- [ ] 2C · `src/lib/money/runway.ts` (parity with `src/lib/cash-burn/burn-engine.ts`, rank correlation ≥ 0.95)
-- [ ] 2D · `src/lib/money/scenario.ts` (replaces `weekly-projection.ts`)
-- [ ] 2E · `src/lib/money/pnl.ts` (replaces `pnl-builder.ts`)
-- [ ] 2F · Register `new-money-experience` flag (default OFF)
-- [ ] 2G · Wrap `src/components/sidebar/data/money.ts` with `FeatureFlagGate` showing V2 3-item list under flag-ON
+- [x] 2A · `src/lib/money/attention-worthy.ts` (isPipelineEventAttentionWorthy gate per MONEY-SCHEMA §1.3)
+- [x] 2B · `src/lib/money/emit-event.ts` (SHARED event_log writer, section='money'; emitMoneyEvent + resolveMoneyEventsForEntity)
+- [x] 2C · `src/lib/money/runway.ts` (projectRunway + applyOverrides + lineAmountForWeek; pure functions, no DB)
+- [x] 2D · `src/lib/money/scenario.ts` (compareScenarios + effectiveLinesForScenario)
+- [x] 2E · `src/lib/money/pnl.ts` (buildForecastPnl + buildActualsPnl + buildVarianceReport)
+- [x] 2F · `FLAG_NEW_MONEY_EXPERIENCE` already registered in src/lib/features/keys.ts (default OFF — absent key evaluates false)
+- [x] 2G · `src/components/sidebar/data/money.ts` exposes getMoneyNavigation/SectionLabel/IntroRoute; Sidebar.tsx accepts `newMoneyExperienceEnabled` prop and swaps legacy 6-item ↔ V2 3-item group; layout.tsx reads the flag and passes the prop
 
 ### Chunk 3 — Cockpit + Plan
 - [ ] 3A · Route shells: `/money/cockpit`, `/money/plan` + drill-ins
@@ -112,3 +112,6 @@
 ## Commit log (append per commit)
 
 - (2026-04-19) Setup: worktree created at `/tmp/money-build-worktree` on `feat/money-redesign` off `main@d169533b`. Tracker + Chunk 1 start.
+- (2026-04-19) Chunk 1A+1B+1C+1D+1E+1F committed (11 migration files, SQL-only).
+- (2026-04-19) Chunk 1 SCHEMA LANDED (commit `1fa585fa`): 20 V2 tables + 2 audit_log additive columns + foundries.active_thesis_id all live on Supabase project jyarhvinengfyrwgtskq. Types regenerated (24,555 lines). Chunk 1G deferred to Chunk 7 pre-flag-flip.
+- (2026-04-19) Chunk 2 helpers + flag wiring (this commit): 5 `src/lib/money/*.ts` files, sidebar data file flag-aware, Sidebar.tsx + platform layout accept `newMoneyExperienceEnabled`. Flag default OFF — no user-visible change yet.

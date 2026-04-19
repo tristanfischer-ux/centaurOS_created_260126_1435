@@ -41,7 +41,11 @@ import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 import { welcomeNavItem, todayNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
 import { planNavigation } from "@/components/sidebar/data/plan"
-import { moneyLegacyNavigation } from "@/components/sidebar/data/money"
+import {
+    getMoneyIntroRoute,
+    getMoneyNavigation,
+    getMoneySectionLabel,
+} from "@/components/sidebar/data/money"
 import { getWorkshopNavigation } from "@/components/sidebar/data/workshop"
 import { marketplacePeopleNavigation, marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
 import type { SidebarNavItem } from "@/components/sidebar/data/types"
@@ -99,6 +103,13 @@ interface SidebarProps {
      * /the-forge-v2 (PR #2+ surface). Default false preserves current behaviour.
      */
     newForgeExperienceEnabled?: boolean
+    /**
+     * Phase 2 feature flag. When true, the "Cash Burn" section header is
+     * rendered as "MONEY [V2]" and the 6-item legacy nav is replaced with
+     * the 3-item Cockpit · Plan · Raise group. Default false preserves the
+     * current legacy experience.
+     */
+    newMoneyExperienceEnabled?: boolean
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -208,6 +219,7 @@ export function Sidebar({
     onboardingData,
     isSupplier,
     newForgeExperienceEnabled = false,
+    newMoneyExperienceEnabled = false,
 }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
@@ -283,6 +295,11 @@ export function Sidebar({
 
     // Workshop nav is flag-aware — Forge href flips to /the-forge-v2 when on.
     const workshopNavigation = getWorkshopNavigation(newForgeExperienceEnabled)
+    // Money nav is flag-aware — legacy 6-item Cash Burn group under flag-off,
+    // 3-item MONEY [V2] group (Cockpit · Plan · Raise) under flag-on.
+    const moneyNavigation = getMoneyNavigation(newMoneyExperienceEnabled)
+    const moneySectionLabel = getMoneySectionLabel(newMoneyExperienceEnabled)
+    const moneyIntroRoute = getMoneyIntroRoute(newMoneyExperienceEnabled)
 
     return (
         <aside
@@ -400,17 +417,17 @@ export function Sidebar({
                     </CollapsibleContent>
                 </Collapsible>
 
-                {/* CASH BURN (Money legacy — Phase 4 will re-scope per SHARED-SIDEBAR) */}
+                {/* MONEY (flag-aware — legacy "Cash Burn" 6-item group OR V2 3-item group) */}
                 <div className="mt-1.5 mb-0.5 border-t border-border" />
                 <SectionHeader
-                    label="Cash Burn"
-                    introRoute="/cash-burn"
+                    label={moneySectionLabel}
+                    introRoute={moneyIntroRoute}
                     isOpen={openSections.cashBurn}
                     onToggle={() => toggleSection("cashBurn")}
                 />
                 <Collapsible open={openSections.cashBurn}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {moneyLegacyNavigation.map((item) => (
+                        {moneyNavigation.map((item) => (
                             <NavLink key={item.name} item={item} pathname={pathname} />
                         ))}
                     </CollapsibleContent>
