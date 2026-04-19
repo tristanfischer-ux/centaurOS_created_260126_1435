@@ -1,6 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { maybeRedirectLegacyPlan } from '@/lib/plan/legacy-redirects'
 
 /**
  * Root middleware for fractionalforge.app
@@ -69,6 +70,13 @@ export async function middleware(request: NextRequest) {
             )
         }
     }
+
+    // PLAN-SCHEMA §A.3 — redirect legacy Plan routes (/strategy /new-objectives
+    // /new-tasks /review /reports /red-team /knowledge) to /plan/* ONLY when
+    // the user has new_plan_experience=true. Flag OFF users keep rendering
+    // legacy pages untouched.
+    const planRedirect = await maybeRedirectLegacyPlan(request)
+    if (planRedirect) return planRedirect
 
     // Continue with auth middleware
     return await updateSession(request)

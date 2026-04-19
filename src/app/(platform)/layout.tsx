@@ -35,7 +35,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
 import { getFeatureFlag } from "@/lib/features/flags";
-import { FLAG_NEW_FORGE_EXPERIENCE, FLAG_NEW_MONEY_EXPERIENCE } from "@/lib/features/keys";
+import { FLAG_NEW_FORGE_EXPERIENCE, FLAG_NEW_MONEY_EXPERIENCE, FLAG_NEW_PLAN_EXPERIENCE } from "@/lib/features/keys";
 
 // DECISION: Vercel Pro caps at 300s. Server actions (research, decomposition,
 // image generation) called from platform pages need up to 240s per invocation.
@@ -125,6 +125,12 @@ export default async function PlatformLayout({
     // Reuses the same Supabase client — no extra round-trip.
     const newMoneyExperienceEnabled = await getFeatureFlag(supabase, user.id, FLAG_NEW_MONEY_EXPERIENCE)
 
+    // Phase 3 — new Plan experience flag. Gates the 7→3 sidebar collapse
+    // (Strategy/Objectives/Tasks/Review/Reports/Red Team/Knowledge → Plan/Report/History)
+    // and the /plan, /plan/report, /plan/history routes (flag-off redirects
+    // /plan/report → /reports and /plan/history → /knowledge).
+    const newPlanExperienceEnabled = await getFeatureFlag(supabase, user.id, FLAG_NEW_PLAN_EXPERIENCE)
+
     return (
         <PostHogProvider>
         <TooltipProvider>
@@ -147,7 +153,7 @@ export default async function PlatformLayout({
                         <KeyboardShortcutsDialog />
                         <KeyboardShortcuts />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} newMoneyExperienceEnabled={newMoneyExperienceEnabled} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} newMoneyExperienceEnabled={newMoneyExperienceEnabled} newPlanExperienceEnabled={newPlanExperienceEnabled} />
                         <MainContentArea>
                             <ActiveTimerBar />
                             <main id="main-content" className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-24 sm:pb-8">
