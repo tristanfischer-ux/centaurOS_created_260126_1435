@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Products — mockup site map (Phase 4 prep)</title>
+<link rel="stylesheet" href="forge-mockup.css">
+<style>
+  body { background: var(--bg); margin: 0; }
+  .shell { max-width: 1180px; margin: 0 auto; padding: 32px 32px 80px; }
+
+  .hero { max-width: 820px; margin: 0 0 36px; }
+  .hero .pill { display: inline-block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; color: var(--brand); background: var(--brand-soft); padding: 4px 10px; border-radius: 4px; margin-bottom: 14px; }
+  .hero h1 { font-size: 34px; letter-spacing: -0.03em; margin: 0 0 10px; font-weight: 800; }
+  .hero p { font-size: 14.5px; color: var(--fg-muted); line-height: 1.6; margin: 0 0 12px; max-width: 720px; }
+  .hero .links { margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero .links a { font-size: 12px; color: var(--brand); text-decoration: none; font-weight: 600; background: var(--brand-soft); border: 1px solid var(--brand-dim); padding: 5px 11px; border-radius: 6px; }
+  .hero .links a:hover { background: var(--brand); color: white; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 36px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow-xs); }
+  .tile .lab { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--fg-muted); }
+  .tile .val { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-top: 3px; }
+  .tile .val.brand { color: var(--brand); }
+  .tile .val.good { color: var(--success); }
+  .tile .val.bad { color: var(--danger); }
+  .tile .sub { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+
+  .tier { margin-bottom: 36px; }
+  .tier-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .tier-head .num { font-size: 30px; font-weight: 800; color: var(--brand); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; min-width: 52px; }
+  .tier-head h2 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+  .tier-head .desc { font-size: 12.5px; color: var(--fg-muted); flex: 1; margin-left: 8px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .mock { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: inherit; display: block; transition: all 0.15s; box-shadow: var(--shadow-xs); position: relative; }
+  .mock:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+  .mock .status { position: absolute; top: 10px; right: 10px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 3px; }
+  .mock .status.built { background: var(--success-soft); color: #166534; }
+  .mock .status.todo { background: var(--warning-soft); color: #854d0e; border: 1px solid var(--warning-dim); }
+  .mock .status.gap { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-dim); }
+  .mock h3 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; padding-right: 60px; }
+  .mock .path { font-family: ui-monospace, "SF Mono", monospace; font-size: 10.5px; color: var(--fg-subtle); margin-bottom: 8px; word-break: break-all; }
+  .mock p { margin: 0; font-size: 11.5px; color: var(--fg); line-height: 1.5; }
+  .mock .tag { font-size: 9.5px; font-weight: 700; color: var(--brand); margin-top: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .flow { background: #1c1917; color: white; padding: 24px 28px; border-radius: 12px; margin: 0 0 36px; font-size: 13.5px; line-height: 1.65; position: relative; overflow: hidden; }
+  .flow::before { content: ""; position: absolute; top: 0; right: 0; width: 240px; height: 240px; background: radial-gradient(circle, rgba(255,69,0,0.12) 0%, transparent 70%); pointer-events: none; }
+  .flow h2 { margin: 0 0 10px; color: white; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; position: relative; }
+  .flow p { color: #d6d3d1; margin: 0 0 6px; position: relative; }
+  .flow .trail { color: #fde68a; font-family: ui-monospace, monospace; font-size: 12px; position: relative; }
+  .flow .trail a { color: #fde68a; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .coverage { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; margin-bottom: 36px; box-shadow: var(--shadow-xs); }
+  .coverage h2 { margin: 0 0 14px; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
+  .coverage table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .coverage th { text-align: left; padding: 8px 10px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); background: var(--surface-soft); border-bottom: 1px solid var(--border); }
+  .coverage td { padding: 10px; border-bottom: 1px solid var(--border-soft); }
+  .coverage tr:last-child td { border-bottom: none; }
+  .coverage .dot { display: inline-block; width: 10px; height: 10px; border-radius: 100%; margin-right: 5px; vertical-align: -1px; }
+  .coverage .dot.ok { background: var(--success); }
+  .coverage .dot.gap { background: var(--danger); }
+  .coverage .dot.partial { background: var(--warning); }
+
+  .footer-note { font-size: 11.5px; color: var(--fg-muted); text-align: center; padding: 24px 0; border-top: 1px solid var(--border); margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <div class="hero">
+    <span class="pill">Phase 4 · prep · awaiting red-team review</span>
+    <h1>Products — mockup site map</h1>
+    <p>ForgeOS Products section is being redesigned as a <strong>market-validation workbench</strong> — hypothesis testing, TAM/SAM/SOM, evidence logs, unit economics, investor-readiness. This page indexes every mockup in the set, maps them to the 5-tab structure, and flags what's still missing.</p>
+    <p>Phase order (locked 2026-04-19): Forge → Money → Plan → <strong>Products</strong>. Products ships last. The current <code>/products</code> page is hidden behind a "Coming Soon" sidecar (see <a href="PHASE-PLAN.md"><code>PHASE-PLAN.md</code></a> §Pre-Phase) so users stop regressing while later phases ship.</p>
+    <div class="links">
+      <a href="PRODUCTS-SCHEMA.md">PRODUCTS-SCHEMA.md</a>
+      <a href="PRODUCTS-MOCKUP-GAP-AUDIT.html">PRODUCTS-MOCKUP-GAP-AUDIT.html</a>
+      <a href="HANDOVER-products.md">HANDOVER-products.md</a>
+      <a href="FORGE-MOCKUP-PRODUCTS-V2.html">PRODUCTS-V2 (main mockup)</a>
+      <a href="PHASE-PLAN.md">PHASE-PLAN.md</a>
+      <a href="SHARED-SCHEMA.md">SHARED-SCHEMA.md</a>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="tile"><div class="lab">Mockups built</div><div class="val">10</div><div class="sub">1 main · 1 empty · 8 drill-ins + transitions</div></div>
+    <div class="tile"><div class="lab">5-tab coverage</div><div class="val brand">5 / 5</div><div class="sub">All tabs have a populated + empty state</div></div>
+    <div class="tile"><div class="lab">Gaps found</div><div class="val bad">18</div><div class="sub">See PRODUCTS-MOCKUP-GAP-AUDIT.html for the list</div></div>
+    <div class="tile"><div class="lab">Must-mock before code</div><div class="val bad">6</div><div class="sub">Blocks Phase 4 if skipped</div></div>
+  </div>
+
+  <!-- Reading order -->
+  <div class="flow">
+    <h2>Reading order for red-team review</h2>
+    <p>1. Skim this index. 2. Read <span class="trail"><a href="PRODUCTS-SCHEMA.md">PRODUCTS-SCHEMA.md</a></span> (data model + permissions + migration). 3. Click through the 5 tabs in <span class="trail"><a href="FORGE-MOCKUP-PRODUCTS-V2.html">PRODUCTS-V2</a></span> top-to-bottom. 4. Step through drill-ins (Market / Evidence / Action). 5. Open <span class="trail"><a href="PRODUCTS-MOCKUP-GAP-AUDIT.html">PRODUCTS-MOCKUP-GAP-AUDIT.html</a></span> and red-team. 6. Reply "locked" to build terminal when approved.</p>
+    <p class="trail">Flow: hypothesis(list → detail) → market(size + competitors) → evidence(interviews + LOIs + assumptions + experiments) → economics(cogs from Forge) → action(readiness checklist) → promote-to-Forge OR archive.</p>
+  </div>
+
+  <!-- Tab coverage -->
+  <div class="coverage">
+    <h2>Coverage per tab · populated / empty / partial / error states</h2>
+    <table>
+      <thead>
+        <tr><th>Tab</th><th>Populated</th><th>Empty</th><th>Partial</th><th>Error</th><th>Drill-ins</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1 · Hypothesis</strong><br><small style="color: var(--fg-muted);">incl. synthesis ribbon, target price, problem</small></td>
+          <td><span class="dot ok"></span>PRODUCTS-V2</td>
+          <td><span class="dot ok"></span>EMPTY-PRODUCTS-V2</td>
+          <td><span class="dot gap"></span>—</td>
+          <td><span class="dot gap"></span>—</td>
+          <td>Hypothesis-Create flow (new from scratch)</td>
+        </tr>
+        <tr>
+          <td><strong>2 · Market</strong><br><small style="color: var(--fg-muted);">incl. TAM/SAM/SOM, segments, competitors</small></td>
+          <td><span class="dot ok"></span>PRODUCTS-V2</td>
+          <td><span class="dot partial"></span>implicit in EMPTY</td>
+          <td><span class="dot gap"></span>—</td>
+          <td><span class="dot gap"></span>—</td>
+          <td>MARKET-SIZING · COMPETITOR-DETAIL</td>
+        </tr>
+        <tr>
+          <td><strong>3 · Evidence</strong><br><small style="color: var(--fg-muted);">interviews, LOIs, assumptions, experiments</small></td>
+          <td><span class="dot ok"></span>PRODUCTS-V2</td>
+          <td><span class="dot partial"></span>implicit in EMPTY</td>
+          <td><span class="dot gap"></span>—</td>
+          <td><span class="dot gap"></span>—</td>
+          <td>INTERVIEW-DETAIL · LOI-DETAIL · ASSUMPTION-TEST · <em>Experiment-Detail (MISSING)</em></td>
+        </tr>
+        <tr>
+          <td><strong>4 · Economics</strong><br><small style="color: var(--fg-muted);">target price, target COGS (Forge-sourced)</small></td>
+          <td><span class="dot ok"></span>PRODUCTS-V2</td>
+          <td><span class="dot partial"></span>implicit in EMPTY</td>
+          <td><span class="dot gap"></span>—</td>
+          <td><span class="dot gap"></span>—</td>
+          <td>None yet — Forge-sourced badge is inline in tab</td>
+        </tr>
+        <tr>
+          <td><strong>5 · Action</strong><br><small style="color: var(--fg-muted);">investor-readiness checklist, aligned-vs-tradeoff</small></td>
+          <td><span class="dot ok"></span>PRODUCTS-V2</td>
+          <td><span class="dot partial"></span>implicit in EMPTY</td>
+          <td><span class="dot gap"></span>—</td>
+          <td><span class="dot gap"></span>—</td>
+          <td>READINESS-ACTION</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tier 1 — core 5-tab surface -->
+  <div class="tier">
+    <div class="tier-head">
+      <span class="num">01</span>
+      <h2>Core surface · list + 5-tab detail</h2>
+      <span class="desc">The Products section lives on <code>/products</code> (list) and <code>/products/[slug]</code> (5-tab detail). These are the two mockups any founder lands on.</span>
+    </div>
+    <div class="grid">
+      <a class="mock" href="FORGE-MOCKUP-PRODUCTS-V2.html">
+        <span class="status built">built</span>
+        <h3>Products detail · 5 tabs</h3>
+        <div class="path">FORGE-MOCKUP-PRODUCTS-V2.html</div>
+        <p>Hero with lifecycle meta-bar (Products → Forge → Operations), Priya synthesis callout, 5-tab strip, populated content across every tab. 1393 lines. Canonical.</p>
+        <div class="tag">Main surface · populated state</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-EMPTY-PRODUCTS-V2.html">
+        <span class="status built">built</span>
+        <h3>Products · empty state</h3>
+        <div class="path">FORGE-MOCKUP-EMPTY-PRODUCTS-V2.html</div>
+        <p>Zero hypotheses. Invites the founder into the three creation paths (net-new, promote-from-Forge, paste-from-plan). Priya briefing in positive framing.</p>
+        <div class="tag">Main surface · empty state</div>
+      </a>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status todo">todo</span>
+        <h3>Products · list view (≥ 1 hypothesis)</h3>
+        <div class="path">PRODUCTS-LIST (MISSING)</div>
+        <p>Multi-hypothesis list. Needed for founders tracking 2–5 parallel hypotheses. Filter by lifecycle_stage, sort by readiness, archive. Gap #1.1 in audit.</p>
+        <div class="tag">V1 must-have · blocks code</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tier 2 — drill-ins -->
+  <div class="tier">
+    <div class="tier-head">
+      <span class="num">02</span>
+      <h2>Drill-ins · per-tab detail pages</h2>
+      <span class="desc">One mockup per entity that a founder opens from inside a tab (size a market, add a competitor, log an interview, test an assumption, close a readiness action).</span>
+    </div>
+    <div class="grid">
+      <a class="mock" href="FORGE-MOCKUP-MARKET-SIZING.html">
+        <span class="status built">built</span>
+        <h3>Market sizing · detail</h3>
+        <div class="path">FORGE-MOCKUP-MARKET-SIZING.html</div>
+        <p>Size TAM/SAM/SOM with methodology + source URL + confidence. Kills the "AI Estimated" hallucination. Segments editor with evidence links per row.</p>
+        <div class="tag">Market tab · drill-in</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-COMPETITOR-DETAIL.html">
+        <span class="status built">built</span>
+        <h3>Competitor · detail</h3>
+        <div class="path">FORGE-MOCKUP-COMPETITOR-DETAIL.html</div>
+        <p>Named competitor with URL, price, tags (including <code>#blocker</code>), insight, evidence snapshot. 90-day staleness check surfaces on Today.</p>
+        <div class="tag">Market tab · drill-in</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-INTERVIEW-DETAIL.html">
+        <span class="status built">built</span>
+        <h3>Customer interview · detail</h3>
+        <div class="path">FORGE-MOCKUP-INTERVIEW-DETAIL.html</div>
+        <p>Quote as atomic unit. Tags (<code>#must-have</code> / <code>#blocker</code> / <code>#willing-to-pay</code>). Linked segment from market sizing. Blocker tag fires event_log.</p>
+        <div class="tag">Evidence tab · drill-in</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-LOI-DETAIL.html">
+        <span class="status built">built</span>
+        <h3>LOI · detail</h3>
+        <div class="path">FORGE-MOCKUP-LOI-DETAIL.html</div>
+        <p>Buyer · volume · price · window · file upload. Status state machine (draft → sent → signed → declined). Signed triggers high-urgency Today entry.</p>
+        <div class="tag">Evidence tab · drill-in</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-ASSUMPTION-TEST.html">
+        <span class="status built">built</span>
+        <h3>Assumption · test</h3>
+        <div class="path">FORGE-MOCKUP-ASSUMPTION-TEST.html</div>
+        <p>Assumption register row. Risk level 1–5. Status untested → testing → valid/invalid. Invalidating high-risk assumptions fires critical Today entry.</p>
+        <div class="tag">Evidence tab · drill-in</div>
+      </a>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status gap">missing</span>
+        <h3>Experiment · detail / log</h3>
+        <div class="path">EXPERIMENT-DETAIL (MISSING)</div>
+        <p>Experiment entity has no drill-in. Needed for result logging + keep/iterate/kill decision. Gap #3.4 in audit.</p>
+        <div class="tag">Evidence tab · drill-in · MUST</div>
+      </div>
+      <a class="mock" href="FORGE-MOCKUP-READINESS-ACTION.html">
+        <span class="status built">built</span>
+        <h3>Readiness · close an action</h3>
+        <div class="path">FORGE-MOCKUP-READINESS-ACTION.html</div>
+        <p>Readiness checklist item. Investor-question grouping (team/ask/market/moat/path). Evidence attachment required to close.</p>
+        <div class="tag">Action tab · drill-in</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Tier 3 — state transitions -->
+  <div class="tier">
+    <div class="tier-head">
+      <span class="num">03</span>
+      <h2>State transitions · lifecycle flips</h2>
+      <span class="desc">The three moments where a hypothesis changes shape: promote to Forge (canonical_surface flips), archive (soft-delete with reason), unarchive (reversal).</span>
+    </div>
+    <div class="grid">
+      <a class="mock" href="FORGE-MOCKUP-PROMOTE-TO-FORGE.html">
+        <span class="status built">built</span>
+        <h3>Promote to Forge · confirmation</h3>
+        <div class="path">FORGE-MOCKUP-PROMOTE-TO-FORGE.html</div>
+        <p>What carries across (intent, target price, target COGS → unit_cost_ceiling, target monthly units, signed LOI refs). What doesn't (TAM/SAM/interviews/assumptions). Founder-only action.</p>
+        <div class="tag">Terminal gate</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-ARCHIVE-PRODUCT.html">
+        <span class="status built">built</span>
+        <h3>Archive · reason required</h3>
+        <div class="path">FORGE-MOCKUP-ARCHIVE-PRODUCT.html</div>
+        <p>Reason picker (killed-by-assumption / pivoted / market-too-small / paused). Pivoted → link to replacement hypothesis. Low-urgency Today entry.</p>
+        <div class="tag">Soft-delete</div>
+      </a>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status gap">missing</span>
+        <h3>Unarchive · restore</h3>
+        <div class="path">UNARCHIVE (MISSING)</div>
+        <p>Inverse of archive. Banner if hypothesis was promoted ("re-promote to re-link"). Gap #C.3 in audit.</p>
+        <div class="tag">State transition · MUST</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tier 4 — cross-cutting gaps -->
+  <div class="tier">
+    <div class="tier-head">
+      <span class="num">04</span>
+      <h2>Cross-cutting surfaces · not owned by any tab</h2>
+      <span class="desc">Onboarding, legacy read-only, permissions banners, mobile-specific, error states. These span tabs and are flagged in the gap audit.</span>
+    </div>
+    <div class="grid">
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status gap">missing</span>
+        <h3>Legacy read-only (Coming Soon bridge)</h3>
+        <div class="path">LEGACY-READ-ONLY (MISSING)</div>
+        <p>Users with existing <code>products</code> rows during Pre-Phase Coming Soon. Reads from old table, no writes. Phase 4 replaces this surface. Gap #C.1.</p>
+        <div class="tag">Pre-Phase bridge · MUST</div>
+      </div>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status gap">missing</span>
+        <h3>Read-only banner (wrong role)</h3>
+        <div class="path">PERMISSION-BANNER (MISSING)</div>
+        <p>Advisor / contractor / read_only_observer view. 9-role matrix enforced. Gap #C.5 in audit.</p>
+        <div class="tag">Cross-tab · MUST</div>
+      </div>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status gap">missing</span>
+        <h3>Promote-blocked banner</h3>
+        <div class="path">PROMOTE-BLOCKED (MISSING)</div>
+        <p>Hypothesis already promoted → tabs show read-only banner "The Brief is canonical now. Edits live at The Forge." Gap #C.4.</p>
+        <div class="tag">Post-promote state · MUST</div>
+      </div>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status gap">missing</span>
+        <h3>Hypothesis-create (net new)</h3>
+        <div class="path">HYPOTHESIS-CREATE (MISSING)</div>
+        <p>Three-field entry form (<code>If / Then / Because</code> grammar per Maze pattern). Tag D/F/V risk. Empty-state has three CTAs but no single mock of the net-new form alone. Gap #1.2.</p>
+        <div class="tag">Hypothesis tab · MUST</div>
+      </div>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status todo">nice</span>
+        <h3>Seed-from-Priya confirmation</h3>
+        <div class="path">SEED-ASSUMPTIONS (MISSING)</div>
+        <p>"Priya suggests 5 assumptions from your hypothesis text — keep/edit/discard." Cuts cold-start friction. Gap #3.5.</p>
+        <div class="tag">Evidence tab · NICE</div>
+      </div>
+      <div class="mock" style="opacity: 0.55; cursor: default;">
+        <span class="status todo">nice</span>
+        <h3>Mobile 375×812 pass</h3>
+        <div class="path">MOBILE (NO MOCKS)</div>
+        <p>Current mocks are desktop 1440. Mobile column-collapse is assumed, not verified. Gap #C.6.</p>
+        <div class="tag">Cross-tab · NICE</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    This index is part of the Phase 4 prep bundle. See <a href="COORDINATION-STATUS.md">COORDINATION-STATUS.md</a> for pipeline state. Build does not start until Tristan red-teams <a href="PRODUCTS-MOCKUP-GAP-AUDIT.html">PRODUCTS-MOCKUP-GAP-AUDIT.html</a> and replies "locked".
+  </div>
+
+</div>
+
+</body>
+</html>

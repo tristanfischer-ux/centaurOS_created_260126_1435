@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Products — gap audit + red team (pre-code)</title>
+<link rel="stylesheet" href="forge-mockup.css">
+<style>
+  body { background: var(--bg); margin: 0; }
+  .shell { max-width: 1180px; margin: 0 auto; padding: 28px 32px 80px; }
+
+  .breadcrumb { font-size: 12px; color: var(--fg-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 7px; }
+  .breadcrumb a { color: var(--fg-muted); text-decoration: none; }
+  .breadcrumb .sep { color: var(--fg-faint); }
+  .breadcrumb .current { color: var(--fg); font-weight: 500; }
+  .ctx-chips { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .ctx-chips a { font-size: 11.5px; color: var(--fg-muted); text-decoration: none; padding: 5px 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); }
+  .ctx-chips a:hover { color: var(--fg); border-color: var(--border-strong); }
+
+  .ga-head { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: var(--shadow-xs); position: relative; overflow: hidden; }
+  .ga-head::after { content: ""; position: absolute; top: 0; right: 0; width: 400px; height: 100%; background: radial-gradient(ellipse at top right, var(--brand-soft) 0%, transparent 60%); pointer-events: none; }
+  .ga-head > * { position: relative; }
+  .ga-head h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 8px; }
+  .ga-head .sub { font-size: 14px; color: var(--fg-muted); max-width: 820px; line-height: 1.55; }
+  .ga-head .sub strong { color: var(--fg); font-weight: 700; }
+
+  .ga-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-soft); }
+  .ga-stats .tile .lab { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--fg-muted); }
+  .ga-stats .tile .val { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-top: 3px; }
+  .ga-stats .tile .val.brand { color: var(--brand); }
+  .ga-stats .tile .val.bad { color: var(--danger); }
+  .ga-stats .tile .val.good { color: var(--success); }
+  .ga-stats .tile .sub { font-size: 11.5px; color: var(--fg-muted); margin-top: 2px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; box-shadow: var(--shadow-xs); }
+  .toc h3 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--fg-muted); }
+  .toc ol { margin: 0; padding-left: 22px; font-size: 13px; line-height: 1.8; }
+  .toc li a { color: var(--fg); text-decoration: none; font-weight: 500; }
+  .toc li a:hover { color: var(--brand); }
+
+  .section-block { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: var(--shadow-xs); }
+  .section-block h2 { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+  .section-block .block-sub { font-size: 13px; color: var(--fg-muted); margin-bottom: 18px; max-width: 760px; line-height: 1.55; }
+  .section-block h2 .tag { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 3px 8px; border-radius: 4px; background: var(--brand-soft); color: var(--brand); vertical-align: middle; margin-left: 10px; }
+
+  .gap-card { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .gap-head { padding: 14px 18px; background: var(--surface-soft); display: grid; grid-template-columns: auto 1fr auto auto; gap: 14px; align-items: center; border-bottom: 1px solid var(--border); }
+  .gap-head .p-num { font-size: 16px; font-weight: 800; color: var(--brand); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .gap-head h3 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+  .gap-head h3 small { font-weight: 500; color: var(--fg-muted); margin-left: 8px; font-size: 11.5px; }
+  .gap-head .count-pills { display: flex; gap: 6px; }
+  .gap-head .cp { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .gap-head .cp.must { background: var(--danger-soft); color: var(--danger); }
+  .gap-head .cp.nice { background: var(--warning-soft); color: var(--warning); }
+  .gap-head .cp.defer { background: var(--surface-muted); color: var(--fg-muted); }
+  .gap-head .view-btn { font-size: 11.5px; color: var(--brand); text-decoration: none; font-weight: 600; }
+
+  .gap-head-row { display: grid; grid-template-columns: 60px 110px 1fr 110px 90px 110px; gap: 14px; padding: 8px 18px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--fg-muted); background: var(--surface-muted); }
+
+  .gap-row { display: grid; grid-template-columns: 60px 110px 1fr 110px 90px 110px; gap: 14px; padding: 12px 18px; border-top: 1px solid var(--border-soft); font-size: 12.5px; align-items: center; }
+  .gap-row:first-of-type { border-top: none; }
+  .gap-row .g-num { font-size: 12px; font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .gap-row .g-trigger { font-size: 11px; color: var(--fg-muted); font-family: ui-monospace, monospace; }
+  .gap-row .g-what { font-weight: 600; }
+  .gap-row .g-what small { display: block; font-size: 11px; color: var(--fg-muted); font-weight: 400; margin-top: 2px; line-height: 1.4; }
+  .gap-row .g-state { font-size: 11px; font-weight: 600; }
+  .gap-row .g-state.empty { color: var(--info); }
+  .gap-row .g-state.error { color: var(--warning); }
+  .gap-row .g-state.missing { color: var(--danger); }
+  .gap-row .g-state.partial { color: var(--warning); }
+  .gap-row .g-pri { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-align: center; text-transform: uppercase; letter-spacing: 0.4px; }
+  .gap-row .g-pri.must { background: var(--danger-soft); color: var(--danger); }
+  .gap-row .g-pri.nice { background: var(--warning-soft); color: var(--warning); }
+  .gap-row .g-pri.defer { background: var(--surface-muted); color: var(--fg-muted); }
+  .gap-row .g-effort { font-size: 11px; text-align: right; color: var(--fg-muted); font-weight: 500; }
+
+  .rt-card { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; overflow: hidden; box-shadow: var(--shadow-xs); }
+  .rt-head { padding: 16px 22px; background: var(--danger-soft); border-bottom: 1px solid var(--danger-dim); display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+  .rt-head .rt-num { width: 36px; height: 36px; border-radius: 100%; background: var(--danger); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+  .rt-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: #7c2d12; letter-spacing: -0.02em; }
+  .rt-head h3 small { display: block; font-weight: 500; color: #9a3412; margin-top: 2px; font-size: 11.5px; letter-spacing: 0; }
+  .rt-head .severity { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 4px 9px; border-radius: 4px; background: #7c2d12; color: white; }
+  .rt-head .severity.med { background: #ca8a04; }
+  .rt-head .severity.low { background: #65a30d; }
+
+  .rt-body { padding: 18px 22px; background: var(--surface); }
+  .rt-body .rt-claim { font-size: 14px; line-height: 1.6; margin-bottom: 12px; color: var(--fg); }
+  .rt-body .rt-claim strong { font-weight: 700; }
+  .rt-body .rt-evidence { margin: 0 0 14px; padding: 12px 16px; background: var(--surface-soft); border-left: 3px solid var(--border-strong); border-radius: 0 6px 6px 0; font-size: 12.5px; line-height: 1.6; color: var(--fg-muted); }
+  .rt-body .rt-evidence strong { color: var(--fg); font-weight: 700; }
+  .rt-body h4 { margin: 14px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg-muted); }
+  .rt-body ul { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
+  .rt-body li { margin: 3px 0; color: var(--fg); }
+  .rt-body li strong { font-weight: 700; }
+
+  .rt-mit { background: var(--success-soft); border: 1px solid var(--success-dim); border-radius: 8px; padding: 12px 16px; margin-top: 14px; font-size: 13px; line-height: 1.6; color: #14532d; }
+  .rt-mit strong { color: #064e3b; font-weight: 700; }
+
+  .plan-band { background: var(--brand-soft); border: 1px solid var(--brand-dim); border-radius: 12px; padding: 18px 22px; margin-bottom: 16px; }
+  .plan-band h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; color: #7c2d12; letter-spacing: -0.01em; }
+  .plan-band p { margin: 0 0 8px; font-size: 13px; color: #9a3412; line-height: 1.6; }
+  .plan-band p strong { color: #7c2d12; font-weight: 700; }
+
+  .next-row { display: grid; grid-template-columns: 36px 1fr 140px 120px; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border-soft); align-items: center; font-size: 13px; }
+  .next-row:last-child { border-bottom: none; }
+  .next-row .n-num { font-weight: 800; color: var(--brand); font-size: 15px; text-align: center; }
+  .next-row .n-what { font-weight: 600; }
+  .next-row .n-what small { display: block; font-size: 11px; color: var(--fg-muted); font-weight: 400; margin-top: 2px; line-height: 1.4; }
+  .next-row .n-parent { font-size: 11.5px; color: var(--fg-muted); }
+  .next-row .n-effort { font-size: 11px; text-align: right; font-weight: 600; color: var(--fg); }
+
+  .cuts-band { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-top: 16px; }
+  .cuts-band h4 { margin: 0 0 10px; font-size: 12px; font-weight: 700; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .cuts-band ul { margin: 0; padding-left: 20px; font-size: 12.5px; line-height: 1.7; color: var(--fg-muted); }
+  .cuts-band ul li strong { color: var(--fg); }
+
+  .annot { background: var(--info-soft); border: 1px solid var(--info-dim); border-radius: 10px; padding: 16px 20px; margin-top: 22px; font-size: 13px; line-height: 1.6; color: #1e3a8a; }
+  .annot strong { display: block; color: #1e40af; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <div class="breadcrumb">
+    <a href="PRODUCTS-MOCKUP-INDEX.html">Products</a>
+    <span class="sep">›</span>
+    <span class="current">Gap audit + red team (pre-code)</span>
+  </div>
+  <div class="ctx-chips">
+    <a href="PRODUCTS-MOCKUP-INDEX.html">← Mockup index</a>
+    <a href="PRODUCTS-SCHEMA.md">PRODUCTS-SCHEMA.md</a>
+    <a href="FORGE-MOCKUP-PRODUCTS-V2.html">PRODUCTS-V2 (main mockup)</a>
+    <a href="HANDOVER-products.md">HANDOVER-products.md</a>
+    <a href="PHASE-PLAN.md">PHASE-PLAN.md</a>
+    <a href="FORGE-MOCKUP-GAP-AUDIT.html">↗ Forge audit (reference pattern)</a>
+  </div>
+
+  <!-- ── HEADER ── -->
+  <div class="ga-head">
+    <h1>Pre-code audit + red team · Products (Phase 4)</h1>
+    <div class="sub"><strong>Goal:</strong> surface every drill-down, edge case, empty state, and structural weakness in the Products mockup set NOW — before a single line of Phase 4 code is written. Output is a prioritised gap list and 5 red-team critiques of what IS built, plus the build list Tristan signs off on before the next session writes code.</div>
+    <div class="ga-stats">
+      <div class="tile"><div class="lab">Pages built</div><div class="val">10</div><div class="sub">1 main · 1 empty · 5 drill-ins · 2 transitions · 1 action</div></div>
+      <div class="tile"><div class="lab">Gaps found</div><div class="val brand">18</div><div class="sub">6 per-tab + 6 cross-cutting + 6 red-team</div></div>
+      <div class="tile"><div class="lab">Must mock before code</div><div class="val bad">6</div><div class="sub">Block Phase 4 start if skipped</div></div>
+      <div class="tile"><div class="lab">Red team issues</div><div class="val">5</div><div class="sub">Structural concerns (2 critical · 2 high · 1 medium)</div></div>
+    </div>
+  </div>
+
+  <!-- ── TOC ── -->
+  <div class="toc">
+    <h3>What's in this audit</h3>
+    <ol>
+      <li><a href="#inv">Gap inventory · per-tab drill-ins (1.x through 6.x)</a></li>
+      <li><a href="#cross">Cross-cutting surfaces not owned by any tab (C.1 through C.7)</a></li>
+      <li><a href="#redteam">Red team · 5 critiques</a></li>
+      <li><a href="#plan">Proposed final mockup round + V1 cuts</a></li>
+    </ol>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       SECTION 1 — GAP INVENTORY (per parent / per tab)
+       ════════════════════════════════════════════════════════════ -->
+  <div class="section-block" id="inv">
+    <h2>1 · Gap inventory — per tab<span class="tag">18 gaps</span></h2>
+    <div class="block-sub">Each gap is numbered <code>&lt;parent&gt;.&lt;gap&gt;</code> so Tristan can reference "gap 1.2" or "gap 3.4" in review. <strong>MUST</strong> = blocks Phase 4 coding; <strong>NICE</strong> = fits in Phase 4 if time permits; <strong>DEFER</strong> = explicit cut from V1, goes to backlog.</div>
+
+    <!-- Tab 1 — Hypothesis -->
+    <div class="gap-card">
+      <div class="gap-head">
+        <span class="p-num">1</span>
+        <h3>Hypothesis tab <small>one-page · problem · target price · synthesis ribbon</small></h3>
+        <div class="count-pills"><span class="cp must">2 MUST</span><span class="cp nice">2 NICE</span></div>
+        <a class="view-btn" href="FORGE-MOCKUP-PRODUCTS-V2.html">View tab ↗</a>
+      </div>
+      <div class="gap-head-row">
+        <span>#</span><span>Trigger</span><span>What's missing</span><span>State</span><span>Pri</span><span>Effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">1.1</span>
+        <span class="g-trigger">/products (≥1 row)</span>
+        <span class="g-what">Products list view <small>Multi-hypothesis list. Filter by lifecycle_stage, sort by readiness count, archive inline. Empty-state mockup shows zero-state; populated list is not mocked.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">1.2</span>
+        <span class="g-trigger">[New hypothesis] CTA</span>
+        <span class="g-what">Hypothesis-create form (net-new) <small>Three-field entry form with <code>If / Then / Because</code> grammar + D/F/V risk tagging (per Maze research pattern). Empty-state has the CTA but no form mockup.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">1.3</span>
+        <span class="g-trigger">Priya fail / timeout</span>
+        <span class="g-what">Synthesis ribbon error state <small>When the async Priya call fails (rate limit, API down, malformed output), the ribbon must show an empty "Run Priya" button, not a silent blank.</small></span>
+        <span class="g-state error">ERROR</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">inline variant</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">1.4</span>
+        <span class="g-trigger">Detail load fails</span>
+        <span class="g-what">Hypothesis-detail error boundary <small>Network failure or bad slug → friendly fallback with retry, not a stack trace. No current mock covers this.</small></span>
+        <span class="g-state error">ERROR</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">inline variant</span>
+      </div>
+    </div>
+
+    <!-- Tab 2 — Market -->
+    <div class="gap-card">
+      <div class="gap-head">
+        <span class="p-num">2</span>
+        <h3>Market tab <small>TAM/SAM/SOM · segments · named competitors</small></h3>
+        <div class="count-pills"><span class="cp must">1 MUST</span><span class="cp nice">2 NICE</span></div>
+        <a class="view-btn" href="FORGE-MOCKUP-MARKET-SIZING.html">View drill-in ↗</a>
+      </div>
+      <div class="gap-head-row">
+        <span>#</span><span>Trigger</span><span>What's missing</span><span>State</span><span>Pri</span><span>Effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">2.1</span>
+        <span class="g-trigger">last_resized_at &gt; 180d</span>
+        <span class="g-what">Stale-sizing banner <small>Banner on the Market tab + Today feed signal when a sizing is 6+ months stale AND confidence is not 'high'. Not currently mocked.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">inline banner</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">2.2</span>
+        <span class="g-trigger">segment row · [+ evidence]</span>
+        <span class="g-what">Segment-evidence edit modal <small>Per-row evidence attach (URL + label). Current mock shows the evidence pill but no edit path. Minor — fold into MARKET-SIZING.</small></span>
+        <span class="g-state partial">PARTIAL</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">add to MARKET-SIZING</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">2.3</span>
+        <span class="g-trigger">save without source_url</span>
+        <span class="g-what">Source-required enforcement UI <small>Schema enforces <code>source_url IS NOT NULL OR methodology LIKE '%founder-estimate%'</code>. UI needs a dialog if founder tries to save without either. Fold into MARKET-SIZING.</small></span>
+        <span class="g-state empty">EMPTY</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">add to MARKET-SIZING</span>
+      </div>
+    </div>
+
+    <!-- Tab 3 — Evidence -->
+    <div class="gap-card">
+      <div class="gap-head">
+        <span class="p-num">3</span>
+        <h3>Evidence tab <small>interviews · LOIs · assumption register · experiments</small></h3>
+        <div class="count-pills"><span class="cp must">2 MUST</span><span class="cp nice">3 NICE</span><span class="cp defer">1 DEFER</span></div>
+        <a class="view-btn" href="FORGE-MOCKUP-PRODUCTS-V2.html#evidence">View tab ↗</a>
+      </div>
+      <div class="gap-head-row">
+        <span>#</span><span>Trigger</span><span>What's missing</span><span>State</span><span>Pri</span><span>Effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">3.1</span>
+        <span class="g-trigger">[+ interview] CTA</span>
+        <span class="g-what">Interview-create inline form <small>Entry form — interviewee, segment tag, quote, tags (<code>#must-have</code> / <code>#blocker</code>). Detail mock exists; create form doesn't.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">3.2</span>
+        <span class="g-trigger">LOI.status → signed</span>
+        <span class="g-what">LOI signed-state celebration <small>Current LOI-DETAIL mock shows status pills but no signed-state celebratory banner. Red-team flagged founders want the moment marked (it's rare evidence).</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">inline to LOI-DETAIL</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">3.3</span>
+        <span class="g-trigger">assumption entry form</span>
+        <span class="g-what">D/F/V tagging on assumptions <small>Maze pattern: every assumption tagged Desirability / Feasibility / Viability. Hardware founders conflate feasibility risk with desirability risk; forcing tag split disambiguates. Not in current schema or mock.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">schema + mock</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">3.4</span>
+        <span class="g-trigger">experiment row</span>
+        <span class="g-what">Experiment drill-in / log <small>Experiment entity has no drill-in mock. Needed for result logging + keep/iterate/kill decision. Current Evidence tab lists 4 entity types (interview · LOI · assumption · experiment) but experiment is the only one without a detail page.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">3.5</span>
+        <span class="g-trigger">[Seed assumptions] CTA</span>
+        <span class="g-what">Priya seed-assumptions picker <small>"Priya suggests 5 assumptions from your hypothesis text — keep/edit/discard". Cuts cold-start friction for migrated hypotheses. Not mocked.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">3.6</span>
+        <span class="g-trigger">interview &gt; 90d old</span>
+        <span class="g-what">Evidence half-life stale badges <small>Per competitor research (Dovetail/Maze/Intercom): evidence decays. Interviews &gt; 90d display a "stale" badge; readiness_items that cite stale evidence get flagged. Not mocked.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">inline badges</span>
+      </div>
+    </div>
+
+    <!-- Tab 4 — Economics -->
+    <div class="gap-card">
+      <div class="gap-head">
+        <span class="p-num">4</span>
+        <h3>Economics tab <small>target price · target COGS (Forge-sourced) · contribution margin</small></h3>
+        <div class="count-pills"><span class="cp must">1 MUST</span><span class="cp nice">1 NICE</span></div>
+        <a class="view-btn" href="FORGE-MOCKUP-PRODUCTS-V2.html#economics">View tab ↗</a>
+      </div>
+      <div class="gap-head-row">
+        <span>#</span><span>Trigger</span><span>What's missing</span><span>State</span><span>Pri</span><span>Effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">4.1</span>
+        <span class="g-trigger">project_id IS NOT NULL</span>
+        <span class="g-what">Forge-sourced COGS · read-only banner + sync timestamp <small>When linked to a Forge project, <code>target_cogs_pence</code> is read-only + shows "sourced from Forge — last synced {time}". Not mocked.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">inline variant</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">4.2</span>
+        <span class="g-trigger">price − cogs computed</span>
+        <span class="g-what">Contribution margin calculator inline <small>(price − cogs) / price display with color bands. Small addition but valuable for pitch prep. Not critical — founders can do the math.</small></span>
+        <span class="g-state empty">EMPTY</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">1 component</span>
+      </div>
+    </div>
+
+    <!-- Tab 5 — Action -->
+    <div class="gap-card">
+      <div class="gap-head">
+        <span class="p-num">5</span>
+        <h3>Action tab <small>investor-readiness checklist · aligned-vs-trade-off moves</small></h3>
+        <div class="count-pills"><span class="cp must">1 MUST</span><span class="cp nice">2 NICE</span></div>
+        <a class="view-btn" href="FORGE-MOCKUP-READINESS-ACTION.html">View drill-in ↗</a>
+      </div>
+      <div class="gap-head-row">
+        <span>#</span><span>Trigger</span><span>What's missing</span><span>State</span><span>Pri</span><span>Effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">5.1</span>
+        <span class="g-trigger">template v1 → v2</span>
+        <span class="g-what">Readiness-template version migration prompt <small>Founder with v1 template sees "New v2 checklist available — import [3 new items]?". Not critical for V1 (no v2 exists yet).</small></span>
+        <span class="g-state empty">EMPTY</span>
+        <span class="g-pri defer">DEFER</span>
+        <span class="g-effort">post-launch</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">5.2</span>
+        <span class="g-trigger">3 closed in 7 days</span>
+        <span class="g-what">"3-closed-this-week" celebration banner <small>Positive event_log signal ("Readiness: 3 items closed this week — viable for re-pitch"). Today-surface entry; also surfaced inline on Action tab.</small></span>
+        <span class="g-state empty">EMPTY</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">inline banner</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">5.3</span>
+        <span class="g-trigger">aligned/trade-off empty</span>
+        <span class="g-what">Aligned-vs-Tradeoff sharpness copy <small>MemPalace red-team round 1 quote: "the best idea on the page. Framing right, inputs wrong." Current mocks show the framing but not the "sharp" output pattern (named numbers + cohorts, not consultancy-speak). Need example state with real-looking copy.</small></span>
+        <span class="g-state partial">PARTIAL</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">copy polish</span>
+      </div>
+    </div>
+
+    <!-- Tab 6 — State transitions -->
+    <div class="gap-card">
+      <div class="gap-head">
+        <span class="p-num">6</span>
+        <h3>State transitions <small>promote · archive · unarchive</small></h3>
+        <div class="count-pills"><span class="cp must">2 MUST</span><span class="cp nice">1 NICE</span></div>
+        <a class="view-btn" href="FORGE-MOCKUP-PROMOTE-TO-FORGE.html">View promote ↗</a>
+      </div>
+      <div class="gap-head-row">
+        <span>#</span><span>Trigger</span><span>What's missing</span><span>State</span><span>Pri</span><span>Effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">6.1</span>
+        <span class="g-trigger">archived → unarchive</span>
+        <span class="g-what">Unarchive flow <small>Inverse of ARCHIVE-PRODUCT. Banner if hypothesis was promoted ("This hypothesis was promoted to a Forge project — re-promote to re-link"). No current mock.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">6.2</span>
+        <span class="g-trigger">promoted but Brief not locked</span>
+        <span class="g-what">Promote-reversibility copy <small>Promotion is reversible until Brief-Lock fires in Forge. Current mock reads as terminal ("proceed to The Forge"). Need explicit "reversible until Brief is locked" copy so founders don't over-commit.</small></span>
+        <span class="g-state partial">PARTIAL</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">copy polish</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">6.3</span>
+        <span class="g-trigger">promote confirm</span>
+        <span class="g-what">Evidence-preview on promote confirmation <small>Show the LOIs / interviews that will cross over as read-only refs in the Forge Brief, so founders know what the Brief will cite. Fold into PROMOTE-TO-FORGE.</small></span>
+        <span class="g-state partial">PARTIAL</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">add to PROMOTE-TO-FORGE</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       SECTION 2 — CROSS-CUTTING SURFACES
+       ════════════════════════════════════════════════════════════ -->
+  <div class="section-block" id="cross">
+    <h2>2 · Cross-cutting surfaces<span class="tag">7 items</span></h2>
+    <div class="block-sub">Surfaces no single tab owns — legacy bridge, onboarding, permissions, mobile, keyboard. These either ship with the first Phase 4 PR or are explicitly deferred.</div>
+
+    <div class="gap-card">
+      <div class="gap-head">
+        <span class="p-num">C</span>
+        <h3>Not owned by any tab <small>must ship somewhere · or explicitly defer</small></h3>
+        <div class="count-pills"><span class="cp must">3 MUST</span><span class="cp nice">3 NICE</span><span class="cp defer">1 DEFER</span></div>
+      </div>
+      <div class="gap-head-row">
+        <span>#</span><span>Trigger</span><span>What's missing</span><span>State</span><span>Pri</span><span>Effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">C.1</span>
+        <span class="g-trigger">Coming Soon user has data</span>
+        <span class="g-what">Legacy read-only bridge page <small>During Pre-Phase Coming Soon (already planned sidecar), users with existing <code>products</code> rows need a read-only view so data isn't hidden for months. Phase 4 replaces the Coming Soon route with real app; the bridge mock is both a sidecar deliverable AND a fallback/test reference for Phase 4 migration.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">C.2</span>
+        <span class="g-trigger">first-time to /products</span>
+        <span class="g-what">First-time-to-Products onboarding tour <small>3-step product tour (hypothesis · evidence · action). Current welcome tour lives at <code>/welcome</code>; Products deserves its own section-level entry. Nice-to-have not MUST.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">1 mockup</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">C.3</span>
+        <span class="g-trigger">/products/[slug]/history</span>
+        <span class="g-what">Audit log UI <small>Every mutation writes to <code>audit_log</code>. Currently no UI to view this — a hypothesis owner can't see "who changed the target price on Thursday". Defer to v2 unless red-team escalates.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri defer">DEFER</span>
+        <span class="g-effort">backlog</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">C.4</span>
+        <span class="g-trigger">hypothesis.project_id ≠ NULL</span>
+        <span class="g-what">Post-promote read-only banner <small>Promoted hypothesis → all tabs show banner "Promoted to Forge — the Brief is the canonical surface now. Edits live at The Forge." Gates all editor controls. Not mocked anywhere.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">inline banner</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">C.5</span>
+        <span class="g-trigger">role ∈ {advisor, contractor, read_only_observer}</span>
+        <span class="g-what">Permission-role read-only banner <small>9-role matrix (PRODUCTS-SCHEMA §6) enforces per-role write gates. Advisors/read_only_observers see a read-only pill on the page header + disabled editor controls. Not mocked.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri must">MUST</span>
+        <span class="g-effort">inline banner</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">C.6</span>
+        <span class="g-trigger">viewport &lt; 768</span>
+        <span class="g-what">Mobile 375×812 pass <small>Current mocks are desktop 1440. Column collapse on 5-tab layout is assumed, not verified. Ships as best-effort for Phase 4; V1 doesn't require dedicated mobile mocks if desktop pass holds on mobile via responsive layout.</small></span>
+        <span class="g-state missing">MISSING</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">best-effort</span>
+      </div>
+      <div class="gap-row">
+        <span class="g-num">C.7</span>
+        <span class="g-trigger">keyboard-only user</span>
+        <span class="g-what">A11y keyboard pass (5-tab, drill-ins) <small>Tab-bar arrow keys, focus ring, escape on modals. The old Products page R4 red-team retro shipped this in the old code; new surface must re-apply. Not a mockup — a visual check rule.</small></span>
+        <span class="g-state empty">EMPTY</span>
+        <span class="g-pri nice">NICE</span>
+        <span class="g-effort">build-time</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       SECTION 3 — RED TEAM (5 critiques)
+       ════════════════════════════════════════════════════════════ -->
+  <div class="section-block" id="redteam">
+    <h2>3 · Red team · 5 critiques<span class="tag">2 critical · 2 high · 1 medium</span></h2>
+    <div class="block-sub">Structural concerns with what IS built, not what's missing. Each critique: claim · evidence · what could break · mitigation. Pulled from MemPalace red-team synthesis (drawer <code>forgeos/decisions</code>, 2026-04-19) + competitor research (Dovetail / Maze / Intercom Surveys).</div>
+
+    <!-- RT1 — Readiness close is vibes-based -->
+    <div class="rt-card">
+      <div class="rt-head">
+        <div class="rt-num">1</div>
+        <h3>Readiness-item close has no enforced evidence<small>Action tab will become Fundability-score theatre v2 if we don't gate "close" on evidence</small></h3>
+        <div class="severity">CRITICAL</div>
+      </div>
+      <div class="rt-body">
+        <div class="rt-claim">The Action tab replaces the killed 56/100 Fundability composite with a checklist — <strong>but the schema lets founders mark items <code>closed</code> with an empty <code>evidence_ref</code></strong>. That recreates the exact failure mode the composite had: vibes-based self-rating. A founder preparing for an investor call will close all 12 items in 5 minutes without a single linked LOI.</div>
+        <div class="rt-evidence"><strong>Evidence:</strong> PRODUCTS-SCHEMA §2.8 — <code>evidence_ref jsonb</code> with no NOT NULL constraint. READINESS-ACTION mock shows "close" button with optional evidence attach. Founder can save without attaching.</div>
+        <h4>What could break</h4>
+        <ul>
+          <li>Founder closes 10/12 readiness items before real evidence exists → opens app thinking they're "investor-ready" → pitches → rejected because none of the closed items have evidence they can show an investor.</li>
+          <li>Priya's synthesis ribbon reads "10/12 ready — strong position" based on counts alone, reinforcing the false confidence.</li>
+          <li>An investor asks "you closed 'Can you name 3 signed LOIs' — show me them" and the Action tab can't surface them because the ref was never required.</li>
+        </ul>
+        <div class="rt-mit"><strong>Mitigation:</strong> Hard constraint: <code>CHECK (status != 'closed' OR evidence_ref IS NOT NULL AND jsonb_array_length(evidence_ref) &gt; 0)</code>. Close button in UI gates on attaching at least one <code>{entity_type, entity_id}</code> ref. Exception: items with <code>status = 'not_applicable'</code> skip the check (some items genuinely don't apply — e.g., "advisor" question for a solo founder).</div>
+      </div>
+    </div>
+
+    <!-- RT2 — Assumption/experiment one-way link -->
+    <div class="rt-card">
+      <div class="rt-head">
+        <div class="rt-num">2</div>
+        <h3>Assumption → valid transition has no experiment requirement<small>Assumption can flip to <code>valid</code> without a single test attached</small></h3>
+        <div class="severity">CRITICAL</div>
+      </div>
+      <div class="rt-body">
+        <div class="rt-claim">Schema lets <code>assumptions.status</code> move from <code>untested</code> → <code>valid</code> with zero linked experiments. <strong>That is the same pattern as an unsourced TAM/SAM/SOM</strong> — a founder mark-ups a claim as validated without cited evidence. Investors will see through it instantly ("what experiment validated this?") but the app happily shows a green "valid" pill.</div>
+        <div class="rt-evidence"><strong>Evidence:</strong> PRODUCTS-SCHEMA §2.6 — <code>linked_experiment_id uuid FK</code> is NULLABLE. UI state transitions aren't gated on a linked row.</div>
+        <h4>What could break</h4>
+        <ul>
+          <li>Founder manually flips assumptions to <code>valid</code> to green-light the Action tab checklist. Synthesis ribbon reads "4 of 5 assumptions validated — strong case".</li>
+          <li>Pitch deck says "we've validated 4 of 5 critical assumptions" based on the status column. No receipt.</li>
+          <li>Invalidated → valid flip (an assumption re-tests positive) requires NEW evidence; the old flip didn't. Inconsistent.</li>
+        </ul>
+        <div class="rt-mit"><strong>Mitigation:</strong> Gate the transition: <code>untested/testing → valid</code> requires <code>linked_experiment_id IS NOT NULL</code> AND that experiment's <code>decision = 'keep'</code>. Server action enforces it; UI shows "Attach an experiment first" on the valid toggle if the gate fails. <code>invalid</code> transition has no evidence requirement (invalidation is cheap — a single contradicting interview is enough).</div>
+      </div>
+    </div>
+
+    <!-- RT3 — Evidence half-life -->
+    <div class="rt-card">
+      <div class="rt-head">
+        <div class="rt-num">3</div>
+        <h3>Evidence has no half-life<small>A customer interview from 8 months ago reads the same as last week's</small></h3>
+        <div class="severity">HIGH</div>
+      </div>
+      <div class="rt-body">
+        <div class="rt-claim">Per competitor research (Dovetail / Maze / Intercom Surveys), <strong>evidence decays</strong>. For pre-revenue hardware founders, an interview from 2025-Q3 is a different asset than one from 2026-Q2 — the market moves. Current Products schema timestamps every evidence item but the UI shows them identically regardless of age.</div>
+        <div class="rt-evidence"><strong>Evidence:</strong> PRODUCTS-SCHEMA §2.4 (interviews) has <code>interviewed_at</code> but no decay. §2.8 (readiness_items) has <code>evidence_ref</code> but doesn't check age of the cited entity. A readiness item can "close" citing an 8-month-old interview.</div>
+        <h4>What could break</h4>
+        <ul>
+          <li>Founder refreshes pitch deck quarterly; cites "we talked to 12 farmers" — 9 of whom were interviewed 14 months ago. Investor pattern-matches as stale.</li>
+          <li>Market has shifted (new regulation, new competitor) between the interview and the pitch; the interview insight is technically wrong now but still counted.</li>
+          <li>Readiness checklist closes citing a stale LOI (draft &gt; 12 months old that was never re-confirmed). Same failure mode.</li>
+        </ul>
+        <div class="rt-mit"><strong>Mitigation:</strong> Add a <code>stale</code> derived flag (computed in view or app-layer, not a stored column): interviews &gt; 90 days = stale; LOIs &gt; 180 days without being re-confirmed = stale; market_sizings &gt; 180 days = stale (already in schema). Action tab readiness_items that cite only stale evidence surface a warning pill "this close relies on stale evidence". Doesn't invalidate — surfaces the risk so the founder can re-interview, re-ping, re-size.</div>
+      </div>
+    </div>
+
+    <!-- RT4 — Hypothesis grammar too permissive -->
+    <div class="rt-card">
+      <div class="rt-head">
+        <div class="rt-num">4</div>
+        <h3>Hypothesis-create form is too permissive<small>No grammar enforcement; "users will love it" saves cleanly</small></h3>
+        <div class="severity">HIGH</div>
+      </div>
+      <div class="rt-body">
+        <div class="rt-claim">Per Maze research pattern, hypothesis clarity is <strong>a write-time concern, not a read-time concern</strong>. Current schema accepts a free-text <code>problem</code> field and a free-text <code>one_liner</code>. There's no "If X, Then Y, Because Z" grammar — which means founders can save "users will love it" and move on. That hypothesis is unfalsifiable and unmockably testable. The rest of the product (assumptions, experiments, readiness) assumes a testable hypothesis upstream.</div>
+        <div class="rt-evidence"><strong>Evidence:</strong> PRODUCTS-SCHEMA §2.1 — <code>one_liner</code>, <code>problem</code> are free-text columns. No CHECK constraint. No grammar template in the mock (gap 1.2 flags the missing create form, but the issue is deeper than "mock it" — it's "structurally force the grammar").</div>
+        <h4>What could break</h4>
+        <ul>
+          <li>Migrated hypotheses (from existing <code>products.description</code>) come in as free-form marketing copy. None are falsifiable statements. Every downstream tab (Market / Evidence / Action) struggles to be useful because the premise is vague.</li>
+          <li>Founders create vanity hypotheses to fill the list view. Without grammar, "make ForgeOS better" is a valid hypothesis. Nothing stops it.</li>
+          <li>Priya's synthesis ribbon can't summarise a non-statement. Her output reads like horoscope copy.</li>
+        </ul>
+        <div class="rt-mit"><strong>Mitigation:</strong> Hypothesis-create form (gap 1.2) requires three <em>separate</em> fields: <code>If (change)</code> · <code>Then (impact)</code> · <code>Because (assumption)</code> — each non-empty. Saved into the <code>problem</code> column as a structured blob (e.g., JSONB <code>{if, then, because}</code>) OR kept separate as three columns. UI composes them back into a one_liner for display. Migrated hypotheses get <code>{if: "(migrated from v1)", then: description, because: "(not captured)"}</code> and an action item "Upgrade this hypothesis with testable grammar" auto-added to Action tab.</div>
+      </div>
+    </div>
+
+    <!-- RT5 — Promote reversibility -->
+    <div class="rt-card">
+      <div class="rt-head">
+        <div class="rt-num">5</div>
+        <h3>PROMOTE_TO_FORGE UI reads as terminal<small>It's reversible until Brief-Lock — but the dialog says "proceed"</small></h3>
+        <div class="severity med">MEDIUM</div>
+      </div>
+      <div class="rt-body">
+        <div class="rt-claim">Promotion flips <code>canonical_surface</code> from <code>products</code> to <code>forge</code>. <strong>That's reversible until the Brief is locked on the Forge side.</strong> The current PROMOTE-TO-FORGE mock reads as terminal — "proceed to The Forge" with no reversibility copy. Founders will either hesitate (bad — they don't commit) or over-commit (bad — they think they're locked in). Transparency is the fix.</div>
+        <div class="rt-evidence"><strong>Evidence:</strong> PRODUCTS-SCHEMA §5.3 documents the reversible window. PROMOTE-TO-FORGE.html mock has no banner about reversibility. Founders will parse the tone as one-way.</div>
+        <h4>What could break</h4>
+        <ul>
+          <li>Founder with a half-ready hypothesis hesitates to promote because "what if I'm wrong". Brief drafting blocked. No Forge work happens.</li>
+          <li>Founder promotes a weak hypothesis (because "I can always edit in Forge"), hits Brief-Lock too eagerly, then discovers the reversal is gone. Now locked into building a weak brief.</li>
+          <li>Without a clear "reversible until Brief-Lock" line, Tristan's own testing revealed this ambiguity during red-team round 2.</li>
+        </ul>
+        <div class="rt-mit"><strong>Mitigation:</strong> Promote dialog copy explicitly states: <em>"Promoting moves canonical ownership to The Forge. You can un-promote until the Brief is locked. After Brief-Lock, this hypothesis becomes read-only in Products — the Brief is the authoritative record. You can always archive."</em> Promote-confirmation on the Forge side surfaces the same reversibility window ("This promotion is still reversible until you lock the Brief"). Gap 6.2 flags the copy work.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       SECTION 4 — PROPOSED FINAL MOCKUP ROUND
+       ════════════════════════════════════════════════════════════ -->
+  <div class="section-block" id="plan">
+    <h2>4 · Proposed final mockup round — before Phase 4 code<span class="tag">14 items · 6 MUST · 6 NICE · 2 DEFER</span></h2>
+    <div class="block-sub">What to build in the next mockup session (before any code lands). MUSTs block Phase 4 start. NICE items ship if time permits. DEFER items are explicit V1 cuts — visible not silent.</div>
+
+    <div class="plan-band">
+      <h3>Build list (14 items, prioritised)</h3>
+      <p><strong>MUST</strong> = blocks Phase 4 code. <strong>NICE</strong> = ships with Phase 4 if time permits, otherwise Phase 4.5. <strong>DEFER</strong> = explicit V1 cut (in V1 Cuts list below).</p>
+
+      <div class="next-row" style="border-bottom: 1px solid var(--brand-dim); font-weight: 700; font-size: 11px; text-transform: uppercase; color: #7c2d12;">
+        <span>#</span><span>Item</span><span>Parent gap</span><span>Priority</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R1</span>
+        <span class="n-what">Products list view (populated)<small>Filter by lifecycle, sort by readiness count, archive inline</small></span>
+        <span class="n-parent">Gap 1.1</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R2</span>
+        <span class="n-what">Hypothesis-create form (If/Then/Because grammar)<small>Three-field entry with D/F/V risk tagging; blocks RT4</small></span>
+        <span class="n-parent">Gap 1.2 · RT4</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R3</span>
+        <span class="n-what">Experiment drill-in / log<small>Result logging + keep/iterate/kill decision</small></span>
+        <span class="n-parent">Gap 3.4</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R4</span>
+        <span class="n-what">Interview-create inline form<small>Interviewee · segment · quote · tags</small></span>
+        <span class="n-parent">Gap 3.1</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R5</span>
+        <span class="n-what">LOI signed-state celebration banner<small>Fold into LOI-DETAIL; mark the moment</small></span>
+        <span class="n-parent">Gap 3.2</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R6</span>
+        <span class="n-what">Readiness-close requires evidence attach<small>Schema CHECK + UI gate; kills RT1</small></span>
+        <span class="n-parent">Gap 5.3 · RT1</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R7</span>
+        <span class="n-what">Unarchive flow mock<small>Inverse of ARCHIVE-PRODUCT; re-promote banner</small></span>
+        <span class="n-parent">Gap 6.1</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R8</span>
+        <span class="n-what">Promote reversibility banner + copy polish<small>"Reversible until Brief-Lock" — kills RT5</small></span>
+        <span class="n-parent">Gap 6.2 · RT5</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R9</span>
+        <span class="n-what">Post-promote read-only banner<small>All tabs gate on canonical_surface = 'forge'</small></span>
+        <span class="n-parent">Gap C.4</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R10</span>
+        <span class="n-what">Permission-role read-only banner<small>Advisor / contractor / read_only_observer view</small></span>
+        <span class="n-parent">Gap C.5</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R11</span>
+        <span class="n-what">Legacy read-only bridge page<small>Coming Soon sidecar; also Phase 4 fallback</small></span>
+        <span class="n-parent">Gap C.1</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R12</span>
+        <span class="n-what">Assumption-required-evidence constraint<small>Schema CHECK on valid transition; kills RT2</small></span>
+        <span class="n-parent">RT2</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R13</span>
+        <span class="n-what">Stale-sizing banner (Market tab)<small>180d + confidence != high surfaces Today signal + banner</small></span>
+        <span class="n-parent">Gap 2.1</span>
+        <span class="n-effort">MUST</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R14</span>
+        <span class="n-what">Evidence half-life stale badges<small>Interviews &gt; 90d; LOIs &gt; 180d; kills RT3</small></span>
+        <span class="n-parent">Gap 3.6 · RT3</span>
+        <span class="n-effort">NICE</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R15</span>
+        <span class="n-what">Forge-sourced COGS inline banner<small>read-only + last_synced_at</small></span>
+        <span class="n-parent">Gap 4.1</span>
+        <span class="n-effort">NICE</span>
+      </div>
+      <div class="next-row">
+        <span class="n-num">R16</span>
+        <span class="n-what">Aligned-vs-Tradeoff sharpness copy<small>Named numbers + cohorts (not consultancy-speak)</small></span>
+        <span class="n-parent">Gap 5.3</span>
+        <span class="n-effort">NICE</span>
+      </div>
+    </div>
+
+    <div class="cuts-band">
+      <h4>V1 cuts — explicit (go to backlog, visible not silent)</h4>
+      <ul>
+        <li><strong>C.3 · Audit log UI</strong> — every mutation hits <code>audit_log</code> but no UI reads it. Defer to v2; founders can query via SQL if needed.</li>
+        <li><strong>C.6 · Mobile dedicated mocks</strong> — desktop 1440 is the target. Responsive collapse ships best-effort; no separate 375×812 mocks in V1.</li>
+        <li><strong>C.2 · Products-specific onboarding tour</strong> — the global <code>/welcome</code> tour covers Products indirectly. Dedicated tour is v2.</li>
+        <li><strong>3.3 · D/F/V assumption tagging</strong> — strong idea from competitor research (Maze), but pushing schema + mock into V1 is scope creep. Add in v2 after we see how founders actually use the plain assumption register.</li>
+        <li><strong>3.5 · Priya seed-assumptions picker</strong> — nice ergonomic; founders can write assumptions manually in V1. Ship in v2 with D/F/V.</li>
+        <li><strong>4.2 · Contribution margin inline calc</strong> — math is <code>(price − cogs) / price</code>; founders can compute it. Nice-to-have, not V1.</li>
+        <li><strong>5.1 · Template-version migration UI</strong> — only one template exists (v1). When v2 lands, revisit.</li>
+        <li><strong>5.2 · 3-closed-this-week celebration</strong> — event_log entry is in schema; Today-tab surfaces it. Inline Action-tab banner can wait.</li>
+      </ul>
+    </div>
+
+    <div class="annot">
+      <strong>Decision point for Tristan</strong>
+      Confirm (or override) the build list above. Reply <code>locked</code> to the build terminal when approved. Then Phase 4 code begins per <a href="HANDOVER-products.md">HANDOVER-products.md</a>. If you want to add/remove items, mark them in a diff comment and reply <code>locked with changes: [list]</code>.
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>
