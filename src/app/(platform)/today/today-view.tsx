@@ -59,7 +59,6 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getMorningBriefing, type MorningBriefing } from "@/actions/nudges"
@@ -899,14 +898,13 @@ export function TodayView({
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, ease: EASE_CURVE }}
-                    data-tour="today-insights"
                 >
                     <StrategySpotlightSection items={strategyHealth} />
                 </motion.div>
             )}
 
             {/* Team brief — C13 collapsed-by-default per Tristan's default */}
-            <section aria-label="Team brief">
+            <section aria-label="Team brief" data-tour="today-insights">
                 <button
                     type="button"
                     onClick={() => setTeamBriefOpen(v => !v)}
