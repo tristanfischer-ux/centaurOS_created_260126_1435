@@ -2903,6 +2903,130 @@ export type Database = {
         }
         Relationships: []
       }
+      assumption_tests: {
+        Row: {
+          actual_outcome: string | null
+          created_at: string
+          decision: string | null
+          expected_outcome: string
+          foundry_id: string
+          hypothesis: string
+          id: string
+          logged_by: string | null
+          product_id: string | null
+          project_id: string | null
+          rationale: string | null
+          tested_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_outcome?: string | null
+          created_at?: string
+          decision?: string | null
+          expected_outcome: string
+          foundry_id: string
+          hypothesis: string
+          id?: string
+          logged_by?: string | null
+          product_id?: string | null
+          project_id?: string | null
+          rationale?: string | null
+          tested_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_outcome?: string | null
+          created_at?: string
+          decision?: string | null
+          expected_outcome?: string
+          foundry_id?: string
+          hypothesis?: string
+          id?: string
+          logged_by?: string | null
+          product_id?: string | null
+          project_id?: string | null
+          rationale?: string | null
+          tested_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assumption_tests_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assumption_tests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assumptions: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          hypothesis_id: string
+          id: string
+          last_status_change_at: string | null
+          linked_experiment_id: string | null
+          risk_level: number
+          status: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          hypothesis_id: string
+          id?: string
+          last_status_change_at?: string | null
+          linked_experiment_id?: string | null
+          risk_level: number
+          status?: string
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          hypothesis_id?: string
+          id?: string
+          last_status_change_at?: string | null
+          linked_experiment_id?: string | null
+          risk_level?: number
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assumptions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assumptions_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assumptions_linked_experiment_fk"
+            columns: ["linked_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -4314,12 +4438,115 @@ export type Database = {
           },
         ]
       }
+      cad_lab_parts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          dimensions: string | null
+          display_name: string | null
+          estimated_cost_gbp: number | null
+          finish: string | null
+          foundry_id: string
+          id: string
+          mass_grams: number | null
+          material: string | null
+          module_id: string
+          name: string
+          preferred_supplier_id: string | null
+          process: string | null
+          project_id: string
+          quantity: number | null
+          source_key_part: string | null
+          tolerance: string | null
+          typical_lead_weeks: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dimensions?: string | null
+          display_name?: string | null
+          estimated_cost_gbp?: number | null
+          finish?: string | null
+          foundry_id: string
+          id?: string
+          mass_grams?: number | null
+          material?: string | null
+          module_id: string
+          name: string
+          preferred_supplier_id?: string | null
+          process?: string | null
+          project_id: string
+          quantity?: number | null
+          source_key_part?: string | null
+          tolerance?: string | null
+          typical_lead_weeks?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dimensions?: string | null
+          display_name?: string | null
+          estimated_cost_gbp?: number | null
+          finish?: string | null
+          foundry_id?: string
+          id?: string
+          mass_grams?: number | null
+          material?: string | null
+          module_id?: string
+          name?: string
+          preferred_supplier_id?: string | null
+          process?: string | null
+          project_id?: string
+          quantity?: number | null
+          source_key_part?: string | null
+          tolerance?: string | null
+          typical_lead_weeks?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cad_lab_parts_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cad_lab_parts_preferred_supplier_id_fkey"
+            columns: ["preferred_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cad_lab_parts_preferred_supplier_id_fkey"
+            columns: ["preferred_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "cad_lab_parts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_lab_projects: {
         Row: {
           accepted_risks: Json | null
           ai_cost_estimates: Json | null
+          archived_at: string | null
           batch_started_at: string | null
           batch_status: string
+          brief_locked_at: string | null
           checkpoints: Json | null
           created_at: string
           created_by: string
@@ -4327,6 +4554,7 @@ export type Database = {
           design_revision: number
           diagnostic_answers: Json | null
           diagnostic_enrichment: Json | null
+          forked_from_id: string | null
           foundry_id: string
           generated_code: string | null
           id: string
@@ -4366,8 +4594,10 @@ export type Database = {
         Insert: {
           accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
+          archived_at?: string | null
           batch_started_at?: string | null
           batch_status?: string
+          brief_locked_at?: string | null
           checkpoints?: Json | null
           created_at?: string
           created_by: string
@@ -4375,6 +4605,7 @@ export type Database = {
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
+          forked_from_id?: string | null
           foundry_id: string
           generated_code?: string | null
           id?: string
@@ -4414,8 +4645,10 @@ export type Database = {
         Update: {
           accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
+          archived_at?: string | null
           batch_started_at?: string | null
           batch_status?: string
+          brief_locked_at?: string | null
           checkpoints?: Json | null
           created_at?: string
           created_by?: string
@@ -4423,6 +4656,7 @@ export type Database = {
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
+          forked_from_id?: string | null
           foundry_id?: string
           generated_code?: string | null
           id?: string
@@ -4459,7 +4693,15 @@ export type Database = {
           updated_at?: string
           visual_style?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cad_lab_projects_forked_from_id_fkey"
+            columns: ["forked_from_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       calendar_sync_mappings: {
         Row: {
@@ -4837,6 +5079,69 @@ export type Database = {
             columns: ["invited_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitors: {
+        Row: {
+          added_at: string
+          created_at: string
+          evidence_url: string | null
+          foundry_id: string
+          hypothesis_id: string
+          id: string
+          insight: string | null
+          last_checked_at: string | null
+          name: string
+          price_pence: number | null
+          tags: string[]
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          added_at?: string
+          created_at?: string
+          evidence_url?: string | null
+          foundry_id: string
+          hypothesis_id: string
+          id?: string
+          insight?: string | null
+          last_checked_at?: string | null
+          name: string
+          price_pence?: number | null
+          tags?: string[]
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          added_at?: string
+          created_at?: string
+          evidence_url?: string | null
+          foundry_id?: string
+          hypothesis_id?: string
+          id?: string
+          insight?: string | null
+          last_checked_at?: string | null
+          name?: string
+          price_pence?: number | null
+          tags?: string[]
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitors_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitors_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
             referencedColumns: ["id"]
           },
         ]
@@ -5502,6 +5807,72 @@ export type Database = {
           },
         ]
       }
+      customer_interviews: {
+        Row: {
+          conducted_by: string | null
+          created_at: string
+          foundry_id: string
+          hypothesis_id: string
+          id: string
+          interviewed_at: string
+          interviewee_company: string | null
+          interviewee_name: string | null
+          interviewee_role: string | null
+          notes: string | null
+          quote: string
+          segment_tag: string | null
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          conducted_by?: string | null
+          created_at?: string
+          foundry_id: string
+          hypothesis_id: string
+          id?: string
+          interviewed_at: string
+          interviewee_company?: string | null
+          interviewee_name?: string | null
+          interviewee_role?: string | null
+          notes?: string | null
+          quote: string
+          segment_tag?: string | null
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          conducted_by?: string | null
+          created_at?: string
+          foundry_id?: string
+          hypothesis_id?: string
+          id?: string
+          interviewed_at?: string
+          interviewee_company?: string | null
+          interviewee_name?: string | null
+          interviewee_role?: string | null
+          notes?: string | null
+          quote?: string
+          segment_tag?: string | null
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_interviews_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_interviews_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_requests: {
         Row: {
           completed_at: string | null
@@ -5996,6 +6367,63 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      disprove_assumptions: {
+        Row: {
+          assumption: string
+          created_at: string
+          current_state: Database["public"]["Enums"]["assumption_state"]
+          foundry_id: string
+          fresh_data_json: Json | null
+          goal_id: string
+          id: string
+          last_refreshed_at: string | null
+          order_index: number
+          refreshed_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          assumption: string
+          created_at?: string
+          current_state?: Database["public"]["Enums"]["assumption_state"]
+          foundry_id: string
+          fresh_data_json?: Json | null
+          goal_id: string
+          id?: string
+          last_refreshed_at?: string | null
+          order_index: number
+          refreshed_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assumption?: string
+          created_at?: string
+          current_state?: Database["public"]["Enums"]["assumption_state"]
+          foundry_id?: string
+          fresh_data_json?: Json | null
+          goal_id?: string
+          id?: string
+          last_refreshed_at?: string | null
+          order_index?: number
+          refreshed_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disprove_assumptions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disprove_assumptions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_goals"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6579,6 +7007,78 @@ export type Database = {
             columns: ["source_artifact_id"]
             isOneToOne: false
             referencedRelation: "agent_artifacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiments: {
+        Row: {
+          completed_at: string | null
+          cost_pence: number | null
+          created_at: string
+          decision: string | null
+          duration_days: number | null
+          foundry_id: string
+          hypothesis_id: string
+          hypothesis_under_test: string | null
+          id: string
+          method: string | null
+          name: string
+          result_summary: string | null
+          started_at: string | null
+          status: string
+          success_criteria: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          cost_pence?: number | null
+          created_at?: string
+          decision?: string | null
+          duration_days?: number | null
+          foundry_id: string
+          hypothesis_id: string
+          hypothesis_under_test?: string | null
+          id?: string
+          method?: string | null
+          name: string
+          result_summary?: string | null
+          started_at?: string | null
+          status?: string
+          success_criteria?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          cost_pence?: number | null
+          created_at?: string
+          decision?: string | null
+          duration_days?: number | null
+          foundry_id?: string
+          hypothesis_id?: string
+          hypothesis_under_test?: string | null
+          id?: string
+          method?: string | null
+          name?: string
+          result_summary?: string | null
+          started_at?: string | null
+          status?: string
+          success_criteria?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiments_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiments_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
             referencedColumns: ["id"]
           },
         ]
@@ -7685,6 +8185,8 @@ export type Database = {
           member_count_cached: number
           name: string
           owner_id: string | null
+          phase3_role_matrix_applied_at: string | null
+          phase3_role_matrix_applied_by: string | null
           purpose_data: Json | null
           report_accent_color: string | null
           report_primary_color: string | null
@@ -7706,6 +8208,8 @@ export type Database = {
           member_count_cached?: number
           name: string
           owner_id?: string | null
+          phase3_role_matrix_applied_at?: string | null
+          phase3_role_matrix_applied_by?: string | null
           purpose_data?: Json | null
           report_accent_color?: string | null
           report_primary_color?: string | null
@@ -7727,6 +8231,8 @@ export type Database = {
           member_count_cached?: number
           name?: string
           owner_id?: string | null
+          phase3_role_matrix_applied_at?: string | null
+          phase3_role_matrix_applied_by?: string | null
           purpose_data?: Json | null
           report_accent_color?: string | null
           report_primary_color?: string | null
@@ -8234,6 +8740,126 @@ export type Database = {
           },
         ]
       }
+      fractional_engagements: {
+        Row: {
+          created_at: string
+          ended_on: string | null
+          foundry_id: string
+          fractional_id: string
+          hours_per_week: number
+          hours_used_this_week: number
+          id: string
+          notice_period_days: number
+          retainer_monthly: number
+          role_in_foundry: string
+          started_on: string
+          status: Database["public"]["Enums"]["engagement_status"]
+          updated_at: string
+          working_style: Database["public"]["Enums"]["working_style"]
+        }
+        Insert: {
+          created_at?: string
+          ended_on?: string | null
+          foundry_id: string
+          fractional_id: string
+          hours_per_week: number
+          hours_used_this_week?: number
+          id?: string
+          notice_period_days?: number
+          retainer_monthly: number
+          role_in_foundry: string
+          started_on: string
+          status?: Database["public"]["Enums"]["engagement_status"]
+          updated_at?: string
+          working_style?: Database["public"]["Enums"]["working_style"]
+        }
+        Update: {
+          created_at?: string
+          ended_on?: string | null
+          foundry_id?: string
+          fractional_id?: string
+          hours_per_week?: number
+          hours_used_this_week?: number
+          id?: string
+          notice_period_days?: number
+          retainer_monthly?: number
+          role_in_foundry?: string
+          started_on?: string
+          status?: Database["public"]["Enums"]["engagement_status"]
+          updated_at?: string
+          working_style?: Database["public"]["Enums"]["working_style"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fractional_engagements_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fractional_engagements_fractional_id_fkey"
+            columns: ["fractional_id"]
+            isOneToOne: false
+            referencedRelation: "fractional_executives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fractional_executives: {
+        Row: {
+          avatar_gradient: string | null
+          bio_long: string | null
+          bio_short: string | null
+          created_at: string
+          default_hours_weekly: number | null
+          default_retainer_monthly: number | null
+          display_name: string
+          email: string
+          id: string
+          network_listed: boolean
+          reply_rate: number | null
+          response_time_avg_hours: number | null
+          specialisation: Database["public"]["Enums"]["fractional_specialisation"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          avatar_gradient?: string | null
+          bio_long?: string | null
+          bio_short?: string | null
+          created_at?: string
+          default_hours_weekly?: number | null
+          default_retainer_monthly?: number | null
+          display_name: string
+          email: string
+          id?: string
+          network_listed?: boolean
+          reply_rate?: number | null
+          response_time_avg_hours?: number | null
+          specialisation: Database["public"]["Enums"]["fractional_specialisation"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          avatar_gradient?: string | null
+          bio_long?: string | null
+          bio_short?: string | null
+          created_at?: string
+          default_hours_weekly?: number | null
+          default_retainer_monthly?: number | null
+          display_name?: string
+          email?: string
+          id?: string
+          network_listed?: boolean
+          reply_rate?: number | null
+          response_time_avg_hours?: number | null
+          specialisation?: Database["public"]["Enums"]["fractional_specialisation"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       fraud_signals: {
         Row: {
           action_taken: string | null
@@ -8425,6 +9051,73 @@ export type Database = {
           },
         ]
       }
+      goal_team_assignments: {
+        Row: {
+          added_at: string
+          added_by: string
+          assignee_type: Database["public"]["Enums"]["assignee_type"]
+          created_at: string
+          foundry_id: string
+          fractional_id: string | null
+          goal_id: string
+          id: string
+          role_on_goal: string
+          specialist_slug: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          assignee_type: Database["public"]["Enums"]["assignee_type"]
+          created_at?: string
+          foundry_id: string
+          fractional_id?: string | null
+          goal_id: string
+          id?: string
+          role_on_goal?: string
+          specialist_slug?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          assignee_type?: Database["public"]["Enums"]["assignee_type"]
+          created_at?: string
+          foundry_id?: string
+          fractional_id?: string | null
+          goal_id?: string
+          id?: string
+          role_on_goal?: string
+          specialist_slug?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_team_assignments_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_team_assignments_fractional_id_fkey"
+            columns: ["fractional_id"]
+            isOneToOne: false
+            referencedRelation: "fractional_executives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_team_assignments_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string
@@ -8548,6 +9241,69 @@ export type Database = {
           },
         ]
       }
+      gutcheck_sessions: {
+        Row: {
+          assumption_states_json: Json
+          cal_narrative: string | null
+          created_at: string
+          decided_at: string | null
+          decision: Database["public"]["Enums"]["gutcheck_decision"] | null
+          decision_note: string | null
+          fired_at: string
+          foundry_id: string
+          goal_id: string
+          human_narrative: string | null
+          id: string
+          triggered_by: string
+          updated_at: string
+        }
+        Insert: {
+          assumption_states_json?: Json
+          cal_narrative?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["gutcheck_decision"] | null
+          decision_note?: string | null
+          fired_at?: string
+          foundry_id: string
+          goal_id: string
+          human_narrative?: string | null
+          id?: string
+          triggered_by: string
+          updated_at?: string
+        }
+        Update: {
+          assumption_states_json?: Json
+          cal_narrative?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["gutcheck_decision"] | null
+          decision_note?: string | null
+          fired_at?: string
+          foundry_id?: string
+          goal_id?: string
+          human_narrative?: string | null
+          id?: string
+          triggered_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gutcheck_sessions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gutcheck_sessions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hiring_requirements: {
         Row: {
           ai_suggested_date: string | null
@@ -8611,6 +9367,243 @@ export type Database = {
             columns: ["linked_objective_id"]
             isOneToOne: false
             referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      history_entries: {
+        Row: {
+          actor_id: string | null
+          actor_type: Database["public"]["Enums"]["actor_type"]
+          alternatives_json: Json | null
+          body: string | null
+          created_at: string
+          edit_log_json: Json
+          entry_type: Database["public"]["Enums"]["history_entry_type"]
+          foundry_id: string
+          goal_id: string | null
+          grounding_text: string | null
+          id: string
+          outcome: Database["public"]["Enums"]["outcome_state"] | null
+          outcome_note: string | null
+          outcome_revisit_at: string | null
+          related_ids_json: Json | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type: Database["public"]["Enums"]["actor_type"]
+          alternatives_json?: Json | null
+          body?: string | null
+          created_at?: string
+          edit_log_json?: Json
+          entry_type: Database["public"]["Enums"]["history_entry_type"]
+          foundry_id: string
+          goal_id?: string | null
+          grounding_text?: string | null
+          id?: string
+          outcome?: Database["public"]["Enums"]["outcome_state"] | null
+          outcome_note?: string | null
+          outcome_revisit_at?: string | null
+          related_ids_json?: Json | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: Database["public"]["Enums"]["actor_type"]
+          alternatives_json?: Json | null
+          body?: string | null
+          created_at?: string
+          edit_log_json?: Json
+          entry_type?: Database["public"]["Enums"]["history_entry_type"]
+          foundry_id?: string
+          goal_id?: string | null
+          grounding_text?: string | null
+          id?: string
+          outcome?: Database["public"]["Enums"]["outcome_state"] | null
+          outcome_note?: string | null
+          outcome_revisit_at?: string | null
+          related_ids_json?: Json | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "history_entries_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "history_entries_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hypotheses: {
+        Row: {
+          archived_at: string | null
+          archived_reason_id: string | null
+          because_assumption: string
+          created_at: string
+          created_by: string
+          customer_segment: string | null
+          foundry_id: string
+          hero_image_url: string | null
+          id: string
+          if_change: string
+          lifecycle_stage: string
+          name: string
+          one_liner: string | null
+          problem: string | null
+          project_id: string | null
+          slug: string
+          synthesis_ribbon: string | null
+          target_cogs_pence: number | null
+          target_monthly_units: number | null
+          target_unit_price_pence: number | null
+          then_impact: string
+          traction_explainer: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_reason_id?: string | null
+          because_assumption: string
+          created_at?: string
+          created_by: string
+          customer_segment?: string | null
+          foundry_id: string
+          hero_image_url?: string | null
+          id?: string
+          if_change: string
+          lifecycle_stage?: string
+          name: string
+          one_liner?: string | null
+          problem?: string | null
+          project_id?: string | null
+          slug: string
+          synthesis_ribbon?: string | null
+          target_cogs_pence?: number | null
+          target_monthly_units?: number | null
+          target_unit_price_pence?: number | null
+          then_impact: string
+          traction_explainer?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          archived_reason_id?: string | null
+          because_assumption?: string
+          created_at?: string
+          created_by?: string
+          customer_segment?: string | null
+          foundry_id?: string
+          hero_image_url?: string | null
+          id?: string
+          if_change?: string
+          lifecycle_stage?: string
+          name?: string
+          one_liner?: string | null
+          problem?: string | null
+          project_id?: string | null
+          slug?: string
+          synthesis_ribbon?: string | null
+          target_cogs_pence?: number | null
+          target_monthly_units?: number | null
+          target_unit_price_pence?: number | null
+          then_impact?: string
+          traction_explainer?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypotheses_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hypotheses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hypothesis_archive_reasons: {
+        Row: {
+          active: boolean
+          description: string | null
+          id: string
+          label: string
+          slot_key: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          description?: string | null
+          id?: string
+          label: string
+          slot_key: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          description?: string | null
+          id?: string
+          label?: string
+          slot_key?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      hypothesis_migration_archive: {
+        Row: {
+          foundry_id: string
+          hypothesis_id: string | null
+          id: string
+          legacy_payload: Json
+          legacy_product_id: string
+          migrated_at: string
+        }
+        Insert: {
+          foundry_id: string
+          hypothesis_id?: string | null
+          id?: string
+          legacy_payload: Json
+          legacy_product_id: string
+          migrated_at?: string
+        }
+        Update: {
+          foundry_id?: string
+          hypothesis_id?: string | null
+          id?: string
+          legacy_payload?: Json
+          legacy_product_id?: string
+          migrated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypothesis_migration_archive_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hypothesis_migration_archive_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
             referencedColumns: ["id"]
           },
         ]
@@ -10222,6 +11215,72 @@ export type Database = {
           },
         ]
       }
+      lois: {
+        Row: {
+          buyer_company: string | null
+          buyer_name: string
+          buyer_role: string | null
+          created_at: string
+          file_url: string | null
+          foundry_id: string
+          hypothesis_id: string
+          id: string
+          intent_price_pence: number | null
+          intent_units: number | null
+          intent_window: string | null
+          signed_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          buyer_company?: string | null
+          buyer_name: string
+          buyer_role?: string | null
+          created_at?: string
+          file_url?: string | null
+          foundry_id: string
+          hypothesis_id: string
+          id?: string
+          intent_price_pence?: number | null
+          intent_units?: number | null
+          intent_window?: string | null
+          signed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          buyer_company?: string | null
+          buyer_name?: string
+          buyer_role?: string | null
+          created_at?: string
+          file_url?: string | null
+          foundry_id?: string
+          hypothesis_id?: string
+          id?: string
+          intent_price_pence?: number | null
+          intent_units?: number | null
+          intent_window?: string | null
+          signed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lois_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lois_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manufacturing_order_lines: {
         Row: {
           assigned_provider_id: string | null
@@ -10491,6 +11550,75 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      market_sizings: {
+        Row: {
+          confidence: string
+          created_at: string
+          foundry_id: string
+          hypothesis_id: string
+          id: string
+          last_resized_at: string | null
+          methodology: string
+          sam_gbp_pence: number | null
+          segments: Json
+          som_gbp_pence: number | null
+          source_label: string | null
+          source_url: string | null
+          sourced_at: string | null
+          tam_gbp_pence: number | null
+          updated_at: string
+        }
+        Insert: {
+          confidence?: string
+          created_at?: string
+          foundry_id: string
+          hypothesis_id: string
+          id?: string
+          last_resized_at?: string | null
+          methodology: string
+          sam_gbp_pence?: number | null
+          segments?: Json
+          som_gbp_pence?: number | null
+          source_label?: string | null
+          source_url?: string | null
+          sourced_at?: string | null
+          tam_gbp_pence?: number | null
+          updated_at?: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          foundry_id?: string
+          hypothesis_id?: string
+          id?: string
+          last_resized_at?: string | null
+          methodology?: string
+          sam_gbp_pence?: number | null
+          segments?: Json
+          som_gbp_pence?: number | null
+          source_label?: string | null
+          source_url?: string | null
+          sourced_at?: string | null
+          tam_gbp_pence?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_sizings_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_sizings_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: true
+            referencedRelation: "hypotheses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketplace_listings: {
         Row: {
@@ -12301,6 +13429,7 @@ export type Database = {
           specialist_id: string | null
           start_date: string | null
           status: string | null
+          strategic_goal_id: string | null
           strategic_risks: Json | null
           title: string
           updated_at: string | null
@@ -12339,6 +13468,7 @@ export type Database = {
           specialist_id?: string | null
           start_date?: string | null
           status?: string | null
+          strategic_goal_id?: string | null
           strategic_risks?: Json | null
           title: string
           updated_at?: string | null
@@ -12377,6 +13507,7 @@ export type Database = {
           specialist_id?: string | null
           start_date?: string | null
           status?: string | null
+          strategic_goal_id?: string | null
           strategic_risks?: Json | null
           title?: string
           updated_at?: string | null
@@ -12444,6 +13575,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objectives_strategic_goal_id_fkey"
+            columns: ["strategic_goal_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_goals"
             referencedColumns: ["id"]
           },
         ]
@@ -14571,6 +15709,81 @@ export type Database = {
           },
         ]
       }
+      pressure_test_sessions: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          goal_id: string | null
+          human_reviewers_json: Json | null
+          id: string
+          legacy_report_snapshot_id: string | null
+          personas_used: string[]
+          recommended_actions_json: Json | null
+          rounds: number
+          subject_ref: string | null
+          subject_snapshot: Json
+          subject_type: Database["public"]["Enums"]["pressure_subject_type"]
+          tensions_json: Json | null
+          transcript_json: Json
+          updated_at: string
+          verdict: Database["public"]["Enums"]["pressure_verdict"] | null
+          verdict_body: string | null
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          goal_id?: string | null
+          human_reviewers_json?: Json | null
+          id?: string
+          legacy_report_snapshot_id?: string | null
+          personas_used?: string[]
+          recommended_actions_json?: Json | null
+          rounds?: number
+          subject_ref?: string | null
+          subject_snapshot: Json
+          subject_type: Database["public"]["Enums"]["pressure_subject_type"]
+          tensions_json?: Json | null
+          transcript_json?: Json
+          updated_at?: string
+          verdict?: Database["public"]["Enums"]["pressure_verdict"] | null
+          verdict_body?: string | null
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          goal_id?: string | null
+          human_reviewers_json?: Json | null
+          id?: string
+          legacy_report_snapshot_id?: string | null
+          personas_used?: string[]
+          recommended_actions_json?: Json | null
+          rounds?: number
+          subject_ref?: string | null
+          subject_snapshot?: Json
+          subject_type?: Database["public"]["Enums"]["pressure_subject_type"]
+          tensions_json?: Json | null
+          transcript_json?: Json
+          updated_at?: string
+          verdict?: Database["public"]["Enums"]["pressure_verdict"] | null
+          verdict_body?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pressure_test_sessions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pressure_test_sessions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_index: {
         Row: {
           avg_price_per_kg: number
@@ -16102,6 +17315,66 @@ export type Database = {
         }
         Relationships: []
       }
+      readiness_items: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          description: string | null
+          evidence_ref: Json
+          foundry_id: string
+          hypothesis_id: string
+          id: string
+          label: string
+          slot_key: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          description?: string | null
+          evidence_ref?: Json
+          foundry_id: string
+          hypothesis_id: string
+          id?: string
+          label: string
+          slot_key: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          description?: string | null
+          evidence_ref?: Json
+          foundry_id?: string
+          hypothesis_id?: string
+          id?: string
+          label?: string
+          slot_key?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "readiness_items_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "readiness_items_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recent_searches: {
         Row: {
           created_at: string | null
@@ -16580,6 +17853,93 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports_sent: {
+        Row: {
+          body_html: string | null
+          body_markdown: string | null
+          created_at: string
+          draft_by: Database["public"]["Enums"]["report_draft_by"]
+          edits_count: number
+          external_share_url: string | null
+          foundry_id: string
+          id: string
+          legacy_report_snapshot_id: string | null
+          link_expires_at: string | null
+          open_count: number
+          pressure_test_session_id: string | null
+          pressure_tested_before_send: boolean
+          pulled_from_json: Json
+          recipients_json: Json
+          reply_count: number
+          sent_at: string
+          sent_via: string[]
+          subject_line: string
+          target_type: Database["public"]["Enums"]["report_target"]
+          updated_at: string
+        }
+        Insert: {
+          body_html?: string | null
+          body_markdown?: string | null
+          created_at?: string
+          draft_by?: Database["public"]["Enums"]["report_draft_by"]
+          edits_count?: number
+          external_share_url?: string | null
+          foundry_id: string
+          id?: string
+          legacy_report_snapshot_id?: string | null
+          link_expires_at?: string | null
+          open_count?: number
+          pressure_test_session_id?: string | null
+          pressure_tested_before_send?: boolean
+          pulled_from_json?: Json
+          recipients_json?: Json
+          reply_count?: number
+          sent_at?: string
+          sent_via?: string[]
+          subject_line: string
+          target_type: Database["public"]["Enums"]["report_target"]
+          updated_at?: string
+        }
+        Update: {
+          body_html?: string | null
+          body_markdown?: string | null
+          created_at?: string
+          draft_by?: Database["public"]["Enums"]["report_draft_by"]
+          edits_count?: number
+          external_share_url?: string | null
+          foundry_id?: string
+          id?: string
+          legacy_report_snapshot_id?: string | null
+          link_expires_at?: string | null
+          open_count?: number
+          pressure_test_session_id?: string | null
+          pressure_tested_before_send?: boolean
+          pulled_from_json?: Json
+          recipients_json?: Json
+          reply_count?: number
+          sent_at?: string
+          sent_via?: string[]
+          subject_line?: string
+          target_type?: Database["public"]["Enums"]["report_target"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_sent_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_sent_pressure_test_session_id_fkey"
+            columns: ["pressure_test_session_id"]
+            isOneToOne: false
+            referencedRelation: "pressure_test_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -18199,6 +19559,71 @@ export type Database = {
         }
         Relationships: []
       }
+      specialist_recommendations: {
+        Row: {
+          body: string
+          confidence: Database["public"]["Enums"]["rec_confidence"]
+          context_ref: string | null
+          context_type: Database["public"]["Enums"]["rec_context_type"]
+          created_at: string
+          durable: boolean
+          expires_at: string | null
+          foundry_id: string
+          grounding_text: string
+          id: string
+          responded_at: string | null
+          responded_note: string | null
+          specialist_slug: string
+          status: Database["public"]["Enums"]["rec_status"]
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          confidence: Database["public"]["Enums"]["rec_confidence"]
+          context_ref?: string | null
+          context_type: Database["public"]["Enums"]["rec_context_type"]
+          created_at?: string
+          durable?: boolean
+          expires_at?: string | null
+          foundry_id: string
+          grounding_text: string
+          id?: string
+          responded_at?: string | null
+          responded_note?: string | null
+          specialist_slug: string
+          status?: Database["public"]["Enums"]["rec_status"]
+          summary: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          confidence?: Database["public"]["Enums"]["rec_confidence"]
+          context_ref?: string | null
+          context_type?: Database["public"]["Enums"]["rec_context_type"]
+          created_at?: string
+          durable?: boolean
+          expires_at?: string | null
+          foundry_id?: string
+          grounding_text?: string
+          id?: string
+          responded_at?: string | null
+          responded_note?: string | null
+          specialist_slug?: string
+          status?: Database["public"]["Enums"]["rec_status"]
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_recommendations_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       standard_hardware: {
         Row: {
           created_at: string | null
@@ -18416,6 +19841,97 @@ export type Database = {
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategic_goals: {
+        Row: {
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          description: string | null
+          foundry_id: string
+          id: string
+          is_pinned: boolean
+          lead_fractional_id: string | null
+          lead_specialist_slug: string | null
+          lead_user_id: string | null
+          milestone_date: string
+          pin_order: number | null
+          purpose_connection: string | null
+          quarter: string
+          source_objective_id: string | null
+          started_at: string | null
+          state: Database["public"]["Enums"]["goal_state"]
+          state_overridden_until: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          description?: string | null
+          foundry_id: string
+          id?: string
+          is_pinned?: boolean
+          lead_fractional_id?: string | null
+          lead_specialist_slug?: string | null
+          lead_user_id?: string | null
+          milestone_date: string
+          pin_order?: number | null
+          purpose_connection?: string | null
+          quarter: string
+          source_objective_id?: string | null
+          started_at?: string | null
+          state?: Database["public"]["Enums"]["goal_state"]
+          state_overridden_until?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          description?: string | null
+          foundry_id?: string
+          id?: string
+          is_pinned?: boolean
+          lead_fractional_id?: string | null
+          lead_specialist_slug?: string | null
+          lead_user_id?: string | null
+          milestone_date?: string
+          pin_order?: number | null
+          purpose_connection?: string | null
+          quarter?: string
+          source_objective_id?: string | null
+          started_at?: string | null
+          state?: Database["public"]["Enums"]["goal_state"]
+          state_overridden_until?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategic_goals_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "strategic_goals_lead_fractional_id_fkey"
+            columns: ["lead_fractional_id"]
+            isOneToOne: false
+            referencedRelation: "fractional_executives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "strategic_goals_source_objective_id_fkey"
+            columns: ["source_objective_id"]
+            isOneToOne: true
+            referencedRelation: "objectives"
             referencedColumns: ["id"]
           },
         ]
@@ -19274,6 +20790,7 @@ export type Database = {
       task_assignees: {
         Row: {
           created_at: string | null
+          fractional_id: string | null
           id: string
           profile_id: string | null
           specialist_id: string | null
@@ -19282,6 +20799,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          fractional_id?: string | null
           id?: string
           profile_id?: string | null
           specialist_id?: string | null
@@ -19290,6 +20808,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          fractional_id?: string | null
           id?: string
           profile_id?: string | null
           specialist_id?: string | null
@@ -19297,6 +20816,13 @@ export type Database = {
           team_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "task_assignees_fractional_id_fkey"
+            columns: ["fractional_id"]
+            isOneToOne: false
+            referencedRelation: "fractional_executives"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_assignees_profile_id_fkey"
             columns: ["profile_id"]
@@ -19724,14 +21250,19 @@ export type Database = {
           foundry_id: string
           ghost_rationale: string | null
           ghost_source: string | null
+          horizon: string | null
           id: string
           is_demo: boolean
+          is_draft: boolean
           is_ghost: boolean
+          is_pinned: boolean
           is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          origin: string | null
+          origin_ref: string | null
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
@@ -19741,6 +21272,7 @@ export type Database = {
           specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
+          strategic_goal_id: string | null
           task_number: number
           task_type: string
           title: string
@@ -19765,14 +21297,19 @@ export type Database = {
           foundry_id: string
           ghost_rationale?: string | null
           ghost_source?: string | null
+          horizon?: string | null
           id?: string
           is_demo?: boolean
+          is_draft?: boolean
           is_ghost?: boolean
+          is_pinned?: boolean
           is_private?: boolean
           last_nudge_at?: string | null
           metadata?: Json | null
           nudge_count?: number | null
           objective_id: string
+          origin?: string | null
+          origin_ref?: string | null
           owner_agent_id?: string | null
           parent_task_id?: string | null
           plan_id?: string | null
@@ -19782,6 +21319,7 @@ export type Database = {
           specialist_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
+          strategic_goal_id?: string | null
           task_number?: number
           task_type?: string
           title: string
@@ -19806,14 +21344,19 @@ export type Database = {
           foundry_id?: string
           ghost_rationale?: string | null
           ghost_source?: string | null
+          horizon?: string | null
           id?: string
           is_demo?: boolean
+          is_draft?: boolean
           is_ghost?: boolean
+          is_pinned?: boolean
           is_private?: boolean
           last_nudge_at?: string | null
           metadata?: Json | null
           nudge_count?: number | null
           objective_id?: string
+          origin?: string | null
+          origin_ref?: string | null
           owner_agent_id?: string | null
           parent_task_id?: string | null
           plan_id?: string | null
@@ -19823,6 +21366,7 @@ export type Database = {
           specialist_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
+          strategic_goal_id?: string | null
           task_number?: number
           task_type?: string
           title?: string
@@ -19912,6 +21456,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_strategic_goal_id_fkey"
+            columns: ["strategic_goal_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_goals"
             referencedColumns: ["id"]
           },
         ]
@@ -22052,14 +23603,19 @@ export type Database = {
           foundry_id: string
           ghost_rationale: string | null
           ghost_source: string | null
+          horizon: string | null
           id: string
           is_demo: boolean
+          is_draft: boolean
           is_ghost: boolean
+          is_pinned: boolean
           is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          origin: string | null
+          origin_ref: string | null
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
@@ -22069,6 +23625,7 @@ export type Database = {
           specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
+          strategic_goal_id: string | null
           task_number: number
           task_type: string
           title: string
@@ -22233,14 +23790,19 @@ export type Database = {
           foundry_id: string
           ghost_rationale: string | null
           ghost_source: string | null
+          horizon: string | null
           id: string
           is_demo: boolean
+          is_draft: boolean
           is_ghost: boolean
+          is_pinned: boolean
           is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          origin: string | null
+          origin_ref: string | null
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
@@ -22250,6 +23812,7 @@ export type Database = {
           specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
+          strategic_goal_id: string | null
           task_number: number
           task_type: string
           title: string
@@ -22424,14 +23987,19 @@ export type Database = {
           foundry_id: string
           ghost_rationale: string | null
           ghost_source: string | null
+          horizon: string | null
           id: string
           is_demo: boolean
+          is_draft: boolean
           is_ghost: boolean
+          is_pinned: boolean
           is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          origin: string | null
+          origin_ref: string | null
           owner_agent_id: string | null
           parent_task_id: string | null
           plan_id: string | null
@@ -22441,6 +24009,7 @@ export type Database = {
           specialist_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
+          strategic_goal_id: string | null
           task_number: number
           task_type: string
           title: string
@@ -23136,6 +24705,18 @@ export type Database = {
       merge_provider_result: {
         Args: { p_project_id: string; p_provider: string; p_result: Json }
         Returns: undefined
+      }
+      plan_can: {
+        Args: { p_action: string; p_foundry_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      plan_is_fractional_on_goal: {
+        Args: { p_goal_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      plan_is_member: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: boolean
       }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
@@ -24125,6 +25706,7 @@ export type Database = {
     }
     Enums: {
       account_type: "team_builder" | "supplier"
+      actor_type: "founder" | "fractional" | "specialist" | "system"
       admin_role:
         | "super_admin"
         | "operations"
@@ -24139,6 +25721,8 @@ export type Database = {
         | "packed"
         | "shipped"
         | "delivered"
+      assignee_type: "user" | "fractional" | "specialist" | "observer"
+      assumption_state: "holding" | "slipping" | "broken" | "unknown"
       conversation_type:
         | "direct"
         | "task"
@@ -24154,6 +25738,7 @@ export type Database = {
         | "arbitration"
         | "resolved"
         | "escalated"
+      engagement_status: "pending_accept" | "active" | "ended" | "on_hold"
       escrow_status:
         | "pending"
         | "held"
@@ -24162,6 +25747,18 @@ export type Database = {
         | "refunded"
         | "partial_refund"
       feedback_category: "bug" | "idea" | "confusion" | "praise"
+      fractional_specialisation:
+        | "fundraising"
+        | "legal"
+        | "cto"
+        | "people"
+        | "cfo"
+        | "marketing"
+        | "product"
+        | "sales"
+        | "operations"
+        | "advisory"
+        | "other"
       fulfillment_capability_type: "make" | "assemble" | "kit_and_ship"
       funding_stage:
         | "Pre-Seed"
@@ -24170,6 +25767,31 @@ export type Database = {
         | "Series B+"
         | "Growth"
         | "Bridge"
+      goal_state:
+        | "draft"
+        | "active"
+        | "at_risk"
+        | "off_track"
+        | "on_track"
+        | "killed"
+        | "pivoted"
+        | "completed"
+      gutcheck_decision:
+        | "kill"
+        | "pivot"
+        | "double_down"
+        | "dismissed"
+        | "expired"
+      history_entry_type:
+        | "decision"
+        | "pressure_test"
+        | "update_sent"
+        | "goal_pinned"
+        | "goal_state_changed"
+        | "specialist_rec_accepted"
+        | "specialist_rec_rejected"
+        | "gutcheck_outcome"
+        | "manual"
       legal_structure: "Ltd" | "Inc" | "LLC" | "GmbH" | "PLC" | "Other"
       manufacturing_order_status:
         | "draft"
@@ -24224,6 +25846,7 @@ export type Database = {
         | "disputed"
         | "cancelled"
       order_type: "people_booking" | "product_rfq" | "service" | "trial"
+      outcome_state: "positive" | "negative" | "pending" | "neutral"
       pipeline_stage: "design" | "specify" | "source" | "assemble" | "complete"
       pitch_prep_status:
         | "draft"
@@ -24234,6 +25857,13 @@ export type Database = {
         | "completed"
         | "cancelled"
       presence_status: "online" | "away" | "focus" | "offline"
+      pressure_subject_type: "goal" | "objective" | "report_draft" | "custom"
+      pressure_verdict:
+        | "proceed"
+        | "proceed_with_mitigations"
+        | "pivot"
+        | "kill"
+        | "inconclusive"
       provider_type:
         | "Legal"
         | "Financial"
@@ -24243,6 +25873,27 @@ export type Database = {
       qa_test_environment: "staging" | "production"
       qa_test_status: "pending" | "running" | "passed" | "failed" | "cancelled"
       qc_status: "pending" | "passed" | "failed" | "waived"
+      rec_confidence: "low" | "medium" | "high" | "very_high"
+      rec_context_type:
+        | "goal"
+        | "objective"
+        | "task"
+        | "gutcheck"
+        | "pressure_test"
+        | "report"
+      rec_status:
+        | "pending"
+        | "accepted"
+        | "edited_accepted"
+        | "rejected"
+        | "ignored"
+        | "expired"
+      report_draft_by: "cal" | "founder"
+      report_target:
+        | "weekly_team"
+        | "monthly_investor"
+        | "quarterly_board"
+        | "custom"
       rfq_status:
         | "Open"
         | "Bidding"
@@ -24263,6 +25914,7 @@ export type Database = {
         | "Pending_Peer_Review"
         | "Pending_Executive_Approval"
       verification_tier: "unverified" | "claimed" | "verified"
+      working_style: "proactive" | "responsive" | "blended"
     }
     CompositeTypes: {
       geometry_dump: {
@@ -24402,6 +26054,7 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["team_builder", "supplier"],
+      actor_type: ["founder", "fractional", "specialist", "system"],
       admin_role: [
         "super_admin",
         "operations",
@@ -24418,6 +26071,8 @@ export const Constants = {
         "shipped",
         "delivered",
       ],
+      assignee_type: ["user", "fractional", "specialist", "observer"],
+      assumption_state: ["holding", "slipping", "broken", "unknown"],
       conversation_type: [
         "direct",
         "task",
@@ -24435,6 +26090,7 @@ export const Constants = {
         "resolved",
         "escalated",
       ],
+      engagement_status: ["pending_accept", "active", "ended", "on_hold"],
       escrow_status: [
         "pending",
         "held",
@@ -24444,6 +26100,19 @@ export const Constants = {
         "partial_refund",
       ],
       feedback_category: ["bug", "idea", "confusion", "praise"],
+      fractional_specialisation: [
+        "fundraising",
+        "legal",
+        "cto",
+        "people",
+        "cfo",
+        "marketing",
+        "product",
+        "sales",
+        "operations",
+        "advisory",
+        "other",
+      ],
       fulfillment_capability_type: ["make", "assemble", "kit_and_ship"],
       funding_stage: [
         "Pre-Seed",
@@ -24452,6 +26121,34 @@ export const Constants = {
         "Series B+",
         "Growth",
         "Bridge",
+      ],
+      goal_state: [
+        "draft",
+        "active",
+        "at_risk",
+        "off_track",
+        "on_track",
+        "killed",
+        "pivoted",
+        "completed",
+      ],
+      gutcheck_decision: [
+        "kill",
+        "pivot",
+        "double_down",
+        "dismissed",
+        "expired",
+      ],
+      history_entry_type: [
+        "decision",
+        "pressure_test",
+        "update_sent",
+        "goal_pinned",
+        "goal_state_changed",
+        "specialist_rec_accepted",
+        "specialist_rec_rejected",
+        "gutcheck_outcome",
+        "manual",
       ],
       legal_structure: ["Ltd", "Inc", "LLC", "GmbH", "PLC", "Other"],
       manufacturing_order_status: [
@@ -24507,6 +26204,7 @@ export const Constants = {
         "cancelled",
       ],
       order_type: ["people_booking", "product_rfq", "service", "trial"],
+      outcome_state: ["positive", "negative", "pending", "neutral"],
       pipeline_stage: ["design", "specify", "source", "assemble", "complete"],
       pitch_prep_status: [
         "draft",
@@ -24518,6 +26216,14 @@ export const Constants = {
         "cancelled",
       ],
       presence_status: ["online", "away", "focus", "offline"],
+      pressure_subject_type: ["goal", "objective", "report_draft", "custom"],
+      pressure_verdict: [
+        "proceed",
+        "proceed_with_mitigations",
+        "pivot",
+        "kill",
+        "inconclusive",
+      ],
       provider_type: [
         "Legal",
         "Financial",
@@ -24528,6 +26234,30 @@ export const Constants = {
       qa_test_environment: ["staging", "production"],
       qa_test_status: ["pending", "running", "passed", "failed", "cancelled"],
       qc_status: ["pending", "passed", "failed", "waived"],
+      rec_confidence: ["low", "medium", "high", "very_high"],
+      rec_context_type: [
+        "goal",
+        "objective",
+        "task",
+        "gutcheck",
+        "pressure_test",
+        "report",
+      ],
+      rec_status: [
+        "pending",
+        "accepted",
+        "edited_accepted",
+        "rejected",
+        "ignored",
+        "expired",
+      ],
+      report_draft_by: ["cal", "founder"],
+      report_target: [
+        "weekly_team",
+        "monthly_investor",
+        "quarterly_board",
+        "custom",
+      ],
       rfq_status: [
         "Open",
         "Bidding",
@@ -24550,6 +26280,7 @@ export const Constants = {
         "Pending_Executive_Approval",
       ],
       verification_tier: ["unverified", "claimed", "verified"],
+      working_style: ["proactive", "responsive", "blended"],
     },
   },
 } as const

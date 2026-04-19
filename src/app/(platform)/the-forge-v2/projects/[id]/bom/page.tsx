@@ -13,7 +13,7 @@ import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { ListChecks, ArrowRight } from "lucide-react"
 
-import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import { loadCadLabProject, listCadLabParts, type CadLabPartRow } from "@/actions/cad-lab-projects"
 import { Card, CardContent } from "@/components/ui/card"
 
 import { WorkspaceShell } from "../../../_components/workspace-shell"
@@ -30,22 +30,43 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ForgeV2BomPage({ params }: { params: Promise<{ id: string }> }): Promise<React.ReactNode> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
-    const project = result.project
+    const [projectResult, partsResult] = await Promise.all([
+        loadCadLabProject(id),
+        listCadLabParts(id),
+    ])
+    if ("error" in projectResult) notFound()
+    const project = projectResult.project
     const modules = project.modules ?? []
+    const persistedParts: CadLabPartRow[] = "parts" in partsResult ? partsResult.parts : []
+    const persistedCount = persistedParts.length
 
-    // INTENT: module-level parts aren't persisted yet in cad_lab_projects. The
-    // BOM rollup ships once a dedicated parts store lands (future PR). For now
-    // we surface modules as BOM-worthy entities with their mass + key parts.
-    interface Row { name: string; desc: string | null; slug: string; moduleName: string; moduleId: string }
-    const rows: Row[] = modules.flatMap(m => (m.keyParts ?? []).map(kp => ({
-        name: shortenPartName(kp),
-        desc: partDescription(kp),
-        slug: kp,
-        moduleName: m.name,
-        moduleId: m.id,
-    })))
+    interface Row { name: string; desc: string | null; slug: string; moduleName: string; moduleId: string; material: string | null; qty: number | null; isPersisted: boolean }
+
+    // Prefer persisted cad_lab_parts rows when present; fall back to keyParts names.
+    const rows: Row[] = persistedCount > 0
+        ? persistedParts.map(p => {
+            const mod = modules.find(m => m.id === p.moduleId)
+            return {
+                name: p.displayName ?? shortenPartName(p.name),
+                desc: p.description ?? partDescription(p.name),
+                slug: p.sourceKeyPart ?? p.name,
+                moduleName: mod?.name ?? p.moduleId,
+                moduleId: p.moduleId,
+                material: p.material,
+                qty: p.quantity,
+                isPersisted: true,
+            }
+        })
+        : modules.flatMap(m => (m.keyParts ?? []).map(kp => ({
+            name: shortenPartName(kp),
+            desc: partDescription(kp),
+            slug: kp,
+            moduleName: m.name,
+            moduleId: m.id,
+            material: null,
+            qty: null,
+            isPersisted: false,
+        })))
 
     return (
         <WorkspaceShell
@@ -54,7 +75,7 @@ export default async function ForgeV2BomPage({ params }: { params: Promise<{ id:
                 { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
                 { label: "BOM" },
             ]}
-            subtitle={rows.length === 0 ? "Bill of materials — no parts yet" : `${rows.length} key components across ${modules.length} modules · per-part specs ship with the parts store`}
+            subtitle={rows.length === 0 ? "Bill of materials — no parts yet" : persistedCount > 0 ? `${rows.length} parts with authored specs across ${modules.length} modules` : `${rows.length} key components across ${modules.length} modules · names only (authored specs land in cad_lab_parts)`}
         >
             {rows.length === 0 ? (
                 <Card className="rounded-xl border">

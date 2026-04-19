@@ -11,20 +11,16 @@
  * Mockup ref: FORGE-MOCKUP-FORK.html.
  */
 
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { GitFork, ArrowRight, Boxes, Layers, Users, FileText, ListChecks, Truck, AlertTriangle, PoundSterling, Rocket } from "lucide-react"
+import { GitFork, Boxes, Layers, Users, FileText, ListChecks, Truck, AlertTriangle, PoundSterling, Rocket } from "lucide-react"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 
 import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { ForkForm } from "./_components/fork-form"
 
 export const dynamic = "force-dynamic"
 
@@ -121,7 +117,7 @@ export default async function ForgeV2ForkPage({ params }: { params: Promise<{ id
                 </div>
             </section>
 
-            {/* Variant form (stub) */}
+            {/* Variant form (real — writes via forkCadLabProject) */}
             <section aria-labelledby="variant-form" className="space-y-3">
                 <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-international-orange" />
@@ -129,38 +125,7 @@ export default async function ForgeV2ForkPage({ params }: { params: Promise<{ id
                         Variant details
                     </h2>
                 </div>
-                <Card className="rounded-xl border">
-                    <CardContent className="py-5 px-5 space-y-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="fork-name">Variant name</Label>
-                            <Input
-                                id="fork-name"
-                                placeholder={`${project.name} v1.1`}
-                                defaultValue=""
-                                disabled
-                            />
-                            <p className="text-[11.5px] text-muted-foreground">Shown in the workspace alongside the parent.</p>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="fork-market">Target market</Label>
-                            <Input
-                                id="fork-market"
-                                placeholder="e.g. Maritime — NATO STANAG 4569, saltwater exposure, GPS-denied nav"
-                                disabled
-                            />
-                            <p className="text-[11.5px] text-muted-foreground">Drives supplier filters, regulatory envelope, risk register defaults.</p>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="fork-why">Why fork</Label>
-                            <Textarea
-                                id="fork-why"
-                                placeholder="Customer ask, pilot commitment, or compliance driver. Specific enough that the fork justifies itself six months from now."
-                                rows={4}
-                                disabled
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
+                <ForkForm projectId={project.id} parentName={project.name} projectHref={projectHref} />
             </section>
 
             {/* Spine preview */}
@@ -199,25 +164,6 @@ export default async function ForgeV2ForkPage({ params }: { params: Promise<{ id
                 </Card>
             </section>
 
-            {/* CTA strip — disabled, coming soon */}
-            <Card className="rounded-xl border bg-muted/30">
-                <CardContent className="py-5 px-5 flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">Forking lands in a later PR</p>
-                        <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed max-w-xl">
-                            The fork mutation — carrying Modules + Geometry forward, scaffolding a new Brief and empty BOM — is not wired yet. For now, open a fresh project and reference this one by hand.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Button asChild size="sm" variant="secondary">
-                            <Link href={projectHref}>Back to project</Link>
-                        </Button>
-                        <Button size="sm" disabled className="gap-1.5">
-                            Create variant <ArrowRight className="h-3.5 w-3.5" />
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
         </WorkspaceShell>
     )
 }
