@@ -51,7 +51,25 @@ export async function middleware(request: NextRequest) {
         const newUrl = new URL(pathname + request.nextUrl.search, 'https://fractionalforge.app')
         return NextResponse.redirect(newUrl, 301)
     }
-    
+
+    // Products Pre-Phase Coming Soon sidecar — redirect deep links to legacy read-only.
+    // /products/[id] (any id not "legacy") → /products/legacy/[id]
+    // Runs BEFORE any layout so the redirect is a true HTTP 307. Next.js App Router
+    // otherwise swallows page.tsx redirect() calls when the parent ProductsLayout
+    // commits render via the Coming Soon route gate (verified 2026-04-19 final agent-
+    // browser pass P1 — page-level redirect returned 200 with Coming Soon body instead
+    // of a 307). Doing the redirect here at edge time is the correct Next 15 pattern.
+    // Temporary: removed when Phase 4 Products ships and the sidecar is torn down.
+    if (pathname.startsWith('/products/')) {
+        const deepLink = pathname.match(/^\/products\/([^/]+)\/?$/)
+        if (deepLink && deepLink[1] !== 'legacy') {
+            return NextResponse.redirect(
+                new URL(`/products/legacy/${deepLink[1]}`, request.url),
+                307,
+            )
+        }
+    }
+
     // Continue with auth middleware
     return await updateSession(request)
 }
