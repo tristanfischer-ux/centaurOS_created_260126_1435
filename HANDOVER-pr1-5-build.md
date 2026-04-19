@@ -105,3 +105,28 @@ User said: after Phase 1 complete (PR #1.5 + PR #2 + later PRs all shipped), kic
 4. Sidebar Products item gets SOON badge — universal, no flag.
 
 Phase order revised same session: Phase 2 = Money (was 4), Phase 4 = Products (was 2, moved last).
+
+---
+
+## After this phase ships — DO NOT STOP
+
+**Fully autonomous pipeline: this terminal is the permanent "build terminal" for the ForgeOS redesign. Do not close the session between phases.**
+
+When PR #1.5 merges to main:
+
+1. Re-read `COORDINATION-STATUS.md` at repo root.
+2. Follow §Pipeline rules state machine.
+3. If Money phase is `build-approved`: immediately `git checkout -b feat/money-redesign` and start Money build per `HANDOVER-money.md`.
+4. If Money phase is `awaiting review`: notify Tristan (iMessage via `mcp__plugin_imessage_imessage__reply` to self-chat if chat_id known, else print prominent `⚠️ AWAITING TRISTAN RED-TEAM REVIEW — Money audit at MONEY-MOCKUP-GAP-AUDIT.html` banner and stay open). Do NOT close the session.
+5. When Tristan says `locked`: update COORDINATION-STATUS.md to `build-approved`, then start Money build.
+6. Same protocol for Plan after Money merges. Same for Products after Plan merges.
+7. Final phase is Products. After Products merges, update COORDINATION-STATUS.md to `redesign complete — pipeline closed` and report to Tristan. Only then may the session end.
+
+**Phase order locked:** Forge → Money → Plan → Products.
+
+**Pickup docs for each phase (the prep terminals produce these):**
+- Money: `HANDOVER-money.md` + `MONEY-SCHEMA.md` + `MONEY-MOCKUP-GAP-AUDIT.html`
+- Plan: `HANDOVER-plan.md` + `PLAN-SCHEMA.md` + `PLAN-MOCKUP-GAP-AUDIT.html`
+- Products: `HANDOVER-products.md` + `PRODUCTS-SCHEMA.md` + `PRODUCTS-MOCKUP-INDEX.html` + `PRODUCTS-MOCKUP-GAP-AUDIT.html`
+
+**Between phases: auto-save checkpoint to MemPalace** (drawer `forgeos/decisions` describing what shipped + what's next). Keeps MEMORY.md and MemPalace in sync so compaction can't break the chain.

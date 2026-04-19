@@ -1,4 +1,4 @@
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar } from "@/components/sidebar/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
 // ContextIndicator removed — banners no longer shown at page top
 import { PWARegister } from "@/components/PWARegister";
