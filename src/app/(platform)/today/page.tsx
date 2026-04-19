@@ -18,6 +18,7 @@ import { getUnreadCount } from "@/actions/messaging"
 import { TodayView } from "./today-view"
 import { getOnboardingState } from "@/actions/onboarding"
 import { createClient } from "@/lib/supabase/server"
+import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 
 export const metadata: Metadata = {
     title: "Today",
@@ -26,13 +27,14 @@ export const metadata: Metadata = {
 
 export default async function TodayPage(): Promise<React.ReactNode> {
     const supabase = await createClient()
-    const [{ data: authData }, briefingResult, pulseResult, strategyResult, unreadResult, onboardingState] = await Promise.all([
+    const [{ data: authData }, briefingResult, pulseResult, strategyResult, unreadResult, onboardingState, foundryId] = await Promise.all([
         supabase.auth.getUser(),
         getMorningBriefing().catch(() => ({ data: null, error: "Failed" })),
         getMyDailyPulse().catch(() => ({ success: false, data: undefined, error: "Failed" }) as DailyPulseResult),
         getStrategyHealthSummary().catch(() => ({ error: "Failed" }) as { error: string }),
         getUnreadCount().catch(() => ({ count: 0 })),
         getOnboardingState().catch(() => undefined),
+        getFoundryIdCached().catch(() => null),
     ])
 
     // Show the "List yourself as a fractional executive" promo card to users who
@@ -63,6 +65,7 @@ export default async function TodayPage(): Promise<React.ReactNode> {
                 initialPulseError={!pulseResult.success || !pulseResult.data}
                 initialOnboardingData={onboardingState}
                 showFractionalExecPrompt={showFractionalExecPrompt}
+                foundryId={foundryId}
             />
         </>
     )
