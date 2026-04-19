@@ -21,8 +21,21 @@
  * - src/app/(platform)/products/legacy/[id]/page.tsx — read-only detail
  */
 
+import type { Metadata } from 'next'
 import { ProductsComingSoon } from './coming-soon'
 import { ProductsRouteGate } from './products-route-gate'
+
+// FIX: Layout-level metadata prevents the root-layout "ForgeOS — The Operating
+// System for Hardware Startups" marketing title from flashing for /products/*
+// URLs on navigation. Layout metadata wins the Next 15 cascade for descendants
+// unless a page.tsx overrides. The Coming Soon and legacy read-only surfaces
+// inherit this; the forthcoming Phase 4 detail pages will override with their
+// own per-product titles.
+export const metadata: Metadata = {
+  title: 'Products | ForgeOS',
+  description:
+    'Products is being redesigned — a market-validation workbench covering hypothesis testing, TAM/SAM/SOM, evidence logs, unit economics, and investor-readiness.',
+}
 
 export default async function ProductsLayout({
   children,
