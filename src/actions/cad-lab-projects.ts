@@ -551,14 +551,27 @@ export async function saveCadLabProductOverview(
   projectId: string,
   overview: string,
 ): Promise<{ success: true } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
     if (overview.length > 10_000) return { error: "Product overview too long (max 10,000 characters)" }
+
+    // SECURITY: fail fast if the brief is currently locked. Unlock first.
+    const { data: current, error: lockCheckErr } = await supabase
+      .from("cad_lab_projects")
+      .select("brief_locked_at")
+      .eq("id", projectId)
+      .eq("foundry_id", foundryId)
+      .single()
+    if (lockCheckErr || !current) return { error: "Project not found" }
+    if ((current as { brief_locked_at?: string | null }).brief_locked_at) {
+      return { error: "Brief is locked — unlock before editing." }
+    }
 
     const { error } = await supabase
       .from("cad_lab_projects")
       .update({ product_overview: overview })
       .eq("id", projectId)
+      .eq("foundry_id", foundryId)
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save product overview:", error.message)
@@ -1393,13 +1406,14 @@ export async function saveCadLabReviewSkipped(
 export async function lockCadLabBrief(
   projectId: string,
 ): Promise<{ success: true; lockedAt: string } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
     const lockedAt = new Date().toISOString()
     const { error } = await supabase
       .from("cad_lab_projects")
       .update({ brief_locked_at: lockedAt })
       .eq("id", projectId)
+      .eq("foundry_id", foundryId)
     if (error) return { error: `Failed to lock brief: ${sanitizeErrorMessage(error)}` }
     return { success: true as const, lockedAt }
   })
@@ -1411,12 +1425,13 @@ export async function lockCadLabBrief(
 export async function unlockCadLabBrief(
   projectId: string,
 ): Promise<{ success: true } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
     const { error } = await supabase
       .from("cad_lab_projects")
       .update({ brief_locked_at: null })
       .eq("id", projectId)
+      .eq("foundry_id", foundryId)
     if (error) return { error: `Failed to unlock brief: ${sanitizeErrorMessage(error)}` }
     return { success: true as const }
   })
@@ -1430,13 +1445,14 @@ export async function archiveCadLabProject(
   projectId: string,
   archived = true,
 ): Promise<{ success: true; archivedAt: string | null } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
     const archivedAt = archived ? new Date().toISOString() : null
     const { error } = await supabase
       .from("cad_lab_projects")
       .update({ archived_at: archivedAt })
       .eq("id", projectId)
+      .eq("foundry_id", foundryId)
     if (error) return { error: `Failed to archive project: ${sanitizeErrorMessage(error)}` }
     return { success: true as const, archivedAt }
   })
@@ -1602,7 +1618,22 @@ export async function createCadLabPart(
 ): Promise<{ partId: string } | { error: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
     if (!input.projectId || !UUID_RE.test(input.projectId)) return { error: "Invalid project ID" }
+    if (!input.moduleId || input.moduleId.trim().length === 0) return { error: "Module ID required" }
     if (!input.name || input.name.trim().length === 0) return { error: "Part name required" }
+    if (input.name.length > 500) return { error: "Part name too long (max 500 characters)" }
+
+    // SECURITY: verify the project belongs to the caller's foundry AND the
+    // moduleId exists on the project. Prevents orphaned parts + cross-foundry writes.
+    const { data: project, error: projectErr } = await supabase
+      .from("cad_lab_projects")
+      .select("id, modules")
+      .eq("id", input.projectId)
+      .eq("foundry_id", foundryId)
+      .single()
+    if (projectErr || !project) return { error: "Project not found" }
+    const modules = (project.modules as unknown as Array<{ id?: string }> | null) ?? []
+    const moduleExists = modules.some(m => m?.id === input.moduleId)
+    if (!moduleExists) return { error: `Module '${input.moduleId}' not found on project` }
 
     const { data, error } = await supabase
       .from("cad_lab_parts")
@@ -1686,13 +1717,14 @@ export async function createAssumptionTest(
 export async function exportProjectHandoffMarkdown(
   projectId: string,
 ): Promise<{ filename: string; contentBase64: string; bytes: number } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { data: project, error } = await supabase
       .from("cad_lab_projects")
       .select("id, name, subject, stage, status, product_overview, research, modules, created_at, updated_at, design_revision, foundry_id")
       .eq("id", projectId)
+      .eq("foundry_id", foundryId)
       .single()
     if (error || !project) return { error: "Project not found" }
 

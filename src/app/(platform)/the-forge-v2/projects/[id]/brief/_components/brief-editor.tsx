@@ -34,7 +34,7 @@ import { useMemo, useState, useTransition } from "react"
 import { ArrowRight, FileText, Lock, Sparkles, Unlock } from "lucide-react"
 import { toast } from "sonner"
 
-import { saveCadLabProductOverview } from "@/actions/cad-lab-projects"
+import { saveCadLabProductOverview, lockCadLabBrief, unlockCadLabBrief } from "@/actions/cad-lab-projects"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -92,6 +92,7 @@ export function BriefEditor({
     const [draft, setDraft] = useState<string>(initialOverview ?? "")
     const [lockedAt, setLockedAt] = useState<string | null>(initialLockedAt)
     const [isSaving, startSave] = useTransition()
+    const [isLocking, startLock] = useTransition()
 
     const isLocked = lockedAt !== null
     const isDirty = draft !== savedOverview
@@ -134,21 +135,33 @@ export function BriefEditor({
         toast.success("Unsaved changes discarded.")
     }
 
-    // DECISION: lock/unlock is optimistic-only until the migration lands. The
-    // server action doesn't exist yet, so there's nothing to await — we simply
-    // flip local state and mirror the UX the real action will produce.
+    // Real persistence via lockCadLabBrief / unlockCadLabBrief (PR #71).
     function handleLock(): void {
         if (isDirty) {
             toast.error("Save or discard your changes before locking the brief.")
             return
         }
-        setLockedAt(new Date().toISOString())
-        toast.success("Brief locked. Downstream artefacts now anchor to this revision.")
+        startLock(async () => {
+            const result = await lockCadLabBrief(projectId)
+            if ("error" in result) {
+                toast.error(result.error)
+                return
+            }
+            setLockedAt(result.lockedAt)
+            toast.success("Brief locked. Downstream artefacts now anchor to this revision.")
+        })
     }
 
     function handleUnlock(): void {
-        setLockedAt(null)
-        toast.success("Brief unlocked — edits are live again.")
+        startLock(async () => {
+            const result = await unlockCadLabBrief(projectId)
+            if ("error" in result) {
+                toast.error(result.error)
+                return
+            }
+            setLockedAt(null)
+            toast.success("Brief unlocked — edits are live again.")
+        })
     }
 
     // ─── Empty state ─────────────────────────────────────────────────────
@@ -198,10 +211,11 @@ export function BriefEditor({
                             variant="secondary"
                             size="sm"
                             onClick={handleUnlock}
+                            disabled={isLocking}
                             className="shrink-0"
                         >
                             <Unlock className="h-3.5 w-3.5" />
-                            Unlock
+                            {isLocking ? "Unlocking…" : "Unlock"}
                         </Button>
                     </CardContent>
                 </Card>
@@ -288,7 +302,7 @@ export function BriefEditor({
                             <Button
                                 size="sm"
                                 onClick={handleLock}
-                                disabled={isSaving || isDirty}
+                                disabled={isSaving || isDirty || isLocking}
                                 title={
                                     isDirty
                                         ? "Save or discard changes before locking"
@@ -296,7 +310,7 @@ export function BriefEditor({
                                 }
                             >
                                 <Lock className="h-3.5 w-3.5" />
-                                Lock brief
+                                {isLocking ? "Locking…" : "Lock brief"}
                             </Button>
                         </div>
                     </div>

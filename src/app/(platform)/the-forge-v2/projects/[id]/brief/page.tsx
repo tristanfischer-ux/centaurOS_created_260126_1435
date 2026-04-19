@@ -9,12 +9,10 @@
  *
  * Mockup refs: FORGE-MOCKUP-BRIEF.html, FORGE-MOCKUP-BRIEF-LOCK.html.
  *
- * TODO (deferred migration): a `brief_locked_at timestamptz` column on
- * `cad_lab_projects` + matching `lockCadLabBrief(projectId)` /
- * `unlockCadLabBrief(projectId)` server actions are queued but not applied
- * this session — other pending migrations are stacked locally and pushing
- * would apply them all. Until the column ships, lock state lives in
- * BriefEditor's local React state; `initialLockedAt` is always `null` here.
+ * Lock state is real — backed by `brief_locked_at timestamptz` on
+ * cad_lab_projects and the lockCadLabBrief / unlockCadLabBrief actions
+ * (shipped PR #71, 2026-04-19). initialLockedAt flows from the loaded
+ * project so the editor mirrors server truth on first render.
  */
 
 import { notFound } from "next/navigation"
@@ -60,7 +58,7 @@ export default async function ForgeV2BriefPage({ params }: { params: Promise<{ i
                 projectHref={projectHref}
                 initialOverview={overview}
                 designBrief={designBrief}
-                initialLockedAt={null}
+                initialLockedAt={project.briefLockedAt}
             />
         </WorkspaceShell>
     )
