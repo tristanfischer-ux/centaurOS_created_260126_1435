@@ -63,17 +63,18 @@ Supporting file: `src/components/sidebar/data/types.ts` exports the shared `Side
 
 tsc: 8 pre-existing errors, 0 new. Visual change: zero.
 
-### F · Today V3 (reskin-plus-frame — preserve existing signals)
-- [ ] F.1 Port headline Priority card — use `briefing.nudges[0]` / `briefing.topTasks[0]` as the primary signal source (existing Today logic)
-- [ ] F.2 Runway card (Money slot) — "Connect Cash Burn" stub (no existing runway action wired to Today). Mini-stats empty.
-- [ ] F.3 Plan panel — populate from `getStrategyHealthSummary()` + `getMyDailyPulse()` (at-risk objectives, tasks due/overdue/completed)
-- [ ] F.4 Forge panel — "Coming in PR #N · Forge experience build starts next" placeholder
-- [ ] F.5 Products panel — "Coming in Phase 2" placeholder
-- [ ] F.6 Waiting-on-you inbox — `briefing.nudges` + `briefing.topTasks` + `pulseData.blockers`
-- [ ] F.7 Greeting + Cal hero narrative — reuse existing `use-cal-briefing.ts`
-- [ ] F.8 `src/types/today.ts` — `TodaySignal` interface matching `event_log` row
-- [ ] F.9 `src/app/api/today-feed/route.ts` — stub returning empty `signals` array (subscribes to `event_log` via Realtime client-side; hydrates only Forge events once PR #2+ starts writing)
-- [ ] F.10 Verify fresh-signup flow via `~/.claude/scripts/forgeos-login.sh` — Today V3 empty-state must not break onboarding
+### F · Today V3 — Today-MINIMAL scope only (visual rebuild deferred to PR #1.5)
+
+Scope revision 2026-04-19 (Tristan reversed the reskin-plus-frame instruction after the same compound-risk argument as Sidebar — `today-view.tsx` is 1636 lines with 30+ signal surfaces; rebuilding it alongside migrations + flag + sidebar-data in one PR = four-dimensional regression debugging in one preview). PR #1 ships the **data contract** only; PR #1.5 ships the visual rebuild bundled with sidebar chrome.
+
+- [x] F.1 _(deferred to PR #1.5)_ Priority card + Runway + Plan/Forge/Products/Money panels + Waiting-on-you inbox + Cal hero slab — all land in the bundled visual rebuild.
+- [x] F.2 `src/types/today.ts` — `TodaySignal` interface + `TodaySignalSection` / `TodaySignalUrgency` / `TodaySignalDecayRate` narrowed unions + `DECAY_RATE_RANK` table + `compareTodaySignals(a, b)` sort comparator + `toTodaySignal(row)` from-DB-row mapper. Envelope stable for downstream phases.
+- [x] F.3 `src/app/api/today-feed/route.ts` — GET handler reading `event_log` where `section='forge'` AND `resolved_at IS NULL`, `limit 200`, then sorted in-route via `compareTodaySignals` (decay_rate → consequence_weight DESC → created_at DESC). Foundry scoping enforced by `event_log_foundry_select` RLS. Returns `{ signals: [] }` on unauth or lookup error — never 500s.
+- [x] F.4 `src/hooks/useTodayForgeFeed.ts` — client hook. Hydrates via `/api/today-feed`, subscribes to `event_log` INSERT + UPDATE via Supabase Realtime (channel `event_log_forge_<foundryId>`, filter `foundry_id=eq.<id>` + client-side `section === 'forge'` check). UPDATE with non-null `resolved_at` evicts the row. **Ships wired but NOT MOUNTED** on `/today` in PR #1 — PR #1.5 mounts it.
+- [x] F.5 `/today` page — visually unchanged. `today-view.tsx` preserved byte-for-byte. Zero regression.
+- [x] F.6 tsc baseline-clean (8 pre-existing errors, 0 new).
+
+**What Phases 2/3/4 consume from PR #1 Today-minimal:** `TodaySignal` type + `/api/today-feed` route + `useTodayForgeFeed` hook + `event_log` table (from B.5) + Realtime publication. Phase 2 Products will write to `event_log` with `section='products'` (and extend the route's filter); PR #1.5 visual rebuild mounts the subscription so events actually show on Today.
 
 ### G · Verification
 - [ ] G.1 `./scripts/check-design-tokens.sh` — no hardcoded colors
@@ -149,18 +150,45 @@ Populated during implementation. Format: `[surface] risk · mitigation`.
 
 ---
 
-## PR #2..N roadmap (not this PR)
+## PR sequence — revised 15-PR plan (Tristan 2026-04-19)
 
-Sketched for handover continuity — not executed in PR #1.
+Three drill-ins not in the original 12-PR plan are scheduled here; PR #1.5 bundles the visual rebuild of the two most-used surfaces (sidebar chrome + Today V3) for one focused review.
 
-- PR #2 — Workspace + phase tabs + 9-artefact grid shell at `/the-forge-v2`
-- PR #3 — Brief + Brief-Lock
-- PR #4 — Modules + Module-Detail + Part-Detail
-- PR #5 — BOM + BOM-Add
-- PR #6 — Suppliers + Supplier-Create + Supplier-Detail
-- PR #7 — Risks + Risk-Create
-- PR #8 — Cost
-- PR #9 — Experts + Expert-Profile
-- PR #10 — Geometry + Geometry-Upload + CAD lab drill-in CTA
-- PR #11 — Launch + Launch-Handoff + Operations + Revisions
-- PR #12 — Cutover: rename `/the-forge-v2` → `/the-forge`, flag global on, remove flag-gate dead code
+- **PR #1** (this PR) — Shared primitives: migrations + flag primitive + sidebar data extraction + Today-minimal API contract. Visual change = zero.
+- **PR #1.5** — Visual rebuild bundle. Sidebar chrome to `sb-*` system per `SHARED-SIDEBAR.html`; `today-view.tsx` full rebuild per `FORGE-MOCKUP-TODAY-V3.html` with ALL existing signals ported into V3 panel slots (briefing.nudges → Waiting-on-you, topTasks/blockers → Today queue, strategyHealth → Plan panel, Cal narrative → Priority slab when hottest, pulseData stats → 3-tile mini-grid). Bundle rationale: both surfaces consume the same `sb-*` token system — one review cycle, one agent-browser walkthrough, one preview sign-off.
+- **Pre-PR #2 audit (required)** — `FORGE-LEGACY-ROUTES-AUDIT.md`. Audit every file under `src/app/(platform)/the-forge/*`; for each file NOT covered by a `FORGE-MOCKUP-*` spec, decide fate: **Migrate** (content folds into new structure), **Preserve** (stays at legacy path — CAD lab is the obvious one), or **Deprecate** (removed with migration path for affected users). Prevents surfaces falling through cracks during v2 build.
+- **PR #2** — Workspace + phase tabs + 9-artefact grid shell at `/the-forge-v2` **+ PROJECT-CREATE** (can't use Workspace without creating projects).
+- **PR #3** — Brief artefact + Brief-Lock flow (Brief-Lock is an approve flow; partial coverage of APPROVE).
+- **PR #4 — Modules + Module-Detail + Part-Detail. Three deliverables (Tristan 2026-04-19):**
+  - **(a) UI** per `FORGE-MOCKUP-MODULE-DETAIL.html` + `FORGE-MOCKUP-PART-DETAIL.html` — all 10 sections mandatory: breadcrumb, dual-illustration hero, DESCRIPTION, Why This Matters, Inputs/Outputs, Key Components, Failure Modes, Unknowns, Lead time, Design Grounded In.
+  - **(b) Migration — `cad_lab_modules → new-slot` field mapping** (PR #4's own `FORGE-DATA-PRESERVATION.md` must include this):
+    - `description` → DESCRIPTION section
+    - `rationale` / `mission_relevance` → Why This Module Matters callout
+    - `inputs[]` / `outputs[]` → Inputs/Outputs pills
+    - `components[]` / `bom_items[]` → KEY COMPONENTS bullets
+    - `failure_modes[]` / `risks[]` → FAILURE MODES list
+    - `open_questions[]` / `unknowns[]` → UNKNOWNS list
+    - `lead_time_weeks` → Lead time badge
+    - `materials_referenced[]` / library tags → DESIGN GROUNDED IN pills
+  - Pre-PR-#4 audit: count `cad_lab_modules` rows with populated `rationale` / `failure_modes` / `unknowns` etc. in production; migration must preserve 100%.
+  - **(c) Specialist regeneration paths per section.** Empty field on a CAD-Lab-linked module → the relevant specialist can populate it on demand. Jian (structure), Fang (DFM), Chase (supply). PR #4 wires specialist server actions per section, not just static fields.
+- **PR #5** — BOM + BOM-Add + Part-Detail ties.
+- **PR #6** — Suppliers + Supplier-Create + Supplier-Detail.
+- **PR #6.5** — Comms & workflows bundle: ASK-SPECIALIST + COMPOSE + REQUEST + SCHEDULE. Referenced from almost every artefact page; natural inflection between "routes exist" and "actions work".
+- **PR #7** — Risks + Risk-Create.
+- **PR #8** — Cost.
+- **PR #8.5** — EXPORT (standalone, can land any time after Cost and before cutover).
+- **PR #9** — Experts + Expert-Profile.
+- **PR #10** — Geometry + Geometry-Upload + CAD lab drill-in CTA.
+- **PR #11** — Launch + Launch-Handoff + Operations + Revisions + Fork + Revision-Merge.
+- **PR #11.5** — Onboarding flow (7-step mockup set). Must land before cutover so wide release has day-one onboarding.
+- **PR #12** — Cutover: rename `/the-forge-v2` → `/the-forge`, CAD lab stays at `/the-forge/cad-lab`, feature flag removed as dead code.
+
+### Phase 2 gate
+
+Phase 2 (Products) cannot start until Phase 1 is **functionally complete**, not just "15 PRs merged":
+
+1. Users can create projects (PROJECT-CREATE shipped in PR #2).
+2. Every mockup action has a wired destination — no dead `href="#"`.
+3. Today V3 coordinates Forge signals end-to-end (PR #1.5 visual + PR #6.5 ASK-SPECIALIST wired).
+4. Legacy routes migrated or preserved per pre-PR #2 audit.
