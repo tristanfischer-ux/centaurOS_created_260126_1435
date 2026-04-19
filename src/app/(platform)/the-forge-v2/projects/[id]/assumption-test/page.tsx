@@ -64,7 +64,7 @@ export default async function ForgeV2AssumptionTestPage({ params }: { params: Pr
                 </CardContent>
             </Card>
 
-            <AssumptionForm />
+            <AssumptionForm projectId={project.id} />
         </WorkspaceShell>
     )
 }

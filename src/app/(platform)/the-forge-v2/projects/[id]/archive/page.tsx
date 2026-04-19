@@ -11,19 +11,17 @@
  * Mockup ref: FORGE-MOCKUP-ARCHIVE-PRODUCT.html.
  */
 
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { Archive, ArrowRight, ShieldCheck, AlertTriangle } from "lucide-react"
+import { ShieldCheck, AlertTriangle } from "lucide-react"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
 import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { ArchiveButton } from "./_components/archive-button"
 
 export const dynamic = "force-dynamic"
 
@@ -188,30 +186,8 @@ export default async function ForgeV2ArchivePage({ params }: { params: Promise<{
                 </Card>
             </section>
 
-            {/* CTA strip — disabled, coming soon */}
-            <Card className="rounded-xl border bg-muted/30">
-                <CardContent className="py-5 px-5 flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <Badge variant="outline" className="text-[10px] font-semibold bg-international-orange/10 text-international-orange border-international-orange/30">
-                            Coming soon
-                        </Badge>
-                        <p className="text-sm font-semibold text-foreground mt-1">Soft-archive lands with the `archived_at` column</p>
-                        <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed max-w-xl">
-                            Archive is deliberately distinct from delete — a column migration is queued alongside Brief lock. Until it ships, this page captures the discipline without committing the record.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Button asChild size="sm" variant="secondary">
-                            <Link href={projectHref}>Back to project</Link>
-                        </Button>
-                        <Button size="sm" disabled className="gap-1.5">
-                            <Archive className="h-3.5 w-3.5" />
-                            Archive with reason
-                            <ArrowRight className="h-3.5 w-3.5" />
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* CTA — real archiveCadLabProject call */}
+            <ArchiveButton projectId={project.id} projectHref={projectHref} initialArchivedAt={project.archivedAt} />
         </WorkspaceShell>
     )
 }

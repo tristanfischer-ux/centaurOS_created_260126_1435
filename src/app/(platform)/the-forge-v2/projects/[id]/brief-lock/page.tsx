@@ -204,7 +204,7 @@ export default async function ForgeV2BriefLockPage({ params }: { params: Promise
             </section>
 
             {/* Lock CTA (client component) */}
-            <LockButton projectHref={projectHref} briefHref={briefHref} />
+            <LockButton projectId={project.id} projectHref={projectHref} briefHref={briefHref} initialLockedAt={project.briefLockedAt} />
         </WorkspaceShell>
     )
 }
