@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plan — Gap audit + red team (pre-code)</title>
+<link rel="stylesheet" href="forge-mockup.css">
+<link rel="stylesheet" href="plan-mockup.css">
+<style>
+  .ga-head { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: var(--shadow-xs); position: relative; overflow: hidden; }
+  .ga-head::after { content: ""; position: absolute; top: 0; right: 0; width: 400px; height: 100%; background: radial-gradient(ellipse at top right, var(--brand-soft) 0%, transparent 60%); pointer-events: none; }
+  .ga-head > * { position: relative; }
+  .ga-head h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 8px; }
+  .ga-head .sub { font-size: 14px; color: var(--fg-muted); max-width: 820px; line-height: 1.55; }
+  .ga-head .sub strong { color: var(--fg); font-weight: 700; }
+
+  .ga-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-soft); }
+  .ga-stats .tile .lab { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--fg-muted); }
+  .ga-stats .tile .val { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-top: 3px; }
+  .ga-stats .tile .val.brand { color: var(--brand); }
+  .ga-stats .tile .val.bad { color: var(--danger); }
+  .ga-stats .tile .val.good { color: var(--success); }
+  .ga-stats .tile .sub { font-size: 11.5px; color: var(--fg-muted); margin-top: 2px; }
+
+  .section-block { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: var(--shadow-xs); }
+  .section-block h2 { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+  .section-block .block-sub { font-size: 13px; color: var(--fg-muted); margin-bottom: 18px; max-width: 800px; line-height: 1.55; }
+  .section-block h2 .tag { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 3px 8px; border-radius: 4px; background: var(--brand-soft); color: var(--brand); vertical-align: middle; margin-left: 10px; }
+
+  .gap-card { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .gap-head { padding: 14px 18px; background: var(--surface-soft); display: grid; grid-template-columns: auto 1fr auto auto; gap: 14px; align-items: center; border-bottom: 1px solid var(--border); }
+  .gap-head .p-num { font-size: 16px; font-weight: 800; color: var(--brand); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; min-width: 18px; }
+  .gap-head h3 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+  .gap-head h3 small { font-weight: 500; color: var(--fg-muted); margin-left: 8px; font-size: 11.5px; }
+  .gap-head .count-pills { display: flex; gap: 6px; }
+  .gap-head .cp { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .gap-head .cp.must { background: var(--danger-soft); color: var(--danger); }
+  .gap-head .cp.nice { background: var(--warning-soft); color: var(--warning); }
+  .gap-head .cp.defer { background: var(--surface-muted); color: var(--fg-muted); }
+  .gap-head .view-btn { font-size: 11.5px; color: var(--brand); text-decoration: none; font-weight: 600; }
+
+  .gap-row { display: grid; grid-template-columns: 46px 115px 1fr 200px 90px 120px; gap: 14px; padding: 10px 18px; border-top: 1px solid var(--border-soft); font-size: 12.5px; align-items: center; }
+  .gap-row:first-of-type { border-top: none; }
+  .gap-row .g-num { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--brand); letter-spacing: -0.01em; }
+  .gap-row .g-trigger { font-size: 11.5px; color: var(--fg-muted); font-family: ui-monospace, monospace; }
+  .gap-row .g-what { font-weight: 600; }
+  .gap-row .g-what small { display: block; font-size: 11px; color: var(--fg-muted); font-weight: 400; margin-top: 2px; line-height: 1.4; }
+  .gap-row .g-state { font-size: 11px; color: var(--fg-muted); }
+  .gap-row .g-state.empty { color: var(--info); }
+  .gap-row .g-state.error { color: var(--warning); }
+  .gap-row .g-state.missing { color: var(--danger); }
+  .gap-row .g-pri { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-align: center; text-transform: uppercase; letter-spacing: 0.4px; }
+  .gap-row .g-pri.must { background: var(--danger-soft); color: var(--danger); }
+  .gap-row .g-pri.nice { background: var(--warning-soft); color: var(--warning); }
+  .gap-row .g-pri.defer { background: var(--surface-muted); color: var(--fg-muted); }
+  .gap-row .g-effort { font-size: 11px; text-align: right; color: var(--fg-muted); font-weight: 500; }
+
+  .gap-head-row { display: grid; grid-template-columns: 46px 115px 1fr 200px 90px 120px; gap: 14px; padding: 8px 18px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--fg-muted); background: var(--surface-muted); }
+
+  /* Red team */
+  .rt-card { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; overflow: hidden; box-shadow: var(--shadow-xs); }
+  .rt-head { padding: 16px 22px; background: var(--danger-soft); border-bottom: 1px solid var(--danger-dim); display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+  .rt-head .rt-num { width: 36px; height: 36px; border-radius: 100%; background: var(--danger); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+  .rt-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: #7c2d12; letter-spacing: -0.02em; }
+  .rt-head h3 small { display: block; font-weight: 500; color: #9a3412; margin-top: 2px; font-size: 11.5px; letter-spacing: 0; }
+  .rt-head .severity { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 4px 9px; border-radius: 4px; background: #7c2d12; color: white; }
+  .rt-head .severity.med { background: #ca8a04; }
+  .rt-head .severity.low { background: #65a30d; }
+
+  .rt-body { padding: 18px 22px; background: var(--surface); }
+  .rt-body .rt-claim { font-size: 14px; line-height: 1.6; margin-bottom: 12px; color: var(--fg); }
+  .rt-body .rt-claim strong { font-weight: 700; }
+  .rt-body .rt-evidence { margin: 0 0 14px; padding: 12px 16px; background: var(--surface-soft); border-left: 3px solid var(--border-strong); border-radius: 0 6px 6px 0; font-size: 12.5px; line-height: 1.6; color: var(--fg-muted); }
+  .rt-body .rt-evidence strong { color: var(--fg); font-weight: 700; }
+  .rt-body h4 { margin: 14px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg-muted); }
+  .rt-body ul, .rt-body ol { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
+  .rt-body li { margin: 3px 0; color: var(--fg); }
+  .rt-body li strong { font-weight: 700; }
+
+  .rt-mit { background: var(--success-soft); border: 1px solid var(--success-dim); border-radius: 8px; padding: 12px 16px; margin-top: 14px; font-size: 13px; line-height: 1.6; color: #14532d; }
+  .rt-mit strong { color: #064e3b; font-weight: 700; }
+
+  /* Proposed plan */
+  .plan-band { background: var(--brand-soft); border: 1px solid var(--brand-dim); border-radius: 12px; padding: 18px 22px; margin-bottom: 16px; }
+  .plan-band h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; color: #7c2d12; letter-spacing: -0.01em; }
+  .plan-band p { margin: 0 0 8px; font-size: 13px; color: #9a3412; line-height: 1.6; }
+  .plan-band p strong { color: #7c2d12; font-weight: 700; }
+
+  .next-row { display: grid; grid-template-columns: 36px 1fr 140px 120px; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border-soft); align-items: center; font-size: 13px; }
+  .next-row:last-child { border-bottom: none; }
+  .next-row .n-num { font-weight: 800; color: var(--brand); font-size: 15px; text-align: center; }
+  .next-row .n-what { font-weight: 600; }
+  .next-row .n-what small { display: block; font-size: 11px; color: var(--fg-muted); font-weight: 400; margin-top: 2px; line-height: 1.4; }
+  .next-row .n-parent { font-size: 11.5px; color: var(--fg-muted); }
+  .next-row .n-effort { font-size: 11px; text-align: right; font-weight: 600; color: var(--fg); }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; box-shadow: var(--shadow-xs); }
+  .toc h3 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--fg-muted); }
+  .toc ol { margin: 0; padding-left: 22px; font-size: 13px; line-height: 1.8; }
+  .toc li a { color: var(--fg); text-decoration: none; font-weight: 500; }
+  .toc li a:hover { color: var(--brand); }
+</style>
+</head>
+<body>
+
+<div class="plan-shell">
+
+<aside class="plan-sidebar">
+  <div class="ps-brand"><span class="ps-logo-dot"></span><span class="ps-brand-text">ForgeOS</span><span class="ps-role-pill">Executive</span><span class="ps-mockup-pill">Mockup</span></div>
+  <div class="ps-search"><input type="text" placeholder="Search audit" /></div>
+  <nav class="ps-nav">
+    <a href="#" class="ps-nav-item"><span class="ps-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span>Today</span></a>
+    <div class="ps-section">
+      <div class="ps-section-header">Plan</div>
+      <a href="PLAN-MOCKUP-WORKSPACE.html" class="ps-nav-item"><span class="ps-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span>Plan</span></a>
+      <a href="PLAN-MOCKUP-REPORT.html" class="ps-nav-item"><span class="ps-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span><span>Report</span></a>
+      <a href="PLAN-MOCKUP-HISTORY.html" class="ps-nav-item"><span class="ps-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg></span><span>History</span></a>
+    </div>
+    <div class="ps-section">
+      <div class="ps-section-header">Audit</div>
+      <a href="PLAN-MOCKUP-GAP-AUDIT.html" class="ps-nav-item active"><span class="ps-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span>Gap audit</span></a>
+    </div>
+    <div class="ps-section">
+      <div class="ps-section-header">Experts</div>
+      <a href="#" class="ps-nav-item"><span class="ps-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span><span>Specialists</span></a>
+    </div>
+  </nav>
+  <div class="ps-bottom">
+    <div class="ps-avatars"><div class="avatar-sm avatar-user">TF</div><div class="avatar-sm avatar-sage">S</div><div class="avatar-sm avatar-cal">C</div></div>
+    <div style="flex: 1; min-width: 0; margin-left: 4px;"><div class="ps-user-name">Tristan</div><div class="ps-user-sub">Fractional Forge</div></div>
+  </div>
+</aside>
+
+<div class="plan-main">
+
+<div class="plan-topbar">
+  <div class="breadcrumb">
+    <a href="PLAN-MOCKUP-INDEX.html">Plan mockup</a>
+    <span class="sep">›</span>
+    <span class="current">Gap audit + red team</span>
+  </div>
+  <div class="topbar-right">
+    <a href="PLAN-MOCKUP-INDEX.html" class="btn sm">← Back to mockup index</a>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- HEADER -->
+<div class="ga-head">
+  <h1>Pre-code audit &amp; red team · Phase 3 Plan</h1>
+  <div class="sub"><strong>Goal:</strong> find every drill-down, edge case, and structural weakness NOW so we don't discover them mid-implementation. Output: prioritised list of what still needs mocking, critique of what's built, and a proposal for the next (and final) mockup round before code. <em>Structure mirrors <a href="FORGE-MOCKUP-GAP-AUDIT.html">FORGE-MOCKUP-GAP-AUDIT.html</a>'s hierarchical numbering (1.1 / C.N). Companion docs: <a href="PLAN-SCHEMA.md">PLAN-SCHEMA.md</a> (data model, 7→3 collapse, Today signal contract, audit_log entity_types, 9-role matrix) + <a href="HANDOVER-plan.md">HANDOVER-plan.md</a> (build pickup instructions) + <a href="PHASE-PLAN.md">PHASE-PLAN.md</a> §Phase 3 (phase-level scope).</em></div>
+  <div class="ga-stats">
+    <div class="tile"><div class="lab">Pages built</div><div class="val">14</div><div class="sub">+ shared CSS</div></div>
+    <div class="tile"><div class="lab">Gaps found</div><div class="val brand">47</div><div class="sub">Unmocked flows/states + Phase 3 wiring</div></div>
+    <div class="tile"><div class="lab">Must mock before code</div><div class="val bad">17</div><div class="sub">Block coding if missed</div></div>
+    <div class="tile"><div class="lab">Red team issues</div><div class="val">5</div><div class="sub">Structural concerns</div></div>
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <h3>What's in this audit</h3>
+  <ol>
+    <li><a href="#inv">Gap inventory — remaining drills per parent page</a></li>
+    <li><a href="#cross">Cross-cutting surfaces not owned by any page</a></li>
+    <li><a href="#redteam">Red team · 5 critiques</a></li>
+    <li><a href="#plan">Proposed final mockup round</a></li>
+  </ol>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 1: GAP INVENTORY -->
+<!-- ============================================ -->
+<div class="section-block" id="inv">
+  <h2>1 · Gap inventory <span class="tag">47 items · 14 pages · + 6 Phase 3 wiring gaps</span></h2>
+  <div class="block-sub">Every button, link, or state that is currently undefined in the Plan mockup set. <strong>MUST</strong> = structural, blocks coding. <strong>NICE</strong> = shapes the schema, worth mocking for clarity. <strong>DEFER</strong> = safe to decide at implementation time.</div>
+
+  <!-- WORKSPACE -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">1</div>
+      <h3>Workspace <small>/plan</small></h3>
+      <div class="count-pills"><span class="cp must">3 must</span><span class="cp nice">2 nice</span><span class="cp defer">1 defer</span></div>
+      <a href="PLAN-MOCKUP-WORKSPACE.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">1.1</div>
+      <div class="g-trigger">First-run UX</div>
+      <div class="g-what">Empty-state Workspace<small>Brand-new foundry · no Goals, no team, no purpose · what does Workspace say? What's the first CTA?</small></div>
+      <div class="g-state empty">Not mocked</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">1.2</div>
+      <div class="g-trigger">"Pin existing Goal"</div>
+      <div class="g-what">Pin picker modal<small>Split from Create · shows list of unpinned Goals so the founder can surface one to the top row</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · 1 modal</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">1.3</div>
+      <div class="g-trigger">"Pin existing task"</div>
+      <div class="g-what">Pin-task picker modal<small>Same pattern as Goal picker · list of unpinned tasks across all Goals, filter by Goal</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · shared with above</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">1.4</div>
+      <div class="g-trigger">Edit purpose</div>
+      <div class="g-what">Foundry purpose editor<small>Click "Edit purpose" in Strategy header · where does it go?</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">1.5</div>
+      <div class="g-trigger">Unpin a Goal</div>
+      <div class="g-what">Unpin confirmation<small>What happens to the Goal's Objectives + Tasks? Move to "Also in play" or archive?</small></div>
+      <div class="g-state missing">Inline only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">1.6</div>
+      <div class="g-trigger">Horizon switch</div>
+      <div class="g-what">This Month · Later · Done<small>Pills exist; only "This week" active · others have no mockup</small></div>
+      <div class="g-state missing">Inline tabs only</div>
+      <div class="g-pri defer">DEFER</div>
+      <div class="g-effort">S</div>
+    </div>
+  </div>
+
+  <!-- GOAL -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">2</div>
+      <h3>Strategic Goal drill-in <small>/plan/goal/[id]</small></h3>
+      <div class="count-pills"><span class="cp must">1 must</span><span class="cp nice">3 nice</span></div>
+      <a href="PLAN-MOCKUP-GOAL.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">2.1</div>
+      <div class="g-trigger">Edit Goal</div>
+      <div class="g-what">Edit title · disprove test · milestone<small>Currently "Edit Goal" is a placeholder link · no destination</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 page or drawer</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">2.2</div>
+      <div class="g-trigger">Archive Goal</div>
+      <div class="g-what">Kill/archive Goal<small>What happens to open Objectives + Tasks? Route to History?</small></div>
+      <div class="g-state missing">Not in UI</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">2.3</div>
+      <div class="g-trigger">Reassign lead</div>
+      <div class="g-what">Swap specialist or human lead<small>Handoff flow · e.g. when fractional retainer ends or team composition shifts</small></div>
+      <div class="g-state missing">Not in UI</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">2.4</div>
+      <div class="g-trigger">Goal-scoped history</div>
+      <div class="g-what">Mini History view for this Goal<small>Activity timeline shows last 6 events · full history is on main History page · need an "all Goal history" view</small></div>
+      <div class="g-state missing">Last 6 only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+  </div>
+
+  <!-- TASK -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">3</div>
+      <h3>Task detail <small>/plan/task/[id]</small></h3>
+      <div class="count-pills"><span class="cp must">1 must</span><span class="cp nice">2 nice</span><span class="cp defer">1 defer</span></div>
+      <a href="PLAN-MOCKUP-TASK.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">3.1</div>
+      <div class="g-trigger">Edit task</div>
+      <div class="g-what">Edit title · description · sub-tasks inline<small>"Edit · Delete" link exists · no destination</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · inline</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">3.2</div>
+      <div class="g-trigger">Reassign task</div>
+      <div class="g-what">Handoff task to different person<small>Sub-tasks mid-flight · hand off to different fractional</small></div>
+      <div class="g-state missing">Inline only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">3.3</div>
+      <div class="g-trigger">Duplicate task</div>
+      <div class="g-what">Clone task to another Objective<small>Common pattern when Objective scope changes mid-quarter</small></div>
+      <div class="g-state missing">Not in UI</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">3.4</div>
+      <div class="g-trigger">Recurring task</div>
+      <div class="g-what">Schedule pattern (weekly, monthly)<small>E.g. "Monthly investor update" is a recurring task · not yet modelled</small></div>
+      <div class="g-state missing">Not mocked</div>
+      <div class="g-pri defer">DEFER</div>
+      <div class="g-effort">M</div>
+    </div>
+  </div>
+
+  <!-- OBJECTIVE-CREATE + TASK-CREATE + GOAL-CREATE (creation flows) -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">4</div>
+      <h3>Creation flows <small>/plan/{goal,obj,task}-create</small></h3>
+      <div class="count-pills"><span class="cp must">2 must</span><span class="cp nice">2 nice</span></div>
+      <a href="PLAN-MOCKUP-OBJECTIVE-CREATE.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">4.1</div>
+      <div class="g-trigger">First Goal ever</div>
+      <div class="g-what">First-Goal flow (no prior Goals exist)<small>Different from "+ Create Goal" · needs to capture foundry purpose first · welcome feel</small></div>
+      <div class="g-state empty">Not mocked</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">4.2</div>
+      <div class="g-trigger">Specialist offline</div>
+      <div class="g-what">Error state — Sage unavailable<small>LLM failure · rate-limited · founder can't start the conversation-first flow · fallback to manual form</small></div>
+      <div class="g-state error">Not mocked</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · state only</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">4.3</div>
+      <div class="g-trigger">Skip conversation</div>
+      <div class="g-what">Direct/manual form entry mode<small>Power-user or AI-averse founder who wants to type into fields directly, skip the chat</small></div>
+      <div class="g-state missing">No alternative</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">4.4</div>
+      <div class="g-trigger">Templates</div>
+      <div class="g-what">Goal / Objective / Task template picker<small>Common patterns — "UK pre-seed round", "Ship first pilot batch" — founder picks and edits</small></div>
+      <div class="g-state missing">No library</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">M</div>
+    </div>
+  </div>
+
+  <!-- PRESSURE-TEST -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">5</div>
+      <h3>Pressure-test <small>/plan/pressure-test</small></h3>
+      <div class="count-pills"><span class="cp nice">3 nice</span><span class="cp defer">1 defer</span></div>
+      <a href="PLAN-MOCKUP-PRESSURE-TEST.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">5.1</div>
+      <div class="g-trigger">Click a persona</div>
+      <div class="g-what">Single-persona deep-dive<small>Click Bear avatar · see all Bear's messages across all rounds, with Bear's reasoning chain expanded</small></div>
+      <div class="g-state missing">Mixed view only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">5.2</div>
+      <div class="g-trigger">Save + reopen</div>
+      <div class="g-what">Saved transcript replay<small>Open a past pressure-test from History · same layout, read-only</small></div>
+      <div class="g-state missing">Not mocked</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">5.3</div>
+      <div class="g-trigger">Compare</div>
+      <div class="g-what">Side-by-side two pressure-tests<small>Same Goal pressure-tested twice (e.g. before and after a decision) · diff the verdicts</small></div>
+      <div class="g-state missing">Not mocked</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">M</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">5.4</div>
+      <div class="g-trigger">Invite observer</div>
+      <div class="g-what">External observer (board member, investor)<small>Share link to let someone watch the debate without participating</small></div>
+      <div class="g-state missing">Not mocked</div>
+      <div class="g-pri defer">DEFER</div>
+      <div class="g-effort">S</div>
+    </div>
+  </div>
+
+  <!-- GUTCHECK -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">6</div>
+      <h3>Mid-quarter gut-check <small>/plan/gut-check</small></h3>
+      <div class="count-pills"><span class="cp must">2 must</span><span class="cp nice">1 nice</span></div>
+      <a href="PLAN-MOCKUP-GUTCHECK.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">6.1</div>
+      <div class="g-trigger">Click "Kill"</div>
+      <div class="g-what">Kill-Goal confirmation + wind-down<small>What happens to open Tasks? Notify team? Entry in History with rationale?</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · confirmation modal</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">6.2</div>
+      <div class="g-trigger">Click "Pivot"</div>
+      <div class="g-what">Pivot flow — edit disprove test + carry-over Tasks<small>Goal stays live, assumptions change · needs a focused edit surface</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">6.3</div>
+      <div class="g-trigger">Dismiss gut-check</div>
+      <div class="g-what">"Check back next week" state<small>What happens · is it re-offered? Does it time out to auto-decision?</small></div>
+      <div class="g-state missing">Inline only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S · state</div>
+    </div>
+  </div>
+
+  <!-- DELEGATE -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">7</div>
+      <h3>Delegate / Chat <small>/plan/chat/[person]</small></h3>
+      <div class="count-pills"><span class="cp must">2 must</span><span class="cp nice">2 nice</span></div>
+      <a href="PLAN-MOCKUP-DELEGATE.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">7.1</div>
+      <div class="g-trigger">Switch to AI</div>
+      <div class="g-what">Chat with an AI specialist (e.g. Sage)<small>Only human chat (Sarah) is mocked · the same interface with a specialist is the other half of the pattern</small></div>
+      <div class="g-state missing">Human only</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · re-use layout</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">7.2</div>
+      <div class="g-trigger">Fractional at capacity</div>
+      <div class="g-what">Capacity-exceeded state<small>Sarah shows 5/6h used · what when she hits 6/6? Greyed out? Can still message but flagged as over-capacity?</small></div>
+      <div class="g-state empty">Not mocked</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · state</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">7.3</div>
+      <div class="g-trigger">Group chat</div>
+      <div class="g-what">3+ participants<small>"Loop David in" creates a 3-way thread · different affordances (replies, mentions)</small></div>
+      <div class="g-state missing">1-1 only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">M</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">7.4</div>
+      <div class="g-trigger">Book 20 min</div>
+      <div class="g-what">Calendar booking flow<small>Click Book 20 min → calendar picker → confirmation</small></div>
+      <div class="g-state missing">CTA only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+  </div>
+
+  <!-- REPORT family -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">8</div>
+      <h3>Report family <small>/plan/report · /report-weekly · /report-board</small></h3>
+      <div class="count-pills"><span class="cp must">2 must</span><span class="cp nice">2 nice</span></div>
+      <a href="PLAN-MOCKUP-REPORT.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">8.1</div>
+      <div class="g-trigger">Send preview</div>
+      <div class="g-what">What recipients actually see<small>Click Send → preview as-recipient-will-see-it · confirmation step before going out</small></div>
+      <div class="g-state missing">No surface</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">8.2</div>
+      <div class="g-trigger">Post-send</div>
+      <div class="g-what">Delivery tracker + reply inbox<small>Who opened · who replied · open rate per recipient · click "View replies"</small></div>
+      <div class="g-state missing">Aggregate only</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">8.3</div>
+      <div class="g-trigger">Custom report</div>
+      <div class="g-what">Custom report composition<small>Fourth target exists as tab but has no landing page · brief → draft → ship flow</small></div>
+      <div class="g-state missing">Stub only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">M · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">8.4</div>
+      <div class="g-trigger">Slide edit</div>
+      <div class="g-what">Board-pack per-slide editor<small>Currently shows 2 slides · clicking a slide should open inline editor for that slide</small></div>
+      <div class="g-state missing">No edit affordance</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">M</div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">9</div>
+      <h3>History <small>/plan/history</small></h3>
+      <div class="count-pills"><span class="cp must">2 must</span><span class="cp nice">2 nice</span></div>
+      <a href="PLAN-MOCKUP-HISTORY.html" class="view-btn">View ↗</a>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Trigger</div><div>Unmocked flow</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">9.1</div>
+      <div class="g-trigger">Click entry</div>
+      <div class="g-what">Single-entry detail page<small>Planned as PLAN-MOCKUP-HISTORY-ENTRY.html · full context, who was involved, rationale, alternatives, outcome tracking</small></div>
+      <div class="g-state missing">No destination</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">9.2</div>
+      <div class="g-trigger">Empty state</div>
+      <div class="g-what">Day-1 History (zero entries)<small>What does "Your external memory" look like before any decisions have been logged?</small></div>
+      <div class="g-state empty">Not mocked</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · state</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">9.3</div>
+      <div class="g-trigger">Search query</div>
+      <div class="g-what">Search results state<small>User types · what do results look like? Filters combined with query?</small></div>
+      <div class="g-state missing">Hero only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">9.4</div>
+      <div class="g-trigger">Manual add</div>
+      <div class="g-what">"+ Add entry" flow<small>Low-priority but present — when founder wants to log a big decision not auto-captured</small></div>
+      <div class="g-state missing">Link only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 2: CROSS-CUTTING -->
+<!-- ============================================ -->
+<div class="section-block" id="cross">
+  <h2>2 · Cross-cutting surfaces <span class="tag">not owned by any page</span></h2>
+  <div class="block-sub">Surfaces that serve Plan across every page — easy to forget because they're nobody's "child", but needed on day 1.</div>
+
+  <div class="gap-card">
+    <div class="gap-head">
+      <div class="p-num">×</div>
+      <h3>Cross-cutting <small>global</small></h3>
+      <div class="count-pills"><span class="cp must">8 must</span><span class="cp nice">6 nice</span><span class="cp defer">3 defer</span></div>
+    </div>
+    <div class="gap-head-row"><div>#</div><div>Domain</div><div>Unmocked surface</div><div>Why it matters</div><div>Priority</div><div>Effort</div></div>
+    <div class="gap-row">
+      <div class="g-num">C.1</div>
+      <div class="g-trigger">Onboarding</div>
+      <div class="g-what">First-run onboarding flow<small>New foundry · 5-step guided setup: purpose → first Strategic Goal with Sage → invite fractional team → tour Workspace → first gut-check date</small></div>
+      <div class="g-state empty">Critical · Day 1 UX</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">L · 4-5 pages</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.2</div>
+      <div class="g-trigger">Fractional onboard</div>
+      <div class="g-what">Add a fractional executive<small>Invite flow · role · hours/wk · retainer · which Goals · first message draft by Cal</small></div>
+      <div class="g-state missing">No surface</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.3</div>
+      <div class="g-trigger">Settings</div>
+      <div class="g-what">Plan section settings<small>Nudge frequency · proactive-suggestion threshold · weekly friction review day/time · specialist behaviour (on/off/quiet)</small></div>
+      <div class="g-state missing">No surface</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.4</div>
+      <div class="g-trigger">Permissions</div>
+      <div class="g-what">Role-based access<small>Founder = everything · Fractional = Goals they're on + their tasks · Observer = read-only · Board member = Report view only</small></div>
+      <div class="g-state missing">No surface</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 page</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.5</div>
+      <div class="g-trigger">Notifications</div>
+      <div class="g-what">Alert/inbox centre<small>"Sarah replied", "Cal drafted weekly review", "gut-check fires Monday" · currently only red dot in sidebar</small></div>
+      <div class="g-state missing">Red dot only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">M</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.6</div>
+      <div class="g-trigger">Search</div>
+      <div class="g-what">Global search across Plan<small>Find a Goal, Task, decision, conversation · cmd-K style · appears in sidebar search box</small></div>
+      <div class="g-state missing">Placeholder only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">M</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.7</div>
+      <div class="g-trigger">Error states</div>
+      <div class="g-what">Standard error pages<small>LLM offline · fractional offline · save failure · rate-limit · 500</small></div>
+      <div class="g-state error">Not mocked</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.8</div>
+      <div class="g-trigger">Export centre</div>
+      <div class="g-what">All exports history<small>Past Reports, History snapshots, Goal outcomes · re-download</small></div>
+      <div class="g-state missing">Per-page only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.9</div>
+      <div class="g-trigger">Mobile</div>
+      <div class="g-what">Responsive layouts<small>Workspace on phone · tap-to-mark-done on Tasks · the rest desktop-first</small></div>
+      <div class="g-state missing">Desktop only</div>
+      <div class="g-pri defer">DEFER</div>
+      <div class="g-effort">L</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.10</div>
+      <div class="g-trigger">Keyboard</div>
+      <div class="g-what">Shortcuts modal<small>? to show · gp/gr/gh nav · e edit · c create · / search</small></div>
+      <div class="g-state missing">No shortcuts</div>
+      <div class="g-pri defer">DEFER</div>
+      <div class="g-effort">S</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.11</div>
+      <div class="g-trigger">Command palette</div>
+      <div class="g-what">⌘K picker<small>Post-MVP · cross-section nav · quick-create anything</small></div>
+      <div class="g-state missing">No surface</div>
+      <div class="g-pri defer">DEFER</div>
+      <div class="g-effort">M</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.12</div>
+      <div class="g-trigger">Legacy redirects</div>
+      <div class="g-what">7 old route redirects + sidecar read-compat<small>/strategy, /new-objectives, /new-tasks, /review, /reports, /red-team, /knowledge must redirect to Plan/Report/History when flag ON — and keep rendering legacy UI when flag OFF (rollback). Per PHASE-PLAN.md data-preservation rule.</small></div>
+      <div class="g-state missing">Not mocked — schema-level only</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · middleware + 7 redirects</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.13</div>
+      <div class="g-trigger">Today V3 Plan panel</div>
+      <div class="g-what">event_log emission from every Plan server action<small>Per SHARED-SCHEMA §1.4 + PLAN-SCHEMA §14: 11 Plan triggers feed event_log (Goal state changes, broken assumption, gutcheck-fired, task overdue, rec-high-confidence, pressure-test verdict, fractional capacity, engagement-ending, report-send-failed). Today V3 Plan tile reads from here via Supabase Realtime.</small></div>
+      <div class="g-state missing">Contract defined, no UI mockup</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · signal-emission wiring</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.14</div>
+      <div class="g-trigger">Permissions UI</div>
+      <div class="g-what">9-role matrix surface on Settings<small>Per PLAN-SCHEMA §16. 9 roles × ~25 Plan actions. Default mapping from current 5-role enum until expansion lands. Settings tab shows matrix + per-member role assignment. Blocks fractional-exec launch if invisible.</small></div>
+      <div class="g-state missing">Mentioned in Settings stub only</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">M · 1 tab + per-member editor</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.15</div>
+      <div class="g-trigger">Data-preservation banner</div>
+      <div class="g-what">"Migrated from Strategy" provenance pill<small>PHASE-PLAN.md §Phase 3 option: show a banner/pill on Goals seeded from legacy `objectives.is_strategic_goal=true` so users recognise their work didn't vanish. Opt-in "view in old UI" link for 30 days post-cutover.</small></div>
+      <div class="g-state missing">Not mocked</div>
+      <div class="g-pri must">MUST</div>
+      <div class="g-effort">S · pill + banner</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.16</div>
+      <div class="g-trigger">Legacy read-only archive</div>
+      <div class="g-what">"Old Strategy/Knowledge still viewable" path<small>Until all legacy routes are fully decommissioned (~30-60 days), flag-OFF paths must keep rendering. Need policy + timeline mocked into Settings so users know their data stays reachable.</small></div>
+      <div class="g-state missing">Policy-only, no UI</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S · copy + settings row</div>
+    </div>
+    <div class="gap-row">
+      <div class="g-num">C.17</div>
+      <div class="g-trigger">Rollback UX</div>
+      <div class="g-what">Flag flip back off — what does the user see?<small>Per PHASE-PLAN.md §Rollback guarantee: if `new_plan_experience` flips OFF after a user has created NEW data, either (a) old UI reads new data, or (b) "view new-experience data" link, or (c) maintenance banner. Pick one; mock it.</small></div>
+      <div class="g-state missing">Policy-only</div>
+      <div class="g-pri nice">NICE</div>
+      <div class="g-effort">S · banner copy</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 3: RED TEAM -->
+<!-- ============================================ -->
+<div class="section-block" id="redteam">
+  <h2>3 · Red team <span class="tag">5 critiques</span></h2>
+  <div class="block-sub">Honest analysis of what's been built. Critiques 1 and 2 are inherited from the Money gap audit and apply equally to Plan. Critiques 3, 4, 5 are net-new to Plan.</div>
+
+  <!-- CRITIQUE 1 -->
+  <div class="rt-card">
+    <div class="rt-head">
+      <div class="rt-num">1</div>
+      <h3>Specialist callouts are AI-branded — violates your own CLAUDE.md rule<small>Copy-voice critique · inherited from money audit</small></h3>
+      <div class="severity">High</div>
+    </div>
+    <div class="rt-body">
+      <div class="rt-claim">Every Plan mockup leans on explicit AI branding — <strong>"Sage · AI · Strategy"</strong>, <strong>"Cal · AI · Chief of Staff"</strong>, <strong>"Leo AI cross-checked"</strong>, <strong>"13 AI specialists orchestrating"</strong>. The in-product CLAUDE.md rule is explicit: <em>no "AI-powered" / "AI-generated" / "Smart" / "Intelligent" labels, no AI agent counts, no robot/brain icons</em>. Test: would this description make sense without mentioning AI? Mostly no — the callouts are the AI's branding.</div>
+      <div class="rt-evidence">
+        <strong>Evidence:</strong> a dedicated <code>.role-ai</code> CSS class with brand-orange styling highlights AI specifically. Team panel on Workspace reads "Plus 13 AI specialists orchestrating · Sage, Fang, Harper, Leo lead on your Goals". Pressure-test page describes the 5 personas as "AI personas on different LLM providers". The rule isn't marketing-optional — it's in-product policy.
+      </div>
+      <h4>Secondary issue — voice drift</h4>
+      <ul>
+        <li><strong>Silicon Valley cadence</strong>: "Taking Sarah's assumptions and drafting the Goal", "Verdict emerging", "Kill · Pivot · Double down".</li>
+        <li><strong>Not Tristan's voice</strong>: British, understated, specific numbers, one clear next action.</li>
+        <li><strong>Risk</strong>: LLMs will generate production copy matching our mockups' Silicon Valley voice. Baking the wrong voice into 13 specialists is expensive to unwind.</li>
+      </ul>
+      <div class="rt-mit">
+        <strong>Mitigation:</strong>
+        <br>• <strong>Strip AI labels from all 14 mockups</strong>: kill the <code>.role-ai</code> class everywhere. Specialists become "Sage · Strategy" not "Sage · AI · Strategy". "Cal drafted" stays (it's description, not branding) but "AI · Chief of Staff" pill goes.
+        <br>• <strong>Frame specialists as roles</strong>: "Strategy · Next action" more useful than "Sage · AI · Strategy Lead". Still routable, less AI-branded.
+        <br>• <strong>Voice sample</strong>: before production copy, pull 3-5 of Tristan's LinkedIn posts and investor emails as reference. Rewrite a sample page's copy in that voice; if it lands, that's the guide.
+      </div>
+    </div>
+  </div>
+
+  <!-- CRITIQUE 2 -->
+  <div class="rt-card">
+    <div class="rt-head">
+      <div class="rt-num">2</div>
+      <h3>Most value depends on data the founder doesn't have yet<small>Cold-start critique · inherited from money audit</small></h3>
+      <div class="severity">High</div>
+    </div>
+    <div class="rt-body">
+      <div class="rt-claim">Every mockup shows a <strong>Q2 week-6 in-flight foundry</strong> with 3 pinned Strategic Goals, 5 onboarded fractional humans, 24 active tasks, a live pressure-test, a history of 147 decisions. A founder on day 1 has <em>none</em> of this. We have zero empty/cold-start mockups across 14 pages.</div>
+      <div class="rt-evidence">
+        <strong>Evidence:</strong> Workspace shows Emma's NDA 9 days late, Northzone in terms talks, £2.2k/unit BOM locked. Goal page has Sage's disprove test with 3 assumptions tagged Holding/Slipping/Broken. History shows 147 entries / 4-month reversal rate. Every mockup shows a working foundry; nobody has seen day-0.
+      </div>
+      <h4>What the founder actually sees on day 1</h4>
+      <ol>
+        <li>Lands on Workspace → empty Strategy header ("What are you building?") + "Create your first Strategic Goal" CTA</li>
+        <li>Opens Goal (but there isn't one yet) → nudged back to Workspace creation flow</li>
+        <li>Opens Report → "No updates sent yet · talk to Cal to draft your first one"</li>
+        <li>Opens History → "Nothing recorded yet · every decision you make here is logged"</li>
+      </ol>
+      <h4>What could break</h4>
+      <ul>
+        <li>Founder signs up · opens Workspace · sees something alien (Sarah Chen? who's Sarah?) · churns</li>
+        <li>Empty states are where product quality is weakest — and we've shown zero</li>
+        <li>Onboarding has no mockup. ~5-page flow MUST exist before code</li>
+      </ul>
+      <div class="rt-mit">
+        <strong>Mitigation:</strong>
+        <br>• <strong>Build the onboarding mockup</strong> — 5 pages: welcome · define purpose · create first Strategic Goal with Sage · invite your first fractional · tour the Workspace
+        <br>• <strong>Build empty-state mockups</strong> for Workspace, Goal (no goals yet), Report (no updates), History (no entries) — four states, one page each or combined into toggles on existing pages
+        <br>• <strong>Time-boxed starter data</strong>: first 7 days Sage + Cal help the founder populate via conversation, not forms
+      </div>
+    </div>
+  </div>
+
+  <!-- CRITIQUE 3 -->
+  <div class="rt-card">
+    <div class="rt-head">
+      <div class="rt-num">3</div>
+      <h3>14 pages for one sidebar section is scope creep<small>Scope critique · net new to Plan</small></h3>
+      <div class="severity">High</div>
+    </div>
+    <div class="rt-body">
+      <div class="rt-claim">The Plan section redesign started as <strong>"collapse 9 pages into 3"</strong> in the original proposal. We now have <strong>14 Plan mockups + a gap audit + ~12 gap-list additions</strong> = ~27 planned surfaces. That's more than Money (19). Plan is one of many ForgeOS sections. The redesign has lost its own thesis.</div>
+      <div class="rt-evidence">
+        <strong>Evidence:</strong> PLAN-SECTION-REDESIGN-PROPOSAL.md opens with: <em>"Nine pages collapse to three, with Today as the shared entry lens."</em> 14 mockups later, we've added Report-Weekly, Report-Board, Objective-Create, Task-Create, Goal-Create, Pressure-Test, Gut-check, Delegate, History-Entry (pending). Each is valuable. Together they re-create the sprawl the redesign was supposed to kill.
+      </div>
+      <h4>Why this happened</h4>
+      <ul>
+        <li><strong>Every click → a mockup</strong>: Tristan said "click through everything so I can see how it works", I built a page per click destination rather than using modals/drawers for some</li>
+        <li><strong>Drill-down expanded</strong>: the original proposal said one /plan surface; we now have per-Goal drill-ins, per-Task drill-ins, per-specialist drill-ins, per-ritual drill-ins</li>
+        <li><strong>Variants proliferated</strong>: one Report page became three target-pages; one pressure-test became its own page</li>
+      </ul>
+      <h4>What could break</h4>
+      <ul>
+        <li>Coding 14 full surfaces + onboarding + empty states + cross-cutting = 8-12 weeks of engineering for one sidebar section. Every section gets the same depth → years of work.</li>
+        <li>Users don't need this much. Most Plan work happens on Workspace + Goal + Report. The other 11 pages serve edge cases.</li>
+        <li>Each page adds schema + server actions + tests. The maintenance tail compounds.</li>
+      </ul>
+      <div class="rt-mit">
+        <strong>Mitigation (MVP cut list):</strong>
+        <br>• <strong>Ship V1 with 7-8 surfaces only</strong>: Workspace + Goal + Task + Report + History + Goal-Create + onboarding. Everything else modal-or-inline.
+        <br>• <strong>Collapse the Report family</strong>: one Report page with a robust target picker; Weekly/Board are draft-preview states, not separate pages.
+        <br>• <strong>Inline the Pressure-test</strong>: modal overlay from the Goal page, not a standalone route. Save the transcript to History as a record.
+        <br>• <strong>Fold Delegate into Task / Goal / inline chat</strong>: no standalone chat page in V1. The conversation surface lives where the work is.
+        <br>• <strong>Gut-check is a Goal-scoped page state</strong>, not a separate route (currently /plan/gutcheck).
+      </div>
+    </div>
+  </div>
+
+  <!-- CRITIQUE 4 -->
+  <div class="rt-card">
+    <div class="rt-head">
+      <div class="rt-num">4</div>
+      <h3>The fractional-human pattern is applied unevenly across pages<small>Consistency critique · net new</small></h3>
+      <div class="severity">Medium</div>
+    </div>
+    <div class="rt-body">
+      <div class="rt-claim">After Tristan's feedback ("too AI-heavy in threads"), I introduced 5 fractional humans (Sarah / Emma / James / Priya / David) and rebalanced some mockups. But the rebalance is <strong>partial and inconsistent</strong> — some pages lead with humans; others still lead with specialists; the rule for "who authors vs who reviews" isn't formalised.</div>
+      <div class="rt-evidence">
+        <strong>Evidence:</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px;">
+          <li><strong>Workspace</strong>: 3 of 7 tasks swapped to humans (Emma/James/Priya); 4 kept specialist-lead. No rule for why these 3.</li>
+          <li><strong>Goal page</strong>: disprove test still attributed to Sage (AI), not Sarah (who would own Fundraise). Team composition card exists only on Workspace.</li>
+          <li><strong>Objective-Create</strong>: Sage solo-drafts. Sarah isn't in the loop. But on Goal-Create, Sarah and Sage co-draft. Inconsistent.</li>
+          <li><strong>Task detail</strong>: thread rebalanced well (Emma authors, Leo AI cross-checks). But parent Task summary still says "You + Emma" without the fractional pill consistently.</li>
+          <li><strong>Report pages</strong>: Cal (AI) drafts all three targets. Sarah's round-size memo from the Delegate page could be an alternative human-drafted flow.</li>
+        </ul>
+      </div>
+      <h4>What could break</h4>
+      <ul>
+        <li>Users won't know the rule. Who drafts, who reviews, who owns?</li>
+        <li>Hiring real fractional humans is expensive. If the UI doesn't make "how to get value from them" obvious, founders will just use AI specialists and save money.</li>
+        <li>The feature ends up either over- or under-representing human work in copy surfaces (Report)</li>
+      </ul>
+      <div class="rt-mit">
+        <strong>Mitigation:</strong>
+        <br>• <strong>Formalise the authorship rule</strong>: humans author first drafts where domain-human exists for the Goal; AI specialist cross-checks / fact-verifies / summarises. Document in PLAN-MOCKUP-TRACKER.md.
+        <br>• <strong>Sweep all 14 mockups</strong> to apply the rule consistently. Write a 10-minute audit checklist.
+        <br>• <strong>Add Team-on-this-Goal card to Goal page</strong> (currently only on Workspace). Makes the human presence visible at every level.
+        <br>• <strong>Reports</strong>: if Sarah is on Fundraise, her voice should lead the fundraise-relevant sections of the Monthly Investor update. Cal stitches together. Not Cal-drafts-everything.
+      </div>
+    </div>
+  </div>
+
+  <!-- CRITIQUE 5 -->
+  <div class="rt-card">
+    <div class="rt-head">
+      <div class="rt-num">5</div>
+      <h3>The conversation-first creation pattern has no alternative<small>Interaction-model critique · net new</small></h3>
+      <div class="severity">Medium</div>
+    </div>
+    <div class="rt-body">
+      <div class="rt-claim">Every creation flow (Goal, Objective, Task) defaults to <strong>specialist-conversation + live-preview</strong>. It's a strong pattern — but it's the <em>only</em> pattern. Power-users, AI-averse founders, and bulk-entry cases have no escape hatch. If the conversation breaks (LLM offline, spec unclear), the founder is stuck.</div>
+      <div class="rt-evidence">
+        <strong>Evidence:</strong> Goal-Create is a 3-participant chat (Tristan + Sarah + Sage). Objective-Create is Sage solo-chat. Task-Create is the exception — has a quick-add bar AND a full-form fallback. The other two don't. If the founder wants to type "add a goal: raise £750k, disprove test is X Y Z, milestone 31 Jul, done" into a form, there's no affordance.
+      </div>
+      <h4>Real founder usage patterns we're not serving</h4>
+      <ul>
+        <li><strong>Bulk setup</strong>: founder who plans on a Sunday and wants to add 8 tasks in 5 minutes — conversation is too slow</li>
+        <li><strong>AI-averse</strong>: founder who distrusts LLMs will never use the chat creation flow. They'll abandon rather than persist</li>
+        <li><strong>LLM down</strong>: infrastructure failure shouldn't block the core feature. Fallback must exist.</li>
+        <li><strong>Duplicate / template</strong>: copying a previous Goal's structure is faster than re-drafting via chat — no pattern exists</li>
+      </ul>
+      <div class="rt-mit">
+        <strong>Mitigation:</strong>
+        <br>• <strong>Add "direct entry" toggle</strong> to Goal-Create and Objective-Create: switch to a classic form. Both exist side-by-side; conversation is default, form is one click away.
+        <br>• <strong>Mock the specialist-offline state</strong>: when Sage is unavailable, show the form as the primary mode + clear note "Sage is back in ~4 min · or fill in directly below".
+        <br>• <strong>Add template library</strong>: Q2 Fundraise Goal template, Pilot Delivery Goal template, etc. · picker appears alongside the chat in create flows. Bulk setup time drops from 20 min to 3.
+        <br>• <strong>Duplicate pattern</strong>: "Create Goal from previous" — clone a completed/archived Goal, edit dates and team.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 4: PROPOSED NEXT ROUND -->
+<!-- ============================================ -->
+<div class="section-block" id="plan">
+  <h2>4 · Proposed final mockup round <span class="tag">before coding</span></h2>
+  <div class="block-sub">What to mock in round 5 (last round before code starts). Combines the MUST gap items + red-team fixes + simplification pass. Estimated effort: 1 focused session + mass-edit pass.</div>
+
+  <div class="plan-band">
+    <h3>Design principle for this round</h3>
+    <p><strong>Simplify, fill gaps, fix voice.</strong> Not just "more mockups" — also <em>cuts</em> surfaces the red team flagged as over-scoped (Critique 3), strips AI-emphasis copy (Critique 1), formalises the human-authorship rule (Critique 4), and adds escape-hatches to conversation-first flows (Critique 5). This round should make the set <em>tighter</em> and more honest, not just larger.</p>
+  </div>
+
+  <h3 style="margin: 20px 0 10px; font-size: 16px; font-weight: 800;">Round 5 — proposed build list</h3>
+
+  <div class="next-row">
+    <div class="n-num">1</div>
+    <div class="n-what">Onboarding flow · 5 pages<small>Welcome → Define foundry purpose → Create first Strategic Goal (Sage-led or direct-entry toggle) → Invite first fractional (optional) → Workspace tour</small></div>
+    <div class="n-parent">Cross-cutting</div>
+    <div class="n-effort">L · 5 pages</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">2</div>
+    <div class="n-what">Empty states for Workspace / Goal / Report / History<small>What main pages look like on day 1. Merged as toggle states on existing mockups · 4 screenshots at minimum.</small></div>
+    <div class="n-parent">Main pages</div>
+    <div class="n-effort">S · 4 states</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">3</div>
+    <div class="n-what">Pin-picker modal<small>Shared between "Pin existing Goal" and "Pin existing task" on Workspace. 1 modal, 2 invocations.</small></div>
+    <div class="n-parent">Workspace</div>
+    <div class="n-effort">S · 1 modal</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">4</div>
+    <div class="n-what">HISTORY-ENTRY single-entry detail<small>Previously planned · click a History entry to see full context, participants, rationale, alternatives, outcome tracking</small></div>
+    <div class="n-parent">History</div>
+    <div class="n-effort">M · 1 page</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">5</div>
+    <div class="n-what">Edit Goal / Edit Task flows<small>Inline editing on Goal + Task pages (disprove test, milestone, title). Partial drawer pattern reused.</small></div>
+    <div class="n-parent">Goal + Task</div>
+    <div class="n-effort">S · 2 inline</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">6</div>
+    <div class="n-what">Kill + Pivot flows from Gut-check<small>Clicking Kill or Pivot currently has no destination. Add confirmation/wind-down + pivot-edit pages.</small></div>
+    <div class="n-parent">Gut-check</div>
+    <div class="n-effort">M · 2 pages</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">7</div>
+    <div class="n-what">Send preview + delivery tracker for Reports<small>What recipients see before hitting send · post-send analytics page (opens, replies, attachments viewed)</small></div>
+    <div class="n-parent">Report</div>
+    <div class="n-effort">M · 2 pages</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">8</div>
+    <div class="n-what">Specialist + fractional offline states<small>Sage unavailable (LLM outage) · Sarah over capacity · what founder sees, what fallback is offered</small></div>
+    <div class="n-parent">Cross-cutting</div>
+    <div class="n-effort">S · 2 states</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">9</div>
+    <div class="n-what">Add-fractional flow<small>Invite a new fractional executive · role, hours/wk, retainer, Goals assigned, first-message draft</small></div>
+    <div class="n-parent">Cross-cutting</div>
+    <div class="n-effort">M · 1 page</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">10</div>
+    <div class="n-what">Settings + permissions (combined)<small>Notification prefs · nudge frequency · role-based access · specialist behaviour · retainer rates · one page with tabs, not two pages</small></div>
+    <div class="n-parent">Cross-cutting</div>
+    <div class="n-effort">M · 1 page</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">11</div>
+    <div class="n-what">Strip AI-emphasis copy across all 14 pages<small>Critique 1 fix. Kill <code>.role-ai</code> styling. Replace "AI · Strategy" with "Strategy". "13 AI specialists" → "13 specialists". Mass edit.</small></div>
+    <div class="n-parent">Voice / all</div>
+    <div class="n-effort">M · many edits</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">12</div>
+    <div class="n-what">Formalise authorship rule + sweep all 14 pages<small>Critique 4 fix. Write rule doc ("humans author first drafts where domain-human present, AI cross-checks"). Apply to Goal disprove tests, Report drafts, Objective creation.</small></div>
+    <div class="n-parent">Consistency / all</div>
+    <div class="n-effort">M · sweep</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">13</div>
+    <div class="n-what">Add direct-entry toggle to Goal-Create + Objective-Create<small>Critique 5 fix. Form mode alongside conversation mode. Power-user escape hatch.</small></div>
+    <div class="n-parent">Create flows</div>
+    <div class="n-effort">S · 2 toggles</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">14</div>
+    <div class="n-what">Write SCHEMA.md<small>Not a mockup — pre-code document. Every Plan table (goals, objectives, tasks, specialist_profiles, fractional_executives, capacity, history_entries, pressure_tests, gut_checks) with columns, types, FKs, indexes, RLS policy. ~10 tables for Plan.</small></div>
+    <div class="n-parent">Pre-code</div>
+    <div class="n-effort">L · 1-2 days</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">15</div>
+    <div class="n-what">Scope-cut note in INDEX<small>Explicit list of V1-cut features (Delegate as standalone page, Pressure-test as standalone route, Custom report, per-persona drill, etc.). Sets MVP expectation before code.</small></div>
+    <div class="n-parent">Index</div>
+    <div class="n-effort">S</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">16</div>
+    <div class="n-what">Legacy route redirect middleware<small>C.12 fix. 7 redirect rules (flag ON) + legacy pages kept reachable (flag OFF). PHASE-PLAN.md §Data-preservation rule — no user data orphaned. Mock the redirect rule table, not the redirected pages.</small></div>
+    <div class="n-parent">Cross-cutting</div>
+    <div class="n-effort">M · middleware + 7 routes</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">17</div>
+    <div class="n-what">Today V3 Plan tile + event_log signal emission map<small>C.13 fix. Mock the tile surface on Today V3 showing Plan signals. Document the 11 emission triggers from PLAN-SCHEMA §14 as a map for build. Realtime subscription (SHARED-SCHEMA §6.3).</small></div>
+    <div class="n-parent">Cross-cutting / Today V3</div>
+    <div class="n-effort">M · 1 tile + spec</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">18</div>
+    <div class="n-what">Permissions UI + role-matrix tab<small>C.14 fix. Settings > Permissions tab showing 9-role matrix (with Phase 3 5-role mapping fallback). Per-member role assignment editor. PLAN-SCHEMA §16.</small></div>
+    <div class="n-parent">Cross-cutting / Settings</div>
+    <div class="n-effort">M · 1 tab</div>
+  </div>
+  <div class="next-row">
+    <div class="n-num">19</div>
+    <div class="n-what">Data-preservation banner + "migrated from" provenance<small>C.15 fix. Pill on backfilled Strategic Goals ("migrated from Strategy · 14 Mar"). Banner on empty Plan workspace if any legacy `objectives.is_strategic_goal=true` rows were NOT backfilled (shouldn't happen, but defensive).</small></div>
+    <div class="n-parent">Cross-cutting / Plan</div>
+    <div class="n-effort">S · pill + banner</div>
+  </div>
+
+  <div class="plan-band" style="background: var(--info-soft); border-color: var(--info-dim); margin-top: 20px;">
+    <h3 style="color: #1e40af;">Total for round 5</h3>
+    <p style="color: #1e3a8a;">Approximately <strong>18-21 new pages/states + sweeps across all 14 existing + 1 pre-code schema document + 4 Phase 3 wiring deliverables (items 16-19)</strong>. After round 5, we have ~30-32 mocked surfaces covering every MVP flow + empty states + error states + documented schema + legacy-data-preservation story. <em>Plus explicit cuts, so we know what we're deliberately NOT building in V1.</em> Coding can start with confidence.</p>
+  </div>
+
+  <h3 style="margin: 24px 0 10px; font-size: 16px; font-weight: 800;">What we are EXPLICITLY cutting (MVP-excluded)</h3>
+  <div style="background: var(--surface-soft); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 13px; line-height: 1.7; color: var(--fg-muted);">
+    <p style="margin: 0 0 8px; color: var(--fg);"><strong>Not shipping in V1 · moved to later release:</strong></p>
+    <ul style="margin: 0; padding-left: 22px;">
+      <li><strong>Delegate as standalone page</strong> — chat lives inline on Task / Goal pages; "@mention" pulls a specialist into the existing thread</li>
+      <li><strong>Pressure-test as standalone route</strong> — becomes a modal overlay from Goal or Report artefact. Transcript saves to History as a record.</li>
+      <li><strong>Custom report target</strong> — ship with 3 structured artefacts only (Weekly Team, Monthly Investor, Quarterly Board)</li>
+      <li><strong>Per-persona drill in Pressure-test</strong> — mixed view only; no click-Bear-to-expand</li>
+      <li><strong>Pressure-test compare view</strong> — defer side-by-side comparison</li>
+      <li><strong>Single-entry History-Entry for non-decision types</strong> — ship detail page for decisions only; other types (goal-pinned, pressure-test-run) stay as log entries</li>
+      <li><strong>Recurring task scheduling</strong> — manual duplication only in V1</li>
+      <li><strong>Bulk task operations</strong> — select-multiple-and-act pattern deferred</li>
+      <li><strong>Mid-quarter gut-check as separate route</strong> — becomes a page state on the Goal page · nothing is lost, one fewer URL</li>
+      <li><strong>Group chat (3+ participants)</strong> — 1-1 only in V1</li>
+      <li><strong>Fractional invite flow</strong> — minimal version (email + role + Goals); retainer and capacity details are settings edits later</li>
+      <li><strong>Export centre</strong> — per-page exports only; no "all exports" index</li>
+      <li><strong>Mobile layouts</strong> — desktop V1</li>
+      <li><strong>Keyboard shortcuts + command palette</strong> — V2</li>
+      <li><strong>Template library for Goals/Objectives/Tasks</strong> — V2; founders start from conversation or blank</li>
+      <li><strong>Explicit rollback UX (C.17)</strong> — if `new_plan_experience` flag flips back OFF after user has created data in the new UI, show a maintenance banner only. No bespoke "view new-experience data in old UI" link. Rollback is a last-resort operational action, not a user-facing feature.</li>
+      <li><strong>Legacy read-only archive nav (C.16)</strong> — legacy routes (`/strategy`, `/knowledge`, etc.) keep rendering when flag is OFF, but get no new sidebar surfacing in the new Plan nav. Users who bookmarked old paths still reach them; discovery goes through the data-preservation pill (C.15 / R5 item 19).</li>
+      <li><strong>9-role enum expansion</strong> — lands in a separate PR BEFORE Phase 3 coding if possible; otherwise Phase 3 ships with graceful degradation to the 5-role mapping (PLAN-SCHEMA §16 Phase 3 fallback). Expansion is not blocking if Tristan accepts the degraded matrix.</li>
+      <li><strong>`external_viewers` table (observer tokens for board-pack shares)</strong> — deferred to post-V1; Send-as-link feature uses server-side token on `reports_sent.external_share_url` without full observer RLS.</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="annot">
+  <strong>Before the next round</strong>
+  Walk this audit. Agree / disagree on: (a) the priority calls (MUST / NICE / DEFER), (b) the 5 red-team critiques and their mitigations, (c) the round-5 scope, (d) the explicit cuts list. Once agreed, round 5 builds in one pass and then we're ready to write code. If you push back on a cut (e.g. "no, I want Pressure-test as a standalone route"), we revise before building — not after.
+</div>
+
+</div>
+</div>
+</div>
+
+<button class="annot-toggle" onclick="document.body.classList.toggle('annot-hidden')">
+  <span class="dot"></span> Toggle design notes
+</button>
+
+</body>
+</html>
