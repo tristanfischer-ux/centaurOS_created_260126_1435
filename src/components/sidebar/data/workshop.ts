@@ -10,20 +10,22 @@ import {
 import type { SidebarNavItem } from './types'
 
 /**
- * WORKSHOP section — includes the flag-aware Forge entry.
+ * WORKSHOP section — Forge cutover 2026-04-19.
  *
- * When `new_forge_experience` flag is ON for the current user, the Forge
- * nav item routes to /the-forge-v2 (the Phase 1 redesign at its dev path
- * before the cutover rename). When OFF (default), it routes to the
- * existing /the-forge. The entry-level target is the only flag-aware
- * link in the sidebar during Phase 1.
+ * The Forge entry now routes unconditionally to /the-forge-v2 (Phase 1
+ * Forge rebuild). The `new_forge_experience` flag parameter is retained
+ * for signature compatibility but ignored. Legacy /the-forge route stays
+ * functional for deep links + is preserved for fallback while the v2
+ * surfaces continue to iterate. CAD Lab remains at /the-forge/cad-lab
+ * and is deep-linked from every v2 page.
  *
- * CAD Lab stays at /the-forge/cad-lab regardless of the flag — it's
- * preserved as the Geometry artefact drill-in. See FORGE-DATA-PRESERVATION.md.
+ * Rollback if needed: revert this file and users fall back to legacy
+ * /the-forge via the flag-off path.
  */
 
-export function getWorkshopNavigation(newForgeExperience: boolean): SidebarNavItem[] {
-  const forgeHref = newForgeExperience ? '/the-forge-v2' : '/the-forge'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getWorkshopNavigation(newForgeExperience: boolean = true): SidebarNavItem[] {
+  const forgeHref = '/the-forge-v2'
   return [
     { name: 'The Forge', href: forgeHref, icon: Hammer, tooltip: 'Explore materials, manufacturing approaches, and find suppliers' },
     { name: 'Products', href: '/products', icon: Package, tooltip: 'Your hardware products — from concept to market' },
