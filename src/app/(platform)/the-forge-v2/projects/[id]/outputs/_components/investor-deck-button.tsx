@@ -27,20 +27,29 @@ export function InvestorDeckButton({ projectId }: InvestorDeckButtonProps): Reac
                 toast.error(result.error)
                 return
             }
-            // Decode base64 → blob → trigger download
-            const binary = atob(result.contentBase64)
-            const bytes = new Uint8Array(binary.length)
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-            const blob = new Blob([bytes], { type: 'text/markdown;charset=utf-8' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = result.filename
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-            toast.success(`Handoff document downloaded (${(result.bytes / 1024).toFixed(1)} KB)`)
+            // Decode base64 → blob → trigger download. atob throws
+            // InvalidCharacterError on malformed input — guard it so a server
+            // regression surfaces as a toast, not an unhandled client crash.
+            let url: string | null = null
+            try {
+                const binary = atob(result.contentBase64)
+                const bytes = new Uint8Array(binary.length)
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+                const blob = new Blob([bytes], { type: 'text/markdown;charset=utf-8' })
+                url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = result.filename
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                toast.success(`Handoff document downloaded (${(result.bytes / 1024).toFixed(1)} KB)`)
+            } catch (err) {
+                console.error("[FORGE-V2] investor-deck download failed:", err)
+                toast.error("Couldn't build the handoff document — please try again in a moment.")
+            } finally {
+                if (url) URL.revokeObjectURL(url)
+            }
         })
     }
 
