@@ -217,16 +217,12 @@ function computeWeights(
 // aerospace UAV project scored below a generic CNC shop. This aligns
 // scoring with how procurement decisions actually get made.
 
-const INDUSTRY_KEYWORDS: Record<string, string[]> = {
-  aerospace: ["aerospace", "aviation", "uav", "drone", "haps", "satellite", "space", "aircraft", "avionics"],
-  medical: ["medical", "implant", "surgical", "biomedical", "dental", "orthopaedic", "orthopedic"],
-  automotive: ["automotive", "vehicle", "ev ", "electric vehicle", "ecu"],
-  defence: ["defence", "defense", "military", "tactical", "weapons"],
-  energy: ["turbine", "nuclear", "reactor", "wind turbine"],
-  consumer: ["consumer electronics", "wearable", "gadget"],
-  industrial: ["machine tool", "factory automation", "industrial automation"],
-  marine: ["marine", "naval", "submarine"],
-}
+import { INDUSTRY_KEYWORDS, inferIndustriesFromText } from "@/lib/cad-lab/infer-industries"
+// ^ Imported here so this file can keep using INDUSTRY_KEYWORDS locally. The
+//   inferIndustriesFromText helper is also re-exported further down for
+//   existing callers that already import it from this path — but the real
+//   implementation lives in the plain lib module (this file is "use server"
+//   and may only export async functions).
 
 /** Regulated-industry certification fingerprints. Lower-case substring match. */
 const REGULATORY_CERTS: Record<string, string[]> = {
@@ -238,18 +234,9 @@ const REGULATORY_CERTS: Record<string, string[]> = {
   food: ["haccp", "fssc 22000", "brc"],
 }
 
-/**
- * Infers project-level industry tags from free-text. Used as a fallback when
- * the caller doesn't supply explicit projectIndustries.
- */
-export function inferIndustriesFromText(text: string): Set<string> {
-  const lower = text.toLowerCase()
-  const matched = new Set<string>()
-  for (const [key, terms] of Object.entries(INDUSTRY_KEYWORDS)) {
-    if (terms.some((t) => lower.includes(t))) matched.add(key)
-  }
-  return matched
-}
+// inferIndustriesFromText lives in @/lib/cad-lab/infer-industries — imported
+// above. Downstream callers that previously imported it from this file should
+// migrate to the lib path; no re-export here because "use server" forbids it.
 
 function scoreIndustryMatch(
   listingIndustries: string[],
