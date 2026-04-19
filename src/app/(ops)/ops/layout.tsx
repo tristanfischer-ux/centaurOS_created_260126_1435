@@ -3,6 +3,11 @@ import { redirect } from "next/navigation"
 import { isAdmin } from "@/lib/admin/access"
 import { OpsNav } from "./ops-nav"
 
+// Every /ops/* route gates on auth + admin check → nothing is statically
+// prerenderable. Matches the (platform) layout pattern. Fixes the Vercel
+// "Missing Supabase environment variables" prerender failure on /ops/about.
+export const dynamic = 'force-dynamic'
+
 /**
  * Platform Operations Layout
  * 
