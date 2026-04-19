@@ -3,7 +3,8 @@
 **Date:** 2026-04-19
 **Handoff from:** Prep terminal (schema + mockups + gap audit)
 **Branch to create:** `feat/products-redesign`
-**Picked up by:** Build terminal — only after Tristan replies `locked` to the gap audit
+**Status:** review locked — build-approved (locked autonomously 2026-04-19 per Tristan sign-off). Build terminal picks up AFTER Plan (Phase 3) merges to main.
+**Picked up by:** Build terminal — after Forge PR #1.5/#2 + Money + Plan all merge
 **Companion docs:** [`PRODUCTS-SCHEMA.md`](./PRODUCTS-SCHEMA.md) · [`PRODUCTS-MOCKUP-INDEX.html`](./PRODUCTS-MOCKUP-INDEX.html) · [`PRODUCTS-MOCKUP-GAP-AUDIT.html`](./PRODUCTS-MOCKUP-GAP-AUDIT.html) · [`SHARED-SCHEMA.md`](./SHARED-SCHEMA.md) · [`PHASE-PLAN.md`](./PHASE-PLAN.md) · [`COORDINATION-STATUS.md`](./COORDINATION-STATUS.md)
 
 ---
@@ -21,10 +22,11 @@ Then open `PRODUCTS-MOCKUP-INDEX.html` and `PRODUCTS-MOCKUP-GAP-AUDIT.html` in t
 
 **DO NOT start building until:**
 - Phases 1 (Forge), 2 (Money), and 3 (Plan) are merged to `main` with flags flipped on.
-- `COORDINATION-STATUS.md` shows Products state = `review locked — build-approved`.
-- Tristan has replied `locked` (or `locked with changes: [...]`) to the red-team of `PRODUCTS-MOCKUP-GAP-AUDIT.html`.
+- `COORDINATION-STATUS.md` shows all three earlier phases = `merged to main`.
 
-Per PHASE-PLAN.md: **no parallel phase work.** If you open this and Plan isn't merged yet, stand down and wait.
+Products prep was locked autonomously 2026-04-19 (see §Locked decisions below). **Tristan sign-off step is DONE**; you do not need to wait on him for anything pre-build. The only remaining gate is sequential phase order.
+
+Per PHASE-PLAN.md: **no parallel phase work.** If you open this and Plan isn't merged yet, stand down and wait. Check COORDINATION-STATUS.md state machine — you only claim Products when no earlier phase is in flight.
 
 ---
 
@@ -164,19 +166,19 @@ Chunks 4–8 follow: Market tab · Evidence tab · Economics tab · Action tab �
 
 ---
 
-## Open questions Tristan needs to answer during build
+## Locked decisions (was: Open questions Tristan needs to answer)
 
-Each has a recommended default. If Tristan doesn't respond within a day, default to the recommendation and note it in the PR body. Tristan can override at any time via COORDINATION-STATUS.md comment.
+**All seven locked autonomously 2026-04-19** per Tristan's verbal sign-off ("I don't really have a massive view on the issues which have been raised. Make the decisions."). Every answer resolves to the prep-draft's recommended default. Build terminal: proceed without reopening these. If you discover a reason to override during build, flag in PR body — Tristan can then course-correct via commit message.
 
-| # | Question | Recommended default | Rationale |
+| # | Question | **Locked decision** | Rationale |
 |---|---|---|---|
-| OQ1 | Keep the composite score killed entirely, or surface a "score = % of readiness_items closed" at the top of the Action tab? | **Keep killed. Show closed count (e.g. "7 of 12 closed") but NO number ≤ 100.** | Numbers invite gaming; count tells the same story without the fundability-theatre risk. |
-| OQ2 | During Pre-Phase Coming Soon, the legacy read-only view shows existing products. At Phase 4 cutover, do we keep `/products/legacy` routes available for N days? | **Keep for 30 days after flag-flip-on, then remove.** | Rollback safety. A founder who hit an edge-case bug should be able to read their old data. After 30 days of steady-state, remove. |
-| OQ3 | D/F/V tagging on assumptions (RT-related; gap 3.3) — schema or not? | **Not in V1. Re-evaluate after 4 weeks of real usage.** | Schema creep. We can add three columns in a Phase 4.5 migration if real founders ask. |
-| OQ4 | Readiness-items that cite stale evidence — warning banner only, or block the "closed" state until evidence is refreshed? | **Warning banner only.** | Blocking is draconian; founder may have good reason to keep citing an older LOI. Surface the risk, let them decide. |
-| OQ5 | Should `promoteToForge` kick off an async Priya call to draft the initial Forge Brief body from the hypothesis, or leave the Brief empty on the Forge side? | **Async Priya draft, founder edits on the Forge side.** | Saves founder ~20 min of typing. Matches the "specialists carry their output attribution" pattern. |
-| OQ6 | On `flag-flip-off` (rollback), do we display a banner to users who had already used the new experience? | **Yes — "Phase 4 has been rolled back temporarily. Your data is preserved. Contact Tristan if you need it."** | Rollback is rare but transparency is cheap. |
-| OQ7 | Cross-section event_log de-dup: Products writes `hypothesis_promoted_to_forge`; Forge writes `brief_locked`. If both fire within an hour, do we show both on Today or collapse? | **Show both — they're different events.** | Brief-Lock is the terminal gate; promote is the initiation. Founder wants to see both happen. |
+| OQ1 | Composite score: killed entirely, or surface "% of readiness_items closed"? | **Killed entirely.** Show closed count ("7 of 12 closed") — no number ≤ 100. No colour-coded "readiness bar". | Numbers invite gaming. The Fundability composite was the problem; reintroducing ANY aggregate score recreates it. Counts answer the same question without the theatre. |
+| OQ2 | `/products/legacy` routes lifetime after Phase 4 cutover? | **Keep for 30 days after flag-flip-on. Then redirect to new route and remove in follow-up PR.** | Rollback safety window. Founder with edge-case bug can read old data. After 30d steady-state, remove. Phase 4 PR #N (last chunk) includes both the removal and the redirect. |
+| OQ3 | D/F/V tagging on assumptions? | **NOT in V1. Defer to Phase 4.5.** Re-evaluate after 4 weeks of real usage. If fewer than 30% of founders use the plain assumptions register, don't add more complexity. | Schema creep. Cheap to add later (3 nullable text columns). Expensive to remove if unused. |
+| OQ4 | Stale-evidence readiness close: warning or block? | **Warning only. Do not block.** Pill copy: "this close relies on stale evidence — consider a fresh interview / LOI re-confirm." | Blocking is draconian. Founder may have good reason to keep citing an older LOI (e.g. buyer confirmed verbally, LOI refresh pending). Surface risk, let them decide. |
+| OQ5 | `promoteToForge` auto-draft Forge Brief via Priya? | **Yes — async Priya draft fires on promote; founder edits on the Forge side.** Priya call is fire-and-forget; if it fails, Brief is empty and the Forge Brief page shows "Run Priya draft" button. | Saves founder ~20 min of typing. Matches specialist-output-attribution pattern. Async so a Priya failure doesn't block the promote. |
+| OQ6 | Rollback banner on flag-flip-off? | **Yes.** Copy: *"Products has been rolled back temporarily. Your hypothesis data is preserved and available via /products/legacy. We'll be back shortly."* Banner dismissible, stored in localStorage. | Rollbacks are rare but transparency is cheap. Zero-regress-without-notice rule from CLAUDE.md. |
+| OQ7 | Today dedup: `hypothesis_promoted_to_forge` + `brief_locked` within an hour — show both or collapse? | **Show both.** Different events with different semantics. | Promote = initiation; Brief-Lock = terminal gate. Founder wants to see both happen, not a collapsed "promoted + locked" event that hides the two-step commitment. Today urgency on both = medium; decay 1d + 30d respectively. |
 
 ---
 

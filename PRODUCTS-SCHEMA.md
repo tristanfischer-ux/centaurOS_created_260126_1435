@@ -512,17 +512,59 @@ $$;
 
 ---
 
-## 10 · Open questions (for Tristan's red-team)
+## 10 · Locked decisions (was §10 Open questions)
 
-| # | Question | Recommended default | Why |
+**Status:** locked autonomously 2026-04-19 per Tristan verbal sign-off ("Make the decisions."). All seven resolve to the recommended default from the prep draft. No further Tristan input needed pre-build.
+
+| # | Question | **Locked decision** | Rationale |
 |---|---|---|---|
-| Q1 | Keep `hypothesis_migration_archive` table forever, or drop after 90 days of flag-on? | **Keep forever** | Audit trail has low storage cost and high investigation value. Drop only if legal requires. |
-| Q2 | Seed 12 readiness_items per hypothesis, or require the founder to pick a template first? | **Seed 12** | Friction-free default; founder deletes items they don't care about. |
-| Q3 | Allow more than one `market_sizings` per hypothesis (e.g. re-sizing versions)? | **No — one row, overwrite on re-size, audit the history via audit_log** | Simpler UI. Re-size history is an audit concern, not a working-memory concern. |
-| Q4 | Should `assumption_invalidated` with `risk_level ≥ 4` auto-archive the hypothesis? | **No — surface it as a critical event_log entry but let the founder decide** | Auto-archive is opinionated; founders may reframe the hypothesis rather than kill it. |
-| Q5 | Should `competitors.tags` be free-text or a pick-list? | **Pick-list seeded with 8 defaults + free-text fallback** | Tag consistency matters for filter UX; free-text sprawl ruins it. |
-| Q6 | Where does the "reason I haven't signed any LOIs yet" narrative live? | **Add `hypotheses.traction_explainer` text column (Phase 4 addendum)** | Founders need a place to frame absence of LOIs for investors. Not critical for V1 but worth noting. |
-| Q7 | Is `readiness_items.investor_question` a free-text tag or an enum? | **Enum (team / ask / market / moat / path) — consistent with mockups** | Enforces grouping in UI. Free-text would fragment. |
+| Q1 | `hypothesis_migration_archive` table lifetime | **Keep forever.** | Low storage cost; high investigation value. Drop only if legal requires it later. |
+| Q2 | Seed 12 readiness_items per hypothesis? | **Yes — seed 12 from v1 template.** | Friction-free default. Founders delete items they don't care about; they don't resent absence. |
+| Q3 | Allow multiple `market_sizings` per hypothesis? | **No. One row per hypothesis. Overwrite on re-size. History via audit_log.** | Re-size history is an audit concern, not a working-memory concern. UI stays clean. |
+| Q4 | Auto-archive on `assumption_invalidated` + `risk_level ≥ 4`? | **No. Surface critical `event_log` entry; founder decides.** | Auto-archive is opinionated; founders often reframe a hypothesis rather than kill it. Never take destructive action based on a single invalidation. |
+| Q5 | `competitors.tags` free-text or pick-list? | **Pick-list of 8 defaults + free-text fallback.** Defaults: `direct`, `indirect`, `incumbent`, `new-entrant`, `open-source`, `in-house`, `price-leader`, `#blocker`. | Tag consistency matters for filter UX. Free-text sprawl ruins it. Escape hatch available when the default set doesn't fit. |
+| Q6 | Where does "why no LOIs yet" narrative live? | **Add `hypotheses.traction_explainer text` column in Phase 4 first migration.** | Founders need a place to frame absence for investors. Not vital but cheap to include from day 1; painful to retrofit later. |
+| Q7 | `readiness_items.investor_question` enum or text? | **Enum: `team` / `ask` / `market` / `moat` / `path`.** | Enforces grouping in UI. Free-text fragments into synonyms. |
+
+### 10.1 · Locked red-team mitigations
+
+**RT1 (CRITICAL) — Readiness-close evidence gate.** Enforced at DB level:
+```sql
+CHECK (status != 'closed' OR (evidence_ref IS NOT NULL AND jsonb_array_length(evidence_ref) > 0) OR status = 'not_applicable')
+```
+UI gates the close button on attaching ≥1 `{entity_type, entity_id}` ref. `not_applicable` bypasses.
+
+**RT2 (CRITICAL) — Assumption→valid requires linked experiment.** Enforced at DB level:
+```sql
+CHECK (status != 'valid' OR linked_experiment_id IS NOT NULL)
+```
+Server action also verifies the linked experiment has `decision = 'keep'`. `invalid` transition has NO evidence requirement — one contradicting interview is enough.
+
+**RT3 (HIGH) — Evidence half-life.** App-layer derived `stale` flag (not a stored column): interviews > 90d; LOIs > 180d without re-confirm; market_sizings > 180d (already in §2.2). Readiness_items citing ONLY stale evidence surface a warning pill ("this close relies on stale evidence"). **Warning, not block** — founder can keep citing an older LOI for good reason.
+
+**RT4 (HIGH) — Hypothesis grammar.** `hypotheses.one_liner` deprecated as an input. Replaced by three separate text columns on `hypotheses`:
+- `if_change text NOT NULL` — the change being proposed
+- `then_impact text NOT NULL` — the expected impact
+- `because_assumption text NOT NULL` — the underlying assumption
+
+UI composes them back into a derived `one_liner` for display (also stored as a cached column, updated on write). Migrated hypotheses get `{if_change: "(migrated from v1)", then_impact: <products.description>, because_assumption: "(not captured — upgrade required)"}` plus an auto-added readiness item "Upgrade this hypothesis with testable grammar (If/Then/Because)" in group=`market`. Hypothesis-create form requires all three fields non-empty (minimum 10 chars each, enforced client-side + server-side).
+
+**RT5 (MEDIUM) — Promote reversibility copy.** Promote dialog explicitly states:
+> *"Promoting moves canonical ownership to The Forge. You can un-promote until the Brief is locked. After Brief-Lock, this hypothesis becomes read-only in Products — the Brief is the authoritative record. You can always archive."*
+Forge-side Brief-Lock confirmation surfaces the reciprocal line ("This promotion is still reversible until you lock the Brief; after lock, the hypothesis becomes read-only in Products").
+
+### 10.2 · Schema addendum — columns added by Q6 + RT4
+
+`hypotheses` gains four columns beyond §2.1:
+
+| column | type | notes |
+|---|---|---|
+| `if_change` | text NOT NULL | RT4 — hypothesis grammar. Min 10 chars enforced in server action. |
+| `then_impact` | text NOT NULL | RT4. |
+| `because_assumption` | text NOT NULL | RT4. |
+| `traction_explainer` | text | Q6. Nullable. Shown on Hypothesis tab below the If/Then/Because block. |
+
+§2.1's `one_liner` column now READ-ONLY / cached: populated on write from a server-side template: `"If {if_change_short}, then {then_impact_short}"` (both truncated to 140 chars). Used for list view display.
 
 ---
 
@@ -531,3 +573,4 @@ $$;
 | Date | Change | Author |
 |---|---|---|
 | 2026-04-19 | v1.0 initial draft — schema, 5-tab model, permissions matrix, data preservation, Today contract | Forge+Products terminal (Products prep) |
+| 2026-04-19 | v1.1 locked — §10 decisions locked autonomously per Tristan verbal sign-off; §10.1 red-team mitigations locked; `hypotheses` schema adds `if_change`/`then_impact`/`because_assumption` columns (RT4) + `traction_explainer` column (Q6); CHECK constraints spelled out for RT1 + RT2 | Forge+Products terminal (Products prep) |

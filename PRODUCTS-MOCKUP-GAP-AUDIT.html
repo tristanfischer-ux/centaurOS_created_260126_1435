@@ -138,8 +138,8 @@
 
   <!-- ── HEADER ── -->
   <div class="ga-head">
-    <h1>Pre-code audit + red team · Products (Phase 4)</h1>
-    <div class="sub"><strong>Goal:</strong> surface every drill-down, edge case, empty state, and structural weakness in the Products mockup set NOW — before a single line of Phase 4 code is written. Output is a prioritised gap list and 5 red-team critiques of what IS built, plus the build list Tristan signs off on before the next session writes code.</div>
+    <h1>Pre-code audit + red team · Products (Phase 4) <span style="background: var(--success); color: white; font-size: 11px; padding: 3px 10px; border-radius: 5px; vertical-align: middle; margin-left: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">LOCKED</span></h1>
+    <div class="sub"><strong>Status:</strong> locked autonomously 2026-04-19 per Tristan verbal sign-off. All 18 gaps (6 MUST + 8 NICE + 2 DEFER) + 5 red-team critiques + 16-item build list + V1 cuts list = locked to recommended defaults. Products waits behind Phases 1/2/3; build terminal picks it up when Plan merges to main. <strong>Goal (retrospective):</strong> surface every drill-down, edge case, empty state, and structural weakness before Phase 4 code begins. Output is the locked red-team surface below.</div>
     <div class="ga-stats">
       <div class="tile"><div class="lab">Pages built</div><div class="val">10</div><div class="sub">1 main · 1 empty · 5 drill-ins · 2 transitions · 1 action</div></div>
       <div class="tile"><div class="lab">Gaps found</div><div class="val brand">18</div><div class="sub">6 per-tab + 6 cross-cutting + 6 red-team</div></div>
@@ -724,9 +724,9 @@
       </ul>
     </div>
 
-    <div class="annot">
-      <strong>Decision point for Tristan</strong>
-      Confirm (or override) the build list above. Reply <code>locked</code> to the build terminal when approved. Then Phase 4 code begins per <a href="HANDOVER-products.md">HANDOVER-products.md</a>. If you want to add/remove items, mark them in a diff comment and reply <code>locked with changes: [list]</code>.
+    <div class="annot" style="background: var(--success-soft); border-color: var(--success-dim); color: #14532d;">
+      <strong style="color: #064e3b;">Locked autonomously 2026-04-19</strong>
+      Tristan: <em>"I don't really have a massive view on the issues which have been raised. Make the decisions. We need to wait until some of the other sections are done first. Just get yourself ready."</em> All 5 red-team mitigations + 7 HANDOVER open questions + 7 SCHEMA open questions are LOCKED to their recommended defaults. See <a href="PRODUCTS-SCHEMA.md" style="color: #064e3b; font-weight: 700;">PRODUCTS-SCHEMA.md §10 + §10.1 + §10.2</a> and <a href="HANDOVER-products.md" style="color: #064e3b; font-weight: 700;">HANDOVER-products.md §Locked decisions</a>. Build terminal picks up Products AFTER Plan (Phase 3) merges to main — sequential phase order holds. No further Tristan sign-off required pre-build.
     </div>
 
   </div>
