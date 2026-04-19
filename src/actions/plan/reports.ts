@@ -234,7 +234,6 @@ export async function draftReport(
       await logAudit({
         action: 'report_drafted' as never,
         entityType: 'reports_sent',
-        entityId: null,
         userId: user.id,
         foundryId,
         metadata: {

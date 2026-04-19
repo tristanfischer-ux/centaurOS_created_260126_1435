@@ -138,12 +138,13 @@ export default async function PlanReportDetailPage({
         )
     }
 
-    const { data: report } = await untyped
+    const reportResult = await untyped
         .from("reports_sent")
         .select("*")
         .eq("id", id)
         .eq("foundry_id", foundryId)
-        .maybeSingle<ReportsSentRow>()
+        .maybeSingle()
+    const report = (reportResult.data as ReportsSentRow | null) ?? null
 
     if (!report) {
         return (
