@@ -22,16 +22,16 @@ Lands the primitives every Phase (2/3/4) will consume. Forge routes themselves a
 - [x] A.3 Write `FORGE-DATA-PRESERVATION.md`
 
 ### B · Migrations (additive only)
-- [ ] B.1 `20260419100000_profiles_feature_flags.sql` — add `feature_flags jsonb NOT NULL DEFAULT '{}'`
-- [ ] B.2 `20260419100100_foundries_shared_schema_columns.sql` — add `tier`, `member_count_cached`, `updated_at` + updated_at trigger
-- [ ] B.3 `20260419100200_audit_log_shared_schema_columns.sql` — add `section`, `event`, `actor_user_id`, `actor_specialist`, `payload`; preserve `action`, `user_id`, `metadata`; indexes `(foundry_id, created_at DESC)` + `(foundry_id, section, entity_id)`
-- [ ] B.4 `20260419100300_memberships.sql` — CREATE TABLE + unique `(user_id, foundry_id)` + RLS + backfill from profiles + sync trigger; CHECK constraint on role enum; NULL-role → founder default
-- [ ] B.5 `20260419100400_event_log.sql` — CREATE TABLE + RLS + indexes + Supabase Realtime publication
-- [ ] B.6 `20260419100500_projects.sql` — CREATE TABLE + unique slug per foundry + RLS
-- [ ] B.7 `20260419100600_project_transitions.sql` — CREATE TABLE + RLS + FK to projects
-- [ ] B.8 `npx supabase db push --linked` — all migrations applied cleanly
-- [ ] B.9 `NODE_OPTIONS="--max-old-space-size=8192" npx supabase gen types typescript --linked > src/types/database.types.ts`
-- [ ] B.10 `tsc --noEmit` clean
+- [x] B.1 `20260419100000_profiles_feature_flags.sql` — add `feature_flags jsonb NOT NULL DEFAULT '{}'`
+- [x] B.2 `20260419100100_foundries_shared_schema_columns.sql` — add `tier` (with CHECK), `member_count_cached`, `updated_at` + updated_at trigger + initial backfill of member count
+- [x] B.3 `20260419100200_audit_log_shared_schema_columns.sql` — add `section`, `event`, `actor_user_id`, `actor_specialist`, `payload`; preserve `action`, `user_id`, `metadata`; indexes `(foundry_id, created_at DESC)` + partial `(foundry_id, section, entity_id) WHERE section IS NOT NULL`
+- [x] B.4 `20260419100300_foundry_memberships_shared_schema_columns.sql` — **REVISED**: existing `foundry_memberships` table IS SHARED-SCHEMA's `memberships`. Additively add `active`, `active_at`, `updated_at` + updated_at trigger + `refresh_foundry_member_count` trigger that keeps `foundries.member_count_cached` in sync. Existing `profiles_ensure_membership` sync trigger (from 20260330200000) unchanged. Role-enum expansion (5 CapitalCase → 9 snake_case) **deferred** from Phase 1 PR #1 — cascades to every consumer.
+- [x] B.5 `20260419100400_event_log.sql` — CREATE TABLE + RLS (foundry-scoped SELECT + service_role INSERT + foundry-member resolve-only UPDATE) + indexes + Supabase Realtime publication
+- [x] B.6 `20260419100500_projects.sql` — CREATE TABLE + unique `(foundry_id, slug)` + RLS + `hypothesis_id` nullable uuid without FK (FK added Phase 2 when hypotheses table lands)
+- [x] B.7 `20260419100600_project_transitions.sql` — CREATE TABLE + RLS (foundry SELECT, service_role INSERT, append-only) + FK to projects
+- [x] B.8 Migrations applied via Supabase Management API (`apply_migration` MCP) — **CLI `db push` blocked by pre-existing migration-history drift** (12 remote-only rows + duplicate-timestamp pair at `20260421000000` + 11 backlog local files, none of which are PR #1 scope). 22/22 DB verification checks passed (columns, triggers, RLS, Realtime publication). Decision: handle the drift in a separate reconciliation PR, not here.
+- [x] B.9 Types regenerated via `npx supabase gen types typescript --linked` — 23,099 lines. `event_log`, `projects`, `project_transitions`, new columns on profiles/foundries/audit_log/foundry_memberships all present.
+- [x] B.10 `tsc --noEmit` baseline-clean — **8 errors total, all pre-existing** (discriminated-union narrowing in `tasks.test.ts`, `BatchApprovalSheet.tsx`, `InlineBatchApproval.tsx`; none reference my new schema). Baseline confirmed by stashing working tree and re-running tsc: same 8 errors.
 
 ### C · Feature-flag primitive
 - [ ] C.1 `src/lib/features/flags.ts` — `getFeatureFlag(supabase, userId, key)`, `requireFeatureFlag(key)` server helper, `useFeatureFlag(key)` client hook
