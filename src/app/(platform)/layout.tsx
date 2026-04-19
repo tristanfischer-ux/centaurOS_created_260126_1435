@@ -34,6 +34,8 @@ import { ActiveTimerBar } from "@/components/time/active-timer-bar";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
+import { getFeatureFlag } from "@/lib/features/flags";
+import { FLAG_NEW_FORGE_EXPERIENCE } from "@/lib/features/keys";
 
 // DECISION: Vercel Pro caps at 300s. Server actions (research, decomposition,
 // image generation) called from platform pages need up to 240s per invocation.
@@ -102,6 +104,12 @@ export default async function PlatformLayout({
     // GUARD: If user has no valid foundry, show recovery screen instead of page content.
     const needsProfileRepair = !profile?.foundry_id
 
+    // Phase 1 — new Forge experience flag. Gates sidebar Forge nav target.
+    // Flag off (default): target /the-forge (current experience).
+    // Flag on: target /the-forge-v2 (redesign routes, flag-gated, land in PR #2+).
+    // Reuses the Supabase client already fetched above — no extra round-trip.
+    const newForgeExperienceEnabled = await getFeatureFlag(supabase, user.id, FLAG_NEW_FORGE_EXPERIENCE)
+
     return (
         <PostHogProvider>
         <TooltipProvider>
@@ -117,7 +125,7 @@ export default async function PlatformLayout({
                         <KeyboardShortcutsDialog />
                         <KeyboardShortcuts />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} />
                         <MainContentArea>
                             <ActiveTimerBar />
                             <main className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-24 sm:pb-8">

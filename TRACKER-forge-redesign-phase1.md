@@ -44,17 +44,24 @@ Lands the primitives every Phase (2/3/4) will consume. Forge routes themselves a
 - [ ] D.1 `src/lib/audit/write.ts` — writes both `action`+`event` (same value) and both `metadata`+`payload` so legacy readers keep working
 - [ ] D.2 Swap 1 high-traffic call site to confirm helper works end-to-end; defer broad migration (not Phase-1 scope)
 
-### E · Sidebar (atomic swap — verified safe, only `(platform)/layout.tsx` imports it)
-- [ ] E.1 `src/components/sidebar/Sidebar.tsx` — new shell matching SHARED-SIDEBAR.html chrome (foundry switcher, section groups, footer Getting Started + AI Credits bar). Semantic tokens only, light-first.
-- [ ] E.2 `src/components/sidebar/data/me.ts` — new Me structure
-- [ ] E.3 `src/components/sidebar/data/supplier-portal.ts` — conditional, faded per mockup
-- [ ] E.4 `src/components/sidebar/data/plan.ts` — **legacy 7-item** (Strategy/Objectives/Tasks/Review/Reports/Red Team/Knowledge → existing routes). Phase 3 swaps.
-- [ ] E.5 `src/components/sidebar/data/money.ts` — **legacy 6-item Cash Burn** (no strikethrough pedagogy). Phase 4 swaps.
-- [ ] E.6 `src/components/sidebar/data/workshop.ts` — Forge entry reads `new_forge_experience` flag; target `/the-forge-v2` when true, `/the-forge` when false. Server component.
-- [ ] E.7 `src/components/sidebar/data/marketplace.ts` — PEOPLE + SUPPLIES sub-groups per mockup
-- [ ] E.8 **Exclude** the AUDIT section (pedagogical only, not for production)
-- [ ] E.9 Update `src/app/(platform)/layout.tsx` to import new Sidebar
-- [ ] E.10 Delete `src/components/Sidebar.tsx` + `useSidebarCollapse` if fully superseded (else document why retained)
+### E · Sidebar (E-MINIMAL — data extraction only; chrome rebuild deferred to PR #1.5)
+
+Scope revision 2026-04-19: after inspecting `src/components/Sidebar.tsx` (605 lines, 20+ integrations), Tristan approved deferring the SHARED-SIDEBAR.html chrome rebuild to a focused PR #1.5. PR #1 ships the **data-architecture split** (the primitive Phases 2/3/4 consume) without touching visual chrome. Zero visual change.
+
+- [x] E.1 _(deferred to PR #1.5)_ full chrome rebuild to match SHARED-SIDEBAR.html `sb-*` class system.
+- [x] E.2 `src/components/sidebar/data/me.ts` — `welcomeNavItem` + `todayNavItem` + `meNavigation` (4 items).
+- [x] E.3 `src/components/sidebar/data/supplier-portal.ts` — `supplierNavigation` (6 items), rendered only when `profiles.is_supplier = true` (condition in Sidebar.tsx unchanged).
+- [x] E.4 `src/components/sidebar/data/plan.ts` — **legacy 7-item** (Strategy/Objectives/Tasks/Review/Reports/Red Team/Knowledge). Phase 3 swaps in a single-file edit.
+- [x] E.5 `src/components/sidebar/data/money.ts` — **legacy 6-item Cash Burn** exported as `moneyLegacyNavigation`. Section label in the sidebar stays "Cash Burn" during Phase 1; Phase 4 changes label to "MONEY [V2]".
+- [x] E.6 `src/components/sidebar/data/workshop.ts` — exports `getWorkshopNavigation(newForgeExperience: boolean): SidebarNavItem[]`. When flag true, Forge href = `/the-forge-v2`; when false, `/the-forge`. All other workshop entries unchanged.
+- [x] E.7 `src/components/sidebar/data/marketplace.ts` — `marketplacePeopleNavigation` + `marketplaceSuppliesNavigation` (PEOPLE + SUPPLIES sub-groups).
+- [x] E.8 AUDIT section excluded (never existed in current Sidebar — so no change needed).
+- [x] E.9 `src/app/(platform)/layout.tsx` reads flag via `getFeatureFlag(supabase, user.id, FLAG_NEW_FORGE_EXPERIENCE)` (reuses existing supabase client — no extra round-trip), passes as `newForgeExperienceEnabled` prop to Sidebar. Sidebar.tsx accepts the prop and calls `getWorkshopNavigation(newForgeExperienceEnabled)`.
+- [x] E.10 _(deferred to PR #1.5)_ delete old `src/components/Sidebar.tsx` + `useSidebarCollapse`. Existing component path preserved per Tristan's E-minimal guardrail.
+
+Supporting file: `src/components/sidebar/data/types.ts` exports the shared `SidebarNavItem` type consumed by every data file.
+
+tsc: 8 pre-existing errors, 0 new. Visual change: zero.
 
 ### F · Today V3 (reskin-plus-frame — preserve existing signals)
 - [ ] F.1 Port headline Priority card — use `briefing.nudges[0]` / `briefing.topTasks[0]` as the primary signal source (existing Today logic)
