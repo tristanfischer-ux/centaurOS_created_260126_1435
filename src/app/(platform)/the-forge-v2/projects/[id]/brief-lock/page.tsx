@@ -80,7 +80,7 @@ export default async function ForgeV2BriefLockPage({ params }: { params: Promise
                 { label: "Workspace", href: "/the-forge-v2" },
                 { label: project.name, href: projectHref },
                 { label: "Brief", href: briefHref },
-                { label: "Lock" },
+                { label: "Lock brief" },
             ]}
             subtitle="Terminal handoff — the brief becomes the canonical record that everything anchors to."
             maxWidth="narrow"
