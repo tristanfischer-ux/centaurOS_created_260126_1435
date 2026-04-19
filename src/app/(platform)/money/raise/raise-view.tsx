@@ -87,8 +87,8 @@ export function RaiseView({ data }: { data: RaiseData }) {
           {data.activeRound ? (
             <p className="text-sm text-muted-foreground mt-2">
               {data.activeRound.name} ·{' '}
-              {formatCurrency(committed, data.activeRound.currency)} / {formatCurrency(data.activeRound.target_cents, data.activeRound.currency)}{' '}
-              · closes {data.activeRound.close_date}
+              {formatCurrency(committed, data.activeRound.currency)} / {formatCurrency(data.activeRound.target_cents, data.activeRound.currency)}
+              {' '}· closes {data.activeRound.close_date}
             </p>
           ) : (
             <p className="text-sm text-muted-foreground mt-2">No active round</p>
