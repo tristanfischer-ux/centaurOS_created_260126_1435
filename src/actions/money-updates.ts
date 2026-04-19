@@ -161,7 +161,7 @@ export async function draftInvestorUpdate(
         month_label: input.month_label.trim(),
         subject: input.subject.trim(),
         body_html: input.body_html ?? '',
-        body_sections: input.body_sections ?? {},
+        body_sections: (input.body_sections ?? {}) as never,
         headline_quote: input.headline_quote ?? null,
         state: 'draft',
         sent_by_user_id: user.id,
