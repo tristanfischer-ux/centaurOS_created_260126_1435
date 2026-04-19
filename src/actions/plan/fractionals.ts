@@ -17,7 +17,7 @@ import type {
   FractionalEngagementRow,
   HistoryEntryRow,
 } from "@/types/plan"
-import { withAuth } from "@/lib/auth/withAuth"
+import { withAuth } from "@/lib/server-action-utils"
 import { logAudit } from "@/actions/audit"
 
 const DEFAULT_HOURS_PER_WEEK = 6
@@ -141,7 +141,7 @@ export async function inviteFractional(
       action: "fractional_invited" as never,
       entityType: "fractional_engagement",
       entityId: ((engagement as Record<string, unknown>).id as string) ?? "",
-      payload: { fractional_id: fractionalId, email: parsed.email },
+      metadata: { fractional_id: fractionalId, email: parsed.email },
     })
 
     return engagement as FractionalEngagementRow
@@ -211,7 +211,7 @@ export async function endEngagement(
       action: "fractional_engagement_ended" as never,
       entityType: "fractional_engagement",
       entityId: engagementId,
-      payload: { reason },
+      metadata: { reason },
     })
 
     return entry as HistoryEntryRow
@@ -249,7 +249,7 @@ export async function updateCapacity(
       action: "fractional_capacity_updated" as never,
       entityType: "fractional_engagement",
       entityId: engagementId,
-      payload: { hours_used_this_week: hoursUsedThisWeek },
+      metadata: { hours_used_this_week: hoursUsedThisWeek },
     })
   })
 }
