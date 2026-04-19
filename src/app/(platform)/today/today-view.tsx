@@ -86,8 +86,15 @@ import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { CHECKLIST_ITEMS } from "@/components/onboarding/GettingStartedChecklist"
 import type { TodayInsightInput } from "@/actions/specialist-page-insights"
 import { useTodayForgeFeed } from "@/hooks/useTodayForgeFeed"
+import { useTodayMoneyFeed } from "@/hooks/useTodayMoneyFeed"
 import type { TodaySignal, TodaySignalSection } from "@/types/today"
 import { DECAY_RATE_RANK } from "@/types/today"
+import {
+    getTodayMoneyRunwayTile,
+    getTodayMoneyPipelineTile,
+    type TodayMoneyRunwayTile,
+    type TodayMoneyPipelineTile,
+} from "@/actions/money-today"
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -209,8 +216,9 @@ function buildQueueItems(params: {
     briefing: MorningBriefing | null
     pulseInsights: FormattedReport['insights'] | null
     forgeFeedSignals: TodaySignal[]
+    moneyFeedSignals: TodaySignal[]
 }): QueueItem[] {
-    const { briefing, pulseInsights, forgeFeedSignals } = params
+    const { briefing, pulseInsights, forgeFeedSignals, moneyFeedSignals } = params
     const now = new Date()
     const items: QueueItem[] = []
 
@@ -300,31 +308,40 @@ function buildQueueItems(params: {
         })
     })
 
-    // useTodayForgeFeed signals → section rows (forge / products / plan / money / meta)
-    forgeFeedSignals.forEach((sig) => {
-        const rank = sig.decayRate ? DECAY_RATE_RANK[sig.decayRate] : 100
-        const tone: QueueItem['decayTone'] =
-            sig.decayRate === 'immediate' ? 'overdue' :
-            sig.decayRate === '1d' || sig.decayRate === '3d' ? 'warn' :
-            'normal'
-        const decayLabel =
-            sig.decayRate === 'immediate' ? 'Now' :
-            sig.decayRate === '1d' ? '1 day' :
-            sig.decayRate === '3d' ? '3 days' :
-            sig.decayRate === '7d' ? '7 days' :
-            sig.decayRate === '30d' ? '30 days' :
-            'open'
-        items.push({
-            key: `forge-${sig.id}`,
-            label: sig.title,
-            sub: sig.body ?? undefined,
-            source: sig.section,
-            decayLabel,
-            decayTone: tone,
-            decayRank: rank,
-            consequenceWeight: sig.consequenceWeight ?? 1,
-            ctaHref: sig.ctaHref ?? '#',
-            ctaLabel: sig.ctaLabel ?? 'Open',
+    // useTodayForgeFeed + useTodayMoneyFeed signals → section rows.
+    // Both hooks return TodaySignal shapes and merge into the same queue;
+    // we tag the queue key with the section to keep React keys stable across
+    // mixed-source updates.
+    const sectionFeed: Array<{ keyPrefix: string; sigs: TodaySignal[] }> = [
+        { keyPrefix: 'forge', sigs: forgeFeedSignals },
+        { keyPrefix: 'money', sigs: moneyFeedSignals },
+    ]
+    sectionFeed.forEach(({ keyPrefix, sigs }) => {
+        sigs.forEach((sig) => {
+            const rank = sig.decayRate ? DECAY_RATE_RANK[sig.decayRate] : 100
+            const tone: QueueItem['decayTone'] =
+                sig.decayRate === 'immediate' ? 'overdue' :
+                sig.decayRate === '1d' || sig.decayRate === '3d' ? 'warn' :
+                'normal'
+            const decayLabel =
+                sig.decayRate === 'immediate' ? 'Now' :
+                sig.decayRate === '1d' ? '1 day' :
+                sig.decayRate === '3d' ? '3 days' :
+                sig.decayRate === '7d' ? '7 days' :
+                sig.decayRate === '30d' ? '30 days' :
+                'open'
+            items.push({
+                key: `${keyPrefix}-${sig.id}`,
+                label: sig.title,
+                sub: sig.body ?? undefined,
+                source: sig.section,
+                decayLabel,
+                decayTone: tone,
+                decayRank: rank,
+                consequenceWeight: sig.consequenceWeight ?? 1,
+                ctaHref: sig.ctaHref ?? '#',
+                ctaLabel: sig.ctaLabel ?? 'Open',
+            })
         })
     })
 
@@ -521,9 +538,33 @@ export function TodayView({
         openPanel(specialistId, { handoffContext: context, contextLabel: 'Today' })
     }
 
-    // ─── Forge feed (Supabase Realtime) ──────────────────────────
+    // ─── Forge + Money feeds (Supabase Realtime) ─────────────────
 
     const forgeFeed = useTodayForgeFeed({ foundryId })
+    const moneyFeed = useTodayMoneyFeed({ foundryId })
+
+    // ─── Money tile state (runway + pipeline) ────────────────────
+    // Phase 2: replace the V3b/V4/V9 stubs with live data. Each tile fetches
+    // independently so a slow runway calculation doesn't block the pipeline tile.
+    const [moneyRunwayTile, setMoneyRunwayTile] = useState<TodayMoneyRunwayTile | null>(null)
+    const [moneyPipelineTile, setMoneyPipelineTile] = useState<TodayMoneyPipelineTile | null>(null)
+
+    useEffect(() => {
+        let cancelled = false
+        Promise.allSettled([
+            getTodayMoneyRunwayTile(),
+            getTodayMoneyPipelineTile(),
+        ]).then(([runwayRes, pipelineRes]) => {
+            if (cancelled) return
+            if (runwayRes.status === 'fulfilled' && !('error' in runwayRes.value)) {
+                setMoneyRunwayTile(runwayRes.value)
+            }
+            if (pipelineRes.status === 'fulfilled' && !('error' in pipelineRes.value)) {
+                setMoneyPipelineTile(pipelineRes.value)
+            }
+        })
+        return () => { cancelled = true }
+    }, [])
 
     // ─── Queue items (merged + sorted) ────────────────────────────
 
@@ -531,7 +572,8 @@ export function TodayView({
         briefing,
         pulseInsights: pulse?.insights ?? null,
         forgeFeedSignals: forgeFeed.signals,
-    }), [briefing, pulse, forgeFeed.signals])
+        moneyFeedSignals: moneyFeed.signals,
+    }), [briefing, pulse, forgeFeed.signals, moneyFeed.signals])
 
     const visibleQueueItems = useMemo(() => {
         const filtered = queueFilter === 'all'
@@ -809,13 +851,13 @@ export function TodayView({
             {/* V3 — Headline grid: Priority slab + Runway stub */}
             <div className="grid grid-cols-1 lg:grid-cols-[2.2fr_1fr] gap-4">
                 <PrioritySlab item={prioritySlab} />
-                <RunwayStub />
+                <RunwayStub data={moneyRunwayTile} />
             </div>
 
             {/* V4 — Minigrid: Forge cost · Money pipeline · Plan tasks */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ForgeCostTile signals={forgeFeed.signals} />
-                <MoneyPipelineTile />
+                <MoneyPipelineTile data={moneyPipelineTile} />
                 <PlanTasksTile
                     onTrack={onTrackCount}
                     pillarTotal={pillarTotal}
@@ -883,7 +925,11 @@ export function TodayView({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <ForgeSignalCard forgeSignals={forgeFeed.signals} />
                 <ProductsSignalCard />
-                <MoneySignalCard />
+                <MoneySignalCard
+                    runway={moneyRunwayTile}
+                    pipeline={moneyPipelineTile}
+                    signals={moneyFeed.signals}
+                />
                 <PlanSignalCard
                     onTrack={onTrackCount}
                     pillarTotal={pillarTotal}
@@ -1104,31 +1150,111 @@ function PrioritySlab({ item }: { item: QueueItem | null }): React.ReactElement 
     )
 }
 
-// ─── V3b — Runway card (Connect Cash/Burn stub) ──────────────────
+// ─── V3b — Runway card (Phase 2 Money: live data via getTodayMoneyRunwayTile) ──
 
-function RunwayStub(): React.ReactElement {
+function formatMoneyAmount(cents: number, currency: string): string {
+    try {
+        return new Intl.NumberFormat('en-GB', {
+            style: 'currency',
+            currency,
+            maximumFractionDigits: 0,
+        }).format(cents / 100)
+    } catch {
+        return `${(cents / 100).toFixed(0)}`
+    }
+}
+
+function RunwayStub({ data }: { data: TodayMoneyRunwayTile | null }): React.ReactElement {
+    // Loading: data not yet hydrated by the parent useEffect.
+    if (data === null) {
+        return (
+            <Card className="rounded-xl border relative">
+                <CardContent className="pt-5 pb-5">
+                    <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                        Cash runway
+                    </p>
+                    <Skeleton className="h-7 w-24 mb-2" />
+                    <Skeleton className="h-3 w-40 mb-3" />
+                    <Skeleton className="h-8 w-full" />
+                </CardContent>
+            </Card>
+        )
+    }
+
+    // Cold start: no plan_line_items yet — keep the original CTA.
+    if (!data.connected) {
+        return (
+            <Card className="rounded-xl border relative">
+                <CardContent className="pt-5 pb-5">
+                    <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                        Cash runway
+                    </p>
+                    <div className="flex items-baseline gap-1 mb-1">
+                        <span className="text-2xl font-bold text-muted-foreground/70 tabular-nums">—</span>
+                        <span className="text-xs text-muted-foreground">months</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                        Add a plan to see runway here.
+                    </p>
+                    <Button size="sm" variant="outline" asChild className="w-full">
+                        <Link href="/money/plan" className="gap-1.5">
+                            <Building2 className="h-3.5 w-3.5" />
+                            Connect Cash/Burn
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    const months = data.runwayMonths
+    const status = data.runwayStatus
+    const statusToneClass =
+        status === 'critical' ? 'text-destructive' :
+        status === 'caution' ? 'text-status-warning' :
+        status === 'sustainable' ? 'text-status-success' :
+        'text-foreground'
+    const statusLabel =
+        status === 'critical' ? 'Critical' :
+        status === 'caution' ? 'Caution' :
+        status === 'sustainable' ? 'Sustainable' :
+        'Healthy'
+
+    const monthsDisplay =
+        status === 'sustainable' ? '∞' :
+        months === null ? '—' :
+        months >= 24 ? '24+' :
+        months.toFixed(1)
+    const burnLabel = data.monthlyBurnCents > 0
+        ? `${formatMoneyAmount(data.monthlyBurnCents, data.currency)}/mo burn`
+        : 'Net positive — income covers burn'
+
     return (
         <Card className="rounded-xl border relative">
             <CardContent className="pt-5 pb-5">
-                <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
-                    Cash runway
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Cash runway
+                    </p>
+                    <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider",
+                        statusToneClass,
+                    )}>
+                        {statusLabel}
+                    </span>
+                </div>
                 <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-2xl font-bold text-muted-foreground/70 tabular-nums">—</span>
+                    <span className={cn("text-2xl font-bold tabular-nums", statusToneClass)}>
+                        {monthsDisplay}
+                    </span>
                     <span className="text-xs text-muted-foreground">months</span>
                 </div>
-                <p className="text-xs text-muted-foreground mb-3">
-                    Connect your finances to see runway here.
-                </p>
+                <p className="text-xs text-muted-foreground mb-3">{burnLabel}</p>
                 <Button size="sm" variant="outline" asChild className="w-full">
-                    <Link href="/money" className="gap-1.5">
-                        <Building2 className="h-3.5 w-3.5" />
-                        Connect Cash/Burn
+                    <Link href="/money/cockpit" className="gap-1.5">
+                        Open Cockpit
                     </Link>
                 </Button>
-                <p className="text-[10px] text-muted-foreground/70 italic mt-2">
-                    Coming in Phase 2 · Money
-                </p>
             </CardContent>
         </Card>
     )
@@ -1162,16 +1288,64 @@ function ForgeCostTile({ signals }: { signals: TodaySignal[] }): React.ReactElem
     )
 }
 
-function MoneyPipelineTile(): React.ReactElement {
+function MoneyPipelineTile({ data }: { data: TodayMoneyPipelineTile | null }): React.ReactElement {
+    // Loading skeleton — same outer frame as a populated tile so the layout doesn't shift.
+    if (data === null) {
+        return (
+            <div className="block rounded-xl border bg-background p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                    <SourceTag source="money" />
+                    <Skeleton className="h-3 w-12" />
+                </div>
+                <Skeleton className="h-6 w-20 mb-1" />
+                <Skeleton className="h-3 w-32" />
+            </div>
+        )
+    }
+
+    if (!data.hasRound) {
+        return (
+            <Link
+                href="/money/raise"
+                className="block rounded-xl border bg-background p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+            >
+                <div className="flex items-center justify-between mb-2">
+                    <SourceTag source="money" />
+                    <span className="text-[10px] text-muted-foreground">no round</span>
+                </div>
+                <div className="text-xl font-bold text-muted-foreground/70 tabular-nums">—</div>
+                <div className="text-xs text-muted-foreground mt-1">Open Raise to start a round</div>
+            </Link>
+        )
+    }
+
+    const pctClosed = data.target_cents > 0
+        ? Math.min(100, Math.round((data.committed_cents / data.target_cents) * 100))
+        : 0
+
     return (
-        <div className="block rounded-xl border bg-background p-4 shadow-sm">
+        <Link
+            href="/money/raise"
+            className="block rounded-xl border bg-background p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+        >
             <div className="flex items-center justify-between mb-2">
                 <SourceTag source="money" />
-                <span className="text-[10px] text-muted-foreground">this week</span>
+                <span className="text-[10px] text-muted-foreground">{data.roundName}</span>
             </div>
-            <div className="text-xl font-bold text-muted-foreground/70 tabular-nums">—</div>
-            <div className="text-xs text-muted-foreground mt-1">Coming in Phase 2 · Money</div>
-        </div>
+            <div className="flex items-baseline gap-1">
+                <span className="text-xl font-bold text-foreground tabular-nums">
+                    {formatMoneyAmount(data.committed_cents, data.currency)}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                    of {formatMoneyAmount(data.target_cents, data.currency)}
+                </span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+                <strong className="text-foreground font-semibold">{pctClosed}% closed</strong>
+                {' · '}
+                {data.pipeline_count} in pipeline
+            </div>
+        </Link>
     )
 }
 
@@ -1526,12 +1700,48 @@ function ProductsSignalCard(): React.ReactElement {
     )
 }
 
-function MoneySignalCard(): React.ReactElement {
+function MoneySignalCard({
+    runway,
+    pipeline,
+    signals,
+}: {
+    runway: TodayMoneyRunwayTile | null
+    pipeline: TodayMoneyPipelineTile | null
+    signals: TodaySignal[]
+}): React.ReactElement {
+    // Composite read: runway one-liner + raise one-liner + active critical-signal count.
+    // Falls back gracefully when either side hasn't loaded or isn't connected yet.
+    const criticalCount = signals.filter(s => s.decayRate === 'immediate' || s.decayRate === '1d').length
+
+    const runwayLine = runway === null
+        ? 'Loading runway…'
+        : !runway.connected
+            ? 'No plan yet'
+            : runway.runwayStatus === 'sustainable'
+                ? 'Net positive'
+                : runway.runwayMonths === null
+                    ? '—'
+                    : `${runway.runwayMonths.toFixed(1)} mo runway`
+
+    const pipelineLine = pipeline === null
+        ? 'Loading raise…'
+        : !pipeline.hasRound
+            ? 'No active round'
+            : `${pipeline.pipeline_count} in pipeline · ${formatMoneyAmount(pipeline.committed_cents, pipeline.currency)} committed`
+
     return (
         <SignalCard
             source="money"
-            href="/money"
-            body={<>Cash &amp; runway<br />Connect finances to see raise status</>}
+            href="/money/cockpit"
+            body={
+                <>
+                    <strong>{runwayLine}</strong>
+                    <br />{pipelineLine}
+                    {criticalCount > 0 && (
+                        <> · <span className="text-destructive font-bold">{criticalCount} critical</span></>
+                    )}
+                </>
+            }
             tag="Money › Cockpit"
         />
     )

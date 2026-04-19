@@ -60,6 +60,7 @@ import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { AICreditsBarLoader } from "@/components/ui/ai-credits-bar"
 import { TimeWeekBarLoader } from "@/components/ui/time-week-bar"
+import { MoneyCreditsPill } from "@/components/sidebar/MoneyCreditsPill"
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist"
 
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
@@ -546,10 +547,14 @@ export function Sidebar({
                 </div>
 
                 {/* Status bars: Time (this week) + Credits. Per CLAUDE.md no-AI-emphasis
-                    rule, the in-product label stays "Credits", not "AI Credits". */}
+                    rule, the in-product label stays "Credits", not "AI Credits".
+                    The Money Credits pill (live ai_credits_ledger sum) lands here under
+                    the flag — it sits below the legacy AI usage pill so the founder sees
+                    both during the migration window. */}
                 <div className="space-y-1">
                     <TimeWeekBarLoader />
                     <AICreditsBarLoader />
+                    {newMoneyExperienceEnabled && <MoneyCreditsPill />}
                 </div>
             </div>
 

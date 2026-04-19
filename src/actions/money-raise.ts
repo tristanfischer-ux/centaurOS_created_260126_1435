@@ -249,6 +249,158 @@ export async function logInvestorTouch(input: {
   })
 }
 
+export type PipelineEventRow = {
+  id: string
+  event_type: string
+  from_stage: string | null
+  to_stage: string | null
+  payload: Record<string, unknown>
+  actor_user_id: string | null
+  created_at: string
+}
+
+export type InvestorFirmInfo = {
+  marketplace_listing_id: string | null
+  title: string | null
+  description: string | null
+  website_url: string | null
+  country: string | null
+  contact_name: string | null
+  contact_email: string | null
+}
+
+export type InvestorDetail = {
+  state: PipelineRow & {
+    foundry_id: string
+    stage_entered_at: string
+  }
+  events: PipelineEventRow[]
+  firm: InvestorFirmInfo | null
+}
+
+function asJsonObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
+export async function getInvestorDetail(
+  pipelineStateId: string,
+): Promise<InvestorDetail | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const { data: stateRow, error } = await supabase
+      .from('investor_pipeline_state')
+      .select(
+        'id, foundry_id, round_id, marketplace_listing_id, investor_firm_id, investor_person_id, current_stage, stage_entered_at, probability_pct, commit_amount_cents, lead_role, pass_reason, match_score_cached',
+      )
+      .eq('id', pipelineStateId)
+      .maybeSingle()
+    if (error) return { error: error.message }
+    if (!stateRow || stateRow.foundry_id !== foundryId) return { error: 'Investor not found' }
+
+    const { data: eventRows } = await supabase
+      .from('investor_pipeline_events')
+      .select('id, event_type, from_stage, to_stage, payload, actor_user_id, created_at')
+      .eq('pipeline_state_id', pipelineStateId)
+      .eq('foundry_id', foundryId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    const events: PipelineEventRow[] = (eventRows ?? []).map((e) => ({
+      id: e.id,
+      event_type: e.event_type,
+      from_stage: e.from_stage,
+      to_stage: e.to_stage,
+      payload: asJsonObject(e.payload),
+      actor_user_id: e.actor_user_id,
+      created_at: e.created_at,
+    }))
+
+    let firm: InvestorFirmInfo | null = null
+    if (stateRow.marketplace_listing_id) {
+      const { data: listing } = await supabase
+        .from('marketplace_listings')
+        .select('id, title, description, website_url, country, contact_name, contact_email')
+        .eq('id', stateRow.marketplace_listing_id)
+        .maybeSingle()
+      if (listing) {
+        firm = {
+          marketplace_listing_id: listing.id,
+          title: listing.title,
+          description: listing.description,
+          website_url: listing.website_url,
+          country: listing.country,
+          contact_name: listing.contact_name,
+          contact_email: listing.contact_email,
+        }
+      }
+    }
+
+    return {
+      state: {
+        id: stateRow.id,
+        foundry_id: stateRow.foundry_id,
+        round_id: stateRow.round_id,
+        marketplace_listing_id: stateRow.marketplace_listing_id,
+        investor_firm_id: stateRow.investor_firm_id,
+        investor_person_id: stateRow.investor_person_id,
+        current_stage: stateRow.current_stage as PipelineRow['current_stage'],
+        stage_entered_at: stateRow.stage_entered_at,
+        probability_pct: stateRow.probability_pct,
+        commit_amount_cents: stateRow.commit_amount_cents,
+        lead_role: stateRow.lead_role,
+        pass_reason: stateRow.pass_reason,
+        match_score_cached: stateRow.match_score_cached,
+      },
+      events,
+      firm,
+    }
+  })
+}
+
+export type InvestorPickerOption = {
+  id: string
+  label: string
+  current_stage: PipelineRow['current_stage']
+}
+
+export async function listInvestorsForPicker(): Promise<
+  { investors: InvestorPickerOption[] } | { error: string }
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const { data: stateRows } = await supabase
+      .from('investor_pipeline_state')
+      .select('id, current_stage, marketplace_listing_id, investor_firm_id')
+      .eq('foundry_id', foundryId)
+      .is('archived_at', null)
+      .neq('current_stage', 'passed')
+      .order('stage_entered_at', { ascending: false })
+      .limit(200)
+
+    const listingIds = (stateRows ?? [])
+      .map((r) => r.marketplace_listing_id)
+      .filter((id): id is string => !!id)
+
+    const titleById = new Map<string, string>()
+    if (listingIds.length > 0) {
+      const { data: listings } = await supabase
+        .from('marketplace_listings')
+        .select('id, title')
+        .in('id', listingIds)
+      for (const l of listings ?? []) titleById.set(l.id, l.title)
+    }
+
+    const investors: InvestorPickerOption[] = (stateRows ?? []).map((r) => ({
+      id: r.id,
+      label: r.marketplace_listing_id ? titleById.get(r.marketplace_listing_id) ?? r.marketplace_listing_id : (r.investor_firm_id ?? 'Unnamed'),
+      current_stage: r.current_stage as PipelineRow['current_stage'],
+    }))
+
+    return { investors }
+  })
+}
+
 export async function passInvestor(input: {
   pipeline_state_id: string
   reason: string
