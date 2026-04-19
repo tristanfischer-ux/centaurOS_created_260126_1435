@@ -1,0 +1,175 @@
+'use client'
+
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { CircleDot, Plus } from 'lucide-react'
+import type { RaiseData, PipelineRow } from '@/actions/money-raise'
+
+const STAGE_ORDER: Array<PipelineRow['current_stage']> = [
+  'target',
+  'researching',
+  'contacted',
+  'meeting',
+  'due_diligence',
+  'verbal',
+  'closed',
+  'passed',
+]
+
+const STAGE_LABEL: Record<PipelineRow['current_stage'], string> = {
+  target: 'Target',
+  researching: 'Researching',
+  contacted: 'Contacted',
+  meeting: 'Meeting',
+  due_diligence: 'DD',
+  verbal: 'Verbal',
+  closed: 'Closed',
+  passed: 'Passed',
+}
+
+function formatCurrency(cents: number, currency: string): string {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(cents / 100)
+}
+
+export function RaiseView({ data }: { data: RaiseData }) {
+  if (!data.activeRound && data.roundCount === 0) {
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight">Raise</h1>
+          <p className="text-sm text-muted-foreground">
+            Start by creating your first fundraise round.
+          </p>
+        </header>
+        <Card>
+          <CardContent className="py-12">
+            <EmptyState
+              icon={<CircleDot className="h-12 w-12" />}
+              title="No round created yet"
+              description="Define your round target, instrument, and close date. You can add investors to your pipeline after."
+              action={
+                <Link href="/money/raise/new-round">
+                  <Button>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Create round
+                  </Button>
+                </Link>
+              }
+            />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const byStage = new Map<string, PipelineRow[]>()
+  for (const s of STAGE_ORDER) byStage.set(s, [])
+  for (const row of data.pipeline) {
+    byStage.get(row.current_stage)?.push(row)
+  }
+
+  const committed = data.pipeline
+    .filter((r) => r.current_stage === 'verbal' || r.current_stage === 'closed')
+    .reduce((s, r) => s + (r.commit_amount_cents ?? 0), 0)
+
+  return (
+    <div className="space-y-6">
+      <header className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Raise</h1>
+          {data.activeRound ? (
+            <p className="text-sm text-muted-foreground mt-2">
+              {data.activeRound.name} ·{' '}
+              {formatCurrency(committed, data.activeRound.currency)} / {formatCurrency(data.activeRound.target_cents, data.activeRound.currency)}
+              {' '}· closes {data.activeRound.close_date}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">No active round</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Link href="/money/raise/thesis">
+            <Button size="sm" variant="secondary">Thesis</Button>
+          </Link>
+          <Link href="/money/raise/pitch">
+            <Button size="sm" variant="secondary">Pitch prep</Button>
+          </Link>
+          <Link href="/money/raise/update">
+            <Button size="sm" variant="secondary">Send update</Button>
+          </Link>
+        </div>
+      </header>
+
+      {data.pipeline.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <EmptyState
+              icon={<CircleDot className="h-12 w-12" />}
+              title="No investors in pipeline yet"
+              description="Add investors from your shortlist or directly from the directory."
+              action={
+                <Link href="/money/raise/investors/browse">
+                  <Button>Browse investors</Button>
+                </Link>
+              }
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${STAGE_ORDER.length}, minmax(180px, 1fr))` }}>
+            {STAGE_ORDER.map((stage) => {
+              const rows = byStage.get(stage) ?? []
+              return (
+                <Card key={stage} className="min-h-[240px]">
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+                      <span>{STAGE_LABEL[stage]}</span>
+                      <Badge variant="secondary" size="sm">{rows.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 pt-0">
+                    {rows.length === 0 ? (
+                      <p className="text-xs text-muted-foreground/60 py-4 text-center">Empty</p>
+                    ) : (
+                      rows.map((row) => (
+                        <Link
+                          key={row.id}
+                          href={`/money/raise/investor/${row.id}`}
+                          className="block rounded-md border border-border bg-card p-2 text-xs hover:bg-muted/30 transition-colors"
+                        >
+                          <div className="font-medium truncate">
+                            {row.investor_firm_id ?? row.marketplace_listing_id ?? 'Unnamed investor'}
+                          </div>
+                          <div className="mt-1 flex items-center justify-between text-muted-foreground">
+                            <span>
+                              {row.commit_amount_cents
+                                ? formatCurrency(row.commit_amount_cents, data.activeRound?.currency ?? 'GBP')
+                                : '—'}
+                            </span>
+                            {row.match_score_cached !== null && (
+                              <Badge variant="outline" size="sm">
+                                {row.match_score_cached}%
+                              </Badge>
+                            )}
+                          </div>
+                        </Link>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

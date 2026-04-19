@@ -19,6 +19,7 @@
  */
 
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import { recordSpecialistCall } from '@/lib/audit/specialist-call'
 import type { Json } from "@/types/database.types"
 import type {
     CadLabModule,
@@ -279,8 +280,22 @@ ${reviewContext}${assemblyNotesInstructions}`
         let loopCount = 0
 
         while (loopCount <= MAX_TOOL_LOOPS) {
+            const turnStartedAt = Date.now()
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const response = await client.messages.create(createParams) as any
+            // Money: each tool-loop turn is a discrete LLM completion → one ledger row.
+            // Wrapped as fire-and-forget; cost tracking is non-fatal to the review.
+            void recordSpecialistCall({
+                foundryId,
+                specialistId: req.specialistId,
+                section: 'forge',
+                model: 'opus',
+                inputTokens: response.usage?.input_tokens ?? 0,
+                outputTokens: response.usage?.output_tokens ?? 0,
+                durationMs: Date.now() - turnStartedAt,
+                invokedByUserId: userId,
+                entityId: req.projectId,
+            })
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const content: any[] = response.content ?? []
 
@@ -420,7 +435,7 @@ export interface QuickVerdictResult {
 export async function quickSpecialistVerdict(
     req: ReviewRequest,
 ): Promise<{ quickVerdict: QuickVerdictResult } | { error: string }> {
-    return withAIGate('cad_lab_review', async () => {
+    return withAIGate('cad_lab_review', async ({ foundryId, user }) => {
         // ── Validate inputs ──
         if (!req.projectId || !/^[0-9a-f-]{36}$/.test(req.projectId)) {
             return { error: "Invalid project ID" }
@@ -483,6 +498,7 @@ SUMMARY: <one sentence explaining the verdict>`
         // surface the real cause. See forgeos-rules.md R4/R5.
         const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
+        const callStartedAt = Date.now()
         const response = await client.messages.create({
             model: QUICK_VERDICT_MODEL,
             max_tokens: QUICK_VERDICT_MAX_TOKENS,
@@ -491,6 +507,20 @@ SUMMARY: <one sentence explaining the verdict>`
                 role: "user",
                 content: `Quick verdict on module "${targetModule.name}" — PASS, WARN, or FAIL?`,
             }],
+        })
+
+        // Money: write specialist_call event so the verdict roll-up shows in
+        // the founder Credits pill alongside the full review's cost.
+        void recordSpecialistCall({
+            foundryId,
+            specialistId: req.specialistId,
+            section: 'forge',
+            model: 'sonnet',
+            inputTokens: response.usage?.input_tokens ?? 0,
+            outputTokens: response.usage?.output_tokens ?? 0,
+            durationMs: Date.now() - callStartedAt,
+            invokedByUserId: user.id,
+            entityId: req.projectId,
         })
 
         const text = response.content

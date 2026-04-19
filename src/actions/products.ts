@@ -21,6 +21,7 @@ import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { isValidUUID } from '@/lib/validations'
 import { classifyAIError } from '@/lib/agents/error-classification'
+import { recordSpecialistCall } from '@/lib/audit/specialist-call'
 import type {
   Product,
   ProductSummary,
@@ -689,7 +690,7 @@ export async function syncProductFinancials(
 export async function generateMarketAssessment(
   productId: string
 ): Promise<ActionResult<MarketAssessment>> {
-  return withAIGate('market_assessment', async ({ supabase, foundryId, trackUsage }) => {
+  return withAIGate('market_assessment', async ({ supabase, foundryId, user, trackUsage }) => {
     if (!productId || typeof productId !== 'string') {
       return { error: 'Invalid product ID' }
     }
@@ -788,6 +789,7 @@ Provide your structured market assessment as JSON.`
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
 
+    const callStartedAt = Date.now()
     try {
       const Anthropic = (await import('@anthropic-ai/sdk')).default
       const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
@@ -807,6 +809,20 @@ Provide your structured market assessment as JSON.`
         model: 'claude-sonnet-4-20250514',
         promptTokens: response.usage?.input_tokens,
         completionTokens: response.usage?.output_tokens,
+      })
+
+      // Money: write specialist_call event for ai_credits_ledger trigger.
+      // Priya owns market assessment per the system prompt above.
+      await recordSpecialistCall({
+        foundryId,
+        specialistId: 'priya',
+        section: 'products',
+        model: 'sonnet',
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+        durationMs: Date.now() - callStartedAt,
+        invokedByUserId: user.id,
+        entityId: productId,
       })
 
       // ── Parse response ─────────────────────────────────────────
