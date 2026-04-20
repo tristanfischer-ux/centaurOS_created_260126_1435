@@ -1,42 +1,37 @@
 /**
- * @file new/page.tsx — /the-forge-v2/new PROJECT-CREATE wizard (server shell).
+ * @file new/page.tsx — /the-forge-v2/new PROJECT-CREATE wizard (V2 — mockup-faithful rebuild).
  *
- * @description Server page that wraps the client wizard in `WorkspaceShell`
- * so the chrome, breadcrumb, and page typography stay consistent with the
- * rest of The Forge v2. The actual 3-step interaction lives in the client
- * component — this file only owns metadata, the shell, and the Suspense
- * boundary the client component renders beneath.
+ * @description Mockup-faithful port of FORGE-MOCKUP-PROJECT-CREATE.html. The
+ * route is the global "start a new project" wizard — reached from the sidebar
+ * "+ New project" CTA, the Today "Start a new build" tile, and the workspace
+ * header button. This server page is a thin shell that only owns metadata,
+ * the route-segment config, and the render of the client view. All interaction
+ * lives in `./project-create-view.tsx` (scoped `.pc2`, self-contained).
+ *
+ * Data contract: no mutation is wired in V1. Submit is disabled with a
+ * tooltip that reads "Project creation ships with the `createCadLabProject`
+ * server action wire-up" — the existing action in `src/actions/cad-lab-projects.ts`
+ * is intentionally NOT called from this route yet. Form state is
+ * client-side-only and feeds the live "What this will create" preview card.
  *
  * @related
- * - Mockup: FORGE-MOCKUP-PROJECT-CREATE.html
- * - Client: ./_components/new-project-wizard
+ * - Mockup: FORGE-MOCKUP-PROJECT-CREATE.html (repo root)
+ * - View:   ./project-create-view.tsx
+ * - Styles: ./project-create-v2.css (scoped `.pc2` — do NOT modify elsewhere)
  */
 
 import type { Metadata } from "next"
 
-import { WorkspaceShell } from "../_components/workspace-shell"
-
-import { NewProjectWizard } from "./_components/new-project-wizard"
-
-export const metadata: Metadata = {
-    title: "The Forge · New project",
-    description:
-        "Describe what you're building and let the specialists draft rev 0.1 of your Brief, Modules, BOM, and Risks register.",
-}
+import { ProjectCreateView } from "./project-create-view"
 
 export const dynamic = "force-dynamic"
 
+export const metadata: Metadata = {
+    title: "Start a new project · The Forge",
+    description:
+        "A project begins as a short voice memo or free-text spec. Chase and Max draft rev 0.1 of the Brief from what you say — you review before anything else happens.",
+}
+
 export default function NewProjectPage(): React.ReactElement {
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: "New project" },
-            ]}
-            subtitle="Describe the product in your own words. Rev 0.1 of the Brief, Modules, BOM, and Risks register drafts from what you say — you review before anything locks."
-            maxWidth="narrow"
-        >
-            <NewProjectWizard />
-        </WorkspaceShell>
-    )
+    return <ProjectCreateView />
 }

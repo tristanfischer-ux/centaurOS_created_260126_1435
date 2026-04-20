@@ -1,290 +1,304 @@
 /**
  * @file launch/page.tsx — /the-forge-v2/projects/:id/launch
  *
- * @description Launch checklist + handoff package preview. Reads the project
- * and derives a launch-readiness state for each gate (brief captured, modules
- * generated, specialist reviews completed, cost estimates present, risks
- * logged, suppliers / RFQ matched). Each item lights green / amber / red
- * based on what's actually in the project. The primary CTA "Ship handoff
- * package" is stubbed — handoff package generation lives in a later PR.
+ * @description Launch / Handoff artefact — mockup-faithful port of
+ * FORGE-MOCKUP-LAUNCH-HANDOFF.html. Server component loads the project,
+ * aggregates the readiness state for each launch gate (brief locked,
+ * modules specified, reviews landed, cost estimated, risks logged,
+ * suppliers shortlisted, CAD uploaded, regulatory declared), and hands
+ * a typed props bundle to LaunchHandoffView.
  *
- * Mockup refs: FORGE-MOCKUP-LAUNCH.html, FORGE-MOCKUP-LAUNCH-HANDOFF.html.
+ * Launch is the "hand the project off to the launch team / manufacturing
+ * partner" surface — a deliberate, reviewed checklist that summarises
+ * everything an external party needs to take over: brief, BOM, cost,
+ * suppliers, compliance, CAD files, test plan.
+ *
+ * Empty-state policy: every gate row and side-card stat is driven by what
+ * is actually in the project payload. When data doesn't exist (CAD files,
+ * regulatory posture, cost ceiling, first-ship date) we render an honest
+ * empty caption, never the mockup's fabricated HAPS / Astra / £148,240
+ * example content.
+ *
+ * @related
+ *   - View:   ./launch-handoff-view.tsx
+ *   - Styles: ./launch-handoff-v2.css (scoped .lh2)
+ *   - Mockup: FORGE-MOCKUP-LAUNCH-HANDOFF.html
  */
 
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { Rocket, CheckCircle2, AlertTriangle, Circle, ArrowRight, Package } from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/lib/supabase/server"
 
-import { WorkspaceShell } from "../../../_components/workspace-shell"
+import {
+    LaunchHandoffView,
+    type LaunchGateRow,
+    type LaunchHandoffViewProps,
+} from "./launch-handoff-view"
 
 export const dynamic = "force-dynamic"
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata(
+    { params }: { params: Promise<{ id: string }> },
+): Promise<Metadata> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
-    if ("error" in result) return { title: "Launch · The Forge" }
-    return { title: `Launch · ${result.project.name}` }
+    const r = await loadCadLabProject(id)
+    if ("error" in r) return { title: "Launch · The Forge" }
+    return { title: `Launch · ${r.project.name}` }
 }
 
-type GateState = 'green' | 'amber' | 'red'
+// ─── Helpers ────────────────────────────────────────────────────────────
 
-interface Gate {
-    label: string
-    detail: string
-    state: GateState
-    owner: string
+function designRevisionToLetter(n: number): string {
+    if (!Number.isFinite(n) || n < 1) return "1"
+    if (n > 26) return String(n)
+    return String.fromCharCode(64 + n)
 }
 
-const STATE_STYLES = {
-    green: { badge: 'Ready', tone: 'bg-status-success-light text-status-success border-status-success/30', Icon: CheckCircle2, iconClass: 'text-status-success' },
-    amber: { badge: 'Partial', tone: 'bg-international-orange/10 text-international-orange border-international-orange/30', Icon: AlertTriangle, iconClass: 'text-status-warning' },
-    red: { badge: 'Blocker', tone: 'bg-destructive/10 text-destructive border-destructive/30', Icon: Circle, iconClass: 'text-destructive' },
-} as const
+/** Best-effort shortlist row count — returns 0 on any failure. */
+async function countShortlistedSuppliers(projectId: string): Promise<number> {
+    try {
+        const supabase = await createClient()
+        const { count, error } = await supabase
+            .from("forge_supplier_shortlist")
+            .select("id", { count: "exact", head: true })
+            .eq("project_id", projectId)
+        if (error) return 0
+        return count ?? 0
+    } catch {
+        return 0
+    }
+}
 
-export default async function ForgeV2LaunchPage({ params }: { params: Promise<{ id: string }> }): Promise<React.ReactNode> {
+/** Best-effort CAD file count — returns 0 on any failure. */
+async function countCadFiles(projectId: string): Promise<number> {
+    try {
+        const supabase = await createClient()
+        const { count, error } = await supabase
+            .from("cad_lab_project_files")
+            .select("id", { count: "exact", head: true })
+            .eq("project_id", projectId)
+        if (error) return 0
+        return count ?? 0
+    } catch {
+        return 0
+    }
+}
+
+// ─── Page ───────────────────────────────────────────────────────────────
+
+export default async function ForgeV2LaunchPage({
+    params,
+}: {
+    params: Promise<{ id: string }>
+}): Promise<React.ReactNode> {
     const { id } = await params
     const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
+    if ("error" in result || !result.project) notFound()
+
     const project = result.project
-    const projectHref = `/the-forge-v2/projects/${project.id}`
-
     const modules = project.modules ?? []
-    const moduleTotal = modules.length
-    const moduleGenerated = modules.filter(m => m.status === 'generated' || m.status === 'specified' || m.status === 'interface_ready').length
 
-    const briefState: GateState = project.productOverview ? 'green' : 'red'
+    // ── Parallel side-fetches (each swallows errors → 0) ────────
+    const [supplierCount, cadFileCount] = await Promise.all([
+        countShortlistedSuppliers(id),
+        countCadFiles(id),
+    ])
 
-    const modulesState: GateState =
-        moduleTotal === 0 ? 'red' :
-        moduleGenerated === moduleTotal ? 'green' : 'amber'
+    // ── Brief-derived data ──────────────────────────────────────
+    const designBrief = project.research?.designBrief ?? null
+    const briefLocked = project.briefLockedAt !== null
+    const constraints = designBrief?.constraints ?? null
+    const unitCostCeilingGbp =
+        typeof constraints?.unitCostCeilingGbp === "number" ? constraints.unitCostCeilingGbp : null
+    const firstShipDateIso = constraints?.firstShipDate ?? null
+    const quantityTarget =
+        typeof designBrief?.quantityTarget === "string" && designBrief.quantityTarget.trim().length > 0
+            ? designBrief.quantityTarget.trim()
+            : null
+    const regulatoryCount = Array.isArray(designBrief?.regulatory)
+        ? designBrief.regulatory.filter(
+              (r) => r && typeof r.code === "string" && r.code.trim().length > 0,
+          ).length
+        : 0
 
-    const reviewCount = project.reviews ? Object.values(project.reviews).reduce((sum: number, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0) : 0
-    const reviewsState: GateState =
-        reviewCount === 0 ? 'red' :
-        reviewCount < moduleTotal ? 'amber' : 'green'
+    // ── Module / parts aggregates ───────────────────────────────
+    const moduleCount = modules.length
+    const specifiedOrGenerated = modules.filter(
+        (m) => m.status === "generated" || m.status === "specified" || m.status === "interface_ready",
+    ).length
+    const partCount = modules.reduce(
+        (acc, m) => acc + (Array.isArray(m.keyParts) ? m.keyParts.length : 0),
+        0,
+    )
 
+    // ── Reviews / cost / risks rollups ──────────────────────────
+    const reviews = project.reviews ?? {}
+    const reviewCount = Object.values(reviews).reduce(
+        (sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0),
+        0,
+    )
     const costEstimates = project.aiCostEstimates ?? {}
     const costCount = Object.keys(costEstimates).length
-    const costState: GateState =
-        costCount === 0 ? 'red' :
-        costCount < moduleTotal ? 'amber' : 'green'
+    const failureModeCount = modules.reduce(
+        (acc, m) => acc + (Array.isArray(m.failureModes) ? m.failureModes.length : 0),
+        0,
+    )
+    const unknownCount = modules.reduce(
+        (acc, m) => acc + (Array.isArray(m.unknowns) ? m.unknowns.length : 0),
+        0,
+    )
 
-    const failureModeCount = modules.reduce((sum, m) => sum + (m.failureModes?.length ?? 0), 0)
-    const unknownCount = modules.reduce((sum, m) => sum + (m.unknowns?.length ?? 0), 0)
-    const riskState: GateState =
-        failureModeCount + unknownCount === 0 ? 'amber' : 'green'
-
-    const suppliersState: GateState =
-        project.linkedRfqId ? 'green' : 'amber'
-
-    const outputsReady = Boolean(project.integratedAssemblyStepUrl) && Boolean(project.systemIllustrationUrl)
-    const outputsState: GateState =
-        outputsReady ? 'green' :
-        project.systemIllustrationUrl || project.integratedAssemblyStepUrl ? 'amber' : 'red'
-
-    const gates: Gate[] = [
+    // ── Derive gate states + blocker list ───────────────────────
+    const gates: LaunchGateRow[] = [
         {
-            label: 'Brief captured',
-            detail: project.productOverview ? `${String(project.productOverview).split(/\s+/).length} words of product overview.` : 'No product overview yet — author the brief before shipping.',
-            state: briefState,
-            owner: 'Founder',
+            id: "brief",
+            label: "Brief locked",
+            sub: briefLocked
+                ? "Brief has been locked as the anchor spec for this revision."
+                : "Brief is still in draft — lock it in the Brief-lock flow before shipping.",
+            state: briefLocked ? "green" : "red",
+            by: briefLocked ? "Founder signoff" : "pending",
         },
         {
-            label: 'Modules generated',
-            detail: moduleTotal === 0 ? 'Run decomposition to define the system architecture.' : `${moduleGenerated} of ${moduleTotal} modules generated or specified.`,
-            state: modulesState,
-            owner: 'Jian · VP Engineering',
+            id: "modules",
+            label: "Modules specified",
+            sub:
+                moduleCount === 0
+                    ? "No modules generated yet — decompose the concept first."
+                    : specifiedOrGenerated === moduleCount
+                      ? `${moduleCount} module${moduleCount === 1 ? "" : "s"} specified or generated.`
+                      : `${specifiedOrGenerated} of ${moduleCount} modules specified or generated.`,
+            state:
+                moduleCount === 0
+                    ? "red"
+                    : specifiedOrGenerated === moduleCount
+                      ? "green"
+                      : "amber",
+            by: "Jian · VP Engineering",
         },
         {
-            label: 'Specialist reviews',
-            detail: reviewCount === 0 ? 'No reviews yet — each module should carry at least one specialist verdict.' : `${reviewCount} reviews across ${moduleTotal || '—'} modules.`,
-            state: reviewsState,
-            owner: 'Specialist roster',
+            id: "reviews",
+            label: "Specialist reviews",
+            sub:
+                reviewCount === 0
+                    ? "No specialist reviews yet — each module should carry at least one verdict."
+                    : reviewCount < moduleCount
+                      ? `${reviewCount} review${reviewCount === 1 ? "" : "s"} across ${moduleCount} module${moduleCount === 1 ? "" : "s"} · coverage incomplete.`
+                      : `${reviewCount} review${reviewCount === 1 ? "" : "s"} across ${moduleCount} module${moduleCount === 1 ? "" : "s"}.`,
+            state:
+                reviewCount === 0
+                    ? "red"
+                    : reviewCount < moduleCount
+                      ? "amber"
+                      : "green",
+            by: "Specialist roster",
         },
         {
-            label: 'Cost estimates',
-            detail: costCount === 0 ? 'No cost estimates yet — rolls up the unit economics.' : `${costCount} of ${moduleTotal || '—'} modules costed.`,
-            state: costState,
-            owner: 'Finn · Finance',
+            id: "cost",
+            label: "Cost estimates",
+            sub:
+                costCount === 0
+                    ? "No cost estimates yet — unit economics aren't rolled up."
+                    : costCount < moduleCount
+                      ? `${costCount} of ${moduleCount} modules costed.`
+                      : `${costCount} module${costCount === 1 ? "" : "s"} costed.`,
+            state:
+                costCount === 0
+                    ? "red"
+                    : costCount < moduleCount
+                      ? "amber"
+                      : "green",
+            by: "Finn · Finance",
         },
         {
-            label: 'Risks logged',
-            detail: failureModeCount + unknownCount === 0 ? 'No failure modes or unknowns declared — either uncommonly clean or under-scrutinised.' : `${failureModeCount} failure modes + ${unknownCount} open questions captured.`,
-            state: riskState,
-            owner: 'Engineering lead',
+            id: "risks",
+            label: "Risks logged",
+            sub:
+                failureModeCount + unknownCount === 0
+                    ? "No failure modes or unknowns declared — either uncommonly clean or under-scrutinised."
+                    : `${failureModeCount} failure mode${failureModeCount === 1 ? "" : "s"} + ${unknownCount} open question${unknownCount === 1 ? "" : "s"} captured.`,
+            state: failureModeCount + unknownCount === 0 ? "amber" : "green",
+            by: "Engineering lead",
         },
         {
-            label: 'Suppliers / RFQ matched',
-            detail: project.linkedRfqId ? 'RFQ linked — supplier matching in motion.' : 'No RFQ linked yet — run supplier match or create an RFQ from CAD Lab.',
-            state: suppliersState,
-            owner: 'Chase · Supply',
+            id: "suppliers",
+            label: "Suppliers shortlisted",
+            sub:
+                supplierCount === 0
+                    ? "No suppliers shortlisted yet — open the Suppliers artefact to shortlist."
+                    : `${supplierCount} supplier${supplierCount === 1 ? "" : "s"} on the project shortlist.`,
+            state: supplierCount === 0 ? "red" : "green",
+            by: "Chase · Supply",
         },
         {
-            label: 'Integrated outputs',
-            detail: outputsReady ? 'System illustration + integrated assembly both ready for handoff.' : project.integratedAssemblyStepUrl || project.systemIllustrationUrl ? 'Partial — one of illustration / STEP missing.' : 'Generate hero illustration and integrated STEP before shipping.',
-            state: outputsState,
-            owner: 'Tool pipeline',
+            id: "cad",
+            label: "CAD geometry uploaded",
+            sub:
+                cadFileCount === 0
+                    ? "No geometry uploaded yet. Upload CAD in the Geometry artefact so the handoff package includes files."
+                    : `${cadFileCount} file${cadFileCount === 1 ? "" : "s"} uploaded.`,
+            state: cadFileCount === 0 ? "amber" : "green",
+            by: "auto",
+        },
+        {
+            id: "regulatory",
+            label: "Regulatory posture declared",
+            sub:
+                regulatoryCount === 0
+                    ? "No regulatory items declared. Declare per-project posture in the Brief so compliance transfers cleanly."
+                    : `${regulatoryCount} standard${regulatoryCount === 1 ? "" : "s"} declared in the brief.`,
+            state: regulatoryCount === 0 ? "amber" : "green",
+            by: "Leo · Legal",
+        },
+        {
+            id: "cost-ceiling",
+            label: "Cost ceiling set",
+            sub:
+                unitCostCeilingGbp == null
+                    ? "No unit cost ceiling declared. Set it in the Brief constraints so Operations can track variance."
+                    : `£${unitCostCeilingGbp.toLocaleString("en-GB")} per unit declared in the brief.`,
+            state: unitCostCeilingGbp == null ? "amber" : "green",
+            by: "Finn · Finance",
+        },
+        {
+            id: "ship-date",
+            label: "Target first-ship date",
+            sub:
+                firstShipDateIso == null
+                    ? "No target first-ship date declared. Set it in the Brief constraints so the warranty clock can start."
+                    : `Target first-ship date: ${new Date(firstShipDateIso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.`,
+            state: firstShipDateIso == null ? "amber" : "green",
+            by: "Founder",
         },
     ]
 
-    const blockers = gates.filter(g => g.state === 'red').length
-    const partial = gates.filter(g => g.state === 'amber').length
-    const ready = gates.filter(g => g.state === 'green').length
-    const allGreen = ready === gates.length
+    // ── Blockers: only red gates are hard blockers (amber = partial) ──
+    const blockers = gates.filter((g) => g.state === "red").map((g) => g.label)
+    const isReady = blockers.length === 0 && gates.every((g) => g.state !== "red")
 
-    const stageReady = project.stage === 'generated' || project.stage === 'complete'
+    const viewProps: LaunchHandoffViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+            designRevision: project.designRevision,
+        },
+        isReady,
+        blockers,
+        gates,
+        snapshot: {
+            currentRevision: designRevisionToLetter(project.designRevision),
+            moduleCount,
+            partCount: partCount > 0 ? partCount : null,
+            supplierCount,
+            cadFileCount,
+            regulatoryCount,
+            unitCostCeilingGbp,
+            firstShipDateIso,
+            quantityTarget,
+        },
+    }
 
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: projectHref },
-                { label: "Launch" },
-            ]}
-            subtitle={allGreen ? "All gates green — handoff package ready to ship." : `${blockers} blocker${blockers === 1 ? '' : 's'} · ${partial} partial · ${ready} ready`}
-            maxWidth="narrow"
-        >
-            {/* Readiness hero */}
-            <Card className={`rounded-xl border border-l-[3px] ${allGreen ? 'border-l-status-success' : blockers > 0 ? 'border-l-destructive' : 'border-l-international-orange'}`}>
-                <CardContent className="py-5 px-5 flex items-start gap-3">
-                    <Rocket className={`h-5 w-5 mt-0.5 shrink-0 ${allGreen ? 'text-status-success' : blockers > 0 ? 'text-destructive' : 'text-international-orange'}`} />
-                    <div className="space-y-1.5 min-w-0">
-                        <p className="text-sm font-semibold text-foreground">
-                            {allGreen
-                                ? 'Clear to ship — the handoff package can be generated.'
-                                : stageReady
-                                    ? 'Design stage ready, but launch gates still have gaps.'
-                                    : 'Launch is a deliberate handoff — the design stage needs to reach generated first.'}
-                        </p>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            Launching freezes the current revision as the &quot;as-designed&quot; record and generates a handoff package (brief, modules, BOM rollup, cost rollup, risks register, supplier roster, integrated outputs). The Forge project stays browseable as a permanent build-time record; future edits flow through as new revisions.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Gate summary strip */}
-            <div className="grid grid-cols-3 gap-3">
-                <SummaryTile label="Ready" value={ready} tone="green" />
-                <SummaryTile label="Partial" value={partial} tone="amber" />
-                <SummaryTile label="Blockers" value={blockers} tone="red" />
-            </div>
-
-            {/* Gate checklist */}
-            <section aria-labelledby="gates-heading" className="space-y-3">
-                <div className="flex items-center gap-2">
-                    <div className="w-1 h-5 rounded-full bg-international-orange" />
-                    <h2 id="gates-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Pre-launch gates
-                    </h2>
-                </div>
-                <Card className="rounded-xl border">
-                    <CardContent className="py-4 px-4">
-                        <ul className="space-y-0">
-                            {gates.map((gate, idx) => {
-                                const style = STATE_STYLES[gate.state]
-                                const Icon = style.Icon
-                                return (
-                                    <li key={idx} className={`flex items-start gap-3 py-3 ${idx < gates.length - 1 ? 'border-b border-border/40' : ''}`}>
-                                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${style.iconClass}`} />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <p className="text-sm font-semibold text-foreground">{gate.label}</p>
-                                                <Badge variant="outline" className={`text-[10px] font-semibold ${style.tone}`}>
-                                                    {style.badge}
-                                                </Badge>
-                                            </div>
-                                            <p className="text-[12.5px] text-muted-foreground leading-relaxed mt-0.5">{gate.detail}</p>
-                                            <p className="text-[11px] text-muted-foreground/80 mt-1">Owner · {gate.owner}</p>
-                                        </div>
-                                    </li>
-                                )
-                            })}
-                        </ul>
-                    </CardContent>
-                </Card>
-            </section>
-
-            {/* Handoff package preview */}
-            <section aria-labelledby="package-heading" className="space-y-3">
-                <div className="flex items-center gap-2">
-                    <div className="w-1 h-5 rounded-full bg-status-success" />
-                    <Package className="h-4 w-4 text-status-success" />
-                    <h2 id="package-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Handoff package
-                    </h2>
-                </div>
-                <Card className="rounded-xl border">
-                    <CardContent className="py-4 px-5">
-                        <p className="text-[12.5px] text-muted-foreground leading-relaxed mb-3">
-                            On ship, ForgeOS compiles a read-only snapshot bundling every artefact at the current revision. Distributable to manufacturing partners, investors, and auditors.
-                        </p>
-                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-foreground">
-                            <PackageItem label="Brief (rev A)" note="Locked narrative + key requirements" />
-                            <PackageItem label="Modules" note={`${moduleTotal} modules with interfaces and failure modes`} />
-                            <PackageItem label="BOM rollup" note="Key parts per module" />
-                            <PackageItem label="Cost rollup" note={costCount > 0 ? `${costCount} module estimates` : 'Pending'} />
-                            <PackageItem label="Risk register" note={`${failureModeCount + unknownCount} items`} />
-                            <PackageItem label="Integrated outputs" note={outputsReady ? 'Illustration + STEP' : 'Partial'} />
-                        </ul>
-                    </CardContent>
-                </Card>
-            </section>
-
-            {/* CTA strip — stub */}
-            <Card className="rounded-xl border bg-muted/30">
-                <CardContent className="py-5 px-5 flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <Badge variant="outline" className="text-[10px] font-semibold bg-international-orange/10 text-international-orange border-international-orange/30">
-                            Coming soon
-                        </Badge>
-                        <p className="text-sm font-semibold text-foreground mt-1">
-                            Handoff package generation lands in a later PR
-                        </p>
-                        <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed max-w-xl">
-                            Close the remaining gates above. Shipping will flip the project to a read-only &quot;as-designed&quot; record and bundle the handoff package for download.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Button asChild size="sm" variant="secondary">
-                            <Link href={projectHref}>Back to project</Link>
-                        </Button>
-                        <Button size="sm" disabled className="gap-1.5">
-                            <Rocket className="h-3.5 w-3.5" />
-                            Ship handoff package
-                            <ArrowRight className="h-3.5 w-3.5" />
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        </WorkspaceShell>
-    )
-}
-
-function SummaryTile({ label, value, tone }: { label: string; value: number; tone: 'green' | 'amber' | 'red' }): React.ReactElement {
-    const border = tone === 'green' ? 'border-t-status-success' : tone === 'amber' ? 'border-t-status-warning' : 'border-t-destructive'
-    const text = tone === 'green' ? 'text-status-success' : tone === 'amber' ? 'text-status-warning' : 'text-destructive'
-    return (
-        <Card className={`rounded-xl border border-t-[3px] ${border}`}>
-            <CardContent className="py-4 px-4">
-                <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
-                <p className={`text-xl font-bold tabular-nums mt-0.5 ${text}`}>{value}</p>
-            </CardContent>
-        </Card>
-    )
-}
-
-function PackageItem({ label, note }: { label: string; note: string }): React.ReactElement {
-    return (
-        <li className="rounded-lg border border-border/60 bg-background p-3">
-            <p className="text-sm font-semibold text-foreground">{label}</p>
-            <p className="text-[11.5px] text-muted-foreground mt-0.5">{note}</p>
-        </li>
-    )
+    return <LaunchHandoffView {...viewProps} />
 }
