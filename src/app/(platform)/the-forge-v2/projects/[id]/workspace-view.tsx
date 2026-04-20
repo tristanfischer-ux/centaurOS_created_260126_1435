@@ -113,26 +113,20 @@ export function WorkspaceView(): React.ReactElement {
                     <div className="pane">
                         <div className="pane-head">
                             <span>Nano Banana render</span>
-                            <span className="style-tag-inline">Photoreal</span>
+                            <span className="style-tag-inline">pending</span>
                         </div>
                         <div className="pane-body">
-                            <div className="pane-empty">
-                                <strong>Render not yet generated</strong>
-                                auto-generation launches when CAD is imported
-                            </div>
+                            <BlueprintPaperPlaceholder label="Concept render" sub="Generates when CAD is imported or a style brief is approved" />
                         </div>
                     </div>
 
                     <div className="pane">
                         <div className="pane-head">
                             <span>System blueprint · plan view</span>
-                            <span className="style-tag-inline">rev A · dims in mm</span>
+                            <span className="style-tag-inline">pending</span>
                         </div>
                         <div className="pane-body">
-                            <div className="pane-empty">
-                                <strong>Blueprint not yet generated</strong>
-                                will auto-render from module geometry
-                            </div>
+                            <BlueprintPaperPlaceholder label="Plan view" sub="Renders from module geometry once modules are stable" />
                         </div>
                     </div>
                 </div>
@@ -620,43 +614,50 @@ export function WorkspaceView(): React.ReactElement {
                 </div>
             </div>
 
-            {/* ── Phase tabs (fixed bottom nav) ────────────── */}
-            <nav className="w2-phase-tabs" aria-label="Project phase navigation">
-                <Link href="#" className="w2-phase-tab active">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="11" cy="11" r="7" />
-                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                    Design
-                </Link>
-                <Link href="#" className="w2-phase-tab">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 2h6a1 1 0 0 1 1 1v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2V3a1 1 0 0 1 1-1z" />
-                        <path d="M9 12h6M9 16h6" />
-                    </svg>
-                    Specify
-                </Link>
-                <Link href="#" className="w2-phase-tab">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="9" cy="21" r="1.5" />
-                        <circle cx="19" cy="21" r="1.5" />
-                        <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
-                    </svg>
-                    Source
-                </Link>
-                <Link href="#" className="w2-phase-tab">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 12 20 22 4 22 4 12" />
-                        <rect x="2" y="7" width="20" height="5" />
-                        <line x1="12" y1="22" x2="12" y2="7" />
-                        <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-                        <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
-                    </svg>
-                    Assemble
-                </Link>
-                <div className="avatar-pill"><div className="avatar">TF</div></div>
-            </nav>
         </div>
+    )
+}
+
+function BlueprintPaperPlaceholder({ label, sub }: { label: string; sub: string }) {
+    return (
+        <svg
+            className="w2-blueprint-placeholder"
+            viewBox="0 0 500 300"
+            preserveAspectRatio="xMidYMid slice"
+            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-label={`${label} — not yet generated`}
+        >
+            <defs>
+                <pattern id="bp-grid-sm" width="10" height="10" patternUnits="userSpaceOnUse">
+                    <path d="M10 0 L 0 0 L 0 10" fill="none" stroke="#e7e5e4" strokeWidth="0.3" />
+                </pattern>
+                <pattern id="bp-grid-lg" width="50" height="50" patternUnits="userSpaceOnUse">
+                    <rect width="50" height="50" fill="url(#bp-grid-sm)" />
+                    <path d="M50 0 L 0 0 L 0 50" fill="none" stroke="#d6d3d1" strokeWidth="0.55" />
+                </pattern>
+            </defs>
+            <rect x="0" y="0" width="500" height="300" fill="#fafaf9" />
+            <rect x="0" y="0" width="500" height="300" fill="url(#bp-grid-lg)" />
+            <rect x="8" y="8" width="484" height="284" fill="none" stroke="#1c1917" strokeWidth="0.8" />
+            <rect x="14" y="14" width="472" height="272" fill="none" stroke="#78716c" strokeWidth="0.4" strokeDasharray="2 3" />
+            <g fontFamily="Inter, system-ui, sans-serif">
+                <text x="22" y="32" fontSize="9" fontWeight="700" letterSpacing="0.08em" fill="#78716c">{label.toUpperCase()} — AWAITING GEOMETRY</text>
+            </g>
+            <g transform="translate(250,140)" textAnchor="middle" fontFamily="Inter, system-ui, sans-serif">
+                <circle r="24" fill="none" stroke="#a8a29e" strokeWidth="0.8" strokeDasharray="3 3" />
+                <line x1="-28" x2="28" y1="0" y2="0" stroke="#a8a29e" strokeWidth="0.6" strokeDasharray="2 2" />
+                <line x1="0" x2="0" y1="-28" y2="28" stroke="#a8a29e" strokeWidth="0.6" strokeDasharray="2 2" />
+                <text y="52" fontSize="11" fontWeight="700" fill="#1c1917">{label}</text>
+                <text y="68" fontSize="9.5" fill="#78716c">{sub}</text>
+            </g>
+            <g fontFamily="Inter, system-ui, sans-serif" fontSize="7.5" fill="#78716c">
+                <rect x="380" y="258" width="108" height="30" fill="#ffffff" stroke="#1c1917" strokeWidth="0.5" />
+                <text x="385" y="268" fontWeight="700" fill="#1c1917">{label.toUpperCase()}</text>
+                <text x="385" y="278">status · pending</text>
+                <text x="385" y="286">scale · TBD</text>
+            </g>
+        </svg>
     )
 }
 
