@@ -40,6 +40,45 @@ import type { StoredReferenceDocument } from "@/lib/cad-lab/reference-document-t
 // SECURITY: Shared UUID regex — enforces 8-4-4-4-12 group structure (not just 36 hex+hyphen chars)
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// ─── Short-name derivation ───────────────────────────────────────────
+// INTENT: Derive a readable project name from an idea brief so the
+// workspace H1 + breadcrumb don't render as a 160-char truncated sentence.
+// Takes the first clause before a sentence break (full stop, comma, dash,
+// newline), collapses whitespace, and caps length on a word boundary.
+//
+// Examples:
+//   "A European-sovereign HAPS — 22m wing, 14 days"
+//     → "A European-sovereign HAPS"
+//   "Solar UAV for maritime ISR. 14-day persistence…"
+//     → "Solar UAV for maritime ISR"
+//   "Lightweight drone" (already short)
+//     → "Lightweight drone"
+//   Single-clause brief longer than the cap
+//     → word-boundary cut at `MAX_NAME_LEN`, ellipsis only if we still had to cut
+//
+// Pure, no awaits — kept as a non-exported const so "use server" semantics
+// are preserved (only async functions may be exported).
+const MAX_NAME_LEN = 60
+function deriveShortName(subject: string): string {
+  const collapsed = subject.trim().replace(/\s+/g, " ")
+  if (!collapsed) return "Untitled project"
+
+  // Split on the first sentence-break character. Em-dash (—) and en-dash (–)
+  // are included since founder briefs often use them as clause separators.
+  const clauseMatch = collapsed.split(/[.,;—–\n]/)[0]?.trim() ?? collapsed
+  const candidate = clauseMatch.length >= 10 ? clauseMatch : collapsed
+
+  if (candidate.length <= MAX_NAME_LEN) return candidate
+
+  // Word-boundary cut: take `MAX_NAME_LEN` chars, then rewind to the last
+  // space so we don't slice mid-word. Append an ellipsis only when we
+  // actually trimmed something.
+  const hardCut = candidate.slice(0, MAX_NAME_LEN)
+  const lastSpace = hardCut.lastIndexOf(" ")
+  const softCut = lastSpace > MAX_NAME_LEN * 0.5 ? hardCut.slice(0, lastSpace) : hardCut
+  return `${softCut.trimEnd()}…`
+}
+
 // ─── Types ───────────────────────────────────────────────────────────
 
 /** Summary returned in project list (excludes large data) */
@@ -318,8 +357,13 @@ export async function createCadLabProject(
       return { error: "Subject is required" }
     }
 
-    // Generate a name from the subject (first ~50 chars)
-    const name = subject.length > 50 ? `${subject.slice(0, 47)}...` : subject
+    // INTENT: The workspace H1 + breadcrumb read `name`, so a hard
+    // character-cut like `slice(47) + "..."` produced an ugly truncated
+    // sentence as the page title. Instead, pull the first clause (before a
+    // sentence break) so "A European-sovereign HAPS — 22m wing, 14 days"
+    // becomes "A European-sovereign HAPS" in the header. Keeps the full
+    // brief intact on `subject`; just derives a shorter, readable label.
+    const name = deriveShortName(subject)
 
     const { data, error } = await supabase
       .from("cad_lab_projects")
