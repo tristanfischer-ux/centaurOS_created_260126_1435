@@ -589,6 +589,59 @@ async function main() {
         quantityTarget: "50",
         complianceNotes:
             "AS9100 Class A structural quality; EASA Part 21 subpart-G airworthiness; UK CAA experimental category; ITAR-free propulsion supply chain (UK + EU sources only).",
+        // V2 Brief-page fields (added 2026-04-20 migration cad_lab_brief_lock)
+        mission:
+            "Deliver persistent stratospheric presence (30-day continuous endurance at FL650) for hardware teams that need a reusable, regulatory-friendly alternative to LEO smallsats and conventional UAVs.",
+        targetCustomers:
+            "UK & EU telco operators (BT, Vodafone, Deutsche Telekom backhaul teams) solving rural coverage; civil-defence + environment agencies running wildfire / flood early-warning; MoD / NATO ISR tier-2 customers after an EASA-certifiable, ITAR-free platform.",
+        whyNow:
+            "Solar cell efficiency crossed 26% in 2025, bringing the daytime energy budget into reach at 42 m². EASA opened a dedicated HAPS subpart-G airworthiness path in Feb 2026. UK spectrum for HAPS backhaul is now allocated. First 36-month window before Airbus Zephyr Next and BAE PHASA-36 saturate the regulated European airspace.",
+        constraints: {
+            unitCostCeilingGbp: 150_000,
+            firstShipDate: "2026-11-01",
+            maxMassKg: 68,
+            batchSize: 50,
+            markets: ["UK", "EU"],
+            productionRegion: "UK + EU (ITAR-free supply chain)",
+        },
+        regulatory: [
+            {
+                code: "AS9100D",
+                name: "Aerospace QMS — Class A",
+                summary: "Primary structural quality system. Wing spar + fuselage ring-frames flow through Class A.",
+                status: "in-progress" as const,
+            },
+            {
+                code: "EASA Part 21",
+                name: "Airworthiness — subpart-G",
+                summary: "Dedicated HAPS airworthiness path. Cube Orange+ FW revision is the critical-path item.",
+                status: "in-progress" as const,
+            },
+            {
+                code: "UK CAA",
+                name: "Experimental category",
+                summary: "Operating permission for first 12 test flights over the North Sea corridor.",
+                status: "in-progress" as const,
+            },
+            {
+                code: "ISO 9001",
+                name: "QMS (supplier-facing)",
+                summary: "Baseline supplier requirement — Intelligent Energy, Astra, Maxeon already compliant.",
+                status: "met" as const,
+            },
+            {
+                code: "RTCA DO-160",
+                name: "Environmental",
+                summary: "Cold-soak, humidity, vibration envelope for FL650 avionics + battery pack qualification.",
+                status: "not-started" as const,
+            },
+            {
+                code: "ITAR",
+                name: "Export control",
+                summary: "ITAR-free confirmation — propulsion supply chain kept within UK + EU sources only.",
+                status: "met" as const,
+            },
+        ],
     }
 
     const research = {
@@ -605,6 +658,15 @@ async function main() {
     }
 
     const now = new Date().toISOString()
+    // Brief locked 4 days ago against revision A — gives the lock banner
+    // something to point at and exercises the brief_locked_at / brief_locked_by
+    // columns added by migration 20260420100000.
+    const briefLockedAt = (() => {
+        const d = new Date()
+        d.setUTCDate(d.getUTCDate() - 4)
+        d.setUTCHours(11, 30, 0, 0)
+        return d.toISOString()
+    })()
 
     const projectRow = {
         id: PROJECT_ID,
@@ -622,6 +684,8 @@ async function main() {
         stage: "analysis" as const,
         status: "generated" as const,
         design_revision: 1,
+        brief_locked_at: briefLockedAt,
+        brief_locked_by: userId,
         created_at: START_DATE.toISOString(),
         updated_at: now,
     }

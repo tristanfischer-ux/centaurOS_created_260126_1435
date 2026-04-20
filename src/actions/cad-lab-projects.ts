@@ -153,6 +153,11 @@ export interface CadLabProjectData {
   /** User-uploaded reference documents (spec sheets, datasheets, CAD files) */
   referenceDocuments: StoredReferenceDocument[] | null
 
+  /** Brief lock state — ISO timestamp when the current brief revision was locked. */
+  briefLockedAt: string | null
+  /** UUID of the user who locked the brief (null while draft). */
+  briefLockedBy: string | null
+
   createdAt: string
   updatedAt: string
 }
@@ -277,6 +282,8 @@ export async function loadCadLabProject(
         referenceDocuments: project.reference_documents
           ? ((project.reference_documents as unknown as StoredReferenceDocument[]).map(d => ({ ...d, rawText: null })))
           : null,
+        briefLockedAt: (project.brief_locked_at as string | null) ?? null,
+        briefLockedBy: (project.brief_locked_by as string | null) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },

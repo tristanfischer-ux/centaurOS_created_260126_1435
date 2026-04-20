@@ -91,10 +91,51 @@ export default async function ForgeV2BriefPage({
         ? costRows.reduce((acc, row) => acc + (typeof row?.totalPerUnit === "number" ? row.totalPerUnit : 0), 0)
         : null
 
-    // Brief narrative fields — none of these exist on CadLabDesignBrief today.
-    // Schema-gap → always empty state.
+    // Brief narrative + constraints — read from the V2 CadLabDesignBrief
+    // shape (see migration 20260420100000_cad_lab_brief_lock). Each field
+    // falls back to the neutral empty-state when not yet declared on the
+    // brief so we never synthesise the mockup's HAPS example.
     const designBrief = project.research?.designBrief ?? null
     const quantityTarget = designBrief?.quantityTarget?.trim() || null
+    const legacyBatchSize = quantityTarget
+
+    const mission = designBrief?.mission?.trim() || null
+    const targetCustomers = designBrief?.targetCustomers?.trim() || null
+    const whyNow = designBrief?.whyNow?.trim() || null
+
+    // Structured constraints → display strings. We keep formatting in the
+    // server component so the view stays dumb and platform-agnostic.
+    const c = designBrief?.constraints ?? null
+    const unitCostCeilingGbp = typeof c?.unitCostCeilingGbp === "number" ? c.unitCostCeilingGbp : null
+    const maxMassKg = typeof c?.maxMassKg === "number" ? c.maxMassKg : null
+    const batchSize = typeof c?.batchSize === "number"
+        ? String(c.batchSize)
+        : legacyBatchSize
+    const constraintsDisplay = {
+        unitCostCeiling: unitCostCeilingGbp != null
+            ? `£${unitCostCeilingGbp.toLocaleString("en-GB")}/unit`
+            : null,
+        firstShipDate: c?.firstShipDate ? formatDisplayDate(c.firstShipDate) : null,
+        maxMass: maxMassKg != null ? `${maxMassKg.toFixed(1)} kg` : null,
+        batchSize,
+        markets: c?.markets && c.markets.length > 0 ? c.markets.join(" · ") : null,
+        productionRegion: c?.productionRegion?.trim() || null,
+    }
+
+    // Regulatory posture: prefer per-project rows declared on the brief;
+    // fall back to the generic engineering-library candidates so the card
+    // never renders fully empty when a project hasn't declared its posture.
+    const regulatoryFromBrief: RegulatoryStandardRow[] = (designBrief?.regulatory ?? [])
+        .filter((r) => typeof r?.code === "string" && typeof r?.name === "string")
+        .map((r) => ({
+            code: r.code,
+            name: r.name,
+            summary: typeof r.summary === "string" ? r.summary : "",
+            status: r.status ?? "not-started",
+        }))
+    const regulatory = regulatoryFromBrief.length > 0
+        ? regulatoryFromBrief
+        : regulatoryStandards
 
     const viewProps: BriefViewProps = {
         project: {
@@ -105,35 +146,24 @@ export default async function ForgeV2BriefPage({
             createdAt: project.createdAt,
             systemIllustrationUrl: project.systemIllustrationUrl,
         },
-        // Lock state is not captured in schema yet. Always draft.
         lockState: {
-            isLocked: false,
-            lockedAt: null,
+            isLocked: project.briefLockedAt !== null,
+            lockedAt: project.briefLockedAt,
         },
         narrative: {
-            // Mission / customers / whyNow fields not captured in
-            // CadLabDesignBrief today → always null → empty state.
-            mission: null,
-            targetCustomers: null,
-            whyNow: null,
+            mission,
+            targetCustomers,
+            whyNow,
         },
-        constraints: {
-            // Only Batch 1 (quantityTarget) exists on the brief today.
-            unitCostCeiling: null,
-            firstShipDate: null,
-            maxMass: null,
-            batchSize: quantityTarget,
-            markets: null,
-            productionRegion: null,
-        },
-        regulatory: regulatoryStandards,
+        constraints: constraintsDisplay,
+        regulatory,
         cost: {
             totalUnitCostGbp,
-            unitCostCeilingGbp: null,
+            unitCostCeilingGbp,
         },
         mass: {
             totalMassKg,
-            maxMassKg: null,
+            maxMassKg,
             moduleCount: modules.length,
         },
     }
@@ -157,6 +187,13 @@ export default async function ForgeV2BriefPage({
  * project_compliance_packet table exists, join on it and infer status
  * (met / in-progress / not-started).
  */
+/** Formats an ISO date for display in the constraints grid — "Nov 2026" style. */
+function formatDisplayDate(iso: string): string {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return d.toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+}
+
 async function safeRegulatoryStandards(): Promise<RegulatoryStandardRow[]> {
     try {
         const supabase = await createClient()

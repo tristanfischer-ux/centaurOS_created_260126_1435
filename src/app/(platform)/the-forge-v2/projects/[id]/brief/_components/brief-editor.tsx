@@ -53,9 +53,20 @@ interface BriefEditorProps {
     initialLockedAt: string | null
 }
 
-/** Design-brief labelled-list row. */
+/** Design-brief labelled-list row. Narrowed to the six string-valued legacy
+ *  fields so the inline editor only renders simple text rows. The V2-only
+ *  fields (mission/targetCustomers/whyNow/constraints/regulatory) live on
+ *  the Brief page itself, not in this legacy editor. */
+type LegacyStringKey =
+    | "useCase"
+    | "targetProcess"
+    | "targetMaterial"
+    | "toleranceTarget"
+    | "quantityTarget"
+    | "complianceNotes"
+
 interface DesignBriefRow {
-    key: keyof CadLabDesignBrief
+    key: LegacyStringKey
     label: string
     hint: string
 }

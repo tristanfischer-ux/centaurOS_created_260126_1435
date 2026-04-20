@@ -30,6 +30,48 @@ export interface CadLabDesignBrief {
   quantityTarget: string
   /** Compliance / certification notes */
   complianceNotes: string
+  // ── V2 extensions (Brief page narrative + structured constraints) ──
+  // Optional for back-compat: legacy briefs (pre-2026-04-20) only have the
+  // six fields above. The V2 Brief page reads these fields when present and
+  // falls back to neutral empty-state rendering when they're not.
+  /** 1–2 sentence mission statement for the product. */
+  mission?: string
+  /** Who this is for — named segments, not personas. */
+  targetCustomers?: string
+  /** Why this matters now — market moment / regulatory window / technology inflection. */
+  whyNow?: string
+  /** Structured programme constraints that every downstream artefact must honour. */
+  constraints?: CadLabDesignBriefConstraints
+  /** Per-project regulatory posture — what standards apply and where we are against each. */
+  regulatory?: CadLabDesignBriefRegulatoryItem[]
+}
+
+/** Structured programme constraints — declared in the brief, honoured downstream. */
+export interface CadLabDesignBriefConstraints {
+  /** Max allowed unit cost in GBP. */
+  unitCostCeilingGbp?: number
+  /** ISO date of target first ship. */
+  firstShipDate?: string
+  /** Max allowed total mass in kg. */
+  maxMassKg?: number
+  /** Initial production batch size (units). */
+  batchSize?: number
+  /** ISO country codes or short market names. */
+  markets?: string[]
+  /** Where the product will be manufactured. */
+  productionRegion?: string
+}
+
+/** Per-project regulatory posture row. */
+export interface CadLabDesignBriefRegulatoryItem {
+  /** Short code (e.g. "AS9100D"). */
+  code: string
+  /** Human-readable name. */
+  name: string
+  /** One-line summary of what this standard covers for this project. */
+  summary: string
+  /** Status against this standard. */
+  status: "met" | "in-progress" | "not-started"
 }
 
 /** DFM (Design for Manufacturability) analysis result */
