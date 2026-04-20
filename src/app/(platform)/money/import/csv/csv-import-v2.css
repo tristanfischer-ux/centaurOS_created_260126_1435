@@ -1,0 +1,657 @@
+/**
+ * csv-import-v2.css — scoped (`.csv2`) styles for the Money CSV import flow.
+ * Ports MONEY-MOCKUP-CSV-IMPORT.html + the shared money-mockup.css tokens
+ * the mockup inherits. Matches the palette used by cockpit-v2 / gmail-import
+ * so the page blends with the rest of Money V2 without leaking styles into
+ * sibling pages.
+ */
+
+.csv2 {
+    /* Palette — mirrors money-mockup.css tokens */
+    --csv-fg:            #1c1917;
+    --csv-fg-muted:      #78716c;
+    --csv-fg-faint:      #a8a29e;
+    --csv-fg-subtle:     #d6d3d1;
+    --csv-surface:       #ffffff;
+    --csv-surface-muted: #f5f5f4;
+    --csv-surface-soft:  #fafaf9;
+    --csv-bg:            #f7f6f4;
+    --csv-border:        #e7e5e4;
+    --csv-border-soft:   #f0eeea;
+    --csv-border-strong: #d6d3d1;
+    --csv-brand:         #ff4500;
+    --csv-brand-dim:     rgba(255, 69, 0, 0.18);
+    --csv-brand-soft:    rgba(255, 69, 0, 0.10);
+    --csv-success:       #15803d;
+    --csv-success-soft:  #dcfce7;
+    --csv-success-dim:   #bbf7d0;
+    --csv-warning:       #b45309;
+    --csv-warning-soft:  #fef3c7;
+    --csv-warning-dim:   #fde68a;
+    --csv-danger:        #b91c1c;
+    --csv-danger-soft:   #fee2e2;
+    --csv-info:          #1d4ed8;
+    --csv-info-soft:     #dbeafe;
+    --csv-info-dim:      #bfdbfe;
+    --csv-shadow-xs:     0 1px 2px rgba(0, 0, 0, 0.04);
+    --csv-shadow-sm:     0 2px 6px rgba(0, 0, 0, 0.05);
+
+    color: var(--csv-fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 24px 32px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* ── Page header ────────────────────────────────────────────────── */
+.csv2-page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.csv2-crumbs {
+    font-size: 12.5px;
+    color: var(--csv-fg-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.csv2-crumbs a {
+    color: var(--csv-fg-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.csv2-crumbs a:hover { color: var(--csv-brand); }
+.csv2-crumbs .sep { color: var(--csv-fg-subtle); }
+.csv2-crumbs .current {
+    color: var(--csv-fg);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.csv2-crumbs .current::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--csv-brand);
+    display: inline-block;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.csv2-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--csv-border-strong);
+    background: var(--csv-surface);
+    color: var(--csv-fg);
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.2;
+    font-family: inherit;
+}
+.csv2-btn:hover:not(:disabled) {
+    border-color: var(--csv-brand);
+    color: var(--csv-brand);
+}
+.csv2-btn.sm { padding: 5px 10px; font-size: 11.5px; }
+.csv2-btn.primary {
+    background: var(--csv-brand);
+    border-color: var(--csv-brand);
+    color: white;
+}
+.csv2-btn.primary:hover:not(:disabled) {
+    background: #e63f00;
+    border-color: #e63f00;
+    color: white;
+}
+.csv2-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* ── Honest-persistence chip ────────────────────────────────────── */
+.csv2-persist-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: var(--csv-warning-soft);
+    color: #78350f;
+    border: 1px solid var(--csv-warning-dim);
+}
+.csv2-persist-chip::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--csv-warning);
+    display: inline-block;
+}
+
+/* ── Hero / intro card ──────────────────────────────────────────── */
+.csv2-head {
+    background: var(--csv-surface);
+    border: 1px solid var(--csv-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 20px;
+    box-shadow: var(--csv-shadow-xs);
+    position: relative;
+    overflow: hidden;
+}
+.csv2-head::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 320px;
+    height: 100%;
+    background: radial-gradient(ellipse at top right, var(--csv-brand-soft) 0%, transparent 60%);
+    pointer-events: none;
+}
+.csv2-head > * { position: relative; }
+.csv2-head h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 0 0 4px;
+}
+.csv2-head .sub {
+    font-size: 13px;
+    color: var(--csv-fg-muted);
+    max-width: 680px;
+    line-height: 1.55;
+    margin-bottom: 10px;
+}
+.csv2-head-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+/* ── Stepper ────────────────────────────────────────────────────── */
+.csv2-stepper {
+    display: grid;
+    grid-template-columns: 90px 1fr 1fr 1fr;
+    gap: 8px;
+    background: var(--csv-surface);
+    border: 1px solid var(--csv-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 20px;
+    box-shadow: var(--csv-shadow-xs);
+    align-items: center;
+}
+.csv2-stepper .stepper-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--csv-fg-muted);
+}
+.csv2-stepper .step {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--csv-border);
+    background: var(--csv-surface-soft);
+    text-decoration: none;
+    color: var(--csv-fg-muted);
+    transition: all 0.15s;
+}
+.csv2-stepper .step .n {
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--csv-fg-faint);
+    letter-spacing: -0.01em;
+}
+.csv2-stepper .step .lbl {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--csv-fg);
+    line-height: 1.1;
+}
+.csv2-stepper .step .sub {
+    font-size: 11px;
+    color: var(--csv-fg-muted);
+    line-height: 1.1;
+}
+.csv2-stepper .step.active {
+    background: var(--csv-brand-soft);
+    border-color: var(--csv-brand-dim);
+    color: var(--csv-brand);
+}
+.csv2-stepper .step.active .n { color: var(--csv-brand); }
+.csv2-stepper .step.done {
+    background: var(--csv-success-soft);
+    border-color: var(--csv-success-dim);
+    color: var(--csv-success);
+}
+.csv2-stepper .step.done .n { color: var(--csv-success); }
+
+/* ── Section cards ──────────────────────────────────────────────── */
+.csv2-section {
+    background: var(--csv-surface);
+    border: 1px solid var(--csv-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 16px;
+    box-shadow: var(--csv-shadow-xs);
+}
+.csv2-section h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+.csv2-section .section-sub {
+    font-size: 12.5px;
+    color: var(--csv-fg-muted);
+    margin-bottom: 14px;
+}
+
+/* ── Drop zone ──────────────────────────────────────────────────── */
+.csv2-drop-zone {
+    border: 2px dashed var(--csv-border-strong);
+    border-radius: 12px;
+    padding: 40px 24px;
+    text-align: center;
+    background: var(--csv-surface-soft);
+    transition: all 0.12s;
+    cursor: pointer;
+}
+.csv2-drop-zone:hover,
+.csv2-drop-zone.dragover {
+    border-color: var(--csv-brand);
+    background: var(--csv-brand-soft);
+}
+.csv2-drop-zone .dz-ic {
+    font-size: 32px;
+    color: var(--csv-fg-faint);
+    margin-bottom: 10px;
+}
+.csv2-drop-zone h4 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 700;
+}
+.csv2-drop-zone p {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--csv-fg-muted);
+}
+.csv2-drop-zone .btn-wrap { margin-top: 12px; }
+
+.csv2-uploaded {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    background: var(--csv-success-soft);
+    border: 1px solid var(--csv-success-dim);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-top: 12px;
+}
+.csv2-uploaded .ic {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--csv-success);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+}
+.csv2-uploaded h4 {
+    margin: 0 0 2px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #14532d;
+}
+.csv2-uploaded p {
+    margin: 0;
+    font-size: 11.5px;
+    color: #14532d;
+}
+
+.csv2-error-banner {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--csv-danger-soft);
+    border: 1px solid #fecaca;
+    color: #7f1d1d;
+    font-size: 12.5px;
+}
+
+.csv2-template {
+    margin-top: 14px;
+    font-size: 12.5px;
+}
+.csv2-template > summary {
+    cursor: pointer;
+    color: var(--csv-fg-muted);
+    font-weight: 600;
+}
+.csv2-template-body {
+    margin-top: 10px;
+    padding: 12px 16px;
+    background: var(--csv-surface-soft);
+    border-radius: 8px;
+    color: var(--csv-fg-muted);
+}
+.csv2-template-body code {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+}
+.csv2-template-body .link {
+    color: var(--csv-brand);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* ── Mapping table ──────────────────────────────────────────────── */
+.csv2-map-head-row {
+    display: grid;
+    grid-template-columns: 1.4fr 36px 1.4fr 1fr 110px;
+    gap: 12px;
+    padding: 10px 0 8px;
+    border-bottom: 2px solid var(--csv-border);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+    color: var(--csv-fg-muted);
+}
+.csv2-map-head-row .status-head { text-align: center; }
+
+.csv2-map-row {
+    display: grid;
+    grid-template-columns: 1.4fr 36px 1.4fr 1fr 110px;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--csv-border-soft);
+    align-items: center;
+    font-size: 13px;
+}
+.csv2-map-row:last-child { border-bottom: none; }
+.csv2-map-row.warn {
+    background: var(--csv-warning-soft);
+    margin: 0 -26px;
+    padding-left: 26px;
+    padding-right: 26px;
+}
+.csv2-map-row .m-left {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--csv-fg);
+    font-weight: 600;
+    background: var(--csv-surface-muted);
+    padding: 6px 10px;
+    border-radius: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.csv2-map-row .m-arrow {
+    text-align: center;
+    color: var(--csv-fg-subtle);
+    font-size: 16px;
+}
+.csv2-map-row .m-right {
+    padding: 6px 10px;
+    border: 1px solid var(--csv-border);
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: var(--csv-surface);
+    font-family: inherit;
+    width: 100%;
+    color: var(--csv-fg);
+}
+.csv2-map-row .m-right.auto {
+    background: var(--csv-success-soft);
+    border-color: var(--csv-success-dim);
+    color: #14532d;
+}
+.csv2-map-row select.m-right { border-color: var(--csv-warning); }
+.csv2-map-row .m-sample {
+    font-size: 11px;
+    color: var(--csv-fg-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.csv2-map-row .m-status {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-align: center;
+    padding: 3px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    justify-self: center;
+}
+.csv2-map-row .m-status.ok {
+    background: var(--csv-success-soft);
+    color: var(--csv-success);
+}
+.csv2-map-row .m-status.check {
+    background: var(--csv-warning-soft);
+    color: var(--csv-warning);
+}
+.csv2-map-row .m-status.skip {
+    background: var(--csv-surface-muted);
+    color: var(--csv-fg-muted);
+}
+
+.csv2-map-hint {
+    margin-top: 14px;
+    padding: 12px 16px;
+    background: var(--csv-info-soft);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #1e3a8a;
+}
+.csv2-map-hint strong { color: #1e3a8a; }
+.csv2-map-hint code {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    background: white;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+/* ── Review preview ─────────────────────────────────────────────── */
+.csv2-pill-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+.csv2-pill-strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 700;
+    border: 1px solid var(--csv-border);
+    background: var(--csv-surface);
+    color: var(--csv-fg-muted);
+}
+.csv2-pill-strong.ok {
+    background: var(--csv-success-soft);
+    border-color: var(--csv-success-dim);
+    color: var(--csv-success);
+}
+.csv2-pill-strong.warn {
+    background: var(--csv-warning-soft);
+    border-color: var(--csv-warning-dim);
+    color: var(--csv-warning);
+}
+.csv2-pill-strong.skip {
+    background: var(--csv-surface-muted);
+    color: var(--csv-fg-muted);
+}
+
+.csv2-review-row {
+    display: grid;
+    grid-template-columns: 22px 1fr 110px 90px 120px 80px;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--csv-border-soft);
+    align-items: center;
+    font-size: 12.5px;
+}
+.csv2-review-row:last-child { border-bottom: none; }
+.csv2-review-row .ic {
+    width: 18px;
+    height: 18px;
+    border-radius: 100%;
+    background: var(--csv-success);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+}
+.csv2-review-row.warn .ic { background: var(--csv-warning); }
+.csv2-review-row.skip .ic {
+    background: var(--csv-surface-muted);
+    color: var(--csv-fg-muted);
+}
+.csv2-review-row .name {
+    font-weight: 600;
+    min-width: 0;
+}
+.csv2-review-row .name small {
+    display: block;
+    font-size: 11px;
+    color: var(--csv-fg-muted);
+    font-weight: 400;
+    margin-top: 1px;
+}
+.csv2-review-row.skip .name {
+    color: var(--csv-fg-muted);
+    font-weight: 500;
+}
+.csv2-review-row .amt {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-weight: 600;
+}
+.csv2-review-row .amt.out { color: var(--csv-danger); }
+.csv2-review-row .amt.in { color: var(--csv-success); }
+.csv2-review-row .freq {
+    font-size: 11px;
+    color: var(--csv-fg-muted);
+}
+.csv2-review-row .status {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--csv-success);
+}
+.csv2-review-row.warn .status { color: var(--csv-warning); }
+.csv2-review-row.skip .status { color: var(--csv-fg-muted); }
+
+.csv2-review-more {
+    margin-top: 12px;
+    text-align: center;
+    color: var(--csv-fg-muted);
+    font-size: 12px;
+}
+
+.csv2-empty-preview {
+    padding: 22px 24px;
+    border: 1px dashed var(--csv-border-strong);
+    border-radius: 10px;
+    background: var(--csv-surface-soft);
+    color: var(--csv-fg-muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+    text-align: center;
+}
+.csv2-empty-preview strong {
+    color: var(--csv-fg);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+/* ── Footer bar ─────────────────────────────────────────────────── */
+.csv2-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    background: var(--csv-surface);
+    border: 1px solid var(--csv-border);
+    border-radius: 12px;
+    padding: 14px 22px;
+    box-shadow: var(--csv-shadow-xs);
+    flex-wrap: wrap;
+}
+.csv2-foot .summary {
+    font-size: 12.5px;
+    color: var(--csv-fg-muted);
+}
+.csv2-foot .ctas {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── Narrow viewport fallbacks ──────────────────────────────────── */
+@media (max-width: 880px) {
+    .csv2 { padding: 20px 18px 36px; }
+    .csv2-stepper {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    .csv2-map-head-row,
+    .csv2-map-row {
+        grid-template-columns: 1fr 24px 1fr;
+    }
+    .csv2-map-head-row .sample-head,
+    .csv2-map-head-row .status-head,
+    .csv2-map-row .m-sample,
+    .csv2-map-row .m-status {
+        display: none;
+    }
+    .csv2-review-row {
+        grid-template-columns: 22px 1fr 90px;
+    }
+    .csv2-review-row .freq,
+    .csv2-review-row .status,
+    .csv2-review-row .fix-slot {
+        display: none;
+    }
+}
