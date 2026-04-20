@@ -84,6 +84,64 @@ After every `git push`, you MUST verify the deployment succeeded:
 
 ---
 
+## Mockup-Faithful Build Rule (MANDATORY when a mockup exists)
+
+When a static HTML mockup has been approved for a page, the production code MUST match the mockup visually and structurally. **"Inspired by the mockup" is not acceptable. "Ships next round" is not acceptable. The mockup IS the V1 spec.**
+
+This rule exists because the workflow has failed in this exact way before: agents read the mockup once, extracted a concept, then wrote scaffolds from memory. The result was 30 routes that all returned 200 but none of which matched what the user signed off on. Never again.
+
+### How to build from a mockup
+
+1. **Open the mockup file and the production file side by side on screen.** Never write production code from memory of the mockup. Port top-to-bottom, section-by-section, in the same order the mockup presents.
+2. **Every `<section>`, card, stat tile, specialist briefing, column header, copy line, CTA, empty state, sidebar in the mockup is MUST for V1.** If something won't ship, the mockup must be edited to remove it FIRST — with the user's explicit sign-off — before you write code that omits it.
+3. **Match the copy.** If the mockup says "Chase has flagged 3 RFQs that need a chase today," the production page says exactly that (or pulls the same sentence from real data). Don't paraphrase. Don't soften. Don't shorten.
+4. **Match the structure.** 5-column kanban in the mockup → 5-column kanban in production. Side-by-side split layout in the mockup → side-by-side split layout in production. A grid of 8 stat tiles in the mockup is not a grid of 4 in production.
+5. **Match the affordances.** Buttons that appear in the mockup must appear in the production page, even if the action is `disabled` pending wiring. A disabled button with the right label is mockup-faithful; a missing button is not.
+
+### Banned patterns inside a mockup-faithful page
+
+- `"Form scaffold. Production action XYZ wires in a future round."` cards
+- `"Coming soon"` / `"Ships next round"` / `"Wires in a future migration"` placeholder copy where the mockup shows real content
+- Stat tiles with different metrics than the mockup (wrong labels, wrong values, fewer tiles, reordered)
+- Missing specialist briefings (Chase / Harper / Priya / etc. sidebars and quote blocks that appear in the mockup)
+- Paraphrased copy where the mockup has finished copy
+- Empty `<Card>` shells where the mockup shows a populated grid, table, or feed
+- Single-panel pages where the mockup shows tabs (Profile / Pricing / Availability / etc.)
+- Form pages without the live-preview, summary card, or stepper visible in the mockup
+
+### Parity gate (NON-NEGOTIABLE before ticking any page done)
+
+```
+agent-browser close --all
+agent-browser open file://<absolute-path>/<MOCKUP>.html --headless --viewport 1440x900
+agent-browser screenshot /tmp/<page>-mockup.png
+agent-browser open <production-url> --headless --viewport 1440x900
+agent-browser screenshot /tmp/<page>-prod.png
+```
+
+Read both screenshots. Diff them mentally section-by-section. Log the result in the page's tracker entry as **`Mockup parity: ✓`** or **`Mockup parity: ⚠ <list of diffs>`**. If `⚠`, fix the diffs in the SAME working session before moving to the next page. A `⚠` entry that is left for "next round" is the failure mode this rule exists to prevent.
+
+### Autonomous-execution protocol when a mockup set exists
+
+When the user is away and says "finish everything off" / "build the rest" / "do the marketplace pages":
+
+- "Finish everything" means **each page to mockup parity** before starting the next.
+- 8 mockup-faithful pages + a clear "22 remaining" handover note beats 30 scaffolds every time.
+- Do not optimise the tracker for green ticks. A page only earns a tick after it passes the parity gate.
+- If the parity gate exposes that a page is harder than expected (full-week timesheet grid, 4-step wizard, bulk-compare table, multi-tab profile editor): build it properly. The mockup signed off on it, so it ships.
+
+### Self-check before EVERY commit on a mockup-backed page
+
+> **"If the user opens this URL in a browser right now, will he see what the mockup shows him?"**
+
+If the answer is "no, but it's a start" or "no, but the data is wired" or "no, but it'll match in the next round" — STOP. You are about to ship a scaffold. Go back to the mockup, port the missing sections, and only commit once the answer is unambiguously yes.
+
+### Failure mode to name explicitly
+
+A page that renders only a breadcrumb, a title, and a single Card with a paragraph of explanatory copy is a **SCAFFOLD**, not a page. It is not "V1". It is not "good enough for now". It is a regression of the mockup-first workflow. Ship nothing in that state.
+
+---
+
 ## Self-Improvement Loop
 
 After ANY correction, mistake, or unexpected behaviour:
@@ -127,6 +185,43 @@ For major strategic decisions (business model, pricing, market entry, technology
 - One task per subagent for focused execution
 - Use subagents for: searching the codebase, reading reference docs, running tests, generating boilerplate
 - The main thread should stay focused on decision-making and integration — delegate the grunt work
+- **Plan-then-parallelise.** Enumerate every independent task up front and launch them all in a single multi-Agent message. Drip-feeding one sub-agent at a time wastes the parallelism sub-agents are for. If 5+ mockup ports are still queued, spawn 5+ agents at once.
+
+### Parallel Sub-Agent Safety Rules (MANDATORY when 2+ agents run concurrently)
+
+When two or more sub-agents work on the same branch at the same time, they can silently trample each other's commits. This has already happened in this repo — one agent's `git add -A` swept another agent's files into the wrong commit, resulting in a commit message that did not describe its contents. These rules exist because that outage was real, not hypothetical.
+
+**Every sub-agent brief in a parallel run MUST include:**
+
+1. **Stage only explicit named paths.** NEVER `git add -A` or `git add .`. Example: `git add src/app/.../cost/page.tsx src/app/.../cost/cost-view.tsx`. Name the files up front in the brief so the agent has a whitelist.
+2. **Claim a single directory.** No two concurrent agents may write to the same directory. List-page + detail-page on the same resource = one agent, or explicit "stay out of /suppliers/*, only edit /suppliers/[id]/*".
+3. **Never regenerate shared files.** `src/types/database.types.ts`, `package.json`, `package-lock.json`, `supabase/migrations/` (as a new file is fine; editing someone else's is not) are shared. Only ONE agent per parallel wave regenerates types or installs deps. Others explicitly must not.
+4. **Never push.** Main thread pushes at the end of the wave. Sub-agents commit locally only. Keeps partial state out of Vercel previews.
+5. **Block on ambiguity — don't guess.** If an agent hits a decision outside its brief (licensing question, schema change, API swap), STOP, write `<FEATURE>-HANDOVER.md` at repo root with 3 ranked options, and report back. Do NOT pick one and continue — the handover-doc pattern is what let DWG-licensing get answered in 30 seconds instead of a wrong-foot implementation.
+6. **Pre-commit cross-contamination check.** Before `git commit`, run `git status --short` and verify ONLY the agent's claimed files are staged. If another agent's files got swept in (even after rule 1), `git restore --staged <file>` them. This rule has already saved a commit this session.
+7. **Use `--no-verify` for concurrent-agent commits.** The pre-commit lint hook runs the whole repo lint each time; when two agents try to commit in the same second, one races and fails. `--no-verify` on sub-agent commits is the pragmatic fix. Main thread does the full-repo verify once at the end before pushing.
+
+### Sub-Agent Briefing Template (use all four parts)
+
+Mockup-port agents that land cleanly always have these four sections in the brief:
+
+1. **Mockup file path** — absolute, the V1 spec. "`/Users/tristanfischer/Developer/.../FORGE-MOCKUP-X.html`". Agent must open it and port top-to-bottom.
+2. **Reference implementation path** — a sibling page already following the pattern. "See `bom-view.tsx` + `bom-v2.css` for the scoped-`.bm2` convention." Stops the agent from inventing a parallel convention.
+3. **Data contract** — exact actions + tables + columns to read, what's nullable today, what doesn't exist yet. "`loadCadLabProject(id)` → `.modules[].keyParts` exists; `.parts_spec` does NOT exist." Prevents the agent from assuming fields.
+4. **Empty-state policy** — "never fake mockup specifics; render honest 'not yet declared' when the field doesn't exist." This is the single most important clause. Without it, sub-agents happily render T800 prepreg / Astra Composites / £172k and the work reads as fake.
+
+Plus the staging clause from rule 1–6 above. Brief without the staging clause = race condition on its way.
+
+### When two terminals on the same repo are safe (and when they aren't)
+
+Running a second terminal on ForgeOS can double throughput but adds failure modes neither session sees:
+
+- **Safe:** Split by directory or by non-code work. Terminal A = `/the-forge-v2/**`, Terminal B = `/marketplace/**`. Or Terminal A = code, Terminal B = investor outreach / drafts. No file collision.
+- **Safe:** Git worktrees. Each terminal on a separate branch in a separate worktree. Claude Code's Agent tool has `isolation: "worktree"` for exactly this case.
+- **Dangerous:** Both terminals spawning sub-agents on the same branch for the same feature. The race described above, doubled. Don't.
+- **Dangerous:** Both terminals running `npx supabase gen types` or `supabase db push` or `npm install` at once. Shared state gets clobbered silently.
+
+Prefer one terminal running many parallel sub-agents (what this rulebook was written for) over two terminals each running a few.
 
 ---
 
