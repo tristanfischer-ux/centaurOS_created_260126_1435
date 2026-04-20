@@ -28,10 +28,18 @@ import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/server"
+import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import { cn } from "@/lib/utils"
 
 import { WorkspaceShell } from "../../../_components/workspace-shell"
+import {
+    CadUploadPanel,
+    type CadUploadedFile,
+    type CadFormat,
+    type ParseStatus,
+} from "./cad-upload-panel"
 
 export const dynamic = "force-dynamic"
 
@@ -76,6 +84,9 @@ export default async function ForgeV2GeometryPage({
     const hasIntegratedAssembly = !!project.integratedAssemblyStepUrl || !!project.integratedAssemblyStlUrl
     const hasAnyGeometry = hasIntegratedAssembly || moduleGeometryCount > 0
 
+    // Round-A CAD uploads (separate from the generated module STEP/STL).
+    const { files: uploadedFiles, stats: uploadStats } = await loadUploadedCadFiles(project.id)
+
     return (
         <WorkspaceShell
             crumbs={[
@@ -90,6 +101,34 @@ export default async function ForgeV2GeometryPage({
                 icon: <Wrench className="h-3.5 w-3.5" />,
             }}
         >
+            {/* Founder-uploaded CAD (Round A) */}
+            <CadUploadPanel projectId={project.id} existingFiles={uploadedFiles} />
+
+            {/* Aggregate stats rollup across uploaded files */}
+            {uploadedFiles.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <StatTile label="Files" value={uploadStats.fileCount.toString()} />
+                    <StatTile
+                        label="Total volume"
+                        value={uploadStats.totalVolumeMm3 != null
+                            ? `${(uploadStats.totalVolumeMm3 / 1000).toFixed(1)} cm³`
+                            : "—"}
+                    />
+                    <StatTile
+                        label="Total parts"
+                        value={uploadStats.totalPartCount != null
+                            ? uploadStats.totalPartCount.toString()
+                            : "—"}
+                    />
+                    <StatTile
+                        label="Max extent"
+                        value={uploadStats.bboxExtentMm != null
+                            ? `${uploadStats.bboxExtentMm.toFixed(0)} mm`
+                            : "—"}
+                    />
+                </div>
+            )}
+
             {/* Integrated assembly summary */}
             <Card className="rounded-xl border">
                 <CardContent className="py-5 px-5">
@@ -216,6 +255,122 @@ export default async function ForgeV2GeometryPage({
                 </p>
             )}
         </WorkspaceShell>
+    )
+}
+
+// ─── Round-A CAD uploads loader ────────────────────────────────────
+
+interface UploadStats {
+    fileCount: number
+    totalVolumeMm3: number | null
+    totalPartCount: number | null
+    bboxExtentMm: number | null
+}
+
+async function loadUploadedCadFiles(projectId: string): Promise<{
+    files: CadUploadedFile[]
+    stats: UploadStats
+}> {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) {
+        return {
+            files: [],
+            stats: { fileCount: 0, totalVolumeMm3: null, totalPartCount: null, bboxExtentMm: null },
+        }
+    }
+
+    const { data, error } = await supabase
+        .from("cad_lab_project_files")
+        .select("id, filename, format, size_bytes, parse_status, parse_error, material_hint, uploaded_by, created_at, volume_mm3, part_count, bbox_min_mm, bbox_max_mm")
+        .eq("project_id", projectId)
+        .eq("foundry_id", foundryId)
+        .order("created_at", { ascending: false })
+
+    if (error || !data) {
+        if (error) {
+            console.error("[geometry/page] failed to load cad_lab_project_files:", error.message)
+        }
+        return {
+            files: [],
+            stats: { fileCount: 0, totalVolumeMm3: null, totalPartCount: null, bboxExtentMm: null },
+        }
+    }
+
+    // Resolve uploader display names in a single lookup.
+    const uploaderIds = Array.from(new Set(data.map(r => r.uploaded_by)))
+    const uploaderNames = new Map<string, string>()
+    if (uploaderIds.length > 0) {
+        const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", uploaderIds)
+        if (profiles) {
+            for (const p of profiles) {
+                uploaderNames.set(p.id, p.full_name ?? "Team member")
+            }
+        }
+    }
+
+    const files: CadUploadedFile[] = data.map(row => ({
+        id: row.id,
+        filename: row.filename,
+        format: row.format as CadFormat,
+        sizeBytes: Number(row.size_bytes),
+        parseStatus: row.parse_status as ParseStatus,
+        parseError: row.parse_error ?? null,
+        materialHint: row.material_hint ?? null,
+        uploaderName: uploaderNames.get(row.uploaded_by) ?? "Team member",
+        createdAt: row.created_at,
+    }))
+
+    // Aggregate parsed geometry for the stats tiles.
+    let totalVolumeMm3: number | null = null
+    let totalPartCount: number | null = null
+    let bboxExtentMm: number | null = null
+
+    for (const row of data) {
+        if (row.parse_status !== "parsed") continue
+        if (typeof row.volume_mm3 === "number") {
+            totalVolumeMm3 = (totalVolumeMm3 ?? 0) + row.volume_mm3
+        }
+        if (typeof row.part_count === "number") {
+            totalPartCount = (totalPartCount ?? 0) + row.part_count
+        }
+        const min = row.bbox_min_mm as { x?: number; y?: number; z?: number } | null
+        const max = row.bbox_max_mm as { x?: number; y?: number; z?: number } | null
+        if (min && max) {
+            const dx = (max.x ?? 0) - (min.x ?? 0)
+            const dy = (max.y ?? 0) - (min.y ?? 0)
+            const dz = (max.z ?? 0) - (min.z ?? 0)
+            const maxEdge = Math.max(dx, dy, dz)
+            if (Number.isFinite(maxEdge)) {
+                bboxExtentMm = bboxExtentMm == null ? maxEdge : Math.max(bboxExtentMm, maxEdge)
+            }
+        }
+    }
+
+    return {
+        files,
+        stats: {
+            fileCount: files.length,
+            totalVolumeMm3,
+            totalPartCount,
+            bboxExtentMm,
+        },
+    }
+}
+
+function StatTile({ label, value }: { label: string; value: string }): React.ReactElement {
+    return (
+        <div className="rounded-xl border border-border bg-card px-4 py-3">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {label}
+            </p>
+            <p className="mt-1 text-lg font-semibold text-foreground tabular-nums">
+                {value}
+            </p>
+        </div>
     )
 }
 
