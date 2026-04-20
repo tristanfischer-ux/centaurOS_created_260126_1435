@@ -36,6 +36,22 @@ const BOM_MAX_TOKENS = 8192
 const MAX_BOM_DEPTH = 20
 /** Max length for user-provided strings interpolated into prompts */
 const MAX_PROMPT_FIELD_LENGTH = 500
+/**
+ * Max skeleton parts to expand in a single Claude call. A single expansion
+ * response for N parts is roughly 400-800 tokens/part. At 15 parts, a worst
+ * case response fits comfortably under BOM_MAX_TOKENS (8192). This was the
+ * root cause of the 84s parse failures in production: a 9-module project
+ * with 45+ skeleton parts would truncate the monolithic response at 8192
+ * tokens and produce invalid JSON.
+ */
+const EXPAND_BATCH_SIZE = 15
+/**
+ * Max concurrent Anthropic requests for BOM expansion batches. Matches the
+ * Max decomposition orchestrator's EXPAND_CONCURRENCY so we don't starve the
+ * rate limiter when both pipelines run back-to-back. A 9-module project with
+ * ~45 parts → 3 batches → wall-clock ~60-90s (vs 226s serial monolithic).
+ */
+const EXPAND_CONCURRENCY = 3
 
 const VALID_PROCESSES = new Set<string>([
   "cnc", "injection_molding", "sheet_metal",
@@ -82,6 +98,121 @@ function validateProcess(p: unknown): ManufacturingProcessType | null {
 function clampPositive(n: unknown): number | null {
   if (typeof n !== "number" || isNaN(n)) return null
   return Math.max(0, n)
+}
+
+/**
+ * Parse JSON with progressive repair for truncated Anthropic responses.
+ *
+ * @description When Claude hits max_tokens mid-response, the JSON is cut off
+ * (often inside a string or array). This helper tries:
+ *   1. JSON.parse on the extracted JSON (happy path)
+ *   2. Trim trailing incomplete content and close open braces/brackets
+ *   3. Return null if unrecoverable
+ *
+ * @returns parsed object or null if unrecoverable
+ */
+function tryParseJsonWithRepair<T = unknown>(jsonStr: string): T | null {
+  // Happy path — valid JSON
+  try {
+    return JSON.parse(jsonStr) as T
+  } catch {
+    // fall through to repair
+  }
+
+  let repaired = jsonStr.trim()
+
+  // Cut back to the last complete `}` or `]` before truncation. This handles
+  // the common case where the response ends mid-property (e.g. `"material": "Alu`).
+  const lastCompleteObjectEnd = repaired.lastIndexOf("}")
+  const lastCompleteArrayEnd = repaired.lastIndexOf("]")
+  const cutPoint = Math.max(lastCompleteObjectEnd, lastCompleteArrayEnd)
+  if (cutPoint > 0 && cutPoint < repaired.length - 1) {
+    repaired = repaired.slice(0, cutPoint + 1)
+  }
+
+  // Count unclosed braces/brackets and append closers in reverse order.
+  // Walk the string respecting string literals so we don't count braces
+  // inside a "description" value.
+  const openStack: string[] = []
+  let inString = false
+  let escaped = false
+  for (const ch of repaired) {
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (ch === "\\") {
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+    if (ch === "{" || ch === "[") openStack.push(ch)
+    else if (ch === "}" && openStack[openStack.length - 1] === "{") openStack.pop()
+    else if (ch === "]" && openStack[openStack.length - 1] === "[") openStack.pop()
+  }
+
+  // If we ended inside a string, close it first.
+  if (inString) repaired += '"'
+
+  // Trim trailing comma that now dangles.
+  repaired = repaired.replace(/,\s*$/, "")
+
+  // Close remaining open structures.
+  while (openStack.length > 0) {
+    const open = openStack.pop()
+    repaired += open === "{" ? "}" : "]"
+  }
+
+  try {
+    return JSON.parse(repaired) as T
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Runs an async mapper over an array with at most `limit` in flight at once.
+ * Returns results in the same order as the input. Mirrors the helper in
+ * `run-max-decomposition.ts` — kept private here so bom.ts stays a
+ * self-contained `"use server"` module.
+ */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let cursor = 0
+  const workerCount = Math.max(1, Math.min(limit, items.length))
+
+  async function runOne(): Promise<void> {
+    while (true) {
+      const idx = cursor++
+      if (idx >= items.length) return
+      results[idx] = await mapper(items[idx], idx)
+    }
+  }
+
+  const workers: Array<Promise<void>> = []
+  for (let i = 0; i < workerCount; i += 1) {
+    workers.push(runOne())
+  }
+  await Promise.all(workers)
+  return results
+}
+
+/** Partition an array into chunks of at most `size` elements. */
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items]
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size))
+  }
+  return out
 }
 
 // ─── Types (internal to progressive BOM flow) ──────────────────────
@@ -219,12 +350,13 @@ Respond with ONLY valid JSON:
     }
 
     const jsonStr = extractJson(textBlock.text)
-    let parsed: { parts: Array<Record<string, unknown>>; bomLines: Array<Record<string, unknown>> }
+    const parsed = tryParseJsonWithRepair<{
+      parts: Array<Record<string, unknown>>
+      bomLines: Array<Record<string, unknown>>
+    }>(jsonStr)
 
-    try {
-      parsed = JSON.parse(jsonStr)
-    } catch {
-      console.error("[skeletonBom] Failed to parse AI response:", jsonStr.slice(0, 200))
+    if (!parsed) {
+      console.error("[skeletonBom] Failed to parse AI response (even with repair):", jsonStr.slice(0, 200))
       return { success: false, error: "Failed to parse skeleton response", parts: [], bomLines: [] }
     }
 
@@ -367,12 +499,12 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
     }
 
     const jsonStr = extractJson(textBlock.text)
-    let parsed: { expansions: Record<string, Record<string, unknown>> }
+    const parsed = tryParseJsonWithRepair<{
+      expansions: Record<string, Record<string, unknown>>
+    }>(jsonStr)
 
-    try {
-      parsed = JSON.parse(jsonStr)
-    } catch {
-      console.error("[expandBomParts] Failed to parse AI response:", jsonStr.slice(0, 200))
+    if (!parsed) {
+      console.error("[expandBomParts] Failed to parse AI response (even with repair):", jsonStr.slice(0, 200))
       return { success: false, error: "Failed to parse expansion response", expansions: {} }
     }
 
@@ -404,14 +536,158 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
   })
 }
 
-// ─── AI BOM Generation (original monolithic — used as fallback) ─────
+// ─── AI BOM Generation (progressive two-phase with batched expansion) ─────
+
+/**
+ * Internal: expand a single batch of skeleton parts into full specs.
+ *
+ * @description Identical prompt structure to `expandBomParts` but operates on
+ * a subset. Used by `generateBomFromModules` to fan out expansion with
+ * concurrency so a 45-part BOM is split into 3 parallel 15-part calls rather
+ * than one 45-part call that truncates at 8192 tokens.
+ *
+ * Takes pre-built prompt context so callers can share catalogue/brief across
+ * batches (fetching the catalogue 3× would be wasteful and non-deterministic).
+ */
+async function expandBomPartsBatchInternal(params: {
+  apiKey: string
+  batchParts: SkeletonPart[]
+  moduleContext: string
+  briefContext: string
+  catalogueRef: string
+}): Promise<{
+  success: boolean
+  error?: string
+  expansions: BomExpansionResult["expansions"]
+}> {
+  const { apiKey, batchParts, moduleContext, briefContext, catalogueRef } = params
+
+  const skeletonSummary = batchParts.map((p) =>
+    `- ${p.partNumber}: "${p.name}" (${p.process}, ${p.isPurchased ? "purchased" : "manufactured"}, module: ${p.sourceModuleId})`
+  ).join("\n")
+
+  const systemPrompt = `You are a manufacturing engineer adding detailed specifications to a BOM skeleton.
+${catalogueRef ? `
+REAL COMPONENT CATALOGUE — USE FOR PURCHASED PARTS:
+${catalogueRef}
+
+For purchased/COTS parts: use exact manufacturer, MPN, and catalogue price if match exists.
+` : ""}
+For each part number in the skeleton, provide:
+- description: 1-2 sentence functional description
+- material: material name (e.g. "6061 Aluminium", "PLA", "304 Stainless Steel")
+- materialSpec: material specification (e.g. "6061-T6", "ABS CF", "AISI 304")
+- finish: surface finish (e.g. "Anodized", "As-printed", "Zinc plated")
+- tolerance: dimensional tolerance (e.g. "±0.1mm", "±0.5mm")
+- massKg: estimated mass in kg (>= 0)
+- envelopeXMm, envelopeYMm, envelopeZMm: bounding envelope in mm (>= 0)
+- estimatedUnitCostGbp: unit cost in GBP (>= 0)
+- aiConfidence: 0-1 confidence in estimates
+
+Respond with ONLY valid JSON:
+{
+  "expansions": {
+    "PART-NUMBER": {
+      "description": "...", "material": "...", "materialSpec": "...",
+      "finish": "...", "tolerance": "...", "massKg": 0.0,
+      "envelopeXMm": 0, "envelopeYMm": 0, "envelopeZMm": 0,
+      "estimatedUnitCostGbp": 0.0, "aiConfidence": 0.0
+    }
+  }
+}`
+
+  const userPrompt = `Expand these skeleton parts with full manufacturing specifications:
+
+${skeletonSummary}
+
+Module context:
+${moduleContext}${briefContext}
+
+Add material, specs, dimensions, mass, cost, and confidence for every part.`
+
+  const Anthropic = (await import("@anthropic-ai/sdk")).default
+  const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
+
+  let response
+  try {
+    response = await client.messages.create({
+      model: BOM_MODEL,
+      max_tokens: BOM_MAX_TOKENS,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    })
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Anthropic request failed",
+      expansions: {},
+    }
+  }
+
+  const textBlock = response.content.find((b) => b.type === "text")
+  if (!textBlock || textBlock.type !== "text") {
+    return { success: false, error: "No text response from Claude", expansions: {} }
+  }
+
+  const jsonStr = extractJson(textBlock.text)
+  const parsed = tryParseJsonWithRepair<{
+    expansions: Record<string, Record<string, unknown>>
+  }>(jsonStr)
+
+  if (!parsed || !parsed.expansions || typeof parsed.expansions !== "object") {
+    console.error(
+      "[expandBomPartsBatchInternal] Failed to parse (even with repair):",
+      jsonStr.slice(0, 200),
+    )
+    return { success: false, error: "Failed to parse expansion response", expansions: {} }
+  }
+
+  // Validate + sanitize each expansion identically to expandBomParts.
+  const expansions: BomExpansionResult["expansions"] = {}
+  for (const [partNumber, raw] of Object.entries(parsed.expansions)) {
+    expansions[partNumber] = {
+      description: truncate(String(raw.description ?? ""), 500),
+      material: truncate(String(raw.material ?? ""), 200),
+      materialSpec: truncate(String(raw.materialSpec ?? ""), 200),
+      finish: truncate(String(raw.finish ?? ""), 200),
+      tolerance: truncate(String(raw.tolerance ?? ""), 100),
+      massKg: clampPositive(raw.massKg) ?? 0,
+      envelopeXMm: clampPositive(raw.envelopeXMm) ?? 0,
+      envelopeYMm: clampPositive(raw.envelopeYMm) ?? 0,
+      envelopeZMm: clampPositive(raw.envelopeZMm) ?? 0,
+      estimatedUnitCostGbp: clampPositive(raw.estimatedUnitCostGbp) ?? 0,
+      aiConfidence: typeof raw.aiConfidence === "number"
+        ? Math.max(0, Math.min(1, raw.aiConfidence))
+        : 0.5,
+    }
+  }
+
+  return { success: true, expansions }
+}
 
 /**
  * Generate a structured BOM from CAD Lab modules using Claude.
  *
- * @description Sends all module keyParts, diagnostic answers, and design brief
- * to Claude which returns structured parts with specs and a hierarchical BOM.
- * Results are saved to the parts and bom_lines tables.
+ * @description Progressive two-phase flow with batched expansion:
+ *   Phase 1: `skeletonBom` — fast ~10s call returning part names + hierarchy
+ *            (max_tokens 2048, cheap to retry, unlikely to truncate).
+ *   Phase 2: Split skeleton parts into batches of up to EXPAND_BATCH_SIZE (15)
+ *            and fan out up to EXPAND_CONCURRENCY (3) in parallel. Each batch
+ *            returns full specs for its subset.
+ *   Phase 3: Merge skeleton + expansions into validated parts; save to DB.
+ *
+ * ROOT CAUSE this replaces: the prior monolithic implementation made ONE
+ * Claude call to expand all modules' keyParts into structured parts with
+ * full specs. For a 9-module project with ~45 parts, the response exceeded
+ * the 8192 max_tokens cap and truncated mid-JSON, producing
+ * `"Failed to parse BOM generation response"` at 84s. Concurrent-serial
+ * generation on Opus also wall-clocked 226s+, which burns Vercel's 300s cap.
+ *
+ * Partial-success recovery: if SOME batches fail expansion, parts for those
+ * batches are still saved with skeleton-only data (process + isPurchased
+ * known; specs blank with aiConfidence=0). The run reports success; the UI
+ * shows the expanded parts normally and the unexpanded parts as
+ * "specs pending" — same pattern as `run-max-decomposition.ts`.
  *
  * SECURITY: AI response is parsed and validated BEFORE any existing data is
  * deleted, preventing data loss from malformed responses. Delete errors are
@@ -430,6 +706,10 @@ export async function generateBomFromModules(
   designBrief?: CadLabDesignBrief,
   diagnosticAnswers?: DiagnosticAnswers,
 ): Promise<BomGenerationResult | { error: string }> {
+  // NOTE: skeletonBom + the internal batch expansion calls already wrap
+  // themselves in withAIGate. We use withAIGate here only for the
+  // orchestration shell to ensure limit enforcement and obtain the shared
+  // supabase client for the delete + insert persistence phase.
   return withAIGate('bom', async ({ supabase }) => {
     const start = Date.now()
 
@@ -448,195 +728,117 @@ export async function generateBomFromModules(
       return { success: false, error: "Project not found" }
     }
 
-    // ── Build AI prompt (with truncated user inputs) ──
-
-    const moduleDescriptions = modules.map((m) => {
-      const diagInfo = diagnosticAnswers?.[m.id]
-        ? `\nDiagnostic answers: ${JSON.stringify(diagnosticAnswers[m.id])}`
-        : ""
-      const massInfo = m.result?.massGrams
-        ? `\nEstimated mass: ${m.result.massGrams}g`
-        : ""
-      const bboxInfo = m.result?.bbox
-        ? `\nBounding box: ${m.result.bbox.xLen}×${m.result.bbox.yLen}×${m.result.bbox.zLen}mm`
-        : ""
-
-      // SECURITY: Truncate user-controlled strings to limit prompt injection surface
-      return `## Module: ${truncate(m.name, 100)} (id: ${truncate(m.id, 50)})
-Purpose: ${truncate(m.purpose, MAX_PROMPT_FIELD_LENGTH)}
-Key Parts: ${m.keyParts.map((p) => truncate(p, 100)).join(", ")}
-Description: ${truncate(m.description, MAX_PROMPT_FIELD_LENGTH)}${massInfo}${bboxInfo}${diagInfo}`
-    }).join("\n\n")
-
-    const briefContext = designBrief
-      ? `\n\nDesign Brief:
-- Use case: ${truncate(designBrief.useCase, 200) || "not specified"}
-- Target process: ${truncate(designBrief.targetProcess, 100) || "not specified"}
-- Target material: ${truncate(designBrief.targetMaterial, 100) || "not specified"}
-- Tolerance: ${truncate(designBrief.toleranceTarget, 100) || "not specified"}
-- Quantity: ${truncate(designBrief.quantityTarget, 100) || "not specified"}
-- Compliance: ${truncate(designBrief.complianceNotes, 200) || "none"}`
-      : ""
-
-    // INTENT: Fetch real component catalogue to ground purchased parts in real products
-    const allKeyParts = modules.flatMap((m) => m.keyParts)
-    const domain = detectDomainFromKeyParts(allKeyParts)
-    const keywords = await extractSearchKeywords(modules)
-    const catalogueRef = await fetchCatalogueForPrompt(domain, keywords)
-
-    const systemPrompt = `You are a manufacturing engineer creating a structured Bill of Materials (BOM) from product module decomposition data.
-${catalogueRef ? `
-REAL COMPONENT CATALOGUE — USE FOR PURCHASED PARTS:
-${catalogueRef}
-
-CATALOGUE RULES:
-- For purchased/COTS parts, check catalogue FIRST
-- If match exists: use exact manufacturer, MPN, and catalogue price for estimatedUnitCostGbp
-- If no match: describe generically with specific specs
-- Never invent part numbers — use real MPNs or descriptive codes
-` : ""}
-Your task:
-1. Expand each module's keyParts into structured parts with manufacturing specifications
-2. Create one assembly-level part per module (acts as parent in the BOM hierarchy)
-3. Deduplicate shared parts across modules (common fasteners, bearings, connectors)
-4. Mark purchased/COTS parts (standard bolts, bearings, electronics, etc.)
-5. Assign part numbers using the pattern: {MODULE_PREFIX}-{SEQ} (e.g., FRAME-001, FRAME-002)
-   - Assembly parts use -ASY suffix (e.g., FRAME-ASY)
-   - Purchased parts use -PUR suffix (e.g., FAST-PUR-001)
-
-For each part, estimate:
-- Manufacturing process (cnc, injection_molding, sheet_metal, 3d_print_fdm, 3d_print_sla, 3d_print_sls, casting, forging, machining, purchased_cots, other)
-- Material and material spec
-- Surface finish
-- Tolerance (default ±0.5mm for 3D printed, ±0.1mm for CNC, ±0.05mm for precision)
-- Mass in kg (estimate from volume and material density; must be >= 0)
-- Bounding envelope in mm (must be >= 0)
-- Unit cost in GBP (rough estimate based on process and size; must be >= 0)
-
-IMPORTANT: Do NOT create circular BOM references (e.g., part A containing part B which contains part A). Each assembly part should only appear once as a parent.
-
-Respond with ONLY valid JSON matching this exact schema:
-{
-  "parts": [
-    {
-      "partNumber": "string",
-      "name": "string",
-      "description": "string",
-      "sourceModuleId": "string (module id)",
-      "process": "enum value",
-      "material": "string",
-      "materialSpec": "string",
-      "finish": "string",
-      "tolerance": "string",
-      "massKg": number,
-      "envelopeXMm": number,
-      "envelopeYMm": number,
-      "envelopeZMm": number,
-      "estimatedUnitCostGbp": number,
-      "isPurchased": boolean,
-      "aiConfidence": number (0-1)
-    }
-  ],
-  "bomLines": [
-    {
-      "parentPartNumber": "string (assembly part number, or null for top-level)",
-      "childPartNumber": "string",
-      "quantity": number,
-      "referenceDesignator": "string (optional)",
-      "notes": "string (optional)"
-    }
-  ]
-}`
-
-    const userPrompt = `Generate a structured BOM for the product "${truncate(project.subject, 200)}" with these modules:
-
-${moduleDescriptions}${briefContext}
-
-Create structured parts and hierarchical BOM lines. Deduplicate common fasteners and purchased components.`
-
-    // ── Call Claude ──
-
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       return { success: false, error: "Anthropic API key not configured" }
     }
 
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+    // ── Phase 1: Skeleton ──
+    // Fast call (~10s) returning part names, hierarchy, process, isPurchased.
+    // If skeleton itself fails the whole run fails — there's no useful fallback.
+    const skeleton = await skeletonBom(projectId, modules, designBrief, diagnosticAnswers)
+    if (!skeleton.success || !skeleton.parts.length) {
+      return {
+        success: false,
+        error: skeleton.error ?? "Failed to generate BOM skeleton",
+      }
+    }
 
-    const response = await client.messages.create({
-      model: BOM_MODEL,
-      max_tokens: BOM_MAX_TOKENS,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+    // ── Phase 2: Batched expansion ──
+    // Build shared prompt context once (catalogue fetch is expensive and
+    // deterministic across batches).
+    const briefContext = designBrief
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
+      : ""
+
+    const moduleContext = modules.map((m) => {
+      const diagInfo = diagnosticAnswers?.[m.id]
+        ? ` | Diagnostics: ${JSON.stringify(diagnosticAnswers[m.id])}`
+        : ""
+      return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${diagInfo}`
+    }).join("\n")
+
+    const allKeyParts = modules.flatMap((m) => m.keyParts)
+    const domain = detectDomainFromKeyParts(allKeyParts)
+    const keywords = await extractSearchKeywords(modules)
+    const catalogueRef = await fetchCatalogueForPrompt(domain, keywords)
+
+    const batches = chunkArray(skeleton.parts, EXPAND_BATCH_SIZE)
+    const batchResults = await runWithConcurrency(
+      batches,
+      EXPAND_CONCURRENCY,
+      (batch) => expandBomPartsBatchInternal({
+        apiKey,
+        batchParts: batch,
+        moduleContext,
+        briefContext,
+        catalogueRef,
+      }),
+    )
+
+    // Merge all successful expansions. Failed batches leave their parts
+    // without expansions — filled with skeleton-only defaults below.
+    const mergedExpansions: BomExpansionResult["expansions"] = {}
+    let failedBatchCount = 0
+    for (const result of batchResults) {
+      if (result.success) {
+        Object.assign(mergedExpansions, result.expansions)
+      } else {
+        failedBatchCount += 1
+      }
+    }
+
+    // If EVERY batch failed, the run isn't recoverable. Return the first
+    // error so the pipeline_run gets a useful message.
+    if (failedBatchCount === batchResults.length && batchResults.length > 0) {
+      const firstErr = batchResults.find((r) => !r.success)?.error
+      return {
+        success: false,
+        error: firstErr ?? "Failed to parse BOM generation response",
+      }
+    }
+
+    // ── Phase 3: Merge skeleton + expansions → validated parts ──
+    // Every skeleton part gets a row. If its expansion is missing (batch
+    // failed), we save with skeleton-only fields and aiConfidence=0 so the
+    // UI can show a "specs pending" hint.
+    const validatedParts = skeleton.parts.map((s) => {
+      const exp = mergedExpansions[s.partNumber]
+      return {
+        partNumber: s.partNumber,
+        name: s.name,
+        description: exp?.description ? truncate(exp.description, 500) : null,
+        sourceModuleId: s.sourceModuleId || null,
+        process: validateProcess(s.process),
+        material: exp?.material ? truncate(exp.material, 200) : null,
+        materialSpec: exp?.materialSpec ? truncate(exp.materialSpec, 200) : null,
+        finish: exp?.finish ? truncate(exp.finish, 200) : null,
+        tolerance: exp?.tolerance ? truncate(exp.tolerance, 100) : null,
+        massKg: exp?.massKg ?? null,
+        envelopeXMm: exp?.envelopeXMm ?? null,
+        envelopeYMm: exp?.envelopeYMm ?? null,
+        envelopeZMm: exp?.envelopeZMm ?? null,
+        estimatedUnitCostGbp: exp?.estimatedUnitCostGbp ?? null,
+        isPurchased: s.isPurchased,
+        // If no expansion: aiConfidence=0 tells the UI "this part is
+        // skeleton-only, needs a spec pass".
+        aiConfidence: exp?.aiConfidence ?? 0,
+      }
     })
 
-    // Extract text response
-    const textBlock = response.content.find((b) => b.type === "text")
-    if (!textBlock || textBlock.type !== "text") {
-      return { success: false, error: "No text response from Claude" }
-    }
-
-    // Parse JSON from response (robust extraction handles prose around JSON)
-    const jsonStr = extractJson(textBlock.text)
-
-    let parsed: {
-      parts: Array<Record<string, unknown>>
-      bomLines: Array<Record<string, unknown>>
-    }
-
-    try {
-      parsed = JSON.parse(jsonStr)
-    } catch {
-      console.error("[generateBomFromModules] Failed to parse AI response:", jsonStr.slice(0, 200))
-      return { success: false, error: "Failed to parse BOM generation response" }
-    }
-
-    if (!Array.isArray(parsed.parts) || !parsed.parts.length) {
-      return { success: false, error: "No parts generated" }
-    }
-
-    if (!Array.isArray(parsed.bomLines)) {
-      parsed.bomLines = []
-    }
-
-    // ── Validate and sanitize AI output ──
-    // SECURITY: Validate all values before inserting into DB
-
-    const validatedParts = parsed.parts.map((p) => ({
-      partNumber: truncate(String(p.partNumber ?? ""), 50),
-      name: truncate(String(p.name ?? ""), 200),
-      description: truncate(String(p.description ?? ""), 500) || null,
-      sourceModuleId: truncate(String(p.sourceModuleId ?? ""), 50) || null,
-      process: validateProcess(p.process),
-      material: truncate(String(p.material ?? ""), 200) || null,
-      materialSpec: truncate(String(p.materialSpec ?? ""), 200) || null,
-      finish: truncate(String(p.finish ?? ""), 200) || null,
-      tolerance: truncate(String(p.tolerance ?? ""), 100) || null,
-      massKg: clampPositive(p.massKg),
-      envelopeXMm: clampPositive(p.envelopeXMm),
-      envelopeYMm: clampPositive(p.envelopeYMm),
-      envelopeZMm: clampPositive(p.envelopeZMm),
-      estimatedUnitCostGbp: clampPositive(p.estimatedUnitCostGbp),
-      isPurchased: Boolean(p.isPurchased),
-      aiConfidence: typeof p.aiConfidence === "number"
-        ? Math.max(0, Math.min(1, p.aiConfidence))
-        : null,
-    }))
-
-    // Check for duplicate part numbers
+    // Duplicate check — skeleton already guards this, but defence in depth.
     const partNumbers = new Set<string>()
     for (const p of validatedParts) {
       if (!p.partNumber) {
-        return { success: false, error: "AI generated a part without a part number" }
+        return { success: false, error: "Skeleton returned a part without a part number" }
       }
       if (partNumbers.has(p.partNumber)) {
-        return { success: false, error: `AI generated duplicate part number: ${p.partNumber}` }
+        return { success: false, error: `Duplicate part number: ${p.partNumber}` }
       }
       partNumbers.add(p.partNumber)
     }
 
-    // ── NOW safe to delete existing data (AI response validated) ──
+    // ── NOW safe to delete existing data (response validated) ──
 
     const { error: bomDelErr } = await supabase
       .from("bom_lines")
@@ -697,13 +899,13 @@ Create structured parts and hierarchical BOM lines. Deduplicate common fasteners
       partNumberToId.set(p.part_number, p.id)
     }
 
-    // ── Insert BOM lines ──
+    // ── Insert BOM lines (from skeleton hierarchy) ──
 
     let droppedLineCount = 0
-    const bomLinesToInsert = parsed.bomLines
+    const bomLinesToInsert = skeleton.bomLines
       .map((bl, idx) => {
-        const childPartNumber = String(bl.childPartNumber ?? "")
-        const parentPartNumber = bl.parentPartNumber ? String(bl.parentPartNumber) : null
+        const childPartNumber = bl.childPartNumber
+        const parentPartNumber = bl.parentPartNumber
         const childId = partNumberToId.get(childPartNumber)
         const parentId = parentPartNumber ? partNumberToId.get(parentPartNumber) : null
 
@@ -720,17 +922,13 @@ Create structured parts and hierarchical BOM lines. Deduplicate common fasteners
           return null
         }
 
-        const qty = typeof bl.quantity === "number" && bl.quantity > 0
-          ? Math.round(bl.quantity)
-          : 1
-
         return {
           cad_lab_project_id: projectId,
           parent_part_id: parentId ?? null,
           child_part_id: childId,
-          quantity: qty,
-          reference_designator: truncate(String(bl.referenceDesignator ?? ""), 100) || null,
-          notes: truncate(String(bl.notes ?? ""), 500) || null,
+          quantity: bl.quantity,
+          reference_designator: null as string | null,
+          notes: null as string | null,
           sort_order: idx,
         }
       })
@@ -747,8 +945,8 @@ Create structured parts and hierarchical BOM lines. Deduplicate common fasteners
 
       if (bomInsertErr) {
         console.error("[generateBomFromModules] Failed to insert BOM lines:", bomInsertErr)
-        // DECISION: Parts are already inserted. Return partial success rather than
-        // leaving the user with parts but no hierarchy and a confusing error.
+        // DECISION: Parts are already inserted. Return partial success rather
+        // than leaving the user with parts but no hierarchy + a confusing error.
         return { success: false, error: "Parts saved but BOM hierarchy failed. Try regenerating." }
       }
     }
