@@ -38,7 +38,7 @@ import {
 import { cn } from "@/lib/utils"
 
 // Mirrors the DB enum; if the migration changes, update here.
-export type CadFormat = "step" | "stl" | "dxf" | "dwg"
+export type CadFormat = "step" | "stl" | "dxf"
 export type ParseStatus = "pending" | "parsing" | "parsed" | "failed"
 
 export interface CadUploadedFile {
@@ -77,7 +77,7 @@ const MATERIAL_OPTIONS = [
   "Copper",
 ] as const
 
-const ACCEPT_EXT = ".step,.stp,.stl,.dxf,.dwg"
+const ACCEPT_EXT = ".step,.stp,.stl,.dxf"
 const MAX_MB = 50
 
 export function CadUploadPanel({
@@ -168,7 +168,7 @@ export function CadUploadPanel({
           </span>
           <div className="space-y-1">
             <p className="text-sm font-semibold text-foreground">
-              Drop a STEP, STL, DXF, or DWG file here
+              Drop a STEP, STL, or DXF file here
             </p>
             <p className="text-[12px] text-muted-foreground">
               Up to {MAX_MB} MB. Parsed on upload — bounding box, volume, part count.
@@ -192,8 +192,7 @@ export function CadUploadPanel({
             {uploading ? "Uploading…" : "Choose file"}
           </Button>
           <p className="text-[11px] text-muted-foreground italic">
-            DWG parsing is pending a licensing decision — you can upload, but
-            we won&apos;t extract geometry yet. Export to DXF or STEP for full parsing.
+            Upload STEP, STL, or DXF. (DWG → export as DXF in your CAD tool.)
           </p>
         </div>
 
@@ -265,7 +264,7 @@ export function CadUploadPanel({
             <Boxes className="h-5 w-5" />
           </span>
           <p className="text-sm text-muted-foreground max-w-sm">
-            No CAD files yet. Drop a STEP, STL, DXF, or DWG to unlock geometry-aware
+            No CAD files yet. Drop a STEP, STL, or DXF to unlock geometry-aware
             modules, BOM, costing, and supplier matching.
           </p>
         </div>
@@ -314,7 +313,6 @@ function FormatChip({ format }: { format: CadFormat }): React.ReactElement {
     step: "bg-international-orange/10 text-international-orange border-international-orange/30",
     stl: "bg-electric-blue/10 text-electric-blue border-electric-blue/30",
     dxf: "bg-status-warning-light text-status-warning border-status-warning/30",
-    dwg: "bg-muted text-muted-foreground border-border",
   }
   return (
     <span
