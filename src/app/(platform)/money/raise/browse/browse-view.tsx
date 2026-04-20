@@ -9,7 +9,7 @@
  */
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,11 +24,28 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Search, Plus, Check, ExternalLink, X, Sparkles } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  Check,
+  ExternalLink,
+  X,
+  Sparkles,
+  LayoutGrid,
+  Table as TableIcon,
+  MapPin,
+} from 'lucide-react'
 import { addInvestorToPipeline } from '@/actions/money-raise'
 import type { MatchBreakdown, RichInvestorFilters, ScoredListingRow } from '@/lib/money/match-types'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 import { ExportMenu } from '@/app/(platform)/money/raise/_shared/export-menu'
+import {
+  CompareTray,
+  MAX_COMPARE,
+} from '@/app/(platform)/money/raise/_shared/compare-tray'
+import { CompareDialog } from '@/app/(platform)/money/raise/_shared/compare-dialog'
+import { InvestorTableView } from './table-view'
+import { InvestorMapView } from './map-view'
 import {
   FilterPanel,
   buildBrowseQuery,
@@ -40,6 +57,18 @@ import {
 } from './filter-panel'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+
+// ---------------------------------------------------------------------------
+// View mode — grid (default) | table | map. Drives a client-only render swap;
+// the server fetches the same `results` array regardless.
+// ---------------------------------------------------------------------------
+
+type ViewMode = 'grid' | 'table' | 'map'
+
+function parseViewMode(v: string | null | undefined): ViewMode {
+  if (v === 'table' || v === 'map') return v
+  return 'grid'
+}
 
 // ---------------------------------------------------------------------------
 // MatchScoreBadge — duplicated from /money/raise/for-you per spec (the for-you
@@ -218,6 +247,8 @@ function InvestorCard({
   alreadyInPipeline,
   isAdding,
   onAdd,
+  isCompareSelected,
+  onToggleCompare,
 }: {
   row: ScoredListingRow
   scoreEntry: { total: number; breakdown: MatchBreakdown } | null
@@ -225,6 +256,8 @@ function InvestorCard({
   alreadyInPipeline: boolean
   isAdding: boolean
   onAdd: (listingId: string) => void
+  isCompareSelected: boolean
+  onToggleCompare: (listingId: string) => void
 }) {
   const chequeRange = formatChequeRange(row.highlights.cheque_range_gbp)
   const stages = (row.highlights.stage_focus ?? []).slice(0, 3)
@@ -232,7 +265,12 @@ function InvestorCard({
   const loc = [row.city, row.country_iso ?? row.country].filter(Boolean).join(' · ')
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card
+      className={cn(
+        'flex h-full flex-col',
+        isCompareSelected && 'ring-2 ring-international-orange/60',
+      )}
+    >
       <CardContent className="flex flex-1 flex-col gap-3 py-5">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
@@ -336,14 +374,75 @@ function InvestorCard({
               {isAdding ? 'Adding…' : 'Add to pipeline'}
             </Button>
           )}
-          <Link href={`/money/raise/investor/${row.id}`}>
-            <Button size="sm" variant="ghost">
-              View details
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant={isCompareSelected ? 'secondary' : 'ghost'}
+              onClick={() => onToggleCompare(row.id)}
+              aria-pressed={isCompareSelected}
+              aria-label={isCompareSelected ? 'Remove from compare' : 'Add to compare'}
+            >
+              {isCompareSelected ? 'In compare' : 'Compare'}
             </Button>
-          </Link>
+            <Link href={`/money/raise/investor/${row.id}`}>
+              <Button size="sm" variant="ghost">
+                View
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ViewToggle — icon-button group for switching between grid/table/map. Used
+// in the header row next to the sort select.
+// ---------------------------------------------------------------------------
+
+function ViewToggle({
+  current,
+  onChange,
+}: {
+  current: ViewMode
+  onChange: (next: ViewMode) => void
+}) {
+  const options: Array<{ value: ViewMode; label: string; Icon: typeof LayoutGrid }> = [
+    { value: 'grid', label: 'Grid', Icon: LayoutGrid },
+    { value: 'table', label: 'Table', Icon: TableIcon },
+    { value: 'map', label: 'Map', Icon: MapPin },
+  ]
+  return (
+    <div
+      role="group"
+      aria-label="View mode"
+      className="inline-flex rounded-md border border-border bg-background p-0.5"
+    >
+      {options.map(({ value, label, Icon }) => {
+        const active = current === value
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChange(value)}
+            aria-pressed={active}
+            aria-label={`${label} view`}
+            title={`${label} view`}
+            className={cn(
+              'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors',
+              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+              active
+                ? 'bg-international-orange text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -363,6 +462,7 @@ export function BrowseInvestorsView({
   initial,
 }: BrowseViewProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [addingId, setAddingId] = useState<string | null>(null)
   const [q, setQ] = useState(initial.q)
@@ -370,6 +470,68 @@ export function BrowseInvestorsView({
     () => new Set(alreadyInPipelineIds),
   )
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // View mode (grid | table | map) — synced to the `view` URL param.
+  const view = parseViewMode(searchParams?.get('view'))
+
+  // Compare selection — pure client state. Stores whole rows so tray chips +
+  // the compare dialog survive pagination (the server-provided `results`
+  // array only contains the current page). Persisting via URL is out of
+  // scope per the spec.
+  const [comparedRows, setComparedRows] = useState<Map<string, ScoredListingRow>>(
+    () => new Map(),
+  )
+  const [compareOpen, setCompareOpen] = useState(false)
+
+  const comparedIds = useMemo(() => new Set(comparedRows.keys()), [comparedRows])
+  const comparedList = useMemo(() => Array.from(comparedRows.values()), [comparedRows])
+
+  const pushView = (next: ViewMode) => {
+    // Preserve every other URL param; only mutate `view`.
+    const params = new URLSearchParams(searchParams?.toString() ?? '')
+    if (next === 'grid') {
+      params.delete('view')
+    } else {
+      params.set('view', next)
+    }
+    const qs = params.toString()
+    router.push(`/money/raise/browse${qs ? `?${qs}` : ''}`)
+  }
+
+  const toggleCompare = (id: string) => {
+    setComparedRows((prev) => {
+      const next = new Map(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else if (next.size < MAX_COMPARE) {
+        const row = results.find((r) => r.id === id)
+        if (row) next.set(id, row)
+      } else {
+        toast.info(`You can compare up to ${MAX_COMPARE} investors at once.`)
+        return prev
+      }
+      return next
+    })
+  }
+
+  const removeFromCompare = (id: string) => {
+    setComparedRows((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Map(prev)
+      next.delete(id)
+      return next
+    })
+  }
+
+  const clearCompare = () => setComparedRows(new Map())
+
+  const openCompare = () => {
+    if (comparedList.length < 2) {
+      toast.info('Select at least 2 investors to compare.')
+      return
+    }
+    setCompareOpen(true)
+  }
 
   // Keep local `q` state aligned when server-side reloads change the URL.
   useEffect(() => {
@@ -556,6 +718,7 @@ export function BrowseInvestorsView({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ViewToggle current={view} onChange={pushView} />
           <Label htmlFor="browse-sort" className="text-xs text-muted-foreground">
             Sort
           </Label>
@@ -663,7 +826,7 @@ export function BrowseInvestorsView({
             </Link>
           </div>
 
-          {/* Results */}
+          {/* Results — render swap based on selected view mode. */}
           {results.length === 0 ? (
             <Card>
               <CardContent className="py-12">
@@ -684,6 +847,17 @@ export function BrowseInvestorsView({
                 />
               </CardContent>
             </Card>
+          ) : view === 'table' ? (
+            <InvestorTableView
+              results={results}
+              hasActiveThesis={hasActiveThesis}
+              scoresByListingId={scoresByListingId}
+              currentTier={currentTier}
+              onToggleCompare={toggleCompare}
+              comparedIds={comparedIds}
+            />
+          ) : view === 'map' ? (
+            <InvestorMapView results={results} />
           ) : (
             <>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -698,6 +872,8 @@ export function BrowseInvestorsView({
                       alreadyInPipeline={pipelineIds.has(row.id)}
                       isAdding={isPending && addingId === row.id}
                       onAdd={handleAdd}
+                      isCompareSelected={comparedIds.has(row.id)}
+                      onToggleCompare={toggleCompare}
                     />
                   )
                 })}
@@ -734,6 +910,22 @@ export function BrowseInvestorsView({
           </div>
         </div>
       </div>
+
+      {/* Compare tray — sticky bottom bar, shown when ≥1 investor selected. */}
+      <CompareTray
+        investors={comparedList}
+        onRemove={removeFromCompare}
+        onClear={clearCompare}
+        onCompare={openCompare}
+      />
+
+      {/* Compare dialog — rendered only when open + ≥2 selected. */}
+      <CompareDialog
+        open={compareOpen}
+        investors={comparedList}
+        scoresByListingId={scoresByListingId}
+        onClose={() => setCompareOpen(false)}
+      />
     </div>
   )
 }
