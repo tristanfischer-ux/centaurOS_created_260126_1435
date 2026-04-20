@@ -498,3 +498,222 @@
   margin-top: 6px;
 }
 .c2-quote-empty strong { color: var(--c-fg); font-weight: 600; }
+
+/* ─── Empty state ───────────────────────────────────────────────────────
+ * Renders when the project has no cost estimates yet (no modules with
+ * AI cost data). Ports FORGE-MOCKUP-EMPTY-COST.html 1:1 — honest £0
+ * headline, "not set" ceiling, four-source explainer, and a placeholder
+ * waterfall so founders see the structure before it fills in.
+ */
+.c2-empty-sub {
+  font-size: 13px;
+  color: var(--c-fg-muted);
+  margin: -8px 0 22px;
+}
+
+.c2-empty-hero {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  padding: 28px 32px;
+  margin-bottom: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 24px;
+  align-items: center;
+  box-shadow: var(--c-shadow-xs);
+}
+@media (max-width: 900px) {
+  .c2-empty-hero { grid-template-columns: 1fr 1fr; }
+  .c2-empty-hero .set-cta { grid-column: 1 / -1; justify-self: start; }
+}
+.c2-empty-hero .metric .k {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-fg-muted);
+  margin-bottom: 6px;
+}
+.c2-empty-hero .metric .v {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--c-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.c2-empty-hero .metric .detail {
+  font-size: 12px;
+  color: var(--c-fg-muted);
+  margin-top: 4px;
+}
+.c2-empty-hero .metric.ceiling .v {
+  color: var(--c-fg-subtle);
+  font-style: italic;
+}
+.c2-empty-hero .set-cta {
+  background: var(--c-brand);
+  color: #fff;
+  text-decoration: none;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13.5px;
+  white-space: nowrap;
+  transition: background 0.15s;
+  border: none;
+  cursor: pointer;
+  display: inline-block;
+}
+.c2-empty-hero .set-cta:hover { background: #e63b00; }
+
+.c2-empty-explainer {
+  background: var(--c-brand-soft);
+  border: 1px solid rgba(255, 69, 0, 0.25);
+  border-left: 3px solid var(--c-brand);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .c2-empty-explainer { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 540px) {
+  .c2-empty-explainer { grid-template-columns: 1fr; }
+}
+.c2-empty-explainer-title {
+  grid-column: 1 / -1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-fg);
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+.c2-empty-explainer-title strong {
+  color: var(--c-brand);
+  font-weight: 700;
+}
+.c2-empty-source {
+  font-size: 12px;
+  color: var(--c-fg);
+  line-height: 1.5;
+}
+.c2-empty-source .sk {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-brand);
+  margin-bottom: 4px;
+}
+.c2-empty-source .status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 100%;
+  background: var(--c-fg-faint);
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.c2-empty-source strong {
+  color: var(--c-fg);
+  font-weight: 600;
+}
+.c2-empty-source .empty-note {
+  color: var(--c-fg-muted);
+  font-style: italic;
+  margin-top: 2px;
+}
+.c2-empty-source .empty-note a {
+  color: var(--c-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+.c2-empty-source .empty-note a:hover { text-decoration: underline; }
+
+.c2-empty-waterfall {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--c-shadow-xs);
+}
+.c2-empty-waterfall .head {
+  background: var(--c-surface-muted);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+.c2-empty-waterfall .head h3 {
+  font-size: 13px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.c2-empty-waterfall .head .sub {
+  font-size: 12px;
+  color: var(--c-fg-muted);
+}
+.c2-empty-waterfall table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.c2-empty-waterfall th {
+  padding: 11px 20px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-fg-muted);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-soft);
+}
+.c2-empty-waterfall td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.c2-empty-waterfall td.placeholder {
+  font-style: italic;
+  color: var(--c-fg-subtle);
+}
+.c2-empty-waterfall td.num {
+  text-align: right;
+  font-weight: 600;
+}
+.c2-empty-waterfall tr.total {
+  background: var(--c-surface-muted);
+  font-weight: 700;
+}
+.c2-empty-waterfall tr.total td {
+  color: var(--c-fg);
+  border-bottom: none;
+}
+.c2-empty-waterfall .overlay {
+  padding: 32px 20px;
+  text-align: center;
+  border-top: 1px dashed var(--c-border);
+  background: var(--c-surface-muted);
+}
+.c2-empty-waterfall .overlay p {
+  font-size: 13px;
+  color: var(--c-fg-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+.c2-empty-waterfall .overlay a {
+  color: var(--c-brand);
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 6px;
+}
+.c2-empty-waterfall .overlay a:hover { text-decoration: underline; }

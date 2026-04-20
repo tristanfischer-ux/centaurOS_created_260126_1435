@@ -135,6 +135,172 @@ export function CostView(props: CostViewProps): React.ReactElement {
 
     const base = `/the-forge-v2/projects/${project.id}`
 
+    // ── Empty state ──────────────────────────────────────────────
+    // Fires when the project has no AI cost estimates yet (and therefore
+    // no modules with a known cost roll-up). Keeps the page honest:
+    // £0 headline, "not set" ceiling, four-source explainer, placeholder
+    // waterfall. Mirrors FORGE-MOCKUP-EMPTY-COST.html 1:1.
+    const isEmpty = rows.length === 0 && unitBomGbp == null
+    if (isEmpty) {
+        return (
+            <div className="c2">
+                {/* ── Breadcrumb ──────────────────────────── */}
+                <div className="c2-breadcrumb">
+                    <Link href="/the-forge-v2">Forge</Link>
+                    <span className="sep">›</span>
+                    <Link href={base}>{project.name}</Link>
+                    <span className="sep">›</span>
+                    <span className="current">Cost</span>
+                </div>
+
+                {/* ── Page header ─────────────────────────── */}
+                <div className="c2-page-header">
+                    <div>
+                        <h1>
+                            <span className="c2-title-dot" aria-hidden="true" />
+                            Unit cost
+                            <span className="c2-chip neutral solid" style={{ marginLeft: 6 }}>
+                                Envelope not set
+                            </span>
+                        </h1>
+                    </div>
+                </div>
+                <div className="c2-empty-sub">
+                    Live unit cost: BOM + NRE + overhead, traced to every contributing line.
+                </div>
+
+                {/* ── Hero strip ──────────────────────────── */}
+                <div className="c2-empty-hero">
+                    <div className="metric">
+                        <div className="k">Cost per unit</div>
+                        <div className="v">£0</div>
+                        <div className="detail">All sources empty</div>
+                    </div>
+                    <div className="metric ceiling">
+                        <div className="k">Target ceiling</div>
+                        <div className="v">—</div>
+                        <div className="detail">Pulled from your Brief once set</div>
+                    </div>
+                    <div className="metric">
+                        <div className="k">Headroom</div>
+                        <div className="v">n/a</div>
+                        <div className="detail">Ceiling − unit cost</div>
+                    </div>
+                    <Link href={`${base}/brief`} className="set-cta">
+                        Set your cost envelope →
+                    </Link>
+                </div>
+
+                {/* ── Explainer — four sources ────────────── */}
+                <div className="c2-empty-explainer">
+                    <div className="c2-empty-explainer-title">
+                        <strong>Your cost artefact pulls from four sources.</strong>{" "}
+                        Today all of them are empty — once any has data, it appears in the waterfall below.
+                    </div>
+
+                    <div className="c2-empty-source">
+                        <span className="sk">
+                            BOM <span className="status-dot" />
+                        </span>
+                        <strong>Live material &amp; part cost.</strong> Every line in the BOM contributes directly.
+                        <div className="empty-note">
+                            No BOM lines yet ·{" "}
+                            <Link href={`${base}/bom`}>add one →</Link>
+                        </div>
+                    </div>
+
+                    <div className="c2-empty-source">
+                        <span className="sk">
+                            Suppliers <span className="status-dot" />
+                        </span>
+                        <strong>Quoted unit prices.</strong> Replaces list prices once supplier quotes come in.
+                        <div className="empty-note">No suppliers shortlisted yet</div>
+                    </div>
+
+                    <div className="c2-empty-source">
+                        <span className="sk">
+                            NRE <span className="status-dot" />
+                        </span>
+                        <strong>Non-recurring engineering.</strong> Tooling, first-article inspection, cert fees — amortised over the batch.
+                        <div className="empty-note">No NRE entries</div>
+                    </div>
+
+                    <div className="c2-empty-source">
+                        <span className="sk">
+                            Cash Burn <span className="status-dot" />
+                        </span>
+                        <strong>Allocated overhead.</strong> Share of monthly burn attributed to this project.
+                        <div className="empty-note">Cash Burn not connected · soon</div>
+                    </div>
+                </div>
+
+                {/* ── Empty waterfall ─────────────────────── */}
+                <div className="c2-empty-waterfall">
+                    <div className="head">
+                        <h3>Cost waterfall — unit build-up</h3>
+                        <span className="sub">BOM → Suppliers → NRE → Overhead → Unit cost</span>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bucket</th>
+                                <th>Source</th>
+                                <th>Lines</th>
+                                <th className="num" style={{ textAlign: "right" }}>Per unit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="placeholder">Direct material</td>
+                                <td className="placeholder">BOM (live)</td>
+                                <td className="placeholder">—</td>
+                                <td className="num">£0.00</td>
+                            </tr>
+                            <tr>
+                                <td className="placeholder">Direct labour</td>
+                                <td className="placeholder">Assembly plan</td>
+                                <td className="placeholder">—</td>
+                                <td className="num">£0.00</td>
+                            </tr>
+                            <tr>
+                                <td className="placeholder">Tooling &amp; NRE (amortised)</td>
+                                <td className="placeholder">Manual entry</td>
+                                <td className="placeholder">—</td>
+                                <td className="num">£0.00</td>
+                            </tr>
+                            <tr>
+                                <td className="placeholder">Certification &amp; compliance</td>
+                                <td className="placeholder">Launch artefact</td>
+                                <td className="placeholder">—</td>
+                                <td className="num">£0.00</td>
+                            </tr>
+                            <tr>
+                                <td className="placeholder">Allocated overhead</td>
+                                <td className="placeholder">Cash Burn · soon</td>
+                                <td className="placeholder">—</td>
+                                <td className="num">£0.00</td>
+                            </tr>
+                            <tr className="total">
+                                <td>Unit cost</td>
+                                <td />
+                                <td />
+                                <td className="num">£0.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div className="overlay">
+                        <p>
+                            Rows will populate and numbers will roll up as each source gets its first entry.{" "}
+                            <Link href={`${base}/bom`}>Start with BOM →</Link>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     // ── Ceiling comparison ───────────────────────────────────────
     const hasAllIn = allInGbp != null
     const hasCeiling = ceilingGbp != null
