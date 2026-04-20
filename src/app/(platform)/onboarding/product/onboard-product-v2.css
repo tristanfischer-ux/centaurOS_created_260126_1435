@@ -1,0 +1,327 @@
+/* Onboard-Product V2 — scoped stylesheet ported from
+   FORGE-MOCKUP-ONBOARD-PRODUCT.html. Every rule is prefixed with .opd2 so
+   nothing leaks to other pages. Token values mirror forge-mockup.css. */
+
+.opd2 {
+    --opd-bg: #fafaf9;
+    --opd-surface: #ffffff;
+    --opd-surface-muted: #f5f5f4;
+    --opd-border: #e7e5e4;
+    --opd-border-strong: #d6d3d1;
+    --opd-border-soft: #f0efed;
+    --opd-fg: #1c1917;
+    --opd-fg-muted: #78716c;
+    --opd-fg-faint: #d6d3d1;
+    --opd-brand: #ff4500;
+    --opd-brand-soft: #fff0ea;
+    --opd-brand-dim: #ffdcc7;
+    --opd-info: #2563eb;
+    --opd-info-soft: #dbeafe;
+    --opd-success: #16a34a;
+    --opd-shadow-md: 0 4px 16px rgba(28, 25, 23, 0.08);
+
+    position: relative;
+    background: var(--opd-bg);
+    color: var(--opd-fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text",
+        system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.55;
+    margin: -1rem;
+    padding: 0;
+    min-height: calc(100vh - 64px);
+}
+
+@media (min-width: 640px) {
+    .opd2 {
+        margin: -1.5rem -1.5rem -1.5rem -1.25rem;
+    }
+}
+@media (min-width: 1024px) {
+    .opd2 {
+        margin: -2rem -2rem -2rem -1.5rem;
+    }
+}
+
+.opd2 *,
+.opd2 *::before,
+.opd2 *::after {
+    box-sizing: border-box;
+}
+.opd2 h1,
+.opd2 h2,
+.opd2 h3,
+.opd2 p,
+.opd2 ul {
+    margin: 0;
+}
+.opd2 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* ── Skip link (top right) ─────────────────────────────────────────── */
+.opd2-skip-wrap {
+    position: absolute;
+    top: 18px;
+    right: 28px;
+    z-index: 5;
+}
+.opd2-skip-wrap a {
+    font-size: 12px;
+    color: var(--opd-fg-muted);
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: all 0.12s;
+}
+.opd2-skip-wrap a:hover {
+    color: var(--opd-fg);
+    background: var(--opd-surface-muted);
+}
+
+/* ── Centered content wrap ─────────────────────────────────────────── */
+.opd2-wrap {
+    max-width: 1040px;
+    margin: 32px auto 120px;
+    padding: 0 36px;
+    position: relative;
+}
+
+.opd2-eyebrow {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--opd-brand);
+    margin-bottom: 10px;
+}
+
+.opd2-title {
+    font-size: 28px;
+    letter-spacing: -0.025em;
+    margin: 0 0 8px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--opd-fg);
+}
+.opd2-title-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--opd-brand);
+    border-radius: 100%;
+    flex-shrink: 0;
+}
+
+.opd2-lead {
+    font-size: 14.5px;
+    color: var(--opd-fg-muted);
+    margin: 0 0 28px;
+    max-width: 640px;
+    line-height: 1.55;
+}
+
+/* ── Two-path grid ─────────────────────────────────────────────────── */
+.opd2-paths {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 26px;
+}
+@media (max-width: 780px) {
+    .opd2-paths {
+        grid-template-columns: 1fr;
+    }
+}
+
+.opd2-path-card {
+    background: var(--opd-surface);
+    border: 1px solid var(--opd-border);
+    border-radius: 14px;
+    padding: 26px 28px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    min-height: 320px;
+}
+.opd2-path-card:hover {
+    border-color: var(--opd-brand);
+    box-shadow: var(--opd-shadow-md);
+    transform: translateY(-1px);
+}
+.opd2-path-card:focus-visible {
+    outline: 2px solid var(--opd-brand);
+    outline-offset: 2px;
+}
+
+.opd2-path-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: var(--opd-brand-soft);
+    color: var(--opd-brand);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+.opd2-path-build .opd2-path-icon {
+    background: var(--opd-info-soft);
+    color: var(--opd-info);
+}
+
+.opd2-path-h {
+    font-size: 19px;
+    margin: 0 0 6px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--opd-fg);
+}
+
+.opd2-path-sub {
+    font-size: 13px;
+    color: var(--opd-fg-muted);
+    line-height: 1.55;
+    margin-bottom: 14px;
+}
+
+.opd2-path-list {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--opd-fg);
+    list-style: disc;
+}
+.opd2-path-list li {
+    margin-bottom: 3px;
+}
+.opd2-path-list li strong {
+    font-weight: 600;
+}
+
+.opd2-path-route {
+    margin-top: auto;
+    padding-top: 16px;
+    font-size: 12px;
+    color: var(--opd-brand);
+    font-weight: 600;
+    border-top: 1px solid var(--opd-border-soft);
+}
+.opd2-path-build .opd2-path-route {
+    color: var(--opd-info);
+}
+
+/* ── Not-sure demo card ────────────────────────────────────────────── */
+.opd2-not-sure {
+    background: var(--opd-surface-muted);
+    border: 1px dashed var(--opd-border-strong);
+    border-radius: 12px;
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+.opd2-ns-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--opd-surface);
+    border: 1px solid var(--opd-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--opd-brand);
+    flex-shrink: 0;
+}
+.opd2-ns-body {
+    flex: 1;
+    min-width: 0;
+}
+.opd2-ns-body h3 {
+    font-size: 14px;
+    margin: 0 0 3px;
+    font-weight: 700;
+    color: var(--opd-fg);
+}
+.opd2-ns-body p {
+    font-size: 12.5px;
+    color: var(--opd-fg-muted);
+    margin: 0;
+    line-height: 1.5;
+}
+.opd2-ns-cta {
+    background: var(--opd-surface);
+    border: 1px solid var(--opd-border-strong);
+    color: var(--opd-fg);
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.12s;
+}
+.opd2-ns-cta:hover {
+    border-color: var(--opd-brand);
+    color: var(--opd-brand);
+}
+.opd2-ns-cta:focus-visible {
+    outline: 2px solid var(--opd-brand);
+    outline-offset: 2px;
+}
+
+/* ── Skip-line (centered, subtle) ──────────────────────────────────── */
+.opd2-skip-line {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 12px;
+}
+.opd2-skip-line a {
+    color: var(--opd-fg-muted);
+    text-decoration: underline;
+}
+.opd2-skip-line a:hover {
+    color: var(--opd-fg);
+}
+
+/* ── Fixed footer bar ─────────────────────────────────────────────── */
+.opd2-foot-bar {
+    position: fixed;
+    bottom: 0;
+    left: 248px;
+    right: 0;
+    background: var(--opd-surface);
+    border-top: 1px solid var(--opd-border);
+    padding: 14px 36px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 90;
+}
+@media (max-width: 1024px) {
+    .opd2-foot-bar {
+        left: 0;
+    }
+}
+.opd2-foot-meta {
+    font-size: 12px;
+    color: var(--opd-fg-muted);
+    margin-right: auto;
+}
+.opd2-foot-back {
+    font-size: 13px;
+    color: var(--opd-fg-muted);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.12s;
+}
+.opd2-foot-back:hover {
+    color: var(--opd-fg);
+    background: var(--opd-surface-muted);
+}
