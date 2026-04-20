@@ -1,0 +1,558 @@
+/**
+ * risks-v2.css — scoped (`.rk2`) styles for the Risks artefact page.
+ * Ports the page-level styles from FORGE-MOCKUP-RISKS.html and
+ * FORGE-MOCKUP-EMPTY-RISKS.html so this page matches the mockups without
+ * leaking global styles into the platform.
+ *
+ * Design tokens match the forge-mockup CSS variables — defined inline on
+ * the root wrapper so the page renders identically in isolation.
+ */
+
+.rk2 {
+  /* Palette — mirrors forge-mockup.css tokens for this page only */
+  --rk-fg:             #1c1917;
+  --rk-fg-muted:       #78716c;
+  --rk-fg-faint:       #a8a29e;
+  --rk-fg-subtle:      #d6d3d1;
+  --rk-surface:        #ffffff;
+  --rk-surface-muted:  #f5f5f4;
+  --rk-surface-soft:   #fafaf9;
+  --rk-border:         #e7e5e4;
+  --rk-border-strong:  #d6d3d1;
+  --rk-brand:          #ff4500;
+  --rk-brand-soft:     rgba(255,69,0,0.10);
+  --rk-success:        #15803d;
+  --rk-success-soft:   #dcfce7;
+  --rk-warning:        #b45309;
+  --rk-warning-soft:   #fef3c7;
+  --rk-danger:         #b91c1c;
+  --rk-danger-soft:    #fee2e2;
+  --rk-info:           #1d4ed8;
+  --rk-info-soft:      #dbeafe;
+  --rk-teal-soft:      #f0fdfa;
+  --rk-teal-border:    #99f6e4;
+  --rk-teal-fg:        #0f766e;
+  --rk-teal-dot:       #0d9488;
+  --rk-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+  --rk-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+
+  color: var(--rk-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 32px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Breadcrumb ──────────────────────────────────────────────── */
+.rk2-breadcrumb {
+  font-size: 11.5px;
+  color: var(--rk-fg-muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rk2-breadcrumb a { color: var(--rk-fg-muted); text-decoration: none; transition: color 0.15s; }
+.rk2-breadcrumb a:hover { color: var(--rk-brand); }
+.rk2-breadcrumb .sep { color: var(--rk-fg-subtle); }
+.rk2-breadcrumb .current { color: var(--rk-fg); font-weight: 600; }
+
+/* ── Page header ─────────────────────────────────────────────── */
+.rk2-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.rk2-page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.rk2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--rk-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
+}
+.rk2-page-header .sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--rk-fg-muted);
+  max-width: 780px;
+}
+.rk2-page-header .cta-group { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.rk2-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rk-fg);
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border-strong);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.rk2-btn:hover { background: var(--rk-surface-muted); border-color: var(--rk-fg-muted); }
+.rk2-btn.primary { background: var(--rk-fg); color: #fff; border-color: var(--rk-fg); }
+.rk2-btn.primary:hover { background: #0f172a; }
+.rk2-btn.soon { opacity: 0.55; pointer-events: none; }
+.rk2-btn.sm { padding: 5px 10px; font-size: 11.5px; }
+
+/* ── Chips ───────────────────────────────────────────────────── */
+.rk2-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  border: 1px solid var(--rk-border);
+  background: var(--rk-surface-muted);
+  color: var(--rk-fg);
+}
+.rk2-chip.solid { border: none; }
+.rk2-chip.danger.solid  { background: var(--rk-danger); color: #fff; }
+.rk2-chip.warning.solid { background: var(--rk-warning); color: #fff; }
+.rk2-chip.info.solid    { background: var(--rk-info); color: #fff; }
+.rk2-chip.success.solid { background: var(--rk-success); color: #fff; }
+.rk2-chip.neutral.solid { background: var(--rk-fg-muted); color: #fff; }
+
+/* ── Annotation band ─────────────────────────────────────────── */
+.rk2-annot {
+  background: var(--rk-surface-soft);
+  border-left: 3px solid var(--rk-fg-subtle);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--rk-fg-muted);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.rk2-annot strong { color: var(--rk-fg); font-weight: 600; margin-right: 4px; }
+
+/* ── Summary strip (populated) ───────────────────────────────── */
+.rk2-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+@media (max-width: 900px) { .rk2-summary { grid-template-columns: repeat(2, 1fr); } }
+
+.rk2-sum-card {
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--rk-shadow-xs);
+  position: relative;
+  overflow: hidden;
+}
+.rk2-sum-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--rk-border);
+}
+.rk2-sum-card.sev-high::before     { background: var(--rk-danger); }
+.rk2-sum-card.sev-med::before      { background: var(--rk-warning); }
+.rk2-sum-card.sev-low::before      { background: var(--rk-info); }
+.rk2-sum-card.sev-resolved::before { background: var(--rk-success); }
+
+.rk2-sum-card .label {
+  font-size: 10.5px;
+  color: var(--rk-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.rk2-sum-card .value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--rk-fg);
+}
+.rk2-sum-card .value.red   { color: var(--rk-danger); }
+.rk2-sum-card .value.amber { color: var(--rk-warning); }
+.rk2-sum-card .value.info  { color: var(--rk-info); }
+.rk2-sum-card .value.green { color: var(--rk-success); }
+.rk2-sum-card .sub {
+  font-size: 10.5px;
+  color: var(--rk-fg-muted);
+  margin-top: 2px;
+}
+
+/* ── Controls bar (search + filters) ─────────────────────────── */
+.rk2-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 10px;
+  margin-bottom: 14px;
+  box-shadow: var(--rk-shadow-xs);
+}
+.rk2-controls .search { flex: 1; max-width: 360px; }
+.rk2-controls .search input {
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--rk-border-strong);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--rk-surface);
+  color: var(--rk-fg);
+}
+.rk2-controls .sep { height: 18px; width: 1px; background: var(--rk-border); }
+.rk2-controls .group { display: flex; gap: 6px; flex-wrap: wrap; }
+.rk2-controls .group .rk2-btn { padding: 5px 10px; font-size: 11.5px; }
+.rk2-controls .spacer { margin-left: auto; }
+
+/* ── Risk list (populated) ───────────────────────────────────── */
+.rk2-list { display: flex; flex-direction: column; gap: 12px; }
+
+.rk2-item {
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: var(--rk-shadow-xs);
+  position: relative;
+  overflow: hidden;
+}
+.rk2-item::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--rk-border);
+}
+.rk2-item.sev-high::before { background: var(--rk-danger); }
+.rk2-item.sev-med::before  { background: var(--rk-warning); }
+.rk2-item.sev-low::before  { background: var(--rk-info); }
+
+.rk2-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.rk2-item-title { flex: 1; }
+.rk2-item-title h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: var(--rk-fg);
+}
+.rk2-item-title .kicker {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--rk-fg-muted);
+}
+.rk2-sev-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rk2-sev-pill.high { background: var(--rk-danger-soft);  color: var(--rk-danger); }
+.rk2-sev-pill.med  { background: var(--rk-warning-soft); color: var(--rk-warning); }
+.rk2-sev-pill.low  { background: var(--rk-info-soft);    color: var(--rk-info); }
+.rk2-item-title .kicker .cat {
+  color: var(--rk-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  font-size: 10px;
+}
+.rk2-item-title .kicker .source-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--rk-surface-muted);
+  color: var(--rk-fg-muted);
+  letter-spacing: 0.02em;
+}
+
+.rk2-item-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--rk-fg);
+  margin-bottom: 12px;
+}
+.rk2-item-body strong { font-weight: 600; }
+
+.rk2-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 14px 0;
+  margin-bottom: 14px;
+  border-top: 1px solid var(--rk-border);
+  border-bottom: 1px solid var(--rk-border);
+}
+@media (max-width: 900px) { .rk2-meta-grid { grid-template-columns: repeat(2, 1fr); } }
+.rk2-meta-grid .m .k {
+  font-size: 10.5px;
+  color: var(--rk-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.rk2-meta-grid .m .v {
+  font-size: 13px;
+  margin-top: 2px;
+  font-weight: 500;
+  color: var(--rk-fg);
+}
+.rk2-meta-grid .m .v.tnum { font-variant-numeric: tabular-nums; }
+.rk2-meta-grid .m .v.muted { color: var(--rk-fg-faint); font-weight: 500; }
+
+.rk2-item-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rk2-grounding-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--rk-fg-faint);
+  font-style: italic;
+}
+.rk2-grounding-strip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 100%;
+  background: var(--rk-teal-dot);
+}
+
+/* ── Empty-state hero ────────────────────────────────────────── */
+.rk2-empty-hero {
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 14px;
+  padding: 48px 40px;
+  text-align: center;
+  box-shadow: var(--rk-shadow-xs);
+  margin-bottom: 22px;
+}
+.rk2-empty-hero .ic {
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
+  background: var(--rk-success-soft);
+  color: var(--rk-success);
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+.rk2-empty-hero h2 {
+  font-size: 22px;
+  margin: 0 0 8px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--rk-fg);
+}
+.rk2-empty-hero p {
+  font-size: 13.5px;
+  color: var(--rk-fg-muted);
+  margin: 0 auto 22px;
+  max-width: 560px;
+  line-height: 1.55;
+}
+.rk2-empty-hero .cta-group {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rk2-empty-hero .note {
+  font-size: 11.5px;
+  color: var(--rk-fg-faint);
+  margin-top: 10px;
+  font-style: italic;
+}
+
+/* ── Specialist recommendations card ─────────────────────────── */
+.rk2-specialist {
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: var(--rk-shadow-xs);
+  margin-bottom: 22px;
+}
+.rk2-specialist h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--rk-fg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rk2-specialist p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--rk-fg-muted);
+  line-height: 1.55;
+}
+.rk2-specialist .actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Design grounded in ──────────────────────────────────────── */
+.rk2-grounded { margin: 24px 0 28px; }
+.rk2-grounded .head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rk-fg-muted);
+  margin: 0 0 10px;
+}
+.rk2-grounded .head svg { width: 13px; height: 13px; }
+.rk2-grounded .pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.rk2-grounded .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--rk-teal-soft);
+  border: 1px solid var(--rk-teal-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rk-teal-fg);
+  text-decoration: none;
+}
+.rk2-grounded .pill:hover { background: #ccfbf1; }
+.rk2-grounded .pill .diamond {
+  width: 8px;
+  height: 8px;
+  background: var(--rk-teal-dot);
+  transform: rotate(45deg);
+  display: inline-block;
+}
+.rk2-grounded .footnote {
+  font-size: 11.5px;
+  color: var(--rk-fg-muted);
+  line-height: 1.55;
+  font-style: italic;
+}
+
+/* ── Risk library card (empty state) ─────────────────────────── */
+.rk2-library {
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 12px;
+  padding: 22px 26px;
+  box-shadow: var(--rk-shadow-xs);
+  margin-bottom: 22px;
+}
+.rk2-library h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--rk-fg);
+}
+.rk2-library .sub {
+  font-size: 12px;
+  color: var(--rk-fg-muted);
+  margin-bottom: 14px;
+}
+.rk2-library .pill-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.rk2-library .cat-pill {
+  padding: 8px 14px;
+  border: 1px solid var(--rk-border);
+  border-radius: 20px;
+  font-size: 12.5px;
+  color: var(--rk-fg);
+  background: var(--rk-surface);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.rk2-library .cat-pill .dot { width: 7px; height: 7px; border-radius: 100%; }
+.rk2-library .cat-pill .dot.supply { background: var(--rk-warning); }
+.rk2-library .cat-pill .dot.cert   { background: var(--rk-danger); }
+.rk2-library .cat-pill .dot.tech   { background: var(--rk-info); }
+.rk2-library .cat-pill .dot.ops    { background: var(--rk-teal-dot); }
+.rk2-library .cat-pill .dot.market { background: #6d28d9; }
+.rk2-library .cat-pill .dot.cost   { background: var(--rk-brand); }
+
+/* ── Group header within the list ────────────────────────────── */
+.rk2-group-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rk-fg-muted);
+  margin: 4px 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rk2-group-header .count {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--rk-surface-muted);
+  color: var(--rk-fg-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}

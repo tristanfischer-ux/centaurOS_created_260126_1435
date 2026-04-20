@@ -1,140 +1,139 @@
 /**
  * @file risks/page.tsx — /the-forge-v2/projects/:id/risks
  *
- * @description Risk register view — sources from module failureModes + unknowns
- * declared during decomposition. Dedicated risk entity lands in a later PR;
- * this view aggregates what's already captured.
+ * @description Risks artefact — mockup-faithful port of FORGE-MOCKUP-RISKS.html
+ * (populated) + FORGE-MOCKUP-EMPTY-RISKS.html (empty). Server component reads
+ * the project, flattens every module's failureModes[] + unknowns[] into risk
+ * rows grouped by severity, and hands a typed props bundle to RisksView.
  *
- * Mockup ref: FORGE-MOCKUP-RISKS.html / FORGE-MOCKUP-EMPTY-RISKS.html.
+ * Empty-state policy: there is no dedicated risks table yet. Severity / owner
+ * / due date / status / mitigation are honestly blank on every row, and the
+ * resolved count is always 0. When both failureModes and unknowns are empty
+ * across every module, the view renders the empty-state hero + library pills.
+ *
+ * Severity mapping (conservative — we never invent per-row severity):
+ *   - failureModes → "med"  (honest default; tagged "From module decomposition")
+ *   - unknowns     → "low"  (open questions, tagged "Open question")
+ *   - "high" count is always 0 (no blocking logic until risks table ships)
+ *
+ * @related
+ *   - View:   ./risks-view.tsx
+ *   - Styles: ./risks-v2.css (scoped .rk2)
+ *   - Mockup: FORGE-MOCKUP-RISKS.html / FORGE-MOCKUP-EMPTY-RISKS.html
  */
 
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { AlertTriangle, HelpCircle, ArrowRight } from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { Card, CardContent } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/server"
 
-import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { RisksView, type RiskRow, type RisksViewProps } from "./risks-view"
 
 export const dynamic = "force-dynamic"
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata(
+    { params }: { params: Promise<{ id: string }> },
+): Promise<Metadata> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
-    if ("error" in result) return { title: "Risks · The Forge" }
-    return { title: `Risks · ${result.project.name}` }
+    const r = await loadCadLabProject(id)
+    if ("error" in r) return { title: "Risks · The Forge" }
+    return { title: `Risks · ${r.project.name}` }
 }
 
-export default async function ForgeV2RisksPage({ params }: { params: Promise<{ id: string }> }): Promise<React.ReactNode> {
+export default async function ForgeV2RisksPage({
+    params,
+}: {
+    params: Promise<{ id: string }>
+}): Promise<React.ReactNode> {
     const { id } = await params
     const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
+    if ("error" in result || !result.project) notFound()
+
     const project = result.project
     const modules = project.modules ?? []
 
-    const failureModes = modules.flatMap(m => (m.failureModes ?? []).map(fm => ({ module: m, text: fm })))
-    const unknowns = modules.flatMap(m => (m.unknowns ?? []).map(u => ({ module: m, text: u })))
-    const totalSignals = failureModes.length + unknowns.length
+    // ── 1. Flatten module failureModes + unknowns into risk rows ────────
+    const risks: RiskRow[] = []
+    let failureModeSourceModules = 0
 
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
-                { label: "Risks" },
-            ]}
-            subtitle={totalSignals === 0 ? "No risk signals yet" : `${failureModes.length} failure modes · ${unknowns.length} open questions`}
-        >
-            {totalSignals === 0 ? (
-                <Card className="rounded-xl border">
-                    <CardContent className="py-12 flex flex-col items-center text-center gap-4">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-status-success-light">
-                            <AlertTriangle className="h-6 w-6 text-status-success" />
-                        </div>
-                        <div className="max-w-sm space-y-2">
-                            <p className="text-sm font-semibold text-foreground">No risks declared yet</p>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                Risks surface as modules are decomposed and reviewed. Dedicated risk authoring ships in a later PR — for now, add failure modes and unknowns per module.
-                            </p>
-                        </div>
-                        <Link
-                            href={`/the-forge-v2/projects/${project.id}/modules`}
-                            className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                        >
-                            Open modules <ArrowRight className="h-3.5 w-3.5" />
-                        </Link>
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <section aria-label="Failure modes">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-1 h-5 rounded-full bg-status-warning" />
-                            <h2 className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                Failure modes ({failureModes.length})
-                            </h2>
-                        </div>
-                        {failureModes.length === 0 ? (
-                            <Card className="rounded-xl border"><CardContent className="py-6"><p className="text-sm text-muted-foreground italic text-center">No failure modes recorded.</p></CardContent></Card>
-                        ) : (
-                            <ul className="space-y-2">
-                                {failureModes.map((f, idx) => (
-                                    <li key={idx}>
-                                        <Link
-                                            href={`/the-forge-v2/projects/${project.id}/modules/${f.module.id}#failure-modes`}
-                                            className="block rounded-xl border bg-background hover:bg-muted/30 hover:shadow-sm transition-all p-4 group"
-                                        >
-                                            <div className="flex items-start gap-2">
-                                                <AlertTriangle className="h-4 w-4 text-status-warning mt-0.5 shrink-0" />
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm text-foreground leading-relaxed">{f.text}</p>
-                                                    <p className="text-[11px] text-muted-foreground mt-1">
-                                                        <span className="font-semibold group-hover:text-international-orange transition-colors">{f.module.name}</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
-                    <section aria-label="Unknowns">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-1 h-5 rounded-full bg-electric-blue" />
-                            <h2 className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                Open questions ({unknowns.length})
-                            </h2>
-                        </div>
-                        {unknowns.length === 0 ? (
-                            <Card className="rounded-xl border"><CardContent className="py-6"><p className="text-sm text-muted-foreground italic text-center">No open questions recorded.</p></CardContent></Card>
-                        ) : (
-                            <ul className="space-y-2">
-                                {unknowns.map((u, idx) => (
-                                    <li key={idx}>
-                                        <Link
-                                            href={`/the-forge-v2/projects/${project.id}/modules/${u.module.id}#unknowns`}
-                                            className="block rounded-xl border bg-background hover:bg-muted/30 hover:shadow-sm transition-all p-4 group"
-                                        >
-                                            <div className="flex items-start gap-2">
-                                                <HelpCircle className="h-4 w-4 text-electric-blue mt-0.5 shrink-0" />
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm text-foreground leading-relaxed">{u.text}</p>
-                                                    <p className="text-[11px] text-muted-foreground mt-1">
-                                                        <span className="font-semibold group-hover:text-international-orange transition-colors">{u.module.name}</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
-                </div>
-            )}
-        </WorkspaceShell>
-    )
+    for (const m of modules) {
+        const failureModes = m.failureModes ?? []
+        const unknowns = m.unknowns ?? []
+
+        if (failureModes.length > 0) failureModeSourceModules += 1
+
+        failureModes.forEach((text, idx) => {
+            if (typeof text !== "string" || text.trim().length === 0) return
+            risks.push({
+                id: `${m.id}-fm-${idx}`,
+                severity: "med",
+                category: `Known failure mode · ${m.name}`,
+                sourceBadge: "From module decomposition",
+                title: text.trim(),
+                moduleId: m.id,
+                moduleName: m.name,
+            })
+        })
+
+        unknowns.forEach((text, idx) => {
+            if (typeof text !== "string" || text.trim().length === 0) return
+            risks.push({
+                id: `${m.id}-uk-${idx}`,
+                severity: "low",
+                category: `Open question · ${m.name}`,
+                sourceBadge: "Open question",
+                title: text.trim(),
+                moduleId: m.id,
+                moduleName: m.name,
+            })
+        })
+    }
+
+    // ── 2. Summary counts (honest — derived only from real data) ────────
+    const counts = {
+        blocking: risks.filter((r) => r.severity === "high").length,
+        medium: risks.filter((r) => r.severity === "med").length,
+        low: risks.filter((r) => r.severity === "low").length,
+        resolved: 0,
+        total: risks.length,
+    }
+
+    // ── 3. Engineering library grounding counts ─────────────────────────
+    const libraryCounts = await safeLibraryCounts()
+
+    const viewProps: RisksViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+        },
+        counts,
+        risks,
+        grounding: {
+            failureModeLibrary: failureModeSourceModules,
+            hardware: libraryCounts.hardware,
+            materials: libraryCounts.materials,
+        },
+    }
+
+    return <RisksView {...viewProps} />
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────
+
+async function safeLibraryCounts(): Promise<{ materials: number; hardware: number }> {
+    try {
+        const supabase = await createClient()
+        const [m, h] = await Promise.all([
+            supabase.from("material_properties").select("*", { count: "exact", head: true }),
+            supabase.from("standard_hardware").select("*", { count: "exact", head: true }),
+        ])
+        return {
+            materials: m.count ?? 0,
+            hardware: h.count ?? 0,
+        }
+    } catch (err) {
+        console.error("[RISKS-PAGE] library counts failed:", err)
+        return { materials: 0, hardware: 0 }
+    }
 }
