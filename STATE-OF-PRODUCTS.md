@@ -1,8 +1,30 @@
-# State of Products — Pre-Phase Coming Soon live on production
+# State of Products — live in BETA (sidecar lifted)
 
 **Date:** 2026-04-20
 **For:** Tristan, when he wakes up
-**Current production tip:** `d3ccb6b7` on `main` (+ pending final agent-browser verification confirmation as of writing)
+**Current production tip:** `330fcce0` on `main`
+
+---
+
+## UPDATE 2026-04-20 morning — Coming Soon sidecar LIFTED
+
+Tristan asked: *"Can you please take the products out of 'soon' so we can actually see it and just keep the beta label? Can you also put a beta label on the Forge?"*
+
+Commit `330fcce0` — `feat(products): unhide Products, keep BETA — sidecar lifted + Forge v2 BETA entry`:
+- Products registry `coming_soon` → `beta` → sidebar shows BETA pill (was SOON).
+- `/products` and `/products/[id]` restored to their real implementations (list view + detail view with edit/archive/promote).
+- `/products/legacy/*` routes deleted. Middleware deep-link redirect removed.
+- Route-gate client component + coming-soon.tsx deleted.
+- Added `/the-forge-v2` registry entry at `status: 'beta'` so the Forge BETA pill renders for users with the `new_forge_experience` flag on (previously only `/the-forge` had a registry entry; flagged users saw no badge).
+- `hasFullSynthesis()` type guard from `8defb085` KEPT — still defensive value for future JSONB shape drift.
+
+**Everything below this banner was accurate for the earlier sidecar-live state. Some of it (e.g. "Middleware 307 redirect to /products/legacy/<id>", references to `/products/legacy` routes, Coming Soon bridge behaviour) no longer applies post-`330fcce0`.** Kept as historical record.
+
+---
+
+## (Historical) Previous state — Pre-Phase Coming Soon live on production
+
+**Previous tip was:** `d3ccb6b7` on `main` (+ pending final agent-browser verification confirmation as of writing)
 **User directive served:** *"Finish it all off. I am going to sleep. There are people who will be accessing the site in different time zones so it has to work. Don't just leave me with a half finished product. Be comprehensive and thorough. Make me proud."*
 
 ---
