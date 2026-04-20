@@ -1,0 +1,408 @@
+/* Interview detail V2 — scoped stylesheet ported from
+   FORGE-MOCKUP-INTERVIEW-DETAIL.html + forge-mockup.css.
+   Every rule is prefixed with .id2 so nothing leaks to other pages. */
+
+.id2 {
+  --id-bg: #fafaf9;
+  --id-surface: #ffffff;
+  --id-surface-muted: #f5f5f4;
+  --id-surface-soft: #fafaf9;
+  --id-border: #e7e5e4;
+  --id-border-strong: #d6d3d1;
+  --id-border-soft: #f0efed;
+  --id-fg: #1c1917;
+  --id-fg-muted: #78716c;
+  --id-fg-subtle: #a8a29e;
+  --id-fg-faint: #d6d3d1;
+  --id-brand: #ff4500;
+  --id-brand-soft: #fff0ea;
+  --id-brand-dim: #ffdcc7;
+  --id-success: #16a34a;
+  --id-success-soft: #dcfce7;
+  --id-success-fg: #166534;
+  --id-warning: #ca8a04;
+  --id-warning-soft: #fef9c3;
+  --id-warning-border: #fde68a;
+  --id-warning-fg: #854d0e;
+  --id-danger: #dc2626;
+  --id-danger-soft: #fee2e2;
+  --id-info: #2563eb;
+  --id-info-soft: #dbeafe;
+  --id-teal: #0d9488;
+  --id-teal-soft: #f0fdfa;
+  --id-teal-border: #99f6e4;
+  --id-teal-fg: #0f766e;
+  --id-shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.03);
+
+  background: var(--id-bg);
+  color: var(--id-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.55;
+  margin: -1rem;
+  padding: 28px 36px 60px;
+  max-width: none;
+  min-height: calc(100vh - 64px);
+}
+
+@media (min-width: 640px) { .id2 { margin: -1.5rem -1.5rem -1.5rem -1.25rem; } }
+@media (min-width: 1024px) { .id2 { margin: -2rem -2rem -2rem -1.5rem; } }
+
+.id2 *, .id2 *::before, .id2 *::after { box-sizing: border-box; }
+.id2 h1, .id2 h2, .id2 h3, .id2 h4, .id2 p, .id2 ul { margin: 0; }
+.id2 a { color: inherit; text-decoration: none; }
+.id2 small { font-size: inherit; font-weight: inherit; }
+
+/* ── Breadcrumb ───────────────────────────────────────── */
+.id2-breadcrumb {
+  font-size: 12px;
+  color: var(--id-fg-muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.id2-breadcrumb a {
+  color: var(--id-fg-muted);
+  text-decoration: none;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: all 0.12s;
+}
+.id2-breadcrumb a:hover { color: var(--id-fg); background: var(--id-surface-muted); }
+.id2-breadcrumb .sep { color: var(--id-fg-faint); font-size: 10px; }
+.id2-breadcrumb .current { color: var(--id-fg); font-weight: 500; }
+
+/* ── Empty-state banner ───────────────────────────────── */
+.id2-empty-banner {
+  background: var(--id-warning-soft);
+  border: 1px solid var(--id-warning-border);
+  border-left: 3px solid var(--id-warning);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--id-warning-fg);
+}
+.id2-empty-banner strong { font-weight: 700; }
+
+/* ── Page header ──────────────────────────────────────── */
+.id2-head {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  background: var(--id-surface);
+  border: 1px solid var(--id-border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  box-shadow: var(--id-shadow-xs);
+}
+@media (max-width: 900px) {
+  .id2-head { grid-template-columns: 56px 1fr; }
+  .id2-head .id2-actions { grid-column: 1 / -1; flex-direction: row; }
+}
+.id2-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 100%;
+  background: var(--id-teal-soft);
+  color: var(--id-teal);
+  font-weight: 700;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.id2-avatar.empty {
+  background: var(--id-surface-muted);
+  color: var(--id-fg-faint);
+}
+.id2-head h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--id-fg);
+}
+.id2-head h1 .empty {
+  color: var(--id-fg-faint);
+  font-weight: 500;
+}
+.id2-head .sub {
+  font-size: 13px;
+  color: var(--id-fg-muted);
+  margin-top: 3px;
+}
+.id2-head .sub .empty { color: var(--id-fg-faint); font-style: italic; }
+.id2-pill-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.id2-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--id-surface-muted);
+  color: var(--id-fg-faint);
+}
+.id2-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.id2-actions .btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--id-fg-faint);
+  text-decoration: none;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--id-border);
+  background: var(--id-surface);
+  cursor: not-allowed;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+/* ── Summary banner ───────────────────────────────────── */
+.id2-summary {
+  background: var(--id-brand-soft);
+  border: 1px solid var(--id-brand-dim);
+  border-left: 3px solid var(--id-brand);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.id2-summary .lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--id-brand);
+  display: block;
+  margin-bottom: 4px;
+}
+.id2-summary .empty {
+  color: var(--id-fg-muted);
+  font-style: italic;
+}
+
+/* ── Page grid ────────────────────────────────────────── */
+.id2-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 28px;
+}
+@media (max-width: 1020px) {
+  .id2-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Section heads ────────────────────────────────────── */
+.id2-sec-h {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--id-fg-muted);
+  margin: 26px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.id2-sec-h:first-child { margin-top: 0; }
+.id2-sec-h .tools {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--id-fg-faint);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Transcript card ──────────────────────────────────── */
+.id2-transcript {
+  background: var(--id-surface);
+  border: 1px solid var(--id-border);
+  border-radius: 10px;
+  padding: 18px 22px;
+  box-shadow: var(--id-shadow-xs);
+}
+.id2-ts-empty {
+  font-size: 13px;
+  color: var(--id-fg-subtle);
+  font-style: italic;
+  padding: 24px 4px;
+  text-align: center;
+}
+.id2-ts-block {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--id-border-soft);
+}
+.id2-ts-block:last-child { border-bottom: none; }
+.id2-ts-block .tc {
+  font-size: 11px;
+  color: var(--id-fg-faint);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+}
+.id2-ts-block .sp {
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--id-fg-faint);
+  margin-bottom: 2px;
+}
+.id2-ts-block .tx {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--id-fg-faint);
+}
+
+/* ── Assumptions card ─────────────────────────────────── */
+.id2-side-card {
+  background: var(--id-surface);
+  border: 1px solid var(--id-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: var(--id-shadow-xs);
+}
+.id2-side-card h4 {
+  margin: 0 0 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--id-fg-muted);
+}
+
+.id2-asm-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--id-border-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.id2-asm-row:last-child { border-bottom: none; }
+.id2-asm-row .ri {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-right: 6px;
+  background: var(--id-surface-muted);
+  color: var(--id-fg-faint);
+}
+.id2-asm-row .body {
+  margin-top: 4px;
+  color: var(--id-fg-faint);
+  font-style: italic;
+}
+.id2-asm-row .status {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  background: var(--id-surface-muted);
+  color: var(--id-fg-faint);
+}
+
+/* ── Right sidebar rows (contact / linked LOIs / related) ── */
+.id2-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--id-border-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.id2-row:last-child { border-bottom: none; }
+.id2-row .k {
+  font-size: 10.5px;
+  color: var(--id-fg-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 2px;
+}
+.id2-row .v {
+  font-weight: 600;
+  color: var(--id-fg-faint);
+}
+
+/* ── Attachments ──────────────────────────────────────── */
+.id2-attach-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--id-border-soft);
+  font-size: 12.5px;
+}
+.id2-attach-row:last-child { border-bottom: none; }
+.id2-attach-row .ai {
+  font-size: 16px;
+  color: var(--id-fg-faint);
+}
+.id2-attach-row .name { color: var(--id-fg-faint); font-weight: 600; }
+.id2-attach-row .meta { margin-left: auto; font-size: 10.5px; color: var(--id-fg-faint); }
+
+/* ── Follow-ups ───────────────────────────────────────── */
+.id2-fu-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--id-border-soft);
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  align-items: baseline;
+}
+.id2-fu-row:last-child { border-bottom: none; }
+.id2-fu-row .check {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-top: 3px;
+  display: inline-block;
+  border: 1.5px solid var(--id-border-strong);
+  background: var(--id-surface);
+}
+.id2-fu-row .body { color: var(--id-fg-faint); }
+.id2-fu-row .due {
+  font-size: 10.5px;
+  color: var(--id-fg-faint);
+  white-space: nowrap;
+}
+
+/* ── Empty inline ─────────────────────────────────────── */
+.id2-empty-inline {
+  font-size: 12px;
+  color: var(--id-fg-subtle);
+  font-style: italic;
+  padding: 4px 0;
+}
