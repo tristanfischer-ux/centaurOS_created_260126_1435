@@ -1,0 +1,389 @@
+/**
+ * interview-create-v2.css — scoped (`.ic2`) styles for the "Log an interview"
+ * page. Ports the page-level styles from FORGE-MOCKUP-INTERVIEW-CREATE.html so
+ * the production page matches the mockup without leaking global styles into
+ * the platform. Design tokens mirror the forge-mockup variables and are
+ * declared inline on the root wrapper, using the same token names as
+ * `risk-create-v2.css` (prefixed `--ic-*` instead of `--rc-*`).
+ */
+
+.ic2 {
+  /* Palette — mirrors forge-mockup.css tokens for this page only */
+  --ic-fg:             #1c1917;
+  --ic-fg-muted:       #78716c;
+  --ic-fg-faint:       #a8a29e;
+  --ic-fg-subtle:      #d6d3d1;
+  --ic-surface:        #ffffff;
+  --ic-surface-muted:  #f5f5f4;
+  --ic-surface-soft:   #fafaf9;
+  --ic-border:         #e7e5e4;
+  --ic-border-soft:    #f0eeed;
+  --ic-border-strong:  #d6d3d1;
+  --ic-brand:          #ff4500;
+  --ic-brand-soft:     rgba(255,69,0,0.10);
+  --ic-brand-dim:      rgba(255,69,0,0.35);
+  --ic-success:        #15803d;
+  --ic-success-soft:   #dcfce7;
+  --ic-success-dim:    #86efac;
+  --ic-warning:        #b45309;
+  --ic-warning-soft:   #fef3c7;
+  --ic-warning-dim:    #fcd34d;
+  --ic-danger:         #b91c1c;
+  --ic-danger-soft:    #fee2e2;
+  --ic-danger-dim:     #fca5a5;
+  --ic-info:           #1d4ed8;
+  --ic-info-soft:      #dbeafe;
+  --ic-info-dim:       #93c5fd;
+  --ic-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+
+  color: var(--ic-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 28px 36px 60px;
+  max-width: 1260px;
+  margin: 0 auto;
+}
+
+/* ── Breadcrumb ──────────────────────────────────────────────── */
+.ic2-breadcrumb {
+  font-size: 12px;
+  color: var(--ic-fg-muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ic2-breadcrumb a {
+  color: var(--ic-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.ic2-breadcrumb a:hover { color: var(--ic-brand); }
+.ic2-breadcrumb .sep { color: var(--ic-fg-subtle); }
+.ic2-breadcrumb .current { color: var(--ic-fg); font-weight: 500; }
+
+/* ── Page header ─────────────────────────────────────────────── */
+.ic2-page-head { margin-bottom: 22px; }
+.ic2-page-head h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ic2-page-head .sub {
+  font-size: 13px;
+  color: var(--ic-fg-muted);
+  line-height: 1.5;
+  max-width: 780px;
+}
+
+/* ── Two-column form layout ──────────────────────────────────── */
+.ic2-form-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 980px) { .ic2-form-grid { grid-template-columns: 1fr; } }
+
+/* ── Form card (left) ────────────────────────────────────────── */
+.ic2-form-card {
+  background: var(--ic-surface);
+  border: 1px solid var(--ic-border);
+  border-radius: 12px;
+  padding: 22px 24px;
+  box-shadow: var(--ic-shadow-xs);
+}
+.ic2-field { margin-bottom: 18px; }
+.ic2-field:last-child { margin-bottom: 0; }
+.ic2-field .lbl {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ic-fg);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+.ic2-field .lbl .req { color: var(--ic-danger); margin-left: 3px; }
+.ic2-field .lbl .note {
+  font-weight: 500;
+  color: var(--ic-fg-muted);
+  font-size: 11.5px;
+  margin-left: 8px;
+  letter-spacing: 0;
+}
+.ic2-field .lbl code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--ic-surface-muted);
+  color: var(--ic-fg);
+}
+.ic2-field .helper {
+  font-size: 11.5px;
+  color: var(--ic-fg-muted);
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.ic2-input,
+.ic2-select,
+.ic2-textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--ic-fg);
+  background: var(--ic-surface);
+  border: 1px solid var(--ic-border);
+  border-radius: 7px;
+  padding: 9px 11px;
+  box-sizing: border-box;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.ic2-input:focus,
+.ic2-select:focus,
+.ic2-textarea:focus {
+  outline: none;
+  border-color: var(--ic-brand);
+  box-shadow: 0 0 0 3px var(--ic-brand-soft);
+}
+.ic2-textarea {
+  resize: vertical;
+  min-height: 56px;
+  line-height: 1.55;
+}
+.ic2-textarea.quote {
+  min-height: 120px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.ic2-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 640px) { .ic2-row-2 { grid-template-columns: 1fr; } }
+
+.ic2-check-inline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--ic-fg);
+  cursor: pointer;
+}
+.ic2-check-inline input { margin: 0; }
+
+/* ── Tag chips ───────────────────────────────────────────────── */
+.ic2-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+.ic2-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 14px;
+  cursor: pointer;
+  border: 1px solid var(--ic-border-strong);
+  background: var(--ic-surface);
+  color: var(--ic-fg-muted);
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ic2-chip:hover { border-color: var(--ic-fg-muted); color: var(--ic-fg); }
+.ic2-chip.on { border-color: transparent; }
+.ic2-chip.on.neutral { background: var(--ic-brand); color: #fff; }
+.ic2-chip.on.danger  { background: var(--ic-danger); color: #fff; }
+.ic2-chip.on.success { background: var(--ic-success); color: #fff; }
+.ic2-chip.on.warning { background: var(--ic-warning); color: #fff; }
+.ic2-chip.on.info    { background: var(--ic-info); color: #fff; }
+.ic2-chip .x { font-size: 11px; opacity: 0.85; }
+.ic2-chip-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  border: 1px dashed var(--ic-border-strong);
+  background: transparent;
+  color: var(--ic-fg-muted);
+  width: auto;
+  max-width: 180px;
+  font-family: inherit;
+}
+.ic2-chip-custom:focus {
+  outline: none;
+  border-color: var(--ic-brand);
+  border-style: solid;
+  color: var(--ic-fg);
+}
+
+/* ── Inline blocker warning ──────────────────────────────────── */
+.ic2-blocker-banner {
+  margin-top: 10px;
+  padding: 9px 14px;
+  background: var(--ic-info-soft);
+  border: 1px solid var(--ic-info-dim);
+  border-left: 3px solid var(--ic-info);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--ic-fg);
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.ic2-blocker-banner strong { color: var(--ic-info); font-weight: 700; }
+.ic2-blocker-banner .bb-ic { font-size: 14px; }
+
+/* ── Bottom actions ──────────────────────────────────────────── */
+.ic2-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 20px;
+  margin-top: 4px;
+  border-top: 1px solid var(--ic-border-soft);
+}
+.ic2-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ic-fg);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.12s;
+}
+.ic2-btn.ghost { color: var(--ic-fg-muted); }
+.ic2-btn.ghost:hover { color: var(--ic-fg); background: var(--ic-surface-muted); }
+.ic2-btn.secondary {
+  background: var(--ic-surface);
+  color: var(--ic-fg);
+  border-color: var(--ic-border-strong);
+}
+.ic2-btn.secondary:hover { border-color: var(--ic-brand); color: var(--ic-brand); }
+.ic2-btn.primary {
+  background: var(--ic-brand);
+  color: #fff;
+  margin-left: auto;
+  border-color: var(--ic-brand);
+}
+.ic2-btn.primary:hover { filter: brightness(1.05); }
+.ic2-btn.soon {
+  opacity: 0.55;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.ic2-actions-helper {
+  font-size: 11.5px;
+  color: var(--ic-fg-muted);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.ic2-page-foot {
+  margin-top: 18px;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--ic-fg-muted);
+  line-height: 1.55;
+}
+
+/* ── Right context sidebar ───────────────────────────────────── */
+.ic2-ctx-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 20px;
+}
+.ic2-ctx-card {
+  background: var(--ic-surface-soft);
+  border: 1px solid var(--ic-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.ic2-ctx-card h4 {
+  margin: 0 0 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ic-fg-muted);
+}
+.ic2-ctx-card .hyp-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ic-fg);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.ic2-ctx-card .hyp-meta {
+  font-size: 11.5px;
+  color: var(--ic-fg-muted);
+  line-height: 1.5;
+}
+.ic2-ctx-card .hyp-meta a {
+  color: var(--ic-brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+.ic2-ctx-card .hyp-meta a:hover { text-decoration: underline; }
+
+.ic2-ctx-empty {
+  font-size: 12px;
+  color: var(--ic-fg-muted);
+  line-height: 1.5;
+}
+
+/* ── Template-question list (replaces mockup's iv-row interview
+     history; empty-state policy says we can't fake mockup specifics,
+     so we render a template prompt list instead) ───────────────── */
+.ic2-tq-row {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--ic-border-soft);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ic-fg);
+}
+.ic2-tq-row:last-child { border-bottom: none; padding-bottom: 0; }
+.ic2-tq-row:first-of-type { padding-top: 0; }
+.ic2-tq-row .n {
+  font-weight: 600;
+  color: var(--ic-fg);
+  display: block;
+  margin-bottom: 2px;
+}
+.ic2-tq-row .r {
+  font-size: 11px;
+  color: var(--ic-fg-muted);
+}
+
+.ic2-help-list {
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ic-fg);
+}
+.ic2-help-list li { margin-bottom: 5px; }
+.ic2-help-list li strong { font-weight: 700; color: var(--ic-fg); }
