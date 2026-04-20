@@ -1,140 +1,195 @@
 /**
  * @file cost/page.tsx — /the-forge-v2/projects/:id/cost
  *
- * @description Cost rollup by module. Reads aiCostEstimates JSONB. Shows
- * per-module cost with mass + material + process context when available.
+ * @description Cost artefact — mockup-faithful port of FORGE-MOCKUP-COST.html.
+ * Server component reads the project, builds the cost hero (Unit BOM · +OFE ·
+ * +NRE · =All-in) + waterfall rows (one per module) + ceiling comparison, then
+ * hands a typed props bundle to CostView for rendering.
  *
- * Mockup ref: FORGE-MOCKUP-COST.html / FORGE-MOCKUP-EMPTY-COST.html.
+ * Data sources, slot by slot:
+ *   - project.aiCostEstimates[moduleId].totalPerUnit  → waterfall rows + Unit BOM
+ *   - project.aiCostEstimates[moduleId].confidence    → source tag per row
+ *   - project.modules[].name / .id / .keyParts        → row name + category heuristic
+ *   - project.research.designBrief.constraints.unitCostCeilingGbp → ceiling bar
+ *   - material_properties / standard_hardware / process_capabilities → grounding pills
+ *
+ * Empty-state policy (no mockup content leaks):
+ *   - OFE solar + NRE amortised → null until declared on the Brief (card renders
+ *     "Not declared on Brief" subtitle; All-in excludes them)
+ *   - Quote-vs-benchmark table → honest empty state until RFQ responses exist
+ *   - No ceiling declared → neutral grey bar with caption
+ *
+ * @related
+ *   - View:   ./cost-view.tsx
+ *   - Styles: ./cost-v2.css (scoped .c2)
+ *   - Mockup: FORGE-MOCKUP-COST.html
  */
 
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { PoundSterling, ArrowRight, TrendingUp } from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/lib/supabase/server"
 
-import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { CostView, type CostCategory, type CostViewProps, type CostWaterfallRow } from "./cost-view"
 
 export const dynamic = "force-dynamic"
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata(
+    { params }: { params: Promise<{ id: string }> },
+): Promise<Metadata> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
-    if ("error" in result) return { title: "Cost · The Forge" }
-    return { title: `Cost · ${result.project.name}` }
+    const r = await loadCadLabProject(id)
+    if ("error" in r) return { title: "Cost · The Forge" }
+    return { title: `Cost · ${r.project.name}` }
 }
 
-export default async function ForgeV2CostPage({ params }: { params: Promise<{ id: string }> }): Promise<React.ReactNode> {
+export default async function ForgeV2CostPage({
+    params,
+}: {
+    params: Promise<{ id: string }>
+}): Promise<React.ReactNode> {
     const { id } = await params
     const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
+    if ("error" in result || !result.project) notFound()
+
     const project = result.project
     const modules = project.modules ?? []
-    const costEstimates = project.aiCostEstimates ?? {}
+    const estimatesById = project.aiCostEstimates ?? {}
 
-    interface Row {
-        moduleId: string
-        moduleName: string
-        estimate: number | null
-        mass: number | null
-        override: number | null
+    // ── 1. Waterfall rows — one per module, real data only ──────────────
+    const rows: CostWaterfallRow[] = []
+    let unitBomTotal: number | null = null
+
+    for (const m of modules) {
+        const est = estimatesById[m.id]
+        if (!est || typeof est.totalPerUnit !== "number") continue
+
+        const valueGbp = est.totalPerUnit
+        const { category, categoryLabel } = inferCategory(m.id, m.name, m.keyParts ?? [])
+        const confidence = est.confidence ?? "medium"
+
+        rows.push({
+            id: m.id,
+            name: m.name,
+            category,
+            categoryLabel,
+            valueGbp,
+            source: `Specialist estimate · ${confidence} confidence`,
+            href: `/the-forge-v2/projects/${project.id}/modules/${m.id}`,
+        })
+
+        unitBomTotal = (unitBomTotal ?? 0) + valueGbp
     }
-    const rows: Row[] = modules.map(m => {
-        const est = costEstimates[m.id] as { totalCostPerUnit?: number } | undefined
-        const override = m.costOverrides?.totalPerUnit ?? null
+
+    // Sort descending by value so the biggest bars show first — founders read
+    // the waterfall top-to-bottom, largest-cost-first, so the shape of the
+    // project's spend is obvious without scanning.
+    rows.sort((a, b) => b.valueGbp - a.valueGbp)
+
+    // ── 2. Brief-driven constraints ─────────────────────────────────────
+    const ceilingGbp =
+        project.research?.designBrief?.constraints?.unitCostCeilingGbp ?? null
+
+    // OFE + NRE are not yet declared on the brief schema. Honest null until
+    // a follow-up migration adds them. The view renders "Not declared on Brief"
+    // for each. All-in falls back to unitBomTotal + (OFE ?? 0) + (NRE ?? 0).
+    const ofeGbp: number | null = null
+    const nreGbp: number | null = null
+
+    const allInGbp =
+        unitBomTotal != null
+            ? unitBomTotal + (ofeGbp ?? 0) + (nreGbp ?? 0)
+            : null
+
+    // ── 3. Engineering library grounding counts ─────────────────────────
+    const grounding = await safeLibraryCounts()
+
+    const viewProps: CostViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+            designRevision: project.designRevision,
+        },
+        allInGbp,
+        unitBomGbp: unitBomTotal,
+        ofeGbp,
+        nreGbp,
+        ceilingGbp,
+        rows,
+        grounding,
+    }
+
+    return <CostView {...viewProps} />
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Heuristic category mapper off module id/name/keyParts. The mockup groups
+ * rows into Structure / Electrical / Propulsion / Labour / Inspect / Logistics
+ * / OFE / NRE. We don't have structured tagging yet so we infer from text
+ * tokens — biased toward precision ("wing" → Structure) with a neutral
+ * fallback so we never fabricate a category we can't justify.
+ */
+function inferCategory(
+    id: string,
+    name: string,
+    keyParts: string[],
+): { category: CostCategory; categoryLabel: string } {
+    const haystack = `${id} ${name} ${keyParts.join(" ")}`.toLowerCase()
+
+    // Solar / OFE tokens
+    if (/solar|photovoltaic|pv cell|ibc/.test(haystack)) {
+        return { category: "solar", categoryLabel: "OFE · Solar" }
+    }
+    // Propulsion
+    if (/propulsion|motor|propeller|prop |esc |rotor|thrust/.test(haystack)) {
+        return { category: "prop", categoryLabel: "Propulsion" }
+    }
+    // Electrical / avionics / battery
+    if (/battery|mppt|avionic|imu|pcba|flight computer|radio|comms|wiring|harness|sensor/.test(haystack)) {
+        return { category: "electrical", categoryLabel: "Electrical" }
+    }
+    // Structure — wing, fuselage, tail, airframe, spar, rib, skin, chassis, frame
+    if (/wing|fuselage|tail|airframe|spar|rib|skin|chassis|frame|structure|cfrp|composite/.test(haystack)) {
+        return { category: "structure", categoryLabel: "Structure" }
+    }
+    // Labour / assembly
+    if (/assembly|integration|labour|labor|layup/.test(haystack)) {
+        return { category: "labour", categoryLabel: "Labour" }
+    }
+    // Inspect / test
+    if (/inspect|test|ndt|metrology|fai|qa|quality/.test(haystack)) {
+        return { category: "inspect", categoryLabel: "Inspect" }
+    }
+    // Logistics
+    if (/freight|logistics|packaging|shipping|duty|tax/.test(haystack)) {
+        return { category: "logistics", categoryLabel: "Logistics" }
+    }
+    // NRE / tooling
+    if (/tooling|nre|autoclave|fixture/.test(haystack)) {
+        return { category: "nre", categoryLabel: "NRE" }
+    }
+
+    return { category: "neutral", categoryLabel: "Module" }
+}
+
+async function safeLibraryCounts(): Promise<{ materials: number; hardware: number; processes: number }> {
+    try {
+        const supabase = await createClient()
+        const [m, h, p] = await Promise.all([
+            supabase.from("material_properties").select("*", { count: "exact", head: true }),
+            supabase.from("standard_hardware").select("*", { count: "exact", head: true }),
+            supabase.from("process_capabilities").select("*", { count: "exact", head: true }),
+        ])
         return {
-            moduleId: m.id,
-            moduleName: m.name,
-            estimate: typeof est?.totalCostPerUnit === 'number' ? est.totalCostPerUnit : null,
-            mass: m.estimatedMassKg ?? null,
-            override,
+            materials: m.count ?? 0,
+            hardware: h.count ?? 0,
+            processes: p.count ?? 0,
         }
-    })
-    const totalAllIn = rows.reduce((sum, r) => sum + (r.override ?? r.estimate ?? 0), 0)
-    const hasEstimates = rows.some(r => r.estimate !== null || r.override !== null)
-
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
-                { label: "Cost" },
-            ]}
-            subtitle={hasEstimates ? `£${Math.round(totalAllIn).toLocaleString()}/unit rolled up from ${rows.filter(r => r.estimate !== null).length} estimates` : "No cost estimates yet"}
-        >
-            {!hasEstimates ? (
-                <Card className="rounded-xl border">
-                    <CardContent className="py-12 flex flex-col items-center text-center gap-4">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-muted">
-                            <PoundSterling className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <div className="max-w-sm space-y-2">
-                            <p className="text-sm font-semibold text-foreground">No cost estimates yet</p>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                Run specialist cost reviews per module in CAD Lab. Each review produces a material + labour estimate that rolls up here.
-                            </p>
-                        </div>
-                        <Link
-                            href={`/the-forge/cad-lab?project=${project.id}`}
-                            className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                        >
-                            Open CAD Lab <ArrowRight className="h-3.5 w-3.5" />
-                        </Link>
-                    </CardContent>
-                </Card>
-            ) : (
-                <>
-                    {/* Headline */}
-                    <Card className="rounded-xl border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.03]">
-                        <CardContent className="py-4 px-5 flex items-center gap-4">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10 text-international-orange">
-                                <TrendingUp className="h-5 w-5" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-[10.5px] font-bold uppercase tracking-widest text-international-orange mb-0.5">Unit cost (all-in)</p>
-                                <p className="text-2xl font-bold text-foreground tabular-nums">£{Math.round(totalAllIn).toLocaleString()}<span className="text-sm text-muted-foreground font-medium"> /unit</span></p>
-                                <p className="text-[11px] text-muted-foreground mt-0.5">Rolled up across {rows.length} modules · ±20% confidence band</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="rounded-xl border overflow-hidden">
-                        <div className="grid grid-cols-[1fr_120px_120px_120px_32px] gap-3 px-5 py-3 border-b border-border bg-muted/30 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                            <span>Module</span>
-                            <span className="text-right">Mass</span>
-                            <span className="text-right">Estimate</span>
-                            <span className="text-right">Override</span>
-                            <span />
-                        </div>
-                        {rows.map((r) => (
-                            <Link
-                                key={r.moduleId}
-                                href={`/the-forge-v2/projects/${project.id}/modules/${r.moduleId}`}
-                                className="grid grid-cols-[1fr_120px_120px_120px_32px] gap-3 px-5 py-3 items-center text-sm border-b border-border/50 last:border-b-0 hover:bg-muted/30 transition-colors group"
-                            >
-                                <span className="font-medium text-foreground truncate group-hover:text-international-orange transition-colors">{r.moduleName}</span>
-                                <span className="text-right tabular-nums text-muted-foreground">{r.mass ? `${r.mass.toFixed(2)} kg` : '—'}</span>
-                                <span className="text-right tabular-nums font-semibold text-foreground">
-                                    {r.estimate !== null ? `£${Math.round(r.estimate).toLocaleString()}` : <span className="text-muted-foreground font-normal">—</span>}
-                                </span>
-                                <span className="text-right tabular-nums">
-                                    {r.override !== null ? (
-                                        <Badge variant="outline" className="text-[10.5px] bg-electric-blue/10 text-electric-blue border-electric-blue/30">
-                                            £{Math.round(r.override).toLocaleString()}
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                    )}
-                                </span>
-                                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange group-hover:translate-x-0.5 transition-all" />
-                            </Link>
-                        ))}
-                    </Card>
-                </>
-            )}
-        </WorkspaceShell>
-    )
+    } catch (err) {
+        console.error("[COST-PAGE] library counts failed:", err)
+        return { materials: 0, hardware: 0, processes: 0 }
+    }
 }
