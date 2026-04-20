@@ -1,0 +1,283 @@
+/**
+ * launch-plan-v2.css — scoped (`.lp2`) styles for the Launch Checklist
+ * artefact page. Ports the page-level styles from FORGE-MOCKUP-LAUNCH.html
+ * (and shared tokens from forge-mockup.css) so this page matches the mockup
+ * without leaking into the rest of the platform.
+ */
+
+.lp2 {
+  /* Palette — mirrors forge-mockup.css tokens for this page only */
+  --lp-fg:             #1c1917;
+  --lp-fg-muted:       #78716c;
+  --lp-fg-faint:       #a8a29e;
+  --lp-fg-subtle:      #d6d3d1;
+  --lp-surface:        #ffffff;
+  --lp-surface-muted:  #f5f5f4;
+  --lp-surface-soft:   #fafaf9;
+  --lp-border:         #e7e5e4;
+  --lp-border-strong:  #d6d3d1;
+  --lp-brand:          #ff4500;
+  --lp-brand-soft:     rgba(255,69,0,0.10);
+  --lp-success:        #15803d;
+  --lp-success-soft:   #dcfce7;
+  --lp-warning:        #b45309;
+  --lp-warning-soft:   #fef3c7;
+  --lp-warning-border: #fde68a;
+  --lp-danger:         #b91c1c;
+  --lp-danger-soft:    #fee2e2;
+  --lp-info:           #1d4ed8;
+  --lp-info-soft:      #dbeafe;
+  --lp-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+  --lp-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+
+  color: var(--lp-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 32px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────── */
+.lp2-breadcrumb {
+  font-size: 11.5px;
+  color: var(--lp-fg-muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lp2-breadcrumb a {
+  color: var(--lp-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.lp2-breadcrumb a:hover { color: var(--lp-brand); }
+.lp2-breadcrumb .sep { color: var(--lp-fg-subtle); }
+.lp2-breadcrumb .current { color: var(--lp-fg); font-weight: 600; }
+
+/* ── Page header ────────────────────────────────────── */
+.lp2-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.lp2-page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.lp2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--lp-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
+}
+.lp2-page-header .sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--lp-fg-muted);
+  max-width: 780px;
+}
+.lp2-page-header .cta-group {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Buttons ────────────────────────────────────────── */
+.lp2-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lp-fg);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border-strong);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.lp2-btn:hover {
+  background: var(--lp-surface-muted);
+  border-color: var(--lp-fg-muted);
+}
+.lp2-btn.primary {
+  background: var(--lp-fg);
+  color: #fff;
+  border-color: var(--lp-fg);
+}
+.lp2-btn.primary:hover { background: #0f172a; }
+.lp2-btn.ghost {
+  background: transparent;
+  border-color: var(--lp-border);
+  color: var(--lp-fg-muted);
+}
+.lp2-btn.soon {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.lp2-link {
+  color: var(--lp-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+.lp2-link:hover { text-decoration: underline; }
+
+/* ── Annotation note band ───────────────────────────── */
+.lp2-annot {
+  background: var(--lp-surface-soft);
+  border-left: 3px solid var(--lp-fg-subtle);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--lp-fg-muted);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.lp2-annot strong {
+  color: var(--lp-fg);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+/* ── Dormant banner ─────────────────────────────────── */
+.lp2-dormant-banner {
+  background: var(--lp-surface-muted);
+  border: 1px dashed var(--lp-border-strong);
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+.lp2-dormant-banner h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--lp-fg);
+}
+.lp2-dormant-banner p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--lp-fg-muted);
+  line-height: 1.55;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.lp2-dormant-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── Checklist section ──────────────────────────────── */
+.lp2-section {
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--lp-shadow-xs);
+  opacity: 0.72;
+}
+.lp2-section.unlocked { opacity: 1; }
+
+.lp2-section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--lp-fg);
+}
+.lp2-section-count {
+  font-size: 11px;
+  color: var(--lp-fg-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Check items ────────────────────────────────────── */
+.lp2-check-item {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--lp-border);
+  align-items: center;
+  font-size: 12.5px;
+}
+.lp2-check-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.lp2-check-item:first-of-type { padding-top: 0; }
+
+.lp2-check-box {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--lp-border-strong);
+  border-radius: 4px;
+  background: var(--lp-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lp2-check-item.done .lp2-check-box {
+  background: var(--lp-success);
+  border-color: var(--lp-success);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.lp2-check-item.done .lp2-check-label {
+  text-decoration: line-through;
+  color: var(--lp-fg-muted);
+}
+
+.lp2-check-label {
+  font-weight: 500;
+  color: var(--lp-fg);
+}
+.lp2-check-sub {
+  font-size: 11px;
+  color: var(--lp-fg-muted);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.lp2-check-by {
+  font-size: 11px;
+  color: var(--lp-fg-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ── Empty row inside a section (for launch-specific items) ── */
+.lp2-empty-row {
+  font-size: 12.5px;
+  color: var(--lp-fg-muted);
+  line-height: 1.65;
+  padding: 4px 2px;
+}
+.lp2-empty-row strong {
+  color: var(--lp-fg);
+  font-weight: 600;
+}
