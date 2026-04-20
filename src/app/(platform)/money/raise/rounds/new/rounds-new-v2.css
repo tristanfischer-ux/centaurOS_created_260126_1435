@@ -1,0 +1,334 @@
+/**
+ * rounds-new-v2.css — scoped (`.rnd2`) styles for Money "Create round".
+ * Ports the page-level styles from MONEY-MOCKUP-CREATE-ROUND.html so the
+ * production page matches the mockup without leaking global styles into the
+ * platform. Design tokens mirror the forge-mockup / money-mockup variables
+ * and are declared inline on the root wrapper.
+ */
+
+.rnd2 {
+    --rnd-fg:             #1c1917;
+    --rnd-fg-muted:       #78716c;
+    --rnd-fg-faint:       #a8a29e;
+    --rnd-fg-subtle:      #d6d3d1;
+    --rnd-surface:        #ffffff;
+    --rnd-surface-muted:  #f5f5f4;
+    --rnd-surface-soft:   #fafaf9;
+    --rnd-border:         #e7e5e4;
+    --rnd-border-strong:  #d6d3d1;
+    --rnd-brand:          #ff4500;
+    --rnd-brand-soft:     rgba(255, 69, 0, 0.10);
+    --rnd-brand-dim:      rgba(255, 69, 0, 0.35);
+    --rnd-danger:         #b91c1c;
+    --rnd-success:        #15803d;
+    --rnd-shadow-xs:      0 1px 2px rgba(0, 0, 0, 0.04);
+
+    color: var(--rnd-fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 24px 32px 48px;
+    max-width: 1040px;
+    margin: 0 auto;
+}
+
+/* ── Breadcrumb ──────────────────────────────────────────────── */
+.rnd2-breadcrumb {
+    font-size: 11.5px;
+    color: var(--rnd-fg-muted);
+    letter-spacing: 0.02em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.rnd2-breadcrumb a {
+    color: var(--rnd-fg-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.rnd2-breadcrumb a:hover { color: var(--rnd-brand); }
+.rnd2-breadcrumb .sep { color: var(--rnd-fg-subtle); }
+.rnd2-breadcrumb .current { color: var(--rnd-fg); font-weight: 600; }
+
+/* ── Header card ─────────────────────────────────────────────── */
+.rnd2-head {
+    background: var(--rnd-surface);
+    border: 1px solid var(--rnd-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 20px;
+    box-shadow: var(--rnd-shadow-xs);
+    position: relative;
+    overflow: hidden;
+}
+.rnd2-head::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 320px;
+    height: 100%;
+    background: radial-gradient(ellipse at top right, var(--rnd-brand-soft) 0%, transparent 60%);
+    pointer-events: none;
+}
+.rnd2-head > * { position: relative; }
+.rnd2-head h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 0 0 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.rnd2-title-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--rnd-brand);
+    border-radius: 100%;
+    flex-shrink: 0;
+}
+.rnd2-head .sub {
+    font-size: 13px;
+    color: var(--rnd-fg-muted);
+    max-width: 680px;
+    line-height: 1.55;
+}
+
+/* ── Section card ────────────────────────────────────────────── */
+.rnd2-section {
+    background: var(--rnd-surface);
+    border: 1px solid var(--rnd-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 16px;
+    box-shadow: var(--rnd-shadow-xs);
+}
+.rnd2-section h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+.rnd2-section .section-sub {
+    font-size: 12px;
+    color: var(--rnd-fg-muted);
+    margin-bottom: 16px;
+}
+
+/* ── Fields ──────────────────────────────────────────────────── */
+.rnd2 .fld { margin-bottom: 14px; }
+.rnd2 .fld:last-child { margin-bottom: 0; }
+.rnd2 .fld label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--rnd-fg);
+    margin-bottom: 5px;
+}
+.rnd2 .fld label .req {
+    color: var(--rnd-danger);
+    margin-left: 2px;
+}
+.rnd2 .fld label .opt {
+    color: var(--rnd-fg-faint);
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 4px;
+}
+.rnd2 .fld input,
+.rnd2 .fld select,
+.rnd2 .fld textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--rnd-border);
+    border-radius: 7px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--rnd-surface);
+    color: var(--rnd-fg);
+    transition: border-color 0.12s, box-shadow 0.12s;
+}
+.rnd2 .fld input:focus,
+.rnd2 .fld select:focus,
+.rnd2 .fld textarea:focus {
+    outline: none;
+    border-color: var(--rnd-brand);
+    box-shadow: 0 0 0 3px var(--rnd-brand-soft);
+}
+.rnd2 .fld input.xl {
+    font-size: 18px;
+    font-weight: 800;
+}
+.rnd2 .fld .hint {
+    font-size: 11.5px;
+    color: var(--rnd-fg-muted);
+    margin-top: 4px;
+    line-height: 1.5;
+}
+.rnd2 .fld .two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.rnd2 .fld.two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.rnd2 .fld textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+@media (max-width: 640px) {
+    .rnd2 .fld.two { grid-template-columns: 1fr; }
+}
+
+/* ── Chip picker (instrument / lead / close-style) ───────────── */
+.rnd2-chip-pick {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.rnd2-cp {
+    padding: 8px 14px;
+    border: 1.5px solid var(--rnd-border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--rnd-fg-muted);
+    background: var(--rnd-surface);
+    font-family: inherit;
+    transition: all 0.12s;
+}
+.rnd2-cp:hover {
+    color: var(--rnd-fg);
+    border-color: var(--rnd-border-strong);
+}
+.rnd2-cp.active {
+    background: var(--rnd-brand);
+    color: #ffffff;
+    border-color: var(--rnd-brand);
+}
+
+/* ── Preview card (rendered raise header) ────────────────────── */
+.rnd2-preview-card {
+    background: var(--rnd-surface);
+    border: 1px solid var(--rnd-border);
+    border-radius: 10px;
+    padding: 18px 22px;
+}
+.rnd2-preview-card .kicker {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--rnd-brand);
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+.rnd2-preview-card .headline {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+}
+.rnd2-preview-card .headline small {
+    font-size: 13px;
+    color: var(--rnd-fg-muted);
+    font-weight: 600;
+    margin-left: 6px;
+}
+.rnd2-preview-card .meta {
+    font-size: 12.5px;
+    color: var(--rnd-fg-muted);
+}
+
+/* ── Math-check callout ──────────────────────────────────────── */
+.rnd2-math {
+    background: var(--rnd-brand-soft);
+    border: 1px solid var(--rnd-brand-dim);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: #7c2d12;
+    line-height: 1.55;
+    margin-top: 12px;
+}
+.rnd2-math strong { color: #451a03; }
+.rnd2-math .eq {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 12.5px;
+    background: #ffffff;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-top: 8px;
+    color: var(--rnd-fg);
+}
+.rnd2-math .big {
+    font-size: 22px;
+    font-weight: 800;
+    color: #7c2d12;
+    display: block;
+    margin-top: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Footer action bar ───────────────────────────────────────── */
+.rnd2-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--rnd-surface);
+    border: 1px solid var(--rnd-border);
+    border-radius: 12px;
+    padding: 14px 22px;
+    box-shadow: var(--rnd-shadow-xs);
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.rnd2-footer .note {
+    font-size: 12.5px;
+    color: var(--rnd-fg-muted);
+    flex: 1;
+    min-width: 220px;
+}
+.rnd2-footer .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.rnd2-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid var(--rnd-border-strong);
+    background: var(--rnd-surface);
+    color: var(--rnd-fg);
+    font-family: inherit;
+    transition: all 0.15s;
+}
+.rnd2-btn:hover { background: var(--rnd-surface-muted); }
+.rnd2-btn.primary {
+    background: var(--rnd-brand);
+    color: #ffffff;
+    border-color: var(--rnd-brand);
+}
+.rnd2-btn.primary:hover { opacity: 0.92; }
+.rnd2-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.rnd2-btn.primary:disabled { background: var(--rnd-success); border-color: var(--rnd-success); }
