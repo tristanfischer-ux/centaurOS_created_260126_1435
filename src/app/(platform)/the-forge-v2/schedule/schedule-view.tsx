@@ -24,7 +24,7 @@
  *     invented numbers.
  *
  * Sections (top to bottom, matching the mockup shell):
- *   1. Breadcrumb — Today › Schedule
+ *   1. Breadcrumb — Forge › Schedule
  *   2. Annotation note — one calendar picker for every Book/Schedule action
  *   3. Page title + sub
  *   4. Main card
@@ -178,7 +178,7 @@ export function ScheduleView(props: ScheduleViewProps): React.ReactElement {
         <div className="sh2">
             {/* ── Breadcrumb ─────────────────────────────── */}
             <nav className="sh2-breadcrumb" aria-label="Breadcrumb">
-                <Link href="/today">Today</Link>
+                <Link href="/the-forge-v2">Forge</Link>
                 <span className="sep" aria-hidden="true">›</span>
                 <span className="current">Schedule</span>
             </nav>
@@ -196,10 +196,9 @@ export function ScheduleView(props: ScheduleViewProps): React.ReactElement {
             {/* ── Page header ────────────────────────────── */}
             <h1 className="sh2-page-title"><span className="sh2-title-dot" aria-hidden="true" />Schedule</h1>
             <p className="sh2-page-sub">
-                This week&rsquo;s scheduled blocks across projects — founder
-                sessions, specialist conversations, supplier calls and
-                compliance audits. Calendar integration is not connected yet,
-                so the week renders empty until blocks land.
+                Every time-bound item across my projects in one place — calendar
+                holds, specialist reviews, supplier deadlines and compliance
+                audits.
             </p>
 
             {/* ── Main + side grid ───────────────────────── */}
