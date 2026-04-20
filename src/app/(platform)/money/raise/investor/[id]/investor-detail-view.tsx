@@ -155,10 +155,45 @@ export function InvestorDetailView({ detail }: { detail: InvestorDetail }) {
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">Firm</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {detail.firm.description && (
-              <p className="text-muted-foreground">{detail.firm.description}</p>
-            )}
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-14 w-14 rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                {detail.firm.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={detail.firm.image_url}
+                    alt={`${detail.firm.title ?? 'Investor'} logo`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-sm font-bold text-muted-foreground">
+                    {(detail.firm.title ?? '?').slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {detail.firm.subcategory && (
+                    <Badge variant="secondary" size="sm">{detail.firm.subcategory}</Badge>
+                  )}
+                  {(detail.firm.city || detail.firm.country) && (
+                    <span className="text-xs text-muted-foreground">
+                      {[detail.firm.city, detail.firm.country].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                  {detail.firm.founded_year && (
+                    <span className="text-xs text-muted-foreground">Founded {detail.firm.founded_year}</span>
+                  )}
+                  {detail.firm.company_size && (
+                    <span className="text-xs text-muted-foreground">{detail.firm.company_size}</span>
+                  )}
+                </div>
+                {detail.firm.description && (
+                  <p className="mt-2 text-muted-foreground">{detail.firm.description}</p>
+                )}
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
               {detail.firm.website_url && (
                 <a
@@ -171,13 +206,96 @@ export function InvestorDetailView({ detail }: { detail: InvestorDetail }) {
                 </a>
               )}
               {detail.firm.contact_name && (
-                <span className="text-muted-foreground">Contact: {detail.firm.contact_name}</span>
+                <span className="text-muted-foreground">
+                  Contact: {detail.firm.contact_name}
+                  {detail.firm.contact_title ? ` (${detail.firm.contact_title})` : ''}
+                </span>
               )}
               {detail.firm.contact_email && (
                 <a href={`mailto:${detail.firm.contact_email}`} className="text-international-orange underline">
                   {detail.firm.contact_email}
                 </a>
               )}
+              {detail.firm.contact_linkedin && (
+                <a href={detail.firm.contact_linkedin} target="_blank" rel="noreferrer" className="text-international-orange underline">
+                  LinkedIn
+                </a>
+              )}
+            </div>
+
+            {detail.firm.last_enriched_at && (
+              <p className="text-[10px] text-muted-foreground/70">
+                Enriched {new Date(detail.firm.last_enriched_at).toLocaleDateString('en-GB')}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {detail.news && (detail.news.intel_summary || detail.news.current_focus) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Recent intel</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {detail.news.current_focus && (
+              <p><span className="font-semibold">Current focus:</span> {detail.news.current_focus}</p>
+            )}
+            {detail.news.intel_summary && (
+              <p className="text-muted-foreground whitespace-pre-line">{detail.news.intel_summary}</p>
+            )}
+            <p className="text-[10px] text-muted-foreground/70">
+              Updated {new Date(detail.news.generated_at).toLocaleDateString('en-GB')}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {detail.portfolio.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Portfolio ({detail.portfolio.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 px-4">Company</th>
+                    <th className="py-2 px-4">Sector</th>
+                    <th className="py-2 px-4">Stage</th>
+                    <th className="py-2 px-4 text-right">Amount</th>
+                    <th className="py-2 px-4">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.portfolio.map((p) => (
+                    <tr key={p.id} className="border-b border-border/50">
+                      <td className="py-2 px-4 font-medium">
+                        {p.source_url ? (
+                          <a href={p.source_url} target="_blank" rel="noreferrer" className="hover:underline">
+                            {p.company_name}
+                          </a>
+                        ) : (
+                          p.company_name
+                        )}
+                      </td>
+                      <td className="py-2 px-4 text-muted-foreground">{p.sector ?? '—'}</td>
+                      <td className="py-2 px-4 text-muted-foreground">{p.stage ?? '—'}</td>
+                      <td className="py-2 px-4 text-right tabular-nums text-muted-foreground">
+                        {p.amount_usd != null
+                          ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(p.amount_usd)
+                          : '—'}
+                      </td>
+                      <td className="py-2 px-4 text-xs text-muted-foreground">
+                        {p.investment_date ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>

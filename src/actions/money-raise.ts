@@ -49,9 +49,19 @@ export type PipelineRow = {
   match_score_cached: number | null
 }
 
+// Join result — pipeline row + surfacing marketplace_listings so kanban cards
+// can render the real firm name + badge instead of "Unnamed investor".
+export type PipelineRowWithFirm = PipelineRow & {
+  firm_title: string | null
+  firm_subcategory: string | null
+  firm_city: string | null
+  firm_country: string | null
+  firm_image_url: string | null
+}
+
 export type RaiseData = {
   activeRound: RaiseRound | null
-  pipeline: PipelineRow[]
+  pipeline: PipelineRowWithFirm[]
   roundCount: number
 }
 
@@ -88,9 +98,50 @@ export async function getRaiseData(): Promise<RaiseData | { error: string }> {
 
     const { data: pipelineRows } = await pipelineQuery
 
+    // Enrich pipeline rows with marketplace_listings for firm name + badges.
+    // Single round-trip join via an IN() on the collected listing IDs.
+    const listingIds = Array.from(
+      new Set(
+        (pipelineRows ?? [])
+          .map((r) => r.marketplace_listing_id)
+          .filter((v): v is string => !!v),
+      ),
+    )
+    const firmById = new Map<
+      string,
+      { title: string | null; subcategory: string | null; city: string | null; country: string | null; image_url: string | null }
+    >()
+    if (listingIds.length > 0) {
+      const { data: firms } = await supabase
+        .from('marketplace_listings')
+        .select('id, title, subcategory, city, country, image_url')
+        .in('id', listingIds)
+      for (const f of firms ?? []) {
+        firmById.set(f.id, {
+          title: f.title,
+          subcategory: f.subcategory,
+          city: f.city,
+          country: f.country,
+          image_url: f.image_url,
+        })
+      }
+    }
+
+    const pipeline: PipelineRowWithFirm[] = (pipelineRows ?? []).map((r) => {
+      const firm = r.marketplace_listing_id ? firmById.get(r.marketplace_listing_id) : undefined
+      return {
+        ...(r as PipelineRow),
+        firm_title: firm?.title ?? null,
+        firm_subcategory: firm?.subcategory ?? null,
+        firm_city: firm?.city ?? null,
+        firm_country: firm?.country ?? null,
+        firm_image_url: firm?.image_url ?? null,
+      }
+    })
+
     return {
       activeRound,
-      pipeline: (pipelineRows ?? []) as PipelineRow[],
+      pipeline,
       roundCount: roundCount ?? 0,
     }
   })
@@ -262,11 +313,45 @@ export type PipelineEventRow = {
 export type InvestorFirmInfo = {
   marketplace_listing_id: string | null
   title: string | null
+  subcategory: string | null
   description: string | null
   website_url: string | null
+  image_url: string | null
+  city: string | null
   country: string | null
+  country_iso: string | null
+  industries: unknown
+  specialties: unknown
+  key_people: unknown
   contact_name: string | null
   contact_email: string | null
+  contact_title: string | null
+  contact_linkedin: string | null
+  founded_year: number | null
+  company_size: string | null
+  last_enriched_at: string | null
+}
+
+export type PortfolioCompanyRow = {
+  id: string
+  company_name: string
+  sector: string | null
+  stage: string | null
+  amount_usd: number | null
+  investment_date: string | null
+  description: string | null
+  why_appealing: string | null
+  source_url: string | null
+}
+
+export type NewsIntelRow = {
+  id: string
+  intel_summary: string | null
+  key_signals: unknown
+  current_focus: string | null
+  recent_deals: unknown
+  sources: unknown
+  generated_at: string
 }
 
 export type InvestorDetail = {
@@ -276,6 +361,8 @@ export type InvestorDetail = {
   }
   events: PipelineEventRow[]
   firm: InvestorFirmInfo | null
+  portfolio: PortfolioCompanyRow[]
+  news: NewsIntelRow | null
 }
 
 function asJsonObject(value: unknown): Record<string, unknown> {
@@ -318,21 +405,69 @@ export async function getInvestorDetail(
     }))
 
     let firm: InvestorFirmInfo | null = null
+    let portfolio: PortfolioCompanyRow[] = []
+    let news: NewsIntelRow | null = null
+
     if (stateRow.marketplace_listing_id) {
-      const { data: listing } = await supabase
-        .from('marketplace_listings')
-        .select('id, title, description, website_url, country, contact_name, contact_email')
-        .eq('id', stateRow.marketplace_listing_id)
-        .maybeSingle()
+      // Parallel fetch: firm + portfolio + news intel
+      const [{ data: listing }, { data: portfolioRows }, { data: newsRow }] = await Promise.all([
+        supabase
+          .from('marketplace_listings')
+          .select(
+            'id, title, subcategory, description, website_url, image_url, city, country, country_iso, industries, specialties, key_people, contact_name, contact_email, contact_title, contact_linkedin, founded_year, company_size, last_enriched_at',
+          )
+          .eq('id', stateRow.marketplace_listing_id)
+          .maybeSingle(),
+        supabase
+          .from('investor_portfolio_companies')
+          .select(
+            'id, company_name, sector, stage, amount_usd, investment_date, description, why_appealing, source_url',
+          )
+          .eq('listing_id', stateRow.marketplace_listing_id)
+          .order('investment_date', { ascending: false, nullsFirst: false })
+          .limit(20),
+        supabase
+          .from('investor_news_intel')
+          .select('id, intel_summary, key_signals, current_focus, recent_deals, sources, generated_at')
+          .eq('listing_id', stateRow.marketplace_listing_id)
+          .order('generated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
+
       if (listing) {
         firm = {
           marketplace_listing_id: listing.id,
           title: listing.title,
+          subcategory: listing.subcategory,
           description: listing.description,
           website_url: listing.website_url,
+          image_url: listing.image_url,
+          city: listing.city,
           country: listing.country,
+          country_iso: listing.country_iso,
+          industries: listing.industries,
+          specialties: listing.specialties,
+          key_people: listing.key_people,
           contact_name: listing.contact_name,
           contact_email: listing.contact_email,
+          contact_title: listing.contact_title,
+          contact_linkedin: listing.contact_linkedin,
+          founded_year: listing.founded_year,
+          company_size: listing.company_size,
+          last_enriched_at: listing.last_enriched_at,
+        }
+      }
+      portfolio = (portfolioRows ?? []) as PortfolioCompanyRow[]
+      if (newsRow) {
+        news = {
+          id: newsRow.id,
+          intel_summary: newsRow.intel_summary,
+          key_signals: newsRow.key_signals,
+          current_focus: newsRow.current_focus,
+          recent_deals: newsRow.recent_deals,
+          sources: newsRow.sources,
+          generated_at: newsRow.generated_at,
         }
       }
     }
@@ -355,7 +490,197 @@ export async function getInvestorDetail(
       },
       events,
       firm,
+      portfolio,
+      news,
     }
+  })
+}
+
+// ============================================================================
+// Investor directory ↔ Raise — browse + add-to-pipeline
+// ============================================================================
+
+export type BrowseInvestorFilters = {
+  query?: string
+  subcategory?: string
+  country?: string
+  limit?: number
+  offset?: number
+}
+
+export type BrowseInvestorRow = {
+  id: string
+  title: string | null
+  subcategory: string | null
+  description: string | null
+  image_url: string | null
+  city: string | null
+  country: string | null
+  website_url: string | null
+  already_in_pipeline: boolean
+  pipeline_state_id: string | null
+  pipeline_stage: string | null
+}
+
+export type BrowseInvestorsResult = {
+  rows: BrowseInvestorRow[]
+  total: number
+  hasMore: boolean
+}
+
+const BROWSE_SUBCATEGORIES = [
+  'VC Fund',
+  'PE Firm',
+  'Accelerator',
+  'Family Office',
+  'Corporate Venture',
+  'Advisory Services',
+  'Other',
+] as const
+
+/**
+ * Browse the `marketplace_listings` Finance directory from inside Money/Raise.
+ * Surfaces the ~7,500 investor rows (VC Funds / PE Firms / Accelerators /
+ * Family Offices / Corporate Venture / Advisory / Other) with a client-
+ * selectable subcategory + country + free-text filter. `already_in_pipeline`
+ * is set when the calling foundry already has an `investor_pipeline_state`
+ * row pointing at that listing, so the UI can show "In pipeline" instead of
+ * "Add to pipeline".
+ */
+export async function browseInvestorsForMoney(
+  filters: BrowseInvestorFilters = {},
+): Promise<BrowseInvestorsResult | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const limit = Math.min(Math.max(filters.limit ?? 25, 1), 100)
+    const offset = Math.max(filters.offset ?? 0, 0)
+
+    let query = supabase
+      .from('marketplace_listings')
+      .select(
+        'id, title, subcategory, description, image_url, city, country, website_url',
+        { count: 'exact' },
+      )
+      .eq('category', 'Finance')
+      .not('title', 'is', null)
+
+    if (filters.subcategory && filters.subcategory !== 'all') {
+      query = query.eq('subcategory', filters.subcategory)
+    }
+    if (filters.country) {
+      query = query.ilike('country', `%${filters.country}%`)
+    }
+    if (filters.query && filters.query.trim()) {
+      // Sanitize the free-text filter to keep postgrest .or() safe — alpha-
+      // numeric + spaces only (protects against injection in .or() filter).
+      const safe = filters.query.trim().replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 60)
+      if (safe) {
+        query = query.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`)
+      }
+    }
+
+    query = query.order('title', { ascending: true }).range(offset, offset + limit - 1)
+
+    const { data: listings, count, error } = await query
+    if (error) return { error: error.message }
+
+    const ids = (listings ?? []).map((l) => l.id)
+    const stateByListing = new Map<string, { id: string; current_stage: string }>()
+    if (ids.length > 0) {
+      const { data: states } = await supabase
+        .from('investor_pipeline_state')
+        .select('id, marketplace_listing_id, current_stage')
+        .eq('foundry_id', foundryId)
+        .in('marketplace_listing_id', ids)
+        .is('archived_at', null)
+      for (const s of states ?? []) {
+        if (s.marketplace_listing_id) {
+          stateByListing.set(s.marketplace_listing_id, {
+            id: s.id,
+            current_stage: s.current_stage,
+          })
+        }
+      }
+    }
+
+    const rows: BrowseInvestorRow[] = (listings ?? []).map((l) => {
+      const state = stateByListing.get(l.id)
+      return {
+        id: l.id,
+        title: l.title,
+        subcategory: l.subcategory,
+        description: l.description,
+        image_url: l.image_url,
+        city: l.city,
+        country: l.country,
+        website_url: l.website_url,
+        already_in_pipeline: !!state,
+        pipeline_state_id: state?.id ?? null,
+        pipeline_stage: state?.current_stage ?? null,
+      }
+    })
+
+    const total = count ?? rows.length
+    return { rows, total, hasMore: offset + rows.length < total }
+  })
+}
+
+export function listBrowseSubcategories(): readonly string[] {
+  return BROWSE_SUBCATEGORIES
+}
+
+/**
+ * Add a marketplace_listings row to the caller's pipeline. Creates a new
+ * investor_pipeline_state row with current_stage='target' and assigns it to
+ * the currently-active round (if any). If the investor is already in the
+ * pipeline, returns the existing state id.
+ */
+export async function addInvestorToPipeline(input: {
+  marketplace_listing_id: string
+  round_id?: string
+}): Promise<{ pipeline_state_id: string; already_existed: boolean } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // Resolve target round: explicit > active > none
+    let roundId: string | null = input.round_id ?? null
+    if (!roundId) {
+      const { data: activeRound } = await supabase
+        .from('investor_round')
+        .select('id')
+        .eq('foundry_id', foundryId)
+        .eq('state', 'active')
+        .is('archived_at', null)
+        .maybeSingle()
+      roundId = activeRound?.id ?? null
+    }
+
+    // Idempotency: if this foundry already has a non-archived pipeline row
+    // for this listing, return it instead of creating a duplicate.
+    const { data: existing } = await supabase
+      .from('investor_pipeline_state')
+      .select('id')
+      .eq('foundry_id', foundryId)
+      .eq('marketplace_listing_id', input.marketplace_listing_id)
+      .is('archived_at', null)
+      .maybeSingle()
+    if (existing) {
+      return { pipeline_state_id: existing.id, already_existed: true }
+    }
+
+    const { data, error } = await supabase
+      .from('investor_pipeline_state')
+      .insert({
+        foundry_id: foundryId,
+        round_id: roundId,
+        marketplace_listing_id: input.marketplace_listing_id,
+        current_stage: 'target',
+        stage_entered_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+    if (error || !data) return { error: error?.message ?? 'Add to pipeline failed' }
+
+    revalidatePath('/money/raise')
+    revalidatePath('/money/raise/browse')
+    return { pipeline_state_id: data.id, already_existed: false }
   })
 }
 

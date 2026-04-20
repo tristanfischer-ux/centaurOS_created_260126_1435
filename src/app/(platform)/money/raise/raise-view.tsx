@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import { CircleDot, Plus } from 'lucide-react'
-import type { RaiseData, PipelineRow } from '@/actions/money-raise'
+import { CircleDot, Plus, Search } from 'lucide-react'
+import type { RaiseData, PipelineRow, PipelineRowWithFirm } from '@/actions/money-raise'
 
 const STAGE_ORDER: Array<PipelineRow['current_stage']> = [
   'target',
@@ -45,7 +45,7 @@ export function RaiseView({ data }: { data: RaiseData }) {
         <header>
           <h1 className="text-2xl font-bold tracking-tight">Raise</h1>
           <p className="text-sm text-muted-foreground">
-            Start by creating your first fundraise round.
+            Start by creating your first fundraise round, then browse 7,500+ investors from the Fractional Forge directory.
           </p>
         </header>
         <Card>
@@ -53,14 +53,22 @@ export function RaiseView({ data }: { data: RaiseData }) {
             <EmptyState
               icon={<CircleDot className="h-12 w-12" />}
               title="No round created yet"
-              description="Define your round target, instrument, and close date. You can add investors to your pipeline after."
+              description="Define your round target, instrument, and close date. You can add investors to your pipeline from the directory after."
               action={
-                <Link href="/money/raise/new-round">
-                  <Button>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Create round
-                  </Button>
-                </Link>
+                <div className="flex gap-2 justify-center">
+                  <Link href="/money/raise/new-round">
+                    <Button>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create round
+                    </Button>
+                  </Link>
+                  <Link href="/money/raise/browse">
+                    <Button variant="secondary">
+                      <Search className="h-4 w-4 mr-1" />
+                      Browse investors
+                    </Button>
+                  </Link>
+                </div>
               }
             />
           </CardContent>
@@ -69,7 +77,7 @@ export function RaiseView({ data }: { data: RaiseData }) {
     )
   }
 
-  const byStage = new Map<string, PipelineRow[]>()
+  const byStage = new Map<string, PipelineRowWithFirm[]>()
   for (const s of STAGE_ORDER) byStage.set(s, [])
   for (const row of data.pipeline) {
     byStage.get(row.current_stage)?.push(row)
@@ -81,7 +89,7 @@ export function RaiseView({ data }: { data: RaiseData }) {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-start justify-between">
+      <header className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Raise</h1>
           {data.activeRound ? (
@@ -94,7 +102,13 @@ export function RaiseView({ data }: { data: RaiseData }) {
             <p className="text-sm text-muted-foreground mt-2">No active round</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/money/raise/browse">
+            <Button size="sm">
+              <Search className="h-4 w-4 mr-1" />
+              Browse investors
+            </Button>
+          </Link>
           <Link href="/money/raise/thesis">
             <Button size="sm" variant="secondary">Thesis</Button>
           </Link>
@@ -113,10 +127,13 @@ export function RaiseView({ data }: { data: RaiseData }) {
             <EmptyState
               icon={<CircleDot className="h-12 w-12" />}
               title="No investors in pipeline yet"
-              description="Add investors from your shortlist or directly from the directory."
+              description="Browse the Fractional Forge investor directory (7,500+ firms) and add them to your pipeline."
               action={
-                <Link href="/money/raise/investors/browse">
-                  <Button>Browse investors</Button>
+                <Link href="/money/raise/browse">
+                  <Button>
+                    <Search className="h-4 w-4 mr-1" />
+                    Browse investors
+                  </Button>
                 </Link>
               }
             />
@@ -124,7 +141,7 @@ export function RaiseView({ data }: { data: RaiseData }) {
         </Card>
       ) : (
         <div className="overflow-x-auto">
-          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${STAGE_ORDER.length}, minmax(180px, 1fr))` }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${STAGE_ORDER.length}, minmax(200px, 1fr))` }}>
             {STAGE_ORDER.map((stage) => {
               const rows = byStage.get(stage) ?? []
               return (
@@ -139,29 +156,38 @@ export function RaiseView({ data }: { data: RaiseData }) {
                     {rows.length === 0 ? (
                       <p className="text-xs text-muted-foreground/60 py-4 text-center">Empty</p>
                     ) : (
-                      rows.map((row) => (
-                        <Link
-                          key={row.id}
-                          href={`/money/raise/investor/${row.id}`}
-                          className="block rounded-md border border-border bg-card p-2 text-xs hover:bg-muted/30 transition-colors"
-                        >
-                          <div className="font-medium truncate">
-                            {row.investor_firm_id ?? row.marketplace_listing_id ?? 'Unnamed investor'}
-                          </div>
-                          <div className="mt-1 flex items-center justify-between text-muted-foreground">
-                            <span>
-                              {row.commit_amount_cents
-                                ? formatCurrency(row.commit_amount_cents, data.activeRound?.currency ?? 'GBP')
-                                : '—'}
-                            </span>
-                            {row.match_score_cached !== null && (
-                              <Badge variant="outline" size="sm">
-                                {row.match_score_cached}%
-                              </Badge>
+                      rows.map((row) => {
+                        const title = row.firm_title ?? 'Unnamed investor'
+                        const loc = [row.firm_city, row.firm_country].filter(Boolean).join(' · ')
+                        return (
+                          <Link
+                            key={row.id}
+                            href={`/money/raise/investor/${row.id}`}
+                            className="block rounded-md border border-border bg-card p-2 text-xs hover:bg-muted/30 transition-colors"
+                          >
+                            <div className="font-medium truncate">{title}</div>
+                            {(row.firm_subcategory || loc) && (
+                              <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
+                                {row.firm_subcategory ?? ''}
+                                {row.firm_subcategory && loc ? ' · ' : ''}
+                                {loc}
+                              </div>
                             )}
-                          </div>
-                        </Link>
-                      ))
+                            <div className="mt-1 flex items-center justify-between text-muted-foreground">
+                              <span>
+                                {row.commit_amount_cents
+                                  ? formatCurrency(row.commit_amount_cents, data.activeRound?.currency ?? 'GBP')
+                                  : '—'}
+                              </span>
+                              {row.match_score_cached !== null && (
+                                <Badge variant="outline" size="sm">
+                                  {row.match_score_cached}%
+                                </Badge>
+                              )}
+                            </div>
+                          </Link>
+                        )
+                      })
                     )}
                   </CardContent>
                 </Card>
