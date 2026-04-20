@@ -4590,6 +4590,87 @@ export type Database = {
           },
         ]
       }
+      cad_lab_project_files: {
+        Row: {
+          bbox_max_mm: Json | null
+          bbox_min_mm: Json | null
+          created_at: string
+          filename: string
+          format: string
+          foundry_id: string
+          id: string
+          material_hint: string | null
+          mime_type: string
+          parse_error: string | null
+          parse_status: string
+          part_count: number | null
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          surface_area_mm2: number | null
+          updated_at: string
+          uploaded_by: string
+          volume_mm3: number | null
+        }
+        Insert: {
+          bbox_max_mm?: Json | null
+          bbox_min_mm?: Json | null
+          created_at?: string
+          filename: string
+          format: string
+          foundry_id: string
+          id?: string
+          material_hint?: string | null
+          mime_type: string
+          parse_error?: string | null
+          parse_status?: string
+          part_count?: number | null
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          surface_area_mm2?: number | null
+          updated_at?: string
+          uploaded_by: string
+          volume_mm3?: number | null
+        }
+        Update: {
+          bbox_max_mm?: Json | null
+          bbox_min_mm?: Json | null
+          created_at?: string
+          filename?: string
+          format?: string
+          foundry_id?: string
+          id?: string
+          material_hint?: string | null
+          mime_type?: string
+          parse_error?: string | null
+          parse_status?: string
+          part_count?: number | null
+          project_id?: string
+          size_bytes?: number
+          storage_path?: string
+          surface_area_mm2?: number | null
+          updated_at?: string
+          uploaded_by?: string
+          volume_mm3?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cad_lab_project_files_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cad_lab_project_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_lab_projects: {
         Row: {
           accepted_risks: Json | null

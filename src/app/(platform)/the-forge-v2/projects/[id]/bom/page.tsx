@@ -1,106 +1,184 @@
 /**
  * @file bom/page.tsx — /the-forge-v2/projects/:id/bom
  *
- * @description Bill of Materials: rolls up every part from every module into
- * one searchable list. Groups by material when possible. Empty state when
- * modules haven't generated parts yet.
+ * @description BOM artefact — mockup-faithful port of FORGE-MOCKUP-BOM.html.
+ * Server component reads the project, flattens every module's keyParts into
+ * BOM rows grouped by module, pulls module-level cost estimates to build the
+ * bottom-right cost stack, and hands a typed props bundle to BomView.
  *
- * Mockup ref: FORGE-MOCKUP-BOM.html / FORGE-MOCKUP-EMPTY-BOM.html.
+ * Empty-state policy: per-part material, tolerance, supplier, unit £ and
+ * spec-fit don't exist yet — they ship with a dedicated parts_spec table in
+ * a future migration. Every such column renders honest "—" / "Not yet
+ * shortlisted" placeholders. We never synthesise mockup specifics (T800
+ * prepreg, Astra Composites, etc.).
+ *
+ * @related
+ *   - View:   ./bom-view.tsx
+ *   - Styles: ./bom-v2.css (scoped .bm2)
+ *   - Mockup: FORGE-MOCKUP-BOM.html
  */
 
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { ListChecks, ArrowRight } from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { Card, CardContent } from "@/components/ui/card"
-
-import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { createClient } from "@/lib/supabase/server"
 import { shortenPartName, partDescription } from "../../../_components/part-name"
+
+import { BomView, type BomCategoryGroup, type BomCostStackLine, type BomPartRow, type BomViewProps } from "./bom-view"
 
 export const dynamic = "force-dynamic"
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata(
+    { params }: { params: Promise<{ id: string }> },
+): Promise<Metadata> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
-    if ("error" in result) return { title: "BOM · The Forge" }
-    return { title: `BOM · ${result.project.name}` }
+    const r = await loadCadLabProject(id)
+    if ("error" in r) return { title: "BOM · The Forge" }
+    return { title: `BOM · ${r.project.name}` }
 }
 
-export default async function ForgeV2BomPage({ params }: { params: Promise<{ id: string }> }): Promise<React.ReactNode> {
+export default async function ForgeV2BomPage({
+    params,
+}: {
+    params: Promise<{ id: string }>
+}): Promise<React.ReactNode> {
     const { id } = await params
     const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
+    if ("error" in result || !result.project) notFound()
+
     const project = result.project
     const modules = project.modules ?? []
 
-    // INTENT: module-level parts aren't persisted yet in cad_lab_projects. The
-    // BOM rollup ships once a dedicated parts store lands (future PR). For now
-    // we surface modules as BOM-worthy entities with their mass + key parts.
-    interface Row { name: string; desc: string | null; slug: string; moduleName: string; moduleId: string }
-    const rows: Row[] = modules.flatMap(m => (m.keyParts ?? []).map(kp => ({
-        name: shortenPartName(kp),
-        desc: partDescription(kp),
-        slug: kp,
-        moduleName: m.name,
-        moduleId: m.id,
-    })))
+    // ── 1. BOM categories ────────────────────────────────────────
+    // One category per module. Each keyPart becomes a row. Per-part qty/cost
+    // are unknown today, so we show 1 / — until a parts_spec table lands.
+    const costEstimatesById = project.aiCostEstimates ?? {}
 
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
-                { label: "BOM" },
-            ]}
-            subtitle={rows.length === 0 ? "Bill of materials — no parts yet" : `${rows.length} key components across ${modules.length} modules · per-part specs ship with the parts store`}
-        >
-            {rows.length === 0 ? (
-                <Card className="rounded-xl border">
-                    <CardContent className="py-12 flex flex-col items-center text-center gap-4">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-muted">
-                            <ListChecks className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <div className="max-w-sm space-y-2">
-                            <p className="text-sm font-semibold text-foreground">No parts in the BOM yet</p>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                Parts populate after each module&apos;s CAD generation. Run the pipeline in CAD Lab to get started.
-                            </p>
-                        </div>
-                        <Link
-                            href={`/the-forge/cad-lab?project=${project.id}`}
-                            className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                        >
-                            Open CAD Lab <ArrowRight className="h-3.5 w-3.5" />
-                        </Link>
-                    </CardContent>
-                </Card>
-            ) : (
-                <Card className="rounded-xl border overflow-hidden">
-                    <div className="grid grid-cols-[2fr_1fr_32px] gap-3 px-5 py-3 border-b border-border bg-muted/30 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                        <span>Component</span>
-                        <span>Module</span>
-                        <span />
-                    </div>
-                    {rows.map((r, idx) => (
-                        <Link
-                            key={`${r.moduleId}-${idx}`}
-                            href={`/the-forge-v2/projects/${project.id}/modules/${r.moduleId}/parts/${encodeURIComponent(r.slug)}`}
-                            className="grid grid-cols-[2fr_1fr_32px] gap-3 px-5 py-3 items-start text-sm border-b border-border/50 last:border-b-0 hover:bg-muted/30 transition-colors group"
-                        >
-                            <div className="min-w-0">
-                                <span className="font-medium text-foreground group-hover:text-international-orange transition-colors block truncate">{r.name}</span>
-                                {r.desc && (
-                                    <span className="text-[12px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">{r.desc}</span>
-                                )}
-                            </div>
-                            <span className="text-muted-foreground truncate text-[12.5px] pt-0.5">{r.moduleName}</span>
-                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange group-hover:translate-x-0.5 transition-all mt-1" />
-                        </Link>
-                    ))}
-                </Card>
-            )}
-        </WorkspaceShell>
-    )
+    const categories: BomCategoryGroup[] = modules.map((m, i) => {
+        const parts: BomPartRow[] = (m.keyParts ?? []).map((kp, idx) => ({
+            id: `${m.id}-${idx}`,
+            name: shortenPartName(kp),
+            meta: partDescription(kp),
+            qty: 1,
+            unitCostGbp: null,
+            extCostGbp: null,
+            leadWeeks: null,
+            moduleId: m.id,
+            moduleLeadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
+        }))
+
+        const est = costEstimatesById[m.id]
+        const moduleUnitCostGbp =
+            est && typeof est.totalPerUnit === "number" ? est.totalPerUnit : null
+
+        return {
+            moduleId: m.id,
+            moduleNum: `M${i + 1}`,
+            moduleName: m.name,
+            moduleUnitCostGbp,
+            moduleLeadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
+            parts,
+        }
+    })
+
+    const totalParts = categories.reduce((acc, c) => acc + c.parts.length, 0)
+
+    // ── 2. Cost stack ────────────────────────────────────────────
+    // Per-module roll-up — the founder wants to see where the £172k came from,
+    // but honestly: we only have module totals (AI estimate), not the full
+    // labour / NRE breakdown the mockup shows. So we render a module-level
+    // stack instead of fabricating labour/NRE line items.
+    const costStack: BomCostStackLine[] = []
+    let rolledUpTotal: number | null = null
+    for (const cat of categories) {
+        if (cat.moduleUnitCostGbp != null) {
+            costStack.push({
+                label: `${cat.moduleNum} · ${cat.moduleName}`,
+                valueGbp: cat.moduleUnitCostGbp,
+                kind: "line",
+            })
+            rolledUpTotal = (rolledUpTotal ?? 0) + cat.moduleUnitCostGbp
+        }
+    }
+    if (rolledUpTotal != null) {
+        costStack.push({
+            label: "All-in unit cost (module roll-up)",
+            valueGbp: rolledUpTotal,
+            kind: "total",
+        })
+    }
+
+    // ── 3. Suppliers engaged — from forge_supplier_shortlist ─────
+    const suppliersEngaged = await safeSupplierCount(id)
+
+    // ── 4. Engineering library grounding counts ──────────────────
+    const grounding = await safeLibraryCounts()
+
+    // ── 5. Unit cost ceiling from brief (if declared) ────────────
+    const unitCostCeilingGbp =
+        project.research?.designBrief?.constraints?.unitCostCeilingGbp ?? null
+
+    const viewProps: BomViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+            designRevision: project.designRevision,
+        },
+        header: {
+            totalParts,
+            moduleCount: modules.length,
+            // SpecD = parts tagged with material/tolerance/supplier. We don't
+            // track this yet, so honestly it's 0 until parts_spec ships.
+            specdParts: 0,
+            suppliersEngaged: suppliersEngaged.total,
+            suppliersPrimary: suppliersEngaged.primary,
+        },
+        unitCostGbp: rolledUpTotal,
+        unitCostCeilingGbp,
+        categories,
+        costStack,
+        grounding,
+    }
+
+    return <BomView {...viewProps} />
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────
+
+async function safeSupplierCount(projectId: string): Promise<{ total: number; primary: number }> {
+    try {
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("forge_supplier_shortlist")
+            .select("ramp_role")
+            .eq("project_id", projectId)
+        if (error || !data) return { total: 0, primary: 0 }
+        return {
+            total: data.length,
+            primary: data.filter((r) => (r.ramp_role as string) === "primary").length,
+        }
+    } catch (err) {
+        console.error("[BOM-PAGE] supplier count failed:", err)
+        return { total: 0, primary: 0 }
+    }
+}
+
+async function safeLibraryCounts(): Promise<{ materials: number; hardware: number; processes: number }> {
+    try {
+        const supabase = await createClient()
+        const [m, h, p] = await Promise.all([
+            supabase.from("material_properties").select("*", { count: "exact", head: true }),
+            supabase.from("standard_hardware").select("*", { count: "exact", head: true }),
+            supabase.from("process_capabilities").select("*", { count: "exact", head: true }),
+        ])
+        return {
+            materials: m.count ?? 0,
+            hardware: h.count ?? 0,
+            processes: p.count ?? 0,
+        }
+    } catch (err) {
+        console.error("[BOM-PAGE] library counts failed:", err)
+        return { materials: 0, hardware: 0, processes: 0 }
+    }
 }

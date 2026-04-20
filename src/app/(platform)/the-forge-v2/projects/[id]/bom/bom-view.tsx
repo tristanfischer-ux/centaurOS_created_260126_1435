@@ -1,0 +1,405 @@
+/**
+ * BomView — BOM artefact page (V2, mockup-faithful).
+ *
+ * Port of FORGE-MOCKUP-BOM.html. Scoped CSS under `.bm2` keeps the styling
+ * isolated so the mockup's palette/typography don't leak into the rest of
+ * the platform.
+ *
+ * Sections (top to bottom):
+ *   1. Breadcrumb
+ *   2. Page header — BOM icon + title + "N of M spec'd" chip + CTAs
+ *   3. Annotation note — explains what the BOM is
+ *   4. Summary strip — 6 stat tiles
+ *   5. Controls — search + group/filter/columns + "Ask Fang"
+ *   6. BOM table — grouped by module (category rows), every keyPart as a row
+ *   7. Design grounded in — teal pills + footnote
+ *   8. Bottom split — DFM signals card + Cost stack card
+ *
+ * Every row is rendered with honest empty states: material / supplier /
+ * unit £ / ext £ / lead / status / spec-fit all read "—" or "Not yet
+ * shortlisted" until a parts_spec table ships. No mockup strings leak.
+ */
+
+"use client"
+
+import Link from "next/link"
+import "./bom-v2.css"
+
+// ─── Types ──────────────────────────────────────────────────────────────
+
+export interface BomPartRow {
+    /** Stable key for React. */
+    id: string
+    /** Short part name (from shortenPartName). */
+    name: string
+    /** Optional subtitle with material hints stripped from the raw keyPart. */
+    meta: string | null
+    /** Quantity — 1 for now (not captured at keyParts level). */
+    qty: number
+    /** Per-part cost in GBP — null until part pricing exists. */
+    unitCostGbp: number | null
+    /** Extended cost = qty × unitCostGbp. */
+    extCostGbp: number | null
+    /** Lead-time weeks — null at part level; module-level lead is shown elsewhere. */
+    leadWeeks: number | null
+    /** Deep-link to Module detail (parts detail ships later). */
+    moduleId: string
+    /** Inherited from the owning module so the row can show "—" honestly. */
+    moduleLeadWeeks: number | null
+}
+
+export interface BomCategoryGroup {
+    /** Module id — used for the cat-row link. */
+    moduleId: string
+    /** Module number label — "M1" / "M2" / … */
+    moduleNum: string
+    /** Module display name — shown in the category row. */
+    moduleName: string
+    /** Per-module unit cost £ (from AI cost estimate). Null if not estimated. */
+    moduleUnitCostGbp: number | null
+    /** Per-module lead weeks — surfaced as a category hint. */
+    moduleLeadWeeks: number | null
+    /** Parts within this category/module. */
+    parts: BomPartRow[]
+}
+
+export interface BomCostStackLine {
+    /** Left-hand label. */
+    label: string
+    /** Right-hand GBP value. Null means "—" is rendered. */
+    valueGbp: number | null
+    /** Optional styling — "total" shows the over colour when budget breached. */
+    kind?: "line" | "subtotal" | "total"
+    /** True to tint the value red — used on the all-in-total when it exceeds ceiling. */
+    over?: boolean
+}
+
+export interface BomViewProps {
+    project: {
+        id: string
+        name: string
+        designRevision: number
+    }
+    header: {
+        totalParts: number
+        moduleCount: number
+        /** Count of parts that have been tagged with material/tolerance/supplier.
+         *  Always 0 until a parts_spec table ships. */
+        specdParts: number
+        /** Suppliers engaged on this project (from forge_supplier_shortlist). */
+        suppliersEngaged: number
+        suppliersPrimary: number
+    }
+    /** Total roll-up across modules. Null when no cost estimates exist. */
+    unitCostGbp: number | null
+    /** Brief's unit-cost ceiling — drives the "over" tint on the total. Null when not set. */
+    unitCostCeilingGbp: number | null
+    /** All BOM categories (one per module), each containing its part rows. */
+    categories: BomCategoryGroup[]
+    /** Cost stack for the bottom-right card. */
+    costStack: BomCostStackLine[]
+    /** How many engineering-library rows back the Design Grounded In pills. */
+    grounding: {
+        materials: number
+        hardware: number
+        processes: number
+    }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+function formatGbp(value: number | null): string {
+    if (value == null) return "—"
+    if (Math.abs(value) >= 1_000_000) return `£${(value / 1_000_000).toFixed(2)}M`
+    if (Math.abs(value) >= 10_000) return `£${Math.round(value / 1000).toLocaleString()}k`
+    if (Math.abs(value) >= 1000) return `£${(value / 1000).toFixed(1)}k`
+    return `£${Math.round(value).toLocaleString()}`
+}
+
+function formatGbpExact(value: number | null): string {
+    if (value == null) return "—"
+    return `£${Math.round(value).toLocaleString()}`
+}
+
+// ─── View ───────────────────────────────────────────────────────────────
+
+export function BomView(props: BomViewProps): React.ReactElement {
+    const { project, header, unitCostGbp, unitCostCeilingGbp, categories, costStack, grounding } = props
+
+    const base = `/the-forge-v2/projects/${project.id}`
+    const allPartsEmpty = header.totalParts === 0
+    const specProgressLabel = `${header.specdParts} of ${header.totalParts} spec'd`
+    const chipTone = header.specdParts === 0 && header.totalParts > 0
+        ? "neutral"
+        : header.specdParts === header.totalParts
+            ? "success"
+            : "warning"
+
+    const allInOverCeiling =
+        unitCostGbp != null && unitCostCeilingGbp != null && unitCostGbp > unitCostCeilingGbp
+
+    return (
+        <div className="bm2">
+            {/* ── Breadcrumb ──────────────────────────── */}
+            <div className="bm2-breadcrumb">
+                <Link href="/the-forge-v2">Forge</Link>
+                <span className="sep">›</span>
+                <Link href={base}>{project.name}</Link>
+                <span className="sep">›</span>
+                <span className="current">BOM</span>
+            </div>
+
+            {/* ── Page header ─────────────────────────── */}
+            <div className="bm2-page-header">
+                <div>
+                    <h1>
+                        <span className="bm2-title-dot" aria-hidden="true" />
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <line x1="8" y1="6" x2="21" y2="6" />
+                            <line x1="8" y1="12" x2="21" y2="12" />
+                            <line x1="8" y1="18" x2="21" y2="18" />
+                            <line x1="3" y1="6" x2="3.01" y2="6" />
+                            <line x1="3" y1="12" x2="3.01" y2="12" />
+                            <line x1="3" y1="18" x2="3.01" y2="18" />
+                        </svg>
+                        BOM · {project.name}
+                        <span className={`bm2-chip ${chipTone} solid`} style={{ marginLeft: 6 }}>{specProgressLabel}</span>
+                    </h1>
+                    <div className="sub">
+                        Top-level fabricated parts. Fasteners and standard hardware are tracked separately.
+                        Every column answers a founder question: what it is · who makes it · how much · what bites.
+                    </div>
+                </div>
+                <div className="cta-group">
+                    <span className="bm2-btn soon" title="Ships with the parts-spec table">Export CSV</span>
+                    <Link href={`${base}/suppliers`} className="bm2-btn">Create RFQ bundle</Link>
+                    <Link href={`${base}/brief-lock`} className="bm2-btn primary">Lock revision {designRevisionToLetter(project.designRevision)}</Link>
+                </div>
+            </div>
+
+            <div className="bm2-annot">
+                <strong>Note</strong>
+                The BOM is the spine of the project. Once parts are tagged with material, tolerance and supplier,
+                each row becomes a decision you can lock or re-open.
+                {allPartsEmpty
+                    ? " No parts identified yet — run module decomposition in the CAD lab to populate the BOM."
+                    : " Per-part material, tolerance and supplier ship with the parts-spec store (next migration)."}
+            </div>
+
+            {/* ── Summary strip ───────────────────────── */}
+            <div className="bm2-summary">
+                <div className="bm2-sum-card">
+                    <div className="label">Parts</div>
+                    <div className="value">{header.totalParts}<small>top-level</small></div>
+                    <div className="delta">across {header.moduleCount} module{header.moduleCount === 1 ? "" : "s"}</div>
+                </div>
+                <div className="bm2-sum-card">
+                    <div className="label">Make / Buy</div>
+                    <div className="value">— / —</div>
+                    <div className="delta">not yet tagged</div>
+                </div>
+                <div className="bm2-sum-card">
+                    <div className="label">Fully spec&apos;d</div>
+                    <div className="value">{header.specdParts}<small>of {header.totalParts}</small></div>
+                    <div className={`delta ${header.totalParts > 0 && header.specdParts < header.totalParts ? "warn" : ""}`}>
+                        {header.totalParts - header.specdParts} TBD
+                    </div>
+                </div>
+                <div className="bm2-sum-card">
+                    <div className="label">Unit cost (rolled up)</div>
+                    <div className="value">{formatGbp(unitCostGbp)}</div>
+                    <div className="delta">module-level AI estimate · not part-priced</div>
+                </div>
+                <div className="bm2-sum-card">
+                    <div className="label">Suppliers engaged</div>
+                    <div className="value">{header.suppliersEngaged}</div>
+                    <div className="delta">{header.suppliersPrimary} primary · shortlist</div>
+                </div>
+                <div className="bm2-sum-card">
+                    <div className="label">Spec-fit flags</div>
+                    <div className="value">—</div>
+                    <div className="delta">flags appear once parts are supplier-matched</div>
+                </div>
+            </div>
+
+            {/* ── Controls ────────────────────────────── */}
+            <div className="bm2-controls">
+                <div className="search">
+                    <input type="search" placeholder="Search parts, modules, suppliers…" disabled />
+                </div>
+                <div className="sep" />
+                <div className="group">
+                    <span className="bm2-btn soon">Group: Module</span>
+                    <span className="bm2-btn soon">Filter: Status</span>
+                    <span className="bm2-btn soon">Columns: All</span>
+                </div>
+                <div className="spacer">
+                    <Link href={`${base}/specialists/vp-manufacturing`} className="bm2-btn">Ask Fang about this BOM</Link>
+                </div>
+            </div>
+
+            {/* ── BOM table ───────────────────────────── */}
+            <div className="bm2-table-wrap">
+                <table className="bm2-table">
+                    <thead>
+                        <tr>
+                            <th>Part</th>
+                            <th>Qty</th>
+                            <th>M/B</th>
+                            <th>Material · Process · Tolerance</th>
+                            <th>Supplier</th>
+                            <th>Unit £</th>
+                            <th>Ext £</th>
+                            <th>Lead</th>
+                            <th>Status</th>
+                            <th>Spec fit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {categories.length === 0 ? (
+                            <tr>
+                                <td colSpan={10} style={{ textAlign: "center", padding: "40px 16px", color: "var(--bm-fg-muted)", fontSize: 12 }}>
+                                    No parts identified yet. Run module decomposition in the CAD lab.
+                                </td>
+                            </tr>
+                        ) : (
+                            categories.flatMap((cat) => [
+                                <tr key={`cat-${cat.moduleId}`} className="cat-row">
+                                    <td colSpan={10}>
+                                        <span>{cat.moduleNum} · {cat.moduleName}</span>
+                                        <span className="cat-total">
+                                            {cat.parts.length} part{cat.parts.length === 1 ? "" : "s"}
+                                            {cat.moduleUnitCostGbp != null ? ` · ${formatGbp(cat.moduleUnitCostGbp)} module estimate` : ""}
+                                            {cat.moduleLeadWeeks != null ? ` · ${cat.moduleLeadWeeks} wk lead` : ""}
+                                        </span>
+                                    </td>
+                                </tr>,
+                                ...cat.parts.map((p) => (
+                                    <tr key={p.id} className="part-row">
+                                        <td>
+                                            <Link
+                                                href={`${base}/modules/${cat.moduleId}`}
+                                                style={{ textDecoration: "none", color: "inherit" }}
+                                            >
+                                                <div className="part-name">{p.name}</div>
+                                                {p.meta && <div className="part-meta">{p.meta}</div>}
+                                            </Link>
+                                        </td>
+                                        <td>{p.qty}</td>
+                                        <td><span className="bm2-mb unknown">—</span></td>
+                                        <td className="empty-dash">—</td>
+                                        <td><span className="bm2-sup-cell"><span className="tbd">Not yet shortlisted</span></span></td>
+                                        <td className="cost-cell empty-dash">—</td>
+                                        <td className="cost-cell empty-dash">—</td>
+                                        <td className="empty-dash">
+                                            {p.moduleLeadWeeks != null ? (
+                                                <span style={{ color: "var(--bm-fg-muted)" }} title="Module-level estimate — pending supplier quote per part">
+                                                    ~{p.moduleLeadWeeks} wk
+                                                </span>
+                                            ) : "—"}
+                                        </td>
+                                        <td><span className="bm2-status pending">Pending spec</span></td>
+                                        <td><span className="bm2-fit empty">—</span></td>
+                                    </tr>
+                                )),
+                            ])
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* ── Design grounded in ──────────────────── */}
+            <div className="bm2-grounded">
+                <div className="head">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 2l9 4v5c0 5-3.5 10-9 11-5.5-1-9-6-9-11V6l9-4z" />
+                    </svg>
+                    <span>Design grounded in</span>
+                </div>
+                <div className="pills">
+                    <Link href="/the-forge-v2/library/materials" className="pill">
+                        <span className="diamond" aria-hidden="true" /> Material library ({grounding.materials} rows)
+                    </Link>
+                    <Link href="/the-forge-v2/library/hardware" className="pill">
+                        <span className="diamond" aria-hidden="true" /> Standard hardware ({grounding.hardware} rows)
+                    </Link>
+                    <Link href="/the-forge-v2/library/processes" className="pill">
+                        <span className="diamond" aria-hidden="true" /> Process capabilities ({grounding.processes} methods)
+                    </Link>
+                </div>
+                <p className="footnote">
+                    Specifications draw on verified engineering data — material properties, ISO hardware dimensions,
+                    and process capability limits from the ForgeOS engineering library.
+                </p>
+            </div>
+
+            {/* ── Bottom split — DFM + Cost ───────────── */}
+            <div className="bm2-side">
+                <div className="bm2-card">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                        </svg>
+                        DFM + supply signals on this BOM
+                        <span className="grounding">0 open · awaiting part-level specs</span>
+                    </h3>
+                    <div className="bm2-dfm-empty">
+                        <p style={{ margin: 0 }}>
+                            DFM signals — single-source exposure, MOQ mismatches, cert expiries, datum-scheme gaps —
+                            populate automatically as parts get tagged with material, tolerance and supplier.
+                        </p>
+                        <p style={{ margin: "8px 0 0" }}>
+                            Ask a specialist to do the first pass:
+                            {" "}
+                            <Link href={`${base}/specialists/vp-manufacturing`} style={{ color: "var(--bm-brand)", fontWeight: 600, textDecoration: "none" }}>
+                                Ask Fang →
+                            </Link>
+                        </p>
+                    </div>
+                </div>
+
+                <div className="bm2-card">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M15 9.5a3 3 0 0 0-3-2.5c-1.66 0-3 1.34-3 3 0 .83.34 1.58.88 2.12m.12 2.88h5.5M8 17h7" />
+                        </svg>
+                        Cost at this BOM
+                        <span className="grounding">module-level AI estimate</span>
+                    </h3>
+
+                    {costStack.length === 0 ? (
+                        <div className="bm2-dfm-empty">
+                            No cost rolled up yet. Run a cost pass in the
+                            {" "}<Link href={`${base}/cost`} style={{ color: "var(--bm-brand)", fontWeight: 600, textDecoration: "none" }}>Cost artefact</Link>
+                            {" "}once modules are stable.
+                        </div>
+                    ) : (
+                        <>
+                            {costStack.map((line, i) => (
+                                <div
+                                    key={`${line.label}-${i}`}
+                                    className={`bm2-cost-line ${line.kind === "subtotal" ? "subtotal" : line.kind === "total" ? "total" : ""}`}
+                                >
+                                    <span className="l">{line.label}</span>
+                                    <span className={`v ${line.kind === "total" && (line.over ?? allInOverCeiling) ? "over" : ""}`}>
+                                        {formatGbpExact(line.valueGbp)}
+                                    </span>
+                                </div>
+                            ))}
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Local helpers ──────────────────────────────────────────────────────
+
+function designRevisionToLetter(n: number): string {
+    if (!Number.isFinite(n) || n < 1) return "1"
+    if (n > 26) return String(n)
+    return String.fromCharCode(64 + n)
+}
