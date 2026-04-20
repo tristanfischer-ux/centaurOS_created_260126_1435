@@ -80,7 +80,11 @@ export function AskSpecialistView(props: AskSpecialistViewProps): React.ReactEle
 
     const placeholder = `Ask ${specialist.name} about this project`
     const modelLabel = formatModelLabel(specialist.modelTier)
-    const voiceLabel = specialist.voiceScore != null ? specialist.voiceScore.toFixed(2) : "—"
+    // NOTE: specialist.voiceScore is a static baseline benchmark from
+    // CLAUDE.md (measured April 2026), not a live session metric. It is
+    // intentionally NOT rendered in the Ask chip to avoid implying a live
+    // value — the baseline lives on the specialist directory page where
+    // it's labelled honestly as "Baseline rubric, April 2026".
 
     return (
         <div className="as2">
@@ -102,9 +106,9 @@ export function AskSpecialistView(props: AskSpecialistViewProps): React.ReactEle
                         <span className="as2-title-dot" aria-hidden="true" />
                         <span className="as2-avatar" aria-hidden="true">{specialist.initials}</span>
                         Ask {specialist.name} · {specialist.title}
-                        <span className="as2-model-chip" title="Model + voice consistency score from the baseline rubric">
+                        <span className="as2-model-chip" title={`${specialist.name} currently runs on ${modelLabel}. Voice-consistency baseline lives on the specialist directory page.`}>
                             <span className="dot" aria-hidden="true" />
-                            {modelLabel} · Voice {voiceLabel}
+                            {modelLabel}
                         </span>
                     </h1>
                     <div className="sub">
