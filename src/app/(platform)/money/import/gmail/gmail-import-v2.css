@@ -1,0 +1,440 @@
+/* Money · Raise · Gmail Import V2 — scoped stylesheet ported from
+   MONEY-MOCKUP-GMAIL-IMPORT.html. Every rule is prefixed with .gml2 so
+   nothing leaks into other /money/* pages. Tokens mirror the sibling
+   .oin2 / .fk2 palettes so Money reads as part of the same V2 family. */
+
+.gml2 {
+  --m-bg: #fafaf9;
+  --m-surface: #ffffff;
+  --m-surface-muted: #f5f5f4;
+  --m-surface-soft: #fafaf9;
+  --m-border: #e7e5e4;
+  --m-border-strong: #d6d3d1;
+  --m-border-soft: #f0efed;
+  --m-fg: #1c1917;
+  --m-fg-muted: #78716c;
+  --m-fg-subtle: #a8a29e;
+  --m-fg-faint: #d6d3d1;
+  --m-brand: #ff4500;
+  --m-brand-hover: #e63b00;
+  --m-brand-soft: #fff0ea;
+  --m-brand-dim: #ffdcc7;
+  --m-success: #16a34a;
+  --m-success-soft: #dcfce7;
+  --m-warning: #ca8a04;
+  --m-warning-soft: #fef9c3;
+  --m-info: #0369a1;
+  --m-info-dim: #dbeafe;
+  --m-info-bg: #fafdff;
+  --m-shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.03);
+  --m-shadow-sm: 0 2px 4px rgba(28, 25, 23, 0.04);
+
+  background: var(--m-bg);
+  color: var(--m-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.55;
+
+  /* Cancel out the platform layout padding so the page fills the main
+     content column edge-to-edge like the mockup. */
+  margin: -1rem;
+  padding: 28px 36px 60px;
+  max-width: none;
+  min-height: calc(100vh - 64px);
+}
+
+@media (min-width: 640px) { .gml2 { margin: -1.5rem -1.5rem -1.5rem -1.25rem; } }
+@media (min-width: 1024px) { .gml2 { margin: -2rem -2rem -2rem -1.5rem; } }
+
+.gml2 *, .gml2 *::before, .gml2 *::after { box-sizing: border-box; }
+.gml2 h1, .gml2 h2, .gml2 h3, .gml2 h4, .gml2 p, .gml2 ul, .gml2 ol, .gml2 dl, .gml2 dt, .gml2 dd { margin: 0; padding: 0; }
+.gml2 ol, .gml2 ul { list-style: none; }
+.gml2 a { color: inherit; text-decoration: none; }
+
+.gml2-wrap { max-width: 920px; }
+
+/* ── 1 + 2 · Page head (breadcrumb + cancel) ─────────────────────────── */
+.gml2-pagehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.gml2-crumbs {
+  font-size: 12px;
+  color: var(--m-fg-muted);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gml2-crumbs a {
+  color: var(--m-fg-muted);
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+.gml2-crumbs a:hover { color: var(--m-fg); background: var(--m-surface-muted); }
+.gml2-crumb-current { color: var(--m-fg); font-weight: 500; }
+.gml2-crumb-sep { color: var(--m-fg-subtle); }
+
+.gml2-pagehead-actions { display: flex; gap: 6px; }
+
+/* ── 3 · Preview banner (honest state of the world) ──────────────────── */
+.gml2-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--m-brand-soft);
+  border: 1px solid var(--m-brand-dim);
+  border-left: 3px solid var(--m-brand);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--m-fg);
+  line-height: 1.55;
+}
+.gml2-banner strong {
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+/* ── 4 · Head card (orange title dot) ────────────────────────────────── */
+.gml2-head {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 16px;
+  box-shadow: var(--m-shadow-xs);
+  position: relative;
+  overflow: hidden;
+}
+.gml2-head::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100%;
+  background: radial-gradient(ellipse at top right, var(--m-brand-soft) 0%, transparent 60%);
+  pointer-events: none;
+}
+.gml2-head > * { position: relative; }
+
+.gml2-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gml2-title-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 100%;
+  background: var(--m-brand);
+  flex-shrink: 0;
+}
+.gml2-sub {
+  font-size: 13px;
+  color: var(--m-fg-muted);
+}
+
+/* ── 5 + 6 + 7 + 8 · Form sections ───────────────────────────────────── */
+.gml2-section {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 16px;
+  box-shadow: var(--m-shadow-xs);
+}
+.gml2-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+.gml2-section-sub {
+  font-size: 12px;
+  color: var(--m-fg-muted);
+  margin-bottom: 14px;
+}
+
+/* ── 5 · Method grid ─────────────────────────────────────────────────── */
+.gml2-method-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 720px) {
+  .gml2-method-grid { grid-template-columns: 1fr; }
+}
+.gml2-method {
+  padding: 18px 20px;
+  border: 1.5px solid var(--m-border);
+  border-radius: 10px;
+  background: var(--m-surface);
+  color: inherit;
+  transition: border-color 0.12s ease;
+}
+.gml2-method[aria-disabled="true"] { cursor: default; }
+.gml2-method--active {
+  background: var(--m-brand-soft);
+  border-color: var(--m-brand);
+}
+.gml2-method-ic {
+  font-size: 22px;
+  color: var(--m-brand);
+  margin-bottom: 8px;
+}
+.gml2-method-name {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.gml2-method-desc {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--m-fg-muted);
+  line-height: 1.5;
+}
+.gml2-method-badge {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--m-success-soft);
+  color: var(--m-success);
+}
+.gml2-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: var(--m-surface-muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--m-fg);
+}
+
+/* ── 6 · URL row ──────────────────────────────────────────────────────── */
+.gml2-url-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.gml2-url-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--m-border);
+  border-radius: 7px;
+  font-size: 13.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--m-fg);
+  background: var(--m-surface);
+  min-width: 0;
+}
+.gml2-url-input:focus {
+  outline: none;
+  border-color: var(--m-brand);
+  box-shadow: 0 0 0 2px var(--m-brand-soft);
+}
+.gml2-hint {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--m-fg-muted);
+}
+
+/* ── 7 · Email thread preview ─────────────────────────────────────────── */
+.gml2-thread {
+  background: var(--m-info-bg);
+  border: 1px solid var(--m-info-dim);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.gml2-msg + .gml2-msg {
+  border-top: 1px dashed var(--m-info-dim);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.gml2-msg-from {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.gml2-msg-from small {
+  color: var(--m-fg-muted);
+  font-weight: 500;
+}
+.gml2-msg-date {
+  font-size: 11px;
+  color: var(--m-fg-muted);
+}
+.gml2-msg-subject {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 8px 0 4px;
+}
+.gml2-msg-body {
+  font-size: 12.5px;
+  color: var(--m-fg);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.gml2-msg-body--muted {
+  color: var(--m-fg-muted);
+  font-size: 12px;
+}
+.gml2-msg--collapsed .gml2-msg-from,
+.gml2-msg--collapsed .gml2-msg-date {
+  color: var(--m-fg-muted);
+}
+
+/* ── 8 · Extracted fields ─────────────────────────────────────────────── */
+.gml2-extract {
+  display: block;
+}
+.gml2-extract-row {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--m-border-soft);
+  align-items: start;
+  font-size: 12.5px;
+}
+.gml2-extract-row:last-child {
+  border-bottom: none;
+}
+@media (max-width: 560px) {
+  .gml2-extract-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 4px;
+  }
+  .gml2-extract-label { grid-column: 1 / -1; }
+}
+.gml2-extract-label {
+  font-size: 11px;
+  color: var(--m-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  padding-top: 2px;
+}
+.gml2-extract-value {
+  color: var(--m-fg);
+  line-height: 1.55;
+  margin: 0;
+}
+.gml2-extract-value strong { font-weight: 700; }
+.gml2-extract-note {
+  color: var(--m-fg-muted);
+  font-size: 11.5px;
+}
+.gml2-extract-list {
+  margin: 0;
+  padding-left: 20px;
+  list-style: decimal;
+}
+.gml2-extract-list li { margin: 2px 0; }
+.gml2-extract-quote { font-style: italic; }
+
+.gml2-extract-tail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.gml2-extract-conf {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.gml2-extract-conf--high {
+  background: var(--m-success-soft);
+  color: var(--m-success);
+}
+.gml2-extract-conf--medium {
+  background: var(--m-warning-soft);
+  color: var(--m-warning);
+}
+
+/* ── 9 · Footer action bar ────────────────────────────────────────────── */
+.gml2-footbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 12px;
+  padding: 14px 22px;
+  box-shadow: var(--m-shadow-xs);
+  flex-wrap: wrap;
+}
+.gml2-footbar-meta {
+  font-size: 12.5px;
+  color: var(--m-fg-muted);
+}
+.gml2-footbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Buttons (shared) ─────────────────────────────────────────────────── */
+.gml2-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--m-border);
+  background: var(--m-surface);
+  color: var(--m-fg);
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.gml2-btn:hover:not(:disabled) { border-color: var(--m-border-strong); background: var(--m-surface-muted); }
+.gml2-btn:disabled,
+.gml2-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.gml2-btn-sm {
+  padding: 5px 10px;
+  font-size: 11.5px;
+  border-radius: 6px;
+}
+.gml2-btn-primary {
+  background: var(--m-brand);
+  border-color: var(--m-brand);
+  color: #fff;
+}
+.gml2-btn-primary:hover:not(:disabled) {
+  background: var(--m-brand-hover);
+  border-color: var(--m-brand-hover);
+  color: #fff;
+}
+.gml2-btn-edit {
+  margin-top: 2px;
+}
