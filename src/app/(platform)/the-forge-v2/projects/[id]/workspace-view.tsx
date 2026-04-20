@@ -170,7 +170,7 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
         !project.conceptRenderUrl
 
     if (isEmpty) {
-        return <EmptyWorkspaceView project={project} base={base} />
+        return <EmptyWorkspaceView project={project} base={base} chaseRun={chaseRun} />
     }
 
     const subjectText = project.subject?.trim() || null
@@ -879,7 +879,15 @@ interface EmptyProjectHeader {
     createdAt: string
 }
 
-function EmptyWorkspaceView({ project, base }: { project: EmptyProjectHeader; base: string }): React.ReactElement {
+function EmptyWorkspaceView({
+    project,
+    base,
+    chaseRun,
+}: {
+    project: EmptyProjectHeader
+    base: string
+    chaseRun: WorkspaceViewProps["chaseRun"]
+}): React.ReactElement {
     const createdRelative = formatRelative(project.createdAt)
     const briefFieldsDone = 0
     const briefFieldsTotal = 6
@@ -933,6 +941,25 @@ function EmptyWorkspaceView({ project, base }: { project: EmptyProjectHeader; ba
                 </div>
                 <div className="body">
                     <h3>Your Brief is in draft</h3>
+                    {/* When Chase is running / done / failed, surface it in
+                        the biggest empty-state callout so a founder who's
+                        just kicked Chase off can see progress without
+                        having to navigate into the Brief page. */}
+                    {chaseRun.status !== "not-started" && (
+                        <div style={{ marginBottom: 8 }}>
+                            <PipelineRunChip
+                                status={chaseRun.status}
+                                specialistName="Chase"
+                                startedAt={
+                                    chaseRun.status === "done"
+                                        ? chaseRun.finishedAt ?? chaseRun.startedAt
+                                        : chaseRun.startedAt ?? chaseRun.finishedAt
+                                }
+                                errorCode={chaseRun.errorCode}
+                                errorMessage={chaseRun.errorMessage}
+                            />
+                        </div>
+                    )}
                     <p>
                         Finish the 6 Key Requirements to unlock Modules, BOM, Suppliers, Risks, Cost, Specialists, Geometry, and Launch. <strong>{briefFieldsDone} of {briefFieldsTotal}</strong> done — <strong>{remaining} remaining</strong>: intended use, target cost, performance envelope, regulatory surface, materials constraint, launch window.
                     </p>
@@ -950,6 +977,29 @@ function EmptyWorkspaceView({ project, base }: { project: EmptyProjectHeader; ba
                             <path d="M9 12h6M9 16h4" />
                         </svg>
                     </div>
+                    {/* When Chase has actually touched this project, surface
+                        the PipelineRunChip on the empty-state Brief card too.
+                        Without this, a founder who kicks off Chase from the
+                        Brief page has no way to see "Chase is working…" from
+                        the workspace — the whole project row shows the
+                        empty-state variant until Chase writes the first
+                        research fields. */}
+                    {chaseRun.status !== "not-started" && (
+                        <div style={{ marginBottom: 8 }}>
+                            <PipelineRunChip
+                                status={chaseRun.status}
+                                specialistName="Chase"
+                                startedAt={
+                                    chaseRun.status === "done"
+                                        ? chaseRun.finishedAt ?? chaseRun.startedAt
+                                        : chaseRun.startedAt ?? chaseRun.finishedAt
+                                }
+                                errorCode={chaseRun.errorCode}
+                                errorMessage={chaseRun.errorMessage}
+                                compact
+                            />
+                        </div>
+                    )}
                     <h4>Brief</h4>
                     <p>{briefFieldsDone} of {briefFieldsTotal} Keys complete. This is the contract that gates everything else.</p>
                     <span className="action">Continue drafting →</span>
