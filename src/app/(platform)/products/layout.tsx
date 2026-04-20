@@ -1,27 +1,58 @@
 /**
- * @file layout.tsx — Products route layout.
+ * @file layout.tsx — Pre-Phase Products route guard.
  *
- * @description Simple passthrough after the Pre-Phase Coming Soon sidecar was
- * lifted on 2026-04-20. The Products section is live in beta — users now reach
- * the real list + detail views directly. Legacy routes and the middleware
- * deep-link redirect were also removed in the same change.
+ * @description Every request under /products passes through this layout. If the
+ * path is /products or anything else under /products/* (except /products/legacy),
+ * we render the Coming Soon bridge. Deep links under /products/legacy pass
+ * through to their children — the read-only legacy views — so founders can
+ * still see their data while the new workbench is built.
  *
- * Per-page metadata still lives on each page file; this layout only sets the
- * tab title fallback.
+ * The pathname is read on the client via usePathname(), so the actual decision
+ * is made inside <ProductsRouteGate>. The server layout pre-renders both
+ * surfaces and hands them as slots.
+ *
+ * This sits behind a dedicated branch (feat/products-coming-soon) and will
+ * be removed when the new Products experience ships in Phase 4.
+ *
+ * @related
+ * - src/app/(platform)/products/coming-soon.tsx — the bridge surface
+ * - src/app/(platform)/products/products-route-gate.tsx — client gate
+ * - src/app/(platform)/products/legacy/page.tsx — read-only list
+ * - src/app/(platform)/products/legacy/[id]/page.tsx — read-only detail
  */
 
 import type { Metadata } from 'next'
+import { ProductsComingSoon } from './coming-soon'
+import { ProductsRouteGate } from './products-route-gate'
 
+// FIX: Layout-level metadata prevents the root-layout "ForgeOS — The Operating
+// System for Hardware Startups" marketing title from flashing for /products/*
+// URLs on navigation. Layout metadata wins the Next 15 cascade for descendants
+// unless a page.tsx overrides. The Coming Soon and legacy read-only surfaces
+// inherit this; the forthcoming Phase 4 detail pages will override with their
+// own per-product titles.
 export const metadata: Metadata = {
   title: 'Products | ForgeOS',
   description:
-    'Hardware products — concept to market. Market assessment, unit economics, fundability scoring, and cross-linking with The Forge.',
+    'Market-validation workbench — hypothesis testing, TAM/SAM/SOM, evidence logs, unit economics, and investor-readiness.',
+  // Platform is auth-gated so crawlers should not reach here, but belt-and-braces
+  // while the page is in beta (Red-team R3 finding P3, 2026-04-19).
+  robots: { index: false, follow: false },
 }
 
-export default function ProductsLayout({
+export default async function ProductsLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return children
+  // PERF: Pre-render the Coming Soon surface on the server so the client gate
+  // can swap between it and {children} without a second round-trip when the
+  // user navigates between deep /products/* links.
+  const comingSoon = await ProductsComingSoon()
+
+  return (
+    <ProductsRouteGate comingSoon={comingSoon}>
+      {children}
+    </ProductsRouteGate>
+  )
 }

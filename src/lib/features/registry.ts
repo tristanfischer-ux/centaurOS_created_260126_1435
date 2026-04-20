@@ -176,23 +176,6 @@ export const FEATURE_REGISTRY: Feature[] = [
         isVisibleInNav: true,
         changelog: 'The Forge — AI-powered product decomposition that transforms an idea into a complete engineering dossier with architecture diagrams, module breakdowns, risk analysis, component libraries, and assembly builders.'
     },
-    // Flag-aware Forge v2 variant — same feature, new path.
-    // When `new_forge_experience` flag is ON, the sidebar routes Forge to
-    // `/the-forge-v2`. isRouteBeta() does exact-match lookup on `feature.route`,
-    // so without this entry the BETA pill vanishes for flagged users. Status,
-    // section, and category match the v1 entry.
-    {
-        id: 'the-forge-v2',
-        name: 'The Forge',
-        description: 'Forge v2 — the Phase 1 workspace redesign. Flag-aware sidebar picks this path when new_forge_experience is on.',
-        route: '/the-forge-v2',
-        releasedAt: new Date('2026-04-19'),
-        category: 'core',
-        section: 'workshop',
-        status: 'beta',
-        isVisibleInNav: true,
-        changelog: 'The Forge v2 — workspace redesign with the new 9-artefact spine (Brief, Modules, BOM, Suppliers, Risks, Cost, Experts, Geometry, Launch).'
-    },
     {
         id: 'canvas',
         name: 'Strategy',
@@ -349,18 +332,18 @@ export const FEATURE_REGISTRY: Feature[] = [
         changelog: 'Added timeline view with Gantt chart visualization. See all your tasks and objectives plotted over time with dependencies and milestones.'
     },
     
-    // === April 2026 Features ===
+    // === Coming Soon ===
     {
         id: 'products',
-        name: 'Products',
-        description: 'Hardware products — concept to market. Market assessment, unit economics, fundability scoring, and cross-linking with The Forge.',
+        name: 'Products (redesigning)',
+        description: 'Market-validation workbench — hypothesis testing, TAM/SAM/SOM, evidence logs, unit economics, investor-readiness. Coming in Phase 4.',
         route: '/products',
-        releasedAt: new Date('2026-04-20'),
+        releasedAt: new Date('2026-04-19'),
         category: 'core',
         section: 'workshop',
-        status: 'beta',
+        status: 'coming_soon',
         isVisibleInNav: true,
-        changelog: 'Products section live in beta — v1 list, detail, market assessment, unit economics, fundability scoring. Phase 4 market-validation workbench (hypothesis testing, evidence logs, investor-readiness checklist) ships post-Plan.',
+        changelog: 'Products section hidden behind Coming Soon while the market-validation workbench is built. Existing product records preserved and viewable in read-only mode at /products/legacy.',
     },
     {
         id: 'fundraise',
