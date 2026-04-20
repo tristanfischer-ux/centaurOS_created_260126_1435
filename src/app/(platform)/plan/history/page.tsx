@@ -31,6 +31,7 @@ import { FLAG_NEW_PLAN_EXPERIENCE } from "@/lib/features/keys"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { HistoryEmptyState } from "@/components/plan/empty-states"
+import { typography } from "@/lib/design-system/typography"
 import type { HistoryEntryRow, HistoryEntryType } from "@/types/plan"
 
 import { HistorySearchBar } from "./history-search-bar"
@@ -108,14 +109,17 @@ export default async function PlanHistoryPage({
 
     if (!foundryId) {
         return (
-            <div className="mx-auto max-w-4xl p-6 sm:p-8">
-                <h1 className="text-2xl font-semibold tracking-tight">History</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Every decision, update, and pressure-test from this foundry — searchable.
-                </p>
-                <div className="mt-6">
-                    <HistoryEmptyState />
-                </div>
+            <div className="max-w-5xl space-y-8">
+                <header className="pb-4 border-b border-muted">
+                    <div className={typography.pageHeader}>
+                        <div className={typography.pageHeaderAccent} />
+                        <h1 className={typography.h1}>History</h1>
+                    </div>
+                    <p className={typography.pageSubtitle}>
+                        Every decision, update, and pressure-test from this foundry — searchable.
+                    </p>
+                </header>
+                <HistoryEmptyState />
             </div>
         )
     }
@@ -324,11 +328,14 @@ export default async function PlanHistoryPage({
     const showingEmpty = deduped.length === 0
 
     return (
-        <div className="mx-auto max-w-5xl p-6 sm:p-8">
+        <div className="max-w-5xl space-y-6">
             {/* Hero ─────────────────────────────────────────────────────── */}
-            <header>
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">History</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
+            <header className="pb-4 border-b border-muted">
+                <div className={typography.pageHeader}>
+                    <div className={typography.pageHeaderAccent} />
+                    <h1 className={typography.h1}>History</h1>
+                </div>
+                <p className={typography.pageSubtitle}>
                     Every decision, update, and pressure-test from this foundry — searchable.
                 </p>
             </header>

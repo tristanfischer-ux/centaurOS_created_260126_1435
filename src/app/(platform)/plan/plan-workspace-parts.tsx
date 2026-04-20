@@ -10,6 +10,7 @@ import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { MigratedPill } from "@/components/plan/MigratedPill"
+import { typography } from "@/lib/design-system/typography"
 import {
     Sparkles,
     Target,
@@ -104,18 +105,20 @@ export function StrategyHeader({
     foundryPurpose: string | null
 }) {
     return (
-        <div className="pb-6 border-b border-border">
-            <div className="flex items-start gap-4">
-                <div className="h-10 w-1 rounded-full bg-international-orange shrink-0 mt-1" />
+        <div className="pb-4 border-b border-muted">
+            <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground pl-4">
                         <Sparkles className="h-3.5 w-3.5" />
                         Strategy
                     </div>
-                    <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-                        {foundryName ?? "Your foundry"}
-                    </h1>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground max-w-3xl">
+                    <div className={`${typography.pageHeader} mt-1`}>
+                        <div className={typography.pageHeaderAccent} />
+                        <h1 className={typography.h1}>
+                            {foundryName ?? "Your foundry"}
+                        </h1>
+                    </div>
+                    <p className={`${typography.pageSubtitle} mt-2 max-w-3xl`}>
                         {foundryPurpose && foundryPurpose.trim().length > 0
                             ? foundryPurpose
                             : "Your foundry purpose hasn't been set yet. A clear purpose anchors every Strategic Goal."}

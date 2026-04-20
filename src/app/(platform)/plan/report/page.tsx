@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { ReportEmptyState } from "@/components/plan/empty-states"
+import { typography } from "@/lib/design-system/typography"
 
 import type { ReportsSentRow, ReportTarget } from "@/types/plan"
 
@@ -61,7 +62,7 @@ export default async function PlanReportPage(): Promise<React.ReactNode> {
 
     if (!foundryId) {
         return (
-            <div className="mx-auto max-w-4xl p-6 sm:p-8">
+            <div className="max-w-4xl space-y-6">
                 <ReportPageHeader recentCount={0} counts={emptyCounts()} />
                 <div className="mt-10">
                     <ReportEmptyState />
@@ -110,7 +111,7 @@ export default async function PlanReportPage(): Promise<React.ReactNode> {
     }
 
     return (
-        <div className="mx-auto max-w-4xl p-6 sm:p-8">
+        <div className="max-w-4xl space-y-6">
             <ReportPageHeader recentCount={recent.length} counts={counts} />
 
             <div className="mt-6 flex flex-wrap gap-2 border-b border-border pb-4">
@@ -199,12 +200,13 @@ function ReportPageHeader({
 }): React.ReactNode {
     void counts
     return (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pb-4 border-b border-muted">
             <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                    Report
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <div className={typography.pageHeader}>
+                    <div className={typography.pageHeaderAccent} />
+                    <h1 className={typography.h1}>Report</h1>
+                </div>
+                <p className={typography.pageSubtitle}>
                     Weekly, monthly and quarterly updates. Cal drafts from your
                     Strategic Goals and this-week tasks; you edit, pressure-test,
                     then send.
