@@ -1,0 +1,518 @@
+/**
+ * log-expense-v2.css — scoped (`.lex2`) styles for /money/expenses/new.
+ * Ports the inline <style> block + shared mockup tokens from
+ * MONEY-MOCKUP-LOG-EXPENSE.html so the production page matches the mockup
+ * without leaking styles into the platform.
+ *
+ * Token values mirror forge-mockup.css + money-mockup.css + the sibling
+ * `.mst2` / `.mck2` stylesheets. Keep these in sync if the shared tokens
+ * evolve.
+ */
+
+.lex2 {
+    --lex-fg: #1c1917;
+    --lex-fg-muted: #78716c;
+    --lex-fg-faint: #a8a29e;
+    --lex-fg-subtle: #d6d3d1;
+    --lex-surface: #ffffff;
+    --lex-surface-muted: #f5f5f4;
+    --lex-surface-soft: #fafaf9;
+    --lex-bg: #f7f6f4;
+    --lex-border: #e7e5e4;
+    --lex-border-soft: #f0eeea;
+    --lex-border-strong: #d6d3d1;
+    --lex-brand: #ff4500;
+    --lex-brand-dim: rgba(255, 69, 0, 0.18);
+    --lex-brand-soft: rgba(255, 69, 0, 0.10);
+    --lex-success: #15803d;
+    --lex-warning: #b45309;
+    --lex-warning-soft: #fef3c7;
+    --lex-warning-dim: #fcd34d;
+    --lex-danger: #b91c1c;
+    --lex-danger-soft: #fee2e2;
+    --lex-info: #1d4ed8;
+    --lex-info-soft: #dbeafe;
+    --lex-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    color: var(--lex-fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+        Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 24px 32px 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+.lex2 *,
+.lex2 *::before,
+.lex2 *::after {
+    box-sizing: border-box;
+}
+.lex2 h1,
+.lex2 h2,
+.lex2 h3,
+.lex2 p {
+    margin: 0;
+}
+.lex2 a {
+    color: inherit;
+    text-decoration: none;
+}
+.lex2 button {
+    font-family: inherit;
+    cursor: pointer;
+}
+.lex2 code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    background: var(--lex-surface-muted);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+/* ── Breadcrumb + context chips header ─────────────────────────────── */
+.lex2-page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.lex2-crumbs {
+    font-size: 12.5px;
+    color: var(--lex-fg-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.lex2-crumbs a {
+    color: var(--lex-fg-muted);
+    transition: color 0.15s;
+}
+.lex2-crumbs a:hover {
+    color: var(--lex-brand);
+}
+.lex2-crumbs .sep {
+    color: var(--lex-fg-subtle);
+}
+.lex2-crumbs .current {
+    color: var(--lex-fg);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.lex2-crumbs .current::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lex-brand);
+}
+
+.lex2-ctx-chips {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lex2-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 7px;
+    border: 1px solid var(--lex-border-strong);
+    background: var(--lex-surface);
+    color: var(--lex-fg);
+    transition: all 0.12s;
+}
+.lex2-btn:hover:not(:disabled) {
+    border-color: var(--lex-fg-muted);
+}
+.lex2-btn:focus-visible {
+    outline: 2px solid var(--lex-brand);
+    outline-offset: 2px;
+}
+.lex2-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.lex2-btn.sm {
+    padding: 6px 10px;
+    font-size: 11.5px;
+}
+.lex2-btn.primary {
+    background: var(--lex-brand);
+    color: #ffffff;
+    border-color: var(--lex-brand);
+}
+.lex2-btn.primary:hover:not(:disabled) {
+    background: #e63e00;
+    border-color: #e63e00;
+}
+
+/* ── Preview banner (honest "not yet persisting") ──────────────────── */
+.lex2-preview-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--lex-warning-soft);
+    border: 1px solid var(--lex-warning-dim);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 12.5px;
+    color: var(--lex-fg);
+}
+.lex2-preview-banner strong {
+    color: var(--lex-warning);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 11px;
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+/* ── Page head (qa-head in mockup) ─────────────────────────────────── */
+.lex2-head {
+    background: var(--lex-surface);
+    border: 1px solid var(--lex-border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 18px;
+    box-shadow: var(--lex-shadow-xs);
+    position: relative;
+    overflow: hidden;
+}
+.lex2-head::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 300px;
+    height: 100%;
+    background: radial-gradient(
+        ellipse at top right,
+        var(--lex-brand-soft) 0%,
+        transparent 60%
+    );
+    pointer-events: none;
+}
+.lex2-head > * {
+    position: relative;
+}
+.lex2-head h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 0 0 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--lex-fg);
+}
+.lex2-title-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--lex-brand);
+    border-radius: 100%;
+    flex-shrink: 0;
+}
+.lex2-head .lex2-sub {
+    font-size: 13px;
+    color: var(--lex-fg-muted);
+    margin-top: 4px;
+}
+
+/* ── Two-thirds grid: form left · rail right ───────────────────────── */
+.lex2-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+@media (max-width: 960px) {
+    .lex2-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Form section cards ────────────────────────────────────────────── */
+.lex2-form-section {
+    background: var(--lex-surface);
+    border: 1px solid var(--lex-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 16px;
+    box-shadow: var(--lex-shadow-xs);
+}
+.lex2-form-section h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--lex-fg);
+}
+.lex2-form-section h3 .section-subtle {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--lex-fg-muted);
+    margin-left: 4px;
+    letter-spacing: 0;
+}
+.lex2-form-section .section-sub {
+    font-size: 12px;
+    color: var(--lex-fg-muted);
+    margin-bottom: 14px;
+}
+
+/* ── Field primitives ─────────────────────────────────────────────── */
+.lex2-fld {
+    margin-bottom: 14px;
+}
+.lex2-fld label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--lex-fg);
+    margin-bottom: 5px;
+}
+.lex2-fld label .req {
+    color: var(--lex-danger);
+    margin-left: 2px;
+}
+.lex2-fld label .opt {
+    color: var(--lex-fg-subtle);
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 6px;
+}
+.lex2-fld input,
+.lex2-fld textarea,
+.lex2-fld select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--lex-border);
+    border-radius: 7px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--lex-surface);
+    color: var(--lex-fg);
+    transition: border-color 0.12s;
+}
+.lex2-fld input:focus,
+.lex2-fld textarea:focus,
+.lex2-fld select:focus {
+    outline: 2px solid var(--lex-brand);
+    outline-offset: 1px;
+    border-color: var(--lex-brand);
+}
+.lex2-fld input[aria-invalid="true"],
+.lex2-fld select[aria-invalid="true"] {
+    border-color: var(--lex-danger);
+}
+.lex2-fld .hint {
+    font-size: 11.5px;
+    color: var(--lex-fg-muted);
+    margin-top: 4px;
+    line-height: 1.5;
+}
+.lex2-fld.two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+@media (max-width: 640px) {
+    .lex2-fld.two {
+        grid-template-columns: 1fr;
+    }
+}
+
+.lex2-err {
+    font-size: 11.5px;
+    color: var(--lex-danger);
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+.lex2-amount-input {
+    font-size: 28px !important;
+    font-weight: 800 !important;
+    padding: 16px !important;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Category grid ─────────────────────────────────────────────────── */
+.lex2-cat-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+}
+@media (max-width: 720px) {
+    .lex2-cat-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+.lex2-cat-opt {
+    padding: 12px 8px;
+    border: 1.5px solid var(--lex-border);
+    border-radius: 8px;
+    text-align: center;
+    background: var(--lex-surface);
+    color: var(--lex-fg-muted);
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.12s;
+}
+.lex2-cat-opt:hover {
+    border-color: var(--lex-border-strong);
+    color: var(--lex-fg);
+}
+.lex2-cat-opt:focus-visible {
+    outline: 2px solid var(--lex-brand);
+    outline-offset: 2px;
+}
+.lex2-cat-opt.active {
+    background: var(--lex-brand-soft);
+    border-color: var(--lex-brand);
+    color: var(--lex-brand);
+}
+
+.lex2-tag-hint {
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--lex-fg-muted);
+}
+
+/* ── Receipt drop zone (preview only — disabled) ───────────────────── */
+.lex2-receipt-drop {
+    border: 2px dashed var(--lex-border-strong);
+    border-radius: 10px;
+    padding: 20px 16px;
+    text-align: center;
+    background: var(--lex-surface-soft);
+    font-size: 12.5px;
+    color: var(--lex-fg-muted);
+    opacity: 0.8;
+}
+.lex2-receipt-drop .icon {
+    font-size: 28px;
+    margin-bottom: 6px;
+    color: var(--lex-fg-subtle);
+}
+.lex2-receipt-drop strong {
+    color: var(--lex-fg);
+    font-weight: 700;
+}
+.lex2-receipt-drop .sub {
+    margin-top: 4px;
+}
+.lex2-receipt-drop .browse {
+    color: var(--lex-brand);
+    text-decoration: underline;
+}
+
+/* ── Rail cards (right column) ─────────────────────────────────────── */
+.lex2-rail-card {
+    background: var(--lex-surface);
+    border: 1px solid var(--lex-border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    box-shadow: var(--lex-shadow-xs);
+}
+.lex2-rail-card .rc-head {
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--lex-fg);
+    margin-bottom: 10px;
+}
+.lex2-rail-card .rc-body {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--lex-fg);
+}
+.lex2-rail-card .rc-body.muted {
+    color: var(--lex-fg-muted);
+}
+.lex2-rail-card kbd {
+    padding: 1px 6px;
+    background: var(--lex-surface-muted);
+    border: 1px solid var(--lex-border);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+}
+.lex2-empty {
+    font-size: 12px;
+    color: var(--lex-fg-muted);
+    line-height: 1.6;
+    padding: 8px 2px;
+}
+
+/* ── Submit notice (honest "not persisted yet") ────────────────────── */
+.lex2-submit-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--lex-info-soft);
+    border: 1px solid var(--lex-info);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+    color: var(--lex-fg);
+    line-height: 1.6;
+}
+.lex2-submit-notice strong {
+    color: var(--lex-info);
+    font-weight: 700;
+}
+.lex2-submit-notice-close {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--lex-fg-muted);
+    padding: 0 4px;
+}
+.lex2-submit-notice-close:hover {
+    color: var(--lex-fg);
+}
+
+/* ── Footer action bar ─────────────────────────────────────────────── */
+.lex2-action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: var(--lex-surface);
+    border: 1px solid var(--lex-border);
+    border-radius: 12px;
+    padding: 14px 22px;
+    box-shadow: var(--lex-shadow-xs);
+    flex-wrap: wrap;
+}
+.lex2-action-status {
+    font-size: 12.5px;
+    color: var(--lex-fg-muted);
+}
+.lex2-action-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
