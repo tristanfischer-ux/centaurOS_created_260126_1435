@@ -25,6 +25,7 @@ export type CockpitData = {
   runwayMonths: number | null
   monthlyBurnCents: number
   openingBalanceCents: number
+  cashZeroDate: string | null
   weeks: Array<{
     weekStart: string
     weekLabel: string
@@ -122,6 +123,7 @@ export async function getCockpitData(): Promise<CockpitData | { error: string }>
       runwayMonths: projection.monthlyBurnMonths,
       monthlyBurnCents: projection.monthlyBurnCents,
       openingBalanceCents,
+      cashZeroDate: projection.cashZeroDate,
       weeks: projection.weeks,
       settings,
       xeroSyncState: (xero?.sync_state as CockpitData['xeroSyncState']) ?? 'disconnected',

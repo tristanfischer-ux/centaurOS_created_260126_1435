@@ -69,6 +69,7 @@ export type RunwayProjection = {
   runwayWeeks: number | null
   monthlyBurnCents: number
   monthlyBurnMonths: number | null
+  cashZeroDate: string | null
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -256,10 +257,16 @@ export function projectRunway(input: RunwayInput): RunwayProjection {
   const monthlyBurnMonths =
     runwayWeeks === null ? null : Math.floor(runwayWeeks / WEEKS_PER_MONTH)
 
+  const cashZeroDate =
+    runwayWeeks === null
+      ? null
+      : isoDate(addDays(firstMonday, runwayWeeks * 7))
+
   return {
     weeks: rows,
     runwayWeeks,
     monthlyBurnCents,
     monthlyBurnMonths,
+    cashZeroDate,
   }
 }

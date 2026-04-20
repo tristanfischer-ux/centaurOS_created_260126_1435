@@ -144,6 +144,24 @@ export function CockpitView({ data }: { data: CockpitData }) {
             Monthly burn: {formatCurrency(data.monthlyBurnCents, data.settings.currency)} ·
             Opening balance: {formatCurrency(data.openingBalanceCents, data.settings.currency)}
           </p>
+          {data.cashZeroDate && (
+            <p className="mt-1 text-sm">
+              <span className="text-muted-foreground">Cash-zero date: </span>
+              <span className="font-medium tabular-nums">
+                {new Date(data.cashZeroDate).toLocaleDateString('en-GB', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </span>
+            </p>
+          )}
+          {!data.cashZeroDate && data.monthlyBurnCents < 0 && (
+            <p className="mt-1 text-sm text-success">
+              <span className="text-muted-foreground">Cash-zero date: </span>
+              <span className="font-medium">Sustainable (cash-positive)</span>
+            </p>
+          )}
         </CardContent>
       </Card>
 
