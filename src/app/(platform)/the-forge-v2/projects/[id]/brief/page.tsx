@@ -39,6 +39,10 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import {
+    loadChaseRunStatus,
+    runChaseResearch,
+} from "@/actions/specialists/run-chase-research"
 import { createClient } from "@/lib/supabase/server"
 
 import { BriefView, type BriefRevisionRow, type BriefViewProps, type RegulatoryStandardRow } from "./brief-view"
@@ -57,15 +61,28 @@ export default async function ForgeV2BriefPage({
 }): Promise<React.ReactNode> {
     const { id } = await params
 
+    // Bind the Chase orchestrator to this project id so the client button
+    // doesn't need to pass it explicitly. The `"use server"` boundary is
+    // on run-chase-research.ts itself.
+    async function runChaseAction(): Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    > {
+        "use server"
+        const res = await runChaseResearch(id, "manual")
+        if (res.ok) return { ok: true, runId: res.runId }
+        return { ok: false, error: res.error, errorCode: res.errorCode }
+    }
+
     // ── 1. Fetch project + ancillary data in parallel ──────────────────
     // loadCadLabProject enforces auth + foundry scoping inside withAuth.
     // design_standards is a public read so we can fire it in parallel.
     // If the project load fails we 404 after both settle — saves one
     // round-trip for the happy path without waiting on a failed query.
-    const [loadResult, regulatoryStandards, revisions] = await Promise.all([
+    const [loadResult, regulatoryStandards, revisions, chaseRunStatus] = await Promise.all([
         loadCadLabProject(id),
         safeRegulatoryStandards(),
         safeRevisionHistory(id),
+        safeChaseRunStatus(id),
     ])
     if ("error" in loadResult || !loadResult.project) {
         notFound()
@@ -169,6 +186,18 @@ export default async function ForgeV2BriefPage({
             moduleCount: modules.length,
         },
         revisions,
+        chaseRun: {
+            status: chaseRunStatus.status,
+            startedAt: chaseRunStatus.startedAt ?? null,
+            finishedAt: chaseRunStatus.finishedAt ?? null,
+            errorCode: chaseRunStatus.errorCode ?? null,
+            errorMessage: chaseRunStatus.errorMessage ?? null,
+            reportChars: chaseRunStatus.reportChars ?? null,
+        },
+        hasResearchReport:
+            typeof project.research?.report === "string"
+                && project.research.report.trim().length >= 200,
+        runChaseAction,
     }
 
     return <BriefView {...viewProps} />
@@ -196,6 +225,17 @@ export default async function ForgeV2BriefPage({
  * brand dot. Unknown / missing rows → empty array → view falls back to
  * the single-row "current · not yet locked" variant.
  */
+async function safeChaseRunStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadChaseRunStatus>>> {
+    try {
+        return await loadChaseRunStatus(projectId)
+    } catch (err) {
+        console.error("[BRIEF-PAGE] chase-run status failed:", err)
+        return { status: "not-started" }
+    }
+}
+
 async function safeRevisionHistory(projectId: string): Promise<BriefRevisionRow[]> {
     try {
         const supabase = await createClient()

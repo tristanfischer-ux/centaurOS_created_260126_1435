@@ -23,6 +23,14 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { Sparkles } from "lucide-react"
+
+import {
+    PipelineRunChip,
+    type PipelineRunStatus,
+} from "@/components/pipeline/pipeline-run-chip"
+import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
+
 import "./brief-v2.css"
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -92,12 +100,27 @@ export interface BriefViewProps {
     }
     /** Revision history rows, newest-first. Empty array → single-row fallback. */
     revisions: BriefRevisionRow[]
+    /** Latest Chase research run — drives the draft CTA + "drafted by" chip. */
+    chaseRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+        reportChars: number | null
+    }
+    /** True when research.report is populated and long enough for Max. */
+    hasResearchReport: boolean
+    /** Server action bound to this project + trigger='manual'. */
+    runChaseAction: () => Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    >
 }
 
 // ─── View ──────────────────────────────────────────────────────────────
 
 export function BriefView(props: BriefViewProps): React.ReactElement {
-    const { project, lockState, narrative, constraints, regulatory, cost, mass, revisions } = props
+    const { project, lockState, narrative, constraints, regulatory, cost, mass, revisions, chaseRun, hasResearchReport, runChaseAction } = props
 
     const briefHref = `/the-forge-v2/projects/${project.id}/brief`
     const forkHref = `/the-forge-v2/projects/${project.id}/fork`
@@ -108,6 +131,26 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
     // Revision letter — 1 → A, 2 → B ... so users read "Revision A" not "Revision 1".
     const revisionLetter = designRevisionToLetter(project.designRevision)
     const createdDate = formatIsoDate(project.createdAt)
+
+    // Chase chip timestamp — 'done' reads finishedAt, live states use startedAt.
+    const chaseChipTimestamp =
+        chaseRun.status === "done"
+            ? chaseRun.finishedAt ?? chaseRun.startedAt
+            : chaseRun.startedAt ?? chaseRun.finishedAt
+
+    // Empty-state = nothing to render in the narrative yet. Show the
+    // Chase draft CTA instead so the founder isn't staring at three
+    // "not yet declared" links with no next action.
+    const isEmptyBrief =
+        !hasResearchReport &&
+        !narrative.mission &&
+        !narrative.targetCustomers &&
+        !narrative.whyNow
+
+    // If Chase is currently working we swap in a live-status card even
+    // when isEmptyBrief is false — founders should see the run progress.
+    const chaseIsLive =
+        chaseRun.status === "running" || chaseRun.status === "queued"
 
     return (
         <div className="b2">
@@ -130,6 +173,18 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
                         <LockStateChip isLocked={lockState.isLocked} />
                     </h1>
                     <div className="sub">The anchor spec. Intent · target markets · regulatory envelope · constraints.</div>
+                    {chaseRun.status !== "not-started" && (
+                        <div style={{ marginTop: 8 }}>
+                            <PipelineRunChip
+                                status={chaseRun.status}
+                                specialistName="Chase"
+                                startedAt={chaseChipTimestamp}
+                                errorCode={chaseRun.errorCode}
+                                errorMessage={chaseRun.errorMessage}
+                                compact
+                            />
+                        </div>
+                    )}
                 </div>
                 <div className="cta-group">
                     <Link href={exportHref} className="b2-btn">Share with investor</Link>
@@ -176,6 +231,23 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
                     <div className="caveat">Mission-envelope UI is in scoping — see MISSION-ENVELOPE-SCOPING.md for the plan</div>
                 </div>
             </div>
+
+            {/* ── Chase draft CTA ───────────────────────────────────
+                Shown when the research report hasn't been seeded yet
+                (empty-state path) or when a run is in flight so the
+                founder can watch the live chip. Populated briefs hide
+                this card — the page-header chip ("Drafted by Chase · Nm
+                ago") carries the status instead. */}
+            {(isEmptyBrief || chaseIsLive || chaseRun.status === "failed") && (
+                <ChaseDraftCta
+                    status={chaseRun.status}
+                    startedAt={chaseChipTimestamp}
+                    errorCode={chaseRun.errorCode}
+                    errorMessage={chaseRun.errorMessage}
+                    action={runChaseAction}
+                    briefHref={briefHref}
+                />
+            )}
 
             {/* ── Lock-state banner ───────────────────────────────── */}
             <LockStateBanner isLocked={lockState.isLocked} />
@@ -296,6 +368,88 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
 }
 
 // ─── Subcomponents ─────────────────────────────────────────────────────
+
+function ChaseDraftCta({
+    status,
+    startedAt,
+    errorCode,
+    errorMessage,
+    action,
+    briefHref,
+}: {
+    status: PipelineRunStatus
+    startedAt: string | null
+    errorCode: string | null
+    errorMessage: string | null
+    action: () => Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    >
+    briefHref: string
+}): React.ReactElement {
+    // Live states → show status card with the chip front-and-centre.
+    // Idle → show the "Draft with Chase" CTA. Failed → show the error
+    // chip plus a retry button.
+    const isLive = status === "running" || status === "queued"
+    const isFailed = status === "failed"
+
+    const heading = isLive
+        ? "Chase is drafting your brief…"
+        : isFailed
+            ? "Chase couldn't finish — give it another go"
+            : "Start with Chase"
+    const body = isLive
+        ? "Pulling real-world specs, regulatory posture, and strategic constraints. Takes about a minute."
+        : isFailed
+            ? "The first run didn't land. Retry from here — nothing else is blocked."
+            : "I'll research the subject you typed, write a multi-paragraph narrative, and pull out the strategic constraints Max needs to decompose. Takes about a minute."
+
+    return (
+        <div
+            className="b2-sb-card"
+            style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                marginBottom: 16,
+            }}
+        >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <h4 style={{ margin: 0 }}>{heading}</h4>
+                {status !== "not-started" && (
+                    <PipelineRunChip
+                        status={status}
+                        specialistName="Chase"
+                        startedAt={startedAt}
+                        errorCode={errorCode}
+                        errorMessage={errorMessage}
+                        compact
+                    />
+                )}
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--b-fg-muted)" }}>
+                {body}
+            </p>
+            {!isLive && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <RunSpecialistButton
+                        action={action}
+                        label={isFailed ? "Retry Chase" : "Draft with Chase"}
+                        subLabel="Chase · Strategist · ~60s"
+                        onSuccessHref={briefHref}
+                        variant="primary"
+                        icon={<Sparkles aria-hidden="true" />}
+                    />
+                    <Link
+                        href={briefHref}
+                        style={{ fontSize: 12, color: "var(--b-fg-muted)" }}
+                    >
+                        Or edit the brief yourself →
+                    </Link>
+                </div>
+            )}
+        </div>
+    )
+}
 
 function LockStateChip({ isLocked }: { isLocked: boolean }): React.ReactElement {
     if (isLocked) {

@@ -37,6 +37,7 @@ import {
 import { loadMaxRunStatus } from "@/actions/specialists/run-max-decomposition"
 import { loadBomRunStatus } from "@/actions/specialists/run-bom-generator"
 import { loadChaseRunStatus } from "@/actions/specialists/run-chase-research"
+import { loadFinnRunStatus } from "@/actions/specialists/run-finn-cost"
 import { loadBriefLockStatus } from "@/actions/brief-lock"
 import { createClient } from "@/lib/supabase/server"
 
@@ -69,7 +70,7 @@ export default async function ForgeV2ProjectPage({
     // ── 2. Derived data — parallelised, all failure-tolerant ─────────
     // Each call's failure mode is local: we swallow errors and fall back to
     // the empty-state shape so one broken source cannot take down the page.
-    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses, supplierShortlist, maxRunStatus, bomRunStatus, chaseRunStatus, briefLockStatus] = await Promise.all([
+    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses, supplierShortlist, maxRunStatus, bomRunStatus, chaseRunStatus, finnRunStatus, briefLockStatus] = await Promise.all([
         safeResume(id),
         safeActivity(id, 7),
         safeEngineeringCounts(),
@@ -79,6 +80,7 @@ export default async function ForgeV2ProjectPage({
         safeMaxRunStatus(id),
         safeBomRunStatus(id),
         safeChaseRunStatus(id),
+        safeFinnRunStatus(id),
         safeBriefLockStatus(id),
     ])
 
@@ -172,6 +174,13 @@ export default async function ForgeV2ProjectPage({
             errorCode: chaseRunStatus.errorCode ?? null,
             errorMessage: chaseRunStatus.errorMessage ?? null,
         },
+        finnRun: {
+            status: finnRunStatus.status,
+            startedAt: finnRunStatus.startedAt ?? null,
+            finishedAt: finnRunStatus.finishedAt ?? null,
+            errorCode: finnRunStatus.errorCode ?? null,
+            errorMessage: finnRunStatus.errorMessage ?? null,
+        },
         briefLock: {
             isLocked: briefLockStatus.isLocked,
             revisionLabel: briefLockStatus.revisionLabel,
@@ -214,6 +223,34 @@ async function safeBomRunStatus(
     } catch (err) {
         console.error("[WORKSPACE-PAGE] bom-run status failed:", err)
         return { status: "not-started" }
+    }
+}
+
+async function safeFinnRunStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadFinnRunStatus>>> {
+    try {
+        return await loadFinnRunStatus(projectId)
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] finn-run status failed:", err)
+        return { status: "not-started" }
+    }
+}
+
+async function safeBriefLockStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadBriefLockStatus>>> {
+    try {
+        return await loadBriefLockStatus(projectId)
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] brief-lock status failed:", err)
+        return {
+            isLocked: false,
+            lockedAt: null,
+            lockedBy: null,
+            revisionNumber: null,
+            revisionLabel: null,
+        }
     }
 }
 

@@ -118,6 +118,16 @@ export interface WorkspaceViewProps {
         errorCode: string | null
         errorMessage: string | null
     }
+    /** Brief lock status — drives the header revision badge. Non-overlapping
+     *  with the Brief tile chip: that chip describes Chase's research run,
+     *  this badge describes whether the brief is locked. */
+    briefLock?: {
+        isLocked: boolean
+        /** e.g. "Rev A". Null when no revision exists yet. */
+        revisionLabel: string | null
+        /** ISO timestamp; null while draft. */
+        lockedAt: string | null
+    }
 }
 
 export interface SupplierShortlistRow {
@@ -130,7 +140,7 @@ export interface SupplierShortlistRow {
 // ─── View ─────────────────────────────────────────────────────────────
 
 export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
-    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun, bomRun, chaseRun } = props
+    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun, bomRun, chaseRun, briefLock } = props
 
     // Base URL for the artefact deep-links. All routes are placeholders that
     // will resolve once the per-artefact pages ship in later rounds.
