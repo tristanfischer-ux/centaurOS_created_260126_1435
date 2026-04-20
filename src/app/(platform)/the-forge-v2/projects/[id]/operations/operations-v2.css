@@ -1,0 +1,476 @@
+/**
+ * operations-v2.css — scoped (`.op2`) styles for the Operations artefact page.
+ * Ports the page-level styles from FORGE-MOCKUP-OPERATIONS.html (and shared
+ * tokens from forge-mockup.css) so this page matches the mockup without
+ * leaking into the rest of the platform.
+ */
+
+.op2 {
+  /* Palette — mirrors forge-mockup.css tokens for this page only */
+  --op-fg:             #1c1917;
+  --op-fg-muted:       #78716c;
+  --op-fg-faint:       #a8a29e;
+  --op-fg-subtle:      #d6d3d1;
+  --op-surface:        #ffffff;
+  --op-surface-muted:  #f5f5f4;
+  --op-surface-soft:   #fafaf9;
+  --op-border:         #e7e5e4;
+  --op-border-strong:  #d6d3d1;
+  --op-brand:          #ff4500;
+  --op-brand-soft:     rgba(255,69,0,0.10);
+  --op-success:        #15803d;
+  --op-success-soft:   #dcfce7;
+  --op-warning:        #b45309;
+  --op-warning-soft:   #fef3c7;
+  --op-warning-border: #fde68a;
+  --op-danger:         #b91c1c;
+  --op-danger-soft:    #fee2e2;
+  --op-info:           #1d4ed8;
+  --op-info-soft:      #dbeafe;
+  --op-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+  --op-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+
+  color: var(--op-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 32px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────── */
+.op2-breadcrumb {
+  font-size: 11.5px;
+  color: var(--op-fg-muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.op2-breadcrumb a {
+  color: var(--op-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.op2-breadcrumb a:hover { color: var(--op-brand); }
+.op2-breadcrumb .sep { color: var(--op-fg-subtle); }
+.op2-breadcrumb .current { color: var(--op-fg); font-weight: 600; }
+
+/* ── Page header ────────────────────────────────────── */
+.op2-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.op2-page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.op2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--op-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
+}
+.op2-page-header .sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--op-fg-muted);
+  max-width: 780px;
+}
+.op2-page-header .cta-group {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Buttons ────────────────────────────────────────── */
+.op2-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--op-fg);
+  background: var(--op-surface);
+  border: 1px solid var(--op-border-strong);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.op2-btn:hover {
+  background: var(--op-surface-muted);
+  border-color: var(--op-fg-muted);
+}
+.op2-btn.primary {
+  background: var(--op-fg);
+  color: #fff;
+  border-color: var(--op-fg);
+}
+.op2-btn.primary:hover { background: #0f172a; }
+.op2-btn.soon {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.op2-link {
+  color: var(--op-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+.op2-link:hover { text-decoration: underline; }
+
+/* ── Annotation note band ───────────────────────────── */
+.op2-annot {
+  background: var(--op-surface-soft);
+  border-left: 3px solid var(--op-fg-subtle);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--op-fg-muted);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.op2-annot strong {
+  color: var(--op-fg);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+/* ── Alert banner (movers) ──────────────────────────── */
+.op2-alert {
+  background: linear-gradient(90deg, var(--op-warning-soft) 0%, transparent 100%);
+  border: 1px solid var(--op-warning-border);
+  border-left: 3px solid var(--op-warning);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.op2-alert h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #78350f;
+}
+.op2-alert p {
+  margin: 0;
+  font-size: 12.5px;
+  color: #78350f;
+  line-height: 1.55;
+}
+
+/* ── Summary strip ──────────────────────────────────── */
+.op2-summary {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+@media (max-width: 1100px) { .op2-summary { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 680px)  { .op2-summary { grid-template-columns: repeat(2, 1fr); } }
+.op2-sum-card {
+  background: var(--op-surface);
+  border: 1px solid var(--op-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: var(--op-shadow-xs);
+}
+.op2-sum-card .label {
+  font-size: 10.5px;
+  color: var(--op-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.op2-sum-card .value {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--op-fg);
+}
+.op2-sum-card .delta {
+  font-size: 10.5px;
+  margin-top: 2px;
+  color: var(--op-fg-muted);
+}
+
+/* ── Section wrapper + head ─────────────────────────── */
+.op2-section { margin-bottom: 24px; }
+.op2-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.op2-section-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--op-fg);
+}
+.op2-section-head .sub {
+  font-size: 11.5px;
+  color: var(--op-fg-muted);
+  margin-top: 2px;
+  line-height: 1.5;
+  max-width: 640px;
+}
+
+/* ── Generic card ───────────────────────────────────── */
+.op2-card {
+  background: var(--op-surface);
+  border: 1px solid var(--op-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: var(--op-shadow-xs);
+}
+
+.op2-empty {
+  font-size: 12.5px;
+  color: var(--op-fg-muted);
+  line-height: 1.65;
+  padding: 4px 2px;
+}
+.op2-empty strong { color: var(--op-fg); font-weight: 600; }
+
+/* ── Production timeline / Gantt skeleton ───────────── */
+.op2-gantt { display: flex; flex-direction: column; gap: 8px; }
+.op2-gantt-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 80px;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--op-border);
+}
+.op2-gantt-row:last-of-type { border-bottom: none; }
+.op2-gantt-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.op2-mod-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  background: var(--op-brand-soft);
+  color: var(--op-brand);
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.op2-gantt-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--op-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op2-gantt-track {
+  height: 14px;
+  background: var(--op-surface-muted);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.op2-gantt-band {
+  height: 100%;
+  background: linear-gradient(90deg, var(--op-brand-soft) 0%, rgba(255,69,0,0.35) 100%);
+  border-radius: 4px;
+  min-width: 12px;
+}
+.op2-gantt-band.empty {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--op-surface-muted),
+    var(--op-surface-muted) 4px,
+    var(--op-border) 4px,
+    var(--op-border) 5px
+  );
+  width: 100%;
+  opacity: 0.6;
+}
+.op2-gantt-lead {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--op-fg);
+}
+.op2-gantt-footnote {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--op-border);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--op-fg-muted);
+  line-height: 1.55;
+}
+
+/* ── Shipping grid ──────────────────────────────────── */
+.op2-ship-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1000px) { .op2-ship-grid { grid-template-columns: repeat(2, 1fr); } }
+.op2-ship-tile {
+  padding: 12px 14px;
+  background: var(--op-surface-soft);
+  border: 1px solid var(--op-border);
+  border-radius: 8px;
+}
+.op2-ship-label {
+  font-size: 10.5px;
+  color: var(--op-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.op2-ship-value {
+  margin-top: 3px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--op-fg);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.op2-ship-meta {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--op-fg-muted);
+}
+
+/* ── Takt grid ──────────────────────────────────────── */
+.op2-takt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) { .op2-takt-grid { grid-template-columns: 1fr; } }
+.op2-takt-card { padding: 14px 16px; }
+.op2-takt-label {
+  font-size: 10.5px;
+  color: var(--op-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.op2-takt-value {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--op-fg);
+}
+.op2-takt-meta {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--op-fg-muted);
+  line-height: 1.55;
+}
+
+/* ── BOM watch table ────────────────────────────────── */
+.op2-table-wrap {
+  background: var(--op-surface);
+  border: 1px solid var(--op-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--op-shadow-xs);
+}
+.op2-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.op2-table thead th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--op-fg-muted);
+  border-bottom: 1px solid var(--op-border);
+  background: var(--op-surface-muted);
+  white-space: nowrap;
+}
+.op2-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--op-border);
+  color: var(--op-fg);
+}
+.op2-table tbody tr:last-child td { border-bottom: none; }
+.op2-table-empty {
+  text-align: center;
+  padding: 32px 16px !important;
+  color: var(--op-fg-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ── Revision nodes ─────────────────────────────────── */
+.op2-rev-node {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--op-border);
+}
+.op2-rev-node:last-of-type { border-bottom: none; }
+.op2-rev-dot {
+  width: 40px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+.op2-rev-dot.shipped { background: var(--op-success-soft); color: var(--op-success); }
+.op2-rev-dot.active  { background: var(--op-warning-soft); color: var(--op-warning); }
+.op2-rev-dot.draft   { background: var(--op-info-soft); color: var(--op-info); }
+.op2-rev-body { flex: 1; min-width: 0; }
+.op2-rev-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--op-fg);
+}
+.op2-rev-meta {
+  font-size: 11px;
+  color: var(--op-fg-muted);
+  margin-top: 2px;
+}
+.op2-rev-stats {
+  font-size: 11px;
+  color: var(--op-fg-muted);
+  text-align: right;
+  line-height: 1.5;
+  white-space: nowrap;
+}
