@@ -1,0 +1,478 @@
+/**
+ * mst2.css — scoped stylesheet for /money/settings, ported 1:1 from
+ * MONEY-MOCKUP-SETTINGS.html. Every rule is prefixed with `.mst2` so
+ * nothing leaks to sibling Money pages. Token values mirror
+ * money-mockup.css + the sibling cockpit-v2.css stylesheet (`.mck2`).
+ */
+
+.mst2 {
+    --mst-fg: #1c1917;
+    --mst-fg-muted: #78716c;
+    --mst-fg-faint: #a8a29e;
+    --mst-fg-subtle: #d6d3d1;
+    --mst-surface: #ffffff;
+    --mst-surface-muted: #f5f5f4;
+    --mst-surface-soft: #fafaf9;
+    --mst-bg: #f7f6f4;
+    --mst-border: #e7e5e4;
+    --mst-border-soft: #f0eeea;
+    --mst-border-strong: #d6d3d1;
+    --mst-brand: #ff4500;
+    --mst-brand-dim: rgba(255, 69, 0, 0.18);
+    --mst-brand-soft: rgba(255, 69, 0, 0.10);
+    --mst-success: #15803d;
+    --mst-success-soft: #dcfce7;
+    --mst-warning: #b45309;
+    --mst-warning-soft: #fef3c7;
+    --mst-danger: #b91c1c;
+    --mst-danger-soft: #fee2e2;
+    --mst-danger-dim: #fecaca;
+    --mst-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    color: var(--mst-fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+        Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 24px 32px 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+.mst2 *,
+.mst2 *::before,
+.mst2 *::after {
+    box-sizing: border-box;
+}
+.mst2 h1,
+.mst2 h2,
+.mst2 h3,
+.mst2 p {
+    margin: 0;
+}
+.mst2 a {
+    color: inherit;
+    text-decoration: none;
+}
+.mst2 button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+/* ── Breadcrumb header ─────────────────────────────────────────────── */
+.mst2-page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.mst2-crumbs {
+    font-size: 12.5px;
+    color: var(--mst-fg-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mst2-crumbs a {
+    color: var(--mst-fg-muted);
+    transition: color 0.15s;
+}
+.mst2-crumbs a:hover {
+    color: var(--mst-brand);
+}
+.mst2-crumbs .sep {
+    color: var(--mst-fg-subtle);
+}
+.mst2-crumbs .current {
+    color: var(--mst-fg);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.mst2-crumbs .current::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mst-brand);
+}
+
+.mst2-ctx-chips {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.mst2-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 7px;
+    border: 1px solid var(--mst-border-strong);
+    background: var(--mst-surface);
+    color: var(--mst-fg);
+    transition: all 0.12s;
+}
+.mst2-btn:hover:not(:disabled) {
+    border-color: var(--mst-fg-muted);
+}
+.mst2-btn:focus-visible {
+    outline: 2px solid var(--mst-brand);
+    outline-offset: 2px;
+}
+.mst2-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.mst2-btn-primary {
+    background: var(--mst-brand);
+    color: #ffffff;
+    border-color: var(--mst-brand);
+}
+.mst2-btn-primary:hover:not(:disabled) {
+    background: #e63e00;
+    border-color: #e63e00;
+}
+.mst2-btn-danger-outline {
+    border-color: var(--mst-danger);
+    color: var(--mst-danger);
+}
+.mst2-btn-danger-outline:hover:not(:disabled) {
+    background: var(--mst-danger-soft);
+    border-color: var(--mst-danger);
+}
+
+/* ── Page-head tile (title + radial brand glow) ────────────────────── */
+.mst2-head {
+    background: var(--mst-surface);
+    border: 1px solid var(--mst-border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: var(--mst-shadow-xs);
+    position: relative;
+    overflow: hidden;
+}
+.mst2-head::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 280px;
+    height: 100%;
+    background: radial-gradient(
+        ellipse at top right,
+        var(--mst-brand-soft) 0%,
+        transparent 60%
+    );
+    pointer-events: none;
+}
+.mst2-head > * {
+    position: relative;
+}
+.mst2-head h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 0 0 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--mst-fg);
+}
+.mst2-title-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--mst-brand);
+    border-radius: 100%;
+    flex-shrink: 0;
+}
+.mst2-head .mst2-sub {
+    font-size: 13px;
+    color: var(--mst-fg-muted);
+    margin-top: 4px;
+}
+
+/* ── Save banner (sticky above grid when dirty) ────────────────────── */
+.mst2-save-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--mst-brand-soft);
+    border: 1px solid var(--mst-brand-dim);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 12.5px;
+    color: var(--mst-fg);
+}
+.mst2-save-banner strong {
+    color: var(--mst-brand);
+    font-weight: 700;
+}
+.mst2-save-banner-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+}
+
+.mst2-alert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    margin-bottom: 12px;
+}
+.mst2-alert-error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+}
+.mst2-alert-success {
+    background: var(--mst-success-soft);
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+/* ── Grid: side-nav + form column ──────────────────────────────────── */
+.mst2-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 20px;
+}
+@media (max-width: 900px) {
+    .mst2-grid {
+        grid-template-columns: 1fr;
+    }
+    .mst2-side {
+        position: static;
+    }
+}
+
+.mst2-side {
+    background: var(--mst-surface);
+    border: 1px solid var(--mst-border);
+    border-radius: 10px;
+    padding: 8px;
+    box-shadow: var(--mst-shadow-xs);
+    align-self: start;
+    position: sticky;
+    top: 20px;
+}
+.mst2-side a {
+    display: block;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mst-fg-muted);
+    border-radius: 6px;
+    margin-bottom: 2px;
+    transition: background 0.12s, color 0.12s;
+}
+.mst2-side a:hover {
+    background: var(--mst-surface-muted);
+    color: var(--mst-fg);
+}
+.mst2-side a.active {
+    background: var(--mst-brand-soft);
+    color: var(--mst-brand);
+    font-weight: 700;
+}
+
+/* ── Form sections ─────────────────────────────────────────────────── */
+.mst2-section {
+    background: var(--mst-surface);
+    border: 1px solid var(--mst-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 16px;
+    box-shadow: var(--mst-shadow-xs);
+    scroll-margin-top: 80px;
+}
+.mst2-section h3 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--mst-fg);
+}
+.mst2-section-sub {
+    font-size: 12px;
+    color: var(--mst-fg-muted);
+    margin-bottom: 14px;
+}
+
+.mst2-row {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--mst-border-soft);
+    align-items: center;
+}
+.mst2-row:last-child {
+    border-bottom: none;
+}
+@media (max-width: 700px) {
+    .mst2-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.mst2-lab {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--mst-fg);
+}
+.mst2-lab small {
+    display: block;
+    font-size: 11.5px;
+    color: var(--mst-fg-muted);
+    font-weight: 400;
+    margin-top: 3px;
+    line-height: 1.5;
+}
+.mst2-ctrl {
+    min-width: 0;
+}
+.mst2-ctrl select,
+.mst2-ctrl input[type="text"],
+.mst2-ctrl input[type="number"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--mst-border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--mst-surface);
+    color: var(--mst-fg);
+}
+.mst2-ctrl select:focus,
+.mst2-ctrl input:focus {
+    outline: 2px solid var(--mst-brand);
+    outline-offset: 1px;
+    border-color: var(--mst-brand);
+}
+
+/* Threshold (input + unit label side-by-side) */
+.mst2-threshold {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.mst2-threshold input {
+    max-width: 110px;
+}
+.mst2-threshold .mst2-unit {
+    font-size: 12px;
+    color: var(--mst-fg-muted);
+}
+.mst2-threshold .mst2-prefix {
+    font-size: 13px;
+    color: var(--mst-fg-muted);
+}
+
+/* Toggle */
+.mst2-toggle {
+    display: inline-flex;
+    align-items: center;
+    width: 44px;
+    height: 24px;
+    background: var(--mst-surface-muted);
+    border: 1px solid var(--mst-border-strong);
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.12s, border-color 0.12s;
+}
+.mst2-toggle::after {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border-radius: 100%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: left 0.12s;
+}
+.mst2-toggle.mst2-on {
+    background: var(--mst-success);
+    border-color: var(--mst-success);
+}
+.mst2-toggle.mst2-on::after {
+    left: 22px;
+}
+.mst2-toggle:focus-visible {
+    outline: 2px solid var(--mst-brand);
+    outline-offset: 2px;
+}
+
+/* Inline pills (e.g. Enterprise active) */
+.mst2-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+}
+.mst2-pill-brand {
+    background: var(--mst-brand);
+    color: #ffffff;
+    border: 1px solid var(--mst-brand);
+}
+.mst2-meta {
+    font-size: 12.5px;
+    color: var(--mst-fg-muted);
+}
+
+/* ── Danger section (advanced / irreversible) ──────────────────────── */
+.mst2-danger {
+    background: #fffbfb;
+    border: 1px solid var(--mst-danger-dim);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    scroll-margin-top: 80px;
+}
+.mst2-danger h3 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--mst-danger);
+}
+.mst2-danger .mst2-section-sub {
+    color: #7c2d12;
+    margin-bottom: 14px;
+}
+.mst2-danger .mst2-row {
+    border-bottom-color: var(--mst-danger-dim);
+}
+
+/* ── Engineering note (footer) ─────────────────────────────────────── */
+.mst2-note {
+    background: var(--mst-surface-soft);
+    border: 1px dashed var(--mst-border-strong);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 12px;
+    color: var(--mst-fg-muted);
+    margin-top: 8px;
+    line-height: 1.55;
+}
+.mst2-note strong {
+    color: var(--mst-fg);
+    font-weight: 700;
+    display: block;
+    margin-bottom: 4px;
+}
