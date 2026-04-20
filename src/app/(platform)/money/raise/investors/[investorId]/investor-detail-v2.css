@@ -1,0 +1,378 @@
+/**
+ * investor-detail-v2.css — scoped (`.ind2`) overrides on top of `.rse2`.
+ * The investor detail page renders inside both `.rse2` (shared page chrome +
+ * modal shell) and `.ind2` (per-page header, stepper, research, rail cards).
+ * Ports MONEY-MOCKUP-INVESTOR-DETAIL.html.
+ */
+
+.ind2 {
+  --ind-teal-a: #0d9488;
+  --ind-teal-b: #0891b2;
+}
+
+/* ── Investor header ──────────────────────────────────────────── */
+.ind2-head {
+  background: var(--rse-surface);
+  border: 1px solid var(--rse-border);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 20px;
+  box-shadow: var(--rse-shadow-xs);
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 18px;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.ind2-head::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 360px;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at top right,
+    var(--rse-brand-soft) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+}
+.ind2-head > * { position: relative; }
+
+.ind2-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 100%;
+  background: linear-gradient(135deg, var(--ind-teal-a), var(--ind-teal-b));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.ind2-head-main h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ind2-head .firm {
+  font-size: 13px;
+  color: var(--rse-fg-muted);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+.ind2-head .chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ind2-head .chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--rse-surface-muted);
+  color: var(--rse-fg);
+  border: 1px solid var(--rse-border);
+}
+.ind2-head .chip.brand {
+  background: var(--rse-brand-soft);
+  color: var(--rse-brand);
+  border-color: var(--rse-brand-dim);
+}
+.ind2-head .chip.success {
+  background: var(--rse-success-soft);
+  color: var(--rse-success);
+  border-color: var(--rse-success-dim);
+}
+
+/* Stage pill inside h1 */
+.ind2-stage-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid var(--rse-border);
+  background: var(--rse-surface-muted);
+  color: var(--rse-fg);
+  text-transform: capitalize;
+}
+.ind2-stage-pill.brand {
+  background: var(--rse-brand-soft);
+  color: var(--rse-brand);
+  border-color: var(--rse-brand-dim);
+}
+.ind2-stage-pill.success {
+  background: var(--rse-success-soft);
+  color: var(--rse-success);
+  border-color: var(--rse-success-dim);
+}
+.ind2-stage-pill.danger {
+  background: var(--rse-danger-soft);
+  color: var(--rse-danger);
+  border-color: var(--rse-danger-dim);
+}
+
+/* ── Stage stepper ─────────────────────────────────────────────── */
+.ind2-stage-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  background: var(--rse-surface);
+  border: 1px solid var(--rse-border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 20px;
+  box-shadow: var(--rse-shadow-xs);
+}
+@media (max-width: 820px) {
+  .ind2-stage-strip { grid-template-columns: repeat(4, 1fr); }
+}
+.ind2-stage-step {
+  padding: 8px 10px;
+  text-align: center;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--rse-fg-faint);
+  background: var(--rse-surface-soft);
+  border: 1px solid var(--rse-border-soft);
+}
+.ind2-stage-step small {
+  display: block;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.75;
+  margin-bottom: 1px;
+  font-weight: 700;
+}
+.ind2-stage-step.done {
+  background: var(--rse-success-soft);
+  color: var(--rse-success);
+  border-color: var(--rse-success-dim);
+}
+.ind2-stage-step.active {
+  background: var(--rse-brand);
+  color: #fff;
+  font-weight: 700;
+  border-color: var(--rse-brand);
+  box-shadow: 0 2px 6px rgba(255, 69, 0, 0.25);
+}
+
+.ind2-passed-banner {
+  background: var(--rse-danger-soft);
+  border: 1px solid var(--rse-danger-dim);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--rse-danger);
+  line-height: 1.55;
+  margin-bottom: 20px;
+}
+.ind2-passed-banner strong { color: var(--rse-danger); }
+
+/* ── Split layout ──────────────────────────────────────────────── */
+.ind2-split {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 960px) {
+  .ind2-split { grid-template-columns: 1fr; }
+}
+
+/* ── Activity / history ────────────────────────────────────────── */
+.ind2-activity,
+.ind2-research {
+  background: var(--rse-surface);
+  border: 1px solid var(--rse-border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  box-shadow: var(--rse-shadow-xs);
+}
+.ind2-activity h3,
+.ind2-research h3 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ind2-research h3 .sub {
+  font-size: 11px;
+  color: var(--rse-fg-muted);
+  font-weight: 500;
+}
+.ind2-research h3 .sub a {
+  color: var(--rse-brand);
+  font-weight: 600;
+}
+
+.ind2-act-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rse-border-soft);
+  font-size: 13px;
+}
+.ind2-act-row:last-child { border-bottom: none; }
+.ind2-act-row .when {
+  font-size: 11px;
+  color: var(--rse-fg-muted);
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+.ind2-act-row .what strong {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 2px;
+}
+.ind2-act-row .what .who {
+  color: var(--rse-fg-muted);
+  font-size: 12px;
+  display: block;
+  margin-top: 2px;
+}
+.ind2-act-row .what blockquote {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  background: var(--rse-surface-soft);
+  border-left: 2px solid var(--rse-border-strong);
+  font-size: 12.5px;
+  color: var(--rse-fg-muted);
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+}
+
+.ind2-research-section {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rse-border-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.ind2-research-section:last-child { border-bottom: none; }
+.ind2-research-section .lab {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--rse-fg-muted);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.ind2-research-section .muted {
+  color: var(--rse-fg-muted);
+  font-style: italic;
+}
+
+.ind2-empty-inline {
+  background: var(--rse-surface-soft);
+  border: 1px dashed var(--rse-border-strong);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  color: var(--rse-fg-muted);
+  line-height: 1.6;
+}
+.ind2-empty-inline.small { padding: 10px 12px; font-size: 12px; }
+
+/* ── Rail cards ─────────────────────────────────────────────────── */
+.ind2-rail {
+  background: var(--rse-surface);
+  border: 1px solid var(--rse-border);
+  border-radius: 12px;
+  margin-bottom: 14px;
+  box-shadow: var(--rse-shadow-xs);
+  overflow: hidden;
+}
+.ind2-rail-head {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--rse-fg-muted);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--rse-border-soft);
+  background: var(--rse-surface-soft);
+}
+.ind2-rail-body {
+  padding: 10px 16px 14px;
+}
+.ind2-rail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  font-size: 12.5px;
+  border-bottom: 1px dashed var(--rse-border-soft);
+}
+.ind2-rail-row:last-child { border-bottom: none; }
+.ind2-rail-row .k {
+  color: var(--rse-fg-muted);
+  font-weight: 500;
+}
+.ind2-rail-row .v {
+  color: var(--rse-fg);
+  font-weight: 600;
+  text-align: right;
+}
+.ind2-rail-row .v.brand { color: var(--rse-brand); }
+.ind2-rail-row .v.muted {
+  color: var(--rse-fg-muted);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.ind2-rail-body.contacts {
+  padding: 0;
+}
+.ind2-contact {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rse-border-soft);
+}
+.ind2-contact:last-child { border-bottom: none; }
+.ind2-contact .name {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.ind2-contact .title {
+  font-size: 11.5px;
+  color: var(--rse-fg-muted);
+  margin-bottom: 6px;
+}
+.ind2-contact .email,
+.ind2-contact .linkedin {
+  display: block;
+  font-size: 11.5px;
+  color: var(--rse-brand);
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 2px;
+}
+.ind2-contact .email:hover,
+.ind2-contact .linkedin:hover {
+  text-decoration: underline;
+}
