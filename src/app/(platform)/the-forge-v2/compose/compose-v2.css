@@ -461,3 +461,33 @@
   margin: 2px 0;
 }
 .cm2-thread-item .cm2-snippet { color: var(--c-fg-muted); }
+
+/* Preview banner — honest preview-state marker above the composer */
+.cm2-preview-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 6px 0 14px;
+  padding: 10px 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #7c2d12;
+}
+.cm2-preview-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 2px 7px;
+  background: #ff4500;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  line-height: 1.45;
+  margin-top: 1px;
+}
+.cm2-preview-text strong { font-weight: 600; color: #431407; }

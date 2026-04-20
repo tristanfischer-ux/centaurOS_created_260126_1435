@@ -14,9 +14,14 @@
  *   - Tone modes (Direct / Formal / Repair): visual toggle; no rewrite
  *     happens client-side — the selected tone ships with the payload
  *     when Send lands.
- *   - Send / Schedule: disabled with "Send ships with the comms mutation
- *     (next round)" helper. No submit path is wired.
- *   - Save draft: disabled (same reason).
+ *   - Save draft: writes the current fields to `localStorage` under
+ *     `forge-v2:compose:draft` and toasts confirmation. No server round-
+ *     trip — the draft persists to this browser only until the comms
+ *     mutation lands. On mount we rehydrate from the same key so a
+ *     founder returning to the page keeps what they wrote.
+ *   - Send now / Schedule: toasts an honest "delivery wires up next round
+ *     — your draft is saved locally" message. Buttons are enabled so a
+ *     click always produces feedback (never a dead button).
  *   - Recent recipients: read-only click-to-fill — fills the To field and
  *     moves focus there so the draft picks up the chosen contact.
  *
@@ -42,8 +47,26 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 import "./compose-v2.css"
+
+// ─── Local draft persistence ───────────────────────────────────────────
+//
+// DECISION: persist the draft to localStorage so the founder doesn't lose
+// the message when they tab away. A server-side drafts table is the
+// proper home once the comms mutation lands; until then, localStorage is
+// the only honest way to say "Save draft" and mean it.
+const DRAFT_STORAGE_KEY = "forge-v2:compose:draft"
+
+interface PersistedDraft {
+    to: string
+    subject: string
+    body: string
+    channel: ComposeChannel
+    tone: ComposeTone
+    savedAt: string
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -84,8 +107,34 @@ export function ComposeView(props: ComposeViewProps): React.ReactElement {
     const [to, setTo] = useState<string>("")
     const [subject, setSubject] = useState<string>("")
     const [body, setBody] = useState<string>("")
+    const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
 
     const toInputRef = useRef<HTMLInputElement>(null)
+
+    // Rehydrate the local draft on mount so the founder never loses work
+    // when they tab away. Runs client-only — no SSR read.
+    useEffect(() => {
+        if (typeof window === "undefined") return
+        try {
+            const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
+            if (!raw) return
+            const parsed = JSON.parse(raw) as PersistedDraft
+            if (typeof parsed !== "object" || parsed === null) return
+            if (typeof parsed.to === "string") setTo(parsed.to)
+            if (typeof parsed.subject === "string") setSubject(parsed.subject)
+            if (typeof parsed.body === "string") setBody(parsed.body)
+            if (parsed.channel === "email" || parsed.channel === "slack" || parsed.channel === "imessage") {
+                setChannel(parsed.channel)
+            }
+            if (parsed.tone === "direct" || parsed.tone === "formal" || parsed.tone === "repair") {
+                setTone(parsed.tone)
+            }
+            if (typeof parsed.savedAt === "string") setLastSavedAt(parsed.savedAt)
+        } catch (err) {
+            // Don't block the page on a corrupt draft — just log.
+            console.warn("[COMPOSE] failed to rehydrate local draft:", err)
+        }
+    }, [])
 
     const handleRecentSelect = useCallback(
         (r: RecentRecipient) => {
@@ -100,11 +149,49 @@ export function ComposeView(props: ComposeViewProps): React.ReactElement {
         []
     )
 
+    const handleSaveDraft = useCallback(() => {
+        if (typeof window === "undefined") return
+        const hasContent =
+            to.trim().length > 0 || subject.trim().length > 0 || body.trim().length > 0
+        if (!hasContent) {
+            toast.error("Nothing to save yet — write something first.")
+            return
+        }
+        const savedAt = new Date().toISOString()
+        const payload: PersistedDraft = { to, subject, body, channel, tone, savedAt }
+        try {
+            window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload))
+            setLastSavedAt(savedAt)
+            toast.success("Draft saved to this browser.")
+        } catch (err) {
+            console.error("[COMPOSE] failed to save draft:", err)
+            toast.error("Could not save the draft locally — check browser storage.")
+        }
+    }, [to, subject, body, channel, tone])
+
+    const handleSendNow = useCallback(() => {
+        // No delivery path exists yet. Persist the draft so nothing is
+        // lost, then toast an honest message. Never pretend we sent.
+        handleSaveDraft()
+        toast("Delivery wires up next round — your draft is saved locally.", {
+            description: "The comms mutation (Gmail / Slack / iMessage) lands with the next build.",
+        })
+    }, [handleSaveDraft])
+
+    const handleSchedule = useCallback(() => {
+        handleSaveDraft()
+        toast("Scheduling lands with the comms mutation.", {
+            description: "Draft is saved locally until then.",
+        })
+    }, [handleSaveDraft])
+
     const signatureName = senderName && senderName.trim().length > 0
         ? senderName.trim()
         : "Your name"
 
-    const sendDisabledLabel = "Send ships with the comms mutation (next round)"
+    const footMeta = lastSavedAt
+        ? `Draft · ${countEdits(to, subject, body)} edits from you · saved locally ${formatRelative(lastSavedAt)}`
+        : `Draft · ${countEdits(to, subject, body)} edits from you · not yet saved`
 
     return (
         <div className="cm2">
@@ -116,6 +203,16 @@ export function ComposeView(props: ComposeViewProps): React.ReactElement {
                 <span className="sep">›</span>
                 <span className="current">Compose message</span>
             </nav>
+
+            {/* ── Preview banner — honest state of what works today ──── */}
+            <div className="cm2-preview-banner" role="status" aria-live="polite">
+                <span className="cm2-preview-badge">Preview</span>
+                <span className="cm2-preview-text">
+                    Compose is in preview. <strong>Save draft</strong> persists to
+                    this browser so nothing is lost between visits. Outbound
+                    delivery (email, Slack, iMessage) wires up next round.
+                </span>
+            </div>
 
             {/* ── Annotation note (mockup parity) ───────────────────── */}
             <div className="cm2-annot">
@@ -261,33 +358,33 @@ export function ComposeView(props: ComposeViewProps): React.ReactElement {
                             <button
                                 type="button"
                                 className="cm2-btn primary"
-                                disabled
-                                aria-label={sendDisabledLabel}
-                                title={sendDisabledLabel}
+                                onClick={handleSendNow}
+                                aria-label="Send now — delivery wires up next round"
+                                title="Delivery wires up next round — click to save your draft locally"
                             >
                                 Send now
                             </button>
                             <button
                                 type="button"
                                 className="cm2-btn"
-                                disabled
-                                aria-label={sendDisabledLabel}
-                                title={sendDisabledLabel}
+                                onClick={handleSchedule}
+                                aria-label="Schedule — delivery wires up next round"
+                                title="Scheduling wires up next round — click to save your draft locally"
                             >
                                 Schedule
                             </button>
                             <button
                                 type="button"
                                 className="cm2-btn ghost"
-                                disabled
-                                aria-label={sendDisabledLabel}
-                                title={sendDisabledLabel}
+                                onClick={handleSaveDraft}
+                                aria-label="Save draft to this browser"
+                                title="Save this draft to your browser so nothing is lost"
                             >
                                 Save draft
                             </button>
                         </div>
                         <div className="cm2-foot-meta">
-                            Draft · {countEdits(to, subject, body)} edits from you · not yet saved
+                            {footMeta}
                         </div>
                     </div>
                 </div>
@@ -398,4 +495,23 @@ function countEdits(to: string, subject: string, body: string): number {
     if (subject.trim().length > 0) n += 1
     if (body.trim().length > 0) n += 1
     return n
+}
+
+/**
+ * Coarse relative-time formatter — "just now" / "2m ago" / "3h ago" / a
+ * locale date string past 24h. Pure client-side; falls back to the raw
+ * ISO string when parsing fails.
+ */
+function formatRelative(iso: string): string {
+    const then = Date.parse(iso)
+    if (Number.isNaN(then)) return iso
+    const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000))
+    if (seconds < 45) return "just now"
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`
+    if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`
+    try {
+        return new Date(then).toLocaleDateString()
+    } catch {
+        return iso
+    }
 }
