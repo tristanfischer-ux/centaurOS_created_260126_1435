@@ -528,16 +528,6 @@ export type BrowseInvestorsResult = {
   hasMore: boolean
 }
 
-const BROWSE_SUBCATEGORIES = [
-  'VC Fund',
-  'PE Firm',
-  'Accelerator',
-  'Family Office',
-  'Corporate Venture',
-  'Advisory Services',
-  'Other',
-] as const
-
 /**
  * Browse the `marketplace_listings` Finance directory from inside Money/Raise.
  * Surfaces the ~7,500 investor rows (VC Funds / PE Firms / Accelerators /
@@ -622,10 +612,6 @@ export async function browseInvestorsForMoney(
     const total = count ?? rows.length
     return { rows, total, hasMore: offset + rows.length < total }
   })
-}
-
-export function listBrowseSubcategories(): readonly string[] {
-  return BROWSE_SUBCATEGORIES
 }
 
 /**

@@ -1,4 +1,5 @@
-import { browseInvestorsForMoney, listBrowseSubcategories } from '@/actions/money-raise'
+import { browseInvestorsForMoney } from '@/actions/money-raise'
+import { BROWSE_SUBCATEGORIES } from '@/lib/money/browse-subcategories'
 import { BrowseInvestorsView } from './browse-view'
 
 export const dynamic = 'force-dynamic'
@@ -40,7 +41,7 @@ export default async function BrowseInvestorsPage({
   return (
     <BrowseInvestorsView
       result={result}
-      subcategories={listBrowseSubcategories()}
+      subcategories={BROWSE_SUBCATEGORIES}
       filters={{
         query: params.q ?? '',
         subcategory: params.subcategory ?? 'all',
