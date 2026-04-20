@@ -311,6 +311,17 @@ export async function loadCadLabProject(
  *
  * @audit Logs project creation with foundry and user context
  */
+function deriveProjectName(raw: string, max = 60): string {
+  const trimmed = raw.trim().replace(/\s+/g, " ")
+  if (trimmed.length === 0) return "Untitled project"
+  if (trimmed.length <= max) return trimmed
+  const clauseEnd = trimmed.slice(0, max + 1).search(/[.;:—]\s|\s[-–—]\s/)
+  if (clauseEnd > 10) return trimmed.slice(0, clauseEnd).trim()
+  const truncated = trimmed.slice(0, max)
+  const lastSpace = truncated.lastIndexOf(" ")
+  return (lastSpace > 20 ? truncated.slice(0, lastSpace) : truncated).trim() + "…"
+}
+
 export async function createCadLabProject(
   subject: string,
   modelId: ClaudeModelId = "claude-opus-4-7",
@@ -321,8 +332,12 @@ export async function createCadLabProject(
       return { error: "Subject is required" }
     }
 
-    // Generate a name from the subject (first ~50 chars)
-    const name = subject.length > 50 ? `${subject.slice(0, 47)}...` : subject
+    // Derive a short name from the description. Prefer the first clause
+    // boundary (period, semicolon, colon, em-dash) if it falls inside the
+    // budget; otherwise truncate on the last word boundary. Keeps cards,
+    // breadcrumbs, and h1s readable without cutting mid-word or dangling
+    // connective words like "for" / "with".
+    const name = deriveProjectName(subject)
 
     const { data, error } = await supabase
       .from("cad_lab_projects")
