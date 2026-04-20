@@ -118,6 +118,14 @@ export interface WorkspaceViewProps {
         errorCode: string | null
         errorMessage: string | null
     }
+    /** Latest Finn (finance-lead) cost estimate run — drives the Cost tile chip. */
+    finnRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+    }
     /** Brief lock status — drives the header revision badge. Non-overlapping
      *  with the Brief tile chip: that chip describes Chase's research run,
      *  this badge describes whether the brief is locked. */
@@ -140,7 +148,7 @@ export interface SupplierShortlistRow {
 // ─── View ─────────────────────────────────────────────────────────────
 
 export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
-    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun, bomRun, chaseRun, briefLock } = props
+    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun, bomRun, chaseRun, finnRun, briefLock } = props
 
     // Base URL for the artefact deep-links. All routes are placeholders that
     // will resolve once the per-artefact pages ship in later rounds.
@@ -191,7 +199,17 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
             {/* ── Project header ───────────────────────────── */}
             <div className="w2-project-header">
                 <div className="title-block">
-                    <h1><span className="dot" />{project.name || "Untitled project"}</h1>
+                    <h1>
+                        <span className="dot" />
+                        {project.name || "Untitled project"}
+                        {briefLock && briefLock.revisionLabel ? (
+                            <BriefLockBadge
+                                isLocked={briefLock.isLocked}
+                                revisionLabel={briefLock.revisionLabel}
+                                briefLockHref={`${base}/brief-lock`}
+                            />
+                        ) : null}
+                    </h1>
                     <div className="sub">{subtitle}</div>
                     <div className="quick-stats">
                         <div className="stat-inline"><span className="k">Target batch:</span><span className="v">{header.quantityTarget || "—"}</span></div>
@@ -486,7 +504,27 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                                 <path d="M15 9.5a3 3 0 0 0-3-2.5c-1.66 0-3 1.34-3 3 0 .83.34 1.58.88 2.12m.12 2.88h5.5M8 17h7" />
                             </svg>
                         </span>
-                        <span className={`w2-chip ${costState.chipTone} solid`}>{costState.chipText}</span>
+                        {/* When Finn has actually touched this project, the
+                            PipelineRunChip replaces the static tile chip so
+                            founders see "Finn is working…" / "Done 4m ago" /
+                            "Failed" instead of a stale "Not estimated" badge.
+                            Falls back to the static chip pre-first-run. */}
+                        {finnRun.status === "not-started" ? (
+                            <span className={`w2-chip ${costState.chipTone} solid`}>{costState.chipText}</span>
+                        ) : (
+                            <PipelineRunChip
+                                status={finnRun.status}
+                                specialistName="Finn"
+                                startedAt={
+                                    finnRun.status === "done"
+                                        ? finnRun.finishedAt ?? finnRun.startedAt
+                                        : finnRun.startedAt ?? finnRun.finishedAt
+                                }
+                                errorCode={finnRun.errorCode}
+                                errorMessage={finnRun.errorMessage}
+                                compact
+                            />
+                        )}
                     </div>
                     <h3>Cost</h3>
                     <div className="subtitle">Unit · landed · tooling · labour · solar</div>
@@ -1299,6 +1337,41 @@ function KcRow({ mod, text }: { mod: string; text: string }) {
     return (
         <Link href="#" className="w2-kc-row">
             <span className="mod">{mod}</span> {text}
+        </Link>
+    )
+}
+
+/**
+ * Header badge showing the brief-lock state.
+ *
+ * Rendered inline with the H1. Two presentations:
+ *   - locked → green chip "Rev A locked" linking to /brief-lock
+ *   - draft  → neutral chip "Rev A draft" linking to /brief-lock
+ *
+ * This is intentionally separate from the Brief tile chip in the artefact
+ * grid — the tile chip tracks Chase's research run; this badge tracks the
+ * lock gate. One is about specialist work, the other about handoff.
+ */
+function BriefLockBadge({
+    isLocked,
+    revisionLabel,
+    briefLockHref,
+}: {
+    isLocked: boolean
+    revisionLabel: string
+    briefLockHref: string
+}): React.ReactElement {
+    return (
+        <Link
+            href={briefLockHref}
+            className={`w2-brief-lock-badge ${isLocked ? "locked" : "draft"}`}
+            aria-label={isLocked ? `${revisionLabel} locked — open brief lock page` : `${revisionLabel} draft — open brief lock page`}
+        >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            {revisionLabel} {isLocked ? "locked" : "draft"}
         </Link>
     )
 }

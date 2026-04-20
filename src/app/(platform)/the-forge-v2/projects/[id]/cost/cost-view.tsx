@@ -27,6 +27,13 @@
 "use client"
 
 import Link from "next/link"
+import { PoundSterling } from "lucide-react"
+
+import {
+    PipelineRunChip,
+    type PipelineRunStatus,
+} from "@/components/pipeline/pipeline-run-chip"
+import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
 
 import "./cost-v2.css"
 
@@ -96,6 +103,25 @@ export interface CostViewProps {
     rows: CostWaterfallRow[]
     /** Engineering-library row counts for the grounding pills. */
     grounding: GroundingCounts
+    /** Latest Finn (cost estimate) run — drives the "Estimated by Finn · 4m ago"
+     *  chip on the populated state, and the chip beside the "Estimate with Finn"
+     *  CTA on the empty state. */
+    finnRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+    }
+    /** True when Finn can't run yet — modules empty OR any module has no
+     *  keyParts[]. Disables the CTA and shows a "Generate BOM first" tooltip
+     *  so the founder isn't sent into a mid-action NO_BOM refusal. */
+    noBom: boolean
+    /** Server-action binding for the Estimate-with-Finn button. Parent binds
+     *  projectId via closure so the client component stays stateless. */
+    runFinnAction: () => Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    >
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -131,9 +157,33 @@ export function CostView(props: CostViewProps): React.ReactElement {
         ceilingGbp,
         rows,
         grounding,
+        finnRun,
+        noBom,
+        runFinnAction,
     } = props
 
     const base = `/the-forge-v2/projects/${project.id}`
+
+    // Finn's run-status chip slot is shared across empty + populated states.
+    // "not-started" renders nothing (the CTA carries the call to action);
+    // any touched state surfaces the PipelineRunChip so founders can see
+    // "Finn is working…" / "Estimated by Finn · 4m ago" / "Failed" without
+    // having to refresh.
+    const finnChip =
+        finnRun.status === "not-started" ? null : (
+            <PipelineRunChip
+                status={finnRun.status}
+                specialistName="Finn"
+                startedAt={
+                    finnRun.status === "done"
+                        ? finnRun.finishedAt ?? finnRun.startedAt
+                        : finnRun.startedAt ?? finnRun.finishedAt
+                }
+                errorCode={finnRun.errorCode}
+                errorMessage={finnRun.errorMessage}
+                compact
+            />
+        )
 
     // ── Empty state ──────────────────────────────────────────────
     // Fires when the project has no AI cost estimates yet (and therefore
@@ -189,6 +239,29 @@ export function CostView(props: CostViewProps): React.ReactElement {
                     <Link href={`${base}/brief`} className="set-cta">
                         Set your cost envelope →
                     </Link>
+                </div>
+
+                {/* ── Finn CTA ────────────────────────────── */}
+                {/* Pairs the pipeline-status chip (once a run exists) with
+                    the Estimate-with-Finn button. Disabled + explained when
+                    the project hasn't been decomposed or doesn't carry a
+                    BOM seed — Finn's orchestrator refuses with NO_BOM in
+                    that state, so we catch it at the UI rather than surface
+                    the error after a click. */}
+                <div className="c2-finn-cta" role="group" aria-label="Run Finn">
+                    {finnChip}
+                    <RunSpecialistButton
+                        action={runFinnAction}
+                        label="Estimate with Finn"
+                        subLabel="Finn · Finance Lead · ~45s"
+                        disabled={noBom}
+                        disabledReason={
+                            noBom
+                                ? "Generate BOM first — Finn needs each module's parts list before I can estimate costs."
+                                : undefined
+                        }
+                        icon={<PoundSterling aria-hidden="true" />}
+                    />
                 </div>
 
                 {/* ── Explainer — four sources ────────────── */}
@@ -400,6 +473,9 @@ export function CostView(props: CostViewProps): React.ReactElement {
                         <span className={`c2-chip ${chipTone} solid`} style={{ marginLeft: 6 }}>
                             {chipLabel}
                         </span>
+                        {finnChip ? (
+                            <span style={{ marginLeft: 6 }}>{finnChip}</span>
+                        ) : null}
                     </h1>
                     <div className="sub">
                         Unit BOM · labour · inspection · solar (OFE) · NRE amortised. Every layer traced to source.

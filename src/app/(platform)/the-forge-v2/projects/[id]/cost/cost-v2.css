@@ -717,3 +717,24 @@
   margin-left: 6px;
 }
 .c2-empty-waterfall .overlay a:hover { text-decoration: underline; }
+
+/* ── Finn CTA row (empty state) ─────────────────────────────────────
+   Paired PipelineRunChip + RunSpecialistButton. Sits above the
+   four-sources explainer so the affordance is the first thing the
+   founder sees after the hero.                                      */
+.c2 .c2-finn-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  margin: 16px 0;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+}
+.c2 .c2-finn-cta > :last-child {
+  /* The RunSpecialistButton component wraps its own div — let it grow
+     to its natural width without fighting the flex container. */
+  flex: 0 0 auto;
+}

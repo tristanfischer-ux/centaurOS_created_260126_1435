@@ -29,6 +29,12 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import {
+    loadFinnRunStatus,
+    runFinnCost,
+    type LoadFinnRunStatusResult,
+    type RunFinnCostReturn,
+} from "@/actions/specialists/run-finn-cost"
 import { createClient } from "@/lib/supabase/server"
 
 import { CostView, type CostCategory, type CostViewProps, type CostWaterfallRow } from "./cost-view"
@@ -56,6 +62,33 @@ export default async function ForgeV2CostPage({
     const project = result.project
     const modules = project.modules ?? []
     const estimatesById = project.aiCostEstimates ?? {}
+
+    // Bind the Finn orchestrator to this project id so the client RunSpecialistButton
+    // doesn't need to thread it explicitly. The `"use server"` boundary is
+    // on run-finn-cost.ts itself; this inline action just narrows the shape
+    // to the button's { ok, runId } | { ok:false, error, errorCode? } contract.
+    async function runFinnAction(): Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    > {
+        "use server"
+        const res: RunFinnCostReturn = await runFinnCost(id, "manual")
+        if (res.ok) return { ok: true, runId: res.runId }
+        return { ok: false, error: res.error, errorCode: res.errorCode }
+    }
+
+    // Finn's latest run status — drives the "Estimated by Finn · 4m ago" chip
+    // at the top of populated state and the "not-started / running / failed"
+    // chip on the empty-state CTA. Failure-tolerant so a missing row never
+    // takes down the page.
+    const finnRun = await safeFinnRunStatus(id)
+
+    // Precondition mirror of the orchestrator's NO_BOM gate: Finn requires
+    // every module to carry keyParts[]. We expose the reverse flag (noBom)
+    // to the view so the CTA can disable + explain why rather than fail
+    // mid-click.
+    const noBom =
+        modules.length === 0 ||
+        modules.some((m) => !Array.isArray(m.keyParts) || m.keyParts.length === 0)
 
     // ── 1. Waterfall rows — one per module, real data only ──────────────
     const rows: CostWaterfallRow[] = []
@@ -118,9 +151,29 @@ export default async function ForgeV2CostPage({
         ceilingGbp,
         rows,
         grounding,
+        finnRun: {
+            status: finnRun.status,
+            startedAt: finnRun.startedAt ?? null,
+            finishedAt: finnRun.finishedAt ?? null,
+            errorCode: finnRun.errorCode ?? null,
+            errorMessage: finnRun.errorMessage ?? null,
+        },
+        noBom,
+        runFinnAction,
     }
 
     return <CostView {...viewProps} />
+}
+
+async function safeFinnRunStatus(
+    projectId: string,
+): Promise<LoadFinnRunStatusResult> {
+    try {
+        return await loadFinnRunStatus(projectId)
+    } catch (err) {
+        console.error("[COST-PAGE] finn-run status failed:", err)
+        return { status: "not-started" }
+    }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────
