@@ -61,6 +61,8 @@ import {
     loadLatestRunForStage,
     startPipelineRun,
 } from "@/actions/pipeline-runs"
+// Wave 1c: auto-fire BOM generator on Max success.
+import { runBomGenerator } from "@/actions/specialists/run-bom-generator"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -395,6 +397,12 @@ export async function runMaxDecomposition(
                     expansionsOk: successfulExpansions,
                     expansionsTotal: skeletonModules.length,
                 },
+            })
+
+            // Wave 1c: auto-fire BOM generator on Max success. Fire-and-forget —
+            // any failure surfaces on the BOM pipeline_run row, not here.
+            void runBomGenerator(projectId, "auto.max-complete").catch((err) => {
+                console.error("[run-max-decomposition] BOM auto-fire failed:", err)
             })
 
             return {

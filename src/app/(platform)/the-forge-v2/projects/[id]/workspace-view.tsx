@@ -102,6 +102,22 @@ export interface WorkspaceViewProps {
         errorCode: string | null
         errorMessage: string | null
     }
+    /** Latest BOM generator run — drives the BOM tile chip. */
+    bomRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+    }
+    /** Latest Chase (strategist) research run — drives the Brief tile chip. */
+    chaseRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+    }
 }
 
 export interface SupplierShortlistRow {
@@ -114,7 +130,7 @@ export interface SupplierShortlistRow {
 // ─── View ─────────────────────────────────────────────────────────────
 
 export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
-    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun } = props
+    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun, bomRun, chaseRun } = props
 
     // Base URL for the artefact deep-links. All routes are placeholders that
     // will resolve once the per-artefact pages ship in later rounds.
@@ -293,7 +309,27 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                                 <path d="M9 12h6M9 16h4" />
                             </svg>
                         </span>
-                        <span className={`w2-chip ${briefState.chipTone} solid`}>{briefState.chipText}</span>
+                        {/* When Chase has actually touched this project, the
+                            PipelineRunChip replaces the static tile chip so
+                            founders see "Chase is working…" / "Done 3m ago" /
+                            "Failed" instead of a stale "Draft / Not started"
+                            badge. Falls back to the static chip pre-first-run. */}
+                        {chaseRun.status === "not-started" ? (
+                            <span className={`w2-chip ${briefState.chipTone} solid`}>{briefState.chipText}</span>
+                        ) : (
+                            <PipelineRunChip
+                                status={chaseRun.status}
+                                specialistName="Chase"
+                                startedAt={
+                                    chaseRun.status === "done"
+                                        ? chaseRun.finishedAt ?? chaseRun.startedAt
+                                        : chaseRun.startedAt ?? chaseRun.finishedAt
+                                }
+                                errorCode={chaseRun.errorCode}
+                                errorMessage={chaseRun.errorMessage}
+                                compact
+                            />
+                        )}
                     </div>
                     <h3>Brief</h3>
                     <div className="subtitle">Intent · target markets · regulatory envelope</div>
@@ -367,7 +403,27 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                                 <line x1="3" y1="18" x2="3.01" y2="18" />
                             </svg>
                         </span>
-                        <span className={`w2-chip ${bomState.chipTone} solid`}>{bomState.chipText}</span>
+                        {/* Same pattern as Modules: once the BOM orchestrator
+                            has touched this project, the PipelineRunChip
+                            replaces the static tile chip so founders see
+                            "Max is working…" / "Done 4m ago" / "Failed"
+                            instead of a stale "No parts yet" badge. */}
+                        {bomRun.status === "not-started" ? (
+                            <span className={`w2-chip ${bomState.chipTone} solid`}>{bomState.chipText}</span>
+                        ) : (
+                            <PipelineRunChip
+                                status={bomRun.status}
+                                specialistName="Max"
+                                startedAt={
+                                    bomRun.status === "done"
+                                        ? bomRun.finishedAt ?? bomRun.startedAt
+                                        : bomRun.startedAt ?? bomRun.finishedAt
+                                }
+                                errorCode={bomRun.errorCode}
+                                errorMessage={bomRun.errorMessage}
+                                compact
+                            />
+                        )}
                     </div>
                     <h3>BOM</h3>
                     <div className="subtitle">Parts · qty · material · tolerance · supplier · cost</div>

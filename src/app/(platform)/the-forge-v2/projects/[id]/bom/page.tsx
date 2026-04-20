@@ -22,6 +22,10 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import {
+    loadBomRunStatus,
+    runBomGenerator,
+} from "@/actions/specialists/run-bom-generator"
 import { createClient } from "@/lib/supabase/server"
 import { shortenPartName, partDescription } from "../../../_components/part-name"
 
@@ -44,11 +48,26 @@ export default async function ForgeV2BomPage({
     params: Promise<{ id: string }>
 }): Promise<React.ReactNode> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
+    const [result, bomRunStatus] = await Promise.all([
+        loadCadLabProject(id),
+        safeBomRunStatus(id),
+    ])
     if ("error" in result || !result.project) notFound()
 
     const project = result.project
     const modules = project.modules ?? []
+
+    // Bind the BOM orchestrator to this project id so the client button
+    // component doesn't need to pass it explicitly. The `"use server"`
+    // boundary is on run-bom-generator.ts itself.
+    async function runBomAction(): Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    > {
+        "use server"
+        const res = await runBomGenerator(id, "manual")
+        if (res.ok) return { ok: true, runId: res.runId }
+        return { ok: false, error: res.error, errorCode: res.errorCode }
+    }
 
     // ── 1. BOM categories ────────────────────────────────────────
     // One category per module. Each keyPart becomes a row. Per-part qty/cost
@@ -142,9 +161,29 @@ export default async function ForgeV2BomPage({
         categories,
         costStack,
         grounding,
+        bomRun: {
+            status: bomRunStatus.status,
+            startedAt: bomRunStatus.startedAt ?? null,
+            finishedAt: bomRunStatus.finishedAt ?? null,
+            errorCode: bomRunStatus.errorCode ?? null,
+            errorMessage: bomRunStatus.errorMessage ?? null,
+        },
+        noModules: modules.length === 0,
+        runBomAction,
     }
 
     return <BomView {...viewProps} />
+}
+
+async function safeBomRunStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadBomRunStatus>>> {
+    try {
+        return await loadBomRunStatus(projectId)
+    } catch (err) {
+        console.error("[BOM-PAGE] bom-run status failed:", err)
+        return { status: "not-started" }
+    }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────

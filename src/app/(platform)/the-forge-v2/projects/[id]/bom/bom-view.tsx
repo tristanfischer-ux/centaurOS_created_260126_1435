@@ -24,6 +24,15 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { ListTree } from "lucide-react"
+
+import {
+    PipelineRunChip,
+    formatRelativeFromNow,
+    type PipelineRunStatus,
+} from "@/components/pipeline/pipeline-run-chip"
+import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
+
 import "./bom-v2.css"
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -108,6 +117,20 @@ export interface BomViewProps {
         hardware: number
         processes: number
     }
+    /** Latest BOM generator pipeline-run status (specialist=cto, stage=bom.generate). */
+    bomRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+    }
+    /** True when no modules have been decomposed yet — disables the generator CTA. */
+    noModules: boolean
+    /** Server action bound to this project + trigger='manual'. */
+    runBomAction: () => Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    >
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -128,8 +151,29 @@ function formatGbpExact(value: number | null): string {
 // ─── View ───────────────────────────────────────────────────────────────
 
 export function BomView(props: BomViewProps): React.ReactElement {
-    const { project, header, unitCostGbp, unitCostCeilingGbp, categories, costStack, grounding } = props
+    const {
+        project,
+        header,
+        unitCostGbp,
+        unitCostCeilingGbp,
+        categories,
+        costStack,
+        grounding,
+        bomRun,
+        noModules,
+        runBomAction,
+    } = props
     const router = useRouter()
+
+    // A single generator is "busy" when it's queued or actively running.
+    // Disables the CTA so the founder can't double-fire.
+    const bomBusy = bomRun.status === "queued" || bomRun.status === "running"
+    // Which timestamp the "done Xm ago" chip should read — finishedAt for
+    // terminal states, startedAt otherwise. Mirrors the Max chip convention.
+    const bomChipTimestamp =
+        bomRun.status === "done"
+            ? bomRun.finishedAt ?? bomRun.startedAt
+            : bomRun.startedAt ?? bomRun.finishedAt
 
     const base = `/the-forge-v2/projects/${project.id}`
     const allPartsEmpty = header.totalParts === 0
@@ -206,8 +250,40 @@ export function BomView(props: BomViewProps): React.ReactElement {
                             Every part, material, fastener, and off-the-shelf component goes here. Once lines exist, the cost
                             waterfall activates, supplier shortlists populate, and DFM checks start running.
                         </p>
+                        {/* Generator CTA — fires the BOM orchestrator. Disabled
+                            when modules haven't been decomposed yet (NO_MODULES
+                            precondition) or when a run is already in flight. */}
+                        <div className="bm2-empty-generate">
+                            {bomRun.status !== "not-started" && (
+                                <div style={{ marginBottom: 10 }}>
+                                    <PipelineRunChip
+                                        status={bomRun.status}
+                                        specialistName="Max"
+                                        startedAt={bomChipTimestamp}
+                                        errorCode={bomRun.errorCode}
+                                        errorMessage={bomRun.errorMessage}
+                                        compact
+                                    />
+                                </div>
+                            )}
+                            <RunSpecialistButton
+                                action={runBomAction}
+                                label="Generate BOM from modules"
+                                subLabel="~30s per module"
+                                icon={<ListTree aria-hidden="true" />}
+                                variant="primary"
+                                disabled={noModules || bomBusy}
+                                disabledReason={
+                                    noModules
+                                        ? "Run Max's module decomposition first — the BOM generator needs modules to work from."
+                                        : bomBusy
+                                            ? "A BOM generation run is already in flight."
+                                            : undefined
+                                }
+                            />
+                        </div>
                         <div className="bm2-empty-ctas">
-                            <Link href={`${base}/geometry/upload`} className="bm2-btn primary">Upload your CAD</Link>
+                            <Link href={`${base}/geometry/upload`} className="bm2-btn">Upload your CAD</Link>
                             <span className="bm2-btn soon" title="Ships with the parts-spec table">+ Add your first line</span>
                             <span className="bm2-btn soon" title="Ships with the parts-spec table">Import from CSV</span>
                             <span className="bm2-btn soon" title="Onshape sync ships in a future round">Sync from Onshape</span>
@@ -300,8 +376,43 @@ export function BomView(props: BomViewProps): React.ReactElement {
                         Top-level fabricated parts. Fasteners and standard hardware are tracked separately.
                         Every column answers a founder question: what it is · who makes it · how much · what bites.
                     </div>
+                    {/* BOM generator provenance — shows once the orchestrator
+                        has actually touched this project. Done state reads
+                        "BOM generated by Max · Xm ago"; live / failed states
+                        let PipelineRunChip render its usual shape. */}
+                    {bomRun.status === "done" && bomChipTimestamp ? (
+                        <div className="bm2-provenance">
+                            BOM generated by Max · {formatRelativeFromNow(bomChipTimestamp)}
+                        </div>
+                    ) : bomRun.status !== "not-started" ? (
+                        <div style={{ marginTop: 8 }}>
+                            <PipelineRunChip
+                                status={bomRun.status}
+                                specialistName="Max"
+                                startedAt={bomChipTimestamp}
+                                errorCode={bomRun.errorCode}
+                                errorMessage={bomRun.errorMessage}
+                                compact
+                            />
+                        </div>
+                    ) : null}
                 </div>
                 <div className="cta-group">
+                    <RunSpecialistButton
+                        action={runBomAction}
+                        label="Regenerate BOM"
+                        subLabel="~30s per module"
+                        icon={<ListTree aria-hidden="true" />}
+                        variant="secondary"
+                        disabled={noModules || bomBusy}
+                        disabledReason={
+                            noModules
+                                ? "Run Max's module decomposition first."
+                                : bomBusy
+                                    ? "A BOM generation run is already in flight."
+                                    : undefined
+                        }
+                    />
                     <span className="bm2-btn soon" title="Ships with the parts-spec table">Export CSV</span>
                     <Link href={`${base}/suppliers`} className="bm2-btn">Create RFQ bundle</Link>
                     <Link href={`${base}/brief-lock`} className="bm2-btn primary">Lock revision {designRevisionToLetter(project.designRevision)}</Link>

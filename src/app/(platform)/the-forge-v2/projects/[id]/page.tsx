@@ -35,6 +35,9 @@ import {
     type ProjectResumeState,
 } from "@/actions/project-workspace"
 import { loadMaxRunStatus } from "@/actions/specialists/run-max-decomposition"
+import { loadBomRunStatus } from "@/actions/specialists/run-bom-generator"
+import { loadChaseRunStatus } from "@/actions/specialists/run-chase-research"
+import { loadBriefLockStatus } from "@/actions/brief-lock"
 import { createClient } from "@/lib/supabase/server"
 
 import { WorkspaceView, type TopMaterialRow, type TopProcessRow, type WorkspaceViewProps } from "./workspace-view"
@@ -66,7 +69,7 @@ export default async function ForgeV2ProjectPage({
     // ── 2. Derived data — parallelised, all failure-tolerant ─────────
     // Each call's failure mode is local: we swallow errors and fall back to
     // the empty-state shape so one broken source cannot take down the page.
-    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses, supplierShortlist, maxRunStatus] = await Promise.all([
+    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses, supplierShortlist, maxRunStatus, bomRunStatus, chaseRunStatus, briefLockStatus] = await Promise.all([
         safeResume(id),
         safeActivity(id, 7),
         safeEngineeringCounts(),
@@ -74,6 +77,9 @@ export default async function ForgeV2ProjectPage({
         safeTopProcesses(),
         safeSupplierShortlist(id),
         safeMaxRunStatus(id),
+        safeBomRunStatus(id),
+        safeChaseRunStatus(id),
+        safeBriefLockStatus(id),
     ])
 
     // ── 3. Header-derived numbers that come straight off the project row
@@ -152,6 +158,25 @@ export default async function ForgeV2ProjectPage({
             errorCode: maxRunStatus.errorCode ?? null,
             errorMessage: maxRunStatus.errorMessage ?? null,
         },
+        bomRun: {
+            status: bomRunStatus.status,
+            startedAt: bomRunStatus.startedAt ?? null,
+            finishedAt: bomRunStatus.finishedAt ?? null,
+            errorCode: bomRunStatus.errorCode ?? null,
+            errorMessage: bomRunStatus.errorMessage ?? null,
+        },
+        chaseRun: {
+            status: chaseRunStatus.status,
+            startedAt: chaseRunStatus.startedAt ?? null,
+            finishedAt: chaseRunStatus.finishedAt ?? null,
+            errorCode: chaseRunStatus.errorCode ?? null,
+            errorMessage: chaseRunStatus.errorMessage ?? null,
+        },
+        briefLock: {
+            isLocked: briefLockStatus.isLocked,
+            revisionLabel: briefLockStatus.revisionLabel,
+            lockedAt: briefLockStatus.lockedAt,
+        },
     }
 
     return <WorkspaceView {...viewProps} />
@@ -166,6 +191,28 @@ async function safeMaxRunStatus(
         return await loadMaxRunStatus(projectId)
     } catch (err) {
         console.error("[WORKSPACE-PAGE] max-run status failed:", err)
+        return { status: "not-started" }
+    }
+}
+
+async function safeChaseRunStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadChaseRunStatus>>> {
+    try {
+        return await loadChaseRunStatus(projectId)
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] chase-run status failed:", err)
+        return { status: "not-started" }
+    }
+}
+
+async function safeBomRunStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadBomRunStatus>>> {
+    try {
+        return await loadBomRunStatus(projectId)
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] bom-run status failed:", err)
         return { status: "not-started" }
     }
 }
