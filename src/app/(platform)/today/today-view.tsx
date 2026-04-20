@@ -82,6 +82,7 @@ import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import { getMyReferralInfo } from "@/actions/referrals"
 import { useWeeklyTime } from "@/hooks/use-weekly-time"
 import { useCalBriefing } from "./use-cal-briefing"
+import { ReleaseNoticeBanner } from "./release-notice-banner"
 import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { CHECKLIST_ITEMS } from "@/components/onboarding/GettingStartedChecklist"
@@ -657,6 +658,7 @@ export function TodayView({
         const userRole = initialOnboardingData?._userRole
         return (
             <div className="max-w-5xl space-y-8">
+                <ReleaseNoticeBanner />
                 <FractionalExecPromoCard visible={showFractionalExecPrompt} />
 
                 {initialOnboardingData && (
@@ -719,6 +721,7 @@ export function TodayView({
     return (
         <div className="max-w-5xl space-y-6">
             {/* Above-V1: dismissible/onboarding banners (preserved) */}
+            <ReleaseNoticeBanner />
             <FractionalExecPromoCard visible={showFractionalExecPrompt} />
 
             {initialOnboardingData && (
