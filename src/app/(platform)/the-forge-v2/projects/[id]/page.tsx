@@ -1,33 +1,47 @@
 /**
  * @file projects/[id]/page.tsx — /the-forge-v2/projects/:id project workspace.
  *
- * @description Project cockpit (V2 — mockup-faithful rebuild). Ports
- * FORGE-MOCKUP-WORKSPACE.html verbatim into production React: breadcrumb,
- * project header, amber resumed card, 4-card health strip, system illustration
- * (empty state), three artefact clusters (Define / Deliver / Support),
- * Engineering Intelligence, Known Challenges, activity timeline, and the
- * fixed-bottom phase tabs.
+ * @description Project cockpit (V2). Server component that fetches all of the
+ * data the WorkspaceView needs in parallel:
  *
- * This commit ships the visual shell with stubbed mockup content (HAPS UAV
- * reference data) so Tristan can parity-check the rendered page against
- * FORGE-MOCKUP-WORKSPACE.html. Real data wiring (briefing, modules, BOM,
- * suppliers, cost, risks, library counts, activity) lands in a follow-up
- * commit.
+ *   - loadCadLabProject(id)          → project row (name, subject, modules, …)
+ *   - getProjectResumeState(id)      → amber / green "where you left off" card
+ *   - getProjectActivityFeed(id, 7)  → recent activity timeline
+ *   - engineering library counts     → material_properties / standard_hardware
+ *                                       / process_capabilities / design_standards
+ *
+ * Empty-state policy (CRITICAL): if a data source does not exist yet (e.g. the
+ * `risks`, `suppliers`, `engagements` tables), we pass `null` / `undefined`
+ * to the view and the view renders the neutral empty-state variant of the
+ * matching card. We do NOT synthesise mockup values ("7 suppliers",
+ * "£172k/unit", etc.) — real or empty, never fake.
+ *
+ * If loadCadLabProject fails or returns null, we call Next's notFound() so
+ * /the-forge-v2/projects/<bogus-id> → 404 as expected.
  *
  * @related
- *  - Mockup: FORGE-MOCKUP-WORKSPACE.html (repo root)
- *  - View:   ./workspace-view.tsx
- *  - Styles: ./workspace-v2.css (scoped .w2)
+ *   - View:   ./workspace-view.tsx
+ *   - Styles: ./workspace-v2.css (scoped .w2)
  */
 
 import type { Metadata } from "next"
+import { notFound } from "next/navigation"
 
-import { WorkspaceView } from "./workspace-view"
+import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import {
+    getProjectActivityFeed,
+    getProjectResumeState,
+    type ProjectActivityEvent,
+    type ProjectResumeState,
+} from "@/actions/project-workspace"
+import { createClient } from "@/lib/supabase/server"
+
+import { WorkspaceView, type TopMaterialRow, type TopProcessRow, type WorkspaceViewProps } from "./workspace-view"
 
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
-    title: "HAPS UAV · The Forge",
+    title: "Project · The Forge",
     description: "Project cockpit — health, artefacts, engineering intelligence, risks, and recent activity.",
 }
 
@@ -36,10 +50,190 @@ export default async function ForgeV2ProjectPage({
 }: {
     params: Promise<{ id: string }>
 }): Promise<React.ReactNode> {
-    // INTENT: visual-parity pass renders the mockup's HAPS reference data.
-    // Real data wiring (loadCadLabProject + per-project content) lands in a
-    // follow-up commit. Await params to satisfy Next 15+ async-params contract.
-    await params
+    const { id } = await params
 
-    return <WorkspaceView />
+    // ── 1. Project record ────────────────────────────────────────────
+    // withAuth enforces auth + foundry scoping. If the id is wrong or the
+    // caller doesn't own it, we 404 rather than leak the existence of
+    // projects in other foundries.
+    const loadResult = await loadCadLabProject(id)
+    if ("error" in loadResult || !loadResult.project) {
+        notFound()
+    }
+    const project = loadResult.project
+
+    // ── 2. Derived data — parallelised, all failure-tolerant ─────────
+    // Each call's failure mode is local: we swallow errors and fall back to
+    // the empty-state shape so one broken source cannot take down the page.
+    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses] = await Promise.all([
+        safeResume(id),
+        safeActivity(id, 7),
+        safeEngineeringCounts(),
+        safeTopMaterials(),
+        safeTopProcesses(),
+    ])
+
+    // ── 3. Header-derived numbers that come straight off the project row
+    const modules = project.modules ?? []
+    const moduleCount = modules.length
+
+    // INTENT: "top-level parts" in the header and the BOM card comes from the
+    // sum of keyParts across all modules. This is the best approximation we
+    // have until a dedicated parts table ships.
+    const partCount = modules.reduce((acc, m) => acc + (m.keyParts?.length ?? 0), 0)
+
+    // Cost: sum AiCostEstimate.totalPerUnit across modules when present.
+    // Null if nothing has been estimated — so the health strip + cost card
+    // render the "not yet estimated" empty state.
+    const costEstimatesById = project.aiCostEstimates ?? {}
+    const costRows = Object.values(costEstimatesById)
+    const totalUnitCostGbp = costRows.length > 0
+        ? costRows.reduce((acc, row) => acc + (typeof row?.totalPerUnit === "number" ? row.totalPerUnit : 0), 0)
+        : null
+
+    // Known challenges: flatten module failureModes + unknowns, keyed by
+    // module name. Arrays are empty when modules haven't been decomposed yet.
+    const knownFailureModes: Array<{ moduleName: string; text: string }> = []
+    const openQuestions: Array<{ moduleName: string; text: string }> = []
+    for (const m of modules) {
+        for (const f of m.failureModes ?? []) {
+            if (typeof f === "string" && f.trim()) knownFailureModes.push({ moduleName: m.name, text: f })
+        }
+        for (const q of m.unknowns ?? []) {
+            if (typeof q === "string" && q.trim()) openQuestions.push({ moduleName: m.name, text: q })
+        }
+    }
+
+    // Regulatory text: if the brief carries compliance notes use them, else
+    // empty-state. We deliberately don't synthesise "AS9100 / EASA" —
+    // that's the mockup's HAPS example.
+    const complianceNotes = project.research?.designBrief?.complianceNotes?.trim() || null
+
+    const viewProps: WorkspaceViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+            subject: project.subject,
+            status: project.status,
+            designRevision: project.designRevision,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+        },
+        header: {
+            moduleCount,
+            partCount,
+            quantityTarget: project.research?.designBrief?.quantityTarget?.trim() || null,
+            complianceNotes,
+        },
+        resume: resumeState,
+        activity: activityEvents,
+        cost: {
+            totalUnitCostGbp,
+            unitCostCeilingGbp: null, // Not captured in CadLabDesignBrief today.
+            moduleCount: costRows.length,
+        },
+        challenges: {
+            failureModes: knownFailureModes,
+            openQuestions,
+        },
+        engineering: engineeringCounts,
+        topMaterials,
+        topProcesses,
+    }
+
+    return <WorkspaceView {...viewProps} />
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+async function safeResume(projectId: string): Promise<ProjectResumeState> {
+    try {
+        const r = await getProjectResumeState(projectId)
+        if ("error" in r) return { lastTouched: null, lastSurface: null, blocker: null }
+        return r.state
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] resume-state failed:", err)
+        return { lastTouched: null, lastSurface: null, blocker: null }
+    }
+}
+
+async function safeActivity(projectId: string, limit: number): Promise<ProjectActivityEvent[]> {
+    try {
+        const r = await getProjectActivityFeed(projectId, limit)
+        if ("error" in r) return []
+        return r.events
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] activity-feed failed:", err)
+        return []
+    }
+}
+
+interface EngineeringCounts {
+    materials: number
+    hardware: number
+    processes: number
+    standards: number
+}
+
+async function safeEngineeringCounts(): Promise<EngineeringCounts> {
+    try {
+        const supabase = await createClient()
+        const [m, h, p, s] = await Promise.all([
+            supabase.from("material_properties").select("*", { count: "exact", head: true }),
+            supabase.from("standard_hardware").select("*", { count: "exact", head: true }),
+            supabase.from("process_capabilities").select("*", { count: "exact", head: true }),
+            supabase.from("design_standards").select("*", { count: "exact", head: true }),
+        ])
+        return {
+            materials: m.count ?? 0,
+            hardware: h.count ?? 0,
+            processes: p.count ?? 0,
+            standards: s.count ?? 0,
+        }
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] engineering counts failed:", err)
+        return { materials: 0, hardware: 0, processes: 0, standards: 0 }
+    }
+}
+
+async function safeTopMaterials(): Promise<TopMaterialRow[]> {
+    try {
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("material_properties")
+            .select("material_code, material_name, yield_strength_mpa, cost_per_kg_usd")
+            .order("material_name", { ascending: true })
+            .limit(3)
+        if (error || !data) return []
+        return data.map((r) => ({
+            materialCode: r.material_code as string,
+            materialName: r.material_name as string,
+            yieldStrengthMpa: (r.yield_strength_mpa as number | null) ?? null,
+            costPerKgUsd: (r.cost_per_kg_usd as number | null) ?? null,
+        }))
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] top materials failed:", err)
+        return []
+    }
+}
+
+async function safeTopProcesses(): Promise<TopProcessRow[]> {
+    try {
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("process_capabilities")
+            .select("process_name, display_name, tolerance_typical_mm, min_wall_thickness_mm")
+            .order("display_name", { ascending: true })
+            .limit(16)
+        if (error || !data) return []
+        return data.map((r) => ({
+            processName: r.process_name as string,
+            displayName: r.display_name as string,
+            toleranceTypicalMm: (r.tolerance_typical_mm as number | null) ?? null,
+            minWallThicknessMm: (r.min_wall_thickness_mm as number | null) ?? null,
+        }))
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] top processes failed:", err)
+        return []
+    }
 }

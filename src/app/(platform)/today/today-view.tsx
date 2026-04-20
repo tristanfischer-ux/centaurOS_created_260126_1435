@@ -2,8 +2,10 @@
  * TodayView — V2 triage surface.
  *
  * Ported 1:1 from FORGE-MOCKUP-TODAY-V2.html. DOM structure, class names,
- * and copy match the mockup exactly. Content is stubbed with the mockup's
- * reference data for visual parity; real data gets wired in a follow-up.
+ * and layout match the mockup exactly. Content is now driven by real data
+ * supplied via props from `page.tsx`. When a data source is unavailable
+ * or empty, the same visual footprint renders with an empty-state — no
+ * hardcoded mockup strings leak through.
  *
  * Sections (top to bottom):
  *   1. Greeting row (name, date/time, 3 signal chips)
@@ -18,15 +20,141 @@
 
 "use client"
 
+import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import "./today-v2.css"
 
-export interface TodayViewProps {
-    userName: string
+// ─── Prop types ──────────────────────────────────────────────────────
+
+export type SourceTag = "forge" | "money" | "people" | "comms" | "compliance"
+
+export interface PriorityAction {
+    label: string
+    href: string
+    variant?: "primary" | "default" | "ghost"
 }
 
-type SourceTag = "forge" | "money" | "people" | "comms" | "compliance"
+export interface PrioritySlab {
+    sourceTag: SourceTag
+    sourceExtra?: string
+    kicker: string
+    title: string
+    body: string
+    actions: PriorityAction[]
+    groundingLine: string | null
+}
+
+export interface QueueItem {
+    rank: number
+    id: string
+    title: string
+    subtitle: string
+    source: SourceTag
+    sourceExtra?: string
+    decay: string
+    decayClass?: "overdue" | "warn"
+    action: string
+    href: string
+}
+
+export interface CalendarItem {
+    id: string
+    time: string
+    isNow: boolean
+    title: string
+    who: string
+    source: SourceTag
+    href?: string
+}
+
+export interface WaitingItem {
+    id: string
+    name: string
+    initials: string
+    avatarKind: "default" | "chase" | "fiona"
+    ask: string
+    meta: string
+    queuedAt: string
+    source: SourceTag
+    actions: { yes: string; ask: string; no: string }
+}
+
+export interface MilestoneMarker {
+    id: string
+    title: string
+    date: string
+    severity: "critical" | "forge" | "money" | "compliance" | "info"
+}
+
+export interface BuildTile {
+    id: string
+    name: string
+    subtitle: string
+    heroUrl: string | null
+    statePill: "on track" | "1 blocking" | "at risk"
+    costLabel: string | null
+    daysToFlight: number | null
+    href: string
+}
+
+export interface TeamMemberBrief {
+    name: string
+    role: string
+}
+
+export interface TeamSummary {
+    topMembers: TeamMemberBrief[]
+    totalCount: number
+    specialistCount: number
+    lastActivityAt: string | null
+}
+
+export interface OperationsSummary {
+    shippedProducts: number
+    activeSuppliers: number
+    certExpiriesNext30d: number | null
+}
+
+export interface TodayViewProps {
+    userName: string
+    signals: {
+        brokeOvernightCount: number
+        overdueCount: number
+        waitingCount: number
+    }
+    priority: PrioritySlab | null
+    runway: {
+        runwayMonths: number | null
+        burnThisMonthPence: number | null
+        biggestCostPence: number | null
+        currency: string
+    }
+    waiting: {
+        items: WaitingItem[]
+        totalCount: number
+    }
+    queue: QueueItem[]
+    calendar: {
+        items: CalendarItem[]
+        tomorrowCount: number
+        connected: boolean
+        hasEvents: boolean
+    }
+    horizon: {
+        anchorTitle: string | null
+        anchorDate: string | null
+        markers: MilestoneMarker[]
+    }
+    builds: {
+        tiles: BuildTile[]
+        hasAny: boolean
+    }
+    operations: OperationsSummary
+    team: TeamSummary | null
+}
+
+// ─── Small helpers ───────────────────────────────────────────────────
 
 const SOURCE_TAG_CLASS: Record<SourceTag, string> = {
     forge: "t2-source-forge",
@@ -53,7 +181,42 @@ function SourceBadge({ kind, extra }: { kind: SourceTag; extra?: string }) {
     )
 }
 
-export function TodayView({ userName }: TodayViewProps) {
+function formatPence(pence: number | null, currency: string): string {
+    if (pence === null) return "—"
+    const pounds = pence / 100
+    const symbol = currency === "GBP" ? "£" : currency === "USD" ? "$" : currency === "EUR" ? "€" : ""
+    if (pounds >= 1000) {
+        return `${symbol}${(pounds / 1000).toFixed(1)}k`
+    }
+    return `${symbol}${pounds.toFixed(0)}`
+}
+
+function formatRelativeTime(iso: string): string {
+    const then = new Date(iso)
+    const now = new Date()
+    const diffMs = now.getTime() - then.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return "just now"
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffHr = Math.floor(diffMin / 60)
+    if (diffHr < 24) return `${diffHr}h ago`
+    const diffDay = Math.floor(diffHr / 24)
+    if (diffDay === 1) return "yesterday"
+    if (diffDay < 7) return `${diffDay}d ago`
+    return then.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+}
+
+function avatarClass(kind: "default" | "chase" | "fiona"): string {
+    if (kind === "chase") return "avatar chase"
+    if (kind === "fiona") return "avatar fiona"
+    return "avatar"
+}
+
+// ─── Main component ──────────────────────────────────────────────────
+
+export function TodayView(props: TodayViewProps) {
+    const { userName, signals, priority, runway, waiting, queue, calendar, horizon, builds, operations, team } = props
+
     const now = new Date()
     const weekdayDate = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
     const clockTime = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
@@ -63,56 +226,133 @@ export function TodayView({ userName }: TodayViewProps) {
     const hour = now.getHours()
     const greetingWord = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening"
 
+    // Queue filter (client-only state; source tabs).
+    const [queueFilter, setQueueFilter] = useState<"all" | SourceTag>("all")
+    const filteredQueue = useMemo(
+        () => (queueFilter === "all" ? queue : queue.filter(q => q.source === queueFilter)),
+        [queueFilter, queue],
+    )
+
     return (
         <div className="t2">
             <h1 className="t2-greeting">{greetingWord}, {firstName}</h1>
             <div className="t2-greeting-sub">
                 {weekdayDate} · {clockTime}
-                <span className="t2-chip danger"><span className="dot" /> 1 broke overnight</span>
-                <span className="t2-chip warning"><span className="dot" /> 2 overdue</span>
-                <span className="t2-chip info"><span className="dot" /> 3 waiting on you</span>
+                {/* Broke-overnight chip: either a count or an "all clear" pill */}
+                {signals.brokeOvernightCount > 0 ? (
+                    <span className="t2-chip danger">
+                        <span className="dot" /> {signals.brokeOvernightCount} broke overnight
+                    </span>
+                ) : (
+                    <span className="t2-chip info">
+                        <span className="dot" /> All clear overnight
+                    </span>
+                )}
+                {/* Overdue chip — omitted when 0 */}
+                {signals.overdueCount > 0 && (
+                    <span className="t2-chip warning">
+                        <span className="dot" /> {signals.overdueCount} overdue
+                    </span>
+                )}
+                {/* Waiting chip — omitted when 0 */}
+                {signals.waitingCount > 0 && (
+                    <span className="t2-chip info">
+                        <span className="dot" /> {signals.waitingCount} waiting on you
+                    </span>
+                )}
             </div>
 
             <div className="t2-headline-grid">
-                <div className="t2-priority">
-                    <div className="t2-kicker-row">
-                        <span className="t2-kicker">🔴 Blocking — #1 today</span>
-                        <SourceBadge kind="forge" extra="HAPS UAV" />
+                {/* Priority slab */}
+                {priority ? (
+                    <div className="t2-priority">
+                        <div className="t2-kicker-row">
+                            <span className="t2-kicker">{priority.kicker}</span>
+                            <SourceBadge kind={priority.sourceTag} extra={priority.sourceExtra} />
+                        </div>
+                        <h2>{priority.title}</h2>
+                        <p>{priority.body}</p>
+                        <div className="actions">
+                            {priority.actions.map((a, idx) => (
+                                <Link
+                                    key={`${a.label}-${idx}`}
+                                    href={a.href}
+                                    className={`t2-btn${a.variant === "primary" ? " primary" : a.variant === "ghost" ? " ghost" : ""}`}
+                                >
+                                    {a.label}
+                                </Link>
+                            ))}
+                        </div>
+                        {priority.groundingLine && (
+                            <div className="t2-grounding-line">{priority.groundingLine}</div>
+                        )}
                     </div>
-                    <h2>Astra&apos;s AS9100 cert expired in February — blocking 2 wing-spar awards (£860).</h2>
-                    <p>
-                        Chase ran the check this morning. Astra confirmed a re-audit on 12 June, so a <strong>6-week gap</strong> if you wait.
-                        Zimmermann scored 65/100 on the same spec, AS9100 runs through 2027 — next-best pivot.
-                    </p>
-                    <div className="actions">
-                        <Link href="#" className="t2-btn primary">Message Astra</Link>
-                        <Link href="#" className="t2-btn">Promote Zimmermann</Link>
-                        <Link href="#" className="t2-btn ghost">See all 4 open risks →</Link>
+                ) : (
+                    <div className="t2-priority" style={{ borderLeftColor: "var(--t-border)" }}>
+                        <div className="t2-kicker-row">
+                            <span className="t2-kicker">No blocking items</span>
+                        </div>
+                        <h2>No blocking items today</h2>
+                        <p>Your specialists haven&apos;t surfaced anything urgent.</p>
+                        <div className="actions">
+                            <Link href="/the-forge-v2" className="t2-btn">Browse your projects →</Link>
+                        </div>
                     </div>
-                    <div className="t2-grounding-line">Chase · 6 of 8 supplier fields · 14 Mar cert-registry cross-check</div>
-                </div>
+                )}
 
+                {/* Runway card */}
                 <div className="t2-runway">
                     <div className="label">Cash runway</div>
-                    <div className="big-num">11.4<small> months</small></div>
-                    <div className="sub">At current burn £62k/mo · Series A target Oct 2026</div>
-                    <div className="t2-runway-bar"><div className="fill" style={{ width: "72%" }} /></div>
-                    <div className="t2-mini-stats">
-                        <div className="s">
-                            <div className="k">Burn this month</div>
-                            <div className="v">£58.4k</div>
-                        </div>
-                        <div className="s">
-                            <div className="k">HAPS commit (over)</div>
-                            <div className="v" style={{ color: "var(--t-danger)" }}>£172k</div>
-                        </div>
-                    </div>
+                    {runway.runwayMonths !== null ? (
+                        <>
+                            <div className="big-num">
+                                {runway.runwayMonths.toFixed(1)}<small> months</small>
+                            </div>
+                            <div className="sub">
+                                {runway.burnThisMonthPence !== null
+                                    ? `At current burn ${formatPence(runway.burnThisMonthPence, runway.currency)}/mo`
+                                    : "Burn unavailable"}
+                            </div>
+                            <div className="t2-runway-bar">
+                                <div className="fill" style={{ width: `${Math.min(100, (runway.runwayMonths / 18) * 100)}%` }} />
+                            </div>
+                            <div className="t2-mini-stats">
+                                <div className="s" style={runway.biggestCostPence === null ? { gridColumn: "1 / span 2" } : undefined}>
+                                    <div className="k">Burn this month</div>
+                                    <div className="v">{formatPence(runway.burnThisMonthPence, runway.currency)}</div>
+                                </div>
+                                {runway.biggestCostPence !== null && (
+                                    <div className="s">
+                                        <div className="k">Biggest commit</div>
+                                        <div className="v">{formatPence(runway.biggestCostPence, runway.currency)}</div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="big-num">
+                                —<small> months</small>
+                            </div>
+                            <div className="sub">
+                                Connect finance in <Link href="/money">Money · Cockpit →</Link>
+                            </div>
+                            <div className="t2-runway-bar"><div className="fill" style={{ width: "0%" }} /></div>
+                            <div className="t2-mini-stats">
+                                <div className="s" style={{ gridColumn: "1 / span 2" }}>
+                                    <div className="k">Burn this month</div>
+                                    <div className="v">—</div>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
+            {/* Waiting on you */}
             <div className="t2-waiting-card">
                 <div className="t2-waiting-head">
-                    <div className="title">Waiting on you <span className="count">3</span></div>
+                    <div className="title">Waiting on you <span className="count">{waiting.totalCount}</span></div>
                     <button type="button" className="t2-morning-nudge">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -121,180 +361,235 @@ export function TodayView({ userName }: TodayViewProps) {
                     </button>
                 </div>
 
-                <div className="t2-waiting-item">
-                    <div className="avatar">JW</div>
-                    <div className="body">
-                        <span className="who">Jian (VP Eng)</span> — approve wing-spar tolerance ±0.3mm on final CAD? Full drawing linked.
-                        <div className="meta">Queued 9:42pm yesterday · <SourceBadge kind="forge" /> · blocks Astra RFQ award</div>
+                {waiting.items.length > 0 ? (
+                    waiting.items.map(item => (
+                        <div key={item.id} className="t2-waiting-item">
+                            <div className={avatarClass(item.avatarKind)}>{item.initials}</div>
+                            <div className="body">
+                                <span className="who">{item.name}</span> — {item.ask}
+                                <div className="meta">
+                                    Queued {formatRelativeTime(item.queuedAt)} · <SourceBadge kind={item.source} /> · {item.meta}
+                                </div>
+                            </div>
+                            <div className="decisions">
+                                <Link href="#" className="t2-btn-y">{item.actions.yes}</Link>
+                                <Link href="#" className="t2-btn-ask">{item.actions.ask}</Link>
+                                <Link href="#" className="t2-btn-n">{item.actions.no}</Link>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="t2-waiting-item">
+                        <div className="body" style={{ textAlign: "center" }}>
+                            <span className="who">Nothing waiting on you right now.</span>
+                            <div className="meta">Specialists queue decisions here when they need your input.</div>
+                        </div>
                     </div>
-                    <div className="decisions">
-                        <Link href="#" className="t2-btn-y">Approve</Link>
-                        <Link href="#" className="t2-btn-ask">Ask Jian</Link>
-                        <Link href="#" className="t2-btn-n">Reject</Link>
-                    </div>
-                </div>
-
-                <div className="t2-waiting-item">
-                    <div className="avatar chase">CH</div>
-                    <div className="body">
-                        <span className="who">Chase (VP Supply)</span> — promote Zimmermann Precision to preferred supplier for wing-spar?
-                        <div className="meta">Queued 6:14am · <SourceBadge kind="forge" /> · unblocks the Astra situation above</div>
-                    </div>
-                    <div className="decisions">
-                        <Link href="#" className="t2-btn-y">Promote</Link>
-                        <Link href="#" className="t2-btn-ask">Compare</Link>
-                        <Link href="#" className="t2-btn-n">Reject</Link>
-                    </div>
-                </div>
-
-                <div className="t2-waiting-item">
-                    <div className="avatar fiona">FI</div>
-                    <div className="body">
-                        <span className="who">Fiona (Fundraising)</span> — send draft follow-up to Kirsty (Octopus Ventures, Series A lead)? 9 days since last contact, draft reads well.
-                        <div className="meta">Queued 7:30am · <SourceBadge kind="money" /> · last 3 replies &lt;24h; silence = decaying interest</div>
-                    </div>
-                    <div className="decisions">
-                        <Link href="#" className="t2-btn-y">Send</Link>
-                        <Link href="#" className="t2-btn-ask">Revise</Link>
-                        <Link href="#" className="t2-btn-n">Hold</Link>
-                    </div>
-                </div>
+                )}
             </div>
 
+            {/* Mid grid: queue + calendar */}
             <div className="t2-mid-grid">
                 <div className="t2-queue-card">
                     <div className="t2-queue-head">
                         <div className="title">Today</div>
                         <div className="t2-queue-filters">
-                            <button type="button" className="active">All</button>
-                            <button type="button">Forge</button>
-                            <button type="button">Money</button>
-                            <button type="button">People</button>
-                            <button type="button">Compliance</button>
+                            <button type="button" className={queueFilter === "all" ? "active" : ""} onClick={() => setQueueFilter("all")}>All</button>
+                            <button type="button" className={queueFilter === "forge" ? "active" : ""} onClick={() => setQueueFilter("forge")}>Forge</button>
+                            <button type="button" className={queueFilter === "money" ? "active" : ""} onClick={() => setQueueFilter("money")}>Money</button>
+                            <button type="button" className={queueFilter === "people" ? "active" : ""} onClick={() => setQueueFilter("people")}>People</button>
+                            <button type="button" className={queueFilter === "compliance" ? "active" : ""} onClick={() => setQueueFilter("compliance")}>Compliance</button>
                         </div>
                     </div>
 
-                    <QueueRow rank={1} title="Astra AS9100 expired" sub={<><SourceBadge kind="forge" /> · blocks wing-spar award (£860 × 2)</>} decay="-62 days" decayClass="overdue" action="Open →" />
-                    <QueueRow rank={2} title="Kirsty (Octopus) follow-up overdue" sub={<><SourceBadge kind="money" /> · Series A lead · last reply 9 Apr</>} decay="-2 days" decayClass="overdue" action="Reply →" />
-                    <QueueRow rank={3} title="ISO 27001 surveillance — book audit slot" sub={<><SourceBadge kind="compliance" /> · auditor requires 14-day notice</>} decay="14 days" decayClass="warn" action="Book →" />
-                    <QueueRow rank={4} title="Cost breach — HAPS £22k over ceiling" sub={<><SourceBadge kind="forge" /> · decide whether to cut solar coverage or raise</>} decay="5 days" decayClass="warn" action="Open →" />
-                    <QueueRow rank={5} title="Investor update (March) — 4 days overdue" sub={<><SourceBadge kind="comms" /> · draft ready, needs sign-off</>} decay="-4 days" decayClass="overdue" action="Review →" />
-                    <QueueRow rank={6} title="Daniel (CTO) 1:1 — mass-budget sync" sub={<><SourceBadge kind="people" /> · standing 14:00 Mon</>} decay="Today 14:00" action="Prep →" />
-                    <QueueRow rank={7} title="T-Motor propeller quote — review" sub={<><SourceBadge kind="forge" /> · 2 of 3 quotes back, still waiting on Hacker</>} decay="2 days" action="Review →" />
+                    {filteredQueue.length > 0 ? (
+                        filteredQueue.map((item) => (
+                            <QueueRow
+                                key={item.id}
+                                rank={item.rank}
+                                title={item.title}
+                                sub={<><SourceBadge kind={item.source} extra={item.sourceExtra} /> · {item.subtitle}</>}
+                                decay={item.decay}
+                                decayClass={item.decayClass}
+                                action={item.action}
+                                href={item.href}
+                            />
+                        ))
+                    ) : (
+                        <div className="t2-queue-row">
+                            <div className="label" style={{ textAlign: "center" }}>
+                                Clear queue. You&apos;re ahead.
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="t2-calendar-card">
                     <h3>Today&apos;s calendar</h3>
-                    <div className="t2-cal-item">
-                        <div className="time now">09:30</div>
-                        <div>
-                            <div className="title">Kirsty call — Series A lead</div>
-                            <div className="who">Octopus Ventures · 30 min</div>
+                    {calendar.hasEvents ? (
+                        calendar.items.map(ev => (
+                            <div key={ev.id} className="t2-cal-item">
+                                <div className={ev.isNow ? "time now" : "time"}>{ev.time}</div>
+                                <div>
+                                    <div className="title">{ev.title}</div>
+                                    <div className="who">{ev.who}</div>
+                                </div>
+                                <SourceBadge kind={ev.source} />
+                            </div>
+                        ))
+                    ) : (
+                        <div className="t2-cal-item">
+                            <div>
+                                <div className="title">
+                                    {calendar.connected ? "No events today" : "Google Calendar not connected"}
+                                </div>
+                                <div className="who">
+                                    {calendar.connected
+                                        ? "Your day is clear."
+                                        : <>Connect in <Link href="/settings/integrations">settings → integrations →</Link></>}
+                                </div>
+                            </div>
                         </div>
-                        <SourceBadge kind="money" />
-                    </div>
-                    <div className="t2-cal-item">
-                        <div className="time">14:00</div>
-                        <div>
-                            <div className="title">Daniel 1:1</div>
-                            <div className="who">Mass budget over on propulsion + empennage</div>
-                        </div>
-                        <SourceBadge kind="people" />
-                    </div>
-                    <div className="t2-cal-item">
-                        <div className="time">16:00</div>
-                        <div>
-                            <div className="title">Supplier review (weekly)</div>
-                            <div className="who">Chase dial-in · 45 min</div>
-                        </div>
-                        <SourceBadge kind="forge" />
-                    </div>
+                    )}
                     <div className="t2-cal-tomorrow">
-                        Tomorrow: <strong>3 calls · 1 review</strong>
+                        {calendar.tomorrowCount > 0
+                            ? <>Tomorrow: <strong>{calendar.tomorrowCount} event{calendar.tomorrowCount === 1 ? "" : "s"}</strong></>
+                            : "Tomorrow: no meetings"}
                     </div>
                 </div>
             </div>
 
+            {/* Risk horizon */}
             <div className="t2-horizon-card">
                 <div className="t2-horizon-head">
                     <h3>14-day risk horizon</h3>
-                    <div className="anchor">Anchor: <strong>HAPS first flight — 12 June</strong> · 5 items threaten the window</div>
+                    {horizon.anchorTitle && horizon.anchorDate ? (
+                        <div className="anchor">
+                            Anchor: <strong>
+                                {horizon.anchorTitle} — {new Date(horizon.anchorDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                            </strong>
+                            {horizon.markers.length > 0 && <> · {horizon.markers.length} item{horizon.markers.length === 1 ? "" : "s"} in window</>}
+                        </div>
+                    ) : (
+                        <div className="anchor">
+                            No anchor milestone set — set your flight date in <Link href="/plan">Strategy → /plan</Link>
+                        </div>
+                    )}
                 </div>
-                <div className="t2-horizon-timeline-wrap">
-                    <RiskHorizonSvg />
-                </div>
+                {horizon.anchorTitle ? (
+                    <div className="t2-horizon-timeline-wrap">
+                        <RiskHorizonSvg markers={horizon.markers} />
+                    </div>
+                ) : null}
             </div>
 
+            {/* Builds */}
             <div className="t2-section-label">
-                <h3>Your builds · 2 active · 1 shipped</h3>
+                <h3>
+                    Your builds · {builds.tiles.length} active
+                </h3>
                 <div className="aside"><Link href="/the-forge-v2">Open Forge →</Link></div>
             </div>
 
             <div className="t2-builds-row">
-                <Link href="#" className="t2-build-tile">
-                    <div className="t2-build-tile-hero haps">
-                        <Image src="/images/case-study-drone.png" alt="HAPS UAV render" fill sizes="(max-width: 900px) 100vw, 33vw" style={{ objectFit: "cover" }} />
-                        <span className="state-pill blocking">1 blocking</span>
-                        <span className="style-tag">Photoreal</span>
-                    </div>
-                    <div className="t2-build-tile-meta">
-                        <h4>HAPS UAV</h4>
-                        <div className="tag">High-altitude pseudo-satellite · 22m wing</div>
-                        <div className="row">
-                            <span><strong>£172k</strong> · over</span>
-                            <span>•</span>
-                            <span><strong>54d</strong> · to flight</span>
+                {builds.hasAny ? (
+                    <>
+                        {builds.tiles.map(tile => (
+                            <Link key={tile.id} href={tile.href} className="t2-build-tile">
+                                <div className="t2-build-tile-hero haps">
+                                    {tile.heroUrl ? (
+                                        <Image
+                                            src={tile.heroUrl}
+                                            alt={`${tile.name} render`}
+                                            fill
+                                            sizes="(max-width: 900px) 100vw, 33vw"
+                                            style={{ objectFit: "cover" }}
+                                        />
+                                    ) : null}
+                                    <span className={`state-pill${tile.statePill === "1 blocking" ? " blocking" : ""}`}>
+                                        {tile.statePill}
+                                    </span>
+                                </div>
+                                <div className="t2-build-tile-meta">
+                                    <h4>{tile.name}</h4>
+                                    <div className="tag">{tile.subtitle}</div>
+                                    <div className="row">
+                                        <span>
+                                            {tile.costLabel ? <><strong>{tile.costLabel}</strong> · cost</> : <><strong>—</strong> · cost</>}
+                                        </span>
+                                        <span>•</span>
+                                        <span>
+                                            {tile.daysToFlight !== null ? <><strong>{tile.daysToFlight}d</strong> · to flight</> : <><strong>—</strong> · to flight</>}
+                                        </span>
+                                    </div>
+                                </div>
+                            </Link>
+                        ))}
+                        <Link href="/the-forge-v2/new" className="t2-build-tile new-build">
+                            <div style={{ textAlign: "center", padding: "24px 20px" }}>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 6 }}>
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                                <div>Start a new build</div>
+                                <div style={{ fontSize: 11, color: "var(--t-fg-subtle)", marginTop: 3 }}>Brief → Modules → BOM</div>
+                            </div>
+                        </Link>
+                    </>
+                ) : (
+                    <Link href="/the-forge-v2/new" className="t2-build-tile new-build" style={{ gridColumn: "1 / -1" }}>
+                        <div style={{ textAlign: "center", padding: "48px 20px" }}>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8 }}>
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            <div style={{ fontSize: 15, fontWeight: 600 }}>Start your first build</div>
+                            <div style={{ fontSize: 12, color: "var(--t-fg-subtle)", marginTop: 4 }}>Brief → Modules → BOM</div>
                         </div>
-                    </div>
-                </Link>
-
-                <Link href="#" className="t2-build-tile">
-                    <div className="t2-build-tile-hero drone">
-                        <Image src="/cad-lab/templates/heavy-drone.png" alt="Atmos Drone v2 render" fill sizes="(max-width: 900px) 100vw, 33vw" style={{ objectFit: "cover" }} />
-                        <span className="state-pill">on track</span>
-                        <span className="style-tag">Photoreal</span>
-                    </div>
-                    <div className="t2-build-tile-meta">
-                        <h4>Atmos Drone v2</h4>
-                        <div className="tag">Survey quad · Lidar payload</div>
-                        <div className="row">
-                            <span><strong>£48k</strong> · on budget</span>
-                            <span>•</span>
-                            <span><strong>Modules</strong> stage</span>
-                        </div>
-                    </div>
-                </Link>
-
-                <Link href="/the-forge-v2/new" className="t2-build-tile new-build">
-                    <div style={{ textAlign: "center", padding: "24px 20px" }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 6 }}>
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        <div>Start a new build</div>
-                        <div style={{ fontSize: 11, color: "var(--t-fg-subtle)", marginTop: 3 }}>Brief → Modules → BOM</div>
-                    </div>
-                </Link>
+                    </Link>
+                )}
             </div>
 
-            <Link href="#" className="t2-footer-strip">
+            {/* Operations strip */}
+            <Link href="/the-forge-v2" className="t2-footer-strip">
                 <div className="body">
-                    <strong>Operations</strong> · 2 products shipped · 7 active suppliers · 3 cert expiries next 30 days
+                    <strong>Operations</strong> · {operations.shippedProducts} product{operations.shippedProducts === 1 ? "" : "s"} shipped · {operations.activeSuppliers} active supplier{operations.activeSuppliers === 1 ? "" : "s"}
+                    {operations.certExpiriesNext30d !== null && (
+                        <> · {operations.certExpiriesNext30d} cert expir{operations.certExpiriesNext30d === 1 ? "y" : "ies"} next 30 days</>
+                    )}
                     <div className="meta">BOM Watch · Supplier Scorecards · Revisions · Compliance Calendar</div>
                 </div>
                 <div className="cta">Open Operations →</div>
             </Link>
 
-            <Link href="#" className="t2-footer-strip">
-                <div className="body">
-                    <strong>Team</strong> · Daniel (CTO) · Priya (Ops) · Rita (Accounts, fractional) · 13 specialists on call
-                    <div className="meta">Last sync posted 5:47pm Friday · 3 people waiting on you (above)</div>
-                </div>
-                <div className="cta">Open Team →</div>
-            </Link>
+            {/* Team strip */}
+            {team && team.topMembers.length > 0 ? (
+                <Link href="/settings/team" className="t2-footer-strip">
+                    <div className="body">
+                        <strong>Team</strong> · {team.topMembers.map(m => `${m.name}${m.role ? ` (${m.role})` : ""}`).join(" · ")} · {team.specialistCount} specialists on call
+                        <div className="meta">
+                            {team.lastActivityAt
+                                ? `Last team activity ${formatRelativeTime(team.lastActivityAt)}`
+                                : "No recent team activity"}
+                            {waiting.totalCount > 0 && ` · ${waiting.totalCount} waiting on you (above)`}
+                        </div>
+                    </div>
+                    <div className="cta">Open Team →</div>
+                </Link>
+            ) : (
+                <Link href="/settings/team" className="t2-footer-strip">
+                    <div className="body">
+                        <strong>Team</strong> · No team yet
+                        <div className="meta">Invite your first teammate to unlock specialist briefings and standups.</div>
+                    </div>
+                    <div className="cta">Invite one →</div>
+                </Link>
+            )}
         </div>
     )
 }
+
+// ─── Sub-components ──────────────────────────────────────────────────
 
 function QueueRow({
     rank,
@@ -303,6 +598,7 @@ function QueueRow({
     decay,
     decayClass,
     action,
+    href,
 }: {
     rank: number
     title: string
@@ -310,6 +606,7 @@ function QueueRow({
     decay: string
     decayClass?: "overdue" | "warn"
     action: string
+    href: string
 }) {
     return (
         <div className="t2-queue-row">
@@ -319,33 +616,55 @@ function QueueRow({
                 <div className="sub">{sub}</div>
             </div>
             <div className={`decay ${decayClass ?? ""}`}>{decay}</div>
-            <Link href="#" className="go-btn">{action}</Link>
+            <Link href={href} className="go-btn">{action}</Link>
         </div>
     )
 }
 
-function RiskHorizonSvg() {
+/**
+ * Renders the 14-day risk horizon SVG. Static day axis + dynamic markers.
+ *
+ * Only the "TODAY" anchor and "FLIGHT" end-cap are drawn unconditionally;
+ * all other markers come from `markers` (milestones within the 14-day
+ * window). When no markers are passed we still show the timeline +
+ * today pin so the layout doesn't collapse.
+ */
+function RiskHorizonSvg({ markers }: { markers: MilestoneMarker[] }) {
+    const now = new Date()
+    const days: { label: string; xOffset: number; major: boolean; isToday: boolean }[] = []
+    for (let i = 0; i < 14; i++) {
+        const d = new Date(now)
+        d.setDate(d.getDate() + i)
+        days.push({
+            label: d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric" }),
+            xOffset: 20 + i * 83,
+            major: i % 2 === 0,
+            isToday: i === 0,
+        })
+    }
+
+    const severityColor: Record<MilestoneMarker["severity"], string> = {
+        critical: "#dc2626",
+        forge: "#ff4500",
+        money: "#7c3aed",
+        compliance: "#ca8a04",
+        info: "#3b82f6",
+    }
+
     return (
         <svg viewBox="0 0 1200 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="20" y1="78" x2="1180" y2="78" stroke="#e7e5e4" strokeWidth="1.5" />
 
             <g fontFamily="-apple-system, Inter, sans-serif" fontSize="10" fill="#a8a29e" textAnchor="middle">
-                <g transform="translate(20,0)"><line y1="73" y2="83" stroke="#d6d3d1" /><text y="105">Sat 19</text></g>
-                <g transform="translate(103,0)"><text y="105" fontWeight="700" fill="#1c1917">Sun 20</text></g>
-                <g transform="translate(186,0)"><line y1="73" y2="83" stroke="#d6d3d1" /><text y="105">Mon 21</text></g>
-                <g transform="translate(269,0)"><text y="105">Tue 22</text></g>
-                <g transform="translate(352,0)"><line y1="73" y2="83" stroke="#d6d3d1" /><text y="105">Wed 23</text></g>
-                <g transform="translate(435,0)"><text y="105">Thu 24</text></g>
-                <g transform="translate(518,0)"><line y1="73" y2="83" stroke="#d6d3d1" /><text y="105">Fri 25</text></g>
-                <g transform="translate(601,0)"><text y="105">Sat 26</text></g>
-                <g transform="translate(684,0)"><line y1="73" y2="83" stroke="#d6d3d1" /><text y="105">Sun 27</text></g>
-                <g transform="translate(767,0)"><text y="105">Mon 28</text></g>
-                <g transform="translate(850,0)"><line y1="73" y2="83" stroke="#d6d3d1" /><text y="105">Tue 29</text></g>
-                <g transform="translate(933,0)"><text y="105">Wed 30</text></g>
-                <g transform="translate(1016,0)"><line y1="73" y2="83" stroke="#d6d3d1" /><text y="105">Thu 1</text></g>
-                <g transform="translate(1099,0)"><text y="105">Fri 2</text></g>
+                {days.map((d, idx) => (
+                    <g key={idx} transform={`translate(${d.xOffset},0)`}>
+                        {d.major && <line y1="73" y2="83" stroke="#d6d3d1" />}
+                        <text y="105" fontWeight={d.isToday ? 700 : 400} fill={d.isToday ? "#1c1917" : undefined}>{d.label}</text>
+                    </g>
+                ))}
             </g>
 
+            {/* TODAY anchor */}
             <g transform="translate(20,0)">
                 <line y1="30" y2="78" stroke="#ff4500" strokeWidth="2" />
                 <circle cy="78" r="5" fill="#ff4500" />
@@ -353,48 +672,24 @@ function RiskHorizonSvg() {
                 <text x="0" y="25" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">TODAY</text>
             </g>
 
-            <g transform="translate(186,0)">
-                <circle cy="78" r="7" fill="#dc2626" stroke="#fff" strokeWidth="2" />
-                <line y1="78" y2="50" stroke="#dc2626" strokeDasharray="2 2" />
-                <rect x="-62" y="32" width="124" height="18" rx="3" fill="#dc2626" />
-                <text x="0" y="45" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">Astra audit window</text>
-            </g>
+            {/* Dynamic markers */}
+            {markers.map(m => {
+                const daysOut = Math.floor((new Date(m.date).getTime() - now.getTime()) / 86400000)
+                if (daysOut < 0 || daysOut > 13) return null
+                const x = 20 + daysOut * 83
+                const color = severityColor[m.severity]
+                const label = m.title.length > 18 ? `${m.title.slice(0, 15)}...` : m.title
+                return (
+                    <g key={m.id} transform={`translate(${x},0)`}>
+                        <circle cy="78" r="6" fill={color} stroke="#fff" strokeWidth="2" />
+                        <line y1="78" y2="50" stroke={color} strokeDasharray="2 2" />
+                        <rect x="-58" y="32" width="116" height="18" rx="3" fill={color} />
+                        <text x="0" y="45" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">{label}</text>
+                    </g>
+                )
+            })}
 
-            <g transform="translate(269,0)">
-                <circle cy="78" r="6" fill="#7c3aed" stroke="#fff" strokeWidth="2" />
-                <line y1="78" y2="110" stroke="#7c3aed" strokeDasharray="2 2" />
-                <rect x="-55" y="112" width="110" height="18" rx="3" fill="#7c3aed" />
-                <text x="0" y="125" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">Kirsty reply SLA</text>
-            </g>
-
-            <g transform="translate(518,0)">
-                <circle cy="78" r="6" fill="#ca8a04" stroke="#fff" strokeWidth="2" />
-                <line y1="78" y2="50" stroke="#ca8a04" strokeDasharray="2 2" />
-                <rect x="-58" y="32" width="116" height="18" rx="3" fill="#ca8a04" />
-                <text x="0" y="45" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">ISO book-by deadline</text>
-            </g>
-
-            <g transform="translate(352,0)">
-                <circle cy="78" r="5" fill="#ff4500" stroke="#fff" strokeWidth="2" />
-                <line y1="78" y2="110" stroke="#ff4500" strokeDasharray="2 2" />
-                <rect x="-48" y="112" width="96" height="18" rx="3" fill="#ff4500" />
-                <text x="0" y="125" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">T-Motor quote</text>
-            </g>
-
-            <g transform="translate(933,0)">
-                <circle cy="78" r="6" fill="#ff4500" stroke="#fff" strokeWidth="2" />
-                <line y1="78" y2="50" stroke="#ff4500" strokeDasharray="2 2" />
-                <rect x="-60" y="32" width="120" height="18" rx="3" fill="#ff4500" />
-                <text x="0" y="45" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">MaxPV NDA expiry</text>
-            </g>
-
-            <g transform="translate(1180,0)">
-                <line y1="30" y2="78" stroke="#16a34a" strokeWidth="2" />
-                <circle cy="78" r="6" fill="#16a34a" stroke="#fff" strokeWidth="2" />
-                <rect x="-64" y="12" width="64" height="18" rx="4" fill="#16a34a" />
-                <text x="-32" y="25" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#fff" textAnchor="middle">FLIGHT +54d</text>
-            </g>
-
+            {/* Legend */}
             <g transform="translate(20,10)" fontFamily="Inter, sans-serif" fontSize="10">
                 <g><circle cx="6" cy="3" r="4" fill="#dc2626" /><text x="15" y="6" fill="#1c1917">Critical</text></g>
                 <g transform="translate(65,0)"><circle cx="6" cy="3" r="4" fill="#ff4500" /><text x="15" y="6" fill="#1c1917">Forge</text></g>
