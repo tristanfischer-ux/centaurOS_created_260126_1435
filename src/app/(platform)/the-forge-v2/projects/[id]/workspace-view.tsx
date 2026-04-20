@@ -56,7 +56,10 @@ export interface WorkspaceViewProps {
         designRevision: number
         createdAt: string
         updatedAt: string
+        /** Blueprint / plan view. Rendered in the right-hand hero pane. */
         systemIllustrationUrl: string | null
+        /** Photo-realistic render. Rendered in the left-hand hero pane. */
+        conceptRenderUrl: string | null
     }
     header: {
         moduleCount: number
@@ -86,12 +89,20 @@ export interface WorkspaceViewProps {
     }
     topMaterials: TopMaterialRow[]
     topProcesses: TopProcessRow[]
+    suppliers: SupplierShortlistRow[]
+}
+
+export interface SupplierShortlistRow {
+    name: string
+    type: string | null
+    modulesMatched: number
+    rampRole: string
 }
 
 // ─── View ─────────────────────────────────────────────────────────────
 
 export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
-    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses } = props
+    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers } = props
 
     const subjectText = project.subject?.trim() || null
     const moduleSegment = header.moduleCount > 0 ? `${header.moduleCount} modules` : "— modules"
@@ -150,10 +161,15 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                     <div className="value">0 <small>open risks</small></div>
                     <div className="detail">Clean slate — no risks logged</div>
                 </div>
-                <div className="w2-health-card green">
+                <div className={`w2-health-card ${suppliers.length > 0 ? "green" : "amber"}`}>
                     <div className="label">Who&apos;s on the hook</div>
-                    <div className="value">0 <small>suppliers</small></div>
-                    <div className="detail"><Link href={`${base}/suppliers`}>/suppliers →</Link></div>
+                    <div className="value">{suppliers.length} <small>supplier{suppliers.length === 1 ? "" : "s"}</small></div>
+                    <div className="detail">
+                        {suppliers.length > 0
+                            ? `${suppliers.filter((s) => s.rampRole === "primary").length} primary · `
+                            : ""}
+                        <Link href={`${base}/suppliers`}>/suppliers →</Link>
+                    </div>
                 </div>
                 {cost.totalUnitCostGbp !== null ? (
                     <div className="w2-health-card amber">
@@ -186,13 +202,13 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                     <div className="pane">
                         <div className="pane-head">
                             <span>Nano Banana render</span>
-                            <span className="style-tag-inline">{project.systemIllustrationUrl ? "rev A" : "pending"}</span>
+                            <span className="style-tag-inline">{project.conceptRenderUrl ? "rev A" : "pending"}</span>
                         </div>
                         <div className="pane-body">
-                            {project.systemIllustrationUrl ? (
+                            {project.conceptRenderUrl ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img
-                                    src={project.systemIllustrationUrl}
+                                    src={project.conceptRenderUrl}
                                     alt={`${project.name} concept render`}
                                     className="system-illustration"
                                 />
@@ -480,10 +496,13 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                         <div>
                             <h2>Engineering Intelligence</h2>
                             <div className="sub">
-                                <span className="num">{engineering.materials}</span> verified materials ·{" "}
+                                <span className="num">{engineering.materials}</span> indexed materials ·{" "}
                                 <span className="num">{engineering.hardware}</span> hardware items ·{" "}
                                 <span className="num">{engineering.processes}</span> manufacturing processes ·{" "}
                                 <span className="num">{engineering.standards}</span> design standards
+                            </div>
+                            <div className="sub" style={{ fontSize: 11, marginTop: 4, opacity: 0.75 }}>
+                                Static library — properties seeded from manufacturer datasheets. Prices are reference values, not live-quoted.
                             </div>
                         </div>
                     </div>
@@ -498,7 +517,7 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                                     <polyline points="2 12 12 17 22 12" />
                                 </svg>
                                 <h3>Material Properties</h3>
-                                <span className="count">{engineering.materials} verified</span>
+                                <span className="count">{engineering.materials} indexed</span>
                             </div>
                             {topMaterials.map((m) => (
                                 <div className="w2-material-row" key={m.materialCode}>
@@ -551,7 +570,7 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                         </div>
                     )}
 
-                    {/* Supplier Intelligence — hidden until the supplier-coverage source lands */}
+                    {/* Supplier Intelligence — reads from forge_supplier_shortlist */}
                     <div className="w2-eng-intel-section">
                         <div className="sec-head">
                             <svg className="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -560,9 +579,29 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                                 <line x1="3" y1="9" x2="21" y2="9" />
                             </svg>
                             <h3>Supplier Intelligence</h3>
-                            <span className="count">Coming soon</span>
+                            <span className="count">
+                                {suppliers.length > 0
+                                    ? `${suppliers.length} shortlisted`
+                                    : "No suppliers yet"}
+                            </span>
                         </div>
-                        <div className="inline-desc">Supplier coverage — arrives with supplier directory v2.</div>
+                        {suppliers.length > 0 ? (
+                            <>
+                                {suppliers.slice(0, 5).map((s) => (
+                                    <div className="w2-material-row" key={s.name}>
+                                        <span className="grade">{(s.rampRole ?? "").slice(0, 1).toUpperCase()}</span>
+                                        <span className="name">{s.name}</span>
+                                        <span className="yield-val">{s.modulesMatched} module{s.modulesMatched === 1 ? "" : "s"}</span>
+                                        <span className="price">{s.type ?? "supplier"}</span>
+                                    </div>
+                                ))}
+                                <Link href={`${base}/suppliers`} className="w2-view-all">View all {suppliers.length} suppliers →</Link>
+                            </>
+                        ) : (
+                            <div className="inline-desc">
+                                No suppliers shortlisted yet. Run <Link href={`${base}/suppliers`}>Supplier match</Link> to score candidates against the BOM.
+                            </div>
+                        )}
                     </div>
                 </div>
             ) : (

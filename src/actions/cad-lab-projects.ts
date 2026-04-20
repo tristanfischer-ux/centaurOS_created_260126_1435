@@ -95,8 +95,10 @@ export interface CadLabProjectData {
    *  hero/module regeneration. Silent — does not auto-regenerate on change. */
   illustrationStyle: IllustrationStyle
 
-  /** System overview illustration URL */
+  /** System overview illustration URL — blueprint / plan view (schematic). */
   systemIllustrationUrl: string | null
+  /** Photo-realistic concept render URL — shown in the left hero pane. */
+  conceptRenderUrl: string | null
 
   /** Integrated system assembly (after all modules generated) */
   integratedAssemblyStlUrl: string | null
@@ -260,6 +262,7 @@ export async function loadCadLabProject(
           ? project.illustration_style
           : "blueprint",
         systemIllustrationUrl: project.system_illustration_url ?? null,
+        conceptRenderUrl: (project.concept_render_url as string | null) ?? null,
         integratedAssemblyStlUrl: project.integrated_assembly_stl_url ?? null,
         integratedAssemblyStepUrl: project.integrated_assembly_step_url ?? null,
         checkpoints: (project.checkpoints as Record<string, DecompositionCheckpoint> | null) ?? null,

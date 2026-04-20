@@ -695,6 +695,7 @@ async function main() {
         product_overview:
             "Stratosphere HAPS-S1 — 25 m wingspan, 42 m² solar array, 30-day endurance at FL650. Target unit cost £150 000 at batch 50. Primary markets: UK + EU telco backhaul and ISR.",
         system_illustration_url: "/seed/haps-s1-concept.svg",
+        concept_render_url: "/seed/haps-s1-render.svg",
         stage: "analysis" as const,
         status: "generated" as const,
         design_revision: 1,

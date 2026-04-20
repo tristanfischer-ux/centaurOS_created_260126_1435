@@ -57,7 +57,10 @@ export interface BriefViewProps {
         subject: string
         designRevision: number
         createdAt: string
+        /** Blueprint / plan view. Rendered in the right hero pane. */
         systemIllustrationUrl: string | null
+        /** Photo-realistic render. Rendered in the left hero pane. */
+        conceptRenderUrl: string | null
     }
     lockState: {
         isLocked: boolean
@@ -121,8 +124,9 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
             <div className="b2-page-header">
                 <div>
                     <h1>
+                        <span className="b2-title-dot" aria-hidden="true" />
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>
-                        Brief
+                        Brief · {project.name}
                         <LockStateChip isLocked={lockState.isLocked} />
                     </h1>
                     <div className="sub">The anchor spec. Intent · target markets · regulatory envelope · constraints.</div>
@@ -139,14 +143,14 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
                 <div className="b2-brief-hero-pane">
                     <div className="head">
                         <span className="label">
-                            {project.systemIllustrationUrl ? "Concept render" : "Concept render · pending"}
+                            {project.conceptRenderUrl ? "Concept render" : "Concept render · pending"}
                         </span>
                     </div>
                     <div className="body">
-                        {project.systemIllustrationUrl ? (
+                        {project.conceptRenderUrl ? (
                             <div className="img-wrap">
                                 <Image
-                                    src={project.systemIllustrationUrl}
+                                    src={project.conceptRenderUrl}
                                     alt={`${project.name} concept render`}
                                     fill
                                     sizes="(max-width: 900px) 100vw, 55vw"

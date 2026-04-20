@@ -76,6 +76,7 @@ export interface ModulesViewProps {
         id: string
         name: string
         systemIllustrationUrl: string | null
+        conceptRenderUrl: string | null
     }
     header: {
         moduleCount: number
@@ -144,13 +145,14 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
             <div className="m2-page-header">
                 <div>
                     <h1>
+                        <span className="m2-title-dot" aria-hidden="true" />
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <rect x="3" y="3" width="7" height="7" rx="1" />
                             <rect x="14" y="3" width="7" height="7" rx="1" />
                             <rect x="3" y="14" width="7" height="7" rx="1" />
                             <rect x="14" y="14" width="7" height="7" rx="1" />
                         </svg>
-                        Modules
+                        Modules · {project.name}
                         <span className="m2-chip success solid" style={{ marginLeft: 6 }}>{stableChipLabel}</span>
                     </h1>
                     <div className="sub">
@@ -175,12 +177,12 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                     <div className="pane">
                         <div className="pane-head">
                             <span>Nano Banana render</span>
-                            <span className="style-tag">{project.systemIllustrationUrl ? "System view" : "pending"}</span>
+                            <span className="style-tag">{project.conceptRenderUrl ? "System view" : "pending"}</span>
                         </div>
                         <div className="pane-body">
-                            {project.systemIllustrationUrl ? (
+                            {project.conceptRenderUrl ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
-                                <img src={project.systemIllustrationUrl} alt={`${project.name} system render`} />
+                                <img src={project.conceptRenderUrl} alt={`${project.name} system render`} />
                             ) : (
                                 <BlueprintFallback label="System render pending" />
                             )}

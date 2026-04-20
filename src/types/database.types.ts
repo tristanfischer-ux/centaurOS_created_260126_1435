@@ -4600,6 +4600,7 @@ export type Database = {
           brief_locked_at: string | null
           brief_locked_by: string | null
           checkpoints: Json | null
+          concept_render_url: string | null
           created_at: string
           created_by: string
           decomposition_connections: Json | null
@@ -4652,6 +4653,7 @@ export type Database = {
           brief_locked_at?: string | null
           brief_locked_by?: string | null
           checkpoints?: Json | null
+          concept_render_url?: string | null
           created_at?: string
           created_by: string
           decomposition_connections?: Json | null
@@ -4704,6 +4706,7 @@ export type Database = {
           brief_locked_at?: string | null
           brief_locked_by?: string | null
           checkpoints?: Json | null
+          concept_render_url?: string | null
           created_at?: string
           created_by?: string
           decomposition_connections?: Json | null

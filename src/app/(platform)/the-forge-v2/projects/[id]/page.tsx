@@ -65,12 +65,13 @@ export default async function ForgeV2ProjectPage({
     // ── 2. Derived data — parallelised, all failure-tolerant ─────────
     // Each call's failure mode is local: we swallow errors and fall back to
     // the empty-state shape so one broken source cannot take down the page.
-    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses] = await Promise.all([
+    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses, supplierShortlist] = await Promise.all([
         safeResume(id),
         safeActivity(id, 7),
         safeEngineeringCounts(),
         safeTopMaterials(),
         safeTopProcesses(),
+        safeSupplierShortlist(id),
     ])
 
     // ── 3. Header-derived numbers that come straight off the project row
@@ -119,6 +120,7 @@ export default async function ForgeV2ProjectPage({
             createdAt: project.createdAt,
             updatedAt: project.updatedAt,
             systemIllustrationUrl: project.systemIllustrationUrl,
+            conceptRenderUrl: project.conceptRenderUrl,
         },
         header: {
             moduleCount,
@@ -140,6 +142,7 @@ export default async function ForgeV2ProjectPage({
         engineering: engineeringCounts,
         topMaterials,
         topProcesses,
+        suppliers: supplierShortlist,
     }
 
     return <WorkspaceView {...viewProps} />
@@ -214,6 +217,34 @@ async function safeTopMaterials(): Promise<TopMaterialRow[]> {
         }))
     } catch (err) {
         console.error("[WORKSPACE-PAGE] top materials failed:", err)
+        return []
+    }
+}
+
+interface SupplierShortlistRow {
+    name: string
+    type: string | null
+    modulesMatched: number
+    rampRole: string
+}
+
+async function safeSupplierShortlist(projectId: string): Promise<SupplierShortlistRow[]> {
+    try {
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("forge_supplier_shortlist")
+            .select("supplier_name, supplier_type, module_ids, ramp_role, best_match_score")
+            .eq("project_id", projectId)
+            .order("best_match_score", { ascending: false })
+        if (error || !data) return []
+        return data.map((r) => ({
+            name: r.supplier_name as string,
+            type: (r.supplier_type as string | null) ?? null,
+            modulesMatched: Array.isArray(r.module_ids) ? r.module_ids.length : 0,
+            rampRole: (r.ramp_role as string) ?? "secondary",
+        }))
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] supplier shortlist failed:", err)
         return []
     }
 }

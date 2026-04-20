@@ -143,6 +143,7 @@ export default async function ForgeV2ModulesPage({
             id: project.id,
             name: project.name,
             systemIllustrationUrl: project.systemIllustrationUrl,
+            conceptRenderUrl: project.conceptRenderUrl,
         },
         header: {
             moduleCount: modules.length,

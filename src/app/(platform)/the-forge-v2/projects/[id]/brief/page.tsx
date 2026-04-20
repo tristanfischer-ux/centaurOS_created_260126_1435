@@ -146,6 +146,7 @@ export default async function ForgeV2BriefPage({
             designRevision: project.designRevision,
             createdAt: project.createdAt,
             systemIllustrationUrl: project.systemIllustrationUrl,
+            conceptRenderUrl: project.conceptRenderUrl,
         },
         lockState: {
             isLocked: project.briefLockedAt !== null,
