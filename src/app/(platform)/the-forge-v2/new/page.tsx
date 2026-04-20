@@ -18,6 +18,11 @@
  * - Mockup: FORGE-MOCKUP-PROJECT-CREATE.html (repo root)
  * - View:   ./project-create-view.tsx
  * - Styles: ./project-create-v2.css (scoped `.pc2` — do NOT modify elsewhere)
+ *
+ * @history This file + its view/css siblings were written in a parallel
+ *          sub-agent wave; the initial port commit was swept into
+ *          88a1dba8 by a concurrent agent. This trailing commit restores
+ *          the proper subject line for bisect / changelog discovery.
  */
 
 import type { Metadata } from "next"
