@@ -1,0 +1,404 @@
+/**
+ * approve-v2.css — scoped (`.ap2`) styles for the Approve confirmation page.
+ * Ports FORGE-MOCKUP-APPROVE.html top-to-bottom. Prefix-isolated so nothing
+ * leaks to other pages. The approve surface is a decision confirmation —
+ * summary of what's being approved, approval-chain sidebar, and a decision
+ * strip at the foot.
+ */
+
+.ap2 {
+  /* Palette — mirrors forge-mockup.css tokens for this page only */
+  --ap-fg:             #1c1917;
+  --ap-fg-muted:       #78716c;
+  --ap-fg-faint:       #a8a29e;
+  --ap-fg-subtle:      #d6d3d1;
+  --ap-surface:        #ffffff;
+  --ap-surface-muted:  #f5f5f4;
+  --ap-surface-soft:   #fafaf9;
+  --ap-border:         #e7e5e4;
+  --ap-border-soft:    #f0efed;
+  --ap-border-strong:  #d6d3d1;
+  --ap-brand:          #ff4500;
+  --ap-brand-soft:     #fff0ea;
+  --ap-brand-dim:      #ffdcc7;
+  --ap-success:        #16a34a;
+  --ap-success-soft:   #dcfce7;
+  --ap-success-dim:    #bbf7d0;
+  --ap-success-strong: #166534;
+  --ap-warning-soft:   #fef9c3;
+  --ap-warning-dim:    #fef08a;
+  --ap-warning-fg:     #854d0e;
+  --ap-danger:         #dc2626;
+  --ap-danger-soft:    #fee2e2;
+  --ap-info:           #1d4ed8;
+  --ap-info-soft:      #dbeafe;
+  --ap-purple:         #7c3aed;
+  --ap-purple-soft:    #ede9fe;
+
+  --ap-shadow-xs:      0 1px 2px rgba(28,25,23,0.03);
+  --ap-shadow-sm:      0 2px 4px rgba(28,25,23,0.04);
+
+  color: var(--ap-fg);
+  background: var(--ap-surface-soft);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: -1rem;
+  padding: 24px 32px 48px;
+  max-width: none;
+  min-height: calc(100vh - 64px);
+}
+
+@media (min-width: 640px) { .ap2 { margin: -1.5rem -1.5rem -1.5rem -1.25rem; } }
+@media (min-width: 1024px) { .ap2 { margin: -2rem -2rem -2rem -1.5rem; } }
+
+.ap2 *, .ap2 *::before, .ap2 *::after { box-sizing: border-box; }
+.ap2 h1, .ap2 h2, .ap2 h3, .ap2 h4, .ap2 p, .ap2 ul { margin: 0; }
+.ap2 a { color: inherit; text-decoration: none; }
+
+/* ── Breadcrumb ───────────────────────────────────────────────── */
+.ap2-breadcrumb {
+  font-size: 12px;
+  color: var(--ap-fg-muted);
+  margin-bottom: 16px;
+}
+.ap2-breadcrumb a {
+  color: var(--ap-fg-muted);
+  text-decoration: none;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: all 0.12s;
+}
+.ap2-breadcrumb a:hover { color: var(--ap-fg); background: var(--ap-surface-muted); }
+.ap2-breadcrumb .sep { color: var(--ap-fg-faint); font-size: 10px; margin: 0 7px; }
+.ap2-breadcrumb .current { color: var(--ap-fg); font-weight: 500; }
+
+/* ── Page header ──────────────────────────────────────────────── */
+.ap2-page-head {
+  margin-bottom: 22px;
+}
+.ap2-page-head h1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+.ap2-page-head .sub {
+  font-size: 13px;
+  color: var(--ap-fg-muted);
+  margin: 0;
+}
+
+/* ── Annotation note strip ────────────────────────────────────── */
+.ap2-annot {
+  font-size: 11.5px;
+  color: var(--ap-fg-muted);
+  background: var(--ap-surface);
+  border: 1px dashed var(--ap-border-strong);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.ap2-annot strong { color: var(--ap-fg); font-weight: 700; margin-right: 6px; }
+
+/* ── Two-column grid ──────────────────────────────────────────── */
+.ap2-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+}
+@media (max-width: 960px) {
+  .ap2-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Main approve card ────────────────────────────────────────── */
+.ap2-main {
+  background: var(--ap-surface);
+  border: 1px solid var(--ap-border);
+  border-radius: 14px;
+  box-shadow: var(--ap-shadow-xs);
+  overflow: hidden;
+}
+
+.ap2-head {
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #fff 0%, var(--ap-warning-soft) 100%);
+  border-bottom: 1px solid var(--ap-warning-dim);
+}
+.ap2-head .who-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.ap2-head .who-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 100%;
+  background: var(--ap-purple-soft);
+  color: var(--ap-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.ap2-head .who-meta {
+  font-size: 12px;
+  color: var(--ap-fg-muted);
+}
+.ap2-head .who-meta strong { color: var(--ap-fg); font-weight: 600; }
+.ap2-head h2 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  margin: 0;
+}
+.ap2-head .ask {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: var(--ap-fg);
+}
+
+/* ── Context cards (summary of what's being approved) ─────────── */
+.ap2-context {
+  padding: 20px 24px;
+}
+.ap2-context h4 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ap-fg-muted);
+}
+.ap2-context h4:not(:first-child) {
+  margin-top: 18px;
+}
+.ap2-context .card {
+  background: var(--ap-surface-soft);
+  border: 1px solid var(--ap-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.ap2-context .card:last-child { margin-bottom: 0; }
+.ap2-context .card strong { font-weight: 600; }
+.ap2-context .card p + p { margin-top: 8px; }
+
+.ap2-context .card .bullet {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  align-items: flex-start;
+}
+.ap2-context .card .bullet:last-child { margin-bottom: 0; }
+.ap2-context .card .bullet .tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  min-width: 50px;
+  text-align: center;
+  line-height: 1.5;
+}
+.ap2-tag-pro  { background: var(--ap-success-soft); color: var(--ap-success-strong); }
+.ap2-tag-con  { background: var(--ap-danger-soft);  color: var(--ap-danger); }
+.ap2-tag-note { background: var(--ap-info-soft);    color: var(--ap-info); }
+
+/* Empty-state variant inside a context card */
+.ap2-context .empty {
+  color: var(--ap-fg-muted);
+  font-style: italic;
+  font-size: 12.5px;
+}
+
+/* ── Decision strip (disabled approve button) ─────────────────── */
+.ap2-decision-strip {
+  padding: 18px 24px;
+  border-top: 1px solid var(--ap-border);
+  background: var(--ap-surface-soft);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ap2-decision-strip .guidance {
+  font-size: 11.5px;
+  color: var(--ap-fg-muted);
+  margin-right: auto;
+  font-style: italic;
+}
+
+.ap2-btn-approve,
+.ap2-btn-ask,
+.ap2-btn-reject {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  border: 1px solid var(--ap-border-strong);
+  background: var(--ap-surface);
+  color: var(--ap-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.ap2-btn-ask {
+  background: var(--ap-brand-soft);
+  color: var(--ap-brand);
+  border-color: var(--ap-brand-dim);
+}
+.ap2-btn-ask:hover { background: var(--ap-brand-dim); }
+.ap2-btn-reject:hover { background: var(--ap-surface-muted); }
+
+.ap2-btn-approve {
+  font-weight: 700;
+  padding: 9px 20px;
+  background: var(--ap-success);
+  color: #ffffff;
+  border-color: var(--ap-success);
+}
+.ap2-btn-approve:not([aria-disabled="true"]):hover { background: #15803d; }
+.ap2-btn-approve[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--ap-success);
+}
+
+/* ── Sidebar cards ────────────────────────────────────────────── */
+.ap2-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ap2-side-card {
+  background: var(--ap-surface);
+  border: 1px solid var(--ap-border);
+  border-radius: 12px;
+  box-shadow: var(--ap-shadow-xs);
+  padding: 16px 18px;
+}
+.ap2-side-card h4 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ap-fg-muted);
+}
+.ap2-side-card .prose {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ap-fg);
+}
+.ap2-side-card .prose ol {
+  margin: 0;
+  padding: 0 0 0 18px;
+}
+.ap2-side-card .prose ol li {
+  margin-bottom: 4px;
+}
+.ap2-side-card .prose ol li:last-child { margin-bottom: 0; }
+
+.ap2-side-card .row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--ap-border-soft);
+  font-size: 12.5px;
+  align-items: baseline;
+}
+.ap2-side-card .row:first-of-type { padding-top: 0; }
+.ap2-side-card .row:last-child { border-bottom: none; padding-bottom: 0; }
+.ap2-side-card .row .k { color: var(--ap-fg-muted); }
+.ap2-side-card .row .v {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ap2-side-card .empty {
+  font-size: 12.5px;
+  color: var(--ap-fg-muted);
+  font-style: italic;
+  line-height: 1.55;
+}
+
+/* Approval chain rows */
+.ap2-chain-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ap-border-soft);
+  font-size: 12.5px;
+}
+.ap2-chain-row:first-child { padding-top: 0; }
+.ap2-chain-row:last-child { border-bottom: none; padding-bottom: 0; }
+.ap2-chain-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 100%;
+  background: var(--ap-purple-soft);
+  color: var(--ap-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.ap2-chain-meta {
+  flex: 1;
+  min-width: 0;
+}
+.ap2-chain-meta .name { font-weight: 600; color: var(--ap-fg); }
+.ap2-chain-meta .role { color: var(--ap-fg-muted); font-size: 11.5px; }
+
+/* ── Pills (reused across sidebar) ────────────────────────────── */
+.ap2-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ap2-pill-red    { background: var(--ap-danger-soft);   color: var(--ap-danger); }
+.ap2-pill-amber  { background: var(--ap-warning-soft);  color: var(--ap-warning-fg); }
+.ap2-pill-green  { background: var(--ap-success-soft);  color: var(--ap-success-strong); }
+.ap2-pill-neutral { background: var(--ap-surface-muted); color: var(--ap-fg-muted); }
+
+/* ── History rows (similar past decisions, empty-state-aware) ── */
+.ap2-history-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ap-border-soft);
+  font-size: 12px;
+  color: var(--ap-fg-muted);
+  line-height: 1.5;
+}
+.ap2-history-row:first-child { padding-top: 0; }
+.ap2-history-row:last-child { border-bottom: none; padding-bottom: 0; }
+.ap2-history-row .title {
+  color: var(--ap-fg);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
