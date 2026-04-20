@@ -14,6 +14,15 @@ import { withAuth } from '@/lib/server-action-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { emitMoneyEvent, resolveMoneyEventsForEntity } from '@/lib/money/emit-event'
 import { isPipelineEventAttentionWorthy } from '@/lib/money/attention-worthy'
+import { scoreListing } from '@/lib/money/match-score'
+import type {
+  MatchBreakdown,
+  MatchThesis,
+  RichInvestorFilters,
+  ScoredListingRow,
+} from '@/lib/money/match-types'
+import { searchMarketplaceListingsSemantic } from '@/lib/search/semantic-search'
+import { sanitizeFilterValue } from '@/lib/security/sanitize-filter'
 
 export type RaiseRound = {
   id: string
@@ -739,5 +748,460 @@ export async function passInvestor(input: {
     if (error) return { error: error.message }
     revalidatePath('/money/raise')
     return { success: true as const }
+  })
+}
+
+// ============================================================================
+// Intel: thesis-based scoring, semantic search, contacts-by-firm
+// ============================================================================
+
+/**
+ * Columns needed to run `scoreListing` + build `ScoredListingRow`. Selected
+ * narrowly to keep React Flight payloads small — no products/materials/equipment
+ * JSONB blobs, no embedding vector, no search_vector.
+ */
+const SCOREABLE_LISTING_COLUMNS =
+  'id, title, subcategory, description, image_url, website_url, city, country, country_iso, data_quality_score, last_enriched_at, attributes' as const
+
+type ScoreableListingSelect =
+  Pick<
+    import('@/types/database.types').Database['public']['Tables']['marketplace_listings']['Row'],
+    | 'id'
+    | 'title'
+    | 'subcategory'
+    | 'description'
+    | 'image_url'
+    | 'website_url'
+    | 'city'
+    | 'country'
+    | 'country_iso'
+    | 'data_quality_score'
+    | 'last_enriched_at'
+    | 'attributes'
+  >
+
+/**
+ * Trim a raw marketplace_listings row down to the UI-safe `ScoredListingRow`
+ * shape (no massive JSON blobs, no embedding vectors).
+ */
+function toScoredListingRow(row: ScoreableListingSelect): ScoredListingRow {
+  const attrs =
+    row.attributes && typeof row.attributes === 'object' && !Array.isArray(row.attributes)
+      ? (row.attributes as Record<string, unknown>)
+      : {}
+
+  const asStrArr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+
+  const cheque = attrs.cheque_range_gbp
+  const chequeRange =
+    cheque && typeof cheque === 'object' && !Array.isArray(cheque)
+      ? (() => {
+          const c = cheque as Record<string, unknown>
+          const min = typeof c.min === 'number' ? c.min : null
+          const max = typeof c.max === 'number' ? c.max : null
+          return min == null && max == null ? null : { min, max }
+        })()
+      : null
+
+  return {
+    id: row.id,
+    title: row.title,
+    subcategory: row.subcategory,
+    description: row.description,
+    image_url: row.image_url,
+    website_url: row.website_url,
+    city: row.city,
+    country: row.country,
+    country_iso: row.country_iso,
+    data_quality_score: row.data_quality_score ?? null,
+    last_enriched_at: row.last_enriched_at,
+    highlights: {
+      investment_thesis: typeof attrs.investment_thesis === 'string' ? attrs.investment_thesis : null,
+      ideal_company_profile:
+        typeof attrs.ideal_company_profile === 'string' ? attrs.ideal_company_profile : null,
+      firm_type: typeof attrs.firm_type === 'string' ? attrs.firm_type : null,
+      fund_size_gbp: typeof attrs.fund_size_gbp === 'number' ? attrs.fund_size_gbp : null,
+      cheque_range_gbp: chequeRange,
+      stage_focus: asStrArr(attrs.stage_focus),
+      sectors: asStrArr(attrs.sectors),
+      geo_focus: asStrArr(attrs.geo_focus),
+      is_active_deploying:
+        typeof attrs.is_active_deploying === 'boolean' ? attrs.is_active_deploying : null,
+    },
+  }
+}
+
+type ListingQuery = ReturnType<
+  Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>['from']
+> extends {
+  select: (...args: unknown[]) => infer Q
+}
+  ? Q
+  : never
+
+/**
+ * Apply rich filters to a supabase query builder. Mutates + returns the query.
+ * Handles both top-level columns (subcategory, country_iso) and JSONB filters
+ * (stage_focus, sectors, firm_type, fund_size_gbp) — matching the legacy
+ * `searchInvestors` semantics from `src/actions/investors.ts`.
+ */
+function applyRichFilters<Q extends {
+  in: (col: string, vals: string[]) => Q
+  or: (expr: string) => Q
+  filter: (col: string, op: string, val: unknown) => Q
+}>(query: Q, filters: RichInvestorFilters): Q {
+  let q = query
+
+  if (filters.subcategory && filters.subcategory.length > 0) {
+    q = q.in('subcategory', filters.subcategory)
+  }
+  if (filters.country && filters.country.length > 0) {
+    // country_iso is top-level (populated by 2026-04-18 migration)
+    q = q.in('country_iso', filters.country)
+  }
+  if (filters.firm_type && filters.firm_type.length > 0) {
+    const types = filters.firm_type
+      .map((t) => sanitizeFilterValue(t))
+      .filter(Boolean)
+    if (types.length > 0) {
+      q = q.or(types.map((t) => `attributes->>firm_type.eq.${t}`).join(','))
+    }
+  }
+  if (filters.stage && filters.stage.length > 0) {
+    const stageFilters = filters.stage
+      .map((s) => `attributes->stage_focus.cs.["${sanitizeFilterValue(s)}"]`)
+      .filter((s) => s.length > 'attributes->stage_focus.cs.[""]'.length)
+    if (stageFilters.length > 0) q = q.or(stageFilters.join(','))
+  }
+  if (filters.sector && filters.sector.length > 0) {
+    const sectorFilters = filters.sector
+      .map((s) => `attributes->sectors.cs.["${sanitizeFilterValue(s)}"]`)
+      .filter((s) => s.length > 'attributes->sectors.cs.[""]'.length)
+    if (sectorFilters.length > 0) q = q.or(sectorFilters.join(','))
+  }
+  // Cheque in cents → firm range is GBP whole units. Divide by 100 for the cmp.
+  if (filters.cheque_min_cents != null) {
+    q = q.filter('attributes->cheque_range_gbp->max', 'gte', Math.floor(filters.cheque_min_cents / 100))
+  }
+  if (filters.cheque_max_cents != null) {
+    q = q.filter('attributes->cheque_range_gbp->min', 'lte', Math.ceil(filters.cheque_max_cents / 100))
+  }
+  if (filters.fund_size_min_cents != null) {
+    q = q.filter('attributes->fund_size_gbp', 'gte', Math.floor(filters.fund_size_min_cents / 100))
+  }
+  if (filters.fund_size_max_cents != null) {
+    q = q.filter('attributes->fund_size_gbp', 'lte', Math.ceil(filters.fund_size_max_cents / 100))
+  }
+
+  return q
+}
+
+/**
+ * Resolve the foundry's active `investor_thesis` row → `MatchThesis`. Returns
+ * null + version if no active thesis is set.
+ */
+async function loadActiveThesisForScoring(
+  supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>,
+  foundryId: string,
+): Promise<{ thesis: MatchThesis; id: string; version: number } | null> {
+  const { data: foundry } = await supabase
+    .from('foundries')
+    .select('active_thesis_id')
+    .eq('id', foundryId)
+    .maybeSingle()
+  const activeId = foundry?.active_thesis_id ?? null
+  if (!activeId) return null
+
+  const { data: row } = await supabase
+    .from('investor_thesis')
+    .select(
+      'id, version, stage_tags, sector_tags, geography, cheque_min_cents, cheque_max_cents, keywords, preferred_instrument, lead_follower_pref',
+    )
+    .eq('id', activeId)
+    .eq('foundry_id', foundryId)
+    .maybeSingle()
+  if (!row) return null
+
+  const leadPref = row.lead_follower_pref ?? 'either'
+  const leadOrFollower: MatchThesis['lead_or_follower'] =
+    leadPref === 'lead' || leadPref === 'follower' || leadPref === 'both' ? leadPref : null
+
+  const thesis: MatchThesis = {
+    stage_tags: row.stage_tags ?? [],
+    sector_tags: row.sector_tags ?? [],
+    geography: row.geography ?? [],
+    cheque_min_cents: row.cheque_min_cents,
+    cheque_max_cents: row.cheque_max_cents,
+    keywords: row.keywords ?? [],
+    instrument:
+      Array.isArray(row.preferred_instrument) && row.preferred_instrument.length > 0
+        ? row.preferred_instrument[0]
+        : null,
+    lead_or_follower: leadOrFollower,
+  }
+  return { thesis, id: row.id, version: row.version }
+}
+
+/**
+ * Score up to `limit` investors against the foundry's active thesis. Scored
+ * results are written back to `investor_pipeline_state` for any listing the
+ * foundry is already tracking (cache refresh). Returns a trimmed payload safe
+ * to ship through React Flight.
+ */
+export async function scoreInvestorsAgainstThesis(args: {
+  limit?: number
+  filters?: RichInvestorFilters
+}): Promise<
+  | { error: string }
+  | {
+      success: true
+      thesis_id: string
+      scored: Array<{
+        listing: ScoredListingRow
+        breakdown: MatchBreakdown
+        cached_score: number | null
+      }>
+    }
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 200)
+    const filters = args.filters ?? {}
+
+    const active = await loadActiveThesisForScoring(supabase, foundryId)
+    if (!active) return { error: 'no_active_thesis' }
+
+    // Cap candidate set at 200 to bound scoring work per call.
+    let candidatesQuery = supabase
+      .from('marketplace_listings')
+      .select(SCOREABLE_LISTING_COLUMNS)
+      .eq('category', 'Finance')
+      .not('title', 'is', null)
+    candidatesQuery = applyRichFilters(candidatesQuery, filters)
+    candidatesQuery = candidatesQuery
+      .order('data_quality_score', { ascending: false })
+      .limit(200)
+
+    const { data: candidates, error } = await candidatesQuery
+    if (error) return { error: error.message }
+
+    const rows = (candidates ?? []) as ScoreableListingSelect[]
+    const now = new Date()
+    const scored = rows.map((row) => ({
+      row,
+      breakdown: scoreListing(row, active.thesis, { now }),
+    }))
+    scored.sort((a, b) => b.breakdown.total - a.breakdown.total)
+    const top = scored.slice(0, limit)
+
+    // Cache into investor_pipeline_state for any listing the foundry already tracks.
+    const listingIds = top.map((s) => s.row.id)
+    if (listingIds.length > 0) {
+      const { data: existing } = await supabase
+        .from('investor_pipeline_state')
+        .select('id, marketplace_listing_id')
+        .eq('foundry_id', foundryId)
+        .in('marketplace_listing_id', listingIds)
+        .is('archived_at', null)
+      const stateByListing = new Map<string, string>()
+      for (const s of existing ?? []) {
+        if (s.marketplace_listing_id) stateByListing.set(s.marketplace_listing_id, s.id)
+      }
+
+      // Fire-and-forget: write the breakdown back. Errors are logged but do
+      // not fail the action — scoring is not a correctness gate.
+      const scoredAt = now.toISOString()
+      const cacheWrites = top
+        .filter((s) => stateByListing.has(s.row.id))
+        .map(async (s) => {
+          const stateId = stateByListing.get(s.row.id)
+          if (!stateId) return
+          const { error: upErr } = await supabase
+            .from('investor_pipeline_state')
+            .update({
+              match_score_cached: s.breakdown.total,
+              match_breakdown_json: s.breakdown as unknown as Record<string, unknown>,
+              match_scored_at: scoredAt,
+              match_score_computed_at: scoredAt,
+              match_score_thesis_version: active.version,
+            })
+            .eq('id', stateId)
+            .eq('foundry_id', foundryId)
+          if (upErr) {
+            console.warn('[scoreInvestorsAgainstThesis] cache write failed', upErr.message)
+          }
+        })
+      await Promise.all(cacheWrites)
+    }
+
+    // Fetch existing cached scores (for listings NOT in pipeline we return null).
+    const cachedById = new Map<string, number | null>()
+    if (listingIds.length > 0) {
+      const { data: stateRows } = await supabase
+        .from('investor_pipeline_state')
+        .select('marketplace_listing_id, match_score_cached')
+        .eq('foundry_id', foundryId)
+        .in('marketplace_listing_id', listingIds)
+        .is('archived_at', null)
+      for (const r of stateRows ?? []) {
+        if (r.marketplace_listing_id) {
+          cachedById.set(r.marketplace_listing_id, r.match_score_cached ?? null)
+        }
+      }
+    }
+
+    return {
+      success: true as const,
+      thesis_id: active.id,
+      scored: top.map(({ row, breakdown }) => ({
+        listing: toScoredListingRow(row),
+        breakdown,
+        cached_score: cachedById.has(row.id) ? cachedById.get(row.id) ?? null : null,
+      })),
+    }
+  })
+}
+
+/**
+ * Search the Finance investor directory by semantic similarity where possible,
+ * falling back to ilike on title/description/thesis text. Applies rich filters
+ * in both paths.
+ */
+export async function searchInvestorsSemantic(args: {
+  query?: string
+  filters?: RichInvestorFilters
+  limit?: number
+  offset?: number
+}): Promise<
+  | { error: string }
+  | {
+      success: true
+      results: ScoredListingRow[]
+      total: number
+      mode: 'semantic' | 'ilike'
+    }
+> {
+  return withAuth(async ({ supabase }) => {
+    const limit = Math.min(Math.max(args.limit ?? 25, 1), 100)
+    const offset = Math.max(args.offset ?? 0, 0)
+    const filters = args.filters ?? {}
+    const query = (args.query ?? '').trim()
+
+    // Semantic path — only if we have query text. Graceful fallback on any
+    // error (missing embedding / missing API key / RPC failure → ilike).
+    if (query.length >= 3) {
+      const hits = await searchMarketplaceListingsSemantic(query, {
+        matchThreshold: 0.35,
+        matchCount: Math.min(200, limit + offset + 50),
+      })
+      if (hits.length > 0) {
+        // Hydrate the hits with the full SCOREABLE columns + apply filters.
+        const ids = hits.map((h) => h.id)
+        let hydrateQuery = supabase
+          .from('marketplace_listings')
+          .select(SCOREABLE_LISTING_COLUMNS)
+          .eq('category', 'Finance')
+          .in('id', ids)
+        hydrateQuery = applyRichFilters(hydrateQuery, filters)
+        const { data: rows, error: hydrateErr } = await hydrateQuery
+        if (!hydrateErr && rows) {
+          // Preserve semantic ordering.
+          const order = new Map<string, number>()
+          hits.forEach((h, i) => order.set(h.id, i))
+          const sorted = (rows as ScoreableListingSelect[]).sort(
+            (a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999),
+          )
+          const paged = sorted.slice(offset, offset + limit)
+          return {
+            success: true as const,
+            results: paged.map(toScoredListingRow),
+            total: sorted.length,
+            mode: 'semantic' as const,
+          }
+        }
+      }
+    }
+
+    // ilike fallback — same filter semantics, paginated via range().
+    let fallback = supabase
+      .from('marketplace_listings')
+      .select(SCOREABLE_LISTING_COLUMNS, { count: 'exact' })
+      .eq('category', 'Finance')
+      .not('title', 'is', null)
+    fallback = applyRichFilters(fallback, filters)
+    if (query) {
+      const safe = sanitizeFilterValue(query).slice(0, 60)
+      if (safe) {
+        fallback = fallback.or(
+          [
+            `title.ilike.%${safe}%`,
+            `description.ilike.%${safe}%`,
+            `attributes->>investment_thesis.ilike.%${safe}%`,
+            `attributes->>ideal_company_profile.ilike.%${safe}%`,
+          ].join(','),
+        )
+      }
+    }
+    fallback = fallback
+      .order('data_quality_score', { ascending: false })
+      .range(offset, offset + limit - 1)
+    const { data, count, error } = await fallback
+    if (error) return { error: error.message }
+
+    const results = ((data ?? []) as ScoreableListingSelect[]).map(toScoredListingRow)
+    return {
+      success: true as const,
+      results,
+      total: count ?? results.length,
+      mode: 'ilike' as const,
+    }
+  })
+}
+
+/**
+ * List people-level contacts belonging to an investor firm (marketplace_listing).
+ * Uses admin client because vc_pe_contacts is typically service-role readable
+ * only (no user-level RLS for cross-firm reads). The firm id is the caller-
+ * supplied listing id — we still gate the action behind `withAuth` so only
+ * authenticated platform users can call it.
+ */
+export async function listInvestorContactsByFirm(firmId: string): Promise<
+  | { error: string }
+  | {
+      success: true
+      contacts: Array<{
+        id: string
+        name: string
+        title: string | null
+        email: string | null
+        linkedin_url: string | null
+        seniority?: string | null
+      }>
+    }
+> {
+  return withAuth(async () => {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_RE.test(firmId)) return { error: 'Invalid firm id' }
+
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('vc_pe_contacts')
+      .select('id, full_name, title, email, linkedin_url, seniority, is_decision_maker')
+      .eq('listing_id', firmId)
+      .order('is_decision_maker', { ascending: false })
+      .order('full_name', { ascending: true })
+      .limit(100)
+
+    if (error) return { error: error.message }
+
+    const contacts = (data ?? []).map((c) => ({
+      id: c.id,
+      name: c.full_name,
+      title: c.title,
+      email: c.email,
+      linkedin_url: c.linkedin_url,
+      seniority: c.seniority,
+    }))
+    return { success: true as const, contacts }
   })
 }
