@@ -207,29 +207,32 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
                         <div className="ic" aria-hidden="true">✓</div>
                         <h2>No risks raised yet.</h2>
                         <p>
-                            That&apos;s normal for a project this early. Risks will appear as you build — your
+                            That&apos;s normal for a project this new. Risks will appear as you build — your
                             team will raise them, modules will surface failure modes, and single-source
-                            suppliers will flag themselves.
+                            suppliers will flag themselves. You can also raise one now.
                         </p>
                         <div className="cta-group">
-                            <Link href={`${base}/modules`} className="rk2-btn primary">
-                                Open modules
+                            <Link href={`${base}/risks/new`} className="rk2-btn primary">
+                                Raise your first risk →
                             </Link>
-                            <span className="rk2-btn soon" title="Raising dedicated risks ships with the risks table">
-                                + Raise risk
+                            <span
+                                className="rk2-btn soon"
+                                title="Auto-surface populates after Brief-lock when modules are scaffolded"
+                            >
+                                Auto-surface from module Failure Modes — populates after Brief-lock
                             </span>
                         </div>
                         <div className="note">
-                            Auto-surface pulls failure modes + unknowns from each module once decomposition is
-                            complete. Raising bespoke risks ships with the dedicated risks table.
+                            Auto-surface pulls the top failure modes from each module&apos;s FMEA once the
+                            Brief is locked and modules are scaffolded.
                         </div>
                     </div>
 
                     <div className="rk2-library">
                         <h3>Risk library — browse by category</h3>
                         <div className="sub">
-                            Common hardware risk categories. Library authoring ships with the risks table;
-                            categories shown for reference.
+                            Common hardware risk categories from other projects in your foundry. Library
+                            authoring ships with the risks table; categories shown for reference.
                         </div>
                         <div className="pill-grid">
                             <span className="cat-pill"><span className="dot supply" aria-hidden="true" />Supply chain</span>

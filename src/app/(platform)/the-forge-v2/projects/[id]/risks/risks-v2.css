@@ -404,6 +404,33 @@
   gap: 12px;
   flex-wrap: wrap;
 }
+/* Hero CTAs are larger than the standard .rk2-btn to match the mockup's
+   prominence — primary is brand orange, secondary is a muted disabled pill
+   carrying the "auto-surface after Brief-lock" affordance. */
+.rk2-empty-hero .cta-group .rk2-btn {
+  padding: 11px 22px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: 8px;
+}
+.rk2-empty-hero .cta-group .rk2-btn.primary {
+  background: var(--rk-brand);
+  color: #fff;
+  border-color: var(--rk-brand);
+}
+.rk2-empty-hero .cta-group .rk2-btn.primary:hover {
+  background: #e63b00;
+  border-color: #e63b00;
+}
+.rk2-empty-hero .cta-group .rk2-btn.soon {
+  background: var(--rk-surface-muted);
+  color: var(--rk-fg-subtle);
+  border-color: var(--rk-border);
+  opacity: 1;
+  font-weight: 500;
+  font-size: 13px;
+  padding: 11px 18px;
+}
 .rk2-empty-hero .note {
   font-size: 11.5px;
   color: var(--rk-fg-faint);
