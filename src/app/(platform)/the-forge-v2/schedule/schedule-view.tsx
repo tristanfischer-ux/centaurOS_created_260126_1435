@@ -194,7 +194,7 @@ export function ScheduleView(props: ScheduleViewProps): React.ReactElement {
             </div>
 
             {/* ── Page header ────────────────────────────── */}
-            <h1 className="sh2-page-title">Schedule</h1>
+            <h1 className="sh2-page-title"><span className="sh2-title-dot" aria-hidden="true" />Schedule</h1>
             <p className="sh2-page-sub">
                 This week&rsquo;s scheduled blocks across projects — founder
                 sessions, specialist conversations, supplier calls and

@@ -91,6 +91,16 @@
   letter-spacing: -0.025em;
   margin: 0 0 6px;
   color: var(--bl-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.bl2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--bl-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
 }
 .bl2-subtitle {
   font-size: 13.5px;

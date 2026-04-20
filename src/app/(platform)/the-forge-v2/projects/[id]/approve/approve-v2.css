@@ -86,6 +86,16 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ap2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--ap-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
 }
 .ap2-page-head .sub {
   font-size: 13px;

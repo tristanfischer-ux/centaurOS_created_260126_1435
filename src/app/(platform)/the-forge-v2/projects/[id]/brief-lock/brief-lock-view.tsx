@@ -138,7 +138,7 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
                 Locking the Brief is the handoff contract between Products (hypothesis) and Forge (build). After this event, Products history persists as read-only provenance and Forge owns every change to cost, requirements, and the artefact spine. Cannot be undone without a fork.
             </div>
 
-            <h1 className="bl2-title">Lock Brief rev {currentLetter} — hand off to Forge</h1>
+            <h1 className="bl2-title"><span className="bl2-title-dot" aria-hidden="true" />Lock Brief rev {currentLetter} — hand off to Forge</h1>
             <p className="bl2-subtitle">
                 Locking the Brief flips canonical ownership from Products to Forge. After this, Products history is read-only; Forge owns every change to target cost, requirements, and cost ceiling. Cannot be undone without a fork.
             </p>

@@ -156,7 +156,7 @@ export function RevisionsView(props: RevisionsViewProps): React.ReactElement {
 
             {/* ── Dark header card ────────────────────── */}
             <div className="rv2-header-card">
-                <h1>{project.name}</h1>
+                <h1><span className="rv2-title-dot" aria-hidden="true" />{project.name}</h1>
                 <div className="sub">
                     {parent
                         ? `Forked from v${parent.revisionNumber} · ${revisions.length} revision${revisions.length === 1 ? "" : "s"} recorded`

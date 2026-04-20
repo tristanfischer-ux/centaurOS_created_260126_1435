@@ -76,7 +76,7 @@ export function InterviewDetailView(props: InterviewDetailViewProps): React.Reac
             <div className="id2-head">
                 <div className="id2-avatar empty" aria-hidden="true">—</div>
                 <div>
-                    <h1><span className="empty">Interviewee — not captured</span></h1>
+                    <h1><span className="id2-title-dot" aria-hidden="true" /><span className="empty">Interviewee — not captured</span></h1>
                     <div className="sub">
                         <span className="empty">Date · duration · channel — populates once the validation store ships.</span>
                     </div>

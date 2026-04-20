@@ -161,7 +161,7 @@ export function ReadinessActionView(props: ReadinessActionViewProps): React.Reac
             {/* ── Header banner ─────────────────────────────────────── */}
             <div className="ra2-gap-head">
                 <div className="lbl">⚠ {item.dimensionLabel}</div>
-                <h1>{item.title}</h1>
+                <h1><span className="ra2-title-dot" aria-hidden="true" />{item.title}</h1>
                 <div className="meta"><RichText segments={item.meta} /></div>
             </div>
 

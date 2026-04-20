@@ -86,6 +86,7 @@ export function ExperimentDetailView(
             <div className="ed2-header">
                 <div className="left">
                     <h1>
+                        <span className="ed2-title-dot" aria-hidden="true" />
                         Experiment {EMPTY_FIELD}
                         <span className="status-badge">Not yet captured</span>
                     </h1>

@@ -77,7 +77,7 @@ export function ApproveView(props: ApproveViewProps): React.ReactElement {
 
             {/* ── Page header ─────────────────────────────────────── */}
             <header className="ap2-page-head">
-                <h1>{copy.h1}</h1>
+                <h1><span className="ap2-title-dot" aria-hidden="true" />{copy.h1}</h1>
                 <p className="sub">{copy.subtitle}</p>
             </header>
 

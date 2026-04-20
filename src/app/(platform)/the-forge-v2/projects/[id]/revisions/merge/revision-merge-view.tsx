@@ -227,6 +227,7 @@ export function RevisionMergeView(props: RevisionMergeViewProps): React.ReactEle
 
             {/* ── Page title + lede ────────────────────── */}
             <h1 className="rm2-title">
+                <span className="rm2-title-dot" aria-hidden="true" />
                 Merge {sourceLabel} → {newLabel}
             </h1>
             <p className="rm2-lede">

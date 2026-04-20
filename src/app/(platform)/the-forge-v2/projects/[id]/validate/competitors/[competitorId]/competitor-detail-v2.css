@@ -136,6 +136,16 @@
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--cd-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.cd2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--cd-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
 }
 .cd2-company-head h1.empty { color: var(--cd-fg-subtle); font-weight: 600; }
 .cd2-company-head .cd2-sub {

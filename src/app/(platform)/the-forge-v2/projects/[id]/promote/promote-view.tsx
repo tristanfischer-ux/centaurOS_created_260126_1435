@@ -184,7 +184,7 @@ export function PromoteView(props: PromoteViewProps): React.ReactElement {
                 touching the project.
             </div>
 
-            <h1 className="pm2-title">Promote {project.name} to a Product line</h1>
+            <h1 className="pm2-title"><span className="pm2-title-dot" aria-hidden="true" />Promote {project.name} to a Product line</h1>
             <p className="pm2-subtitle">
                 The Forge project stays canonical for engineering; the Product row owns the
                 commercial hypothesis. This surface previews what the row will look like before

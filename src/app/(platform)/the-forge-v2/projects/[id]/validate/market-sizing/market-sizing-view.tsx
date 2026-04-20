@@ -87,7 +87,7 @@ export function MarketSizingView(props: MarketSizingViewProps): React.ReactEleme
                 <span className="current">Market sizing</span>
             </nav>
 
-            <h1 className="page-title">Market sizing — TAM / SAM / SOM</h1>
+            <h1 className="page-title"><span className="ms2-title-dot" aria-hidden="true" />Market sizing — TAM / SAM / SOM</h1>
             <p className="page-sub">
                 Every number cites its source. Pick a methodology, edit a parameter to see live recalc.
                 {industryHint ? (

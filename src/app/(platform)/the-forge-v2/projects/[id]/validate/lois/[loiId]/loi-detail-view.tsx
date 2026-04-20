@@ -82,6 +82,7 @@ export function LoiDetailView(props: LoiDetailViewProps): React.ReactElement {
                 <div className="ld2-logo" aria-hidden="true">L</div>
                 <div className="ld2-header-body">
                     <h1>
+                        <span className="ld2-title-dot" aria-hidden="true" />
                         <span className="ld2-empty-dash">—</span>
                     </h1>
                     <div className="sub">

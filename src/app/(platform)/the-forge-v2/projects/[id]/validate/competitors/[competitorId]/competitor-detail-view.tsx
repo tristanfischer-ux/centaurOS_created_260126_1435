@@ -75,7 +75,7 @@ export function CompetitorDetailView(props: CompetitorDetailViewProps): React.Re
             <div className="cd2-company-head">
                 <div className="cd2-company-logo empty" aria-hidden="true">—</div>
                 <div>
-                    <h1 className="empty">Competitor not logged yet</h1>
+                    <h1 className="empty"><span className="cd2-title-dot" aria-hidden="true" />Competitor not logged yet</h1>
                     <div className="cd2-sub">
                         HQ · founded year · one-line positioning populate once the competitor is saved from the validate flow.
                     </div>

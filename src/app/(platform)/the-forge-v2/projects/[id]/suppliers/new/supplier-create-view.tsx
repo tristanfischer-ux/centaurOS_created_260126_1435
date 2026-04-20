@@ -118,7 +118,7 @@ export function SupplierCreateView(props: SupplierCreateViewProps): React.ReactE
             </div>
 
             {/* ── Page title ─────────────────────────── */}
-            <h1 className="sc2-page-title">Find or add a supplier</h1>
+            <h1 className="sc2-page-title"><span className="sc2-title-dot" aria-hidden="true" />Find or add a supplier</h1>
             <p className="sc2-page-sub">
                 Search the ForgeOS network first — the match score reflects fit against this project&apos;s
                 modules and part specs. If you already have an incumbent you want on record, switch to

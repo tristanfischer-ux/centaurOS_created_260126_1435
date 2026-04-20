@@ -148,7 +148,7 @@ export function ProjectCreateView(): React.ReactElement {
             </nav>
 
             {/* ── Page title + sub ───────────────────────────────── */}
-            <h1 className="pc2-page-title">Start a new project</h1>
+            <h1 className="pc2-page-title"><span className="pc2-title-dot" aria-hidden="true" />Start a new project</h1>
             <p className="pc2-page-sub">
                 A project begins as a short voice memo or free-text spec. Chase and Max draft
                 rev 0.1 of the Brief from what you say. You review before anything else happens.

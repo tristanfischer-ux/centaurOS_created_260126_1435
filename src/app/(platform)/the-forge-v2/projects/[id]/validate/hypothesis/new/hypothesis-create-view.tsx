@@ -133,7 +133,7 @@ export function HypothesisCreateView(props: HypothesisCreateViewProps): React.Re
             {/* ── Hero header ─────────────────────────── */}
             <div className="hc2-hero-head">
                 <div className="kicker">Net-new hypothesis · 3 fields</div>
-                <h1>New hypothesis</h1>
+                <h1><span className="hc2-title-dot" aria-hidden="true" />New hypothesis</h1>
                 <div className="sub">
                     Start a testable proposition. Three fields. Ten seconds of thought each.
                 </div>

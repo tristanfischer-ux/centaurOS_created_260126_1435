@@ -154,6 +154,7 @@ export function RiskCreateView(props: RiskCreateViewProps): React.ReactElement {
             <div className="rc2-page-header">
                 <div>
                     <h1>
+                        <span className="rc2-title-dot" aria-hidden="true" />
                         <svg
                             width="22"
                             height="22"

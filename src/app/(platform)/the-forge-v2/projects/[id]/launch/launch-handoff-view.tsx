@@ -119,7 +119,7 @@ export function LaunchHandoffView(props: LaunchHandoffViewProps): React.ReactEle
             </div>
 
             {/* ── Page header ────────────────────────────── */}
-            <h1 className="lh2-title">Ship {project.name} and hand off to Operations</h1>
+            <h1 className="lh2-title"><span className="lh2-title-dot" aria-hidden="true" />Ship {project.name} and hand off to Operations</h1>
             <p className="lh2-subtitle">
                 Launching moves the canonical surface from Forge to Operations. Build-time
                 concerns (BOM, Suppliers, Risks) become ops-time surfaces (BOM Watch,

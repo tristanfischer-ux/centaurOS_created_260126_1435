@@ -92,6 +92,16 @@
   letter-spacing: -0.02em;
   margin: 0 0 6px;
   color: var(--sh-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.sh2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--sh-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
 }
 .sh2-page-sub {
   font-size: 13px;

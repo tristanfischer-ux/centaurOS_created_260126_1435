@@ -155,7 +155,7 @@ export function InterviewCreateView(
 
             {/* ── Page header ─────────────────────────── */}
             <header className="ic2-page-head">
-                <h1>Log an interview</h1>
+                <h1><span className="ic2-title-dot" aria-hidden="true" />Log an interview</h1>
                 <p className="sub">
                     The atomic unit is the quote. One person. One quote. Tag it so Cal
                     can pull it into your synthesis ribbon and so investors see the

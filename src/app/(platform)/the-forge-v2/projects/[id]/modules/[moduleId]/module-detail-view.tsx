@@ -140,6 +140,7 @@ export function ModuleDetailView(props: ModuleDetailViewProps): React.ReactEleme
             <div className="md2-page-header">
                 <div>
                     <h1>
+                        <span className="md2-title-dot" aria-hidden="true" />
                         {mod.moduleNum} · {mod.name}
                         {mod.revisionChip && (
                             <span className="md2-chip success solid" style={{ marginLeft: 6 }}>

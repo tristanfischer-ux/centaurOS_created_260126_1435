@@ -115,6 +115,16 @@
   font-weight: 800;
   letter-spacing: -0.025em;
   margin: 0 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.hc2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--hc-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
 }
 .hc2-hero-head .sub {
   font-size: 13.5px;

@@ -136,6 +136,7 @@ export function PartDetailView(props: PartDetailViewProps): React.ReactElement {
             <div className="pd2-page-header">
                 <div>
                     <h1>
+                        <span className="pd2-title-dot" aria-hidden="true" />
                         {part.displayName}
                         <span className="pd2-chip info solid" style={{ marginLeft: 6 }}>Ref pending</span>
                     </h1>
