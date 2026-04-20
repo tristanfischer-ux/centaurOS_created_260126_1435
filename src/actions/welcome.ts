@@ -92,3 +92,97 @@ export async function markCockpitTourComplete(): Promise<{ success: boolean }> {
 
     return { success: true }
 }
+
+/**
+ * Allowed step IDs for the Money onboarding flow.
+ *
+ * INTENT: Each step of the 5-step Money onboarding (welcome → connect →
+ * first-plan → thesis → tour) flips its own flag on
+ * `profiles.onboarding_data` under a `money_<step>_completed_at` ISO
+ * timestamp. Keeps the progress visible per-step so we can build a
+ * sidebar progress widget later without a schema change.
+ */
+export type MoneyOnboardingStepId =
+    | "welcome"
+    | "connect"
+    | "first_plan"
+    | "thesis"
+    | "tour"
+
+const MONEY_STEP_IDS: ReadonlyArray<MoneyOnboardingStepId> = [
+    "welcome",
+    "connect",
+    "first_plan",
+    "thesis",
+    "tour",
+]
+
+/**
+ * Marks a Money onboarding step complete by merging
+ * `money_<step>_completed_at: <ISO>` and
+ * `money_<step>_complete: true` into `profiles.onboarding_data`.
+ *
+ * INTENT: Mirrors `markWelcomeComplete` / `markCockpitTourComplete` — same
+ * JSONB column, no new columns. When the Money schema lands,
+ * `money_settings.onboarding_progress` will carry the foundry-level
+ * summary; until then the per-user flags here are the single source of
+ * truth for "has this founder seen this step".
+ *
+ * Valid step IDs: welcome, connect, first_plan, thesis, tour.
+ *
+ * @security Uses the RLS-scoped client (not admin). Users can only
+ * mutate their own profile per the canonical UPDATE policy.
+ */
+export async function markMoneyOnboardingStepComplete(
+    stepId: MoneyOnboardingStepId,
+): Promise<{ success: boolean }> {
+    if (!MONEY_STEP_IDS.includes(stepId)) {
+        console.error("[money-onboarding] Unknown step id:", stepId)
+        return { success: false }
+    }
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false }
+
+    const { data: profile, error: readError } = await supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", user.id)
+        .single()
+
+    if (readError) {
+        console.error(
+            "[money-onboarding] Failed to read profile onboarding_data:",
+            readError.message,
+        )
+        return { success: false }
+    }
+
+    // NOTE: We cast through a Record type so TS can spread `existing`, then
+    // pass the object back to Supabase. The profiles.onboarding_data column
+    // is a JSONB; every value we set here is a JSON-safe primitive.
+    const existing = (profile?.onboarding_data as Record<string, unknown> | null) ?? {}
+    const nowIso = new Date().toISOString()
+    const updated = {
+        ...existing,
+        [`money_${stepId}_complete`]: true,
+        [`money_${stepId}_completed_at`]: nowIso,
+    } as Record<string, unknown>
+
+    const { error: updateError } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- onboarding_data is JSONB; the Json type from generated types is awkward to satisfy for a spread object
+        .update({ onboarding_data: updated as any })
+        .eq("id", user.id)
+
+    if (updateError) {
+        console.error(
+            "[money-onboarding] Failed to mark step complete:",
+            updateError.message,
+        )
+        return { success: false }
+    }
+
+    return { success: true }
+}
