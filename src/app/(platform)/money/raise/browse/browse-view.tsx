@@ -27,6 +27,8 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Search, Plus, Check, ExternalLink, X, Sparkles } from 'lucide-react'
 import { addInvestorToPipeline } from '@/actions/money-raise'
 import type { MatchBreakdown, RichInvestorFilters, ScoredListingRow } from '@/lib/money/match-types'
+import type { SubscriptionTier } from '@/lib/billing/plans'
+import { ExportMenu } from '@/app/(platform)/money/raise/_shared/export-menu'
 import {
   FilterPanel,
   buildBrowseQuery,
@@ -110,7 +112,7 @@ type BrowseViewProps = {
   alreadyInPipelineIds: string[]
   subcategories: readonly string[]
   /** Foundry subscription tier — drives the Explorer upgrade CTA + Pro badge. */
-  currentTier: string
+  currentTier: SubscriptionTier
   initial: InitialState
 }
 
@@ -569,6 +571,15 @@ export function BrowseInvestorsView({
               <SelectItem value="az">A–Z</SelectItem>
             </SelectContent>
           </Select>
+          <ExportMenu
+            kind="browse"
+            currentTier={currentTier}
+            context={{
+              query: initial.q,
+              filters: initial.filters,
+              includeMatchScore: hasActiveThesis,
+            }}
+          />
         </div>
       </header>
 

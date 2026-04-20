@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { scoreInvestorsAgainstThesis } from '@/actions/money-raise'
+import { getInvestorTierAccess } from '@/actions/investors'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Sparkles } from 'lucide-react'
@@ -9,7 +10,10 @@ import { ForYouView } from './for-you-view'
 export const dynamic = 'force-dynamic'
 
 export default async function ForYouPage() {
-  const result = await scoreInvestorsAgainstThesis({ limit: 50 })
+  const [result, tierAccess] = await Promise.all([
+    scoreInvestorsAgainstThesis({ limit: 50 }),
+    getInvestorTierAccess(),
+  ])
 
   if ('error' in result) {
     if (result.error === 'no_active_thesis') {
@@ -68,6 +72,7 @@ export default async function ForYouPage() {
       scored={result.scored}
       thesisId={result.thesis_id}
       alreadyInPipelineIds={alreadyInPipelineIds}
+      currentTier={tierAccess.tier}
     />
   )
 }

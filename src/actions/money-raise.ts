@@ -23,6 +23,7 @@ import type {
 } from '@/lib/money/match-types'
 import { searchMarketplaceListingsSemantic } from '@/lib/search/semantic-search'
 import { sanitizeFilterValue } from '@/lib/security/sanitize-filter'
+import { getInvestorTierAccess } from '@/actions/investors'
 
 export type RaiseRound = {
   id: string
@@ -1203,5 +1204,303 @@ export async function listInvestorContactsByFirm(firmId: string): Promise<
       seniority: c.seniority,
     }))
     return { success: true as const, contacts }
+  })
+}
+
+// ============================================================================
+// CSV Exports — browse / matched / pipeline
+// ============================================================================
+
+/**
+ * RFC 4180 CSV field escape. Wraps values containing commas / quotes / newlines
+ * in double quotes and doubles internal quotes. Also neutralises formula
+ * injection (leading =, +, -, @, tab, CR, LF) by prefixing a single quote so
+ * Excel / Sheets do not evaluate the cell.
+ */
+function csvField(value: unknown): string {
+  let s =
+    value == null
+      ? ''
+      : typeof value === 'string'
+        ? value
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : String(value)
+  if (/^[=+\-@\t\r\n]/.test(s)) {
+    s = "'" + s
+  }
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function csvRow(fields: unknown[]): string {
+  return fields.map(csvField).join(',')
+}
+
+function truncateThesis(value: string | null | undefined, max = 300): string {
+  if (!value) return ''
+  const flat = value.replace(/\s+/g, ' ').trim()
+  if (flat.length <= max) return flat
+  return flat.slice(0, max - 1) + '…'
+}
+
+function exportTimestampSlug(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`
+}
+
+const EXPORT_INVESTOR_HEADERS = [
+  'Firm name',
+  'Subcategory',
+  'Country',
+  'Stage focus',
+  'Sectors',
+  'Min cheque (GBP)',
+  'Max cheque (GBP)',
+  'Fund type',
+  'Investment thesis',
+  'Website',
+  'Last enriched',
+] as const
+
+const EXPORT_PIPELINE_HEADERS = [
+  'Firm name',
+  'Subcategory',
+  'Country',
+  'Current stage',
+  'Last touch type',
+  'Last touch at',
+  'Match score',
+  'Notes summary',
+] as const
+
+const PIPELINE_STAGE_LABEL: Record<PipelineRow['current_stage'], string> = {
+  target: 'Target',
+  researching: 'Researching',
+  contacted: 'Contacted',
+  meeting: 'Meeting',
+  due_diligence: 'Due diligence',
+  verbal: 'Verbal',
+  closed: 'Closed',
+  passed: 'Passed',
+}
+
+function listingToInvestorRow(
+  row: ScoredListingRow,
+  matchScore: number | null,
+  includeMatchScore: boolean,
+): unknown[] {
+  const h = row.highlights
+  const cheque = h.cheque_range_gbp
+  const base = [
+    row.title ?? '',
+    row.subcategory ?? '',
+    row.country_iso ?? row.country ?? '',
+    (h.stage_focus ?? []).join('; '),
+    (h.sectors ?? []).join('; '),
+    cheque?.min != null ? cheque.min : '',
+    cheque?.max != null ? cheque.max : '',
+    h.firm_type ?? '',
+    truncateThesis(h.investment_thesis),
+    row.website_url ?? '',
+    row.last_enriched_at ?? '',
+  ]
+  if (includeMatchScore) base.push(matchScore != null ? matchScore : '')
+  return base
+}
+
+/**
+ * CSV export of a filtered browse result set. Uses the same
+ * searchInvestorsSemantic path as /money/raise/browse so exports reflect
+ * exactly what the user sees. Starter+ tier only.
+ */
+export async function exportInvestorsCsv(args: {
+  query?: string
+  filters?: RichInvestorFilters
+  limit?: number
+  includeMatchScore?: boolean
+}): Promise<{ error: string } | { success: true; filename: string; csv: string }> {
+  return withAuth(async () => {
+    const access = await getInvestorTierAccess()
+    if (!access.detailAccess) {
+      return { error: 'tier_upgrade_required' }
+    }
+
+    const limit = Math.min(Math.max(args.limit ?? 500, 1), 500)
+    const includeMatchScore = !!args.includeMatchScore
+
+    const search = await searchInvestorsSemantic({
+      query: args.query,
+      filters: args.filters,
+      limit,
+      offset: 0,
+    })
+    if ('error' in search) return { error: search.error }
+
+    let scoresByListingId: Record<string, number> = {}
+    if (includeMatchScore) {
+      const scored = await scoreInvestorsAgainstThesis({
+        limit: 500,
+        filters: args.filters,
+      })
+      if (!('error' in scored)) {
+        for (const s of scored.scored) {
+          scoresByListingId[s.listing.id] = s.breakdown.total
+        }
+      } else if (scored.error !== 'no_active_thesis') {
+        // Missing thesis is expected + recoverable — just skip the column data.
+        // Any other error means scoring infra is broken; surface it.
+        return { error: scored.error }
+      }
+    }
+
+    const headers = includeMatchScore
+      ? [...EXPORT_INVESTOR_HEADERS, 'Match score']
+      : [...EXPORT_INVESTOR_HEADERS]
+
+    const lines: string[] = [csvRow(headers)]
+    for (const row of search.results) {
+      const score = scoresByListingId[row.id] ?? null
+      lines.push(csvRow(listingToInvestorRow(row, score, includeMatchScore)))
+    }
+
+    // UTF-8 BOM so Excel detects the encoding correctly on Windows.
+    const csv = '\uFEFF' + lines.join('\r\n')
+    const filename = `investors-${exportTimestampSlug()}.csv`
+    return { success: true as const, filename, csv }
+  })
+}
+
+/**
+ * CSV export of the top-N thesis-matched investors. Requires an active thesis
+ * and Starter+ tier.
+ */
+export async function exportMatchedCsv(args: {
+  limit?: number
+}): Promise<{ error: string } | { success: true; filename: string; csv: string }> {
+  return withAuth(async () => {
+    const access = await getInvestorTierAccess()
+    if (!access.detailAccess) {
+      return { error: 'tier_upgrade_required' }
+    }
+
+    const limit = Math.min(Math.max(args.limit ?? 100, 1), 500)
+    const scored = await scoreInvestorsAgainstThesis({ limit })
+    if ('error' in scored) return { error: scored.error }
+
+    const headers = [...EXPORT_INVESTOR_HEADERS, 'Match score']
+    const lines: string[] = [csvRow(headers)]
+    for (const s of scored.scored) {
+      lines.push(csvRow(listingToInvestorRow(s.listing, s.breakdown.total, true)))
+    }
+
+    const csv = '\uFEFF' + lines.join('\r\n')
+    const filename = `investors-matched-${exportTimestampSlug()}.csv`
+    return { success: true as const, filename, csv }
+  })
+}
+
+/**
+ * CSV export of the caller's own pipeline — all stages, non-archived. Free
+ * tier is allowed because the pipeline is the founder's own data.
+ */
+export async function exportPipelineCsv(): Promise<
+  { error: string } | { success: true; filename: string; csv: string }
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // Pull pipeline rows (full foundry scope — no round filter, all stages
+    // including passed so founders can export the complete history).
+    const { data: pipelineRows, error } = await supabase
+      .from('investor_pipeline_state')
+      .select(
+        'id, marketplace_listing_id, current_stage, match_score_cached',
+      )
+      .eq('foundry_id', foundryId)
+      .is('archived_at', null)
+      .order('stage_entered_at', { ascending: false })
+    if (error) return { error: error.message }
+
+    const rows = pipelineRows ?? []
+    const listingIds = Array.from(
+      new Set(
+        rows
+          .map((r) => r.marketplace_listing_id)
+          .filter((v): v is string => !!v),
+      ),
+    )
+    const stateIds = rows.map((r) => r.id)
+
+    type FirmFacts = { title: string | null; subcategory: string | null; country: string | null; country_iso: string | null }
+    const firmById = new Map<string, FirmFacts>()
+    if (listingIds.length > 0) {
+      const { data: firms } = await supabase
+        .from('marketplace_listings')
+        .select('id, title, subcategory, country, country_iso')
+        .in('id', listingIds)
+      for (const f of firms ?? []) {
+        firmById.set(f.id, {
+          title: f.title,
+          subcategory: f.subcategory,
+          country: f.country,
+          country_iso: f.country_iso,
+        })
+      }
+    }
+
+    // Latest touch (touch_logged) + latest free-text note per pipeline row.
+    type LastTouch = { type: string; at: string }
+    const lastTouchByState = new Map<string, LastTouch>()
+    const notesByState = new Map<string, string>()
+    if (stateIds.length > 0) {
+      const { data: events } = await supabase
+        .from('investor_pipeline_events')
+        .select('pipeline_state_id, event_type, payload, created_at')
+        .in('pipeline_state_id', stateIds)
+        .eq('foundry_id', foundryId)
+        .order('created_at', { ascending: false })
+      for (const e of events ?? []) {
+        if (e.event_type === 'touch_logged' && !lastTouchByState.has(e.pipeline_state_id)) {
+          const payload = asJsonObject(e.payload)
+          const type = typeof payload.type === 'string' ? payload.type : 'touch'
+          const at = typeof payload.date === 'string' ? payload.date : e.created_at
+          lastTouchByState.set(e.pipeline_state_id, { type, at })
+        }
+        if (e.event_type === 'note' && !notesByState.has(e.pipeline_state_id)) {
+          const payload = asJsonObject(e.payload)
+          const body = typeof payload.notes === 'string'
+            ? payload.notes
+            : typeof payload.body === 'string'
+              ? payload.body
+              : ''
+          if (body) notesByState.set(e.pipeline_state_id, truncateThesis(body))
+        }
+      }
+    }
+
+    const lines: string[] = [csvRow([...EXPORT_PIPELINE_HEADERS])]
+    for (const r of rows) {
+      const firm = r.marketplace_listing_id ? firmById.get(r.marketplace_listing_id) : undefined
+      const lastTouch = lastTouchByState.get(r.id)
+      const stage = r.current_stage as PipelineRow['current_stage']
+      lines.push(
+        csvRow([
+          firm?.title ?? '',
+          firm?.subcategory ?? '',
+          firm?.country_iso ?? firm?.country ?? '',
+          PIPELINE_STAGE_LABEL[stage] ?? stage,
+          lastTouch?.type ?? '',
+          lastTouch?.at ?? '',
+          r.match_score_cached ?? '',
+          notesByState.get(r.id) ?? '',
+        ]),
+      )
+    }
+
+    const csv = '\uFEFF' + lines.join('\r\n')
+    const filename = `pipeline-${exportTimestampSlug()}.csv`
+    return { success: true as const, filename, csv }
   })
 }

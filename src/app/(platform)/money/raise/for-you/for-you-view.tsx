@@ -17,6 +17,8 @@ import {
 import { Search, Plus, Check, ExternalLink } from 'lucide-react'
 import { addInvestorToPipeline } from '@/actions/money-raise'
 import type { MatchBreakdown, ScoredListingRow } from '@/lib/money/match-types'
+import type { SubscriptionTier } from '@/lib/billing/plans'
+import { ExportMenu } from '@/app/(platform)/money/raise/_shared/export-menu'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -323,10 +325,12 @@ export function ForYouView({
   scored,
   thesisId,
   alreadyInPipelineIds,
+  currentTier,
 }: {
   scored: ScoredItem[]
   thesisId: string
   alreadyInPipelineIds: string[]
+  currentTier: SubscriptionTier
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -456,6 +460,7 @@ export function ForYouView({
               ))}
             </SelectContent>
           </Select>
+          <ExportMenu kind="matched" currentTier={currentTier} />
         </div>
       </header>
 

@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { CircleDot, Plus, Search } from 'lucide-react'
 import type { RaiseData, PipelineRow, PipelineRowWithFirm } from '@/actions/money-raise'
+import type { SubscriptionTier } from '@/lib/billing/plans'
+import { ExportMenu } from '@/app/(platform)/money/raise/_shared/export-menu'
 
 const STAGE_ORDER: Array<PipelineRow['current_stage']> = [
   'target',
@@ -38,7 +40,13 @@ function formatCurrency(cents: number, currency: string): string {
   }).format(cents / 100)
 }
 
-export function RaiseView({ data }: { data: RaiseData }) {
+export function RaiseView({
+  data,
+  currentTier,
+}: {
+  data: RaiseData
+  currentTier: SubscriptionTier
+}) {
   if (!data.activeRound && data.roundCount === 0) {
     return (
       <div className="space-y-6">
