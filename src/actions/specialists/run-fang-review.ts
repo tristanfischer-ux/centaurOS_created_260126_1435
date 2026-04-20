@@ -250,18 +250,54 @@ export async function runFangReview(
                 }
             }
 
-            // 7. requestSpecialistReview already persists via the upsert RPC
-            //    (with a non-fatal log on failure). Re-read the project to
-            //    confirm the review landed before marking the run 'done' —
-            //    otherwise a silent RPC failure would leave the chip green
-            //    on a still-empty tile. If the read shows no Fang row we
-            //    fail the pipeline_run honestly.
+            // 7. Persist the review directly via the admin client.
+            //
+            // GOTCHA: `requestSpecialistReview` also attempts persistence via
+            // the `upsert_cad_lab_review` RPC, but that RPC declares
+            // `p_foundry_id UUID` while `foundries.id` is `TEXT`. Postgres
+            // rejects every call with "invalid input syntax for type uuid"
+            // (confirmed in prod logs 2026-04-20 — see MEMORY.md §Gotchas).
+            // The inner action swallows the error as non-fatal and returns
+            // `{ review }` as if everything worked, which is why the module
+            // detail page stays blank.
+            //
+            // DECISION: do the merge ourselves using the admin client (RLS
+            // already cleared by the foundry check at step 1). Preserves any
+            // prior reviews for the module (including from other specialists)
+            // and replaces the previous Fang review on re-run so history
+            // doesn't bloat into N copies. Fixing the shared RPC would be
+            // cleaner but requires a migration and belongs in Wave 1c's
+            // canonical path — this orchestrator-scoped fix unblocks Fang
+            // now without touching the shared save path.
+            const saveOk = await saveFangReviewDirect(
+                projectId,
+                moduleId,
+                foundryId,
+                reviewResult.review,
+            )
+            if (!saveOk) {
+                await failPipelineRun(
+                    runId,
+                    "SAVE_FAILED",
+                    "Fang produced a review but it couldn't be persisted — check Postgres logs.",
+                )
+                return {
+                    ok: false,
+                    runId,
+                    error: "Fang's review couldn't be saved — try again in a moment.",
+                    errorCode: "SAVE_FAILED",
+                }
+            }
+
+            // Paranoid read-back — ensures the JSONB merge actually landed
+            // before the chip flips green. Defends against any future shape
+            // mismatch slipping past the write.
             const persisted = await loadFangReviewForModule(projectId, moduleId, foundryId)
             if (!persisted) {
                 await failPipelineRun(
                     runId,
                     "SAVE_FAILED",
-                    "Fang produced a review but it couldn't be persisted — check Postgres logs.",
+                    "Fang review merged but read-back returned nothing — check Postgres logs.",
                 )
                 return {
                     ok: false,
@@ -488,6 +524,78 @@ function extractDesignBrief(
 function extractDiagnosticAnswers(raw: unknown): DiagnosticAnswers | null {
     if (!raw || typeof raw !== "object") return null
     return raw as DiagnosticAnswers
+}
+
+/**
+ * Persists a Fang review into `cad_lab_projects.reviews[moduleId]` via the
+ * admin client, merging with any prior reviews on the same module.
+ *
+ * @description Replaces any existing `vp-manufacturing` entry for this
+ * module (so re-runs don't duplicate) while preserving reviews from other
+ * specialists. Writes the production `SpecialistReview` shape that the
+ * Module detail page consumes — `specialistId` / `verdict` / `issues` /
+ * `recommendations` — NOT the legacy seeded shape.
+ *
+ * GOTCHA: Intentionally side-steps `upsert_cad_lab_review` — that RPC has a
+ * UUID-vs-TEXT foundry_id signature bug. See the comment at the call site
+ * in `runFangReview` for the full story. If the RPC is ever fixed this
+ * function can collapse into a single `rpc(...)` call again.
+ *
+ * Returns `true` on successful merge + update, `false` on any failure
+ * (caller fails the pipeline run with SAVE_FAILED).
+ */
+async function saveFangReviewDirect(
+    projectId: string,
+    moduleId: string,
+    foundryId: string,
+    review: SpecialistReview,
+): Promise<boolean> {
+    const admin = createAdminClient()
+
+    // Read-modify-write. Safe for this orchestrator because Fang runs are
+    // serialised by the pipeline_run row per (project, module). Two Fang
+    // reviews on the same module can't overlap; reviews by other
+    // specialists write to a different array index in the JSONB object so
+    // they don't conflict at the module-key level, only at the row level
+    // where Postgres' MVCC handles the last-write-wins ordering fine for
+    // our append/replace pattern. A truly atomic server-side merge would
+    // require fixing the shared RPC — tracked for Wave 1c.
+    const { data: row, error: readErr } = await admin
+        .from("cad_lab_projects")
+        .select("reviews")
+        .eq("id", projectId)
+        .eq("foundry_id", foundryId)
+        .maybeSingle()
+
+    if (readErr || !row) {
+        console.error(
+            "[run-fang-review] saveFangReviewDirect: pre-read failed:",
+            readErr?.message ?? "no row",
+        )
+        return false
+    }
+
+    const existingReviews = (row.reviews as Record<string, SpecialistReview[]> | null) ?? {}
+    const forModule = existingReviews[moduleId] ?? []
+    const withoutOldFang = forModule.filter((r) => r.specialistId !== SPECIALIST_ID)
+    const mergedForModule = [...withoutOldFang, review]
+    const nextReviews = { ...existingReviews, [moduleId]: mergedForModule }
+
+    const { error: writeErr } = await admin
+        .from("cad_lab_projects")
+        .update({ reviews: nextReviews as unknown as Database["public"]["Tables"]["cad_lab_projects"]["Row"]["reviews"] })
+        .eq("id", projectId)
+        .eq("foundry_id", foundryId)
+
+    if (writeErr) {
+        console.error(
+            "[run-fang-review] saveFangReviewDirect: update failed:",
+            writeErr.message,
+        )
+        return false
+    }
+
+    return true
 }
 
 /**
