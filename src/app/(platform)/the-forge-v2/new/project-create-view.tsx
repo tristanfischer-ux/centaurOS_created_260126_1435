@@ -180,14 +180,31 @@ export function ProjectCreateView(): React.ReactElement {
         const brief = form.subject.trim()
 
         startTransition(async () => {
-            const result = await createCadLabProject(brief)
+            // INTENT: wrap the server-action await in try/catch. The action
+            // itself is defensive (returns `{ error }` on known failure
+            // paths) but a thrown error — Next.js Flight decode error,
+            // network drop, serverless container termination, Vercel 500 —
+            // would otherwise bubble up into the transition and be silently
+            // swallowed. Founders saw the click register, no redirect, no
+            // error, no DB row. Fix: surface thrown errors to the UI via
+            // `submitError` exactly like returned `{ error }` payloads.
+            try {
+                const result = await createCadLabProject(brief)
 
-            if ("error" in result) {
-                setSubmitError(result.error)
-                return
+                if ("error" in result) {
+                    setSubmitError(result.error)
+                    return
+                }
+
+                router.push(`/the-forge-v2/projects/${result.projectId}`)
+            } catch (err) {
+                const message =
+                    err instanceof Error && err.message
+                        ? err.message
+                        : "Something broke while creating the project. Try once more — if it happens again, tell us what you typed."
+                console.error("[ProjectCreateView] createCadLabProject threw:", err)
+                setSubmitError(message)
             }
-
-            router.push(`/the-forge-v2/projects/${result.projectId}`)
         })
     }
 

@@ -13,6 +13,8 @@
  * @audit Project mutations are tracked via updated_at timestamps.
  */
 
+import { after } from "next/server"
+
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
@@ -392,17 +394,35 @@ export async function createCadLabProject(
       subject: subject.slice(0, 50),
     })
 
-    // Wave 1d: auto-fire Chase research on project creation. Fire-and-forget —
-    // any failure surfaces on Chase's pipeline_run row, not here. Dynamic
-    // import avoids a circular "use server" module-init cycle between
-    // cad-lab-projects.ts and run-chase-research.ts (Chase imports
-    // saveCadLabResearch from this file).
-    import("@/actions/specialists/run-chase-research").then(({ runChaseResearch }) =>
-      runChaseResearch(data.id, "auto.project-create").catch((err) => {
-        console.error("[createCadLabProject] auto-trigger Chase failed:", err)
-      }),
-    ).catch((err) => {
-      console.error("[createCadLabProject] Chase import failed:", err)
+    // INTENT: auto-fire Chase research on project creation so Brief rev 0.1
+    // starts drafting the instant the project row lands. Uses Next.js
+    // `after()` so the work is properly tracked by the serverless lifecycle
+    // and does NOT run inside the response-critical path — the client gets
+    // `{ projectId }` immediately and redirects, Chase begins in parallel.
+    //
+    // TRIED: plain `import("...").then(...)` fire-and-forget. Problem:
+    // unawaited dynamic imports in a server action have raced the serverless
+    // container's termination — the project row lands, but the Chase
+    // orchestrator never starts (the import resolves AFTER the function
+    // returns and the container tears down). Evidence: project 8c3e08f0
+    // (2026-04-20 21:38:31) created successfully but pipeline_runs was
+    // empty. `after()` is the supported mechanism for post-response work.
+    //
+    // FLOW: dynamic import is still required — `run-chase-research.ts`
+    // imports `saveCadLabResearch` from this file, so a top-level import
+    // here would create a circular "use server" module-init cycle.
+    after(async () => {
+      try {
+        const { runChaseResearch } = await import(
+          "@/actions/specialists/run-chase-research"
+        )
+        await runChaseResearch(data.id, "auto.project-create")
+      } catch (err) {
+        console.error("[createCadLabProject] Chase auto-trigger failed:", {
+          projectId: data.id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
     })
 
     return { projectId: data.id }
