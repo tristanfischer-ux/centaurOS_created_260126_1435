@@ -150,7 +150,7 @@ export function OperationsView(props: OperationsViewProps): React.ReactElement {
                 <p>
                     No price, lead-time or compliance movers surfaced yet. The movers feed
                     populates once BOM parts are shortlisted against suppliers and price-drift
-                    tracking is enabled.
+                    tracking is enabled — nothing is inferred from module-level lead-times alone.
                 </p>
             </div>
 
