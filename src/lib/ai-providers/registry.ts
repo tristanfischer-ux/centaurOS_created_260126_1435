@@ -626,6 +626,25 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
 // ─── DeepSeek Text Streaming (OpenAI-compatible) ─────────────────────
 
 /**
+ * DeepSeek API hard cap on max_tokens.
+ *
+ * GOTCHA: DeepSeek's chat completions endpoint rejects requests with
+ * `max_tokens > 8192` with HTTP 400 `Invalid max_tokens value, the valid
+ * range of max_tokens is [1, 8192]`. The rest of the stack (specialists,
+ * brief dialog) asks for 16384 (normal) or 32768 (deep-think), which would
+ * fire this error instantly, surface as "Stream interrupted" via
+ * classifyStreamError, and render as "Max lost connection mid-response."
+ * in the Ask chat. Every DeepSeek-tier specialist (Max, Jian, Fang, Priya)
+ * was silently dead on their first message because of this.
+ *
+ * Clamp here rather than at callsites so the provider owns its own limits
+ * and no caller can violate the contract.
+ *
+ * @see https://api-docs.deepseek.com/api/create-chat-completion
+ */
+const DEEPSEEK_MAX_TOKENS_CAP = 8192
+
+/**
  * Streams text from DeepSeek via their OpenAI-compatible endpoint.
  * DeepSeek V4 and R1 use the same chat completions API at
  * `https://api.deepseek.com`.
@@ -641,12 +660,23 @@ async function streamDeepSeek(opts: StreamingTextOptions): Promise<void> {
 
     const messages = buildMessages(opts)
 
+    // Clamp to DeepSeek's hard cap — see DEEPSEEK_MAX_TOKENS_CAP comment above.
+    const requestedMaxTokens = opts.maxTokens ?? 4096
+    const clampedMaxTokens = Math.min(requestedMaxTokens, DEEPSEEK_MAX_TOKENS_CAP)
+    if (clampedMaxTokens < requestedMaxTokens) {
+        console.warn("[streamDeepSeek] max_tokens clamped:", {
+            requested: requestedMaxTokens,
+            clamped: clampedMaxTokens,
+            reason: "DeepSeek API hard cap of 8192",
+        })
+    }
+
     try {
         const stream = await client.chat.completions.create({
             model: opts.modelId,
             messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
             stream: true,
-            max_tokens: opts.maxTokens ?? 4096,
+            max_tokens: clampedMaxTokens,
         })
 
         for await (const chunk of stream) {
