@@ -170,6 +170,14 @@ export function ExportView(props: ExportViewProps): React.ReactElement {
                 artefact tree is locked.
             </div>
 
+            {/* Beta honesty chip — download links run a dry run today. */}
+            <div className="ex2-beta-chip" role="note">
+                <span className="ex2-beta-chip__tag">Beta</span>
+                <span className="ex2-beta-chip__body">
+                    Download links run a dry run today; wire-up ships next round.
+                </span>
+            </div>
+
             {/* ── Main grid ───────────────────────────── */}
             <div className="ex2-grid">
                 {/* ── Left column ─────────────────────── */}
@@ -309,6 +317,21 @@ export function ExportView(props: ExportViewProps): React.ReactElement {
 
                 {/* ── Right column ────────────────────── */}
                 <div className="ex2-col">
+                    {/* How this works — explainer */}
+                    <div className="ex2-card ex2-how">
+                        <div className="ex2-card-head">
+                            <h3>How this works</h3>
+                        </div>
+                        <ul className="ex2-how__list">
+                            <li>Download the locked revision as a PDF pack, a CSV BOM, or a zipped CAD bundle — good for investor updates, supplier packs, or board packs.</li>
+                            <li>Exports pin to whichever revision is locked today. Older revisions are exportable individually from Revisions.</li>
+                            <li>Files are generated on demand — the download is a snapshot, not a live link.</li>
+                        </ul>
+                        <div className="ex2-how__foot">
+                            Questions → <Link href="/the-forge/ask">/the-forge/ask</Link> — ask a specialist
+                        </div>
+                    </div>
+
                     {/* History card */}
                     <div className="ex2-card">
                         <div className="ex2-card-head">

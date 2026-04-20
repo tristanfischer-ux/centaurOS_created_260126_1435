@@ -141,6 +141,19 @@ export function RevisionsView(props: RevisionsViewProps): React.ReactElement {
                 against it.
             </div>
 
+            {/* ── How this works ──────────────────────── */}
+            <div className="rv2-how">
+                <div className="rv2-how__head">How this works</div>
+                <ul className="rv2-how__list">
+                    <li>Create a new revision when your brief, BOM, or cost changes materially — say, after a supplier quote swap or a scope cut.</li>
+                    <li>Each revision is a named snapshot (Rev A / B / C…). Old revisions stay readable. You can compare any two side by side.</li>
+                    <li>Lock Rev N to send it to Forge — suppliers, specialists, and manufacturing plan all pin to the locked revision.</li>
+                </ul>
+                <div className="rv2-how__foot">
+                    Questions → <Link href="/the-forge/ask">/the-forge/ask</Link> — ask a specialist
+                </div>
+            </div>
+
             {/* ── Dark header card ────────────────────── */}
             <div className="rv2-header-card">
                 <h1>{project.name}</h1>

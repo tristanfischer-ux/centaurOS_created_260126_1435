@@ -223,6 +223,17 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
                 </div>
 
                 <div className="b2-sidebar-stack">
+                    <div className="b2-sb-card b2-how">
+                        <h4 className="b2-how__head">How this works</h4>
+                        <ul className="b2-how__list">
+                            <li>The brief captures your target buyer, use case, constraints, and success criteria. Specialists ground everything else on this.</li>
+                            <li>Edit freely while Rev {revisionLetter} is unlocked. Locking freezes the brief so your BOM / cost / supplier plan line up with one source of truth.</li>
+                            <li>Lock is reversible via a new revision — nothing is destroyed.</li>
+                        </ul>
+                        <div className="b2-how__foot">
+                            Questions → <Link href="/the-forge/ask">/the-forge/ask</Link> — ask a specialist
+                        </div>
+                    </div>
                     <RegulatoryPostureCard standards={regulatory} forkHref={forkHref} />
                     <AllInCostCard
                         totalUnitCostGbp={cost.totalUnitCostGbp}

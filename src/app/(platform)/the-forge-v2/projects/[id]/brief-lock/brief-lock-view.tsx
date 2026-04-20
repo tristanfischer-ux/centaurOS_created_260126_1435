@@ -374,6 +374,18 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
 
                 {/* ── Sidebar ─────────────────────────────────── */}
                 <div>
+                    <div className="bl2-side-card bl2-how">
+                        <h4>How this works</h4>
+                        <ul className="bl2-how__list">
+                            <li>Locking creates an immutable snapshot of the brief, BOM, cost ceiling, and module list for this revision.</li>
+                            <li>After lock, Forge uses the snapshot for supplier shortlists, RFQs, and manufacturing readiness — nothing shifts under them.</li>
+                            <li>To change anything, create a new revision (Rev {currentLetter} → Rev {nextLetter}). The old lock stays as the record of what you approved.</li>
+                        </ul>
+                        <div className="bl2-how__foot">
+                            Questions → <Link href="/the-forge/ask">/the-forge/ask</Link> — ask a specialist
+                        </div>
+                    </div>
+
                     <div className="bl2-side-card">
                         <h4>Why this is irreversible</h4>
                         <p>
