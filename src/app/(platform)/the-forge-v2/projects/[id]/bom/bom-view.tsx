@@ -133,6 +133,132 @@ export function BomView(props: BomViewProps): React.ReactElement {
 
     const base = `/the-forge-v2/projects/${project.id}`
     const allPartsEmpty = header.totalParts === 0
+    // ── Empty-state branch ──────────────────────────────────────
+    // Render the mockup-faithful empty state when this project has no
+    // modules declared OR no parts identified in any module yet. Porting
+    // FORGE-MOCKUP-EMPTY-BOM.html 1:1 — summary tiles visible at zero,
+    // hero CTA group, skeleton preview rows, and the "activates once
+    // you add parts" right rail.
+    const isEmpty = categories.length === 0 || header.totalParts === 0
+
+    if (isEmpty) {
+        return (
+            <div className="bm2 bm2-empty">
+                {/* ── Breadcrumb ──────────────────────────── */}
+                <div className="bm2-breadcrumb">
+                    <Link href="/the-forge-v2">Forge</Link>
+                    <span className="sep">›</span>
+                    <Link href={base}>{project.name}</Link>
+                    <span className="sep">›</span>
+                    <span className="current">BOM</span>
+                </div>
+
+                {/* ── Page header ─────────────────────────── */}
+                <div className="bm2-empty-h">
+                    <h1>
+                        <span className="bm2-title-dot" aria-hidden="true" />
+                        Bill of materials
+                        <span className="bm2-empty-pill">0 parts · draft</span>
+                    </h1>
+                    <div className="bm2-empty-sub">
+                        Rev {designRevisionToLetter(project.designRevision)} · {project.name} · add your first line to start the live cost roll-up.
+                    </div>
+                </div>
+
+                {/* ── Summary cards (all zero) ────────────── */}
+                <div className="bm2-empty-summary">
+                    <div className="bm2-empty-card">
+                        <div className="k">Parts</div>
+                        <div className="v">0</div>
+                        <div className="detail">No lines added</div>
+                    </div>
+                    <div className="bm2-empty-card">
+                        <div className="k">Cost at this BOM</div>
+                        <div className="v">£0</div>
+                        <div className="detail">
+                            {unitCostCeilingGbp != null ? `Ceiling ${formatGbp(unitCostCeilingGbp)}` : "Ceiling not set"}
+                        </div>
+                    </div>
+                    <div className="bm2-empty-card">
+                        <div className="k">Suppliers</div>
+                        <div className="v">0</div>
+                        <div className="detail">None shortlisted</div>
+                    </div>
+                    <div className="bm2-empty-card">
+                        <div className="k">Issues</div>
+                        <div className="v">0</div>
+                        <div className="detail">DFM checks pending</div>
+                    </div>
+                </div>
+
+                <div className="bm2-empty-grid">
+                    {/* Hero empty state */}
+                    <div className="bm2-empty-hero">
+                        <div className="bm2-empty-icon" aria-hidden="true">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                <line x1="12" y1="22.08" x2="12" y2="12" />
+                            </svg>
+                        </div>
+                        <h2>Add your first BOM line</h2>
+                        <p>
+                            Every part, material, fastener, and off-the-shelf component goes here. Once lines exist, the cost
+                            waterfall activates, supplier shortlists populate, and DFM checks start running.
+                        </p>
+                        <div className="bm2-empty-ctas">
+                            <Link href={`${base}/geometry/upload`} className="bm2-btn primary">Upload your CAD</Link>
+                            <span className="bm2-btn soon" title="Ships with the parts-spec table">+ Add your first line</span>
+                            <span className="bm2-btn soon" title="Ships with the parts-spec table">Import from CSV</span>
+                            <span className="bm2-btn soon" title="Onshape sync ships in a future round">Sync from Onshape</span>
+                            <span className="bm2-btn soon" title="Solidworks sync ships in a future round">Sync from Solidworks</span>
+                        </div>
+
+                        <div className="bm2-empty-skeleton">
+                            <div className="sk-label">What the table will look like</div>
+                            {[0, 1, 2].map((i) => (
+                                <div className="sk-row" key={`sk-${i}`}>
+                                    <div className="bar short" />
+                                    <div className="bar" />
+                                    <div className="bar narrow" />
+                                    <div className="bar narrow" />
+                                    <div className="bar short" />
+                                    <div className="bar short" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Right rail */}
+                    <div className="bm2-empty-rail">
+                        <h3>Activates once you add parts</h3>
+
+                        <div className="rail-item">
+                            <span className="rk">Cost tracking</span>
+                            Live unit-cost roll-up. Every line contributes to the total; changes ripple instantly.
+                        </div>
+                        <div className="rail-item">
+                            <span className="rk">Supplier shortlists</span>
+                            Suggested suppliers scored against your BOM — by material, by cert, by geography.
+                        </div>
+                        <div className="rail-item">
+                            <span className="rk">DFM signals</span>
+                            Design-for-manufacture flags. Tolerance, part-count, assembly sequence checks.
+                        </div>
+                        <div className="rail-item">
+                            <span className="rk">Cert cross-checks</span>
+                            Every supplier cert validated against registry data — catches expired certs before they bite.
+                        </div>
+                        <div className="rail-item">
+                            <span className="rk">Risk auto-surface</span>
+                            Single-source parts flagged. Long-lead items flagged. Obsolete parts flagged.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     const specProgressLabel = `${header.specdParts} of ${header.totalParts} spec'd`
     const chipTone = header.specdParts === 0 && header.totalParts > 0
         ? "neutral"
