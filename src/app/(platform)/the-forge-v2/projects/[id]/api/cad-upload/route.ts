@@ -1,8 +1,10 @@
 /**
  * @file route.ts — POST /the-forge-v2/projects/:id/api/cad-upload
  *
- * @description Server-side CAD upload endpoint for the 4 V1 formats:
- * STEP, STL, DXF, DWG. Accepts multipart/form-data with fields:
+ * @description Server-side CAD upload endpoint for the 3 V1 formats:
+ * STEP, STL, DXF. (DWG was dropped from V1 — see migration
+ * 20260420210000_cad_lab_files_drop_dwg.sql. Founders export DWG as DXF.)
+ * Accepts multipart/form-data with fields:
  *
  *   - file           (the CAD file; required; <= 50 MB)
  *   - material_hint  (free-text, optional; <= 200 chars)
@@ -44,17 +46,18 @@ const MAX_SIZE_BYTES = 50 * 1024 * 1024 // 50 MB
 const MAX_MATERIAL_HINT_LEN = 200
 const BUCKET = "project-cad-files"
 
-// Accepted extensions → canonical format tag.
+// Accepted extensions → canonical format tag. DWG intentionally omitted.
 const EXT_TO_FORMAT: Record<string, CadFormat> = {
   step: "step",
   stp:  "step",
   stl:  "stl",
   dxf:  "dxf",
-  dwg:  "dwg",
 }
 
 // MIME allowlist per format. Many CAD exporters default to octet-stream so
 // we accept that as a safety fallback after the extension check passes.
+// DWG MIMEs intentionally omitted — see migration
+// 20260420210000_cad_lab_files_drop_dwg.sql for context.
 const MIME_ALLOWLIST = new Set<string>([
   "application/step",
   "application/STEP",
@@ -65,10 +68,6 @@ const MIME_ALLOWLIST = new Set<string>([
   "application/vnd.ms-pki.stl",
   "application/dxf",
   "image/vnd.dxf",
-  "application/acad",
-  "application/dwg",
-  "application/x-dwg",
-  "image/vnd.dwg",
   "application/octet-stream",
   "", // some browsers send empty for drag-dropped files
 ])
@@ -139,7 +138,8 @@ export async function POST(
     if (!format) {
       return bad(
         415,
-        "Unsupported format. Upload STEP (.step, .stp), STL (.stl), DXF (.dxf), or DWG (.dwg).",
+        "Unsupported format. Upload STEP (.step, .stp), STL (.stl), or DXF (.dxf). " +
+          "For DWG files, export as DXF in your CAD tool and upload that.",
       )
     }
 
