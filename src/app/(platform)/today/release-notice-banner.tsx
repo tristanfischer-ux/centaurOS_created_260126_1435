@@ -72,9 +72,6 @@ export function ReleaseNoticeBanner(): React.ReactElement | null {
                             <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange/90 text-white">
                                 <Link href="/the-forge-v2">Open The Forge</Link>
                             </Button>
-                            <Button asChild size="sm" variant="outline">
-                                <Link href="/messages">Send feedback</Link>
-                            </Button>
                         </div>
                     </div>
                 </div>
