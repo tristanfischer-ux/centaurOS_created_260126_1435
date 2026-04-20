@@ -5,9 +5,33 @@
  * real, non-fabricated fields for each shortlisted supplier and hands them
  * to SuppliersView.
  *
- * Data honesty policy (2026-04-20): every field hardcoded per-supplier in
- * `scripts/seed-haps-suppliers.ts` is treated as fabricated and is NOT
- * loaded into the view. We read two values only:
+ * ── Tenant isolation (P0 data-isolation guarantee) ─────────────────────
+ * The Suppliers tab is a PROJECT-SCOPED SHORTLIST — not a foundry-wide
+ * directory. Founders shortlist suppliers for THIS project via the CAD
+ * lab Source stage; this page surfaces that per-project roster and
+ * nothing else.
+ *
+ * Triple-scoped to prevent cross-tenant or cross-project leakage:
+ *   1. `loadCadLabProject(id)` enforces auth + foundry scoping —
+ *      returns notFound() if the caller's foundry doesn't own the
+ *      project, so a logged-in founder of foundry B cannot load
+ *      foundry A's project by guessing the URL.
+ *   2. `.eq("project_id", projectId)` on forge_supplier_shortlist
+ *      filters server-side to rows for THIS project. No other project's
+ *      shortlist rows can ever join.
+ *   3. RLS policy "view_forge_supplier_shortlist_in_own_foundry" enforces
+ *      foundry match at the database level (migration
+ *      20260421010000) — defence in depth against a compromised
+ *      server-side client.
+ *
+ * A `[TEST]%` guard also strips any accidentally-seeded test-prefixed
+ * supplier names at the query level so founders never see staging
+ * fixtures in their production UI.
+ *
+ * ── Data honesty policy (2026-04-20) ───────────────────────────────────
+ * Every field hardcoded per-supplier in `scripts/seed-haps-suppliers.ts`
+ * is treated as fabricated and is NOT loaded into the view. We read two
+ * values only:
  *   - supplier name (from the shortlist row — stable even if the global
  *     directory renames it)
  *   - HQ city/country (from suppliers.company_info.hq — a public fact
@@ -24,6 +48,7 @@
  *   - View:   ./suppliers-view.tsx
  *   - Styles: ./suppliers-v2.css (scoped .sp2)
  *   - Seed:   scripts/seed-haps-suppliers.ts
+ *   - RLS:    supabase/migrations/20260421010000_forge_supplier_shortlist.sql
  */
 
 import type { Metadata } from "next"
@@ -90,6 +115,16 @@ export default async function ForgeV2SuppliersPage({
  * supplier_type, capabilities, ramp_role, match score, match reasons,
  * module_ids count, ratings, verification) is intentionally ignored —
  * see file header for the full list.
+ *
+ * SECURITY: project_id filter is load-bearing for tenant isolation.
+ * Do NOT remove or relax without updating the file-header isolation
+ * contract. RLS is the second line of defence, not the first.
+ *
+ * SECURITY: the `.not("supplier_name", "ilike", "[TEST]%")` clause
+ * strips any staging-fixture rows so production founders never see
+ * bracketed test names in their UI. Seed scripts today do not insert
+ * [TEST] into shortlists, but the guard is cheap and catches future
+ * seed mistakes at the query level — not in the view.
  */
 async function safeShortlistWithJoin(projectId: string): Promise<SuppliersSupplierRow[]> {
     try {
@@ -99,6 +134,7 @@ async function safeShortlistWithJoin(projectId: string): Promise<SuppliersSuppli
             .from("forge_supplier_shortlist")
             .select("id, supplier_id, supplier_name")
             .eq("project_id", projectId)
+            .not("supplier_name", "ilike", "[TEST]%")
             .order("supplier_name", { ascending: true, nullsFirst: false })
 
         if (error || !shortlist || shortlist.length === 0) return []
