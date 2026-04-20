@@ -13,7 +13,7 @@
 | 1 | Forge | PR #1 merged, PR #1.5 in flight | `feat/forge-visual-rebuild` | `HANDOVER-pr1-5-build.md` | 2026-04-19 |
 | Pre | Products Coming Soon sidecar | **merged to main** (commit `1d4d88b7` · flag-free — all users see Coming Soon immediately · legacy read-only at `/products/legacy`) | `feat/products-coming-soon` | `PHASE-PLAN.md` §Pre-Phase | 2026-04-19 |
 | 2 | Money | **merged to main** (PR #68 · commit `4656f369` · flag OFF default) | `feat/money-redesign` | `HANDOVER-money.md` + `COMPLETENESS-AUDIT-money.md` | 2026-04-19 |
-| 3 | Plan | build in flight (parallel, Chunk A shipped) — DO NOT double-claim | `feat/plan-redesign` | `HANDOVER-plan.md` | 2026-04-19 |
+| 3 | Plan | **merged to main** (PR #75 · commit `16e0c815` · flag ON for all 110 users / 46 foundries · 2026-04-20 02:54 UTC) | `feat/plan-redesign` (deleted) | `HANDOVER-plan.md` | 2026-04-20 |
 | 4 | Products | review locked — build-approved (autonomous RT mitigations + defaults, ready to build after Plan merges) | — | `HANDOVER-products.md` | 2026-04-19 |
 
 ---
@@ -120,3 +120,4 @@ Each of the 3 prep terminals (Money, Plan, Products) MUST do ALL of these on com
 ### Compaction safety
 
 Between each phase, the build terminal must save a MemPalace checkpoint (`forgeos/decisions`) describing what just shipped + what's next. This guarantees the chain survives `/compact` or session restart. A fresh session reading MEMORY.md + this file can always re-enter the pipeline at the correct state.
+- ✅ 2026-04-20 — **Plan Phase 3 MERGED + LIVE** via PR #75 (squash commit `16e0c815`). Red team 5/5 PASS (functional · data+RLS · regression · roles · rollback). Production Vercel deploy green. BATCH FLAG FLIP executed: 110 authenticated users across 46 foundries now see new_plan_experience=true by default. All flag-OFF preservation paths verified: 1,452 legacy objectives intact, 37 backfilled strategic_goals traceable via source_objective_id UNIQUE FK, legacy /strategy /new-objectives /new-tasks /review /reports /red-team /knowledge routes still render for anyone whose flag gets flipped OFF (hotfix escape hatch). Rollback = single SQL: `UPDATE profiles SET feature_flags = feature_flags - 'new_plan_experience'`. Hidden bonus fix: middleware.ts moved from repo root → src/middleware.ts (was never compiled); this also resurrected centauros.io / centaurdynamics.io cross-domain redirects + ops-subdomain gating that had been silently dead for months. Plan pipeline closed. Products Phase 4 is NEXT — its prep is already `review locked — build-approved`.
