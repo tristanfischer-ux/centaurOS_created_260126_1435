@@ -1,0 +1,382 @@
+/**
+ * revisions-v2.css — scoped (`.rv2`) styles for the Revisions artefact page.
+ * Ports the page-level styles from FORGE-MOCKUP-REVISIONS.html so this page
+ * matches the mockup without leaking styles into the rest of the platform.
+ */
+
+.rv2 {
+  /* Palette — mirrors forge-mockup.css tokens for this page only */
+  --rv-fg:             #1c1917;
+  --rv-fg-muted:       #78716c;
+  --rv-fg-faint:       #a8a29e;
+  --rv-fg-subtle:      #d6d3d1;
+  --rv-surface:        #ffffff;
+  --rv-surface-muted:  #f5f5f4;
+  --rv-surface-soft:   #fafaf9;
+  --rv-border:         #e7e5e4;
+  --rv-border-strong:  #d6d3d1;
+  --rv-brand:          #ff4500;
+  --rv-brand-soft:     rgba(255,69,0,0.10);
+  --rv-success:        #15803d;
+  --rv-success-soft:   #dcfce7;
+  --rv-warning:        #b45309;
+  --rv-warning-soft:   #fef3c7;
+  --rv-danger:         #b91c1c;
+  --rv-danger-soft:    #fee2e2;
+  --rv-info:           #1d4ed8;
+  --rv-info-soft:      #dbeafe;
+  --rv-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+  --rv-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+
+  color: var(--rv-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 32px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* Breadcrumb */
+.rv2-breadcrumb {
+  font-size: 11.5px;
+  color: var(--rv-fg-muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rv2-breadcrumb a {
+  color: var(--rv-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.rv2-breadcrumb a:hover { color: var(--rv-brand); }
+.rv2-breadcrumb .sep { color: var(--rv-fg-subtle); }
+.rv2-breadcrumb .current { color: var(--rv-fg); font-weight: 600; }
+
+/* Annotation note */
+.rv2-annot {
+  background: var(--rv-surface-soft);
+  border-left: 3px solid var(--rv-fg-subtle);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--rv-fg-muted);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.rv2-annot strong { color: var(--rv-fg); font-weight: 600; margin-right: 4px; }
+
+/* Dark header card — the v0 → v1 fork line */
+.rv2-header-card {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #fff;
+  border-radius: 14px;
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: var(--rv-shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.rv2-header-card::before {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 260px; height: 260px;
+  background: radial-gradient(circle, rgba(255,69,0,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.rv2-header-card h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  position: relative;
+}
+.rv2-header-card .sub {
+  color: #cbd5e1;
+  font-size: 13px;
+  position: relative;
+  margin-bottom: 16px;
+}
+.rv2-rev-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  flex-wrap: wrap;
+}
+.rv2-rev-dot {
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+.rv2-rev-dot.parent {
+  background: rgba(22,163,74,0.25);
+  color: #86efac;
+}
+.rv2-rev-dot.child {
+  background: rgba(234,88,12,0.25);
+  color: #fed7aa;
+}
+.rv2-rev-dot.draft {
+  background: rgba(255,255,255,0.1);
+  color: #e2e8f0;
+}
+.rv2-rev-arrow {
+  color: rgba(255,255,255,0.5);
+  font-size: 20px;
+}
+.rv2-header-card .cta-spacer {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* Buttons (shared with the header dark-card) */
+.rv2-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rv-fg);
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-border-strong);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rv2-btn:hover { background: var(--rv-surface-muted); border-color: var(--rv-fg-muted); }
+.rv2-btn.primary { background: var(--rv-fg); color: #fff; border-color: var(--rv-fg); }
+.rv2-btn.primary:hover { background: #0f172a; }
+.rv2-btn.on-dark {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border-color: rgba(255,255,255,0.2);
+}
+.rv2-btn.on-dark:hover { background: rgba(255,255,255,0.18); }
+.rv2-btn.soon { opacity: 0.55; pointer-events: none; }
+
+/* Diff summary strip — 4 stat cards */
+.rv2-diff-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1100px) { .rv2-diff-summary { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 680px)  { .rv2-diff-summary { grid-template-columns: 1fr; } }
+
+.rv2-diff-card {
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--rv-shadow-xs);
+}
+.rv2-diff-card .label {
+  font-size: 10.5px;
+  color: var(--rv-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.rv2-diff-card .value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+  color: var(--rv-fg);
+}
+.rv2-diff-card .value.up   { color: var(--rv-danger); }
+.rv2-diff-card .value.down { color: var(--rv-success); }
+.rv2-diff-card .value.muted { color: var(--rv-fg-faint); }
+.rv2-diff-card .sub {
+  font-size: 11px;
+  color: var(--rv-fg-muted);
+  margin-top: 2px;
+}
+
+/* Diff section cards */
+.rv2-diff-section {
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--rv-shadow-xs);
+}
+.rv2-diff-section h3 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--rv-fg);
+}
+.rv2-diff-section h3 .count {
+  font-size: 11px;
+  color: var(--rv-fg-muted);
+  font-weight: 500;
+}
+.rv2-diff-section p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--rv-fg);
+  line-height: 1.55;
+}
+.rv2-diff-section p strong { color: var(--rv-fg); font-weight: 600; }
+.rv2-diff-section p.muted { color: var(--rv-fg-muted); }
+
+/* Compliance impact grid */
+.rv2-compliance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) { .rv2-compliance-grid { grid-template-columns: 1fr; } }
+
+.rv2-compliance-cell {
+  padding: 14px;
+  background: var(--rv-surface-muted);
+  border-radius: 8px;
+}
+.rv2-compliance-cell.retest {
+  background: var(--rv-warning-soft);
+}
+.rv2-compliance-cell .tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--rv-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.rv2-compliance-cell.retest .tag { color: var(--rv-warning); }
+.rv2-compliance-cell .title {
+  font-weight: 600;
+  font-size: 13px;
+  margin: 4px 0 3px;
+  color: var(--rv-fg);
+}
+.rv2-compliance-cell .desc {
+  font-size: 11px;
+  color: var(--rv-fg-muted);
+  line-height: 1.5;
+}
+.rv2-compliance-cell.retest .desc { color: var(--rv-warning); }
+
+/* Revision row list — each brief_revision rendered as a compact row inside
+ * the diff-section. Used for the "Revision history" section. */
+.rv2-rev-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: 14px;
+  padding: 12px 0;
+  align-items: flex-start;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--rv-border);
+}
+.rv2-rev-row:last-child { border-bottom: none; padding-bottom: 0; }
+.rv2-rev-row:first-child { padding-top: 0; }
+
+.rv2-rev-row .num {
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--rv-surface-muted);
+  color: var(--rv-fg-muted);
+  text-align: center;
+  align-self: flex-start;
+}
+.rv2-rev-row .num.current {
+  background: var(--rv-brand-soft);
+  color: var(--rv-brand);
+}
+.rv2-rev-row .num.locked {
+  background: var(--rv-success-soft);
+  color: var(--rv-success);
+}
+.rv2-rev-row .label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--rv-fg);
+}
+.rv2-rev-row .summary {
+  font-size: 11.5px;
+  color: var(--rv-fg-muted);
+  margin-top: 3px;
+  line-height: 1.55;
+}
+.rv2-rev-row .meta {
+  font-size: 10.5px;
+  color: var(--rv-fg-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+.rv2-rev-row .meta .status {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.rv2-rev-row .meta .status.locked {
+  background: var(--rv-success-soft);
+  color: var(--rv-success);
+}
+.rv2-rev-row .meta .status.draft {
+  background: var(--rv-surface-muted);
+  color: var(--rv-fg-muted);
+}
+
+/* Empty-state card */
+.rv2-empty {
+  background: var(--rv-surface);
+  border: 1px dashed var(--rv-border-strong);
+  border-radius: 12px;
+  padding: 48px 28px;
+  text-align: center;
+  box-shadow: var(--rv-shadow-xs);
+  margin-bottom: 16px;
+}
+.rv2-empty .icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--rv-surface-muted);
+  color: var(--rv-fg-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.rv2-empty h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--rv-fg);
+}
+.rv2-empty p {
+  margin: 0 auto 16px;
+  font-size: 12.5px;
+  color: var(--rv-fg-muted);
+  line-height: 1.6;
+  max-width: 480px;
+}
