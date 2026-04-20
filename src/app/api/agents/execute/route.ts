@@ -1934,6 +1934,19 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                         content: msg.content,
                     }))
 
+                    // GOTCHA: DeepSeek's chat completions API hard-caps max_tokens at 8192.
+                    // Anthropic / OpenAI / Gemini / MiniMax / Qwen all accept 16384–32768.
+                    // Clamp per-provider at dispatch so the first call is already compliant —
+                    // otherwise the registry-level safety net in streamDeepSeek (see
+                    // DEEPSEEK_MAX_TOKENS_CAP in registry.ts, commit c7ae580b) fires a warn
+                    // on every DeepSeek call for Max/Jian/Fang/Priya. This path is the
+                    // primary call site for specialists with modelTier === "deepseek".
+                    const requestedMaxTokens = enableThinking ? 32768 : 16384
+                    const providerMaxTokens =
+                        primaryTarget.providerId === "deepseek"
+                            ? Math.min(requestedMaxTokens, 8192)
+                            : requestedMaxTokens
+
                     await new Promise<void>((resolve, reject) => {
                         streamFn({
                             apiKey: targetApiKey,
@@ -1941,7 +1954,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                             systemPrompt: enrichedSystemPrompt,
                             userPrompt: finalPrompt,
                             conversationHistory,
-                            maxTokens: enableThinking ? 32768 : 16384,
+                            maxTokens: providerMaxTokens,
                             onChunk(text) {
                                 fullOutput += text
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
