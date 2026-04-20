@@ -17,6 +17,9 @@ public/workbox-*.js.map
 __pycache__/
 drone_output/
 experiments/
+# Exception: app route named `experiments` is source code, not experiment output.
+!src/app/**/experiments/
+!src/app/**/experiments/**
 data/step-library-staging/
 data/robot-step-staging/
 
