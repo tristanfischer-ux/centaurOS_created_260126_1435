@@ -241,14 +241,14 @@ export default async function ForgeV2ExportPage({
             <Card className="rounded-xl border">
                 <CardContent className="py-4 px-6 flex flex-wrap items-center justify-between gap-3">
                     <p className="text-[11.5px] text-muted-foreground leading-relaxed">
-                        Looking for something else? Raw STEP / STL per module lives in CAD Lab;
-                        the BOM CSV generator will surface on the BOM artefact page.
+                        Looking for something else? Raw STEP / STL per module lives on the
+                        Geometry page; the BOM CSV generator will surface on the BOM artefact
+                        page.
                     </p>
                     <div className="flex items-center gap-2 shrink-0">
                         <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
-                            <Link href={`/the-forge/cad-lab?project=${project.id}`}>
-                                Open CAD Lab
-                                <ExternalLink className="h-3 w-3" />
+                            <Link href={`/the-forge-v2/projects/${project.id}/geometry`}>
+                                Open Geometry
                             </Link>
                         </Button>
                         <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">

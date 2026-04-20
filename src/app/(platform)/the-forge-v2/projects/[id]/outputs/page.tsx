@@ -168,11 +168,6 @@ export default async function ForgeV2OutputsPage({
                 { label: "Outputs" },
             ]}
             subtitle="Hero render · integrated STEP/STL · module blueprints · investor deck"
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}`,
-                icon: <FileOutput className="h-3.5 w-3.5" />,
-            }}
         >
             {/* Summary tile */}
             <Card className="rounded-xl border border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.03]">

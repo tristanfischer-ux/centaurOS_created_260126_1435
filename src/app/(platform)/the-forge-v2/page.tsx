@@ -79,9 +79,6 @@ export default async function ForgeV2WorkspacePage(): Promise<React.ReactNode> {
                             <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
                                 <Link href="/the-forge-v2/new"><Sparkles className="h-3.5 w-3.5" /> Start from a description</Link>
                             </Button>
-                            <Button asChild size="sm" variant="outline" className="gap-1.5">
-                                <Link href="/the-forge/cad-lab"><Layers className="h-3.5 w-3.5" /> Browse templates</Link>
-                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -94,9 +91,6 @@ export default async function ForgeV2WorkspacePage(): Promise<React.ReactNode> {
                         <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                             {projects.length === 1 ? "1 project" : `${projects.length} projects`}
                         </h2>
-                        <Link href="/the-forge/cad-lab" className="text-xs text-muted-foreground hover:text-international-orange transition-colors">
-                            Open legacy CAD lab →
-                        </Link>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {projects.map((p) => {

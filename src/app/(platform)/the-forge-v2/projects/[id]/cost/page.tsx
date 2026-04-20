@@ -74,14 +74,15 @@ export default async function ForgeV2CostPage({ params }: { params: Promise<{ id
                         <div className="max-w-sm space-y-2">
                             <p className="text-sm font-semibold text-foreground">No cost estimates yet</p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                                Run specialist cost reviews per module in CAD Lab. Each review produces a material + labour estimate that rolls up here.
+                                Specialist cost reviews per module produce a material + labour
+                                estimate that rolls up here once modules are reviewed.
                             </p>
                         </div>
                         <Link
-                            href={`/the-forge/cad-lab?project=${project.id}`}
+                            href={`/the-forge-v2/projects/${project.id}/modules`}
                             className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
                         >
-                            Open CAD Lab <ArrowRight className="h-3.5 w-3.5" />
+                            Review modules <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
                     </CardContent>
                 </Card>

@@ -69,11 +69,6 @@ export default async function ForgeV2PartDetailPage({
                 { label: part.name },
             ]}
             subtitle={part.description ?? `Part within ${mod.name}`}
-            primaryCta={{
-                label: "Open in CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}&module=${mod.id}`,
-                icon: <Wrench className="h-3.5 w-3.5" />,
-            }}
             maxWidth="narrow"
         >
             {/* Spec strip */}
