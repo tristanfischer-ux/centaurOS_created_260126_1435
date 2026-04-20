@@ -58,7 +58,16 @@
 .t2 small { font-size: inherit; font-weight: inherit; }
 
 /* Greeting */
-.t2-greeting { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; color: var(--t-fg); }
+.t2-greeting {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px;
+  color: var(--t-fg);
+  display: inline-flex; align-items: center; gap: 10px;
+}
+.t2-title-dot {
+  width: 10px; height: 10px; border-radius: 100%;
+  background: rgb(255, 69, 0);
+  flex-shrink: 0;
+}
 .t2-greeting-sub {
   font-size: 13px; color: var(--t-fg-muted); margin-bottom: 28px;
   display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
@@ -358,3 +367,153 @@
 }
 .t2-empty strong { color: var(--t-fg); font-size: 13px; font-weight: 600; display: block; }
 .t2-empty a { color: var(--t-brand); font-weight: 600; font-size: 12px; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Empty-state variant — ported 1:1 from FORGE-MOCKUP-EMPTY-TODAY.html.
+   Renders when the workspace has no priority, no builds, no queue,
+   no waiting items, and no calendar events. Every card below has a
+   clear next step or explains what it needs. No zeros.
+   ───────────────────────────────────────────────────────────────── */
+
+.t2-prio-empty {
+  background: linear-gradient(135deg, #fff7ed 0%, #fff 100%);
+  border: 1px solid var(--t-brand-dim); border-left: 3px solid var(--t-brand);
+  border-radius: 14px; padding: 28px 32px; margin-bottom: 22px;
+  display: flex; align-items: center; gap: 24px;
+}
+.t2-prio-empty .illus {
+  width: 96px; height: 96px; flex-shrink: 0;
+  background: var(--t-brand-soft); border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t-brand); font-size: 36px; font-weight: 600;
+}
+.t2-prio-empty .body { flex: 1; }
+.t2-prio-empty .k {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--t-brand); margin-bottom: 6px;
+}
+.t2-prio-empty h2 {
+  font-size: 20px; margin: 0 0 6px; font-weight: 700; letter-spacing: -0.015em;
+  color: var(--t-fg);
+}
+.t2-prio-empty p {
+  font-size: 13.5px; color: var(--t-fg-muted); margin: 0 0 14px; line-height: 1.55;
+  max-width: 560px;
+}
+.t2-prio-empty .cta {
+  background: var(--t-brand); color: #fff; text-decoration: none;
+  padding: 11px 22px; border-radius: 8px; font-weight: 700; font-size: 14px;
+  display: inline-block; transition: background 0.15s;
+}
+.t2-prio-empty .cta:hover { background: #e63b00; }
+.t2-prio-empty .cta-secondary {
+  color: var(--t-fg-muted); margin-left: 14px; font-size: 13px; text-decoration: none;
+}
+.t2-prio-empty .cta-secondary:hover { color: var(--t-fg); }
+@media (max-width: 700px) {
+  .t2-prio-empty { flex-direction: column; align-items: flex-start; padding: 22px; }
+  .t2-prio-empty .illus { width: 72px; height: 72px; font-size: 28px; }
+}
+
+/* Empty-row layouts */
+.t2-empty-row-2 { display: grid; grid-template-columns: 1fr 1.2fr; gap: 18px; margin-bottom: 18px; }
+.t2-empty-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+@media (max-width: 900px) {
+  .t2-empty-row-2 { grid-template-columns: 1fr; }
+  .t2-empty-row-3 { grid-template-columns: 1fr; }
+}
+
+.t2-empty-card {
+  background: var(--t-surface); border: 1px solid var(--t-border);
+  border-radius: 12px; padding: 20px 22px;
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--t-shadow-xs);
+}
+.t2-empty-card .k {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--t-fg-muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.t2-empty-card .k .soon-badge {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;
+  background: var(--t-surface-muted); color: var(--t-fg-subtle);
+  padding: 2px 7px; border-radius: 3px;
+  text-transform: uppercase;
+}
+.t2-empty-card .placeholder-line {
+  font-size: 15px; font-weight: 600; color: var(--t-fg); letter-spacing: -0.01em;
+}
+.t2-empty-card .msg {
+  font-size: 12.5px; color: var(--t-fg-muted); line-height: 1.5; margin-bottom: 4px;
+}
+.t2-empty-card .stub-big {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--t-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.t2-empty-card .action-link {
+  font-size: 12.5px; color: var(--t-brand); text-decoration: none;
+  font-weight: 600; margin-top: 4px; align-self: flex-start;
+}
+.t2-empty-card .action-link:hover { text-decoration: underline; }
+
+/* Builds band — empty */
+.t2-builds-band {
+  background: var(--t-surface); border: 1px solid var(--t-border);
+  border-radius: 14px; padding: 22px 26px; margin-bottom: 18px;
+  box-shadow: var(--t-shadow-xs);
+}
+.t2-builds-band h3 {
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--t-fg-muted); margin: 0 0 14px;
+}
+.t2-new-build-tile {
+  background: var(--t-brand-soft); border: 2px dashed var(--t-brand-dim);
+  border-radius: 12px; padding: 30px 28px; text-align: center;
+  text-decoration: none; color: var(--t-fg); display: block;
+  transition: all 0.15s;
+}
+.t2-new-build-tile:hover {
+  background: var(--t-surface); border-color: var(--t-brand); transform: translateY(-1px);
+  box-shadow: var(--t-shadow-sm);
+}
+.t2-new-build-tile .plus {
+  font-size: 32px; color: var(--t-brand); font-weight: 300; line-height: 1;
+}
+.t2-new-build-tile h4 {
+  font-size: 16px; margin: 8px 0 3px; font-weight: 700; letter-spacing: -0.015em;
+  color: var(--t-fg);
+}
+.t2-new-build-tile p {
+  font-size: 12.5px; color: var(--t-fg-muted); margin: 0; line-height: 1.5;
+}
+
+/* Ops / Team strips — empty */
+.t2-empty-strips { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 900px) { .t2-empty-strips { grid-template-columns: 1fr; } }
+
+.t2-strip-card {
+  background: var(--t-surface-muted); border: 1px solid var(--t-border);
+  border-radius: 12px; padding: 18px 22px;
+  display: flex; align-items: center; gap: 14px;
+}
+.t2-strip-card .ic {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: var(--t-surface); border: 1px solid var(--t-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+  color: var(--t-fg-muted);
+}
+.t2-strip-card .sb-body { flex: 1; }
+.t2-strip-card .sb-body h4 {
+  font-size: 13.5px; margin: 0 0 3px; font-weight: 700; color: var(--t-fg);
+  letter-spacing: -0.005em;
+}
+.t2-strip-card .sb-body p {
+  font-size: 12px; color: var(--t-fg-muted); margin: 0; line-height: 1.5;
+}
+.t2-strip-card .sb-action {
+  font-size: 12px; color: var(--t-brand); text-decoration: none; font-weight: 600;
+  padding: 7px 12px; border-radius: 6px; border: 1px solid var(--t-brand-dim);
+  background: var(--t-surface); white-space: nowrap;
+}
+.t2-strip-card .sb-action:hover { background: var(--t-brand); color: #fff; border-color: var(--t-brand); }

@@ -233,9 +233,137 @@ export function TodayView(props: TodayViewProps) {
         [queueFilter, queue],
     )
 
+    // ── Empty-state detection ────────────────────────────────────────
+    // True only when every data source on the page is empty — no priority
+    // surfaced, no builds, no queue, no waiting items, no calendar events,
+    // no horizon anchor, no runway number. If ANY one of these is populated
+    // we fall through to the standard populated view so partial-data states
+    // never get hidden behind the empty shell.
+    const isEmptyDay =
+        priority === null &&
+        !builds.hasAny &&
+        queue.length === 0 &&
+        waiting.totalCount === 0 &&
+        !calendar.hasEvents &&
+        horizon.anchorTitle === null &&
+        runway.runwayMonths === null
+
+    if (isEmptyDay) {
+        return (
+            <div className="t2">
+                <h1 className="t2-greeting">
+                    <span className="t2-title-dot" aria-hidden="true" />
+                    {greetingWord}, {firstName} — let&apos;s get going.
+                </h1>
+                <div className="t2-greeting-sub">
+                    {weekdayDate} · {clockTime} · setup done · nothing queued yet
+                </div>
+
+                {/* Priority slab replacement */}
+                <div className="t2-prio-empty">
+                    <div className="illus" aria-hidden="true">◈</div>
+                    <div className="body">
+                        <div className="k">Priority</div>
+                        <h2>No priorities yet — start your first project</h2>
+                        <p>
+                            Priorities appear when risks fire, suppliers miss SLAs, or a readiness gap
+                            becomes the blocker. Until there&apos;s a project or product in flight,
+                            there&apos;s nothing to prioritise.
+                        </p>
+                        <Link href="/the-forge-v2/new" className="cta">Start a project →</Link>
+                        <Link href="/the-forge-v2" className="cta-secondary">or validate a hypothesis first</Link>
+                    </div>
+                </div>
+
+                {/* Runway + Waiting row */}
+                <div className="t2-empty-row-2">
+                    <div className="t2-empty-card">
+                        <div className="k">Runway <span className="soon-badge">Soon</span></div>
+                        <div className="stub-big">—</div>
+                        <div className="msg">
+                            Connect Cash Burn (Xero) to see runway, burn rate, and the cash horizon.
+                            Manual entry opens when the integration ships.
+                        </div>
+                        <Link href="/money" className="action-link">Enter manually →</Link>
+                    </div>
+                    <div className="t2-empty-card">
+                        <div className="k">Waiting on you</div>
+                        <div className="placeholder-line">Nothing queued yet</div>
+                        <div className="msg">
+                            Your team&apos;s asks, supplier questions, and partner replies appear here.
+                            Connect Gmail to pull in external threads.
+                        </div>
+                        <Link href="/settings/integrations" className="action-link">Connect Gmail →</Link>
+                    </div>
+                </div>
+
+                {/* Today queue + Calendar + Risk horizon */}
+                <div className="t2-empty-row-3">
+                    <div className="t2-empty-card">
+                        <div className="k">Today queue</div>
+                        <div className="placeholder-line">No items</div>
+                        <div className="msg">
+                            As you tag objectives, book meetings, or raise risks, this fills up.
+                            It&apos;s your single work queue across Plan, Forge, and Cash Burn.
+                        </div>
+                    </div>
+                    <div className="t2-empty-card">
+                        <div className="k">Calendar peek</div>
+                        <div className="placeholder-line">Calendar not connected</div>
+                        <div className="msg">
+                            Your day&apos;s meetings show here with a 2-line prep summary per call.
+                        </div>
+                        <Link href="/settings/integrations" className="action-link">Connect Google Calendar →</Link>
+                    </div>
+                    <div className="t2-empty-card">
+                        <div className="k">14-day risk horizon</div>
+                        <div className="placeholder-line">Set a launch date to activate</div>
+                        <div className="msg">
+                            The horizon shows every risk that could bite between now and ship day.
+                            Set a target launch to switch it on.
+                        </div>
+                        <Link href="/plan" className="action-link">Set launch date →</Link>
+                    </div>
+                </div>
+
+                {/* Builds band */}
+                <div className="t2-builds-band">
+                    <h3>Your builds</h3>
+                    <Link href="/the-forge-v2/new" className="t2-new-build-tile">
+                        <div className="plus" aria-hidden="true">+</div>
+                        <h4>Start a new build</h4>
+                        <p>Hardware project · BOM, suppliers, cost, risks all linked. 4-step wizard, 5 minutes.</p>
+                    </Link>
+                </div>
+
+                {/* Ops + Team */}
+                <div className="t2-empty-strips">
+                    <div className="t2-strip-card">
+                        <div className="ic" aria-hidden="true">📦</div>
+                        <div className="sb-body">
+                            <h4>Operations</h4>
+                            <p>Activates after your first shipment. Tracks fulfilment, RMAs, uptime, and customer support.</p>
+                        </div>
+                    </div>
+                    <div className="t2-strip-card">
+                        <div className="ic" aria-hidden="true">👥</div>
+                        <div className="sb-body">
+                            <h4>Your team</h4>
+                            <p>Invite co-founders, engineers, or advisors to see them here.</p>
+                        </div>
+                        <Link href="/settings/team" className="sb-action">Invite →</Link>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="t2">
-            <h1 className="t2-greeting">{greetingWord}, {firstName}</h1>
+            <h1 className="t2-greeting">
+                <span className="t2-title-dot" aria-hidden="true" />
+                {greetingWord}, {firstName}
+            </h1>
             <div className="t2-greeting-sub">
                 {weekdayDate} · {clockTime}
                 {/* Broke-overnight chip: either a count or an "all clear" pill */}
