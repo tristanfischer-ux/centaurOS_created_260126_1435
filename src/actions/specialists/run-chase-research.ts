@@ -117,6 +117,29 @@ const STAGE = "research.seed"
  *  run-max-decomposition.ts §MISSING_BRIEF (currently 200 chars). */
 const MIN_REPORT_CHARS = 200
 
+/**
+ * Classifies inner runCadLabResearch errors as transient (worth a retry) or
+ * hard (caller error, budget cap, validation) where retrying would burn the
+ * budget without any chance of success. Keep the regex tight — anything
+ * broader risks double-charging founders on genuine hard failures.
+ *
+ * Transient signals observed so far:
+ *   - "Claude synthesis failed" — the Sonnet call threw mid-stream (cold
+ *     start, provider hiccup). The grounded-search sources were gathered
+ *     fine; only synthesis flaked. This is the dominant E2E-round-3 mode.
+ *   - "timeout" / "timed out" — HTTP or AbortSignal.timeout from the
+ *     inner API helpers.
+ *   - "network" / "fetch" — TCP-layer blip.
+ *   - "rate limit" / "429" — provider throttling; a 2s wait often clears.
+ *   - "transient" — explicit marker the inner engine may surface.
+ */
+const TRANSIENT_ERROR_PATTERN =
+    /timeout|timed out|synthesis failed|network|fetch failed|rate.?limit|429|transient|ECONNRESET|ETIMEDOUT/i
+
+/** Delay before the retry attempt. Short — we're not backing off, we're
+ *  just letting a cold-start finish warming. */
+const RETRY_DELAY_MS = 2000
+
 // ─── runChaseResearch ──────────────────────────────────────────────────
 
 /**
@@ -258,21 +281,36 @@ export async function runChaseResearch(
             }
         }
 
+        // Tracks whether the first inner call failed transiently and a
+        // retry was needed. Surfaced in pipeline_runs.output_ref so ops
+        // can see transient-recovery rate without trawling logs.
+        let retried = false
+        let firstErrorMessage: string | null = null
+
         try {
             // 5. Delegate the heavy research lift to the canonical
             //    cad-lab action. It handles Gemini + Google Search,
             //    Thingiverse CAD lookup, domain detection, standards
             //    retrieval, and the Claude→OpenAI→Gemini synthesis
             //    fallback chain. We wrap it — don't duplicate it.
-            const researchResult: CadLabResearchResult = await runCadLabResearch(
-                description,
-                priorDesignBrief
-                    ? {
-                          designBrief: priorDesignBrief,
-                          assumptionNotes: priorAssumptionNotes,
-                      }
-                    : undefined,
-            )
+            //
+            //    E2E round 3 found the auto-fire on project-create fails
+            //    ~40s in with "Claude synthesis failed — sources were
+            //    still collected" on the first call, then succeeds on a
+            //    manual retry 87s later. Classic cold-start / transient
+            //    synthesis flake. One-shot retry inside this orchestrator
+            //    converts that failure mode into an invisible recovery
+            //    without papering over hard errors (budget cap, auth,
+            //    validation) that retry can't fix.
+            const researchResult: CadLabResearchResult =
+                await runResearchWithOneRetry(description, {
+                    priorDesignBrief,
+                    priorAssumptionNotes,
+                    onRetry: (firstErr) => {
+                        retried = true
+                        firstErrorMessage = firstErr
+                    },
+                })
 
             const report =
                 typeof researchResult.report === "string"
@@ -295,6 +333,17 @@ export async function runChaseResearch(
                         typeof researchResult.modelUsed === "string"
                             ? researchResult.modelUsed
                             : null,
+                    // If the retry ALSO failed, record both messages so
+                    // ops can distinguish "retry didn't help" from
+                    // "first attempt was a hard failure we didn't retry".
+                    ...(retried
+                        ? {
+                              output_ref: {
+                                  retried: true,
+                                  firstErrorMessage,
+                              },
+                          }
+                        : {}),
                 })
                 return {
                     ok: false,
@@ -405,6 +454,13 @@ export async function runChaseResearch(
                         ? researchResult.sources.length
                         : 0,
                     extractionOk: extraction.ok,
+                    // Observability for the transient-retry path. When
+                    // retried=true the row went first-attempt→fail→
+                    // second-attempt→success; firstErrorMessage preserves
+                    // the original failure message for trend analysis.
+                    ...(retried
+                        ? { retried: true, firstErrorMessage }
+                        : {}),
                 },
             })
 
@@ -487,6 +543,56 @@ export async function loadChaseRunStatus(
 }
 
 // ─── Internals ─────────────────────────────────────────────────────────
+
+/**
+ * Wraps runCadLabResearch with a single transient-failure retry. The inner
+ * engine returns `{ success: false, error }` rather than throwing, so we
+ * inspect the error string and decide whether to retry.
+ *
+ * Hard failures (budget cap, auth, validation, unknown non-transient) are
+ * returned as-is after the first attempt — retrying those would just burn
+ * the tier budget without any chance of success.
+ *
+ * Transient failures (cold-start synthesis flake, network blip, timeout,
+ * rate-limit) get exactly one more attempt after a 2s pause. Whatever the
+ * second attempt returns is the final answer — no further loops.
+ *
+ * Timing budget: first call ~40s (observed failure window), delay 2s,
+ * retry ~87s → worst-case ~130s. Still well under Vercel's 300s cap.
+ */
+async function runResearchWithOneRetry(
+    description: string,
+    opts: {
+        priorDesignBrief: CadLabDesignBrief | undefined
+        priorAssumptionNotes: string | undefined
+        onRetry: (firstErrorMessage: string) => void
+    },
+): Promise<CadLabResearchResult> {
+    const researchArg = opts.priorDesignBrief
+        ? {
+              designBrief: opts.priorDesignBrief,
+              assumptionNotes: opts.priorAssumptionNotes,
+          }
+        : undefined
+
+    const first = await runCadLabResearch(description, researchArg)
+    if (first.success) return first
+
+    const errMsg = typeof first.error === "string" ? first.error : ""
+    if (!TRANSIENT_ERROR_PATTERN.test(errMsg)) {
+        // Hard failure — don't retry. Caller will surface as-is.
+        return first
+    }
+
+    // Transient. Log, notify orchestrator so it can flag the pipeline_run,
+    // wait briefly, try once more.
+    console.warn(
+        `[run-chase-research] transient inner failure on first attempt; retrying once. First error: ${errMsg}`,
+    )
+    opts.onRetry(errMsg)
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+    return runCadLabResearch(description, researchArg)
+}
 
 interface ExtractionResult {
     ok: boolean
