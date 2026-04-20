@@ -28,6 +28,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import type { CadLabModule } from "@/lib/cad-lab-types"
 
 import {
     OperationsView,
@@ -76,11 +77,23 @@ export default async function ForgeV2OperationsPage({
         (acc, m) => (typeof m.leadWeeks === "number" && m.leadWeeks > acc ? m.leadWeeks : acc),
         0,
     )
+    // Track which module owns the longest lead so the summary tile can
+    // surface that module's provenance tag next to the week number.
+    const longestLeadModule = modules.find(
+        (m) => typeof m.leadWeeks === "number" && m.leadWeeks === longestLead && longestLead > 0,
+    )
+    const longestLeadSource: CadLabModule["leadTimeSource"] | null =
+        longestLeadModule ? ((longestLeadModule as CadLabModule).leadTimeSource ?? null) : null
     const productionRows: OperationsProductionRow[] = modules.map((m, i) => ({
         id: m.id,
         moduleNum: `M${i + 1}`,
         moduleName: m.name,
         leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
+        // Forward the module's provenance tag so the view can render a chip
+        // next to every lead-time week number. Falls back to null when the
+        // module hasn't been tagged — the view then renders "source unknown".
+        leadTimeSource:
+            (m as CadLabModule).leadTimeSource ?? null,
         // Band width as a fraction of the longest lead-time, so the
         // skeleton timeline is visually coherent without fabricating dates.
         bandFraction:
@@ -116,6 +129,7 @@ export default async function ForgeV2OperationsPage({
         summary: {
             moduleCount: modules.length,
             longestLeadWeeks: longestLead > 0 ? longestLead : null,
+            longestLeadSource,
             currentMassKg,
             budgetMassKg,
         },

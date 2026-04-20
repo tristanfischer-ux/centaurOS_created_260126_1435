@@ -182,7 +182,10 @@ export default async function ForgeV2ModulesPage({
 function leadSourceLabel(source: string | undefined | null): string | null {
     switch (source) {
         case "supplier-quote":      return "Supplier quote"
-        case "ai-estimate":         return "AI estimate"
+        // NOTE: `ai-estimate` is labelled "Specialist estimate" on purpose —
+        // ForgeOS in-product copy never surfaces "AI" as the source of a
+        // number to founders (see CLAUDE.md §No AI Emphasis).
+        case "ai-estimate":         return "Specialist estimate"
         case "historical-analogue": return "Historical analogue"
         case "specialist-judgement":return "Specialist judgement"
         default: return null

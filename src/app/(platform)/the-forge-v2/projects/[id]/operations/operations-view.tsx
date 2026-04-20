@@ -31,6 +31,18 @@ import "./operations-v2.css"
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
+/**
+ * Provenance tag for a lead-time estimate. Mirrors the enum on
+ * `CadLabModule.leadTimeSource`. `null` means the module has not been
+ * tagged yet — the view renders "source unknown" in that case.
+ */
+export type LeadTimeSource =
+    | "supplier-quote"
+    | "ai-estimate"
+    | "historical-analogue"
+    | "specialist-judgement"
+    | null
+
 export interface OperationsProductionRow {
     /** Stable key for React. */
     id: string
@@ -40,6 +52,13 @@ export interface OperationsProductionRow {
     moduleName: string
     /** Lead-time in weeks, or null when not estimated. */
     leadWeeks: number | null
+    /**
+     * Provenance of the lead-time estimate. Rendered as a small chip next to
+     * the week number so founders can see at a glance whether a number is
+     * grounded in a supplier quote or a specialist's judgement call. Null
+     * when the module predates the provenance field.
+     */
+    leadTimeSource: LeadTimeSource
     /** Band width fraction (0–1) for the skeleton Gantt row. 0 = no band. */
     bandFraction: number
 }
@@ -59,6 +78,8 @@ export interface OperationsViewProps {
     summary: {
         moduleCount: number
         longestLeadWeeks: number | null
+        /** Provenance tag for whichever module owns the longest lead time. */
+        longestLeadSource: LeadTimeSource
         /** Sum of module estimatedMassKg, null when no module has an estimate. */
         currentMassKg: number | null
         /** Sum of module budgetMassKg, null when no module has a budget. */
@@ -87,6 +108,53 @@ function formatShipDate(iso: string | null): string {
     const d = new Date(iso)
     if (Number.isNaN(d.getTime())) return iso
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+}
+
+/**
+ * Maps a lead-time provenance enum to the plain-English caption shown on
+ * the provenance chip. `ai-estimate` is labelled "specialist estimate" on
+ * purpose — the platform rule is to never surface "AI" as the source of a
+ * number to founders. Null / unknown tags render "source unknown" so the
+ * gap is visible rather than silently hidden.
+ */
+function leadSourceLabel(source: LeadTimeSource): string {
+    switch (source) {
+        case "supplier-quote":       return "from supplier quote"
+        case "ai-estimate":          return "specialist estimate"
+        case "historical-analogue":  return "historical analogue"
+        case "specialist-judgement": return "specialist judgement"
+        default:                     return "source unknown"
+    }
+}
+
+/** Tone class for the chip — visual differentiation between grounded
+ *  (supplier quote, historical) vs. judgement-based (specialist) vs. unknown. */
+function leadSourceTone(source: LeadTimeSource): "quote" | "historical" | "judgement" | "unknown" {
+    switch (source) {
+        case "supplier-quote":       return "quote"
+        case "historical-analogue":  return "historical"
+        case "ai-estimate":
+        case "specialist-judgement": return "judgement"
+        default:                     return "unknown"
+    }
+}
+
+// ─── Provenance chip ────────────────────────────────────────────────────
+
+/**
+ * Small rounded-pill chip that labels the provenance of a lead-time
+ * estimate. Rendered next to every week number on Operations so founders
+ * can see at a glance whether a lead-time is grounded in a supplier quote
+ * or a specialist's judgement. Tone classes map to subtle background
+ * variants defined in operations-v2.css.
+ */
+function LeadSourceChip({ source }: { source: LeadTimeSource }): React.ReactElement {
+    const tone = leadSourceTone(source)
+    return (
+        <span className={`op2-lead-src op2-lead-src-${tone}`} title="Source of this lead-time estimate">
+            {leadSourceLabel(source)}
+        </span>
+    )
 }
 
 // ─── View ───────────────────────────────────────────────────────────────
@@ -144,6 +212,12 @@ export function OperationsView(props: OperationsViewProps): React.ReactElement {
                 plan is declared.
             </div>
 
+            {/* ── Lead-time provenance legend ─────────────── */}
+            <div className="op2-lead-legend">
+                <strong>Lead times</strong> show the source of each estimate — supplier quote,
+                specialist judgement, historical analogue, or specialist estimate.
+            </div>
+
             {/* ── Alert banner — this week's movers ──────── */}
             <div className="op2-alert">
                 <h3>This week&apos;s movers across Operations</h3>
@@ -168,8 +242,15 @@ export function OperationsView(props: OperationsViewProps): React.ReactElement {
                 </div>
                 <div className="op2-sum-card">
                     <div className="label">Longest module lead</div>
-                    <div className="value">
-                        {hasAnyLeadTime ? `${summary.longestLeadWeeks} wk` : "—"}
+                    <div className="value op2-sum-value-wrap">
+                        {hasAnyLeadTime ? (
+                            <>
+                                <span>{summary.longestLeadWeeks} wk</span>
+                                <LeadSourceChip source={summary.longestLeadSource} />
+                            </>
+                        ) : (
+                            "—"
+                        )}
                     </div>
                     <div className="delta">
                         {hasAnyLeadTime ? `across ${summary.moduleCount} modules` : "not estimated yet"}
@@ -232,7 +313,16 @@ export function OperationsView(props: OperationsViewProps): React.ReactElement {
                                         )}
                                     </div>
                                     <div className="op2-gantt-lead">
-                                        {row.leadWeeks != null ? `${row.leadWeeks} wk` : "—"}
+                                        {row.leadWeeks != null ? (
+                                            <>
+                                                <span className="op2-gantt-lead-num">{row.leadWeeks} wk</span>
+                                                <LeadSourceChip source={row.leadTimeSource} />
+                                            </>
+                                        ) : (
+                                            <span className="op2-gantt-lead-num op2-gantt-lead-unknown">
+                                                — <span className="op2-gantt-lead-unknown-meta">(source unknown)</span>
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             ))}
