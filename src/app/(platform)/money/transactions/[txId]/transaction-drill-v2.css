@@ -1,0 +1,322 @@
+/**
+ * transaction-drill-v2.css — scoped (`.txd2`) styles for the Money
+ * Transaction Drill page. Ports the page-level styles from
+ * MONEY-MOCKUP-TRANSACTION-DRILL.html. Convention mirrors cost-detail-v2.css
+ * (`.cd2`) + cockpit-v2.css (`.mck2`).
+ */
+
+.txd2 {
+  /* Palette — mirrors money-mockup.css tokens for this page only */
+  --txd-fg:             #1c1917;
+  --txd-fg-muted:       #78716c;
+  --txd-fg-faint:       #a8a29e;
+  --txd-fg-subtle:      #d6d3d1;
+  --txd-surface:        #ffffff;
+  --txd-surface-muted:  #f5f5f4;
+  --txd-surface-soft:   #fafaf9;
+  --txd-bg:             #f7f6f4;
+  --txd-border:         #e7e5e4;
+  --txd-border-soft:    #f0eeea;
+  --txd-border-strong:  #d6d3d1;
+  --txd-brand:          #ff4500;
+  --txd-brand-dim:      rgba(255,69,0,0.18);
+  --txd-brand-soft:     rgba(255,69,0,0.10);
+  --txd-success:        #15803d;
+  --txd-success-soft:   #dcfce7;
+  --txd-warning:        #b45309;
+  --txd-warning-soft:   #fef3c7;
+  --txd-warning-dim:    #fde68a;
+  --txd-danger:         #b91c1c;
+  --txd-danger-soft:    #fee2e2;
+  --txd-info:           #1d4ed8;
+  --txd-info-soft:      #dbeafe;
+  --txd-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+  --txd-shadow-sm:      0 2px 6px rgba(0,0,0,0.05);
+
+  color: var(--txd-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 32px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Breadcrumb header ─────────────────────────────────────────── */
+.txd2-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.txd2-crumbs {
+  font-size: 12.5px;
+  color: var(--txd-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.txd2-crumbs a {
+  color: var(--txd-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.txd2-crumbs a:hover { color: var(--txd-brand); }
+.txd2-crumbs .sep { color: var(--txd-fg-subtle); }
+.txd2-crumbs .current { color: var(--txd-fg); font-weight: 700; }
+.txd2-ctx-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.txd2-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--txd-border-strong);
+  background: var(--txd-surface);
+  color: var(--txd-fg);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.txd2-btn:hover {
+  border-color: var(--txd-brand);
+  color: var(--txd-brand);
+}
+.txd2-btn.sm { padding: 5px 10px; font-size: 12px; }
+.txd2-btn.primary {
+  background: var(--txd-brand);
+  border-color: var(--txd-brand);
+  color: #fff;
+}
+.txd2-btn.primary:hover { background: #e63e00; color: #fff; }
+.txd2-btn.soon {
+  cursor: not-allowed;
+  color: var(--txd-fg-muted);
+  background: var(--txd-surface-muted);
+  border-color: var(--txd-border);
+}
+.txd2-btn.soon:hover {
+  color: var(--txd-fg-muted);
+  border-color: var(--txd-border);
+}
+
+/* ── Transaction header ────────────────────────────────────────── */
+.txd2-head {
+  background: var(--txd-surface);
+  border: 1px solid var(--txd-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--txd-shadow-xs);
+  position: relative;
+  overflow: hidden;
+}
+.txd2-head::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 360px;
+  height: 100%;
+  background: radial-gradient(ellipse at top right, var(--txd-brand-soft) 0%, transparent 60%);
+  pointer-events: none;
+}
+.txd2-head > * { position: relative; }
+
+.txd2-head h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--txd-fg);
+}
+.txd2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--txd-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
+}
+.txd2-head .sub {
+  font-size: 13px;
+  color: var(--txd-fg-muted);
+  line-height: 1.5;
+  max-width: 720px;
+}
+.txd2-head .sub strong {
+  color: var(--txd-fg);
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.txd2-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--txd-border-soft);
+}
+.txd2-stats .tile .lab {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--txd-fg-muted);
+}
+.txd2-stats .tile .val {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  margin-top: 3px;
+}
+.txd2-stats .tile .val.bad { color: var(--txd-danger); }
+.txd2-stats .tile .val.good { color: var(--txd-success); }
+.txd2-stats .tile .sub {
+  font-size: 11.5px;
+  color: var(--txd-fg-muted);
+  margin-top: 2px;
+}
+@media (max-width: 720px) {
+  .txd2-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Flagged banner ────────────────────────────────────────────── */
+.txd2-flag-banner {
+  background: var(--txd-warning-soft);
+  border: 1px solid var(--txd-warning-dim);
+  border-left: 3px solid var(--txd-warning);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+.txd2-flag-banner .flag-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #78350f;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.txd2-flag-banner .flag-title .warn-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--txd-warning);
+  border-radius: 50%;
+}
+.txd2-flag-banner .flag-body {
+  margin: 0;
+  font-size: 12.5px;
+  color: #78350f;
+  line-height: 1.55;
+}
+
+/* ── Cards ─────────────────────────────────────────────────────── */
+.txd2-card {
+  background: var(--txd-surface);
+  border: 1px solid var(--txd-border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: var(--txd-shadow-xs);
+  margin-bottom: 16px;
+}
+.txd2-card h3 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--txd-fg);
+}
+
+/* ── Detail grid ───────────────────────────────────────────────── */
+.txd2-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 22px;
+}
+@media (max-width: 720px) {
+  .txd2-detail-grid { grid-template-columns: 1fr 1fr; }
+}
+.txd2-detail-grid .cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--txd-border-soft);
+}
+.txd2-detail-grid .cell .k {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--txd-fg-muted);
+}
+.txd2-detail-grid .cell .v {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txd-fg);
+}
+.txd2-detail-grid .cell .v.muted {
+  color: var(--txd-fg-muted);
+  font-weight: 500;
+  font-style: italic;
+}
+.txd2-detail-grid .cell .v.brand {
+  color: var(--txd-brand);
+}
+.txd2-detail-grid .cell .v.bad { color: var(--txd-danger); }
+.txd2-detail-grid .cell .v.good { color: var(--txd-success); }
+.txd2-detail-grid .cell .v.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.txd2-detail-grid .cell .v.mono.small {
+  font-size: 11px;
+  color: var(--txd-fg-muted);
+}
+
+/* ── Empty state ───────────────────────────────────────────────── */
+.txd2-empty {
+  background: var(--txd-surface-soft);
+  border: 1px dashed var(--txd-border-strong);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  color: var(--txd-fg-muted);
+  line-height: 1.55;
+}
+.txd2-empty strong { color: var(--txd-fg); font-weight: 700; }
+.txd2-empty a {
+  color: var(--txd-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+.txd2-empty a:hover { text-decoration: underline; }
+
+/* ── Actions strip ─────────────────────────────────────────────── */
+.txd2-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--txd-surface);
+  border: 1px solid var(--txd-border);
+  border-radius: 12px;
+  padding: 14px 22px;
+  box-shadow: var(--txd-shadow-xs);
+  align-items: center;
+  margin-bottom: 16px;
+}

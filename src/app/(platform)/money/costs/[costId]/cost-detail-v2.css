@@ -1,0 +1,382 @@
+/**
+ * cost-detail-v2.css — scoped (`.cd2`) styles for the Money Cost Detail page.
+ * Ports the page-level styles from MONEY-MOCKUP-COST-DETAIL.html so this page
+ * visually matches the mockup without leaking styles into the rest of the
+ * platform. Convention mirrors cockpit-v2.css (`.mck2`) + part-detail-v2.css
+ * (`.pd2`).
+ */
+
+.cd2 {
+  /* Palette — mirrors money-mockup.css tokens for this page only */
+  --cd-fg:             #1c1917;
+  --cd-fg-muted:       #78716c;
+  --cd-fg-faint:       #a8a29e;
+  --cd-fg-subtle:      #d6d3d1;
+  --cd-surface:        #ffffff;
+  --cd-surface-muted:  #f5f5f4;
+  --cd-surface-soft:   #fafaf9;
+  --cd-bg:             #f7f6f4;
+  --cd-border:         #e7e5e4;
+  --cd-border-soft:    #f0eeea;
+  --cd-border-strong:  #d6d3d1;
+  --cd-brand:          #ff4500;
+  --cd-brand-dim:      rgba(255,69,0,0.18);
+  --cd-brand-soft:     rgba(255,69,0,0.10);
+  --cd-success:        #15803d;
+  --cd-success-soft:   #dcfce7;
+  --cd-warning:        #b45309;
+  --cd-warning-soft:   #fef3c7;
+  --cd-danger:         #b91c1c;
+  --cd-danger-soft:    #fee2e2;
+  --cd-info:           #1d4ed8;
+  --cd-info-soft:      #dbeafe;
+  --cd-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+  --cd-shadow-sm:      0 2px 6px rgba(0,0,0,0.05);
+
+  color: var(--cd-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 32px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Breadcrumb header ─────────────────────────────────────────── */
+.cd2-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.cd2-crumbs {
+  font-size: 12.5px;
+  color: var(--cd-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cd2-crumbs a {
+  color: var(--cd-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.cd2-crumbs a:hover { color: var(--cd-brand); }
+.cd2-crumbs .sep { color: var(--cd-fg-subtle); }
+.cd2-crumbs .current {
+  color: var(--cd-fg);
+  font-weight: 700;
+}
+.cd2-ctx-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.cd2-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--cd-border-strong);
+  background: var(--cd-surface);
+  color: var(--cd-fg);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.cd2-btn:hover {
+  border-color: var(--cd-brand);
+  color: var(--cd-brand);
+}
+.cd2-btn.sm { padding: 5px 10px; font-size: 12px; }
+.cd2-btn.primary {
+  background: var(--cd-brand);
+  border-color: var(--cd-brand);
+  color: #fff;
+}
+.cd2-btn.primary:hover {
+  background: #e63e00;
+  color: #fff;
+}
+.cd2-btn.soon {
+  cursor: not-allowed;
+  color: var(--cd-fg-muted);
+  background: var(--cd-surface-muted);
+  border-color: var(--cd-border);
+}
+.cd2-btn.soon:hover {
+  color: var(--cd-fg-muted);
+  border-color: var(--cd-border);
+}
+
+/* ── Cost header card ──────────────────────────────────────────── */
+.cd2-head {
+  background: var(--cd-surface);
+  border: 1px solid var(--cd-border);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 20px;
+  box-shadow: var(--cd-shadow-xs);
+  position: relative;
+  overflow: hidden;
+}
+.cd2-head::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100%;
+  background: radial-gradient(ellipse at top right, var(--cd-brand-soft) 0%, transparent 60%);
+  pointer-events: none;
+}
+.cd2-head > * { position: relative; }
+
+.cd2-kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cd-danger);
+  margin-bottom: 8px;
+}
+.cd2-kicker.in { color: var(--cd-success); }
+.cd2-kicker.out { color: var(--cd-danger); }
+
+.cd2-head h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--cd-fg);
+}
+.cd2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--cd-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
+}
+
+.cd2-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--cd-fg-muted);
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.cd2-meta .m {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cd2-meta .m strong {
+  color: var(--cd-fg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd2-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Specialist strip (Finn) ───────────────────────────────────── */
+.cd2-specialist-strip {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  background: var(--cd-surface);
+  border: 1px solid var(--cd-border);
+  border-left: 3px solid var(--cd-brand);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--cd-shadow-xs);
+}
+.cd2-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--cd-brand-soft);
+  color: var(--cd-brand);
+  font-weight: 700;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.04em;
+}
+.cd2-specialist-strip .cd2-msg {
+  font-size: 13px;
+  color: var(--cd-fg);
+  line-height: 1.5;
+}
+.cd2-specialist-strip .cd2-msg strong {
+  font-weight: 700;
+}
+
+/* ── Two-column split ──────────────────────────────────────────── */
+.cd2-split {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .cd2-split { grid-template-columns: 1fr; }
+}
+
+.cd2-col-left,
+.cd2-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Cards (left column) ───────────────────────────────────────── */
+.cd2-card {
+  background: var(--cd-surface);
+  border: 1px solid var(--cd-border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: var(--cd-shadow-xs);
+}
+.cd2-card h3 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--cd-fg);
+}
+
+/* ── Empty state block inside cards ────────────────────────────── */
+.cd2-empty {
+  background: var(--cd-surface-soft);
+  border: 1px dashed var(--cd-border-strong);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  color: var(--cd-fg-muted);
+  line-height: 1.55;
+}
+.cd2-empty strong { color: var(--cd-fg); font-weight: 700; }
+.cd2-empty a { color: var(--cd-brand); font-weight: 600; text-decoration: none; }
+.cd2-empty a:hover { text-decoration: underline; }
+
+/* ── Assumption rows ───────────────────────────────────────────── */
+.cd2-assumption-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 1fr;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--cd-border-soft);
+  align-items: center;
+  font-size: 13px;
+}
+.cd2-assumption-row:last-child { border-bottom: none; }
+.cd2-assumption-row .a-name {
+  font-weight: 600;
+  color: var(--cd-fg-muted);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.cd2-assumption-row .a-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--cd-fg);
+}
+.cd2-assumption-row .a-val.empty {
+  color: var(--cd-fg-faint);
+  font-style: italic;
+  font-weight: 500;
+}
+.cd2-assumption-row .a-note {
+  color: var(--cd-fg-muted);
+  font-size: 12px;
+}
+
+/* ── Right rail cards ──────────────────────────────────────────── */
+.cd2-rail {
+  background: var(--cd-surface);
+  border: 1px solid var(--cd-border);
+  border-radius: 12px;
+  box-shadow: var(--cd-shadow-xs);
+  overflow: hidden;
+}
+.cd2-rail .rc-head {
+  padding: 10px 16px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--cd-fg-muted);
+  border-bottom: 1px solid var(--cd-border-soft);
+  background: var(--cd-surface-soft);
+}
+.cd2-rail .rc-body {
+  padding: 10px 16px;
+  font-size: 12.5px;
+}
+.cd2-rail .rail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--cd-border-soft);
+  gap: 10px;
+}
+.cd2-rail .rail-row:last-child { border-bottom: none; }
+.cd2-rail .rail-row .k {
+  color: var(--cd-fg-muted);
+  font-size: 12px;
+}
+.cd2-rail .rail-row .v {
+  font-weight: 600;
+  color: var(--cd-fg);
+  font-size: 12.5px;
+  text-align: right;
+}
+.cd2-rail .rail-row .v.brand { color: var(--cd-brand); }
+.cd2-rail .rail-row .v.muted { color: var(--cd-fg-muted); font-weight: 500; }
+.cd2-rail .rail-row .v .muted { color: var(--cd-fg-muted); font-weight: 500; font-style: italic; }
+.cd2-rail .rail-row .v .brand { color: var(--cd-brand); }
+
+.cd2-rail .tag-body {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--cd-fg-muted);
+}
+.cd2-rail .tag-body .fg { color: var(--cd-fg); font-weight: 700; }
+.cd2-rail .tag-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  background: var(--cd-surface-muted);
+  padding: 1px 5px;
+  border-radius: 3px;
+  display: inline-block;
+  margin: 2px 2px 2px 0;
+}
+
+.cd2-rail .audit-body {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--cd-fg-muted);
+}
+.cd2-rail .audit-body .fg { color: var(--cd-fg); font-weight: 700; }
+.cd2-rail .audit-body > div {
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--cd-border-soft);
+}
+.cd2-rail .audit-body > div:last-child { border-bottom: none; }
