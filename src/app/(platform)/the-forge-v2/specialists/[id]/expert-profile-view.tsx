@@ -84,7 +84,7 @@ export function ExpertProfileView(props: ExpertProfileViewProps): React.ReactEle
             <nav className="epf2-breadcrumb" aria-label="Breadcrumb">
                 <Link href="/the-forge-v2">Forge</Link>
                 <span className="sep">›</span>
-                <Link href="/the-forge-v2/specialists">Specialists</Link>
+                <Link href="/the-forge-v2/experts">Experts</Link>
                 <span className="sep">›</span>
                 <span className="current">{specialist.name}</span>
             </nav>
@@ -239,7 +239,7 @@ export function ExpertProfileView(props: ExpertProfileViewProps): React.ReactEle
                             before the brief is locked.
                         </div>
                     </Link>
-                    <Link href="/the-forge-v2/specialists" className="epf2-cta-card">
+                    <Link href="/the-forge-v2/experts" className="epf2-cta-card">
                         <span className="cta-icon" aria-hidden="true">↺</span>
                         <div className="cta-title">Back to the roster</div>
                         <div className="cta-sub">
