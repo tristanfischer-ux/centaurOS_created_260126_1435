@@ -5,7 +5,7 @@ import { rateLimit } from "@/lib/security/rate-limit"
 import { checkAILimit, checkDailyFeatureCap, FREE_TIER_SPECIALISTS } from "@/lib/ai/limit-check"
 import { estimateAICost, trackAIUsage, MODALITY_FEATURE_MAP } from "@/lib/ai/usage-tracking"
 import { countTokens } from "@/lib/agent-memory"
-import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider } from "@/lib/ai-providers/registry"
+import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider, getProviderMaxTokens } from "@/lib/ai-providers/registry"
 import { decryptApiKey } from "@/lib/ai-providers/key-vault"
 import type { AIProviderId, OutputModality } from "@/lib/ai-providers/types"
 import { PROVIDER_REGISTRY } from "@/lib/ai-providers/types"
@@ -2186,7 +2186,19 @@ async function handleSpeculativeStreaming(
                     const apiKey = resolveApiKeyForProvider(target.providerId)
                     if (!streamFn || !apiKey) continue
 
-                    const maxTokens = enableThinking ? 32768 : 16384
+                    // GOTCHA: DeepSeek's chat completions API hard-caps max_tokens at 8192.
+                    // This speculative deep-model path is the PRIMARY call site for the
+                    // Ask-a-Specialist chat when the specialist has speculativeEnabled:true
+                    // (Max, Jian, Fang, Priya — all DeepSeek-tier). Without the per-provider
+                    // clamp the first send fires HTTP 400 from DeepSeek, surfaces as
+                    // "Stream interrupted" via classifyStreamError, and renders as the
+                    // "X is having trouble connecting" toast. The registry-level safety
+                    // net in streamDeepSeek (DEEPSEEK_MAX_TOKENS_CAP) still catches it,
+                    // but logs a warn on every clean chat turn. Shared helper —
+                    // getProviderMaxTokens — is the single choke point; adopt here too
+                    // so the primary streaming path (line ~1466), tool-aware streaming
+                    // (line ~1944) and this speculative deep path all agree.
+                    const maxTokens = getProviderMaxTokens(target.providerId, enableThinking)
                     const useThinking = enableThinking && target.providerId === "anthropic"
 
                     try {

@@ -642,7 +642,42 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
  *
  * @see https://api-docs.deepseek.com/api/create-chat-completion
  */
-const DEEPSEEK_MAX_TOKENS_CAP = 8192
+export const DEEPSEEK_MAX_TOKENS_CAP = 8192
+
+/**
+ * Per-provider max_tokens budget for a specialist chat/deep-model dispatch.
+ *
+ * DECISION: This is the SINGLE choke point callers should use when dispatching
+ * to `streamFn` from /api/agents/execute. Centralising provider-specific caps
+ * here means:
+ *   1. The registry safety net in streamDeepSeek never fires on the clean path
+ *      (no `[streamDeepSeek] max_tokens clamped` warn log on every DeepSeek
+ *      chat turn for Max/Jian/Fang/Priya).
+ *   2. Adding a new provider with its own hard cap only needs one edit here,
+ *      not four (primary streaming, tool-aware streaming, speculative deep,
+ *      speculative fast).
+ *   3. Tool-aware vs speculative vs primary paths cannot drift — they all
+ *      ask this helper for the right ceiling.
+ *
+ * DeepSeek is hard-capped at 8192 (API rejects 8193+ with HTTP 400).
+ * All other providers (Anthropic, OpenAI, Gemini, MiniMax, Qwen, Together)
+ * accept 16384–32768. If a new provider is added with a cap below the default,
+ * add a branch here.
+ *
+ * @param providerId  The AI provider the call will dispatch to
+ * @param enableThinking Whether deep-think / extended thinking is enabled
+ * @returns The max_tokens value safe to send to this provider
+ */
+export function getProviderMaxTokens(
+    providerId: AIProviderId,
+    enableThinking: boolean | undefined,
+): number {
+    const requested = enableThinking ? 32768 : 16384
+    if (providerId === "deepseek") {
+        return Math.min(requested, DEEPSEEK_MAX_TOKENS_CAP)
+    }
+    return requested
+}
 
 /**
  * Streams text from DeepSeek via their OpenAI-compatible endpoint.
