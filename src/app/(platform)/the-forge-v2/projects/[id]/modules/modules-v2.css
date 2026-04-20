@@ -401,3 +401,10 @@
   margin-top: 6px;
   display: flex; gap: 4px; flex-wrap: wrap;
 }
+.m2-mod-card .mod-fang-chip {
+  margin-top: 8px;
+  display: flex;
+  /* PipelineRunChip is an inline element with its own colour palette —
+   * this wrapper just reserves a line for it and keeps it from spilling
+   * into the :hover underline on the parent <Link>. */
+}

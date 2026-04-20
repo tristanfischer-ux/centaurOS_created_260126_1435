@@ -18,10 +18,16 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import {
+    loadFangRunStatus,
+    runFangReview,
+} from "@/actions/specialists/run-fang-review"
+import type { CadLabModule, SpecialistReview } from "@/lib/cad-lab-types"
 
 import {
     ModuleDetailView,
+    type ModuleDetailFangIssue,
+    type ModuleDetailFangReview,
     type ModuleDetailGroundedPill,
     type ModuleDetailPartRow,
     type ModuleDetailViewProps,
@@ -46,13 +52,56 @@ export default async function ForgeV2ModuleDetailPage({
     params: Promise<{ id: string; moduleId: string }>
 }): Promise<React.ReactNode> {
     const { id, moduleId } = await params
-    const result = await loadCadLabProject(id)
+    const [result, fangStatus] = await Promise.all([
+        loadCadLabProject(id),
+        loadFangRunStatus(id, moduleId),
+    ])
     if ("error" in result || !result.project) notFound()
 
     const project = result.project
     const modules = project.modules ?? []
     const mod = modules.find((m) => m.id === moduleId)
     if (!mod) notFound()
+
+    // Bind the Fang orchestrator to this (project, module, trigger='manual') so
+    // the client button doesn't need to repeat the ids on every call. The
+    // `"use server"` boundary is on run-fang-review.ts.
+    async function runFangAction(): Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    > {
+        "use server"
+        const res = await runFangReview(id, moduleId, "manual")
+        if (res.ok) return { ok: true, runId: res.runId }
+        return { ok: false, error: res.error, errorCode: res.errorCode }
+    }
+
+    // Pull the persisted Fang review (if any) from the project-level reviews
+    // JSONB. Stored shape is Record<moduleId, SpecialistReview[]>; we pick the
+    // entry whose specialistId matches vp-manufacturing.
+    const reviewsForModule = (project.reviews?.[moduleId] ?? []) as SpecialistReview[]
+    const persistedFangReview =
+        reviewsForModule.find((r) => r.specialistId === "vp-manufacturing") ?? null
+    const fangReview: ModuleDetailFangReview | null = persistedFangReview
+        ? {
+              verdict: persistedFangReview.verdict,
+              summary: persistedFangReview.summary,
+              issues: persistedFangReview.issues.map((i): ModuleDetailFangIssue => ({
+                  severity: i.severity,
+                  category: i.category,
+                  message: i.message,
+                  suggestion: i.suggestion ?? null,
+              })),
+              recommendations: persistedFangReview.recommendations,
+              reviewedAt: persistedFangReview.reviewedAt,
+          }
+        : null
+
+    // Fang can't review a module with no keyParts — surface an honest
+    // disabled CTA pointing the founder to BOM generation first.
+    const fangDisabled = (mod.keyParts?.length ?? 0) === 0
+    const fangDisabledReason = fangDisabled
+        ? "Module has no parts yet — generate BOM first."
+        : null
 
     const moduleIndex = modules.findIndex((m) => m.id === moduleId)
     const moduleNum = `M${moduleIndex + 1}`
@@ -144,6 +193,17 @@ export default async function ForgeV2ModuleDetailPage({
             typeof (mod as CadLabModule & { budgetMassKg?: number }).budgetMassKg === "number"
                 ? (mod as CadLabModule & { budgetMassKg?: number }).budgetMassKg ?? null
                 : null,
+        fangRun: {
+            status: fangStatus.status,
+            startedAt: fangStatus.startedAt,
+            finishedAt: fangStatus.finishedAt,
+            errorCode: fangStatus.errorCode,
+            errorMessage: fangStatus.errorMessage,
+        },
+        fangReview,
+        runFangAction,
+        fangDisabled,
+        fangDisabledReason,
     }
 
     return <ModuleDetailView {...viewProps} />

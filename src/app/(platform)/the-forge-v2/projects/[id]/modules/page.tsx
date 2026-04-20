@@ -23,6 +23,7 @@ import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { loadMaxRunStatus, runMaxDecomposition } from "@/actions/specialists/run-max-decomposition"
+import { loadFangRunStatusesForProject } from "@/actions/specialists/run-fang-review"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
 import { ModulesView, type ModuleCardRow, type ModuleMassRow, type ModulesViewProps, type ThumbKind } from "./modules-view"
@@ -44,9 +45,14 @@ export default async function ForgeV2ModulesPage({
     params: Promise<{ id: string }>
 }): Promise<React.ReactNode> {
     const { id } = await params
-    const [result, maxRunStatus] = await Promise.all([
+    // DECISION: Three loaders fired in parallel. The Fang loader is a
+    // single DB round-trip for every module's latest Fang run (see
+    // loadFangRunStatusesForProject header — N queries is the first thing
+    // to blow Vercel's 300s budget once projects exceed 20 modules).
+    const [result, maxRunStatus, fangStatuses] = await Promise.all([
         loadCadLabProject(id),
         loadMaxRunStatus(id),
+        loadFangRunStatusesForProject(id),
     ])
     if ("error" in result || !result.project) {
         notFound()
@@ -114,6 +120,7 @@ export default async function ForgeV2ModulesPage({
                 ? (m.description.length > 140 ? `${m.description.slice(0, 137)}…` : m.description)
                 : (typeof m.purpose === "string" ? m.purpose : "")
 
+        const fang = fangStatuses[m.id]
         return {
             id: m.id,
             moduleNum,
@@ -127,6 +134,11 @@ export default async function ForgeV2ModulesPage({
             issues,
             thumbKind: pickThumbKind(m),
             massOver: delta != null && delta > 0.05,
+            fangRun: {
+                status: fang?.status ?? "not-started",
+                startedAt: fang?.startedAt ?? null,
+                finishedAt: fang?.finishedAt ?? null,
+            },
         }
     })
 

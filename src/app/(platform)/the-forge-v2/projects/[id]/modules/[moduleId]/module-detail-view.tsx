@@ -27,6 +27,15 @@
 "use client"
 
 import Link from "next/link"
+import { ClipboardCheck } from "lucide-react"
+
+import {
+    PipelineRunChip,
+    type PipelineRunStatus,
+    formatRelativeFromNow,
+} from "@/components/pipeline/pipeline-run-chip"
+import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
+
 import "./module-detail-v2.css"
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -51,6 +60,30 @@ export interface ModuleDetailGroundedPill {
     label: string
     /** Optional link target — if null, renders as a static pill. */
     href: string | null
+}
+
+export interface ModuleDetailFangIssue {
+    /** Severity — maps to issue chip colour. */
+    severity: "critical" | "warning" | "info"
+    /** Short category label, e.g. "Tolerance", "Material compatibility". */
+    category: string
+    /** One-sentence description of the concern. */
+    message: string
+    /** Optional suggested fix. */
+    suggestion: string | null
+}
+
+export interface ModuleDetailFangReview {
+    /** Overall verdict — drives the chip colour. */
+    verdict: "pass" | "warn" | "fail"
+    /** One-sentence summary line. */
+    summary: string
+    /** Issues surfaced — up to 6 rendered, the rest are truncated. */
+    issues: ModuleDetailFangIssue[]
+    /** Actionable recommendations. */
+    recommendations: string[]
+    /** When the review landed (ISO string). */
+    reviewedAt: string
 }
 
 export interface ModuleDetailViewProps {
@@ -104,12 +137,42 @@ export interface ModuleDetailViewProps {
     currentMassKg: number | null
     /** Declared mass budget (kg). */
     budgetMassKg: number | null
+    /** Latest Fang (VP Manufacturing) run status for this module. */
+    fangRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+    }
+    /** Persisted Fang review, if any. Null when Fang hasn't reviewed yet. */
+    fangReview: ModuleDetailFangReview | null
+    /** Server action bound to this project + module + trigger='manual'. */
+    runFangAction: () => Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    >
+    /** True when Fang can't run yet (e.g. no keyParts). Disables the CTA. */
+    fangDisabled: boolean
+    /** Reason shown as tooltip when fangDisabled is true. */
+    fangDisabledReason: string | null
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 
 export function ModuleDetailView(props: ModuleDetailViewProps): React.ReactElement {
-    const { project, module: mod, groundedIn, parts, currentMassKg, budgetMassKg } = props
+    const {
+        project,
+        module: mod,
+        groundedIn,
+        parts,
+        currentMassKg,
+        budgetMassKg,
+        fangRun,
+        fangReview,
+        runFangAction,
+        fangDisabled,
+        fangDisabledReason,
+    } = props
 
     const workspaceHref = `/the-forge-v2/projects/${project.id}`
     const modulesHref = `${workspaceHref}/modules`
@@ -366,6 +429,17 @@ export function ModuleDetailView(props: ModuleDetailViewProps): React.ReactEleme
                 )}
             </div>
 
+            {/* ── Fang review tile ────────────────────── */}
+            <FangReviewSection
+                projectId={project.id}
+                moduleName={mod.name}
+                fangRun={fangRun}
+                fangReview={fangReview}
+                runFangAction={runFangAction}
+                fangDisabled={fangDisabled}
+                fangDisabledReason={fangDisabledReason}
+            />
+
             {/* ── Lead time pill ──────────────────────── */}
             {mod.leadWeeks != null ? (
                 <div className="md2-lead-time-pill">
@@ -488,6 +562,195 @@ export function ModuleDetailView(props: ModuleDetailViewProps): React.ReactEleme
                     <div className="md2-parts-empty">
                         No parts declared yet. Run CAD generation to populate this table.
                     </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ─── Subcomponents ──────────────────────────────────────────────────────
+
+interface FangReviewSectionProps {
+    projectId: string
+    moduleName: string
+    fangRun: ModuleDetailViewProps["fangRun"]
+    fangReview: ModuleDetailFangReview | null
+    runFangAction: ModuleDetailViewProps["runFangAction"]
+    fangDisabled: boolean
+    fangDisabledReason: string | null
+}
+
+/**
+ * Renders the "Review with Fang" tile. Shape depends on state:
+ *
+ *   - No review yet, not-started  → empty card with CTA
+ *   - Queued / Running            → empty card with "Fang is reviewing…" chip
+ *   - Failed (no prior review)    → empty card with failure chip + Retry CTA
+ *   - Populated (done or failed
+ *     after a prior success)      → summary + issues + recs + "Reviewed Xm ago"
+ *                                    (+ Re-run CTA on the right)
+ */
+function FangReviewSection({
+    projectId: _projectId,
+    moduleName,
+    fangRun,
+    fangReview,
+    runFangAction,
+    fangDisabled,
+    fangDisabledReason,
+}: FangReviewSectionProps): React.ReactElement {
+    // VOID: _projectId currently unused — kept in signature so a future
+    // deep-link to the full review markdown page is a one-line edit.
+    void _projectId
+
+    const isLive = fangRun.status === "queued" || fangRun.status === "running"
+    const chipTimestamp =
+        fangRun.status === "done"
+            ? fangRun.finishedAt ?? fangRun.startedAt
+            : fangRun.startedAt ?? fangRun.finishedAt
+    const hasReview = fangReview != null
+    const runDisabled = fangDisabled || isLive
+    const runDisabledReason = fangDisabled
+        ? fangDisabledReason ?? undefined
+        : isLive
+            ? "Fang is already reviewing this module."
+            : undefined
+
+    const ctaLabel = hasReview ? "Re-review with Fang" : "Review with Fang"
+
+    if (!hasReview) {
+        return (
+            <div className="md2-section-block">
+                <h4 className="md2-section-head">Manufacturing review</h4>
+                <div className="md2-review-card empty">
+                    <div className="md2-review-head">
+                        <div>
+                            <h3>
+                                <ClipboardCheck size={16} aria-hidden="true" />
+                                Fang · VP Manufacturing
+                            </h3>
+                            <div className="sub">
+                                Per-module DFM check — tolerances, process fit, assembly notes.
+                            </div>
+                            {fangRun.status !== "not-started" && (
+                                <div style={{ marginTop: 6 }}>
+                                    <PipelineRunChip
+                                        status={fangRun.status}
+                                        specialistName="Fang"
+                                        startedAt={chipTimestamp}
+                                        errorCode={fangRun.errorCode}
+                                        errorMessage={fangRun.errorMessage}
+                                        compact
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        <div className="md2-review-cta">
+                            <RunSpecialistButton
+                                action={runFangAction}
+                                label={ctaLabel}
+                                subLabel="Fang · VP Manufacturing · ~45s"
+                                variant="primary"
+                                icon={<ClipboardCheck aria-hidden="true" />}
+                                disabled={runDisabled}
+                                disabledReason={runDisabledReason}
+                            />
+                        </div>
+                    </div>
+                    <p className="md2-review-summary">
+                        {fangDisabled
+                            ? fangDisabledReason ??
+                              "Fang needs parts before she can review manufacturability."
+                            : `No manufacturing review yet for ${moduleName}. Fang will look at tolerances, process fit, and assembly sequence.`}
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    // Populated state
+    const review = fangReview!
+    const verdictLabel =
+        review.verdict === "pass" ? "Pass" : review.verdict === "warn" ? "Watch" : "Fail"
+    const reviewedRel = formatRelativeFromNow(review.reviewedAt)
+    const visibleIssues = review.issues.slice(0, 6)
+    const hiddenIssueCount = Math.max(0, review.issues.length - visibleIssues.length)
+
+    return (
+        <div className="md2-section-block">
+            <h4 className="md2-section-head">Manufacturing review</h4>
+            <div className="md2-review-card">
+                <div className="md2-review-head">
+                    <div>
+                        <h3>
+                            <ClipboardCheck size={16} aria-hidden="true" />
+                            Fang · VP Manufacturing
+                            <span className={`md2-review-verdict ${review.verdict}`}>
+                                {verdictLabel}
+                            </span>
+                        </h3>
+                        <div className="sub">
+                            Reviewed by Fang {reviewedRel ? `· ${reviewedRel}` : ""}
+                        </div>
+                    </div>
+                    <div className="md2-review-cta">
+                        <RunSpecialistButton
+                            action={runFangAction}
+                            label={ctaLabel}
+                            subLabel="Fang · VP Manufacturing · ~45s"
+                            variant="secondary"
+                            icon={<ClipboardCheck aria-hidden="true" />}
+                            disabled={runDisabled}
+                            disabledReason={runDisabledReason}
+                        />
+                    </div>
+                </div>
+                <p className="md2-review-summary">{review.summary}</p>
+                {fangRun.status === "failed" && fangRun.errorMessage && (
+                    <p className="md2-review-error">
+                        Last re-run failed — {fangRun.errorMessage}
+                    </p>
+                )}
+                {visibleIssues.length > 0 && (
+                    <div className="md2-review-issues">
+                        {visibleIssues.map((issue, i) => (
+                            <div
+                                key={i}
+                                className={`md2-review-issue ${issue.severity}`}
+                            >
+                                <div>
+                                    <span className="severity">{issue.severity}</span>
+                                    <span className="category">{issue.category}:</span>{" "}
+                                    {issue.message}
+                                    {issue.suggestion && (
+                                        <>
+                                            <br />
+                                            <em>Suggestion: {issue.suggestion}</em>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {hiddenIssueCount > 0 && (
+                            <div className="md2-review-issue info">
+                                <div>
+                                    <span className="category">
+                                        + {hiddenIssueCount} more
+                                    </span>{" "}
+                                    issue{hiddenIssueCount === 1 ? "" : "s"} — re-run to see
+                                    the full review body.
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+                {review.recommendations.length > 0 && (
+                    <ul className="md2-review-recs">
+                        <li className="head">Recommendations</li>
+                        {review.recommendations.slice(0, 5).map((rec, i) => (
+                            <li key={i}>{rec}</li>
+                        ))}
+                    </ul>
                 )}
             </div>
         </div>

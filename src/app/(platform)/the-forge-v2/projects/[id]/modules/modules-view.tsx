@@ -68,6 +68,12 @@ export interface ModuleCardRow {
     thumbKind: ThumbKind
     /** True when the card should be flagged "over" on the mass stat. */
     massOver: boolean
+    /** Latest Fang (VP Manufacturing) review run for this module. */
+    fangRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+    }
 }
 
 export type ThumbKind =
@@ -447,6 +453,24 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                                 {c.issues.map((iss, i) => (
                                     <span key={i} className={`m2-chip ${iss.severity}`}>{iss.label}</span>
                                 ))}
+                            </div>
+                        )}
+                        {/* Fang per-module review status — compact chip so it
+                            doesn't fight the mass / lead stats for space.
+                            Hidden entirely when Fang hasn't been kicked off
+                            for this module. */}
+                        {c.fangRun.status !== "not-started" && (
+                            <div className="mod-fang-chip">
+                                <PipelineRunChip
+                                    status={c.fangRun.status}
+                                    specialistName="Fang"
+                                    startedAt={
+                                        c.fangRun.status === "done"
+                                            ? c.fangRun.finishedAt ?? c.fangRun.startedAt
+                                            : c.fangRun.startedAt ?? c.fangRun.finishedAt
+                                    }
+                                    compact
+                                />
                             </div>
                         )}
                     </Link>
