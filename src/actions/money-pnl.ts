@@ -43,10 +43,11 @@ export async function getPnlReport(
   args: { scenarioId?: string; months?: number } = {},
 ): Promise<PnlReportResponse> {
   return withAuth(async ({ supabase, foundryId }) => {
-    // 1. Tier gate — Starter+ only. Same helper used by /money/raise so the
-    // customer-facing tier-mapping stays consistent.
+    // 1. Tier gate — paid plans only. Free tier has investorDetailAccess=true
+    // (they can see investor basics), but intelligenceAccess=false gates them
+    // out of P&L reports / deep intel. Matches /money/raise sidebar gating.
     const access = await getInvestorTierAccess()
-    if (!access.detailAccess) {
+    if (!access.intelligenceAccess) {
       return { error: 'tier_upgrade_required' as const }
     }
 
