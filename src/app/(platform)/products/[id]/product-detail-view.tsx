@@ -85,6 +85,25 @@ import {
 import type { Product, ProductLifecycle, MarketAssessment, FundabilityScore, DesignBrief, ProductIteration, ProductSynthesis, IterationPareto } from '@/types/product'
 import { LIFECYCLE_LABELS, LIFECYCLE_ORDER } from '@/types/product'
 
+// ─── Synthesis validity guard ──────────────────────────────────────
+// Reality check: the DB column `product_synthesis` is JSONB, so a row can
+// carry a partial/legacy shape that satisfies TypeScript at the type-cast
+// boundary but misses required fields at render time. If pareto is missing
+// we'd crash in the Fundability tab on `synthesis.pareto.market`. Guard
+// here — treat any invalid shape as "no synthesis" and show the empty-
+// state CTA. Verified 2026-04-20 against legacy-shaped rows.
+function hasFullSynthesis(s: ProductSynthesis | null | undefined): s is ProductSynthesis {
+  if (!s) return false
+  const p = (s as Partial<ProductSynthesis>).pareto
+  if (!p || typeof p !== 'object') return false
+  return (
+    typeof p.market === 'number' &&
+    typeof p.financial === 'number' &&
+    typeof p.fundability === 'number' &&
+    typeof p.manufacturing === 'number'
+  )
+}
+
 // ─── Lifecycle styling ──────────────────────────────────────────────
 
 const LIFECYCLE_VARIANT: Record<ProductLifecycle, 'default' | 'secondary' | 'success' | 'warning' | 'info' | 'brand' | 'outline'> = {
@@ -266,7 +285,7 @@ export function ProductDetailView({ product: initialProduct, readOnly = false }:
         }
       }
     }
-    if (synthesis) {
+    if (hasFullSynthesis(synthesis)) {
       const p = synthesis.pareto
       parts.push(`Pareto: market=${p.market}, financial=${p.financial}, fundability=${p.fundability}, manufacturing=${p.manufacturing}`)
     }
@@ -2217,7 +2236,7 @@ export function ProductDetailView({ product: initialProduct, readOnly = false }:
               </div>
             </CardHeader>
             <CardContent>
-              {synthesis ? (
+              {hasFullSynthesis(synthesis) ? (
                 <div className="space-y-6">
                   {/* Pareto Score Bars */}
                   <div>
