@@ -63,6 +63,7 @@ export function ForkForm({ projectId, parentName, projectHref }: ForkFormProps):
                             placeholder={`${parentName} · variant`}
                             required
                             disabled={isPending}
+                            maxLength={200}
                         />
                         <p className="text-[11.5px] text-muted-foreground">Shown in the workspace alongside the parent.</p>
                     </div>

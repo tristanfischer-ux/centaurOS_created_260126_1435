@@ -30,7 +30,7 @@
  */
 
 import Link from "next/link"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { ArrowRight, FileText, Lock, Sparkles, Unlock } from "lucide-react"
 import { toast } from "sonner"
 
@@ -98,6 +98,19 @@ export function BriefEditor({
     const isDirty = draft !== savedOverview
     const overLength = draft.length > OVERVIEW_MAX
     const hasBriefData = (initialOverview && initialOverview.trim().length > 0) || designBrief !== null
+
+    // RT.4 — warn on navigation-away with unsaved changes. The browser's native
+    // "Leave site?" dialog is the standard UX and prevents accidental loss of
+    // multi-paragraph edits. No-op when clean or locked.
+    useEffect(() => {
+        if (!isDirty || isLocked) return
+        const handler = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            e.returnValue = ""
+        }
+        window.addEventListener("beforeunload", handler)
+        return () => window.removeEventListener("beforeunload", handler)
+    }, [isDirty, isLocked])
 
     const designBriefRows = useMemo(() => {
         if (!designBrief) return []
