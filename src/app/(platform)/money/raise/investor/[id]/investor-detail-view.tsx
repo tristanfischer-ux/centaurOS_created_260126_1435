@@ -46,6 +46,15 @@ import { DataFreshnessCard } from './data-freshness-card'
 import { RecentDealsCard } from './recent-deals-card'
 import { TierLockSection } from '../../_shared/tier-lock-section'
 import type { FirmContact } from './contact-detail-dialog'
+import {
+  SimilarInvestorsCard,
+  type SimilarInvestorEntry,
+} from './similar-investors-card'
+import { CoInvestmentCard, type CoInvestorEntry } from './co-investment-card'
+import {
+  TeamExpertiseCard,
+  type TeamExpertisePartner,
+} from './team-expertise-card'
 
 // Soft-teaser preview length for portfolio — see InvestmentPatternCard / sidebar
 const PORTFOLIO_TEASER_ROWS = 5
@@ -141,6 +150,9 @@ export function InvestorDetailView({
   dataQualityScore,
   matchBreakdown,
   currentTier,
+  similar,
+  coInvestors,
+  teamExpertise,
 }: {
   detail: InvestorDetail
   contacts: FirmContact[]
@@ -149,6 +161,9 @@ export function InvestorDetailView({
   matchBreakdown: MatchBreakdown | null
   /** Foundry subscription tier — drives tier-locked sections. */
   currentTier: string | null
+  similar: SimilarInvestorEntry[]
+  coInvestors: CoInvestorEntry[]
+  teamExpertise: { expertise: string[] | null; partners: TeamExpertisePartner[] }
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -669,6 +684,39 @@ export function InvestorDetailView({
             <ConnectionBriefCard
               connectionBrief={firmAttributes.connection_brief}
               warmIntroPaths={firmAttributes.warm_intro_paths}
+            />
+          </TierLockSection>
+
+          {/* Similar investors — Pro+ */}
+          <TierLockSection
+            requiredTier="pro"
+            currentTier={currentTier}
+            title="Similar investors"
+            teaser="Pro plan surfaces investors similar to this firm based on portfolio + thesis alignment."
+          >
+            <SimilarInvestorsCard similar={similar} />
+          </TierLockSection>
+
+          {/* Co-investment network — Pro+ */}
+          <TierLockSection
+            requiredTier="pro"
+            currentTier={currentTier}
+            title="Co-investment network"
+            teaser="Pro plan maps co-investors across shared portfolio companies."
+          >
+            <CoInvestmentCard coInvestors={coInvestors} />
+          </TierLockSection>
+
+          {/* Team expertise — Pro+ */}
+          <TierLockSection
+            requiredTier="pro"
+            currentTier={currentTier}
+            title="Team expertise"
+            teaser="Pro plan summarises partners' expertise areas and sector focus."
+          >
+            <TeamExpertiseCard
+              expertise={teamExpertise.expertise}
+              partners={teamExpertise.partners}
             />
           </TierLockSection>
 

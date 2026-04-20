@@ -1,13 +1,18 @@
 import { getInvestorDetail, listInvestorContactsByFirm } from '@/actions/money-raise'
 import {
   checkInvestorViewCap,
+  getCoInvestors,
   getInvestorTierAccess,
+  getSimilarInvestors,
   recordInvestorDetailView,
 } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
 import type { MatchBreakdown } from '@/lib/money/match-types'
 import { InvestorDetailView, type FirmAttributes } from './investor-detail-view'
 import type { FirmContact } from './contact-detail-dialog'
+import type { SimilarInvestorEntry } from './similar-investors-card'
+import type { CoInvestorEntry } from './co-investment-card'
+import type { TeamExpertisePartner } from './team-expertise-card'
 import { ViewCapUpgradePrompt } from '../../_shared/view-cap-upgrade-prompt'
 
 export const dynamic = 'force-dynamic'
@@ -63,6 +68,25 @@ function extractFirmAttributes(attrs: unknown): FirmAttributes {
     recent_deals_summary: str(obj.recent_deals_summary),
     data_source: str(obj.data_source),
   }
+}
+
+/**
+ * Extract expertise chips from `attributes.team_expertise`, which in practice
+ * is a single prose string. We split on common delimiters and cap at 20 chips
+ * so the UI stays tidy. Returns null when there's no usable string at all, so
+ * the card can pick the right empty state.
+ */
+function parseTeamExpertise(raw: unknown): string[] | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  // Split on bullets, semicolons, pipes, commas, and newlines. Keep chips short.
+  const parts = trimmed
+    .split(/[•;|,\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && s.length <= 60)
+  if (parts.length === 0) return [trimmed.slice(0, 60)]
+  return parts.slice(0, 20)
 }
 
 /**
@@ -155,7 +179,16 @@ export default async function InvestorDetailPage({
   //   - partner list (vc_pe_contacts) via the action we already audited
   //   - rich `attributes` + data_quality_score from marketplace_listings
   //   - cached match breakdown from the foundry's pipeline row
-  const [contactsRes, richRes, matchRes] = await Promise.all([
+  //   - similar investors (pgvector/Jaccard), co-investors, team expertise (Pro-tier)
+  // DECISION: Promise.allSettled so a slow RPC (co-investors) or missing row
+  // doesn't break the whole detail page.
+  const [
+    contactsRes,
+    richRes,
+    matchRes,
+    similarRes,
+    coInvestorsRes,
+  ] = await Promise.allSettled([
     listingId
       ? listInvestorContactsByFirm(listingId)
       : Promise.resolve({ success: true as const, contacts: [] as FirmContact[] }),
@@ -180,22 +213,83 @@ export default async function InvestorDetailPage({
         .maybeSingle()
       return data as { match_breakdown_json: unknown } | null
     })(),
+    listingId
+      ? getSimilarInvestors(listingId, 8, tierAccess)
+      : Promise.resolve({ firms: [], similarityScores: {} as Record<string, number> }),
+    listingId
+      ? getCoInvestors(listingId, tierAccess)
+      : Promise.resolve({ coInvestors: [] as Awaited<ReturnType<typeof getCoInvestors>>['coInvestors'] }),
   ])
 
+  const contactsValue =
+    contactsRes.status === 'fulfilled'
+      ? contactsRes.value
+      : { success: true as const, contacts: [] as FirmContact[] }
   const contacts: FirmContact[] =
-    'error' in contactsRes ? [] : contactsRes.contacts.map((c) => ({
-      id: c.id,
-      name: c.name,
-      title: c.title,
-      email: c.email,
-      linkedin_url: c.linkedin_url,
-      seniority: c.seniority ?? null,
+    'error' in contactsValue
+      ? []
+      : contactsValue.contacts.map((c) => ({
+          id: c.id,
+          name: c.name,
+          title: c.title,
+          email: c.email,
+          linkedin_url: c.linkedin_url,
+          seniority: c.seniority ?? null,
+        }))
+
+  const richValue = richRes.status === 'fulfilled' ? richRes.value : null
+  const firmAttributes = extractFirmAttributes(richValue?.attributes ?? null)
+  const dataQualityScore =
+    typeof richValue?.data_quality_score === 'number' ? richValue.data_quality_score : null
+
+  const matchValue = matchRes.status === 'fulfilled' ? matchRes.value : null
+  const matchBreakdown = parseMatchBreakdown(matchValue?.match_breakdown_json ?? null)
+
+  // Similar investors — map InvestorFirm[] to the slim props shape
+  const similarValue =
+    similarRes.status === 'fulfilled'
+      ? similarRes.value
+      : { firms: [], similarityScores: {} as Record<string, number> }
+  const similar: SimilarInvestorEntry[] = similarValue.firms
+    .filter((f) => f.id !== listingId)
+    .map((f) => ({
+      id: f.id,
+      title: f.title,
+      subcategory: f.subcategory ?? null,
+      country: f.attributes.hq_city ?? f.attributes.location ?? null,
+      similarity_score: similarValue.similarityScores[f.id] ?? null,
     }))
 
-  const firmAttributes = extractFirmAttributes(richRes?.attributes ?? null)
-  const dataQualityScore =
-    typeof richRes?.data_quality_score === 'number' ? richRes.data_quality_score : null
-  const matchBreakdown = parseMatchBreakdown(matchRes?.match_breakdown_json ?? null)
+  // Co-investors — reshape to the card's prop shape
+  const coInvestorsValue =
+    coInvestorsRes.status === 'fulfilled'
+      ? coInvestorsRes.value
+      : { coInvestors: [] as Awaited<ReturnType<typeof getCoInvestors>>['coInvestors'] }
+  const coInvestors: CoInvestorEntry[] = coInvestorsValue.coInvestors.map((c) => ({
+    firm_id: c.listingId,
+    firm_title: c.firmName,
+    shared_portfolio_count: c.sharedCompanyCount,
+    shared_portfolio_sample: c.sharedCompanyNames,
+  }))
+
+  // Team expertise — chips + partner list (falls back to contacts with a title).
+  // FALLBACK: vc_pe_contacts has no focus_areas column today, so we only emit
+  // partners array (without focus_areas). The card degrades to "enriched later".
+  const rawTeamExpertise =
+    richValue?.attributes &&
+    typeof richValue.attributes === 'object' &&
+    !Array.isArray(richValue.attributes)
+      ? (richValue.attributes as Record<string, unknown>).team_expertise
+      : null
+  const expertiseChips = parseTeamExpertise(rawTeamExpertise)
+  const partners: TeamExpertisePartner[] = contacts
+    .filter((c) => c.title)
+    .slice(0, 12)
+    .map((c) => ({
+      name: c.name,
+      title: c.title,
+      // No per-partner focus_areas in vc_pe_contacts schema — intentionally omitted.
+    }))
 
   return (
     <InvestorDetailView
@@ -205,6 +299,9 @@ export default async function InvestorDetailPage({
       dataQualityScore={dataQualityScore}
       matchBreakdown={matchBreakdown}
       currentTier={tierAccess.tier}
+      similar={similar}
+      coInvestors={coInvestors}
+      teamExpertise={{ expertise: expertiseChips, partners }}
     />
   )
 }
