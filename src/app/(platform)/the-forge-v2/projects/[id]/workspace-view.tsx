@@ -114,7 +114,7 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
         <div className="w2">
             {/* ── Breadcrumb ───────────────────────────────── */}
             <div className="w2-breadcrumb">
-                <Link href="/today">Today</Link>
+                <Link href="/the-forge-v2">Forge</Link>
                 <span className="sep">›</span>
                 <span className="current">{project.name || "Untitled project"}</span>
             </div>

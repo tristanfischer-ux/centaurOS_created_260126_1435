@@ -93,7 +93,7 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
         <div className="b2">
             {/* ── Breadcrumb ───────────────────────────────────────── */}
             <div className="b2-breadcrumb">
-                <Link href="/today">Today</Link>
+                <Link href="/the-forge-v2">Forge</Link>
                 <span className="sep">›</span>
                 <Link href={workspaceHref}>{project.name}</Link>
                 <span className="sep">›</span>
