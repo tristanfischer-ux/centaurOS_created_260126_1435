@@ -34,6 +34,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
+import { loadBriefLockStatus } from "@/actions/brief-lock"
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { createClient } from "@/lib/supabase/server"
 
@@ -58,13 +59,18 @@ export default async function ForgeV2BriefLockPage({
 }): Promise<React.ReactNode> {
     const { id } = await params
 
-    // ── 1. Fetch project + newest brief_revision in parallel ──────────
-    // loadCadLabProject enforces auth + foundry scoping. The revision
-    // number query is a soft failure — if the table is empty or the
-    // row isn't there yet, we fall back to project.designRevision.
-    const [loadResult, currentRevisionNumber] = await Promise.all([
+    // ── 1. Fetch project + newest brief_revision + canonical lock status
+    //        in parallel. loadCadLabProject enforces auth + foundry
+    //        scoping. `loadBriefLockStatus` is the canonical lock-state
+    //        reader (project row + newest revision); we prefer it over
+    //        reading the stamp off the project alone so the UI
+    //        stays correct when the revisions table and the project row
+    //        briefly disagree. Both are soft failures — if either query
+    //        fails we fall back to the project's in-row fields.
+    const [loadResult, currentRevisionNumber, lockStatus] = await Promise.all([
         loadCadLabProject(id),
         readCurrentRevisionNumber(id),
+        safeLockStatus(id),
     ])
     if ("error" in loadResult || !loadResult.project) {
         notFound()
@@ -226,6 +232,14 @@ export default async function ForgeV2BriefLockPage({
         },
     ]
 
+    // Prefer the canonical lock status from `loadBriefLockStatus` — it
+    // reads both tables — and fall back to the project row's stamped
+    // fields if that call failed. The end result is identical in the
+    // happy path; this just protects against transient drift.
+    const lockIsLocked = lockStatus ? lockStatus.isLocked : project.briefLockedAt !== null
+    const lockLockedAt = lockStatus ? lockStatus.lockedAt : project.briefLockedAt
+    const lockLockedBy = lockStatus ? lockStatus.lockedBy : project.briefLockedBy
+
     const viewProps: BriefLockViewProps = {
         project: {
             id: project.id,
@@ -234,11 +248,14 @@ export default async function ForgeV2BriefLockPage({
             designRevision: project.designRevision,
         },
         lockState: {
-            isLocked: project.briefLockedAt !== null,
-            lockedAt: project.briefLockedAt,
-            lockedBy: project.briefLockedBy,
+            isLocked: lockIsLocked,
+            lockedAt: lockLockedAt,
+            lockedBy: lockLockedBy,
         },
-        currentRevisionNumber: currentRevisionNumber ?? project.designRevision,
+        currentRevisionNumber:
+            lockStatus?.revisionNumber ??
+            currentRevisionNumber ??
+            project.designRevision,
         narrative: { mission, targetCustomers, whyNow },
         constraints: constraintsDisplay,
         regulatoryCodes,
@@ -254,6 +271,23 @@ export default async function ForgeV2BriefLockPage({
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Canonical lock-status reader — delegates to `loadBriefLockStatus` which
+ * joins the project row + newest revisions row + foundry check. Soft
+ * failure: returns null if the action throws (the caller falls back to
+ * the project row's in-line fields).
+ */
+async function safeLockStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadBriefLockStatus>> | null> {
+    try {
+        return await loadBriefLockStatus(projectId)
+    } catch (err) {
+        console.error("[BRIEF-LOCK-PAGE] loadBriefLockStatus failed:", err)
+        return null
+    }
+}
 
 /**
  * Reads the newest revision_number from brief_revisions. Returns null if the

@@ -22,6 +22,11 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
+
+import { lockCadLabBrief, unlockCadLabBrief, type BriefLockErrorCode } from "@/actions/brief-lock"
+
 import "./brief-lock-v2.css"
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -112,12 +117,55 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
         modulesWithUnknownsCount,
     } = props
 
+    const router = useRouter()
+    const [isPending, startTransition] = useTransition()
+    const [justLockedRevisionLabel, setJustLockedRevisionLabel] = useState<string | null>(null)
+    const [actionError, setActionError] = useState<{ message: string; code?: BriefLockErrorCode } | null>(null)
+
     const workspaceHref = `/the-forge-v2/projects/${project.id}`
     const briefHref = `${workspaceHref}/brief`
     const forkHref = `${workspaceHref}/fork`
+    const modulesHref = `${workspaceHref}/modules`
 
     const currentLetter = designRevisionToLetter(currentRevisionNumber)
     const nextLetter = designRevisionToLetter(currentRevisionNumber + 1)
+
+    // UI treats either a server-side `isLocked` OR a just-completed lock as
+    // the locked state. This avoids a race where the server data hasn't
+    // refreshed yet (router.refresh pending) but the action returned ok.
+    const showLocked = lockState.isLocked || justLockedRevisionLabel !== null
+
+    const handleLock = (): void => {
+        setActionError(null)
+        startTransition(async () => {
+            const result = await lockCadLabBrief(project.id)
+            if (!result.ok) {
+                setActionError({ message: result.error, code: result.errorCode })
+                return
+            }
+            setJustLockedRevisionLabel(
+                `Rev ${designRevisionToLetter(result.revisionNumber)}`,
+            )
+            // Refresh server data so the page re-renders with
+            // AlreadyLockedBanner + the workspace header badge flips.
+            router.refresh()
+        })
+    }
+
+    const handleUnlock = (): void => {
+        setActionError(null)
+        startTransition(async () => {
+            const result = await unlockCadLabBrief(project.id)
+            if (!result.ok) {
+                setActionError({ message: result.error, code: result.errorCode })
+                return
+            }
+            // Route back to the brief editor — the founder wants to edit,
+            // not sit on the lock confirm page.
+            router.push(briefHref)
+            router.refresh()
+        })
+    }
 
     return (
         <div className="bl2">
@@ -146,11 +194,12 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
             <div className="bl2-grid">
                 {/* ── Main wrap ──────────────────────────────────── */}
                 <div className="bl2-wrap">
-                    {lockState.isLocked ? (
+                    {showLocked ? (
                         <AlreadyLockedBanner
                             lockedAt={lockState.lockedAt}
                             lockedBy={lockState.lockedBy}
                             currentLetter={currentLetter}
+                            justLockedRevisionLabel={justLockedRevisionLabel}
                         />
                     ) : (
                         <TerminalCallout projectName={project.name} />
@@ -206,7 +255,7 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
                     <div className="bl2-section-title">Revision bump</div>
                     <div className="bl2-bump">
                         <div className="bl2-bump__head">
-                            <span>{lockState.isLocked ? "This revision is already locked" : "On lock"}</span>
+                            <span>{showLocked ? "This revision is already locked" : "On lock"}</span>
                             <span><strong>{moduleCount}</strong> modules in scope</span>
                         </div>
                         <div className="bl2-bump__row">
@@ -214,7 +263,7 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
                                 <span className="k">Current</span>
                                 <span className="v">Rev {currentLetter}</span>
                                 <span className="meta">
-                                    {lockState.isLocked ? "locked" : "draft · editable"}
+                                    {showLocked ? "locked" : "draft · editable"}
                                 </span>
                             </div>
                             <div className="bl2-bump__arrow" aria-hidden="true">→</div>
@@ -222,7 +271,7 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
                                 <span className="k">After lock</span>
                                 <span className="v">Rev {nextLetter}</span>
                                 <span className="meta">
-                                    {lockState.isLocked
+                                    {showLocked
                                         ? "next editable revision"
                                         : "next edit opens rev " + nextLetter}
                                 </span>
@@ -351,25 +400,81 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
                         </ol>
                     </div>
 
-                    {/* Decision strip (CTA footer). Lock button is intentionally disabled
-                        — the lock server action lives in another directory. */}
+                    {/* Decision strip (CTA footer) — wired to lockCadLabBrief /
+                        unlockCadLabBrief. When locked, the primary CTA becomes
+                        "Open new revision" (unlock → Rev N+1 draft); when
+                        draft, the primary CTA is "Lock revision N". */}
+                    {actionError ? (
+                        <div className="bl2-action-error" role="alert">
+                            <strong>Couldn&apos;t {showLocked ? "open a new revision" : "lock the brief"}.</strong>{" "}
+                            {actionError.message}
+                            {actionError.code ? (
+                                <span className="bl2-action-error__code"> ({actionError.code})</span>
+                            ) : null}
+                        </div>
+                    ) : null}
                     <div className="bl2-decision">
                         <div className="bl2-decision__warn">
-                            This cannot be undone. To change a locked Brief later, open a Fork.
+                            {showLocked
+                                ? "A new revision keeps the locked Rev " + currentLetter + " as the historical record. Downstream artefacts (BOM, Suppliers) stay anchored to it."
+                                : "This cannot be undone. To change a locked Brief later, open a new revision."}
                         </div>
-                        <Link href={briefHref} className="bl2-btn-ghost">
-                            Cancel · keep editing
-                        </Link>
-                        <button type="button" className="bl2-btn-lock" disabled aria-disabled="true" title="Lock action wires in the next round — server action ships separately">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <rect x="3" y="11" width="18" height="11" rx="2" />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                            </svg>
-                            {lockState.isLocked
-                                ? `Rev ${currentLetter} already locked`
-                                : `Lock revision ${currentLetter} and move to Forge`}
-                        </button>
+                        {showLocked ? (
+                            <>
+                                <Link href={workspaceHref} className="bl2-btn-ghost">
+                                    Back to project
+                                </Link>
+                                <button
+                                    type="button"
+                                    className="bl2-btn-lock"
+                                    onClick={handleUnlock}
+                                    disabled={isPending}
+                                    aria-busy={isPending}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                    {isPending
+                                        ? "Opening…"
+                                        : `Open Rev ${nextLetter} to revise`}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Link href={briefHref} className="bl2-btn-ghost">
+                                    Cancel · keep editing
+                                </Link>
+                                <button
+                                    type="button"
+                                    className="bl2-btn-lock"
+                                    onClick={handleLock}
+                                    disabled={isPending}
+                                    aria-busy={isPending}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                    {isPending
+                                        ? "Locking…"
+                                        : `Lock Rev ${currentLetter} and hand off to Forge`}
+                                </button>
+                            </>
+                        )}
                     </div>
+
+                    {/* Auto-Max notice appears right after a successful lock so
+                        the founder understands the background work that just
+                        kicked off. Hidden when the page is loaded on an
+                        already-locked brief (Max's earlier run lives on the
+                        Modules tab already). */}
+                    {justLockedRevisionLabel ? (
+                        <div className="bl2-auto-max" role="status">
+                            <strong>Max is decomposing your modules in the background.</strong>{" "}
+                            Head over to <Link href={modulesHref}>Modules</Link> in a minute or two — the chip there tracks the run.
+                        </div>
+                    ) : null}
                 </div>
 
                 {/* ── Sidebar ─────────────────────────────────── */}
@@ -401,7 +506,7 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
                         <SnapshotRow k="Current revision" v={`Rev ${currentLetter}`} />
                         <SnapshotRow
                             k="Lock state"
-                            v={lockState.isLocked ? "Locked" : "Draft"}
+                            v={showLocked ? "Locked" : "Draft"}
                         />
                         <SnapshotRow k="Modules decomposed" v={moduleCount > 0 ? String(moduleCount) : null} />
                         <SnapshotRow
@@ -416,8 +521,8 @@ export function BriefLockView(props: BriefLockViewProps): React.ReactElement {
                     </div>
 
                     <div className="bl2-side-card">
-                        <h4>{lockState.isLocked ? "After lock · current state" : "After lock · next actions"}</h4>
-                        {lockState.isLocked ? (
+                        <h4>{showLocked ? "After lock · current state" : "After lock · next actions"}</h4>
+                        {showLocked ? (
                             <>
                                 <p>1. Every downstream artefact (BOM, Suppliers, Risks, Cost) now cites Rev {currentLetter}.</p>
                                 <p>2. Any change opens a proposal for Rev {nextLetter} — not an edit to Rev {currentLetter}.</p>
@@ -462,11 +567,15 @@ function AlreadyLockedBanner({
     lockedAt,
     lockedBy,
     currentLetter,
+    justLockedRevisionLabel,
 }: {
     lockedAt: string | null
     lockedBy: string | null
     currentLetter: string
+    /** Set immediately after a successful lock; swaps copy to "just locked". */
+    justLockedRevisionLabel: string | null
 }): React.ReactElement {
+    const justLocked = justLockedRevisionLabel !== null
     return (
         <div className="bl2-locked-banner">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -474,10 +583,18 @@ function AlreadyLockedBanner({
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
             <div>
-                <strong>Revision {currentLetter} is already locked.</strong>
-                This project has been handed off to Forge. Suppliers cite this revision on RFQs. Editing opens a proposal for the next revision — not an edit to Rev {currentLetter}.
+                <strong>
+                    {justLocked
+                        ? `${justLockedRevisionLabel} locked — handed off to Forge.`
+                        : `Revision ${currentLetter} is already locked.`}
+                </strong>
+                {justLocked
+                    ? " Max is decomposing your modules in the background. Downstream artefacts (BOM, Suppliers, Risks, Cost) now anchor to this revision."
+                    : " This project has been handed off to Forge. Suppliers cite this revision on RFQs. Editing opens a proposal for the next revision — not an edit to Rev " +
+                      currentLetter +
+                      "."}
                 <div className="meta">
-                    Locked {lockedAt ? formatIsoDateTime(lockedAt) : "timestamp unavailable"}
+                    Locked {lockedAt ? formatIsoDateTime(lockedAt) : justLocked ? "just now" : "timestamp unavailable"}
                     {lockedBy ? ` · by ${lockedBy}` : ""}
                 </div>
             </div>
