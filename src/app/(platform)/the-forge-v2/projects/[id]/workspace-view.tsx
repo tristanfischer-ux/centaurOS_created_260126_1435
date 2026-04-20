@@ -56,6 +56,7 @@ export interface WorkspaceViewProps {
         designRevision: number
         createdAt: string
         updatedAt: string
+        systemIllustrationUrl: string | null
     }
     header: {
         moduleCount: number
@@ -185,20 +186,38 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                     <div className="pane">
                         <div className="pane-head">
                             <span>Nano Banana render</span>
-                            <span className="style-tag-inline">pending</span>
+                            <span className="style-tag-inline">{project.systemIllustrationUrl ? "rev A" : "pending"}</span>
                         </div>
                         <div className="pane-body">
-                            <BlueprintPaperPlaceholder label="Concept render" sub="Generates when CAD is imported or a style brief is approved" />
+                            {project.systemIllustrationUrl ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={project.systemIllustrationUrl}
+                                    alt={`${project.name} concept render`}
+                                    className="system-illustration"
+                                />
+                            ) : (
+                                <BlueprintPaperPlaceholder label="Concept render" sub="Generates when CAD is imported or a style brief is approved" />
+                            )}
                         </div>
                     </div>
 
                     <div className="pane">
                         <div className="pane-head">
                             <span>System blueprint · plan view</span>
-                            <span className="style-tag-inline">pending</span>
+                            <span className="style-tag-inline">{project.systemIllustrationUrl ? "rev A" : "pending"}</span>
                         </div>
                         <div className="pane-body">
-                            <BlueprintPaperPlaceholder label="Plan view" sub="Renders from module geometry once modules are stable" />
+                            {project.systemIllustrationUrl ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={project.systemIllustrationUrl}
+                                    alt={`${project.name} plan view blueprint`}
+                                    className="system-illustration"
+                                />
+                            ) : (
+                                <BlueprintPaperPlaceholder label="Plan view" sub="Renders from module geometry once modules are stable" />
+                            )}
                         </div>
                     </div>
                 </div>

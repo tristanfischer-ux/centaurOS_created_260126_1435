@@ -3881,6 +3881,57 @@ export type Database = {
           },
         ]
       }
+      brief_revisions: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          project_id: string
+          revision_label: string
+          revision_number: number
+          summary: string
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          project_id: string
+          revision_label: string
+          revision_number: number
+          summary?: string
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          project_id?: string
+          revision_label?: string
+          revision_number?: number
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brief_revisions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_revisions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       burn_scenarios: {
         Row: {
           cost_delay_weeks: number

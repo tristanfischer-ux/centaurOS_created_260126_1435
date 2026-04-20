@@ -41,7 +41,7 @@ import { notFound } from "next/navigation"
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { createClient } from "@/lib/supabase/server"
 
-import { BriefView, type BriefViewProps, type RegulatoryStandardRow } from "./brief-view"
+import { BriefView, type BriefRevisionRow, type BriefViewProps, type RegulatoryStandardRow } from "./brief-view"
 
 export const dynamic = "force-dynamic"
 
@@ -62,9 +62,10 @@ export default async function ForgeV2BriefPage({
     // design_standards is a public read so we can fire it in parallel.
     // If the project load fails we 404 after both settle — saves one
     // round-trip for the happy path without waiting on a failed query.
-    const [loadResult, regulatoryStandards] = await Promise.all([
+    const [loadResult, regulatoryStandards, revisions] = await Promise.all([
         loadCadLabProject(id),
         safeRegulatoryStandards(),
+        safeRevisionHistory(id),
     ])
     if ("error" in loadResult || !loadResult.project) {
         notFound()
@@ -166,6 +167,7 @@ export default async function ForgeV2BriefPage({
             maxMassKg,
             moduleCount: modules.length,
         },
+        revisions,
     }
 
     return <BriefView {...viewProps} />
@@ -187,6 +189,38 @@ export default async function ForgeV2BriefPage({
  * project_compliance_packet table exists, join on it and infer status
  * (met / in-progress / not-started).
  */
+/**
+ * Loads the brief revision history for this project, newest-first. The
+ * newest row is flagged isCurrent: true so the view renders it with the
+ * brand dot. Unknown / missing rows → empty array → view falls back to
+ * the single-row "current · not yet locked" variant.
+ */
+async function safeRevisionHistory(projectId: string): Promise<BriefRevisionRow[]> {
+    try {
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("brief_revisions")
+            .select("id, revision_label, summary, locked_at, created_at")
+            .eq("project_id", projectId)
+            .order("revision_number", { ascending: false })
+        if (error || !data) return []
+        return data.map((r, idx) => {
+            const lockedAt = r.locked_at as string | null
+            return {
+                id: r.id as string,
+                label: r.revision_label as string,
+                summary: (r.summary as string | null) ?? "",
+                at: lockedAt ?? (r.created_at as string),
+                isCurrent: idx === 0,
+                isLocked: lockedAt !== null,
+            }
+        })
+    } catch (err) {
+        console.error("[BRIEF-PAGE] revision history failed:", err)
+        return []
+    }
+}
+
 /** Formats an ISO date for display in the constraints grid — "Nov 2026" style. */
 function formatDisplayDate(iso: string): string {
     const d = new Date(iso)

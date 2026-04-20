@@ -608,37 +608,37 @@ async function main() {
             {
                 code: "AS9100D",
                 name: "Aerospace QMS — Class A",
-                summary: "Primary structural quality system. Wing spar + fuselage ring-frames flow through Class A.",
+                summary: "Required on primary structure suppliers",
                 status: "in-progress" as const,
             },
             {
                 code: "EASA Part 21",
-                name: "Airworthiness — subpart-G",
-                summary: "Dedicated HAPS airworthiness path. Cube Orange+ FW revision is the critical-path item.",
+                name: "Subpart-G airworthiness",
+                summary: "HAPS path · Cube Orange+ FW is critical path",
                 status: "in-progress" as const,
             },
             {
                 code: "UK CAA",
-                name: "Experimental category",
-                summary: "Operating permission for first 12 test flights over the North Sea corridor.",
+                name: "Experimental permit",
+                summary: "12 test flights · North Sea corridor",
                 status: "in-progress" as const,
             },
             {
                 code: "ISO 9001",
-                name: "QMS (supplier-facing)",
-                summary: "Baseline supplier requirement — Intelligent Energy, Astra, Maxeon already compliant.",
+                name: "Supplier QMS",
+                summary: "Baseline supplier requirement",
                 status: "met" as const,
             },
             {
                 code: "RTCA DO-160",
                 name: "Environmental",
-                summary: "Cold-soak, humidity, vibration envelope for FL650 avionics + battery pack qualification.",
+                summary: "FL650 avionics + battery qualification",
                 status: "not-started" as const,
             },
             {
-                code: "ITAR",
+                code: "ITAR / EAR99",
                 name: "Export control",
-                summary: "ITAR-free confirmation — propulsion supply chain kept within UK + EU sources only.",
+                summary: "ITAR-free · UK+EU propulsion sources only",
                 status: "met" as const,
             },
         ],
@@ -681,6 +681,7 @@ async function main() {
         ai_cost_estimates: aiCostEstimatesJson,
         product_overview:
             "Stratosphere HAPS-S1 — 25 m wingspan, 42 m² solar array, 30-day endurance at FL650. Target unit cost £150 000 at batch 50. Primary markets: UK + EU telco backhaul and ISR.",
+        system_illustration_url: "/seed/haps-s1-concept.svg",
         stage: "analysis" as const,
         status: "generated" as const,
         design_revision: 1,
@@ -731,6 +732,66 @@ async function main() {
         process.exit(1)
     }
     console.log(`  ✓ Activity timeline: ${auditRows.length} events`)
+
+    // 5. Brief revision history — wipe prior seed-flagged rows, reinsert the
+    //    mockup's four-row timeline. rev 1 (locked) is the current row.
+    const { error: revDelErr } = await supabase
+        .from("brief_revisions")
+        .delete()
+        .eq("project_id", PROJECT_ID)
+    if (revDelErr) {
+        console.warn("  ! Could not prune brief_revisions rows (may be first run):", revDelErr.message)
+    }
+
+    const revisionRows = [
+        {
+            project_id: PROJECT_ID,
+            foundry_id: FOUNDRY_ID,
+            revision_number: 1,
+            revision_label: "Revision A (current · locked)",
+            summary: "locked by Max after specialist review · 14 supplier RFQs cite this rev",
+            locked_at: briefLockedAt,
+            locked_by: userId,
+            created_at: daysAgoTs(4, 11),
+        },
+        {
+            project_id: PROJECT_ID,
+            foundry_id: FOUNDRY_ID,
+            revision_number: 2,
+            revision_label: "Draft 0.3 → Revision A",
+            summary: "added EASA Part 21 DOA target · removed global mission scope to UK+EU only",
+            locked_at: null,
+            locked_by: null,
+            created_at: daysAgoTs(8, 14),
+        },
+        {
+            project_id: PROJECT_ID,
+            foundry_id: FOUNDRY_ID,
+            revision_number: 3,
+            revision_label: "Draft 0.2",
+            summary: "raised unit-cost ceiling to £150k after first BOM roll-up · Fang",
+            locked_at: null,
+            locked_by: null,
+            created_at: daysAgoTs(14, 10),
+        },
+        {
+            project_id: PROJECT_ID,
+            foundry_id: FOUNDRY_ID,
+            revision_number: 4,
+            revision_label: "Draft 0.1",
+            summary: "initial concept · 30-day endurance target · HAPS envelope set",
+            locked_at: null,
+            locked_by: null,
+            created_at: daysAgoTs(21, 9),
+        },
+    ]
+
+    const { error: revInsErr } = await supabase.from("brief_revisions").insert(revisionRows)
+    if (revInsErr) {
+        console.error("  ✗ brief_revisions insert failed:", revInsErr.message)
+        process.exit(1)
+    }
+    console.log(`  ✓ Brief revisions: ${revisionRows.length} rows`)
 
     // 5. Summary
     console.log("\n✅ HAPS UAV seed complete.\n")

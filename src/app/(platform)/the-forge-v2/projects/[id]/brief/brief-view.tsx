@@ -35,6 +35,21 @@ export interface RegulatoryStandardRow {
     status: "met" | "in-progress" | "not-started"
 }
 
+export interface BriefRevisionRow {
+    /** UUID — stable key for React. */
+    id: string
+    /** "A", "B"... or a free-form label like "Draft 0.3 → Revision A". */
+    label: string
+    /** One-line summary of what changed in this revision. */
+    summary: string
+    /** ISO timestamp (createdAt for drafts, lockedAt for locked revisions). */
+    at: string
+    /** True for the newest row — shown with the "current" (brand) dot. */
+    isCurrent: boolean
+    /** True once locked_at is populated. Drives the chip wording. */
+    isLocked: boolean
+}
+
 export interface BriefViewProps {
     project: {
         id: string
@@ -72,12 +87,14 @@ export interface BriefViewProps {
         maxMassKg: number | null
         moduleCount: number
     }
+    /** Revision history rows, newest-first. Empty array → single-row fallback. */
+    revisions: BriefRevisionRow[]
 }
 
 // ─── View ──────────────────────────────────────────────────────────────
 
 export function BriefView(props: BriefViewProps): React.ReactElement {
-    const { project, lockState, narrative, constraints, regulatory, cost, mass } = props
+    const { project, lockState, narrative, constraints, regulatory, cost, mass, revisions } = props
 
     const briefHref = `/the-forge-v2/projects/${project.id}/brief`
     const forkHref = `/the-forge-v2/projects/${project.id}/fork`
@@ -217,17 +234,32 @@ export function BriefView(props: BriefViewProps): React.ReactElement {
                 </div>
             </div>
 
-            {/* ── Revision history (single-row until table ships) ───── */}
+            {/* ── Revision history ─────────────────────────────────── */}
             <div className="b2-revision-card">
                 <h4>Revision history</h4>
                 <div className="b2-revision-timeline">
-                    <div className="b2-rev-row">
-                        <span className="dot current" />
-                        <div className="content">
-                            <div className="label">Revision {revisionLetter} (current · not yet locked)</div>
-                            <div className="time">Created {createdDate} · revision history table not yet enabled</div>
+                    {revisions.length > 0 ? (
+                        revisions.map((row) => (
+                            <div key={row.id} className="b2-rev-row">
+                                <span className={`dot ${row.isCurrent ? "current" : "old"}`} />
+                                <div className="content">
+                                    <div className="label">{row.label}</div>
+                                    <div className="time">
+                                        {formatIsoDate(row.at)}
+                                        {row.summary ? ` · ${row.summary}` : ""}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="b2-rev-row">
+                            <span className="dot current" />
+                            <div className="content">
+                                <div className="label">Revision {revisionLetter} (current{lockState.isLocked ? " · locked" : " · not yet locked"})</div>
+                                <div className="time">Created {createdDate}</div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
 

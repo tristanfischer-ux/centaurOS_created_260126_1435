@@ -259,6 +259,12 @@
   height: 100%;
   display: block;
 }
+.w2-system-card .system-illustration {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .w2-system-card .legend {
   display: flex; gap: 20px;
   justify-content: center;

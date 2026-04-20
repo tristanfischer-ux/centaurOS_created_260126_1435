@@ -118,6 +118,7 @@ export default async function ForgeV2ProjectPage({
             designRevision: project.designRevision,
             createdAt: project.createdAt,
             updatedAt: project.updatedAt,
+            systemIllustrationUrl: project.systemIllustrationUrl,
         },
         header: {
             moduleCount,
