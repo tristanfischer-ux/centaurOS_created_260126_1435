@@ -11,6 +11,7 @@ const TABS = [
   { href: '/money/raise/browse', label: 'Browse', match: /^\/money\/raise\/browse/ },
   { href: '/money/raise/contacts', label: 'Contacts', match: /^\/money\/raise\/contacts/ },
   { href: '/money/raise/grants', label: 'Grants', match: /^\/money\/raise\/grants/ },
+  { href: '/money/raise/portfolio-companies', label: 'Portfolio', match: /^\/money\/raise\/portfolio/ },
   { href: '/money/raise/thesis', label: 'Thesis', match: /^\/money\/raise\/thesis/ },
   { href: '/money/raise/pitch', label: 'Pitch prep', match: /^\/money\/raise\/pitch/ },
   { href: '/money/raise/update', label: 'Updates', match: /^\/money\/raise\/update/ },

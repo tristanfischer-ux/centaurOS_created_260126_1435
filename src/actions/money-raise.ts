@@ -1340,7 +1340,7 @@ export async function exportInvestorsCsv(args: {
     })
     if ('error' in search) return { error: search.error }
 
-    let scoresByListingId: Record<string, number> = {}
+    const scoresByListingId: Record<string, number> = {}
     if (includeMatchScore) {
       const scored = await scoreInvestorsAgainstThesis({
         limit: 500,
