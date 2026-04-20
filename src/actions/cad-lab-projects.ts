@@ -1168,6 +1168,47 @@ export async function deleteCadLabProject(
   })
 }
 
+// ─── Unarchive Project ───────────────────────────────────────────────
+
+/**
+ * Unarchives a The Forge project — the inverse of archive.
+ *
+ * @description Sets `cad_lab_projects.archived_at` back to NULL, restoring
+ * the project to the active workspace list at its previous lifecycle stage.
+ * Evidence, modules, specialist reviews, checkpoints, and readiness items
+ * were never deleted — just hidden behind the archive filter. Idempotent:
+ * unarchiving an already-active project is a no-op from the caller's side.
+ *
+ * @param projectId - Project UUID to unarchive
+ * @returns Success or error
+ *
+ * @security `withAuth` enforces authentication + foundry membership; RLS
+ * ensures the UPDATE can only touch rows inside the caller's foundry.
+ * @audit Logs unarchive event (projectId + userId) to server console.
+ */
+export async function unarchiveCadLabProject(
+  projectId: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase, user }) => {
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ archived_at: null })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to unarchive project:", error.message)
+      return { error: `Failed to unarchive: ${sanitizeErrorMessage(error)}` }
+    }
+
+    // AUDIT: Log unarchive event
+    console.info("[THE-FORGE-PROJECTS] Project unarchived:", { projectId, userId: user.id })
+
+    return { success: true as const }
+  })
+}
+
 // ─── Poll Unified Result ──────────────────────────────────────────────
 
 /**

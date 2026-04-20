@@ -1,0 +1,283 @@
+/* Unarchive V2 — scoped stylesheet ported from FORGE-MOCKUP-UNARCHIVE.html.
+   Every rule is prefixed with .uar2 so nothing leaks to other pages.
+   Design tokens mirror fork-v2.css so Unarchive and Fork read as siblings. */
+
+.uar2 {
+  --b-bg: #fafaf9;
+  --b-surface: #ffffff;
+  --b-surface-muted: #f5f5f4;
+  --b-surface-soft: #fafaf9;
+  --b-border: #e7e5e4;
+  --b-border-strong: #d6d3d1;
+  --b-border-soft: #f0efed;
+  --b-fg: #1c1917;
+  --b-fg-muted: #78716c;
+  --b-fg-subtle: #a8a29e;
+  --b-fg-faint: #d6d3d1;
+  --b-brand: #ff4500;
+  --b-brand-soft: #fff0ea;
+  --b-brand-dim: #ffdcc7;
+  --b-info: #2563eb;
+  --b-info-soft: #dbeafe;
+  --b-info-dim: #bfdbfe;
+  --b-success: #16a34a;
+  --b-success-soft: #dcfce7;
+  --b-success-dim: #bbf7d0;
+  --b-error: #b91c1c;
+  --b-error-soft: #fee2e2;
+  --b-error-dim: #fecaca;
+  --b-shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.03);
+  --b-shadow-sm: 0 2px 4px rgba(28, 25, 23, 0.04);
+  --b-shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
+
+  background: var(--b-bg);
+  color: var(--b-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.55;
+  margin: -1rem;
+  padding: 28px 36px 60px;
+  max-width: none;
+  min-height: calc(100vh - 64px);
+}
+
+@media (min-width: 640px) { .uar2 { margin: -1.5rem -1.5rem -1.5rem -1.25rem; } }
+@media (min-width: 1024px) { .uar2 { margin: -2rem -2rem -2rem -1.5rem; } }
+
+.uar2 *, .uar2 *::before, .uar2 *::after { box-sizing: border-box; }
+.uar2 h1, .uar2 h2, .uar2 h3, .uar2 h4, .uar2 p, .uar2 ul { margin: 0; }
+.uar2 a { color: inherit; text-decoration: none; }
+
+/* ── Breadcrumb ─────────────────────────────────────────────────────── */
+.uar2-breadcrumb {
+  font-size: 12px;
+  color: var(--b-fg-muted);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.uar2-breadcrumb a {
+  color: var(--b-fg-muted);
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: all 0.12s;
+}
+.uar2-breadcrumb a:hover { color: var(--b-fg); background: var(--b-surface-muted); }
+.uar2-breadcrumb .sep { color: var(--b-fg-faint); font-size: 10px; }
+.uar2-breadcrumb .current { color: var(--b-fg); font-weight: 600; }
+
+/* ── Page header ────────────────────────────────────────────────────── */
+.uar2-page-header {
+  background: var(--b-surface);
+  border: 1px solid var(--b-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  box-shadow: var(--b-shadow-xs);
+}
+.uar2-page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--b-fg);
+}
+.uar2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--b-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
+}
+.uar2-page-header .lead {
+  font-size: 13px;
+  color: var(--b-fg-muted);
+  margin: 6px 0 0;
+  max-width: 680px;
+  line-height: 1.55;
+}
+
+/* ── Stack (card wrapper) ───────────────────────────────────────────── */
+.uar2-stack {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* ── Card ───────────────────────────────────────────────────────────── */
+.uar2-card {
+  width: 520px;
+  max-width: 100%;
+  background: var(--b-surface);
+  border: 1px solid var(--b-border);
+  border-radius: 12px;
+  box-shadow: var(--b-shadow-lg);
+  overflow: hidden;
+}
+
+.uar2-card-head {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--b-border-soft);
+}
+.uar2-card-head h2 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0 0 6px;
+  color: var(--b-fg);
+}
+.uar2-meta {
+  font-size: 11.5px;
+  color: var(--b-fg-muted);
+  line-height: 1.55;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.uar2-card-body {
+  padding: 18px 22px 4px;
+}
+
+.uar2-subject {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--b-fg);
+  margin: 0 0 4px;
+  letter-spacing: -0.005em;
+}
+.uar2-subject-desc {
+  font-size: 12.5px;
+  color: var(--b-fg-muted);
+  margin: 0 0 16px;
+  line-height: 1.55;
+}
+
+.uar2-explain {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--b-fg);
+  margin: 12px 0 16px;
+}
+
+/* ── Banners ────────────────────────────────────────────────────────── */
+.uar2-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.uar2-banner .b-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+}
+.uar2-banner .b-body { flex: 1; }
+.uar2-banner .b-body strong { font-weight: 700; }
+
+.uar2-banner.info {
+  background: var(--b-info-soft);
+  border: 1px solid var(--b-info-dim);
+  color: #1e3a8a;
+}
+.uar2-banner.info .b-icon { background: var(--b-info); }
+
+.uar2-banner.success {
+  background: var(--b-success-soft);
+  border: 1px solid var(--b-success-dim);
+  color: #14532d;
+}
+.uar2-banner.success .b-icon { background: var(--b-success); }
+
+.uar2-banner.error {
+  background: var(--b-error-soft);
+  border: 1px solid var(--b-error-dim);
+  color: #7f1d1d;
+}
+.uar2-banner.error .b-icon { background: var(--b-error); }
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+.uar2-card-foot {
+  padding: 14px 22px;
+  border-top: 1px solid var(--b-border);
+  background: var(--b-surface-soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+.uar2-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 18px;
+  border-radius: 7px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 1px solid transparent;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.uar2-btn.ghost {
+  background: var(--b-surface);
+  color: var(--b-fg);
+  border-color: var(--b-border);
+}
+.uar2-btn.ghost:hover { background: var(--b-surface-muted); border-color: var(--b-border-strong); }
+
+.uar2-btn.primary {
+  background: var(--b-brand);
+  color: #fff;
+  font-weight: 600;
+  border-color: var(--b-brand);
+  letter-spacing: -0.005em;
+}
+.uar2-btn.primary:hover:not([disabled]) {
+  background: #e63b00;
+  border-color: #e63b00;
+}
+.uar2-btn[disabled],
+.uar2-btn[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .uar2-card-foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .uar2-btn { width: 100%; }
+}
