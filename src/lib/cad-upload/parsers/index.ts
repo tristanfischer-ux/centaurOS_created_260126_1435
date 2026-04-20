@@ -1,10 +1,17 @@
 /**
  * @file parsers/index.ts
  *
- * @description Unified dispatch for the 4 V1 CAD formats. Every parser returns
- * a `ParseResult` — never throws. Callers (the upload route handler) should
- * check `result.ok` and, if false, persist `result.error` to
- * `cad_lab_project_files.parse_error` with `parse_status = 'failed'`.
+ * @description Unified dispatch for the 3 V1 CAD formats (STEP / STL / DXF).
+ * Every parser returns a `ParseResult` — never throws. Callers (the upload
+ * route handler) should check `result.ok` and, if false, persist
+ * `result.error` to `cad_lab_project_files.parse_error` with
+ * `parse_status = 'failed'`.
+ *
+ * DWG was dropped from V1 — see migration 20260420210000_cad_lab_files_drop_dwg.sql
+ * and CAD-UPLOAD-HANDOVER.md. Founders export DWG as DXF in their CAD tool.
+ * When licensing permits a DWG parser, add a `dwg.ts`, re-broaden `CadFormat`,
+ * and extend the switch below — the rest of the pipeline is structured to
+ * accept that change as a single plug-in.
  *
  * @security Parsers run server-side on untrusted founder-uploaded bytes. Each
  * parser isolates its work inside try/catch and returns structured errors so
@@ -14,7 +21,6 @@
 import { parseStl } from "./stl"
 import { parseDxf } from "./dxf"
 import { parseStep } from "./step"
-import { parseDwg } from "./dwg"
 
 export type Vec3 = { x: number; y: number; z: number }
 
@@ -34,7 +40,7 @@ export type ParseResult =
   | { ok: true; geometry: ParsedGeometry }
   | { ok: false; error: string; code?: string }
 
-export type CadFormat = "step" | "stl" | "dxf" | "dwg"
+export type CadFormat = "step" | "stl" | "dxf"
 
 /**
  * Dispatch parse by declared format.
@@ -55,8 +61,6 @@ export async function parseCadFile(
         return await parseStl(buffer)
       case "dxf":
         return await parseDxf(buffer)
-      case "dwg":
-        return await parseDwg(buffer)
       default: {
         // Exhaustiveness check — future format additions trip here.
         const _exhaustive: never = format
