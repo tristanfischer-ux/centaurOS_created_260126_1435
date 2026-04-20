@@ -1,0 +1,814 @@
+/**
+ * ths2.css — scoped stylesheet for /money/raise/thesis, ported 1:1 from
+ * MONEY-MOCKUP-THESIS-BUILDER.html. Every rule is prefixed with `.ths2`
+ * so nothing leaks to sibling Money pages. Token values mirror
+ * money-mockup.css + sibling Money stylesheets (`.mck2`, `.mst2`).
+ */
+
+.ths2 {
+    --ths-fg: #1c1917;
+    --ths-fg-muted: #78716c;
+    --ths-fg-faint: #a8a29e;
+    --ths-fg-subtle: #d6d3d1;
+    --ths-surface: #ffffff;
+    --ths-surface-muted: #f5f5f4;
+    --ths-surface-soft: #fafaf9;
+    --ths-bg: #f7f6f4;
+    --ths-border: #e7e5e4;
+    --ths-border-soft: #f0eeea;
+    --ths-border-strong: #d6d3d1;
+    --ths-brand: #ff4500;
+    --ths-brand-dim: rgba(255, 69, 0, 0.18);
+    --ths-brand-soft: rgba(255, 69, 0, 0.10);
+    --ths-success: #15803d;
+    --ths-success-soft: #dcfce7;
+    --ths-success-dim: #bbf7d0;
+    --ths-warning: #b45309;
+    --ths-warning-soft: #fef3c7;
+    --ths-danger: #b91c1c;
+    --ths-danger-soft: #fee2e2;
+    --ths-info: #1e40af;
+    --ths-info-soft: #dbeafe;
+    --ths-info-dim: #bfdbfe;
+    --ths-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    color: var(--ths-fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+        Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 24px 32px 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+.ths2 *,
+.ths2 *::before,
+.ths2 *::after {
+    box-sizing: border-box;
+}
+.ths2 h1,
+.ths2 h2,
+.ths2 h3,
+.ths2 p {
+    margin: 0;
+}
+.ths2 a {
+    color: inherit;
+    text-decoration: none;
+}
+.ths2 button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+/* ── Breadcrumb header ─────────────────────────────────────────────── */
+.ths2-page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.ths2-crumbs {
+    font-size: 12.5px;
+    color: var(--ths-fg-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ths2-crumbs a {
+    color: var(--ths-fg-muted);
+    transition: color 0.15s;
+}
+.ths2-crumbs a:hover {
+    color: var(--ths-brand);
+}
+.ths2-crumbs .sep {
+    color: var(--ths-fg-subtle);
+}
+.ths2-crumbs .current {
+    color: var(--ths-fg);
+    font-weight: 700;
+}
+
+.ths2-ctx {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.ths2-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border: 1px solid var(--ths-border);
+    border-radius: 6px;
+    background: var(--ths-surface);
+    color: var(--ths-fg);
+    font-size: 12.5px;
+    font-weight: 600;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.ths2-btn:hover {
+    background: var(--ths-surface-muted);
+    border-color: var(--ths-border-strong);
+}
+.ths2-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.ths2-btn.sm {
+    padding: 5px 9px;
+    font-size: 11.5px;
+}
+.ths2-btn-primary {
+    background: var(--ths-brand);
+    border-color: var(--ths-brand);
+    color: #fff;
+}
+.ths2-btn-primary:hover {
+    background: #e63e00;
+    border-color: #e63e00;
+}
+.ths2-btn-primary:disabled {
+    background: var(--ths-brand);
+    border-color: var(--ths-brand);
+}
+
+/* ── Title tile (header stats) ─────────────────────────────────────── */
+.ths2-head {
+    background: var(--ths-surface);
+    border: 1px solid var(--ths-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 20px;
+    box-shadow: var(--ths-shadow-xs);
+    position: relative;
+    overflow: hidden;
+}
+.ths2-head::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 420px;
+    height: 100%;
+    background: radial-gradient(
+        ellipse at top right,
+        var(--ths-brand-soft) 0%,
+        transparent 60%
+    );
+    pointer-events: none;
+}
+.ths2-head > * {
+    position: relative;
+}
+.ths2-head h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--ths-fg);
+}
+.ths2-title-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--ths-brand);
+    border-radius: 100%;
+    flex-shrink: 0;
+}
+.ths2-head .sub {
+    font-size: 13.5px;
+    color: var(--ths-fg-muted);
+    line-height: 1.5;
+    max-width: 720px;
+}
+.ths2-head .sub strong {
+    color: var(--ths-fg);
+}
+.ths2-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--ths-border-soft);
+}
+.ths2-stats .rs .lab {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--ths-fg-muted);
+}
+.ths2-stats .rs .val {
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    margin-top: 4px;
+    color: var(--ths-fg);
+}
+.ths2-stats .rs .val.brand {
+    color: var(--ths-brand);
+}
+.ths2-stats .rs .val.empty {
+    color: var(--ths-fg-faint);
+}
+.ths2-stats .rs .sub {
+    font-size: 11.5px;
+    color: var(--ths-fg-muted);
+    margin-top: 2px;
+}
+
+/* ── Stepper ─────────────────────────────────────────────────────── */
+.ths2-stepper {
+    display: grid;
+    grid-template-columns: 90px repeat(5, 1fr);
+    gap: 8px;
+    background: var(--ths-surface);
+    border: 1px solid var(--ths-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 20px;
+    box-shadow: var(--ths-shadow-xs);
+    align-items: center;
+}
+.ths2-stepper .stepper-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--ths-fg-muted);
+}
+.ths2-stepper .step {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    min-width: 0;
+}
+.ths2-stepper .step:hover {
+    background: var(--ths-surface-muted);
+}
+.ths2-stepper .step.active {
+    background: var(--ths-brand-soft);
+}
+.ths2-stepper .step .n {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--ths-fg-muted);
+    letter-spacing: 0.6px;
+}
+.ths2-stepper .step.active .n {
+    color: var(--ths-brand);
+}
+.ths2-stepper .step .lbl {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ths-fg);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ths2-stepper .step .sub {
+    font-size: 10.5px;
+    color: var(--ths-fg-muted);
+    margin-top: 1px;
+}
+
+/* ── Form section cards ───────────────────────────────────────────── */
+.ths2-section {
+    background: var(--ths-surface);
+    border: 1px solid var(--ths-border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 16px;
+    box-shadow: var(--ths-shadow-xs);
+}
+.ths2-section h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ths-fg);
+}
+.ths2-section-sub {
+    font-size: 12.5px;
+    color: var(--ths-fg-muted);
+    margin-bottom: 14px;
+}
+
+.ths2-auto-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--ths-info-soft);
+    color: var(--ths-info);
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.ths2-auto-tag.manual {
+    background: var(--ths-surface-muted);
+    color: var(--ths-fg-muted);
+}
+
+/* ── Field rows ──────────────────────────────────────────────────── */
+.ths2-fld {
+    display: grid;
+    grid-template-columns: 200px 1fr 150px;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--ths-border-soft);
+    align-items: center;
+}
+.ths2-fld:last-child {
+    border-bottom: none;
+}
+.ths2-fld label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ths-fg);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.ths2-fld label small {
+    display: block;
+    font-size: 11px;
+    color: var(--ths-fg-muted);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: 2px;
+}
+.ths2-fld label.danger {
+    color: var(--ths-danger);
+}
+
+.ths2-fld .val {
+    font-size: 13.5px;
+    color: var(--ths-fg);
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+}
+.ths2-fld .val.empty {
+    color: var(--ths-fg-faint);
+    font-style: italic;
+    font-size: 12.5px;
+}
+
+.ths2-fld .action {
+    justify-self: end;
+}
+
+/* ── Controls ────────────────────────────────────────────────────── */
+.ths2-input,
+.ths2-select {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--ths-border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--ths-surface);
+    color: var(--ths-fg);
+}
+.ths2-input:focus,
+.ths2-select:focus {
+    outline: 2px solid var(--ths-brand);
+    outline-offset: 1px;
+    border-color: var(--ths-brand);
+}
+
+.ths2-cheque-grid {
+    display: grid;
+    grid-template-columns: 1fr 14px 1fr;
+    gap: 8px;
+    align-items: center;
+}
+.ths2-cheque-grid .sep {
+    color: var(--ths-fg-muted);
+    text-align: center;
+    font-size: 13px;
+}
+
+/* ── Chips ───────────────────────────────────────────────────────── */
+.ths2-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.ths2-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 15px;
+    background: var(--ths-brand-soft);
+    color: var(--ths-brand);
+    font-size: 11.5px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.ths2-chip:hover {
+    background: var(--ths-brand-dim);
+}
+.ths2-chip.off {
+    background: var(--ths-surface-muted);
+    color: var(--ths-fg-muted);
+}
+.ths2-chip.off:hover {
+    background: var(--ths-border);
+}
+.ths2-chip .x {
+    font-size: 10px;
+    line-height: 1;
+}
+.ths2-chip-danger {
+    background: var(--ths-danger-soft);
+    color: var(--ths-danger);
+}
+.ths2-chip-danger:hover {
+    background: #fecaca;
+}
+
+.ths2-chip-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 15px;
+    background: var(--ths-surface-muted);
+    color: var(--ths-fg-muted);
+    border: 1px dashed var(--ths-border-strong);
+    font-size: 11.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+.ths2-chip-add:hover {
+    background: var(--ths-brand-soft);
+    color: var(--ths-brand);
+    border-color: var(--ths-brand-dim);
+}
+
+.ths2-chip-input {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 15px;
+    background: var(--ths-surface);
+    border: 1px solid var(--ths-brand);
+    font-size: 11.5px;
+}
+.ths2-chip-input input {
+    border: none;
+    outline: none;
+    width: 120px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 11.5px;
+    color: var(--ths-fg);
+}
+
+/* ── Weighting sliders ─────────────────────────────────────────── */
+.ths2-weight-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 56px;
+    gap: 12px;
+    padding: 10px 0;
+    align-items: center;
+    border-bottom: 1px solid var(--ths-border-soft);
+}
+.ths2-weight-row:last-child {
+    border-bottom: none;
+}
+.ths2-weight-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ths-fg);
+}
+.ths2-weight-name small {
+    display: block;
+    font-size: 11px;
+    color: var(--ths-fg-muted);
+    font-weight: 400;
+    margin-top: 2px;
+}
+.ths2-weight-slider {
+    width: 100%;
+    appearance: none;
+    height: 8px;
+    background: var(--ths-surface-muted);
+    border-radius: 4px;
+    outline: none;
+    cursor: pointer;
+}
+.ths2-weight-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ths-brand);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--ths-brand);
+    cursor: pointer;
+}
+.ths2-weight-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ths-brand);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--ths-brand);
+    cursor: pointer;
+}
+.ths2-weight-val {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 42px;
+    text-align: right;
+    color: var(--ths-brand);
+    font-size: 13px;
+}
+.ths2-weight-foot {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ths-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+}
+.ths2-weight-foot .muted {
+    color: var(--ths-fg-muted);
+}
+.ths2-weight-foot .valid {
+    color: var(--ths-success);
+    font-weight: 700;
+}
+.ths2-weight-foot .invalid {
+    color: var(--ths-danger);
+    font-weight: 700;
+}
+
+/* ── Data-source tiles ────────────────────────────────────────── */
+.ths2-ds-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+.ths2-ds-tile {
+    background: var(--ths-surface-soft);
+    border: 1px solid var(--ths-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    text-align: left;
+    font-family: inherit;
+}
+.ths2-ds-tile:hover {
+    border-color: var(--ths-border-strong);
+}
+.ths2-ds-tile .ds-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+    gap: 12px;
+}
+.ths2-ds-tile .ds-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ths-fg);
+}
+.ths2-ds-tile .ds-desc {
+    font-size: 11.5px;
+    color: var(--ths-fg-muted);
+    line-height: 1.5;
+    min-height: 34px;
+}
+.ths2-ds-tile.on {
+    background: var(--ths-success-soft);
+    border-color: var(--ths-success-dim);
+}
+.ths2-ds-tile.on .ds-name {
+    color: #14532d;
+}
+.ths2-ds-tile.off {
+    opacity: 0.7;
+}
+
+.ths2-ds-toggle {
+    display: inline-block;
+    width: 30px;
+    height: 18px;
+    background: var(--ths-success);
+    border-radius: 9px;
+    position: relative;
+    flex-shrink: 0;
+}
+.ths2-ds-toggle::after {
+    content: "";
+    position: absolute;
+    right: 2px;
+    top: 2px;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 100%;
+}
+.ths2-ds-tile.off .ths2-ds-toggle {
+    background: var(--ths-surface-muted);
+    border: 1px solid var(--ths-border);
+}
+.ths2-ds-tile.off .ths2-ds-toggle::after {
+    right: auto;
+    left: 2px;
+    background: var(--ths-fg-subtle);
+}
+
+/* ── Match preview empty state ─────────────────────────────── */
+.ths2-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--ths-fg-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.ths2-empty strong {
+    color: var(--ths-fg);
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+/* ── Two-column grid (body + rail) ─────────────────────────── */
+.ths2-body {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 1100px) {
+    .ths2-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+.ths2-rail > * + * {
+    margin-top: 12px;
+}
+.ths2-rail-card {
+    background: var(--ths-surface);
+    border: 1px solid var(--ths-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: var(--ths-shadow-xs);
+}
+.ths2-rail-card .rc-head {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--ths-fg-muted);
+    margin-bottom: 8px;
+}
+.ths2-rail-card .rc-body {
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ths-fg-muted);
+}
+.ths2-rail-card .rc-body strong {
+    color: var(--ths-fg);
+    font-weight: 700;
+}
+
+.ths2-score-math {
+    background: var(--ths-info-soft);
+    border: 1px solid var(--ths-info-dim);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #1e3a8a;
+    line-height: 1.6;
+    font-family: ui-monospace, monospace;
+}
+.ths2-score-math .sm-name {
+    color: #1e40af;
+    font-weight: 700;
+}
+.ths2-score-math .sm-num {
+    color: var(--ths-brand);
+    font-weight: 700;
+}
+
+/* ── Alerts / status banners ───────────────────────────────── */
+.ths2-alert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+.ths2-alert-error {
+    background: var(--ths-danger-soft);
+    border: 1px solid #fecaca;
+    color: var(--ths-danger);
+}
+.ths2-alert-success {
+    background: var(--ths-success-soft);
+    border: 1px solid var(--ths-success-dim);
+    color: var(--ths-success);
+}
+
+.ths2-save-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--ths-brand-soft);
+    border: 1px solid var(--ths-brand-dim);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 12.5px;
+    color: var(--ths-fg);
+}
+.ths2-save-banner strong {
+    color: var(--ths-brand);
+    font-weight: 700;
+}
+.ths2-save-banner-actions {
+    margin-left: auto;
+}
+
+/* ── Specialist briefing (Fiona) ───────────────────────────── */
+.ths2-briefing {
+    background: var(--ths-info-soft);
+    border: 1px solid var(--ths-info-dim);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+.ths2-briefing-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--ths-info);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.ths2-briefing-body {
+    font-size: 12.5px;
+    color: #1e3a8a;
+    line-height: 1.55;
+}
+.ths2-briefing-body strong {
+    color: var(--ths-fg);
+    font-weight: 700;
+}
+
+/* ── Company snapshot helper text ─────────────────────────── */
+.ths2-snapshot-note {
+    background: var(--ths-surface-muted);
+    border: 1px dashed var(--ths-border-strong);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--ths-fg-muted);
+    line-height: 1.55;
+    margin-top: 8px;
+}
+.ths2-snapshot-note strong {
+    color: var(--ths-fg);
+    font-weight: 700;
+}
