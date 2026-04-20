@@ -229,6 +229,63 @@
 .rk2-controls .group .rk2-btn { padding: 5px 10px; font-size: 11.5px; }
 .rk2-controls .spacer { margin-left: auto; }
 
+/* ── How ownership & due dates work — compact explainer card ── */
+/* Mirrors the `.rv2-how` pattern on the Revisions page. Sits above the
+   populated risk list to explain why Owner + Due date don't appear on
+   each row yet — they land with the dedicated risks table rewrite. */
+.rk2-how {
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--rk-shadow-xs);
+}
+.rk2-how__head {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rk-fg);
+  margin-bottom: 10px;
+}
+.rk2-how__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rk2-how__list li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--rk-fg);
+}
+.rk2-how__list li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 100%;
+  background: var(--rk-brand);
+}
+.rk2-how__foot {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rk-border);
+  font-size: 11.5px;
+  color: var(--rk-fg-muted);
+}
+.rk2-how__foot a {
+  color: var(--rk-brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+.rk2-how__foot a:hover { text-decoration: underline; }
+
 /* ── Risk list (populated) ───────────────────────────────────── */
 .rk2-list { display: flex; flex-direction: column; gap: 12px; }
 
@@ -323,6 +380,9 @@
   border-top: 1px solid var(--rk-border);
   border-bottom: 1px solid var(--rk-border);
 }
+/* 2-col variant — used while owner/due-date aren't tracked yet.
+   Affects + Status only; Owner + Due date land with the risks table. */
+.rk2-meta-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 @media (max-width: 900px) { .rk2-meta-grid { grid-template-columns: repeat(2, 1fr); } }
 .rk2-meta-grid .m .k {
   font-size: 10.5px;

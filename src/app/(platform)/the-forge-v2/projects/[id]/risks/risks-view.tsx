@@ -185,7 +185,7 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
             {/* ── Controls ────────────────────────────── */}
             <div className="rk2-controls">
                 <div className="search">
-                    <input type="search" placeholder="Search risks, modules, owners…" disabled />
+                    <input type="search" placeholder="Search risks and modules…" disabled />
                 </div>
                 <div className="sep" />
                 <div className="group">
@@ -251,7 +251,21 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
                     </div>
                 </>
             ) : (
-                <div className="rk2-list">
+                <>
+                    {/* ── How ownership & due dates work ──────── */}
+                    <div className="rk2-how">
+                        <div className="rk2-how__head">How ownership and due dates work</div>
+                        <ul className="rk2-how__list">
+                            <li>Owners and due dates land with the risk-tracking rewrite — today, risks surface as they&apos;re decomposed from your modules.</li>
+                            <li>Every row below came from a module&apos;s known failure modes or open questions. Open the module to add mitigation context.</li>
+                            <li>Once the dedicated risks table ships, you&apos;ll assign a named owner, set a pivot-by date, and close the loop with a status clock.</li>
+                        </ul>
+                        <div className="rk2-how__foot">
+                            Questions → <Link href={`${base}/specialists/vp-manufacturing`}>ask Fang</Link> — he&apos;ll walk you through the current decomposition.
+                        </div>
+                    </div>
+
+                    <div className="rk2-list">
                     {groups.map((g) => {
                         if (g.rows.length === 0) return null
                         return (
@@ -272,7 +286,8 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
                             </section>
                         )
                     })}
-                </div>
+                    </div>
+                </>
             )}
 
             {/* ── Specialist recommendations (always present) ── */}
@@ -375,11 +390,7 @@ function RiskItem({ row, moduleHref }: { row: RiskRow; moduleHref: string }): Re
                 </Link>
             </div>
 
-            <div className="rk2-meta-grid">
-                <div className="m">
-                    <div className="k">Owner</div>
-                    <div className="v muted">—</div>
-                </div>
+            <div className="rk2-meta-grid cols-2">
                 <div className="m">
                     <div className="k">Affects</div>
                     <div className="v">
@@ -387,10 +398,6 @@ function RiskItem({ row, moduleHref }: { row: RiskRow; moduleHref: string }): Re
                             {row.moduleName}
                         </Link>
                     </div>
-                </div>
-                <div className="m">
-                    <div className="k">Due date</div>
-                    <div className="v muted tnum">—</div>
                 </div>
                 <div className="m">
                     <div className="k">Status</div>
@@ -406,9 +413,6 @@ function RiskItem({ row, moduleHref }: { row: RiskRow; moduleHref: string }): Re
                 </Link>
                 <span className="rk2-btn sm soon" title="Mitigation authoring ships with the risks table">
                     Add mitigation
-                </span>
-                <span className="rk2-btn sm soon" title="Assignment ships with the risks table">
-                    Assign owner
                 </span>
             </div>
 
