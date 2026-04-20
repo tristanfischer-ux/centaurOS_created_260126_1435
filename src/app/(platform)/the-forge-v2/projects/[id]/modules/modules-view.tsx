@@ -50,6 +50,8 @@ export interface ModuleCardRow {
     massKg: number | null
     /** Lead-time in weeks or null. */
     leadWeeks: number | null
+    /** Short provenance label for the lead-time (e.g. "Supplier quote"). */
+    leadSource: string | null
     /** Ring colour driven by mass breach — 'green' | 'amber' | 'red'. */
     tone: "green" | "amber" | "red"
     /** Issue chips shown at the bottom of the card. */
@@ -265,12 +267,16 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                                             ? "—"
                                             : (delta > 0 ? "+" : "") + delta.toFixed(2)}
                                 </div>
-                                <div className="bar">
-                                    {m.budgetKg != null && m.currentKg != null && (
-                                        <div
-                                            className={`bar-fill ${fillClass}`}
-                                            style={{ width: `${Math.min(pct, 100)}%` }}
-                                        />
+                                <div className="bar-cell">
+                                    {m.budgetKg != null && m.currentKg != null ? (
+                                        <div className="bar">
+                                            <div
+                                                className={`bar-fill ${fillClass}`}
+                                                style={{ width: `${Math.min(pct, 100)}%` }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="bar empty" aria-hidden="true" />
                                     )}
                                 </div>
                             </div>
@@ -288,14 +294,18 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                                     ? "—"
                                     : (totalDelta > 0 ? "+" : "") + totalDelta.toFixed(2)}
                         </div>
-                        <div className="bar">
-                            {currentTotalKg != null && budgetTotalKg != null && (
-                                <div
-                                    className={`bar-fill ${totalTone === "over" ? "breach" : totalTone === "under" ? "fine" : "fine"}`}
-                                    style={{
-                                        width: `${Math.min(100, Math.max(10, (currentTotalKg / budgetTotalKg) * 100))}%`,
-                                    }}
-                                />
+                        <div className="bar-cell">
+                            {currentTotalKg != null && budgetTotalKg != null ? (
+                                <div className="bar">
+                                    <div
+                                        className={`bar-fill ${totalTone === "over" ? "breach" : "fine"}`}
+                                        style={{
+                                            width: `${Math.min(100, Math.max(10, (currentTotalKg / budgetTotalKg) * 100))}%`,
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="bar empty" aria-hidden="true" />
                             )}
                         </div>
                     </div>
@@ -332,6 +342,7 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                             <div className="s">
                                 <div className="k">Lead</div>
                                 <div className="v">{c.leadWeeks != null ? `${c.leadWeeks} wk` : "—"}</div>
+                                {c.leadSource && <div className="lead-source">{c.leadSource}</div>}
                             </div>
                         </div>
                         {c.issues.length > 0 && (

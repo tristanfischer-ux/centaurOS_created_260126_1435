@@ -250,14 +250,33 @@
 .m2-mass-grid .num.budget { color: var(--m-fg-muted); }
 .m2-mass-grid .num.over   { color: var(--m-danger);  font-weight: 600; }
 .m2-mass-grid .num.under  { color: var(--m-success); font-weight: 600; }
+/* The row uses display:contents so each child of .row is a direct grid cell.
+   .bar-cell receives the row padding; the actual .bar sits inside at a fixed
+   6px height so global `box-sizing: border-box` can't collapse it. */
+.m2-mass-grid .bar-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
 .m2-mass-grid .bar {
-  height: 5px;
+  height: 6px;
+  width: 100%;
   background: var(--m-surface-muted);
   border-radius: 3px;
-  position: relative; overflow: hidden;
+  position: relative;
+  overflow: hidden;
+}
+.m2-mass-grid .bar.empty {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--m-surface-muted) 0 4px,
+    #ededeb 4px 8px
+  );
 }
 .m2-mass-grid .bar-fill {
-  height: 100%; border-radius: 3px;
+  height: 100%;
+  min-width: 4px;
+  border-radius: 3px;
   transition: width 0.3s;
 }
 .m2-mass-grid .bar-fill.fine   { background: var(--m-success); }
@@ -371,6 +390,13 @@
   font-variant-numeric: tabular-nums;
 }
 .m2-mod-card .mod-stats .s .v.over { color: var(--m-danger); }
+.m2-mod-card .mod-stats .s .lead-source {
+  margin-top: 2px;
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--m-fg-faint);
+  letter-spacing: 0.02em;
+}
 .m2-mod-card .mod-issues {
   margin-top: 6px;
   display: flex; gap: 4px; flex-wrap: wrap;

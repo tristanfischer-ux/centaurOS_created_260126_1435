@@ -581,33 +581,70 @@ function BlueprintPaperPlaceholder({ label, sub }: { label: string; sub: string 
 // ─── Mission envelope (generic, project-agnostic — kept from mockup) ──
 
 function MissionEnvelopeSvg(): React.ReactElement {
+    // Layout:
+    //   top band  (y 0–36)    title bar
+    //   plot      (y 40–200)  grid + axes + curve + labels
+    //   bottom    (y 204–240) x-axis label + tick notes
+    //   left gutter (x 0–54)  rotated y-axis label + tick notes
     return (
-        <svg className="envelope" viewBox="0 0 500 240" xmlns="http://www.w3.org/2000/svg">
+        <svg className="envelope" viewBox="0 0 500 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mission envelope — altitude versus endurance, generic reference curve">
             <defs>
                 <marker id="b2-arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto-start-reverse">
                     <path d="M0,0 L10,5 L0,10 z" fill="#1c1917" />
                 </marker>
             </defs>
             <rect x="0" y="0" width="500" height="240" fill="#fafaf9" />
+
+            {/* Title band — solid separation from the plot */}
+            <rect x="0" y="0" width="500" height="28" fill="#f0efed" />
+            <text x="16" y="18" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#1c1917" letterSpacing="0.08em">MISSION ENVELOPE</text>
+            <text x="484" y="18" textAnchor="end" fontFamily="Inter, sans-serif" fontSize="9.5" fill="#78716c" letterSpacing="0.02em">generic reference curve · not project-tuned</text>
+
+            {/* Plot area boundary (subtle) */}
+            <rect x="56" y="40" width="420" height="160" fill="#ffffff" stroke="#e7e5e4" strokeWidth="0.5" />
+
             {/* Faint grid */}
             <g stroke="#e7e5e4" strokeWidth="0.4">
-                <line x1="60" y1="50" x2="460" y2="50" />
-                <line x1="60" y1="100" x2="460" y2="100" />
-                <line x1="60" y1="150" x2="460" y2="150" />
-                <line x1="140" y1="30" x2="140" y2="200" />
-                <line x1="220" y1="30" x2="220" y2="200" />
-                <line x1="300" y1="30" x2="300" y2="200" />
-                <line x1="380" y1="30" x2="380" y2="200" />
+                <line x1="56" y1="80"  x2="476" y2="80" />
+                <line x1="56" y1="120" x2="476" y2="120" />
+                <line x1="56" y1="160" x2="476" y2="160" />
+                <line x1="140" y1="40" x2="140" y2="200" />
+                <line x1="224" y1="40" x2="224" y2="200" />
+                <line x1="308" y1="40" x2="308" y2="200" />
+                <line x1="392" y1="40" x2="392" y2="200" />
             </g>
+
             {/* Axes */}
-            <line x1="60" y1="30" x2="60" y2="200" stroke="#1c1917" strokeWidth="1.1" markerStart="url(#b2-arrow)" />
-            <line x1="60" y1="200" x2="470" y2="200" stroke="#1c1917" strokeWidth="1.1" markerEnd="url(#b2-arrow)" />
-            <text x="68" y="24" fontFamily="Inter, sans-serif" fontSize="10.5" fontWeight="700" fill="#1c1917">Performance (indicative)</text>
-            <text x="408" y="218" fontFamily="Inter, sans-serif" fontSize="10.5" fontWeight="700" fill="#1c1917">Duration (indicative)</text>
-            {/* Feasible envelope curve */}
-            <path d="M80 190 Q 180 160, 300 130 Q 380 110, 440 100" fill="none" stroke="#0f766e" strokeWidth="1.6" strokeDasharray="5,3" />
-            {/* Title block */}
-            <text x="250" y="20" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="700" fill="#1c1917">MISSION ENVELOPE · generic reference curve</text>
+            <line x1="56" y1="40"  x2="56"  y2="200" stroke="#1c1917" strokeWidth="1.1" markerStart="url(#b2-arrow)" />
+            <line x1="56" y1="200" x2="476" y2="200" stroke="#1c1917" strokeWidth="1.1" markerEnd="url(#b2-arrow)" />
+
+            {/* Y-axis label — rotated in the left gutter */}
+            <text
+                x="16" y="120"
+                transform="rotate(-90, 16, 120)"
+                textAnchor="middle"
+                fontFamily="Inter, sans-serif"
+                fontSize="10"
+                fontWeight="700"
+                fill="#1c1917"
+                letterSpacing="0.04em"
+            >
+                Altitude ft
+            </text>
+            <text x="50" y="45"  textAnchor="end" fontFamily="Inter, sans-serif" fontSize="9" fill="#78716c">FL650</text>
+            <text x="50" y="122" textAnchor="end" fontFamily="Inter, sans-serif" fontSize="9" fill="#78716c">FL350</text>
+            <text x="50" y="202" textAnchor="end" fontFamily="Inter, sans-serif" fontSize="9" fill="#78716c">Sea level</text>
+
+            {/* X-axis label — bottom band */}
+            <text x="266" y="230" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="700" fill="#1c1917" letterSpacing="0.04em">Endurance (days on station)</text>
+            <text x="140" y="214" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="9" fill="#78716c">7 d</text>
+            <text x="308" y="214" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="9" fill="#78716c">30 d</text>
+            <text x="476" y="214" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="9" fill="#78716c">90 d</text>
+
+            {/* Feasible envelope curve — shaded band */}
+            <path d="M80 195 Q 180 160, 300 120 Q 380 100, 450 88 L 450 200 L 80 200 Z" fill="rgba(15,118,110,0.08)" />
+            <path d="M80 195 Q 180 160, 300 120 Q 380 100, 450 88" fill="none" stroke="#0f766e" strokeWidth="1.6" strokeDasharray="5,3" />
+            <text x="354" y="104" fontFamily="Inter, sans-serif" fontSize="9" fontWeight="600" fill="#0f766e">Feasible design region</text>
         </svg>
     )
 }

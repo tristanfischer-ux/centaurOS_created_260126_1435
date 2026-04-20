@@ -473,10 +473,42 @@
 .w2-process-row .tol { color: var(--w-brand); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .w2-process-row .wall { color: var(--w-fg-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-.w2-supplier-row { grid-template-columns: 1fr auto auto; font-size: 12.5px; }
-.w2-supplier-row .sname { color: var(--w-fg); }
-.w2-supplier-row .scount { color: var(--w-brand); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.w2-supplier-row .srange { color: var(--w-fg-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.w2-supplier-row { grid-template-columns: 10px 1fr auto auto; gap: 10px; font-size: 12.5px; }
+.w2-supplier-row .name { color: var(--w-fg); font-weight: 500; }
+.w2-supplier-row .meta { color: var(--w-fg-muted); font-size: 11.5px; white-space: nowrap; }
+
+/* Role legend + dot + chip — shared between legend row and supplier rows */
+.w2-role-legend {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 6px 14px;
+  padding: 6px 0 10px;
+  font-size: 11px;
+  color: var(--w-fg-muted);
+  border-bottom: 1px dashed var(--w-border-soft);
+  margin-bottom: 4px;
+}
+.w2-role-dot {
+  width: 8px; height: 8px;
+  border-radius: 100%;
+  display: inline-block;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+.w2-role-dot.role-primary   { background: var(--w-brand); }
+.w2-role-dot.role-secondary { background: var(--w-info); }
+.w2-role-dot.role-backup    { background: var(--w-fg-subtle); }
+
+.w2-role-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.w2-role-chip.role-primary   { background: var(--w-brand-soft); color: var(--w-brand); }
+.w2-role-chip.role-secondary { background: var(--w-info-soft);  color: var(--w-info); }
+.w2-role-chip.role-backup    { background: var(--w-surface-muted); color: var(--w-fg-muted); }
 
 /* ── Known Challenges ──────────────────────────────────────────── */
 .w2-known-challenges {

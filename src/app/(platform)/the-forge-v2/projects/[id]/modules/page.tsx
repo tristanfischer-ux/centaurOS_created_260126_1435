@@ -106,6 +106,7 @@ export default async function ForgeV2ModulesPage({
             partCount: m.keyParts?.length ?? 0,
             massKg: typeof mass === "number" ? mass : null,
             leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
+            leadSource: leadSourceLabel((m as CadLabModule & { leadTimeSource?: string }).leadTimeSource),
             tone,
             issues,
             thumbKind: pickThumbKind(m),
@@ -173,6 +174,21 @@ export default async function ForgeV2ModulesPage({
  * Picks a thumbnail kind from the module id / name using simple keyword
  * matching. Falls back to "avionics" (the most generic-looking thumb).
  */
+/**
+ * Turns a module's `leadTimeSource` tag into the short caption rendered on
+ * the module card. Returning null hides the caption entirely (e.g. for
+ * legacy modules that haven't been tagged yet).
+ */
+function leadSourceLabel(source: string | undefined | null): string | null {
+    switch (source) {
+        case "supplier-quote":      return "Supplier quote"
+        case "ai-estimate":         return "AI estimate"
+        case "historical-analogue": return "Historical analogue"
+        case "specialist-judgement":return "Specialist judgement"
+        default: return null
+    }
+}
+
 function pickThumbKind(m: CadLabModule): ThumbKind {
     const s = `${m.id ?? ""} ${m.name ?? ""}`.toLowerCase()
     if (/wing/.test(s)) return "wing"

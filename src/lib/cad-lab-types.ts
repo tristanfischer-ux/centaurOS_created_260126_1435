@@ -384,6 +384,12 @@ export interface CadLabModule {
   keyParts: string[]
   /** Estimated procurement lead time in weeks */
   leadWeeks: number
+  /** Source / evidence behind leadWeeks. Rendered as a one-line provenance
+   *  caption on the Modules page so founders know whether a lead-time is a
+   *  supplier quote, an AI estimate, or a historical analogue. Optional for
+   *  back-compat with modules decomposed before the 2026-04-20 provenance
+   *  caption shipped. */
+  leadTimeSource?: "supplier-quote" | "ai-estimate" | "historical-analogue" | "specialist-judgement"
   /** AI-estimated mass in kg from decomposition (product-scale-aware) */
   estimatedMassKg?: number
   /** Pre-declared mass budget for this module in kg. The Modules artefact

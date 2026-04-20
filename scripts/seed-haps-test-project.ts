@@ -68,6 +68,9 @@ interface SeedModule {
      *  budget table reads this and surfaces deltas vs estimatedMassKg. */
     budgetMassKg: number
     leadWeeks: number
+    /** Where the lead-time number came from. Shown under the Lead stat on the
+     *  Modules page so founders know how much to trust each number. */
+    leadTimeSource: "supplier-quote" | "ai-estimate" | "historical-analogue" | "specialist-judgement"
     failureModes: string[]
     unknowns: string[]
     /** Per-unit all-in cost (GBP) across this module. Sum across modules = £172k. */
@@ -108,6 +111,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 22.4,
         budgetMassKg: 22.5,
         leadWeeks: 14,
+        leadTimeSource: "supplier-quote",
         failureModes: [
             "Spar-cap delamination under thermal cycling (−65 °C ↔ +55 °C at FL650)",
             "Boom-attachment fitting fatigue at 15 000 gust cycles",
@@ -155,6 +159,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 15.6,
         budgetMassKg: 15.2,
         leadWeeks: 18,
+        leadTimeSource: "supplier-quote",
         failureModes: [
             "Fuel-cell flooding above 98% humidity during climb through weather layer",
             "Prop-blade fatigue at 1 900 rpm over 30-day continuous duty",
@@ -201,6 +206,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 9.4,
         budgetMassKg: 9.5,
         leadWeeks: 12,
+        leadTimeSource: "historical-analogue",
         failureModes: [
             "Ring-frame web buckling during ground-handling tip-overs",
             "Tank mount fatigue under 30-day vibration environment",
@@ -241,6 +247,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 2.1,
         budgetMassKg: 1.9,
         leadWeeks: 10,
+        leadTimeSource: "historical-analogue",
         failureModes: [
             "Ruddervator hinge wear after 120 h flutter testing",
             "Servo backlash in sub-freezing soak",
@@ -277,6 +284,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 4.7,
         budgetMassKg: 5.0,
         leadWeeks: 16,
+        leadTimeSource: "supplier-quote",
         failureModes: [
             "Cell delamination under thermal cycling (−65 °C to +55 °C)",
             "Hot-spot formation when a bypass diode fails open",
@@ -320,6 +328,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 7.8,
         budgetMassKg: 7.6,
         leadWeeks: 11,
+        leadTimeSource: "supplier-quote",
         failureModes: [
             "Single-cell runaway during sub-freezing charge",
             "BMS false-positive on cell imbalance above 12 000 m",
@@ -358,6 +367,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 2.3,
         budgetMassKg: 2.4,
         leadWeeks: 9,
+        leadTimeSource: "ai-estimate",
         failureModes: [
             "MOSFET failure under cold-soak switching at 300 kHz",
             "Bus-capacitor failure after 8 000 h duty at 80 °C",
@@ -396,6 +406,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 2.4,
         budgetMassKg: 2.5,
         leadWeeks: 13,
+        leadTimeSource: "ai-estimate",
         failureModes: [
             "IMU gyro bias drift after 120 h of continuous flight",
             "ADS-B transceiver lockup during airspace hand-off",
@@ -435,6 +446,7 @@ const MODULES: SeedModule[] = [
         estimatedMassKg: 1.47,
         budgetMassKg: 1.4,
         leadWeeks: 12,
+        leadTimeSource: "supplier-quote",
         failureModes: [
             "Antenna icing at FL650 above 30% relative humidity",
             "Iridium Certus modem lock-up during polar hand-off (>70° N)",
@@ -568,6 +580,7 @@ async function main() {
         estimatedMassKg: m.estimatedMassKg,
         budgetMassKg: m.budgetMassKg,
         leadWeeks: m.leadWeeks,
+        leadTimeSource: m.leadTimeSource,
         failureModes: m.failureModes,
         unknowns: m.unknowns,
         status: "researched" as const,

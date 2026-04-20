@@ -174,8 +174,8 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                 {cost.totalUnitCostGbp !== null ? (
                     <div className="w2-health-card amber">
                         <div className="label">Cost at this BOM</div>
-                        <div className="value">{formatGbp(cost.totalUnitCostGbp)}<small>/unit all-in</small></div>
-                        <div className="detail">Estimated across {cost.moduleCount} module{cost.moduleCount === 1 ? "" : "s"}</div>
+                        <div className="value">{formatGbp(cost.totalUnitCostGbp)}<small>/unit rough</small></div>
+                        <div className="detail">Module-level AI estimate · not a part-priced BOM · <Link href={`${base}/cost`}>/cost →</Link></div>
                     </div>
                 ) : (
                     <div className="w2-health-card green">
@@ -184,10 +184,14 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                         <div className="detail">Cost not yet estimated · <Link href={`${base}/bom`}>/bom →</Link></div>
                     </div>
                 )}
-                <div className="w2-health-card green">
+                <div className="w2-health-card amber">
                     <div className="label">BOM maturity</div>
-                    <div className="value">0<small>/0 parts spec&apos;d</small></div>
-                    <div className="detail"><Link href={`${base}/bom`}>/bom →</Link></div>
+                    <div className="value">0<small>/{header.partCount} parts spec&apos;d</small></div>
+                    <div className="detail">
+                        {header.partCount > 0
+                            ? <>{header.partCount} parts identified · none tagged with material, tolerance or supplier yet · <Link href={`${base}/bom`}>/bom →</Link></>
+                            : <Link href={`${base}/bom`}>/bom →</Link>}
+                    </div>
                 </div>
             </div>
 
@@ -587,14 +591,26 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                         </div>
                         {suppliers.length > 0 ? (
                             <>
-                                {suppliers.slice(0, 5).map((s) => (
-                                    <div className="w2-material-row" key={s.name}>
-                                        <span className="grade">{(s.rampRole ?? "").slice(0, 1).toUpperCase()}</span>
-                                        <span className="name">{s.name}</span>
-                                        <span className="yield-val">{s.modulesMatched} module{s.modulesMatched === 1 ? "" : "s"}</span>
-                                        <span className="price">{s.type ?? "supplier"}</span>
-                                    </div>
-                                ))}
+                                <div className="w2-role-legend">
+                                    <span className="w2-role-dot role-primary" aria-hidden="true" /> Primary ramp candidate
+                                    <span className="w2-role-dot role-secondary" aria-hidden="true" /> Secondary
+                                    <span className="w2-role-dot role-backup" aria-hidden="true" /> Backup
+                                </div>
+                                {suppliers.slice(0, 5).map((s) => {
+                                    const role = (s.rampRole || "secondary").toLowerCase()
+                                    const roleLabel =
+                                        role === "primary" ? "Primary" :
+                                            role === "backup" ? "Backup" :
+                                                "Secondary"
+                                    return (
+                                        <div className="w2-supplier-row" key={s.name}>
+                                            <span className={`w2-role-dot role-${role}`} aria-hidden="true" />
+                                            <span className="name">{s.name}</span>
+                                            <span className="meta">{s.modulesMatched} module{s.modulesMatched === 1 ? "" : "s"} · {s.type ?? "supplier"}</span>
+                                            <span className={`w2-role-chip role-${role}`}>{roleLabel}</span>
+                                        </div>
+                                    )
+                                })}
                                 <Link href={`${base}/suppliers`} className="w2-view-all">View all {suppliers.length} suppliers →</Link>
                             </>
                         ) : (
