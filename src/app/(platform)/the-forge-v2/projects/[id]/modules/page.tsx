@@ -1,23 +1,30 @@
 /**
  * @file modules/page.tsx — /the-forge-v2/projects/:id/modules
  *
- * @description Module roster for a project: readiness chip per module,
- * failure-mode count, lead-time pill, mass-budget cell. Links to per-module
- * detail pages. Mockup ref: FORGE-MOCKUP-MODULES.html.
+ * @description Modules artefact page (V2 — mockup-faithful). Server component
+ * that loads the project, derives mass-budget rows + module cards from real
+ * `project.modules` JSONB + AI cost estimates + system-level constraints on
+ * the designBrief, and hands a typed props bundle to ModulesView.
+ *
+ * Empty-state policy: when a field isn't captured yet (e.g. per-module
+ * `budgetMassKg` — added to the modules shape in the 2026-04-20 seed round)
+ * we pass null and the view renders `—`. We never synthesise the mockup's
+ * HAPS numbers.
+ *
+ * Module cards pick a `thumbKind` from the module id/name using a simple
+ * keyword matcher (see pickThumbKind). The thumb SVGs themselves live in
+ * the view so they stay colocated with the `.m2-mod-thumb` styling.
+ *
+ * Mockup reference: FORGE-MOCKUP-MODULES.html
  */
 
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { AlertTriangle, ArrowRight, Clock, Boxes } from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import type { CadLabModule } from "@/lib/cad-lab-types"
-import { cn } from "@/lib/utils"
 
-import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { ModulesView, type ModuleCardRow, type ModuleMassRow, type ModulesViewProps, type ThumbKind } from "./modules-view"
 
 export const dynamic = "force-dynamic"
 
@@ -30,15 +37,6 @@ export async function generateMetadata(
     return { title: `Modules · ${result.project.name}` }
 }
 
-const STATUS_TONE: Record<CadLabModule['status'], { label: string; class: string }> = {
-    pending:          { label: 'Pending',    class: 'bg-muted text-muted-foreground border-border' },
-    researched:       { label: 'Researched', class: 'bg-electric-blue/10 text-electric-blue border-electric-blue/30' },
-    interface_ready:  { label: 'Interface',  class: 'bg-status-warning-light text-status-warning border-status-warning/30' },
-    specified:        { label: 'Specified',  class: 'bg-status-warning-light text-status-warning border-status-warning/30' },
-    generated:        { label: 'Generated',  class: 'bg-status-success-light text-status-success border-status-success/30' },
-    failed:           { label: 'Failed',     class: 'bg-destructive/10 text-destructive border-destructive/30' },
-}
-
 export default async function ForgeV2ModulesPage({
     params,
 }: {
@@ -46,97 +44,143 @@ export default async function ForgeV2ModulesPage({
 }): Promise<React.ReactNode> {
     const { id } = await params
     const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
+    if ("error" in result || !result.project) {
+        notFound()
+    }
     const project = result.project
     const modules = project.modules ?? []
-    const massTotal = modules.reduce((sum, m) => sum + (m.estimatedMassKg ?? 0), 0)
 
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
-                { label: "Modules" },
-            ]}
-            subtitle={`${modules.length} ${modules.length === 1 ? 'module' : 'modules'} · total estimated mass ${massTotal.toFixed(2)} kg`}
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}`,
-            }}
-        >
-            {modules.length === 0 ? (
-                <Card className="rounded-xl border">
-                    <CardContent className="py-12 flex flex-col items-center text-center gap-3">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-muted">
-                            <Boxes className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm font-semibold text-foreground">No modules yet</p>
-                        <p className="text-xs text-muted-foreground max-w-sm">
-                            Run decomposition in CAD Lab to break this concept into modules. Each module gets its own CAD pipeline + parts + review.
-                        </p>
-                    </CardContent>
-                </Card>
-            ) : (
-                <Card className="rounded-xl border overflow-hidden">
-                    {/* Header row */}
-                    <div className="grid grid-cols-[1fr_100px_100px_90px_90px_32px] gap-3 px-5 py-3 border-b border-border bg-muted/30 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                        <span>Module</span>
-                        <span className="text-right">Mass</span>
-                        <span className="text-right">Lead</span>
-                        <span className="text-right">Failures</span>
-                        <span className="text-right">Status</span>
-                        <span />
-                    </div>
-                    {modules.map((m) => {
-                        const tone = STATUS_TONE[m.status] ?? STATUS_TONE.pending
-                        return (
-                            <Link
-                                key={m.id}
-                                href={`/the-forge-v2/projects/${project.id}/modules/${m.id}`}
-                                className="grid grid-cols-[1fr_100px_100px_90px_90px_32px] gap-3 px-5 py-4 items-center text-sm border-b border-border/50 last:border-b-0 hover:bg-muted/30 transition-colors group"
-                            >
-                                <div className="min-w-0">
-                                    <div className="font-semibold text-foreground truncate group-hover:text-international-orange transition-colors">{m.name}</div>
-                                    <div className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">{m.purpose}</div>
-                                </div>
-                                <div className="text-right tabular-nums text-sm">
-                                    {m.estimatedMassKg ? (
-                                        <span>{m.estimatedMassKg.toFixed(2)} <span className="text-[10px] text-muted-foreground">kg</span></span>
-                                    ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                    )}
-                                </div>
-                                <div className="text-right text-sm tabular-nums inline-flex items-center justify-end gap-1">
-                                    {m.leadWeeks ? (
-                                        <>
-                                            <Clock className="h-3 w-3 text-muted-foreground" />
-                                            <span>{m.leadWeeks} <span className="text-[10px] text-muted-foreground">wk</span></span>
-                                        </>
-                                    ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                    )}
-                                </div>
-                                <div className="text-right">
-                                    {m.failureModes && m.failureModes.length > 0 ? (
-                                        <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-status-warning">
-                                            <AlertTriangle className="h-3 w-3" />
-                                            {m.failureModes.length}
-                                        </span>
-                                    ) : (
-                                        <span className="text-muted-foreground text-[11.5px]">0</span>
-                                    )}
-                                </div>
-                                <div className="text-right">
-                                    <Badge variant="outline" className={cn("text-[10px] font-semibold uppercase tracking-wide", tone.class)}>
-                                        {tone.label}
-                                    </Badge>
-                                </div>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-international-orange group-hover:translate-x-0.5 transition-all" />
-                            </Link>
-                        )
-                    })}
-                </Card>
-            )}
-        </WorkspaceShell>
-    )
+    // ── Mass rows ──────────────────────────────────────────────
+    // Per-module budget lives on the module's optional `budgetMassKg` field
+    // (written by the HAPS seed). If no module has a budget, the sum is null
+    // and the view renders "not yet declared".
+    const mass: ModuleMassRow[] = modules.map((m, i) => {
+        const budget = (m as CadLabModule & { budgetMassKg?: number }).budgetMassKg
+        return {
+            id: m.id,
+            label: `M${i + 1} · ${m.name}`,
+            budgetKg: typeof budget === "number" ? budget : null,
+            currentKg: typeof m.estimatedMassKg === "number" ? m.estimatedMassKg : null,
+        }
+    })
+    const budgetTotalKg = mass.every((r) => r.budgetKg == null)
+        ? null
+        : mass.reduce((acc, r) => acc + (r.budgetKg ?? 0), 0)
+    const currentTotalKg = mass.every((r) => r.currentKg == null)
+        ? null
+        : mass.reduce((acc, r) => acc + (r.currentKg ?? 0), 0)
+
+    const massDeltaKg =
+        budgetTotalKg != null && currentTotalKg != null
+            ? currentTotalKg - budgetTotalKg
+            : null
+
+    // ── Module cards ────────────────────────────────────────────
+    const cards: ModuleCardRow[] = modules.map((m, i) => {
+        const moduleNum = `M${i + 1}`
+        const budget = (m as CadLabModule & { budgetMassKg?: number }).budgetMassKg
+        const mass = m.estimatedMassKg
+        const delta = typeof mass === "number" && typeof budget === "number" ? mass - budget : null
+        const tone: "green" | "amber" | "red" =
+            delta == null ? "green" : delta > 0.15 ? "red" : delta > 0.05 ? "amber" : "green"
+        const issues: ModuleCardRow["issues"] = []
+        if (delta != null && delta > 0.15) {
+            issues.push({ label: `Mass +${delta.toFixed(2)}kg`, severity: "danger" })
+        } else if (delta != null && delta > 0.05) {
+            issues.push({ label: `Mass +${delta.toFixed(2)}kg`, severity: "warning" })
+        }
+        if (m.failureModes && m.failureModes.length >= 3) {
+            issues.push({ label: `${m.failureModes.length} failure modes`, severity: "warning" })
+        }
+
+        const body =
+            typeof m.description === "string" && m.description.length > 0
+                ? (m.description.length > 140 ? `${m.description.slice(0, 137)}…` : m.description)
+                : (typeof m.purpose === "string" ? m.purpose : "")
+
+        return {
+            id: m.id,
+            moduleNum,
+            name: m.name,
+            body: body || "Module purpose not yet declared.",
+            partCount: m.keyParts?.length ?? 0,
+            massKg: typeof mass === "number" ? mass : null,
+            leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
+            tone,
+            issues,
+            thumbKind: pickThumbKind(m),
+            massOver: delta != null && delta > 0.05,
+        }
+    })
+
+    // ── System meta ─────────────────────────────────────────────
+    const db = project.research?.designBrief
+    const mtowKg =
+        db && typeof db === "object" && "constraints" in db && db.constraints?.maxMassKg != null
+            ? db.constraints.maxMassKg
+            : null
+
+    // Span + solar area — derived from the project subject when present.
+    // Cheap string scrape keeps the values honest (we don't invent them
+    // when the subject doesn't mention them).
+    const subject = typeof project.subject === "string" ? project.subject : ""
+    const span = /(\d+(?:\.\d+)?)\s*m\s*wing/i.test(subject)
+        ? subject.match(/(\d+(?:\.\d+)?)\s*m\s*wing/i)?.[1] + " m"
+        : /(\d+(?:\.\d+)?)\s*m\s*span/i.test(subject)
+            ? subject.match(/(\d+(?:\.\d+)?)\s*m\s*span/i)?.[1] + " m"
+            : null
+    const solarAreaMatch = subject.match(/(\d+(?:\.\d+)?)\s*m²\s*solar/i) ?? subject.match(/(\d+(?:\.\d+)?)\s*m2\s*solar/i)
+    const solarArea = solarAreaMatch?.[1] ? `${solarAreaMatch[1]} m²` : null
+
+    // Interface count — sum inputs+outputs across modules as a proxy. Real
+    // interface_contracts exists on the project row but for the Modules
+    // mockup the "N interfaces" count is enough.
+    const interfaceCount = modules.reduce((acc, m) => acc + (m.inputs?.length ?? 0) + (m.outputs?.length ?? 0), 0)
+    const unmatchedPortCount = 0 // No interface-matching implementation yet → honest 0
+
+    const viewProps: ModulesViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+            systemIllustrationUrl: project.systemIllustrationUrl,
+        },
+        header: {
+            moduleCount: modules.length,
+            interfaceCount,
+            unmatchedPortCount,
+            massDeltaKg,
+        },
+        systemMeta: {
+            modules: modules.length,
+            span,
+            solarArea,
+            mtowKg,
+            interfaces: interfaceCount,
+        },
+        budgetTotalKg,
+        currentTotalKg,
+        mass,
+        cards,
+    }
+
+    return <ModulesView {...viewProps} />
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Picks a thumbnail kind from the module id / name using simple keyword
+ * matching. Falls back to "avionics" (the most generic-looking thumb).
+ */
+function pickThumbKind(m: CadLabModule): ThumbKind {
+    const s = `${m.id ?? ""} ${m.name ?? ""}`.toLowerCase()
+    if (/wing/.test(s)) return "wing"
+    if (/propulsion|motor|propeller|prop\b/.test(s)) return "propulsion"
+    if (/fuselage|body|chassis/.test(s)) return "fuselage"
+    if (/tail|empennage|rudder|elevator/.test(s)) return "tail"
+    if (/solar|pv\b|photovolt/.test(s)) return "solar"
+    if (/battery|pack|cell\b/.test(s)) return "battery"
+    if (/mppt|converter|power\b|electronics|inverter/.test(s)) return "power-electronics"
+    if (/comms|radio|sat(?:com|link)|iridium|antenna/.test(s)) return "comms"
+    return "avionics"
 }

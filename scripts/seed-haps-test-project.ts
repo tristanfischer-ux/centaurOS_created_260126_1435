@@ -64,6 +64,9 @@ interface SeedModule {
     inputs: string[]
     outputs: string[]
     estimatedMassKg: number
+    /** Pre-declared mass budget (kg) for this module — the Modules mass
+     *  budget table reads this and surfaces deltas vs estimatedMassKg. */
+    budgetMassKg: number
     leadWeeks: number
     failureModes: string[]
     unknowns: string[]
@@ -103,6 +106,7 @@ const MODULES: SeedModule[] = [
         inputs: ["Aero-loads flight envelope", "Payload mass budget", "MPPT cable run"],
         outputs: ["Lift", "Solar panel mounting surface", "Control-surface actuation path"],
         estimatedMassKg: 22.4,
+        budgetMassKg: 22.5,
         leadWeeks: 14,
         failureModes: [
             "Spar-cap delamination under thermal cycling (−65 °C ↔ +55 °C at FL650)",
@@ -149,6 +153,7 @@ const MODULES: SeedModule[] = [
         inputs: ["H₂ from centre tank", "Battery DC bus", "FMS throttle command"],
         outputs: ["Thrust", "Waste heat", "Water exhaust"],
         estimatedMassKg: 15.6,
+        budgetMassKg: 15.2,
         leadWeeks: 18,
         failureModes: [
             "Fuel-cell flooding above 98% humidity during climb through weather layer",
@@ -194,6 +199,7 @@ const MODULES: SeedModule[] = [
         inputs: ["Wing root loads", "Tail loads", "Ground-handling loads"],
         outputs: ["Structural load path", "Avionics thermal environment"],
         estimatedMassKg: 9.4,
+        budgetMassKg: 9.5,
         leadWeeks: 12,
         failureModes: [
             "Ring-frame web buckling during ground-handling tip-overs",
@@ -233,6 +239,7 @@ const MODULES: SeedModule[] = [
         inputs: ["Autopilot servo command", "Aero loads"],
         outputs: ["Pitch / yaw control authority", "Static directional stability"],
         estimatedMassKg: 2.1,
+        budgetMassKg: 1.9,
         leadWeeks: 10,
         failureModes: [
             "Ruddervator hinge wear after 120 h flutter testing",
@@ -268,6 +275,7 @@ const MODULES: SeedModule[] = [
         inputs: ["Solar irradiance", "Wing skin bond surface"],
         outputs: ["DC power to MPPT"],
         estimatedMassKg: 4.7,
+        budgetMassKg: 5.0,
         leadWeeks: 16,
         failureModes: [
             "Cell delamination under thermal cycling (−65 °C to +55 °C)",
@@ -310,6 +318,7 @@ const MODULES: SeedModule[] = [
         inputs: ["DC from MPPT", "Pack thermistor chain"],
         outputs: ["DC to avionics + motor bus", "BMS CAN telemetry"],
         estimatedMassKg: 7.8,
+        budgetMassKg: 7.6,
         leadWeeks: 11,
         failureModes: [
             "Single-cell runaway during sub-freezing charge",
@@ -347,6 +356,7 @@ const MODULES: SeedModule[] = [
         inputs: ["96 V DC from solar array", "BMS CAN"],
         outputs: ["96 V pack bus", "28 V avionics bus", "12 V comms bus"],
         estimatedMassKg: 2.3,
+        budgetMassKg: 2.4,
         leadWeeks: 9,
         failureModes: [
             "MOSFET failure under cold-soak switching at 300 kHz",
@@ -384,6 +394,7 @@ const MODULES: SeedModule[] = [
         inputs: ["Pilot-in-command commands via satcom", "Sensor fusion data"],
         outputs: ["Control-surface commands", "Health telemetry"],
         estimatedMassKg: 2.4,
+        budgetMassKg: 2.5,
         leadWeeks: 13,
         failureModes: [
             "IMU gyro bias drift after 120 h of continuous flight",
@@ -422,6 +433,7 @@ const MODULES: SeedModule[] = [
         inputs: ["Avionics CAN bus", "Antenna RF path"],
         outputs: ["Satellite command+telemetry link", "Mesh to nearby HAPS"],
         estimatedMassKg: 1.47,
+        budgetMassKg: 1.4,
         leadWeeks: 12,
         failureModes: [
             "Antenna icing at FL650 above 30% relative humidity",
@@ -554,6 +566,7 @@ async function main() {
         inputs: m.inputs,
         outputs: m.outputs,
         estimatedMassKg: m.estimatedMassKg,
+        budgetMassKg: m.budgetMassKg,
         leadWeeks: m.leadWeeks,
         failureModes: m.failureModes,
         unknowns: m.unknowns,

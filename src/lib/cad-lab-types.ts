@@ -386,6 +386,11 @@ export interface CadLabModule {
   leadWeeks: number
   /** AI-estimated mass in kg from decomposition (product-scale-aware) */
   estimatedMassKg?: number
+  /** Pre-declared mass budget for this module in kg. The Modules artefact
+   *  surfaces the delta (estimatedMassKg − budgetMassKg) so founders can
+   *  spot breaches early. Optional for back-compat with modules decomposed
+   *  before the 2026-04-20 Mass Budget UI shipped. */
+  budgetMassKg?: number
   /** ID of the primary module this mirrors (e.g. right_leg mirrors left_leg) */
   mirrorOf?: string
   /** Technical description (1-2 paragraphs) */
