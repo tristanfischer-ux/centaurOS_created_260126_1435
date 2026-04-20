@@ -566,6 +566,10 @@
   flex: 1;
   min-width: 180px;
 }
+.pc2-submit-error {
+  color: #c0392b;
+  font-weight: 500;
+}
 
 .pc2-btn {
   border: 1px solid var(--pc-border-strong);

@@ -24,32 +24,40 @@
  * no wiring into name/industry/mission). Rather than ship a fake affordance
  * we render a typed-brief textarea only, with an honest one-line note that
  * voice input lands in a later round. Chase reads the typed brief verbatim.
- *   6. Footer bar — Cancel (left), note (centre), disabled "Draft Brief
- *      rev 0.1 →" primary CTA (right). Tooltip names the server action that
- *      is intentionally NOT wired in V1.
+ *   6. Footer bar — Cancel (left), note (centre), primary "Draft Brief
+ *      rev 0.1 →" CTA (right) that calls the `createCadLabProject` server
+ *      action and redirects to the new workspace on success.
  *   7. Inline annotation note — steps 2–5 are progressive, pauseable, etc.
  *
  * Data contract
  * -------------
- * V1 ships with NO mutation. The `createCadLabProject` server action exists
- * at src/actions/cad-lab-projects.ts but is intentionally not invoked from
- * this route. The submit button is disabled with a tooltip naming the
- * action so the follow-up ticket is self-evident. Form state is held in
- * local React state and feeds the preview card on the right rail.
+ * Submit calls `createCadLabProject(subject)` from src/actions/cad-lab-projects.ts.
+ * The action derives a short display name from the subject (via
+ * `deriveShortName`), inserts the project, auto-fires Chase research, and
+ * returns `{ projectId }` or `{ error }`. On success we push to
+ * `/the-forge-v2/projects/{projectId}`. Extra fields on this form (name /
+ * industry / mission / target customers / why-now / regulatory / invitees /
+ * starter reference) are captured in local state for the live preview rail
+ * and are intentionally NOT persisted yet — the action signature only takes
+ * `subject` today. Those fields light up once the matching columns and action
+ * extension land in a follow-up.
  *
  * Empty-state policy
  * ------------------
  * Every form slot is fully interactive client-side. The preview card shows
  * placeholder copy ("Not yet declared", italicised muted) that swaps to the
  * live value as the user types. Invitees list is empty by default with a
- * helpful inline hint — we do NOT fake foundry members since this page is
- * read-only pending the server-action wire-up.
+ * helpful inline hint. Submit is only enabled when the subject brief is at
+ * least `SUBJECT_MIN` characters.
  */
 
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { useMemo, useState, useTransition } from "react"
+
+import { createCadLabProject } from "@/actions/cad-lab-projects"
 
 import "./project-create-v2.css"
 
@@ -70,13 +78,13 @@ interface FormState {
     starterReference: StarterReferenceChoice | null
 }
 
+const SUBJECT_MIN = 20
 const SUBJECT_MAX = 1000
-const DISABLED_TOOLTIP =
-    "Project creation ships with the createCadLabProject server action wire-up"
 
 // ─── View ──────────────────────────────────────────────────────────────
 
 export function ProjectCreateView(): React.ReactElement {
+    const router = useRouter()
     const [form, setForm] = useState<FormState>({
         name: "",
         subject: "",
@@ -89,9 +97,15 @@ export function ProjectCreateView(): React.ReactElement {
         inviteeDraft: "",
         starterReference: null,
     })
+    const [submitError, setSubmitError] = useState<string | null>(null)
+    const [isPending, startTransition] = useTransition()
 
     const subjectCount = form.subject.length
     const subjectOverLimit = subjectCount > SUBJECT_MAX
+    const subjectBelowMin = subjectCount > 0 && subjectCount < SUBJECT_MIN
+    const subjectValid =
+        subjectCount >= SUBJECT_MIN && subjectCount <= SUBJECT_MAX
+    const canSubmit = subjectValid && !isPending
 
     const previewRows = useMemo(
         () => [
@@ -142,6 +156,39 @@ export function ProjectCreateView(): React.ReactElement {
             e.preventDefault()
             handleAddInvitee()
         }
+    }
+
+    function handleSubmit(): void {
+        setSubmitError(null)
+
+        if (!subjectValid) {
+            // INTENT: the submit button is disabled in this state, but guard
+            // anyway so a keyboard-submit can't slip past the validation.
+            setSubmitError(
+                subjectCount < SUBJECT_MIN
+                    ? `Add at least ${SUBJECT_MIN - subjectCount} more character${SUBJECT_MIN - subjectCount === 1 ? "" : "s"} so Chase has enough to draft rev 0.1.`
+                    : `Trim the brief to ${SUBJECT_MAX.toLocaleString("en-GB")} characters or fewer.`,
+            )
+            return
+        }
+
+        // DECISION: only `subject` is persisted today. The extra form fields
+        // (name / industry / mission / targetCustomers / whyNow / regulatory /
+        // invitees / starterReference) feed the live preview rail so founders
+        // can see what they wrote — they'll wire into the action signature
+        // once the matching columns land.
+        const brief = form.subject.trim()
+
+        startTransition(async () => {
+            const result = await createCadLabProject(brief)
+
+            if ("error" in result) {
+                setSubmitError(result.error)
+                return
+            }
+
+            router.push(`/the-forge-v2/projects/${result.projectId}`)
+        })
     }
 
     return (
@@ -220,6 +267,9 @@ export function ProjectCreateView(): React.ReactElement {
                                 >
                                     {subjectCount.toLocaleString("en-GB")} / {SUBJECT_MAX.toLocaleString("en-GB")}
                                     {subjectOverLimit ? " · over limit" : ""}
+                                    {subjectBelowMin
+                                        ? ` · ${SUBJECT_MIN - subjectCount} more to unlock`
+                                        : ""}
                                 </span>
                                 <p id="pc2-voice-coming" className="pc2-field-hint">
                                     Voice input coming next round — type for now.
@@ -524,16 +574,23 @@ export function ProjectCreateView(): React.ReactElement {
                 <div className="pc2-wizard-foot">
                     <Link href="/the-forge-v2" className="pc2-btn ghost">Cancel</Link>
                     <div className="note">
-                        Nothing is committed until step 5 — everything is revisable.
+                        {submitError ? (
+                            <span role="alert" className="pc2-submit-error">
+                                {submitError}
+                            </span>
+                        ) : (
+                            "Nothing is committed until you press Draft Brief — everything stays revisable."
+                        )}
                     </div>
                     <button
                         type="button"
                         className="pc2-btn primary"
-                        disabled
-                        title={DISABLED_TOOLTIP}
-                        aria-disabled="true"
+                        onClick={handleSubmit}
+                        disabled={!canSubmit}
+                        aria-disabled={!canSubmit}
+                        aria-busy={isPending}
                     >
-                        Draft Brief rev 0.1 →
+                        {isPending ? "Drafting…" : "Draft Brief rev 0.1 →"}
                     </button>
                 </div>
             </div>
