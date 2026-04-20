@@ -56,6 +56,18 @@ Total: **11 Products commits on main in one session.** Zero reverts.
 
 ---
 
+## P1 caught post-handover + fixed (commit `8defb085`)
+
+Agent-browser comprehensive verification (run after this handover was first committed) found: the read-only detail view crashed with `TypeError: Cannot read properties of undefined (reading 'market')` when a product's `product_synthesis` JSONB was populated but lacked the `pareto` key. Root cause: TypeScript type-casts at the JSONB hydration boundary don't validate runtime shape — a legacy-shaped synthesis object satisfied the `ProductSynthesis` type annotation but missed fields the Fundability tab reads.
+
+**Fix:**
+- Code: added `hasFullSynthesis()` runtime type guard in `src/app/(platform)/products/[id]/product-detail-view.tsx`. Any synthesis object missing required fields renders the friendly "Run synthesis to see your Pareto scores" placeholder instead of crashing. Commit `8defb085`.
+- Data: nulled `product_synthesis` on the seeded test product (`aae14126-bde8-4615-8c0d-0a2baf86e3d8`) via direct SQL so the page renders cleanly on this specific row even pre-deploy of the code fix.
+- **Production audit: ZERO customer rows have this shape.** Only the one sandbox seed (which I wrote) carried the legacy shape. Verified via `SELECT foundry_id, COUNT(*) FROM products WHERE product_synthesis IS NOT NULL AND NOT (product_synthesis ? 'pareto')` — returned one row, all claude-test-foundry.
+- This fix hardens the code for the future: if any specialist output ever produces a partial-shape synthesis, the detail view degrades gracefully instead of crashing.
+
+---
+
 ## Evidence
 
 ### Unauth curl proof of middleware deep-link redirect (2026-04-20, post `d3ccb6b7`)
