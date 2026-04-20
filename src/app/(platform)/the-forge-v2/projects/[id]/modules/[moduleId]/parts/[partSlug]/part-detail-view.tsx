@@ -137,7 +137,7 @@ export function PartDetailView(props: PartDetailViewProps): React.ReactElement {
                 <div>
                     <h1>
                         {part.displayName}
-                        <span className="pd2-chip info solid" style={{ marginLeft: 6 }}>{part.slug.slice(0, 16)}</span>
+                        <span className="pd2-chip info solid" style={{ marginLeft: 6 }}>Ref pending</span>
                     </h1>
                     <p className="pd2-purpose-line">
                         {hasDescription

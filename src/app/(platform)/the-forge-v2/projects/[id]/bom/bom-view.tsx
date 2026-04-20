@@ -23,6 +23,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import "./bom-v2.css"
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -32,6 +33,9 @@ export interface BomPartRow {
     id: string
     /** Short part name (from shortenPartName). */
     name: string
+    /** Raw keyPart string — used as the URL slug for the part-detail page.
+     *  The part-detail route decodes and matches this against m.keyParts[]. */
+    slug: string
     /** Optional subtitle with material hints stripped from the raw keyPart. */
     meta: string | null
     /** Quantity — 1 for now (not captured at keyParts level). */
@@ -125,6 +129,7 @@ function formatGbpExact(value: number | null): string {
 
 export function BomView(props: BomViewProps): React.ReactElement {
     const { project, header, unitCostGbp, unitCostCeilingGbp, categories, costStack, grounding } = props
+    const router = useRouter()
 
     const base = `/the-forge-v2/projects/${project.id}`
     const allPartsEmpty = header.totalParts === 0
@@ -274,34 +279,52 @@ export function BomView(props: BomViewProps): React.ReactElement {
                                         </span>
                                     </td>
                                 </tr>,
-                                ...cat.parts.map((p) => (
-                                    <tr key={p.id} className="part-row">
-                                        <td>
-                                            <Link
-                                                href={`${base}/modules/${cat.moduleId}`}
-                                                style={{ textDecoration: "none", color: "inherit" }}
-                                            >
-                                                <div className="part-name">{p.name}</div>
-                                                {p.meta && <div className="part-meta">{p.meta}</div>}
-                                            </Link>
-                                        </td>
-                                        <td>{p.qty}</td>
-                                        <td><span className="bm2-mb unknown">—</span></td>
-                                        <td className="empty-dash">—</td>
-                                        <td><span className="bm2-sup-cell"><span className="tbd">Not yet shortlisted</span></span></td>
-                                        <td className="cost-cell empty-dash">—</td>
-                                        <td className="cost-cell empty-dash">—</td>
-                                        <td className="empty-dash">
-                                            {p.moduleLeadWeeks != null ? (
-                                                <span style={{ color: "var(--bm-fg-muted)" }} title="Module-level estimate — pending supplier quote per part">
-                                                    ~{p.moduleLeadWeeks} wk
-                                                </span>
-                                            ) : "—"}
-                                        </td>
-                                        <td><span className="bm2-status pending">Pending spec</span></td>
-                                        <td><span className="bm2-fit empty">—</span></td>
-                                    </tr>
-                                )),
+                                ...cat.parts.map((p) => {
+                                    const partHref = `${base}/modules/${cat.moduleId}/parts/${encodeURIComponent(p.slug)}`
+                                    return (
+                                        <tr
+                                            key={p.id}
+                                            className="part-row"
+                                            role="link"
+                                            tabIndex={0}
+                                            style={{ cursor: "pointer" }}
+                                            onClick={() => router.push(partHref)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault()
+                                                    router.push(partHref)
+                                                }
+                                            }}
+                                            aria-label={`Open ${p.name}`}
+                                        >
+                                            <td>
+                                                <Link
+                                                    href={partHref}
+                                                    style={{ textDecoration: "none", color: "inherit" }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <div className="part-name">{p.name}</div>
+                                                    {p.meta && <div className="part-meta">{p.meta}</div>}
+                                                </Link>
+                                            </td>
+                                            <td>{p.qty}</td>
+                                            <td><span className="bm2-mb unknown">—</span></td>
+                                            <td className="empty-dash">—</td>
+                                            <td><span className="bm2-sup-cell"><span className="tbd">Not yet shortlisted</span></span></td>
+                                            <td className="cost-cell empty-dash">—</td>
+                                            <td className="cost-cell empty-dash">—</td>
+                                            <td className="empty-dash">
+                                                {p.moduleLeadWeeks != null ? (
+                                                    <span style={{ color: "var(--bm-fg-muted)" }} title="Module-level estimate — pending supplier quote per part">
+                                                        ~{p.moduleLeadWeeks} wk
+                                                    </span>
+                                                ) : "—"}
+                                            </td>
+                                            <td><span className="bm2-status pending">Pending spec</span></td>
+                                            <td><span className="bm2-fit empty">—</span></td>
+                                        </tr>
+                                    )
+                                }),
                             ])
                         )}
                     </tbody>

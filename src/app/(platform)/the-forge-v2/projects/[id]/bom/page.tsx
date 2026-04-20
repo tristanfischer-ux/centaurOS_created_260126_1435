@@ -59,6 +59,9 @@ export default async function ForgeV2BomPage({
         const parts: BomPartRow[] = (m.keyParts ?? []).map((kp, idx) => ({
             id: `${m.id}-${idx}`,
             name: shortenPartName(kp),
+            // Preserve the original keyPart string for the part-detail route
+            // (the slug matches against m.keyParts[] after decodeURIComponent).
+            slug: kp,
             meta: partDescription(kp),
             qty: 1,
             unitCostGbp: null,
