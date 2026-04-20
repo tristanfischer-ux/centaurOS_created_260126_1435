@@ -1493,7 +1493,7 @@ export async function forkCadLabProject(
         subject: src.subject,
         model_id: src.model_id,
         status: 'draft' as string,
-        stage: 'draft' as string,
+        stage: src.stage ?? 'design',
         foundry_id: src.foundry_id,
         created_by: user.id,
         research: src.research,
