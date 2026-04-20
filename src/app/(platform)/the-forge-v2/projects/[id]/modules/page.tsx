@@ -22,6 +22,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import { loadMaxRunStatus, runMaxDecomposition } from "@/actions/specialists/run-max-decomposition"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
 import { ModulesView, type ModuleCardRow, type ModuleMassRow, type ModulesViewProps, type ThumbKind } from "./modules-view"
@@ -43,12 +44,27 @@ export default async function ForgeV2ModulesPage({
     params: Promise<{ id: string }>
 }): Promise<React.ReactNode> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
+    const [result, maxRunStatus] = await Promise.all([
+        loadCadLabProject(id),
+        loadMaxRunStatus(id),
+    ])
     if ("error" in result || !result.project) {
         notFound()
     }
     const project = result.project
     const modules = project.modules ?? []
+
+    // Bind the Max orchestrator to this project id so the client button
+    // component doesn't need to pass it explicitly. The `"use server"`
+    // boundary is on run-max-decomposition.ts itself.
+    async function runMaxAction(): Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    > {
+        "use server"
+        const res = await runMaxDecomposition(id, "manual")
+        if (res.ok) return { ok: true, runId: res.runId }
+        return { ok: false, error: res.error, errorCode: res.errorCode }
+    }
 
     // ── Mass rows ──────────────────────────────────────────────
     // Per-module budget lives on the module's optional `budgetMassKg` field
@@ -163,6 +179,15 @@ export default async function ForgeV2ModulesPage({
         currentTotalKg,
         mass,
         cards,
+        maxRun: {
+            status: maxRunStatus.status,
+            startedAt: maxRunStatus.startedAt ?? null,
+            finishedAt: maxRunStatus.finishedAt ?? null,
+            errorCode: maxRunStatus.errorCode ?? null,
+            errorMessage: maxRunStatus.errorMessage ?? null,
+            moduleCount: maxRunStatus.moduleCount ?? null,
+        },
+        runMaxAction,
     }
 
     return <ModulesView {...viewProps} />

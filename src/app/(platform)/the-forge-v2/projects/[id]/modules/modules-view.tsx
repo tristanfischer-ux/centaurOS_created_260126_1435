@@ -20,6 +20,14 @@
 "use client"
 
 import Link from "next/link"
+import { Cog } from "lucide-react"
+
+import {
+    PipelineRunChip,
+    type PipelineRunStatus,
+} from "@/components/pipeline/pipeline-run-chip"
+import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
+
 import "./modules-v2.css"
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -102,15 +110,45 @@ export interface ModulesViewProps {
     mass: ModuleMassRow[]
     /** Pre-computed rows for the module cards grid. */
     cards: ModuleCardRow[]
+    /** Latest Max (CTO) decomposition run status for this project. */
+    maxRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+        moduleCount: number | null
+    }
+    /** Server action bound to this project + trigger='manual'. */
+    runMaxAction: () => Promise<
+        { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
+    >
 }
 
 // ─── View ───────────────────────────────────────────────────────────────
 
 export function ModulesView(props: ModulesViewProps): React.ReactElement {
-    const { project, header, systemMeta, budgetTotalKg, currentTotalKg, mass, cards } = props
+    const {
+        project,
+        header,
+        systemMeta,
+        budgetTotalKg,
+        currentTotalKg,
+        mass,
+        cards,
+        maxRun,
+        runMaxAction,
+    } = props
 
     const workspaceHref = `/the-forge-v2/projects/${project.id}`
     const geometryHref = `/the-forge-v2/projects/${project.id}/geometry`
+    const modulesHref = `/the-forge-v2/projects/${project.id}/modules`
+    // Which timestamp the chip should show — 'done' reads finishedAt, live
+    // states use startedAt. Falls back to whichever is non-null.
+    const chipTimestamp =
+        maxRun.status === "done"
+            ? maxRun.finishedAt ?? maxRun.startedAt
+            : maxRun.startedAt ?? maxRun.finishedAt
 
     const totalDelta =
         budgetTotalKg != null && currentTotalKg != null
@@ -160,12 +198,71 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                     <div className="sub">
                         {header.moduleCount} modules · {header.interfaceCount} interface contracts · {header.unmatchedPortCount} unmatched ports · {deltaLabel}
                     </div>
+                    {/* Max pipeline chip — surfaces "Max is working…", "Done 2m ago", or the error state. */}
+                    {maxRun.status !== "not-started" && (
+                        <div style={{ marginTop: 8 }}>
+                            <PipelineRunChip
+                                status={maxRun.status}
+                                specialistName="Max"
+                                startedAt={chipTimestamp}
+                                errorCode={maxRun.errorCode}
+                                errorMessage={maxRun.errorMessage}
+                                compact
+                            />
+                        </div>
+                    )}
                 </div>
                 <div className="cta-group">
-                    <span className="m2-btn soon">Re-run decomposition</span>
+                    {/* Re-run shows only when modules already exist — fresh
+                        empty state gets the full CTA further down. */}
+                    {cards.length > 0 && (
+                        <RunSpecialistButton
+                            action={runMaxAction}
+                            label="Re-run decomposition"
+                            subLabel="Max · CTO · ~90s"
+                            onSuccessHref={modulesHref}
+                            variant="secondary"
+                            icon={<Cog aria-hidden="true" />}
+                            disabled={maxRun.status === "running" || maxRun.status === "queued"}
+                            disabledReason={
+                                maxRun.status === "running" || maxRun.status === "queued"
+                                    ? "Max is already working on this decomposition."
+                                    : undefined
+                            }
+                        />
+                    )}
                     <Link href={geometryHref} className="m2-btn">View geometry →</Link>
                 </div>
             </div>
+
+            {/* ── First-run CTA when no modules exist ─────────────── */}
+            {cards.length === 0 && (
+                <div
+                    className="m2-mass-card"
+                    style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}
+                >
+                    <div>
+                        <h3 style={{ margin: 0 }}>No modules yet</h3>
+                        <div className="sub" style={{ marginTop: 4 }}>
+                            Max breaks the project into subsystem modules with failure modes, key parts, and lead-time estimates. Takes about a minute and a half.
+                        </div>
+                    </div>
+                    <RunSpecialistButton
+                        action={runMaxAction}
+                        label="Decompose with Max"
+                        subLabel="Max · CTO · ~90s"
+                        onSuccessHref={modulesHref}
+                        variant="primary"
+                        icon={<Cog aria-hidden="true" />}
+                        disabled={maxRun.status === "running" || maxRun.status === "queued"}
+                        disabledReason={
+                            maxRun.status === "running" || maxRun.status === "queued"
+                                ? "Max is already working on this decomposition."
+                                : undefined
+                        }
+                    />
+                </div>
+            )}
 
             {/* ── System hero ─────────────────────────── */}
             <div className="m2-system-hero">

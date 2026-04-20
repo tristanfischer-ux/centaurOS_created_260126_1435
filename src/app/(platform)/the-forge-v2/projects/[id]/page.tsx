@@ -34,6 +34,7 @@ import {
     type ProjectActivityEvent,
     type ProjectResumeState,
 } from "@/actions/project-workspace"
+import { loadMaxRunStatus } from "@/actions/specialists/run-max-decomposition"
 import { createClient } from "@/lib/supabase/server"
 
 import { WorkspaceView, type TopMaterialRow, type TopProcessRow, type WorkspaceViewProps } from "./workspace-view"
@@ -65,13 +66,14 @@ export default async function ForgeV2ProjectPage({
     // ── 2. Derived data — parallelised, all failure-tolerant ─────────
     // Each call's failure mode is local: we swallow errors and fall back to
     // the empty-state shape so one broken source cannot take down the page.
-    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses, supplierShortlist] = await Promise.all([
+    const [resumeState, activityEvents, engineeringCounts, topMaterials, topProcesses, supplierShortlist, maxRunStatus] = await Promise.all([
         safeResume(id),
         safeActivity(id, 7),
         safeEngineeringCounts(),
         safeTopMaterials(),
         safeTopProcesses(),
         safeSupplierShortlist(id),
+        safeMaxRunStatus(id),
     ])
 
     // ── 3. Header-derived numbers that come straight off the project row
@@ -143,12 +145,30 @@ export default async function ForgeV2ProjectPage({
         topMaterials,
         topProcesses,
         suppliers: supplierShortlist,
+        maxRun: {
+            status: maxRunStatus.status,
+            startedAt: maxRunStatus.startedAt ?? null,
+            finishedAt: maxRunStatus.finishedAt ?? null,
+            errorCode: maxRunStatus.errorCode ?? null,
+            errorMessage: maxRunStatus.errorMessage ?? null,
+        },
     }
 
     return <WorkspaceView {...viewProps} />
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
+
+async function safeMaxRunStatus(
+    projectId: string,
+): Promise<Awaited<ReturnType<typeof loadMaxRunStatus>>> {
+    try {
+        return await loadMaxRunStatus(projectId)
+    } catch (err) {
+        console.error("[WORKSPACE-PAGE] max-run status failed:", err)
+        return { status: "not-started" }
+    }
+}
 
 async function safeResume(projectId: string): Promise<ProjectResumeState> {
     try {

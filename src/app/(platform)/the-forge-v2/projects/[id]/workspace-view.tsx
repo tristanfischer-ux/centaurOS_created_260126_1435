@@ -30,6 +30,10 @@
 import Link from "next/link"
 import "./workspace-v2.css"
 import type { ProjectActivityEvent, ProjectResumeState } from "@/actions/project-workspace"
+import {
+    PipelineRunChip,
+    type PipelineRunStatus,
+} from "@/components/pipeline/pipeline-run-chip"
 
 // ─── Props ────────────────────────────────────────────────────────────
 
@@ -90,6 +94,14 @@ export interface WorkspaceViewProps {
     topMaterials: TopMaterialRow[]
     topProcesses: TopProcessRow[]
     suppliers: SupplierShortlistRow[]
+    /** Latest Max (CTO) decomposition run — drives the Modules tile chip. */
+    maxRun: {
+        status: PipelineRunStatus
+        startedAt: string | null
+        finishedAt: string | null
+        errorCode: string | null
+        errorMessage: string | null
+    }
 }
 
 export interface SupplierShortlistRow {
@@ -102,7 +114,7 @@ export interface SupplierShortlistRow {
 // ─── View ─────────────────────────────────────────────────────────────
 
 export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
-    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers } = props
+    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun } = props
 
     // Base URL for the artefact deep-links. All routes are placeholders that
     // will resolve once the per-artefact pages ship in later rounds.
@@ -307,7 +319,27 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                                 <rect x="14" y="14" width="7" height="7" rx="1" />
                             </svg>
                         </span>
-                        <span className={`w2-chip ${modulesState.chipTone} solid`}>{modulesState.chipText}</span>
+                        {/* When Max has actually touched this project, the
+                            PipelineRunChip replaces the static tile chip so
+                            founders see "Max is working…" / "Done 4m ago" /
+                            "Failed" instead of a stale "Not yet decomposed"
+                            badge. Falls back to the static chip pre-first-run. */}
+                        {maxRun.status === "not-started" ? (
+                            <span className={`w2-chip ${modulesState.chipTone} solid`}>{modulesState.chipText}</span>
+                        ) : (
+                            <PipelineRunChip
+                                status={maxRun.status}
+                                specialistName="Max"
+                                startedAt={
+                                    maxRun.status === "done"
+                                        ? maxRun.finishedAt ?? maxRun.startedAt
+                                        : maxRun.startedAt ?? maxRun.finishedAt
+                                }
+                                errorCode={maxRun.errorCode}
+                                errorMessage={maxRun.errorMessage}
+                                compact
+                            />
+                        )}
                     </div>
                     <h3>Modules</h3>
                     <div className="subtitle">Decomposition · interfaces · failure modes</div>
