@@ -163,8 +163,6 @@ export default async function ForgeV2SuppliersPage(
     const allSuppliers = suppliersResult.results
     const filtered = allSuppliers.filter(s => matchesSpecialism(s, specialism))
 
-    const createRfqHref = `/the-forge/cad-lab?project=${project.id}&action=rfq`
-
     return (
         <WorkspaceShell
             crumbs={[
@@ -177,11 +175,6 @@ export default async function ForgeV2SuppliersPage(
                     ? "No suppliers matched yet"
                     : `${filtered.length} of ${allSuppliers.length} supplier${allSuppliers.length === 1 ? "" : "s"}${specialism !== "all" ? ` · ${SPECIALISMS.find(s => s.id === specialism)?.label}` : ""}`
             }
-            primaryCta={{
-                label: "Create RFQ",
-                href: createRfqHref,
-                icon: <Plus className="h-3.5 w-3.5" />,
-            }}
         >
             {/* Linked RFQ banner */}
             {project.linkedRfqId && (
@@ -198,7 +191,7 @@ export default async function ForgeV2SuppliersPage(
                                 )}
                             </p>
                             <p className="text-[11.5px] text-muted-foreground mt-0.5">
-                                Broadcast to matched suppliers from CAD Lab. Responses land in the RFQ page.
+                                Broadcast to matched suppliers. Responses land in the RFQ page.
                             </p>
                         </div>
                         <Button asChild size="sm" variant="outline" className="gap-1.5 shrink-0">

@@ -381,12 +381,6 @@ export default async function ForgeV2SupplierDetailPage(
                                     <p className="text-sm text-muted-foreground">
                                         No RFQs tracked against this supplier for this project yet.
                                     </p>
-                                    <Link
-                                        href={`/the-forge/cad-lab?project=${project.id}&action=rfq`}
-                                        className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                                    >
-                                        Create RFQ <ArrowRight className="h-3.5 w-3.5" />
-                                    </Link>
                                 </CardContent>
                             </Card>
                         ) : (

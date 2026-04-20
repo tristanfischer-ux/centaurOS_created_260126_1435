@@ -140,11 +140,6 @@ export default async function ForgeV2ProjectPage({
                     {stageLabel}
                 </Badge>
             }
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}`,
-                icon: <Wrench className="h-3.5 w-3.5" />,
-            }}
         >
             {/* Hero illustration */}
             {project.systemIllustrationUrl && (
@@ -347,10 +342,9 @@ export default async function ForgeV2ProjectPage({
                         chips={project.integratedAssemblyStepUrl ? [
                             { label: 'Integrated STEP', tone: 'success' },
                         ] : [{ label: 'Pending', tone: 'muted' }]}
-                        footerLabel="Open CAD Lab"
                         grounding={project.integratedAssemblyStlUrl ? 'STL + STEP ready' : undefined}
                         state={geometryState}
-                        href={`/the-forge/cad-lab?project=${project.id}`}
+                        href={`/the-forge-v2/projects/${project.id}/geometry`}
                     />
                     <ArtefactCard
                         icon={Wrench}
@@ -505,12 +499,12 @@ function KnownChallenges({
 // Deep links to the CAD lab's reference material until a proper library
 // browser ships.
 
-interface LibrarySection { icon: React.ComponentType<{ className?: string }>; label: string; count: number; hint: string; href: string }
+interface LibrarySection { icon: React.ComponentType<{ className?: string }>; label: string; count: number; hint: string; href: string | null }
 
 const LIBRARY_SECTIONS: LibrarySection[] = [
-    { icon: Library,  label: "Materials",       count: 20, hint: "Ti-6Al-4V · 7075-T6 · CFRP · more",                    href: "/the-forge/cad-lab/templates" },
-    { icon: Cog,      label: "Hardware",        count: 82, hint: "Bolts · bearings · fasteners with load ratings",       href: "/the-forge/cad-lab/templates" },
-    { icon: Factory,  label: "Processes",       count: 20, hint: "Wire EDM · CNC · SLA · DMLS · sheet metal · more",     href: "/the-forge/cad-lab/templates" },
+    { icon: Library,  label: "Materials",       count: 20, hint: "Ti-6Al-4V · 7075-T6 · CFRP · more",                    href: null },
+    { icon: Cog,      label: "Hardware",        count: 82, hint: "Bolts · bearings · fasteners with load ratings",       href: null },
+    { icon: Factory,  label: "Processes",       count: 20, hint: "Wire EDM · CNC · SLA · DMLS · sheet metal · more",     href: null },
     { icon: Truck,    label: "Supplier techniques", count: 10, hint: "CNC milling · laser cut · sand cast · EDM · SLA",  href: "/suppliers/search" },
 ]
 
@@ -528,29 +522,41 @@ function EngineeringIntelligence({ projectId }: { projectId: string }): React.Re
             <Card className="rounded-xl border">
                 <CardContent className="py-4 px-5">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {LIBRARY_SECTIONS.map(s => (
-                            <Link
-                                key={s.label}
-                                href={s.href}
-                                className="flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-background hover:bg-muted/30 hover:shadow-sm transition-all group"
-                            >
-                                <span className="flex items-center justify-center w-9 h-9 rounded-md bg-international-orange/10 text-international-orange shrink-0">
-                                    <s.icon className="h-4 w-4" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">
-                                        {s.label}
-                                    </p>
-                                    <p className="text-lg font-bold text-foreground tabular-nums leading-tight group-hover:text-international-orange transition-colors">
-                                        {s.count}
-                                        <span className="text-xs font-medium text-muted-foreground ml-1">catalog</span>
-                                    </p>
-                                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-                                        {s.hint}
-                                    </p>
+                        {LIBRARY_SECTIONS.map(s => {
+                            const tile = (
+                                <>
+                                    <span className="flex items-center justify-center w-9 h-9 rounded-md bg-international-orange/10 text-international-orange shrink-0">
+                                        <s.icon className="h-4 w-4" />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">
+                                            {s.label}
+                                        </p>
+                                        <p className={cn("text-lg font-bold text-foreground tabular-nums leading-tight transition-colors", s.href && "group-hover:text-international-orange")}>
+                                            {s.count}
+                                            <span className="text-xs font-medium text-muted-foreground ml-1">catalog</span>
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                                            {s.hint}
+                                        </p>
+                                    </div>
+                                </>
+                            )
+                            const tileClass = "flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-background transition-all"
+                            return s.href ? (
+                                <Link
+                                    key={s.label}
+                                    href={s.href}
+                                    className={cn(tileClass, "hover:bg-muted/30 hover:shadow-sm group")}
+                                >
+                                    {tile}
+                                </Link>
+                            ) : (
+                                <div key={s.label} className={tileClass}>
+                                    {tile}
                                 </div>
-                            </Link>
-                        ))}
+                            )
+                        })}
                     </div>
                 </CardContent>
             </Card>

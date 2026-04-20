@@ -59,10 +59,6 @@ export default async function ForgeV2ModulesPage({
                 { label: "Modules" },
             ]}
             subtitle={`${modules.length} ${modules.length === 1 ? 'module' : 'modules'} · total estimated mass ${massTotal.toFixed(2)} kg`}
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}`,
-            }}
         >
             {modules.length === 0 ? (
                 <Card className="rounded-xl border">

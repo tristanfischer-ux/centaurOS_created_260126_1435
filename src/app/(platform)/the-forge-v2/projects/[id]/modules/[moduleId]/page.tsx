@@ -106,11 +106,6 @@ export default async function ForgeV2ModuleDetailPage({
                     {tone.label}
                 </Badge>
             }
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}&module=${mod.id}`,
-                icon: <Wrench className="h-3.5 w-3.5" />,
-            }}
             maxWidth="narrow"
         >
             {/* Sticky in-page nav — pinned below header */}

@@ -125,11 +125,6 @@ export default async function ForgeV2OperationsPage({
                 { label: "Operations" },
             ]}
             subtitle="Build sequence · assembly instructions"
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}`,
-                icon: <Wrench className="h-3.5 w-3.5" />,
-            }}
         >
             {/* Summary strip */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -220,18 +215,13 @@ export default async function ForgeV2OperationsPage({
                                 Build-order authoring ships in a later PR
                             </h2>
                             <p className="text-sm text-muted-foreground leading-relaxed">
-                                Once modules are decomposed and geometry is stable, the CAD Lab will let you
-                                author the assembly sequence — step order, torque specs, fixture callouts — and
-                                roll it up here as the project-level build instructions.
+                                Once modules are decomposed and geometry is stable, you&apos;ll
+                                author the assembly sequence — step order, torque specs, fixture
+                                callouts — and roll it up here as the project-level build
+                                instructions.
                             </p>
                         </div>
                         <div className="flex flex-wrap items-center justify-center gap-2">
-                            <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                <Link href={`/the-forge/cad-lab?project=${project.id}`}>
-                                    <Wrench className="h-3.5 w-3.5" />
-                                    Open CAD Lab
-                                </Link>
-                            </Button>
                             <Button asChild size="sm" variant="outline">
                                 <Link href={`/the-forge-v2/projects/${project.id}/modules`}>
                                     Review modules

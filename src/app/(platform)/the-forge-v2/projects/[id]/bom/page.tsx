@@ -86,14 +86,15 @@ export default async function ForgeV2BomPage({ params }: { params: Promise<{ id:
                         <div className="max-w-sm space-y-2">
                             <p className="text-sm font-semibold text-foreground">No parts in the BOM yet</p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                                Parts populate after each module&apos;s CAD generation. Run the pipeline in CAD Lab to get started.
+                                Parts populate after each module&apos;s CAD generation. Decompose
+                                the concept into modules to kick the pipeline off.
                             </p>
                         </div>
                         <Link
-                            href={`/the-forge/cad-lab?project=${project.id}`}
+                            href={`/the-forge-v2/projects/${project.id}/modules`}
                             className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
                         >
-                            Open CAD Lab <ArrowRight className="h-3.5 w-3.5" />
+                            Review modules <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
                     </CardContent>
                 </Card>
