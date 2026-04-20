@@ -109,7 +109,50 @@ type BrowseViewProps = {
   scoresByListingId: Record<string, { total: number; breakdown: MatchBreakdown }> | null
   alreadyInPipelineIds: string[]
   subcategories: readonly string[]
+  /** Foundry subscription tier — drives the Explorer upgrade CTA + Pro badge. */
+  currentTier: string
   initial: InitialState
+}
+
+// ---------------------------------------------------------------------------
+// Upgrade CTA card — injected into the results grid for Explorer users with
+// > 25 total matches so they see what they're missing.
+// ---------------------------------------------------------------------------
+
+function BrowseUpgradeCta({ total }: { total: number }) {
+  const moreCount = Math.max(0, total - 25)
+  return (
+    <Card className="flex h-full flex-col border-international-orange/40 bg-international-orange/5">
+      <CardContent className="flex flex-1 flex-col justify-between gap-3 py-5">
+        <div className="space-y-2">
+          <Badge
+            variant="outline"
+            className="border-international-orange/60 bg-international-orange/10 text-international-orange"
+          >
+            Upgrade
+          </Badge>
+          <h3 className="text-base font-semibold text-foreground">
+            Upgrade to Startup Team to see {moreCount.toLocaleString()} more{' '}
+            {moreCount === 1 ? 'firm' : 'firms'}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            150 investor profiles per month, verified emails, and portfolio intel across the
+            full UK directory.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 pt-2">
+          <Button
+            asChild
+            size="sm"
+            className="bg-international-orange hover:bg-international-orange/90"
+          >
+            <Link href="/pricing?plan=starter">View Startup Team — £49/mo</Link>
+          </Button>
+          <p className="text-[11px] text-muted-foreground">No contracts. Cancel anytime.</p>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +271,19 @@ function InvestorCard({
               )}
             </div>
           </div>
-          {showScore && scoreEntry && <MatchScoreBadge score={scoreEntry.total} />}
+          {showScore && scoreEntry && (
+            <div className="flex flex-col items-end gap-1">
+              <MatchScoreBadge score={scoreEntry.total} />
+              <Badge
+                variant="outline"
+                size="sm"
+                className="border-international-orange/40 bg-international-orange/5 text-[9px] uppercase tracking-wider text-international-orange"
+                title="Match-score breakdowns unlock on Professional"
+              >
+                Pro
+              </Badge>
+            </div>
+          )}
         </div>
 
         {row.description && (
@@ -302,6 +357,7 @@ export function BrowseInvestorsView({
   scoresByListingId,
   alreadyInPipelineIds,
   subcategories,
+  currentTier,
   initial,
 }: BrowseViewProps) {
   const router = useRouter()
@@ -475,6 +531,10 @@ export function BrowseInvestorsView({
   const endIdx = startIdx + results.length - 1
   const hasMore = initial.page * initial.limit < total
   const showMatchBadges = hasActiveThesis && scoresByListingId != null
+  // Explorer-tier monetisation CTA: only on page 1, only when there's headroom
+  // above the 25-row free view, only for free tier. Shown AFTER the 25 cards.
+  const showExplorerUpgradeCta =
+    currentTier === 'free' && initial.page === 1 && total > 25 && results.length > 0
 
   return (
     <div className="space-y-6">
@@ -614,22 +674,33 @@ export function BrowseInvestorsView({
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {results.map((row) => {
-                const scoreEntry = scoresByListingId?.[row.id] ?? null
-                return (
-                  <InvestorCard
-                    key={row.id}
-                    row={row}
-                    scoreEntry={scoreEntry}
-                    showScore={showMatchBadges}
-                    alreadyInPipeline={pipelineIds.has(row.id)}
-                    isAdding={isPending && addingId === row.id}
-                    onAdd={handleAdd}
-                  />
-                )
-              })}
-            </div>
+            <>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {results.map((row) => {
+                  const scoreEntry = scoresByListingId?.[row.id] ?? null
+                  return (
+                    <InvestorCard
+                      key={row.id}
+                      row={row}
+                      scoreEntry={scoreEntry}
+                      showScore={showMatchBadges}
+                      alreadyInPipeline={pipelineIds.has(row.id)}
+                      isAdding={isPending && addingId === row.id}
+                      onAdd={handleAdd}
+                    />
+                  )
+                })}
+              </div>
+              {showExplorerUpgradeCta && (
+                <div className="pt-4">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="md:col-span-2 xl:col-span-3">
+                      <BrowseUpgradeCta total={total} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Pagination */}

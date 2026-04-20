@@ -44,7 +44,11 @@ import { ConnectionBriefCard } from './connection-brief-card'
 import { HardwareFitCard } from './hardware-fit-card'
 import { DataFreshnessCard } from './data-freshness-card'
 import { RecentDealsCard } from './recent-deals-card'
+import { TierLockSection } from '../../_shared/tier-lock-section'
 import type { FirmContact } from './contact-detail-dialog'
+
+// Soft-teaser preview length for portfolio — see InvestmentPatternCard / sidebar
+const PORTFOLIO_TEASER_ROWS = 5
 
 const STAGE_OPTIONS: Array<PipelineRow['current_stage']> = [
   'target',
@@ -136,12 +140,15 @@ export function InvestorDetailView({
   firmAttributes,
   dataQualityScore,
   matchBreakdown,
+  currentTier,
 }: {
   detail: InvestorDetail
   contacts: FirmContact[]
   firmAttributes: FirmAttributes
   dataQualityScore: number | null
   matchBreakdown: MatchBreakdown | null
+  /** Foundry subscription tier — drives tier-locked sections. */
+  currentTier: string | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -409,65 +416,11 @@ export function InvestorDetailView({
           )}
 
           {detail.portfolio.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">
-                  Portfolio ({detail.portfolio.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <caption className="sr-only">
-                      Portfolio companies for {investorName}
-                    </caption>
-                    <thead>
-                      <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                        <th scope="col" className="py-2 px-4">Company</th>
-                        <th scope="col" className="py-2 px-4">Sector</th>
-                        <th scope="col" className="py-2 px-4">Stage</th>
-                        <th scope="col" className="py-2 px-4 text-right">Amount</th>
-                        <th scope="col" className="py-2 px-4">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.portfolio.map((p) => (
-                        <tr key={p.id} className="border-b border-border/50">
-                          <td className="py-2 px-4 font-medium">
-                            {p.source_url ? (
-                              <a
-                                href={p.source_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="hover:underline"
-                              >
-                                {p.company_name}
-                              </a>
-                            ) : (
-                              p.company_name
-                            )}
-                          </td>
-                          <td className="py-2 px-4 text-muted-foreground">{p.sector ?? '—'}</td>
-                          <td className="py-2 px-4 text-muted-foreground">{p.stage ?? '—'}</td>
-                          <td className="py-2 px-4 text-right tabular-nums text-muted-foreground">
-                            {p.amount_usd != null
-                              ? new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency: 'USD',
-                                  maximumFractionDigits: 0,
-                                }).format(p.amount_usd)
-                              : '—'}
-                          </td>
-                          <td className="py-2 px-4 text-xs text-muted-foreground">
-                            {p.investment_date ?? '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+            <PortfolioTable
+              portfolio={detail.portfolio}
+              investorName={investorName}
+              currentTier={currentTier}
+            />
           )}
 
           <RecentDealsCard
@@ -669,20 +622,56 @@ export function InvestorDetailView({
 
         {/* --- Right column (sidebar) -------------------------------------- */}
         <aside className="space-y-6 min-w-0">
-          <KeyPeopleCard contacts={contacts} />
-          <FundPerformanceCard
-            fundPerformance={firmAttributes.fund_performance}
-            fundHistory={firmAttributes.fund_history}
-            exits={firmAttributes.exits}
-          />
-          <InvestmentPatternCard
-            investmentPattern={firmAttributes.investment_pattern}
-            portfolio={detail.portfolio}
-          />
-          <ConnectionBriefCard
-            connectionBrief={firmAttributes.connection_brief}
-            warmIntroPaths={firmAttributes.warm_intro_paths}
-          />
+          {/* Key people / partners — Starter+ */}
+          <TierLockSection
+            requiredTier="starter"
+            currentTier={currentTier}
+            title="Key people"
+            teaser="Starter unlocks partner names, titles, and seniority for every firm."
+          >
+            <KeyPeopleCard contacts={contacts} />
+          </TierLockSection>
+
+          {/* Fund performance — Starter+ */}
+          <TierLockSection
+            requiredTier="starter"
+            currentTier={currentTier}
+            title="Fund performance"
+            teaser="Starter unlocks fund history, returns, and exit activity."
+          >
+            <FundPerformanceCard
+              fundPerformance={firmAttributes.fund_performance}
+              fundHistory={firmAttributes.fund_history}
+              exits={firmAttributes.exits}
+            />
+          </TierLockSection>
+
+          {/* Investment pattern — Starter+ */}
+          <TierLockSection
+            requiredTier="starter"
+            currentTier={currentTier}
+            title="Investment pattern"
+            teaser="Starter unlocks how they deploy cheques, stage cadence, and sector mix."
+          >
+            <InvestmentPatternCard
+              investmentPattern={firmAttributes.investment_pattern}
+              portfolio={detail.portfolio}
+            />
+          </TierLockSection>
+
+          {/* Connection brief — Pro+ */}
+          <TierLockSection
+            requiredTier="pro"
+            currentTier={currentTier}
+            title="Connection brief"
+            teaser="Professional unlocks the connection brief and warm-intro paths for this firm."
+          >
+            <ConnectionBriefCard
+              connectionBrief={firmAttributes.connection_brief}
+              warmIntroPaths={firmAttributes.warm_intro_paths}
+            />
+          </TierLockSection>
+
           <HardwareFitCard score={firmAttributes.hardware_fit_score} />
           <DataFreshnessCard
             dataQualityScore={dataQualityScore}
@@ -692,5 +681,118 @@ export function InvestorDetailView({
         </aside>
       </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PortfolioTable
+//
+// Always shows the first PORTFOLIO_TEASER_ROWS rows. If there are more rows
+// and the user is below Starter, the remainder renders as a locked teaser.
+// ---------------------------------------------------------------------------
+
+function PortfolioTable({
+  portfolio,
+  investorName,
+  currentTier,
+}: {
+  portfolio: InvestorDetail['portfolio']
+  investorName: string
+  currentTier: string | null
+}) {
+  const tierRank: Record<string, number> = {
+    free: 0,
+    seed: 1,
+    starter: 2,
+    professional: 3,
+    enterprise: 4,
+  }
+  const rank = tierRank[currentTier ?? 'free'] ?? 0
+  const hasStarter = rank >= tierRank.starter
+  const teaser = portfolio.slice(0, PORTFOLIO_TEASER_ROWS)
+  const rest = portfolio.slice(PORTFOLIO_TEASER_ROWS)
+  const hiddenCount = hasStarter ? 0 : rest.length
+
+  const renderRows = (rows: InvestorDetail['portfolio']) => (
+    <>
+      {rows.map((p) => (
+        <tr key={p.id} className="border-b border-border/50">
+          <td className="py-2 px-4 font-medium">
+            {p.source_url ? (
+              <a
+                href={p.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:underline"
+              >
+                {p.company_name}
+              </a>
+            ) : (
+              p.company_name
+            )}
+          </td>
+          <td className="py-2 px-4 text-muted-foreground">{p.sector ?? '—'}</td>
+          <td className="py-2 px-4 text-muted-foreground">{p.stage ?? '—'}</td>
+          <td className="py-2 px-4 text-right tabular-nums text-muted-foreground">
+            {p.amount_usd != null
+              ? new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'USD',
+                  maximumFractionDigits: 0,
+                }).format(p.amount_usd)
+              : '—'}
+          </td>
+          <td className="py-2 px-4 text-xs text-muted-foreground">
+            {p.investment_date ?? '—'}
+          </td>
+        </tr>
+      ))}
+    </>
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">
+          Portfolio ({portfolio.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <caption className="sr-only">
+              Portfolio companies for {investorName}
+            </caption>
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th scope="col" className="py-2 px-4">Company</th>
+                <th scope="col" className="py-2 px-4">Sector</th>
+                <th scope="col" className="py-2 px-4">Stage</th>
+                <th scope="col" className="py-2 px-4 text-right">Amount</th>
+                <th scope="col" className="py-2 px-4">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {renderRows(teaser)}
+              {hasStarter && rest.length > 0 && renderRows(rest)}
+            </tbody>
+          </table>
+        </div>
+        {hiddenCount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/30 px-4 py-3 text-xs">
+            <span className="text-muted-foreground">
+              {hiddenCount} more{' '}
+              {hiddenCount === 1 ? 'portfolio company' : 'portfolio companies'} hidden
+            </span>
+            <Link
+              href="/pricing?plan=starter"
+              className="font-medium text-international-orange hover:underline"
+            >
+              Upgrade to Startup Team to see all {'->'}
+            </Link>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

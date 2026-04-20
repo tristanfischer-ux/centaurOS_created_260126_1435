@@ -12,6 +12,7 @@ import {
   scoreInvestorsAgainstThesis,
 } from '@/actions/money-raise'
 import { getActiveThesis } from '@/actions/money-thesis'
+import { getInvestorTierAccess } from '@/actions/investors'
 import { BROWSE_SUBCATEGORIES } from '@/lib/money/browse-subcategories'
 import type { RichInvestorFilters, MatchBreakdown, ScoredListingRow } from '@/lib/money/match-types'
 import { createClient } from '@/lib/supabase/server'
@@ -82,8 +83,8 @@ export default async function BrowseInvestorsPage({
 
   const richFilters = toRichFilters(params)
 
-  // Fetch results + thesis in parallel. Thesis read is cheap (single row by id).
-  const [searchResult, thesisResult] = await Promise.all([
+  // Fetch results + thesis + tier access in parallel.
+  const [searchResult, thesisResult, tierAccess] = await Promise.all([
     searchInvestorsSemantic({
       query,
       filters: richFilters,
@@ -91,6 +92,7 @@ export default async function BrowseInvestorsPage({
       offset,
     }),
     getActiveThesis(),
+    getInvestorTierAccess(),
   ])
 
   if ('error' in searchResult) {
@@ -180,6 +182,7 @@ export default async function BrowseInvestorsPage({
       scoresByListingId={scoresByListingId}
       alreadyInPipelineIds={alreadyInPipelineIds}
       subcategories={BROWSE_SUBCATEGORIES}
+      currentTier={tierAccess.tier}
       initial={{
         q: query,
         sort: sortMode,

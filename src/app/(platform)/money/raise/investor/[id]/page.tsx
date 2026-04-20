@@ -1,8 +1,14 @@
 import { getInvestorDetail, listInvestorContactsByFirm } from '@/actions/money-raise'
+import {
+  checkInvestorViewCap,
+  getInvestorTierAccess,
+  recordInvestorDetailView,
+} from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
 import type { MatchBreakdown } from '@/lib/money/match-types'
 import { InvestorDetailView, type FirmAttributes } from './investor-detail-view'
 import type { FirmContact } from './contact-detail-dialog'
+import { ViewCapUpgradePrompt } from '../../_shared/view-cap-upgrade-prompt'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,11 +110,51 @@ export default async function InvestorDetailPage({
     )
   }
 
+  // FLOW: View-cap gate — only when the pipeline row is backed by a
+  // marketplace_listing_id. Custom/manual pipeline entries (no listing) skip
+  // the cap entirely because they can't be resolved in the directory anyway.
+  const listingId = detail.state.marketplace_listing_id
+  const tierAccess = await getInvestorTierAccess()
+
+  if (listingId) {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      const viewCap = await checkInvestorViewCap(
+        detail.state.foundry_id,
+        tierAccess.tier,
+        listingId,
+      )
+
+      // INTENT: Hard block — show upgrade prompt instead of firm detail.
+      if (!viewCap.allowed) {
+        const firmName =
+          detail.firm?.title ??
+          detail.state.investor_firm_id ??
+          detail.state.marketplace_listing_id ??
+          'Investor'
+        return (
+          <ViewCapUpgradePrompt
+            firmName={firmName}
+            firmType={null}
+            hqCity={detail.firm?.city ?? null}
+            tier={tierAccess.tier}
+            viewCap={viewCap}
+          />
+        )
+      }
+
+      // View allowed — record so caps increment and the investor joins the library.
+      await recordInvestorDetailView(listingId, detail.state.foundry_id, user.id)
+    }
+  }
+
   // Fan out in parallel:
   //   - partner list (vc_pe_contacts) via the action we already audited
   //   - rich `attributes` + data_quality_score from marketplace_listings
   //   - cached match breakdown from the foundry's pipeline row
-  const listingId = detail.state.marketplace_listing_id
   const [contactsRes, richRes, matchRes] = await Promise.all([
     listingId
       ? listInvestorContactsByFirm(listingId)
@@ -158,6 +204,7 @@ export default async function InvestorDetailPage({
       firmAttributes={firmAttributes}
       dataQualityScore={dataQualityScore}
       matchBreakdown={matchBreakdown}
+      currentTier={tierAccess.tier}
     />
   )
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -15,7 +16,15 @@ const TABS = [
   { href: '/money/raise/update', label: 'Updates', match: /^\/money\/raise\/update/ },
 ] as const
 
-export function RaiseSubNav() {
+interface RaiseSubNavProps {
+  /**
+   * Optional right-aligned slot — used by the layout to render the server-side
+   * view-cap badge ("N/50 views this month") when a cap applies.
+   */
+  trailingSlot?: ReactNode
+}
+
+export function RaiseSubNav({ trailingSlot }: RaiseSubNavProps = {}) {
   const pathname = usePathname() ?? ''
   return (
     <nav
@@ -40,6 +49,9 @@ export function RaiseSubNav() {
           </Link>
         )
       })}
+      {trailingSlot ? (
+        <div className="ml-auto flex items-center pb-1 pl-3">{trailingSlot}</div>
+      ) : null}
     </nav>
   )
 }
