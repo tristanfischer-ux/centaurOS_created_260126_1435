@@ -1,36 +1,43 @@
 /**
  * @file suppliers/[supplierId]/page.tsx — /the-forge-v2/projects/:id/suppliers/:supplierId
  *
- * @description Supplier drill-in from the project roster. Pulls the supplier
- * row via getSupplierById (marketplace_listings), renders a spec strip
- * (certifications, typical lead times, MOQ, price range), contact block,
- * linked RFQs list (project-scoped), and a Message-supplier CTA.
+ * @description Supplier detail drill-in from the project shortlist. Server
+ * component that loads two rows in parallel:
+ *   1. forge_supplier_shortlist — the project-scoped row with match score,
+ *      module_ids, match reasons, ramp role, and shortlist notes.
+ *   2. suppliers — the global directory row with description, website,
+ *      capabilities (jsonb), company_info (jsonb), verification status,
+ *      community rating, review count, used_by_count, domain categories.
  *
- * Mockup ref: FORGE-MOCKUP-SUPPLIER-DETAIL.html.
+ * Both rows are required — 404 if either is missing so bogus ids don't leak
+ * existence across foundries or surface a broken half-rendered page.
+ *
+ * Mockup ref: FORGE-MOCKUP-SUPPLIER-DETAIL.html. Scoped CSS under `.sd2`.
+ *
+ * Empty-state policy: RFQ lifecycle (RFQs sent / quotes received / awards /
+ * NDAs) ships in a later round. Those surfaces are rendered as honest
+ * "RFQ lifecycle ships in a later round" placeholders. We NEVER synthesise
+ * mockup specifics (Astra AS9100 expired / cert dates / RFQ history /
+ * quoted £ amounts / Chase narrative) — only real data from the two rows.
+ *
+ * @related
+ *   - View:   ./supplier-detail-view.tsx
+ *   - Styles: ./supplier-detail-v2.css (scoped .sd2 — do NOT modify)
+ *   - Mockup: FORGE-MOCKUP-SUPPLIER-DETAIL.html
  */
 
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import {
-    Building2,
-    MapPin,
-    Check,
-    Mail,
-    Phone,
-    ArrowRight,
-    ShieldCheck,
-    Truck,
-} from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { getSupplierById, type SupplierCard } from "@/actions/suppliers"
 import { createClient } from "@/lib/supabase/server"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 
-import { WorkspaceShell } from "../../../../_components/workspace-shell"
+import {
+    SupplierDetailView,
+    type CapabilityEntry,
+    type ModuleLink,
+    type SupplierDetailViewProps,
+} from "./supplier-detail-view"
 
 export const dynamic = "force-dynamic"
 
@@ -40,75 +47,18 @@ export async function generateMetadata(
     { params }: { params: Promise<{ id: string; supplierId: string }> },
 ): Promise<Metadata> {
     const { supplierId } = await params
-    const supplier = await getSupplierById(supplierId).catch(() => null)
-    if (!supplier) return { title: "Supplier · The Forge" }
-    return { title: `${supplier.name} · Suppliers · The Forge` }
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────
-
-interface LinkedRfq {
-    id: string
-    title: string
-    status: string
-    createdAt: string | null
-}
-
-/**
- * Pulls RFQs created from this project so we can show a per-supplier history
- * row. Project-linked RFQs are tagged via `specifications.custom_fields.source`.
- * Returns an empty array on any failure — never crash this surface.
- */
-async function loadProjectRfqs(projectId: string, linkedRfqId: string | null): Promise<LinkedRfq[]> {
-    if (!linkedRfqId) return []
     try {
         const supabase = await createClient()
         const { data } = await supabase
-            .from("rfqs")
-            .select("id, title, status, created_at")
-            .eq("id", linkedRfqId)
+            .from("suppliers")
+            .select("name")
+            .eq("id", supplierId)
             .maybeSingle()
-        if (!data) return []
-        return [{
-            id: data.id,
-            title: (data.title as string | null) ?? `Project ${projectId.slice(0, 8)} RFQ`,
-            status: (data.status as string | null) ?? "draft",
-            createdAt: (data.created_at as string | null) ?? null,
-        }]
+        if (!data?.name) return { title: "Supplier · The Forge" }
+        return { title: `${data.name} · Suppliers · The Forge` }
     } catch {
-        return []
+        return { title: "Supplier · The Forge" }
     }
-}
-
-function extractContact(supplier: SupplierCard): { email: string | null; phone: string | null } {
-    const attrs = supplier.attributes ?? {}
-    // attributes.contact may be a JSON object or separate email/phone fields
-    const contact = (attrs.contact ?? {}) as Record<string, unknown>
-    const email = typeof attrs.email === "string"
-        ? attrs.email
-        : typeof contact.email === "string"
-            ? contact.email
-            : null
-    const phone = typeof attrs.phone === "string"
-        ? attrs.phone
-        : typeof contact.phone === "string"
-            ? contact.phone
-            : null
-    return { email, phone }
-}
-
-function extractStringArray(value: unknown): string[] {
-    if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string")
-    if (typeof value === "string" && value.length > 0) {
-        return value.split(/[,;]/).map(s => s.trim()).filter(Boolean)
-    }
-    return []
-}
-
-function extractStringField(value: unknown): string | null {
-    if (typeof value === "string" && value.trim().length > 0) return value.trim()
-    if (typeof value === "number") return String(value)
-    return null
 }
 
 // ─── Page ───────────────────────────────────────────────────────────
@@ -118,308 +68,195 @@ export default async function ForgeV2SupplierDetailPage(
 ): Promise<React.ReactNode> {
     const { id, supplierId } = await params
 
+    // ── 1. Project load (enforces auth + foundry scoping via withAuth) ──
     const projectResult = await loadCadLabProject(id)
-    if ("error" in projectResult) notFound()
+    if ("error" in projectResult || !projectResult.project) notFound()
     const project = projectResult.project
 
-    const supplier = await getSupplierById(supplierId).catch(() => null)
-    if (!supplier) notFound()
+    // ── 2. Parallel fetch: shortlist row + global supplier row ──────────
+    const supabase = await createClient()
+    const [shortlistRes, supplierRes] = await Promise.all([
+        supabase
+            .from("forge_supplier_shortlist")
+            .select("*")
+            .eq("project_id", id)
+            .eq("supplier_id", supplierId)
+            .maybeSingle(),
+        supabase
+            .from("suppliers")
+            .select("*")
+            .eq("id", supplierId)
+            .maybeSingle(),
+    ])
 
-    const attrs = supplier.attributes ?? {}
-    const country = extractStringField(attrs.country)
-    const city = extractStringField(attrs.city)
-    const location = [city, country].filter(Boolean).join(", ") || null
+    const shortlist = shortlistRes.data
+    const supplier = supplierRes.data
+    if (!shortlist || !supplier) notFound()
 
-    const certifications = extractStringArray(attrs.certifications)
-    const specialties = extractStringArray(attrs.specialties)
-    const materials = extractStringArray(attrs.materials)
-    const keyEquipment = extractStringArray(attrs.key_equipment)
-
-    const leadTime = extractStringField(attrs.lead_time)
-    const moq = extractStringField(attrs.minimum_order) ?? extractStringField(attrs.moq)
-    const priceRange = extractStringField(attrs.price_range)
-        ?? extractStringField(attrs.pricing)
-        ?? extractStringField(attrs.typical_price)
-
-    const { email, phone } = extractContact(supplier)
-
-    const linkedRfqs = await loadProjectRfqs(project.id, project.linkedRfqId)
-
-    const specStrip: Array<{ label: string; value: string | null }> = [
-        { label: "Lead time", value: leadTime },
-        { label: "MOQ", value: moq },
-        { label: "Price range", value: priceRange },
-        { label: "Certifications", value: certifications.length > 0 ? `${certifications.length}` : null },
-    ]
-    const hasSpecStrip = specStrip.some(s => s.value !== null)
-
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
-                { label: "Suppliers", href: `/the-forge-v2/projects/${project.id}/suppliers` },
-                { label: supplier.name || "Supplier" },
-            ]}
-            subtitle={[location, specialties[0] ?? supplier.subcategory ?? null].filter(Boolean).join(" · ") || "Supplier detail"}
-            primaryCta={{
-                label: "Message supplier",
-                href: `/messages/compose?supplier=${supplier.id}&project=${project.id}`,
-                icon: <Mail className="h-3.5 w-3.5" />,
-            }}
-        >
-            {/* Supplier header card */}
-            <Card className="rounded-xl border">
-                <CardContent className="p-6 flex items-start gap-5">
-                    <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-international-orange/10 text-international-orange shrink-0">
-                        <Building2 className="h-8 w-8" />
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-3">
-                        <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-xl font-bold text-foreground truncate">
-                                    {supplier.name || "Untitled supplier"}
-                                </h2>
-                                {supplier.is_verified && (
-                                    <Badge variant="outline" className="text-[10px] bg-status-success-light text-status-success border-status-success/30 gap-1">
-                                        <Check className="h-3 w-3" /> Verified
-                                    </Badge>
-                                )}
-                            </div>
-                            {location && (
-                                <p className="text-[12.5px] text-muted-foreground inline-flex items-center gap-1 mt-1">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    {location}
-                                </p>
-                            )}
-                        </div>
-
-                        {supplier.description && (
-                            <p className="text-sm text-foreground leading-relaxed max-w-2xl">
-                                {supplier.description}
-                            </p>
-                        )}
-
-                        {specialties.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                                {specialties.slice(0, 6).map((s, i) => (
-                                    <Badge key={i} variant="outline" className="text-[11px] border-border bg-muted/40 text-foreground">
-                                        {s}
-                                    </Badge>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Spec strip */}
-            {hasSpecStrip && (
-                <Card className="rounded-xl border">
-                    <CardContent className="p-0">
-                        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
-                            {specStrip.map((cell, i) => (
-                                <div key={i} className="p-4">
-                                    <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        {cell.label}
-                                    </p>
-                                    <p className="text-sm font-semibold text-foreground mt-1">
-                                        {cell.value ?? <span className="text-muted-foreground font-normal">—</span>}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Two-column: certifications + capabilities/contact */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
-                {/* Certifications */}
-                <section aria-label="Certifications">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="w-1 h-5 rounded-full bg-international-orange" />
-                        <h3 className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                            Certifications ({certifications.length})
-                        </h3>
-                    </div>
-                    {certifications.length === 0 ? (
-                        <Card className="rounded-xl border">
-                            <CardContent className="py-6 text-center">
-                                <p className="text-sm text-muted-foreground italic">
-                                    No certifications on file.
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Card className="rounded-xl border">
-                            <CardContent className="p-0">
-                                <ul className="divide-y divide-border">
-                                    {certifications.map((cert, i) => (
-                                        <li key={i} className="flex items-center gap-3 px-5 py-3">
-                                            <ShieldCheck className="h-4 w-4 text-status-success shrink-0" />
-                                            <span className="text-sm font-medium text-foreground flex-1 truncate">{cert}</span>
-                                            <Badge variant="outline" className="text-[10px] bg-status-success-light text-status-success border-status-success/30">
-                                                Valid
-                                            </Badge>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Capabilities */}
-                    {(materials.length > 0 || keyEquipment.length > 0) && (
-                        <div className="mt-6">
-                            <div className="flex items-center gap-2 mb-3">
-                                <div className="w-1 h-5 rounded-full bg-electric-blue" />
-                                <h3 className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                    Capabilities
-                                </h3>
-                            </div>
-                            <Card className="rounded-xl border">
-                                <CardContent className="p-5 space-y-4">
-                                    {materials.length > 0 && (
-                                        <div>
-                                            <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                                Materials
-                                            </p>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {materials.map((m, i) => (
-                                                    <Badge key={i} variant="outline" className="text-[11px] border-border bg-muted/40 text-foreground">
-                                                        {m}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {keyEquipment.length > 0 && (
-                                        <div>
-                                            <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                                                Key equipment
-                                            </p>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {keyEquipment.map((e, i) => (
-                                                    <Badge key={i} variant="outline" className="text-[11px] border-border bg-muted/40 text-foreground">
-                                                        {e}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-                </section>
-
-                {/* Contact + Linked RFQs */}
-                <section className="space-y-6" aria-label="Contact and RFQs">
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-1 h-5 rounded-full bg-international-orange" />
-                            <h3 className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                Contact
-                            </h3>
-                        </div>
-                        <Card className="rounded-xl border">
-                            <CardContent className="p-5 space-y-3">
-                                {email ? (
-                                    <a
-                                        href={`mailto:${email}`}
-                                        className="flex items-center gap-3 text-sm text-foreground hover:text-international-orange transition-colors"
-                                    >
-                                        <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                                        <span className="truncate">{email}</span>
-                                    </a>
-                                ) : (
-                                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                        <Mail className="h-4 w-4 shrink-0" />
-                                        <span className="italic">No email on file</span>
-                                    </div>
-                                )}
-                                {phone ? (
-                                    <a
-                                        href={`tel:${phone}`}
-                                        className="flex items-center gap-3 text-sm text-foreground hover:text-international-orange transition-colors"
-                                    >
-                                        <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                                        <span className="truncate">{phone}</span>
-                                    </a>
-                                ) : (
-                                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                        <Phone className="h-4 w-4 shrink-0" />
-                                        <span className="italic">No phone on file</span>
-                                    </div>
-                                )}
-                                <Button
-                                    asChild
-                                    size="sm"
-                                    className="w-full gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white mt-2"
-                                >
-                                    <Link href={`/messages/compose?supplier=${supplier.id}&project=${project.id}`}>
-                                        <Mail className="h-3.5 w-3.5" />
-                                        Message supplier
-                                    </Link>
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-1 h-5 rounded-full bg-international-orange" />
-                            <h3 className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                Linked RFQs
-                            </h3>
-                        </div>
-                        {linkedRfqs.length === 0 ? (
-                            <Card className="rounded-xl border">
-                                <CardContent className="py-6 px-5 flex flex-col items-center text-center gap-2">
-                                    <Truck className="h-5 w-5 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground">
-                                        No RFQs tracked against this supplier for this project yet.
-                                    </p>
-                                    <Link
-                                        href={`/the-forge/cad-lab?project=${project.id}&action=rfq`}
-                                        className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                                    >
-                                        Create RFQ <ArrowRight className="h-3.5 w-3.5" />
-                                    </Link>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <Card className="rounded-xl border">
-                                <CardContent className="p-0">
-                                    <ul className="divide-y divide-border">
-                                        {linkedRfqs.map(rfq => (
-                                            <li key={rfq.id}>
-                                                <Link
-                                                    href={`/rfq/${rfq.id}`}
-                                                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition-colors group"
-                                                >
-                                                    <Truck className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-semibold text-foreground truncate group-hover:text-international-orange transition-colors">
-                                                            {rfq.title}
-                                                        </p>
-                                                        <p className="text-[11px] text-muted-foreground">
-                                                            {rfq.status}
-                                                            {rfq.createdAt && ` · ${new Date(rfq.createdAt).toLocaleDateString()}`}
-                                                        </p>
-                                                    </div>
-                                                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange group-hover:translate-x-0.5 transition-all" />
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-                </section>
-            </div>
-        </WorkspaceShell>
+    // ── 3. Resolve module links ─────────────────────────────────────────
+    // forge_supplier_shortlist.module_ids references project.modules[].id.
+    // Build lookup so the view can show module name + deep-link.
+    const modulesById = new Map(
+        (project.modules ?? []).map((m) => [m.id, m.name] as const),
     )
+    const matchedModules: ModuleLink[] = (shortlist.module_ids ?? []).map((mid) => ({
+        id: mid,
+        name: modulesById.get(mid) ?? mid,
+        href: `/the-forge-v2/projects/${project.id}/modules/${mid}`,
+        isKnown: modulesById.has(mid),
+    }))
+
+    // ── 4. Capabilities jsonb → typed entry list ────────────────────────
+    // Renders as a capability list with: key → humanised label, value →
+    // rendered by kind (array = pills, number = with unit, string = text).
+    const capabilities: CapabilityEntry[] = capabilitiesToEntries(supplier.capabilities)
+
+    // ── 5. Company info jsonb → hero meta strip ─────────────────────────
+    const companyInfo = isObject(supplier.company_info) ? supplier.company_info : {}
+    const hq = stringField(companyInfo.hq)
+    const employees = numberField(companyInfo.employees)
+    const founded = numberField(companyInfo.founded)
+
+    // ── 6. Match score (shortlist.best_match_score is 0–1, render /100) ─
+    const matchScore =
+        typeof shortlist.best_match_score === "number"
+            ? Math.round(shortlist.best_match_score * 100)
+            : null
+
+    const rampRole = normaliseRampRole(shortlist.ramp_role)
+
+    // ── 7. Domain categories (array on the supplier row) ────────────────
+    const domainCategories = Array.isArray(supplier.domain_categories)
+        ? supplier.domain_categories.filter((c): c is string => typeof c === "string")
+        : []
+
+    // ── 8. Match reasons (array on the shortlist row) ───────────────────
+    const matchReasons = Array.isArray(shortlist.all_match_reasons)
+        ? shortlist.all_match_reasons.filter((r): r is string => typeof r === "string")
+        : []
+
+    // Shortlist.notes is free text. Seed populates it with the description,
+    // but a curator can override to capture the "why this supplier for this
+    // project" context. Trim to avoid whitespace-only strings rendering as
+    // populated.
+    const shortlistNote = typeof shortlist.notes === "string" && shortlist.notes.trim().length > 0
+        ? shortlist.notes.trim()
+        : null
+
+    const viewProps: SupplierDetailViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+        },
+        supplier: {
+            id: supplier.id,
+            name: supplier.name,
+            description: supplier.description ?? null,
+            website: supplier.website ?? null,
+            supplierType: supplier.supplier_type,
+            verificationStatus: supplier.verification_status ?? null,
+            communityRating: typeof supplier.community_rating === "number" ? supplier.community_rating : null,
+            reviewCount: typeof supplier.review_count === "number" ? supplier.review_count : null,
+            usedByCount: typeof supplier.used_by_count === "number" ? supplier.used_by_count : null,
+            hq,
+            employees,
+            founded,
+            domainCategories,
+            capabilities,
+            logoInitials: deriveInitials(supplier.name),
+        },
+        shortlist: {
+            matchScore,
+            rampRole,
+            matchReasons,
+            note: shortlistNote,
+            matchedModules,
+        },
+    }
+
+    return <SupplierDetailView {...viewProps} />
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+function isObject(v: unknown): v is Record<string, unknown> {
+    return typeof v === "object" && v !== null && !Array.isArray(v)
+}
+
+function stringField(v: unknown): string | null {
+    if (typeof v === "string" && v.trim().length > 0) return v.trim()
+    return null
+}
+
+function numberField(v: unknown): number | null {
+    if (typeof v === "number" && Number.isFinite(v)) return v
+    return null
+}
+
+function normaliseRampRole(raw: string | null | undefined): "primary" | "secondary" | "backup" {
+    if (raw === "primary" || raw === "secondary" || raw === "backup") return raw
+    return "backup"
+}
+
+function deriveInitials(name: string): string {
+    const clean = name.replace(/[^A-Za-z0-9\s]/g, " ").trim()
+    const parts = clean.split(/\s+/).filter(Boolean)
+    if (parts.length === 0) return "S"
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+}
+
+/**
+ * Converts supplier.capabilities jsonb into a typed entry list for the view.
+ * Handles: string, number, string[], certifications[] (tagged as chips).
+ * Ignores null/undefined values and non-primitive objects.
+ *
+ * Unit inference for numeric values is keyed off the snake_case suffix:
+ *   *_kw   → kW   |   *_kg   → kg   |   *_m   → m
+ *   *_bar  → bar  |   *_pct  → %    |   *_ah  → Ah
+ *   *_kbps → kbps |   everything else → bare number
+ */
+function capabilitiesToEntries(raw: unknown): CapabilityEntry[] {
+    if (!isObject(raw)) return []
+    const entries: CapabilityEntry[] = []
+    for (const [key, value] of Object.entries(raw)) {
+        if (value == null) continue
+        const label = humaniseKey(key)
+        if (Array.isArray(value)) {
+            const items = value.filter((v): v is string => typeof v === "string" && v.length > 0)
+            if (items.length === 0) continue
+            // Certifications render as neutral chips instead of plain pills.
+            const kind: CapabilityEntry["kind"] = key === "certifications" ? "certifications" : "array"
+            entries.push({ key, label, kind, items })
+        } else if (typeof value === "number" && Number.isFinite(value)) {
+            entries.push({ key, label, kind: "number", number: value, unit: inferUnit(key) })
+        } else if (typeof value === "string" && value.trim().length > 0) {
+            entries.push({ key, label, kind: "string", text: value.trim() })
+        }
+    }
+    // Certifications last so the neutral-chip block sits beneath the pills.
+    entries.sort((a, b) => {
+        const rank = (e: CapabilityEntry) => (e.kind === "certifications" ? 1 : 0)
+        return rank(a) - rank(b)
+    })
+    return entries
+}
+
+function humaniseKey(key: string): string {
+    return key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function inferUnit(key: string): string | null {
+    if (/_kw$/i.test(key)) return "kW"
+    if (/_kg$/i.test(key)) return "kg"
+    if (/_m$/i.test(key)) return "m"
+    if (/_bar$/i.test(key)) return "bar"
+    if (/_pct$/i.test(key)) return "%"
+    if (/_ah$/i.test(key)) return "Ah"
+    if (/_kbps$/i.test(key)) return "kbps"
+    if (/_hz$/i.test(key)) return "Hz"
+    if (/_v$/i.test(key)) return "V"
+    return null
 }
