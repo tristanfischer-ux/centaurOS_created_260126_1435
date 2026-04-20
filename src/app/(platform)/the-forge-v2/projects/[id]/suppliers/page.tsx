@@ -1,356 +1,262 @@
 /**
  * @file suppliers/page.tsx — /the-forge-v2/projects/:id/suppliers
  *
- * @description Supplier roster for a project. Pulls the general supplier list
- * (marketplace_listings via searchSuppliers) and renders it as a filter-chip-led
- * roster: specialism chips pre-filter the visible cards, each card opens the
- * per-supplier detail page. Highlighted banner when the project has a linked
- * RFQ; Create-RFQ CTA deep-links back into CAD Lab's RFQ flow.
+ * @description Suppliers artefact — mockup-faithful port of
+ * FORGE-MOCKUP-SUPPLIERS.html. Server component reads the project, pulls the
+ * full per-project supplier shortlist from `forge_supplier_shortlist`, joins
+ * to the global `suppliers` table for community rating / verification /
+ * capabilities / company_info, then hands a typed props bundle to
+ * SuppliersView.
  *
- * Mockup ref: FORGE-MOCKUP-SUPPLIERS.html.
+ * Empty-state policy: the RFQ lifecycle (sent / quoted / awarded) does not
+ * yet exist on this project — those tiles render honest zeros. Suppliers
+ * without a global row fall back to null rating / null hq / empty
+ * capabilities; they still render but the missing fields show "—" or a
+ * muted empty-state variant. We never synthesise mockup specifics
+ * (Astra cert expiries, £18.1k RFQ exposure, etc.).
+ *
+ * @related
+ *   - View:   ./suppliers-view.tsx
+ *   - Styles: ./suppliers-v2.css (scoped .sp2)
+ *   - Mockup: FORGE-MOCKUP-SUPPLIERS.html
  */
 
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { Truck, MapPin, Check, Building2, ArrowRight, Plus, ShieldCheck } from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { searchSuppliers, type SupplierCard } from "@/actions/suppliers"
 import { createClient } from "@/lib/supabase/server"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 
-import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { SuppliersView, type SuppliersSupplierRow, type SuppliersViewProps } from "./suppliers-view"
 
 export const dynamic = "force-dynamic"
-
-// ─── Metadata ───────────────────────────────────────────────────────
 
 export async function generateMetadata(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<Metadata> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
-    if ("error" in result) return { title: "Suppliers · The Forge" }
-    return { title: `Suppliers · ${result.project.name}` }
+    const r = await loadCadLabProject(id)
+    if ("error" in r) return { title: "Suppliers · The Forge" }
+    return { title: `Suppliers · ${r.project.name}` }
 }
 
-// ─── Specialism chips ───────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────
 
-/**
- * Canonical specialism chips shown at the top of the roster. Each maps to a
- * loose substring match against the supplier's name, description, or
- * domain_categories. Keeps the UX simple: filter chips, not a search box.
- */
-const SPECIALISMS = [
-    { id: "all",        label: "All" },
-    { id: "cnc",        label: "CNC" },
-    { id: "sheet",      label: "Sheet metal" },
-    { id: "cfrp",       label: "CFRP" },
-    { id: "injection",  label: "Injection moulding" },
-    { id: "additive",   label: "Additive" },
-    { id: "pcba",       label: "PCBA" },
-    { id: "assembly",   label: "Assembly" },
-] as const
+type RampRole = "primary" | "secondary" | "backup"
 
-type SpecialismId = (typeof SPECIALISMS)[number]["id"]
+function coerceRole(v: unknown): RampRole {
+    const s = typeof v === "string" ? v.toLowerCase() : ""
+    if (s === "primary" || s === "secondary" || s === "backup") return s
+    return "secondary"
+}
 
-function matchesSpecialism(supplier: SupplierCard, specialism: SpecialismId): boolean {
-    if (specialism === "all") return true
-    const haystack = [
-        supplier.name,
-        supplier.description ?? "",
-        supplier.subcategory,
-        ...(Array.isArray(supplier.attributes?.specialties) ? supplier.attributes.specialties as string[] : []),
-        ...(Array.isArray(supplier.attributes?.materials) ? supplier.attributes.materials as string[] : []),
-        ...(Array.isArray(supplier.attributes?.key_equipment) ? supplier.attributes.key_equipment as string[] : []),
-    ].join(" ").toLowerCase()
-
-    switch (specialism) {
-        case "cnc":        return /\bcnc\b|milling|machining|turning/.test(haystack)
-        case "sheet":      return /sheet metal|laser cut|press brake|stamping/.test(haystack)
-        case "cfrp":       return /cfrp|composite|prepreg|autoclave|layup/.test(haystack)
-        case "injection":  return /injection|moulding|molding|tooling/.test(haystack)
-        case "additive":   return /additive|3d print|sls|fdm|slm|dmls/.test(haystack)
-        case "pcba":       return /pcba|pcb|electronics|smt|assembly/.test(haystack)
-        case "assembly":   return /assembly|integrat|sub-assembly/.test(haystack)
-        default:           return true
+/** Extract up to 3 meaningful capability strings from the global supplier row. */
+function extractCapabilities(caps: unknown): string[] {
+    if (!caps || typeof caps !== "object") return []
+    const c = caps as Record<string, unknown>
+    const out: string[] = []
+    // Common shapes from the seed: processes / products / materials arrays.
+    const arrayKeys = ["processes", "products", "materials", "substrates"]
+    for (const k of arrayKeys) {
+        const arr = c[k]
+        if (Array.isArray(arr)) {
+            for (const v of arr) {
+                if (typeof v === "string" && v.length > 0 && out.length < 4) out.push(v)
+            }
+        }
     }
+    return out.slice(0, 4)
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────
-
-/**
- * Pulls the RFQ status for the project's linked RFQ, if any. Kept inline and
- * lightweight — we only need status for the banner label, not the whole RFQ.
- * Returns null gracefully when the RFQ has been deleted or access is denied.
- */
-async function loadLinkedRfqStatus(rfqId: string | null): Promise<string | null> {
-    if (!rfqId) return null
-    try {
-        const supabase = await createClient()
-        const { data } = await supabase
-            .from("rfqs")
-            .select("status")
-            .eq("id", rfqId)
-            .maybeSingle()
-        return (data?.status as string | undefined) ?? null
-    } catch {
-        return null
-    }
+/** Pull HQ / location out of the global supplier company_info JSONB. */
+function extractHq(companyInfo: unknown): string | null {
+    if (!companyInfo || typeof companyInfo !== "object") return null
+    const c = companyInfo as Record<string, unknown>
+    const hq = c.hq ?? c.location ?? c.country ?? null
+    return typeof hq === "string" && hq.length > 0 ? hq : null
 }
 
-function extractCountry(supplier: SupplierCard): string | null {
-    const country = supplier.attributes?.country
-    if (typeof country === "string" && country.length > 0) return country
-    return null
+/** Extract up to N match reasons from all_match_reasons. */
+function extractReasons(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return []
+    return raw.filter((r): r is string => typeof r === "string" && r.length > 0)
 }
 
-function extractCertifications(supplier: SupplierCard): string[] {
-    const raw = supplier.attributes?.certifications
-    if (Array.isArray(raw)) return raw.filter((c): c is string => typeof c === "string").slice(0, 3)
-    if (typeof raw === "string" && raw.length > 0) return raw.split(/[,;]/).map(s => s.trim()).filter(Boolean).slice(0, 3)
-    return []
-}
+// ─── Page ───────────────────────────────────────────────────────────────
 
-function extractSpecialismTags(supplier: SupplierCard): string[] {
-    const specialties = supplier.attributes?.specialties
-    if (Array.isArray(specialties)) {
-        return specialties.filter((s): s is string => typeof s === "string").slice(0, 3)
-    }
-    // Fall back to subcategory + first material
-    const tags: string[] = []
-    if (supplier.subcategory) tags.push(supplier.subcategory)
-    const materials = supplier.attributes?.materials
-    if (Array.isArray(materials)) {
-        tags.push(...materials.filter((m): m is string => typeof m === "string").slice(0, 2))
-    }
-    return tags.slice(0, 3)
-}
-
-// ─── Page ───────────────────────────────────────────────────────────
-
-export default async function ForgeV2SuppliersPage(
-    { params, searchParams }: {
-        params: Promise<{ id: string }>
-        searchParams: Promise<{ specialism?: string }>
-    },
-): Promise<React.ReactNode> {
+export default async function ForgeV2SuppliersPage({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ id: string }>
+    searchParams: Promise<{ role?: string; type?: string }>
+}): Promise<React.ReactNode> {
     const { id } = await params
-    const { specialism: specialismRaw } = await searchParams
+    const { role: roleRaw, type: typeRaw } = await searchParams
+
     const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
+    if ("error" in result || !result.project) notFound()
     const project = result.project
 
-    // Read chosen specialism from query (default: "all")
-    const specialism: SpecialismId = SPECIALISMS.some(s => s.id === specialismRaw)
-        ? (specialismRaw as SpecialismId)
-        : "all"
+    // Parse active filters from the query string.
+    const activeRole: RampRole | null =
+        roleRaw === "primary" || roleRaw === "secondary" || roleRaw === "backup"
+            ? roleRaw
+            : null
+    const activeType: string | null = typeof typeRaw === "string" && typeRaw.length > 0 ? typeRaw : null
 
-    // Parallel fetch: supplier roster + linked RFQ status
-    const [suppliersResult, linkedRfqStatus] = await Promise.all([
-        searchSuppliers({ limit: 50, sortBy: "name" }).catch(() => ({
-            results: [] as SupplierCard[],
-            total: 0,
-            searchMode: "browse" as const,
-        })),
-        loadLinkedRfqStatus(project.linkedRfqId),
+    // Fetch shortlist + library counts in parallel. Individual failures do not
+    // break the page — each returns a neutral empty-state shape.
+    const [shortlistRows, grounding] = await Promise.all([
+        safeShortlistWithJoin(id),
+        safeLibraryCounts(),
     ])
 
-    const allSuppliers = suppliersResult.results
-    const filtered = allSuppliers.filter(s => matchesSpecialism(s, specialism))
+    // Role counts across the whole shortlist (pre-filter) — drives stat strip.
+    const roleCounts = {
+        primary: shortlistRows.filter((r) => r.rampRole === "primary").length,
+        secondary: shortlistRows.filter((r) => r.rampRole === "secondary").length,
+        backup: shortlistRows.filter((r) => r.rampRole === "backup").length,
+    }
 
-    const createRfqHref = `/the-forge/cad-lab?project=${project.id}&action=rfq`
+    // Type counts — distinct supplier_type values with a count.
+    const typeMap = new Map<string, number>()
+    for (const r of shortlistRows) {
+        if (r.type) typeMap.set(r.type, (typeMap.get(r.type) ?? 0) + 1)
+    }
+    const typeCounts = Array.from(typeMap.entries())
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => b.count - a.count)
 
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
-                { label: "Suppliers" },
-            ]}
-            subtitle={
-                allSuppliers.length === 0
-                    ? "No suppliers matched yet"
-                    : `${filtered.length} of ${allSuppliers.length} supplier${allSuppliers.length === 1 ? "" : "s"}${specialism !== "all" ? ` · ${SPECIALISMS.find(s => s.id === specialism)?.label}` : ""}`
+    // Apply active filters for the rendered grid.
+    const filtered = shortlistRows.filter((r) => {
+        if (activeRole && r.rampRole !== activeRole) return false
+        if (activeType && r.type !== activeType) return false
+        return true
+    })
+
+    const viewProps: SuppliersViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+        },
+        suppliers: filtered,
+        totalShortlisted: shortlistRows.length,
+        roleCounts,
+        typeCounts,
+        activeRole,
+        activeType,
+        grounding,
+    }
+
+    return <SuppliersView {...viewProps} />
+}
+
+// ─── Data loaders ──────────────────────────────────────────────────────
+
+/**
+ * Loads the project shortlist and joins each row to the global supplier
+ * directory (community_rating / verification_status / capabilities / hq /
+ * description). Returns an empty array on failure rather than throwing —
+ * the page should degrade to the empty state, never crash.
+ */
+async function safeShortlistWithJoin(projectId: string): Promise<SuppliersSupplierRow[]> {
+    try {
+        const supabase = await createClient()
+
+        const { data: shortlist, error } = await supabase
+            .from("forge_supplier_shortlist")
+            .select(
+                "id, supplier_id, supplier_name, supplier_type, module_ids, ramp_role, best_match_score, all_match_reasons, notes",
+            )
+            .eq("project_id", projectId)
+            .order("best_match_score", { ascending: false, nullsFirst: false })
+
+        if (error || !shortlist || shortlist.length === 0) return []
+
+        // Batch-fetch global supplier rows we need for rating / verify / hq.
+        const supplierIds = shortlist
+            .map((r) => r.supplier_id as string | null)
+            .filter((x): x is string => typeof x === "string" && x.length > 0)
+
+        const globalById = new Map<string, {
+            capabilities: unknown
+            community_rating: number | null
+            company_info: unknown
+            description: string | null
+            domain_categories: string[] | null
+            review_count: number | null
+            used_by_count: number | null
+            verification_status: string | null
+        }>()
+
+        if (supplierIds.length > 0) {
+            const { data: globals } = await supabase
+                .from("suppliers")
+                .select(
+                    "id, capabilities, community_rating, company_info, description, domain_categories, review_count, used_by_count, verification_status",
+                )
+                .in("id", supplierIds)
+
+            if (globals) {
+                for (const g of globals) {
+                    globalById.set(g.id as string, {
+                        capabilities: g.capabilities,
+                        community_rating: g.community_rating as number | null,
+                        company_info: g.company_info,
+                        description: g.description as string | null,
+                        domain_categories: g.domain_categories as string[] | null,
+                        review_count: g.review_count as number | null,
+                        used_by_count: g.used_by_count as number | null,
+                        verification_status: g.verification_status as string | null,
+                    })
+                }
             }
-            primaryCta={{
-                label: "Create RFQ",
-                href: createRfqHref,
-                icon: <Plus className="h-3.5 w-3.5" />,
-            }}
-        >
-            {/* Linked RFQ banner */}
-            {project.linkedRfqId && (
-                <Card className="rounded-xl border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.04]">
-                    <CardContent className="py-3 px-5 flex items-center gap-4">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10 text-international-orange">
-                            <Truck className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">
-                                RFQ {project.linkedRfqId.slice(0, 8)} open
-                                {linkedRfqStatus && (
-                                    <span className="text-muted-foreground font-medium"> · {linkedRfqStatus}</span>
-                                )}
-                            </p>
-                            <p className="text-[11.5px] text-muted-foreground mt-0.5">
-                                Broadcast to matched suppliers from CAD Lab. Responses land in the RFQ page.
-                            </p>
-                        </div>
-                        <Button asChild size="sm" variant="outline" className="gap-1.5 shrink-0">
-                            <Link href={`/rfq/${project.linkedRfqId}`}>
-                                View RFQ <ArrowRight className="h-3.5 w-3.5" />
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            )}
+        }
 
-            {/* Specialism filter chips */}
-            {allSuppliers.length > 0 && (
-                <nav aria-label="Filter by specialism" className="flex flex-wrap gap-2">
-                    {SPECIALISMS.map(chip => {
-                        const active = chip.id === specialism
-                        const href = chip.id === "all"
-                            ? `/the-forge-v2/projects/${project.id}/suppliers`
-                            : `/the-forge-v2/projects/${project.id}/suppliers?specialism=${chip.id}`
-                        return (
-                            <Link
-                                key={chip.id}
-                                href={href}
-                                className={cn(
-                                    "inline-flex items-center rounded-full border px-3 py-1 text-[12px] font-medium transition-colors",
-                                    active
-                                        ? "bg-international-orange text-white border-international-orange"
-                                        : "border-border bg-background text-foreground hover:bg-muted/50",
-                                )}
-                                aria-pressed={active}
-                            >
-                                {chip.label}
-                            </Link>
-                        )
-                    })}
-                </nav>
-            )}
+        return shortlist.map((r) => {
+            const supplierId = r.supplier_id as string
+            const g = globalById.get(supplierId)
+            return {
+                supplierId,
+                shortlistId: r.id as string,
+                name: (r.supplier_name as string) ?? "Untitled supplier",
+                type: (r.supplier_type as string | null) ?? null,
+                hq: extractHq(g?.company_info),
+                description: g?.description ?? (r.notes as string | null) ?? null,
+                rampRole: coerceRole(r.ramp_role),
+                matchScore: (r.best_match_score as number | null) ?? null,
+                modulesMatched: Array.isArray(r.module_ids) ? (r.module_ids as string[]).length : 0,
+                matchReasons: extractReasons(r.all_match_reasons),
+                capabilities: extractCapabilities(g?.capabilities),
+                communityRating: g?.community_rating ?? null,
+                reviewCount: g?.review_count ?? null,
+                usedByCount: g?.used_by_count ?? null,
+                verificationStatus: g?.verification_status ?? null,
+                domainCategories: g?.domain_categories ?? [],
+            }
+        })
+    } catch (err) {
+        console.error("[SUPPLIERS-PAGE] shortlist + join failed:", err)
+        return []
+    }
+}
 
-            {/* Roster */}
-            {allSuppliers.length === 0 ? (
-                <Card className="rounded-xl border">
-                    <CardContent className="py-12 flex flex-col items-center text-center gap-4">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-muted">
-                            <Truck className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <div className="max-w-sm space-y-2">
-                            <p className="text-sm font-semibold text-foreground">No suppliers matched yet</p>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                Run supplier matching from CAD Lab to populate this roster, or create an RFQ to broadcast to the network.
-                            </p>
-                        </div>
-                        <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                            <Link href={createRfqHref}>
-                                <Plus className="h-3.5 w-3.5" /> Create RFQ
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            ) : filtered.length === 0 ? (
-                <Card className="rounded-xl border">
-                    <CardContent className="py-10 flex flex-col items-center text-center gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-muted">
-                            <Truck className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm font-semibold text-foreground">No matches for this specialism</p>
-                        <p className="text-xs text-muted-foreground max-w-sm">
-                            Try a different chip, or clear the filter to see all {allSuppliers.length} suppliers.
-                        </p>
-                        <Link
-                            href={`/the-forge-v2/projects/${project.id}/suppliers`}
-                            className="text-sm font-semibold text-international-orange hover:underline"
-                        >
-                            Clear filter
-                        </Link>
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filtered.map(supplier => {
-                        const country = extractCountry(supplier)
-                        const certs = extractCertifications(supplier)
-                        const tags = extractSpecialismTags(supplier)
-                        return (
-                            <Link
-                                key={supplier.id}
-                                href={`/the-forge-v2/projects/${project.id}/suppliers/${supplier.id}`}
-                                className="group block"
-                            >
-                                <Card className="h-full rounded-xl border hover:border-international-orange/60 hover:shadow-sm transition-all">
-                                    <CardContent className="p-5 flex flex-col gap-3 h-full">
-                                        <div className="flex items-start gap-3">
-                                            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10 text-international-orange shrink-0">
-                                                <Building2 className="h-5 w-5" />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-sm font-semibold text-foreground truncate group-hover:text-international-orange transition-colors">
-                                                    {supplier.name || "Untitled supplier"}
-                                                </p>
-                                                {country && (
-                                                    <p className="text-[11.5px] text-muted-foreground inline-flex items-center gap-1 mt-0.5">
-                                                        <MapPin className="h-3 w-3" />
-                                                        {country}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            {supplier.is_verified && (
-                                                <Badge variant="outline" className="shrink-0 text-[10px] bg-status-success-light text-status-success border-status-success/30 gap-1">
-                                                    <Check className="h-3 w-3" /> Verified
-                                                </Badge>
-                                            )}
-                                        </div>
-
-                                        {supplier.description && (
-                                            <p className="text-[12.5px] text-muted-foreground leading-relaxed line-clamp-2">
-                                                {supplier.description}
-                                            </p>
-                                        )}
-
-                                        {tags.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {tags.map((t, i) => (
-                                                    <Badge key={i} variant="outline" className="text-[10.5px] border-border bg-muted/40 text-foreground">
-                                                        {t}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {certs.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/50">
-                                                {certs.map((c, i) => (
-                                                    <span
-                                                        key={i}
-                                                        className="inline-flex items-center gap-1 text-[10.5px] font-medium text-status-success"
-                                                    >
-                                                        <ShieldCheck className="h-3 w-3" />
-                                                        {c}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        <div className="mt-auto pt-2 flex items-center justify-end text-[12px] font-semibold text-muted-foreground group-hover:text-international-orange transition-colors">
-                                            Open <ArrowRight className="h-3.5 w-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </Link>
-                        )
-                    })}
-                </div>
-            )}
-        </WorkspaceShell>
-    )
+async function safeLibraryCounts(): Promise<{ materials: number; processes: number; standards: number }> {
+    try {
+        const supabase = await createClient()
+        const [m, p, s] = await Promise.all([
+            supabase.from("material_properties").select("*", { count: "exact", head: true }),
+            supabase.from("process_capabilities").select("*", { count: "exact", head: true }),
+            supabase.from("design_standards").select("*", { count: "exact", head: true }),
+        ])
+        return {
+            materials: m.count ?? 0,
+            processes: p.count ?? 0,
+            standards: s.count ?? 0,
+        }
+    } catch (err) {
+        console.error("[SUPPLIERS-PAGE] library counts failed:", err)
+        return { materials: 0, processes: 0, standards: 0 }
+    }
 }
