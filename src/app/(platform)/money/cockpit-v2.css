@@ -1,0 +1,701 @@
+/**
+ * cockpit-v2.css — scoped (`.mck2`) styles for the Money Cockpit landing page.
+ * Ports the page-level styles from MONEY-MOCKUP-COCKPIT.html + money-mockup.css
+ * tokens so this page matches the mockup without leaking styles into the rest
+ * of the platform.
+ */
+
+.mck2 {
+  /* Palette — mirrors money-mockup.css tokens */
+  --mck-fg:             #1c1917;
+  --mck-fg-muted:       #78716c;
+  --mck-fg-faint:       #a8a29e;
+  --mck-fg-subtle:      #d6d3d1;
+  --mck-surface:        #ffffff;
+  --mck-surface-muted:  #f5f5f4;
+  --mck-surface-soft:   #fafaf9;
+  --mck-bg:             #f7f6f4;
+  --mck-border:         #e7e5e4;
+  --mck-border-soft:    #f0eeea;
+  --mck-border-strong:  #d6d3d1;
+  --mck-brand:          #ff4500;
+  --mck-brand-dim:      rgba(255,69,0,0.18);
+  --mck-brand-soft:     rgba(255,69,0,0.10);
+  --mck-success:        #15803d;
+  --mck-success-soft:   #dcfce7;
+  --mck-warning:        #b45309;
+  --mck-warning-soft:   #fef3c7;
+  --mck-danger:         #b91c1c;
+  --mck-danger-soft:    #fee2e2;
+  --mck-info:           #1d4ed8;
+  --mck-info-soft:      #dbeafe;
+  --mck-info-dim:       #bfdbfe;
+  --mck-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+  --mck-shadow-sm:      0 2px 6px rgba(0,0,0,0.05);
+
+  color: var(--mck-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 32px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Breadcrumb header ─────────────────────────────────────────── */
+.mck2-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.mck2-crumbs {
+  font-size: 12.5px;
+  color: var(--mck-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mck2-crumbs a {
+  color: var(--mck-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.mck2-crumbs a:hover { color: var(--mck-brand); }
+.mck2-crumbs .sep { color: var(--mck-fg-subtle); }
+.mck2-crumbs .current {
+  color: var(--mck-fg);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.mck2-crumbs .current::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mck-brand);
+  display: inline-block;
+}
+
+.mck2-ctx-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mck2-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--mck-border);
+  background: var(--mck-surface);
+  color: var(--mck-fg-muted);
+}
+.mck2-pill.brand {
+  background: var(--mck-brand-soft);
+  color: var(--mck-brand);
+  border-color: var(--mck-brand-dim);
+}
+.mck2-pill.info {
+  background: var(--mck-info-soft);
+  color: var(--mck-info);
+  border-color: var(--mck-info-dim);
+}
+.mck2-pill.warn {
+  background: var(--mck-warning-soft);
+  color: var(--mck-warning);
+  border-color: #fde68a;
+}
+
+/* ── Connect-source banner (shown when Xero not wired) ────────── */
+.mck2-banner {
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--mck-shadow-xs);
+}
+.mck2-banner .icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #fde68a;
+  color: var(--mck-warning);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.mck2-banner .body {
+  flex: 1;
+  font-size: 13px;
+  color: #78350f;
+  line-height: 1.5;
+}
+.mck2-banner .body strong { color: #92400e; }
+.mck2-banner .actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* ── Runway hero ──────────────────────────────────────────────── */
+.mck2-hero {
+  background: var(--mck-surface);
+  border: 1px solid var(--mck-border);
+  border-radius: 14px;
+  padding: 28px 32px;
+  margin-bottom: 20px;
+  box-shadow: var(--mck-shadow-xs);
+}
+.mck2-hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 32px;
+  align-items: center;
+}
+.mck2-hero .kicker {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--mck-fg-muted);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.mck2-hero .big-num {
+  font-size: 72px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--mck-fg);
+  line-height: 1;
+  margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.mck2-hero .big-num small {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--mck-fg-muted);
+  margin-left: 8px;
+  letter-spacing: -0.01em;
+}
+.mck2-hero .big-num .placeholder {
+  color: var(--mck-fg-faint);
+  font-weight: 700;
+}
+.mck2-hero .explain {
+  font-size: 13.5px;
+  color: var(--mck-fg-muted);
+  line-height: 1.55;
+  margin-bottom: 12px;
+  max-width: 460px;
+}
+.mck2-hero .explain strong { color: var(--mck-fg); font-weight: 700; }
+.mck2-hero .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--mck-success-soft);
+  color: var(--mck-success);
+  font-size: 11.5px;
+  font-weight: 700;
+  border: 1px solid #bbf7d0;
+}
+.mck2-hero .tag.empty {
+  background: var(--mck-surface-muted);
+  color: var(--mck-fg-muted);
+  border-color: var(--mck-border);
+}
+
+.mck2-hero-chart {
+  background: var(--mck-surface-soft);
+  border: 1px solid var(--mck-border-soft);
+  border-radius: 10px;
+  padding: 16px 18px;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.mck2-hero-chart .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--mck-fg-muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.mck2-hero-chart svg {
+  width: 100%;
+  height: 100px;
+  display: block;
+}
+.mck2-hero-chart .axes {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--mck-fg-faint);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.mck2-hero-chart .note {
+  font-size: 11.5px;
+  color: var(--mck-fg-muted);
+  line-height: 1.5;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--mck-border);
+}
+.mck2-hero-chart .note strong { color: var(--mck-fg); font-weight: 700; }
+
+.mck2-hero-chart.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--mck-fg-muted);
+  font-size: 12.5px;
+  font-style: normal;
+  min-height: 180px;
+  border-style: dashed;
+  border-color: var(--mck-border-strong);
+}
+.mck2-hero-chart.empty .placeholder-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mck-fg);
+  margin-bottom: 4px;
+  font-style: normal;
+}
+
+/* ── Specialist CTA strip ─────────────────────────────────────── */
+.mck2-spec {
+  background: var(--mck-surface);
+  border: 1px solid var(--mck-border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--mck-shadow-xs);
+}
+.mck2-spec .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+.mck2-spec .msg {
+  flex: 1;
+  font-size: 13px;
+  color: var(--mck-fg-muted);
+  line-height: 1.5;
+}
+.mck2-spec .msg strong { color: var(--mck-fg); font-weight: 700; }
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.mck2-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--mck-border-strong);
+  background: var(--mck-surface);
+  color: var(--mck-fg);
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.mck2-btn:hover {
+  border-color: var(--mck-fg-faint);
+  background: var(--mck-surface-muted);
+}
+.mck2-btn.primary {
+  background: var(--mck-brand);
+  border-color: var(--mck-brand);
+  color: white;
+}
+.mck2-btn.primary:hover {
+  background: #e03e00;
+  border-color: #e03e00;
+}
+.mck2-btn.sm {
+  padding: 5px 10px;
+  font-size: 11.5px;
+}
+
+/* ── KPI strip ─────────────────────────────────────────────────── */
+.mck2-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.mck2-kpi-card {
+  background: var(--mck-surface);
+  border: 1px solid var(--mck-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: var(--mck-shadow-xs);
+}
+.mck2-kpi-card .lab {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--mck-fg-muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.mck2-kpi-card .val {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--mck-fg);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.mck2-kpi-card .val.empty { color: var(--mck-fg-faint); }
+.mck2-kpi-card .val small {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mck-fg-muted);
+  margin-left: 4px;
+}
+.mck2-kpi-card .delta {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.mck2-kpi-card .delta.good { color: var(--mck-success); }
+.mck2-kpi-card .delta.bad { color: var(--mck-danger); }
+.mck2-kpi-card .delta.flat { color: var(--mck-fg-muted); }
+.mck2-kpi-card .sub {
+  font-size: 11.5px;
+  color: var(--mck-fg-muted);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+/* ── Movers + raise status split ──────────────────────────────── */
+.mck2-split {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.mck2-card {
+  background: var(--mck-surface);
+  border: 1px solid var(--mck-border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: var(--mck-shadow-xs);
+}
+.mck2-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+.mck2-card-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--mck-fg);
+}
+.mck2-card-head .period {
+  font-size: 11.5px;
+  color: var(--mck-fg-muted);
+}
+
+/* Movers split (out / in columns) */
+.mck2-movers-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.mck2-movers-side h4 {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--mck-fg-muted);
+  font-weight: 700;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mck2-movers-side h4 .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.mck2-movers-side.out h4 .dot { background: var(--mck-danger); }
+.mck2-movers-side.in h4 .dot { background: var(--mck-success); }
+.mck2-movers-empty {
+  font-size: 12px;
+  color: var(--mck-fg-muted);
+  font-style: normal;
+  padding: 14px 12px;
+  background: var(--mck-surface-soft);
+  border: 1px dashed var(--mck-border);
+  border-radius: 8px;
+  line-height: 1.5;
+}
+.mck2-movers-empty strong { color: var(--mck-fg); font-weight: 700; }
+
+/* Raise status card */
+.mck2-raise h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.mck2-raise .sub {
+  font-size: 12px;
+  color: var(--mck-fg-muted);
+  margin-bottom: 14px;
+}
+.mck2-round-prog { margin-bottom: 14px; }
+.mck2-round-prog .bar {
+  height: 10px;
+  background: var(--mck-surface-muted);
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+.mck2-round-prog .fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--mck-brand), #f97316);
+}
+.mck2-round-prog .legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--mck-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.mck2-round-prog .legend strong { color: var(--mck-fg); font-weight: 700; }
+
+.mck2-raise-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+  padding: 12px 0;
+  border-top: 1px dashed var(--mck-border);
+  border-bottom: 1px dashed var(--mck-border);
+}
+.mck2-raise-meta .m-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+.mck2-raise-meta .m-row .k { color: var(--mck-fg-muted); }
+.mck2-raise-meta .m-row .v {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mck2-raise-meta .m-row .v.empty {
+  color: var(--mck-fg-muted);
+  font-weight: 500;
+}
+
+.mck2-raise-empty {
+  padding: 22px 18px;
+  text-align: center;
+  background: var(--mck-surface-soft);
+  border: 1px dashed var(--mck-border);
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+.mck2-raise-empty .title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--mck-fg);
+  margin-bottom: 4px;
+}
+.mck2-raise-empty p {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--mck-fg-muted);
+  line-height: 1.5;
+}
+
+.mck2-raise-ctas {
+  display: flex;
+  gap: 8px;
+}
+.mck2-raise-ctas .mck2-btn { flex: 1; justify-content: center; }
+
+/* ── Upcoming commitments card ────────────────────────────────── */
+.mck2-commit-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.mck2-commit-item {
+  border-left: 3px solid var(--mck-border);
+  padding: 10px 14px;
+  background: var(--mck-surface-soft);
+  border-radius: 0 8px 8px 0;
+}
+.mck2-commit-item.overdue {
+  border-left-color: var(--mck-danger);
+  background: var(--mck-danger-soft);
+}
+.mck2-commit-item.soon {
+  border-left-color: var(--mck-warning);
+  background: var(--mck-warning-soft);
+}
+.mck2-commit-item.upcoming {
+  border-left-color: var(--mck-info);
+  background: var(--mck-info-soft);
+}
+.mck2-commit-item.far {
+  border-left-color: var(--mck-success);
+  background: var(--mck-success-soft);
+}
+.mck2-commit-item .when {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--mck-fg-muted);
+}
+.mck2-commit-item.overdue .when { color: var(--mck-danger); }
+.mck2-commit-item.soon .when { color: var(--mck-warning); }
+.mck2-commit-item .what {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 4px 0 2px;
+  line-height: 1.35;
+}
+.mck2-commit-item .amt {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.mck2-commit-item .note {
+  font-size: 11px;
+  color: var(--mck-fg-muted);
+  margin-top: 2px;
+}
+
+.mck2-commit-empty {
+  grid-column: 1 / -1;
+  padding: 20px 16px;
+  text-align: center;
+  background: var(--mck-surface-soft);
+  border: 1px dashed var(--mck-border);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--mck-fg-muted);
+  line-height: 1.5;
+}
+.mck2-commit-empty strong { color: var(--mck-fg); font-weight: 700; }
+
+/* ── Cockpit foot (data source + quick actions) ───────────────── */
+.mck2-foot {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+  background: var(--mck-surface);
+  border: 1px solid var(--mck-border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: var(--mck-shadow-xs);
+  flex-wrap: wrap;
+}
+.mck2-data-src {
+  font-size: 12.5px;
+  color: var(--mck-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mck2-data-src .src-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--mck-success-soft);
+  color: var(--mck-success);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.mck2-data-src .src-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mck-success);
+}
+.mck2-data-src .src-pill.off {
+  background: var(--mck-surface-muted);
+  color: var(--mck-fg-muted);
+}
+.mck2-data-src .src-pill.off::before { background: var(--mck-fg-faint); }
+.mck2-data-src .dim { color: var(--mck-fg-subtle); }
+.mck2-data-src a {
+  color: var(--mck-fg-muted);
+  text-decoration: none;
+}
+.mck2-data-src a:hover {
+  color: var(--mck-brand);
+  text-decoration: underline;
+}
+
+.mck2-quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .mck2-hero-inner { grid-template-columns: 1fr; }
+  .mck2-split { grid-template-columns: 1fr; }
+  .mck2-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .mck2-commit-list { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .mck2 { padding: 16px 18px 32px; }
+  .mck2-movers-split { grid-template-columns: 1fr; }
+  .mck2-kpi-strip { grid-template-columns: 1fr; }
+  .mck2-commit-list { grid-template-columns: 1fr; }
+  .mck2-foot { grid-template-columns: 1fr; }
+  .mck2-hero .big-num { font-size: 56px; }
+}
