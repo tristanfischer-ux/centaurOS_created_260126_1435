@@ -44,6 +44,7 @@ import {
     failPipelineRun,
     startPipelineRun,
 } from "@/actions/pipeline-runs"
+import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -384,6 +385,11 @@ export async function loadFangRunStatusesForProject(
         if (!project || project.foundry_id !== foundryId) {
             return out
         }
+
+        // Watchdog: flip any stale 'running' row to 'failed' before reading.
+        // Prevents infinite-spinner UI when a run hit Vercel's 300s cap.
+        // Errors swallowed — a failed sweep must never block the status read.
+        await sweepStalledRuns(projectId).catch(() => {})
 
         // Single query: all Fang runs for this project, newest first.
         // We dedupe in-memory to the latest per moduleId. Postgres

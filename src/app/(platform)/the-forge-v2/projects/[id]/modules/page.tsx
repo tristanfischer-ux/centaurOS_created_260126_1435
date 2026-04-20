@@ -29,6 +29,13 @@ import type { CadLabModule } from "@/lib/cad-lab-types"
 import { ModulesView, type ModuleCardRow, type ModuleMassRow, type ModulesViewProps, type ThumbKind } from "./modules-view"
 
 export const dynamic = "force-dynamic"
+// Max's decomposition fan-out (skeleton + N module expansions at concurrency 3)
+// can run 60-180s on large projects. Vercel's default function cap is 10s for
+// Hobby / 60s for Pro — both too short. Route segment config raises the cap
+// for server actions invoked from this page (runMaxDecomposition). The ceiling
+// is Vercel Pro's hard cap of 300s; any stall beyond that is swept by the
+// pipeline-runs-watchdog on the next status read.
+export const maxDuration = 300
 
 export async function generateMetadata(
     { params }: { params: Promise<{ id: string }> },

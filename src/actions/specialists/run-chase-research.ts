@@ -62,6 +62,7 @@ import {
     loadLatestRunForStage,
     startPipelineRun,
 } from "@/actions/pipeline-runs"
+import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 import { callClaude } from "@/lib/cad-lab/api-helpers"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import type {
@@ -458,6 +459,11 @@ export async function loadChaseRunStatus(
         if (!project || project.foundry_id !== foundryId) {
             return { status: "not-started" }
         }
+
+        // Watchdog: flip any stale 'running' row to 'failed' before reading.
+        // Prevents infinite-spinner UI when a run hit Vercel's 300s cap.
+        // Errors swallowed — a failed sweep must never block the status read.
+        await sweepStalledRuns(projectId).catch(() => {})
 
         const row = await loadLatestRunForStage(projectId, SPECIALIST_ID, STAGE)
         if (!row) {

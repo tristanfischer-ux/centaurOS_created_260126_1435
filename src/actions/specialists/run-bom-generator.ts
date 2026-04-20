@@ -69,6 +69,7 @@ import {
     loadLatestRunForStage,
     startPipelineRun,
 } from "@/actions/pipeline-runs"
+import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 // Wave 1d: auto-fire Finn cost on BOM success.
 import { runFinnCost } from "@/actions/specialists/run-finn-cost"
 import { checkAILimit } from "@/lib/ai/limit-check"
@@ -403,6 +404,11 @@ export async function loadBomRunStatus(
         if (!project || project.foundry_id !== foundryId) {
             return { status: "not-started" }
         }
+
+        // Watchdog: flip any stale 'running' row to 'failed' before reading.
+        // Prevents infinite-spinner UI when a run hit Vercel's 300s cap.
+        // Errors swallowed — a failed sweep must never block the status read.
+        await sweepStalledRuns(projectId).catch(() => {})
 
         const row = await loadLatestRunForStage(projectId, SPECIALIST_ID, STAGE)
         if (!row) {

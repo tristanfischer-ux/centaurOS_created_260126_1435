@@ -41,6 +41,13 @@ import { createClient } from "@/lib/supabase/server"
 import { BriefLockView, type BriefLockViewProps, type ChecklistItem, type StillOpenItem } from "./brief-lock-view"
 
 export const dynamic = "force-dynamic"
+// lockCadLabBrief fires runMaxDecomposition as fire-and-forget, but the
+// parent server action itself still runs inside this route's function and
+// can touch 60s+ on project reloads / revision bumps. Route segment config
+// raises the cap so the action never gets killed mid-response. Ceiling is
+// Vercel Pro's hard cap of 300s; any stall beyond that is swept by the
+// pipeline-runs-watchdog on the next status read.
+export const maxDuration = 300
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
     const { id } = await params

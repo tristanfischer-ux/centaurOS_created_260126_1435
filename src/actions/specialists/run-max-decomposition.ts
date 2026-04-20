@@ -61,6 +61,7 @@ import {
     loadLatestRunForStage,
     startPipelineRun,
 } from "@/actions/pipeline-runs"
+import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 // Wave 1c: auto-fire BOM generator on Max success.
 import { runBomGenerator } from "@/actions/specialists/run-bom-generator"
 import { checkAILimit } from "@/lib/ai/limit-check"
@@ -456,6 +457,11 @@ export async function loadMaxRunStatus(
         if (!project || project.foundry_id !== foundryId) {
             return { status: "not-started" }
         }
+
+        // Watchdog: flip any stale 'running' row to 'failed' before reading.
+        // Prevents infinite-spinner UI when a run hit Vercel's 300s cap.
+        // Errors swallowed — a failed sweep must never block the status read.
+        await sweepStalledRuns(projectId).catch(() => {})
 
         const row = await loadLatestRunForStage(projectId, SPECIALIST_ID, STAGE)
         if (!row) {
