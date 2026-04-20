@@ -8,16 +8,22 @@
  * starter-reference picker, and the preview rail all live on this page.
  *
  * Sections (top to bottom), matching the mockup 1:1:
- *   1. Breadcrumb — Today › New project
+ *   1. Breadcrumb — Forge › New project
  *   2. Page title + sub
  *   3. Wizard head — "New project — step 1 of 5" + "Est. 4 minutes"
  *   4. Wizard step strip — 1 current, 2–5 inactive
- *   5. Wizard body — left: active step (voice CTA + textarea + inline note +
+ *   5. Wizard body — left: active step (textarea + inline note +
  *      labeled fields for name / industry / mission / target customers /
  *      why-now / regulatory / invitees + step-4 reference picker preview);
  *      right rail: "What you're creating" (Chase/Max/Fang/Jian/Finn briefings),
  *      live "What this will create" preview from form state,
  *      "Similar projects in the network".
+ *
+ * Voice input — intentionally NOT shipped in V1. The mockup's "Record 60–90
+ * sec voice memo" button was cosmetic (no MediaRecorder / no transcription /
+ * no wiring into name/industry/mission). Rather than ship a fake affordance
+ * we render a typed-brief textarea only, with an honest one-line note that
+ * voice input lands in a later round. Chase reads the typed brief verbatim.
  *   6. Footer bar — Cancel (left), note (centre), disabled "Draft Brief
  *      rev 0.1 →" primary CTA (right). Tooltip names the server action that
  *      is intentionally NOT wired in V1.
@@ -142,7 +148,7 @@ export function ProjectCreateView(): React.ReactElement {
         <div className="pc2">
             {/* ── Breadcrumb ─────────────────────────────────────── */}
             <nav className="pc2-breadcrumb" aria-label="Breadcrumb">
-                <Link href="/today">Today</Link>
+                <Link href="/the-forge-v2">Forge</Link>
                 <span className="sep">›</span>
                 <span className="current">New project</span>
             </nav>
@@ -150,8 +156,9 @@ export function ProjectCreateView(): React.ReactElement {
             {/* ── Page title + sub ───────────────────────────────── */}
             <h1 className="pc2-page-title"><span className="pc2-title-dot" aria-hidden="true" />Start a new project</h1>
             <p className="pc2-page-sub">
-                A project begins as a short voice memo or free-text spec. Chase and Max draft
-                rev 0.1 of the Brief from what you say. You review before anything else happens.
+                Type a short brief in your own words — what you&apos;re building, who it&apos;s for,
+                what the constraint is. Chase and Max draft rev 0.1 of the Brief from what you wrote.
+                You review before anything else happens.
             </p>
 
             {/* ── Wizard ─────────────────────────────────────────── */}
@@ -186,28 +193,14 @@ export function ProjectCreateView(): React.ReactElement {
                         <div>
                             <h3 className="pc2-step-heading">Describe what you&apos;re building</h3>
                             <p className="pc2-step-lede">
-                                Talk to us like you&apos;d brief a capable co-founder over coffee.
-                                Chase is listening for the edges of the problem, not the polish.
+                                Write like you&apos;d brief a capable co-founder over coffee.
+                                Chase reads for the edges of the problem, not the polish.
                             </p>
 
-                            {/* Voice row — disabled in V1 */}
-                            <div className="pc2-voice-row">
-                                <button
-                                    type="button"
-                                    className="pc2-voice-btn"
-                                    disabled
-                                    title="Voice capture wires in with the server action"
-                                >
-                                    <span style={{ fontSize: 18 }} aria-hidden="true">🎙</span>
-                                    Record 60–90 sec voice memo
-                                </button>
-                                <span className="pc2-voice-alt">or type below</span>
-                            </div>
-
-                            {/* Subject (voice-memo-transcript) */}
+                            {/* Subject — typed brief. Voice capture intentionally omitted in V1. */}
                             <div className="pc2-field">
                                 <label htmlFor="pc2-subject" className="pc2-field-label">
-                                    Voice memo · transcript
+                                    Your brief (draft)
                                 </label>
                                 <textarea
                                     id="pc2-subject"
@@ -218,7 +211,7 @@ export function ProjectCreateView(): React.ReactElement {
                                         setForm((s) => ({ ...s, subject: e.target.value }))
                                     }
                                     maxLength={SUBJECT_MAX + 200}
-                                    aria-describedby="pc2-subject-count"
+                                    aria-describedby="pc2-subject-count pc2-voice-coming"
                                 />
                                 <span
                                     id="pc2-subject-count"
@@ -228,10 +221,13 @@ export function ProjectCreateView(): React.ReactElement {
                                     {subjectCount.toLocaleString("en-GB")} / {SUBJECT_MAX.toLocaleString("en-GB")}
                                     {subjectOverLimit ? " · over limit" : ""}
                                 </span>
+                                <p id="pc2-voice-coming" className="pc2-field-hint">
+                                    Voice input coming next round — type for now.
+                                </p>
                             </div>
 
                             <div className="pc2-inline-note">
-                                <strong>What Chase listens for:</strong> problem, market, envelope
+                                <strong>What Chase looks for:</strong> problem, market, envelope
                                 (cost / mass / timeline), regulatory stack, launch target. The fewer
                                 blanks you leave, the less Chase has to infer.
                             </div>
@@ -409,7 +405,7 @@ export function ProjectCreateView(): React.ReactElement {
                                 </h3>
                                 <p className="sub">
                                     You&apos;ll pick this in step 4 — showing it now so you know the three
-                                    entry shapes before you commit to a voice memo.
+                                    entry shapes before you commit to a brief.
                                 </p>
 
                                 <div className="pc2-ref-grid">
@@ -471,7 +467,7 @@ export function ProjectCreateView(): React.ReactElement {
                                         <span className="who">Fang</span>a BOM skeleton (parts, quantities, cost envelopes)
                                     </li>
                                     <li>
-                                        <span className="who">Jian</span>a Risks register seeded from the voice memo
+                                        <span className="who">Jian</span>a Risks register seeded from your brief
                                     </li>
                                     <li>
                                         <span className="who">Finn</span>a Cost envelope with sensitivity bands
@@ -526,7 +522,7 @@ export function ProjectCreateView(): React.ReactElement {
 
                 {/* ── Footer ─────────────────────────────────────── */}
                 <div className="pc2-wizard-foot">
-                    <Link href="/today" className="pc2-btn ghost">Cancel</Link>
+                    <Link href="/the-forge-v2" className="pc2-btn ghost">Cancel</Link>
                     <div className="note">
                         Nothing is committed until step 5 — everything is revisable.
                     </div>
@@ -546,8 +542,8 @@ export function ProjectCreateView(): React.ReactElement {
             <div className="pc2-annot">
                 <strong>Note</strong>
                 Steps 2–5 (Who is it for? · Constraints · Starter reference · Review &amp; create)
-                are collapsed here. They progressively resolve from the voice memo — Chase
-                auto-fills what it heard, you correct the gaps. The wizard is pauseable and
+                are collapsed here. They progressively resolve from your brief — Chase
+                auto-fills what it parses, you correct the gaps. The wizard is pauseable and
                 resumable.
             </div>
         </div>
