@@ -104,6 +104,29 @@ export interface SupplierShortlistRow {
 export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
     const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers } = props
 
+    // Base URL for the artefact deep-links. All routes are placeholders that
+    // will resolve once the per-artefact pages ship in later rounds.
+    const base = `/the-forge-v2/projects/${project.id}`
+
+    // ── Empty-state detection ────────────────────────────────────────
+    // A project is "empty" when it exists but nothing downstream has been
+    // declared yet: no modules, no captured brief fields, no geometry, no
+    // identified parts. In that state we render a purpose-built
+    // empty-state variant (ported from FORGE-MOCKUP-EMPTY-WORKSPACE.html)
+    // that leads with the Brief CTA and locks the other 8 artefact cards.
+    // Populated projects take the full cockpit path below — unchanged.
+    const isEmpty =
+        header.moduleCount === 0 &&
+        header.partCount === 0 &&
+        !header.quantityTarget &&
+        !header.complianceNotes &&
+        !project.systemIllustrationUrl &&
+        !project.conceptRenderUrl
+
+    if (isEmpty) {
+        return <EmptyWorkspaceView project={project} base={base} />
+    }
+
     const subjectText = project.subject?.trim() || null
     const moduleSegment = header.moduleCount > 0 ? `${header.moduleCount} modules` : "— modules"
     const partSegment = header.partCount > 0 ? `${header.partCount} top-level parts` : "— parts"
@@ -117,10 +140,6 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
     const modulesState = modulesStateFor(header.moduleCount)
     const bomState = bomStateFor(header.partCount)
     const costState = costStateFor(cost)
-
-    // Base URL for the artefact deep-links. All routes are placeholders that
-    // will resolve once the per-artefact pages ship in later rounds.
-    const base = `/the-forge-v2/projects/${project.id}`
 
     return (
         <div className="w2">
@@ -706,6 +725,196 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                     ))
                 )}
             </div>
+        </div>
+    )
+}
+
+// ─── Empty-state variant ──────────────────────────────────────────────
+// Port of FORGE-MOCKUP-EMPTY-WORKSPACE.html. Used when a project has been
+// created but no brief fields, modules, parts or geometry exist yet. The
+// Brief is the only unlocked artefact; the other eight are locked behind
+// Brief-lock with a tooltip-style tag. Copy is first-person, British
+// English, and leads with the useful next step rather than the gap.
+
+interface EmptyProjectHeader {
+    id: string
+    name: string
+    designRevision: number
+    createdAt: string
+}
+
+function EmptyWorkspaceView({ project, base }: { project: EmptyProjectHeader; base: string }): React.ReactElement {
+    const createdRelative = formatRelative(project.createdAt)
+    const briefFieldsDone = 0
+    const briefFieldsTotal = 6
+    const remaining = briefFieldsTotal - briefFieldsDone
+
+    return (
+        <div className="w2">
+            {/* ── Breadcrumb ───────────────────────────────── */}
+            <div className="w2-breadcrumb">
+                <Link href="/the-forge-v2">Forge</Link>
+                <span className="sep">›</span>
+                <span className="current">{project.name || "Untitled project"}</span>
+            </div>
+
+            {/* ── Project header ───────────────────────────── */}
+            <div className="w2-es-header">
+                <h1>
+                    <span className="dot" />
+                    {project.name || "Untitled project"}
+                    <span className="w2-es-pill">Brief draft · {briefFieldsDone} of {briefFieldsTotal} keys done</span>
+                </h1>
+                <div className="w2-es-sub">
+                    Created {createdRelative} · rev {project.designRevision} · no modules, no BOM, no suppliers, no risks yet
+                </div>
+            </div>
+
+            {/* ── Lifecycle meta-bar ───────────────────────── */}
+            <div className="w2-es-meta-bar">
+                <div className="title">Lifecycle</div>
+                <div className="stages">
+                    <div className="stage"><div className="num">01</div><div className="name">Hypothesis</div></div>
+                    <span className="arrow">▸</span>
+                    <div className="stage active"><div className="num">02</div><div className="name">Brief draft</div></div>
+                    <span className="arrow">▸</span>
+                    <div className="stage"><div className="num">03</div><div className="name">Build</div></div>
+                    <span className="arrow">▸</span>
+                    <div className="stage"><div className="num">04</div><div className="name">Ship</div></div>
+                    <span className="arrow">▸</span>
+                    <div className="stage"><div className="num">05</div><div className="name">In market</div></div>
+                </div>
+            </div>
+
+            {/* ── Brief callout ────────────────────────────── */}
+            <div className="w2-es-brief-callout">
+                <div className="icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                        <rect x="8" y="2" width="8" height="4" rx="1" />
+                        <path d="M9 12h6M9 16h4" />
+                    </svg>
+                </div>
+                <div className="body">
+                    <h3>Your Brief is in draft</h3>
+                    <p>
+                        Finish the 6 Key Requirements to unlock Modules, BOM, Suppliers, Risks, Cost, Specialists, Geometry, and Launch. <strong>{briefFieldsDone} of {briefFieldsTotal}</strong> done — <strong>{remaining} remaining</strong>: intended use, target cost, performance envelope, regulatory surface, materials constraint, launch window.
+                    </p>
+                </div>
+                <Link href={`${base}/brief`} className="cta">Continue drafting →</Link>
+            </div>
+
+            {/* ── 9-artefact grid ──────────────────────────── */}
+            <div className="w2-es-artefact-grid">
+                <Link href={`${base}/brief`} className="w2-es-art-card">
+                    <div className="ic">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                            <rect x="8" y="2" width="8" height="4" rx="1" />
+                            <path d="M9 12h6M9 16h4" />
+                        </svg>
+                    </div>
+                    <h4>Brief</h4>
+                    <p>{briefFieldsDone} of {briefFieldsTotal} Keys complete. This is the contract that gates everything else.</p>
+                    <span className="action">Continue drafting →</span>
+                </Link>
+
+                <LockedArtCard title="Modules" copy="Decomposes the system into subsystem modules, each with its own failure-mode register and interface spec.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                </LockedArtCard>
+
+                <LockedArtCard title="BOM" copy="The bill of materials. Parts, quantities, materials, live cost roll-up.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6" />
+                        <line x1="8" y1="12" x2="21" y2="12" />
+                        <line x1="8" y1="18" x2="21" y2="18" />
+                        <line x1="3" y1="6" x2="3.01" y2="6" />
+                        <line x1="3" y1="12" x2="3.01" y2="12" />
+                        <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>
+                </LockedArtCard>
+
+                <LockedArtCard title="Suppliers" copy="Shortlisted, scored, RFQ in flight. Cert validity live-checked.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 20h20" />
+                        <path d="M2 20V8l5 3V8l5 3V8l5 3V8l5 3v9" />
+                        <rect x="8" y="15" width="2" height="2" />
+                        <rect x="14" y="15" width="2" height="2" />
+                    </svg>
+                </LockedArtCard>
+
+                <LockedArtCard title="Risks" copy="Register of open, accepted, and resolved risks. Auto-surfaced from module failure modes.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                </LockedArtCard>
+
+                <LockedArtCard title="Cost" copy="Unit cost envelope: BOM + NRE + overhead. Waterfall traced to every line.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M15 9.5a3 3 0 0 0-3-2.5c-1.66 0-3 1.34-3 3 0 .83.34 1.58.88 2.12m.12 2.88h5.5M8 17h7" />
+                    </svg>
+                </LockedArtCard>
+
+                <LockedArtCard title="Specialists" copy="Per-module role input — CTO, VP manufacturing, supply chain, safety, legal.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                        <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                    </svg>
+                </LockedArtCard>
+
+                <LockedArtCard title="Geometry" copy="CAD sync from Onshape or Solidworks. System illustration and per-module renders.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                    </svg>
+                </LockedArtCard>
+
+                <LockedArtCard title="Launch" copy="Regulatory filings, DHL / Maersk logistics, customer list, comms plan.">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                        <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                    </svg>
+                </LockedArtCard>
+            </div>
+
+            {/* ── Side row: Engineering Intelligence + Known Challenges ── */}
+            <div className="w2-es-side-row">
+                <div className="w2-es-side-panel">
+                    <h3>Engineering Intelligence</h3>
+                    <div className="empty-msg">
+                        Library will populate once materials are referenced in your BOM. You&apos;ll see <strong>alloy datasheets, supplier cert history, past DFM flags, and in-kind substitutes</strong>. Library entries persist across projects in your foundry.
+                    </div>
+                </div>
+
+                <div className="w2-es-side-panel">
+                    <h3>Known Challenges</h3>
+                    <div className="empty-msg">
+                        Will populate from <strong>module Failure Modes</strong> and <strong>open Unknowns</strong> once the Brief is locked and modules are scaffolded. These are the things that could kill the build — surfaced early, tracked till closed.
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function LockedArtCard({ title, copy, children }: { title: string; copy: string; children: React.ReactNode }) {
+    return (
+        <div className="w2-es-art-card locked" aria-disabled="true">
+            <div className="lock-tag">Brief-lock required</div>
+            <div className="ic">{children}</div>
+            <h4>{title}</h4>
+            <p>{copy}</p>
         </div>
     )
 }

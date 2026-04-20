@@ -636,3 +636,213 @@
 
 /* Phase tabs removed per Tristan 2026-04-20 — the Design/Specify/Source/Assemble
    ribbon implied stage-gates that the artefact grid above already communicates. */
+
+/* ═════════════════════════════════════════════════════════════════════
+   EMPTY-STATE VARIANT — ported from FORGE-MOCKUP-EMPTY-WORKSPACE.html
+   All rules prefixed with .w2-es (nested inside .w2 scope). Used only
+   when the project has no modules / brief / geometry yet.
+   ═════════════════════════════════════════════════════════════════════ */
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.w2-es-header { margin-bottom: 18px; }
+.w2-es-header h1 {
+  font-size: 26px; font-weight: 700; letter-spacing: -0.025em;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 6px;
+}
+.w2-es-header h1 .dot {
+  width: 10px; height: 10px; border-radius: 100%;
+  background: var(--w-brand); flex-shrink: 0;
+}
+.w2-es-pill {
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px;
+  background: var(--w-warning-soft); color: var(--w-warning);
+  border: 1px solid #fef08a;
+  white-space: nowrap;
+}
+.w2-es-sub {
+  font-size: 12.5px; color: var(--w-fg-muted); margin: 0;
+}
+
+/* ── Lifecycle meta-bar ──────────────────────────────────────────── */
+.w2-es-meta-bar {
+  background: linear-gradient(135deg, #fafaf9 0%, #fff 100%);
+  border: 1px solid var(--w-border); border-radius: 12px;
+  padding: 16px 20px; margin: 20px 0;
+  display: flex; align-items: center; gap: 20px;
+}
+.w2-es-meta-bar .title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--w-fg-muted); min-width: 110px;
+}
+.w2-es-meta-bar .stages {
+  display: flex; gap: 4px; flex: 1; align-items: center;
+}
+.w2-es-meta-bar .stage {
+  flex: 1; padding: 9px 10px; border-radius: 7px;
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 11.5px; color: var(--w-fg-muted);
+  background: var(--w-surface); border: 1px solid var(--w-border);
+  text-align: center;
+}
+.w2-es-meta-bar .stage .num {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+}
+.w2-es-meta-bar .stage .name {
+  font-weight: 600; font-size: 12px; color: var(--w-fg);
+}
+.w2-es-meta-bar .stage.active {
+  background: var(--w-brand-soft); border-color: var(--w-brand);
+  color: var(--w-brand);
+}
+.w2-es-meta-bar .stage.active .name { color: var(--w-brand); }
+.w2-es-meta-bar .arrow { color: var(--w-fg-faint); font-size: 14px; }
+
+/* ── Brief callout ───────────────────────────────────────────────── */
+.w2-es-brief-callout {
+  background: var(--w-brand-soft);
+  border: 1px solid var(--w-brand-dim);
+  border-left: 3px solid var(--w-brand);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 22px;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 20px;
+  align-items: center;
+}
+.w2-es-brief-callout .icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: var(--w-surface);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--w-brand);
+}
+.w2-es-brief-callout .body h3 {
+  font-size: 16px; margin: 0 0 4px;
+  font-weight: 700; letter-spacing: -0.015em;
+}
+.w2-es-brief-callout .body p {
+  font-size: 13px; margin: 0;
+  color: var(--w-fg-muted); line-height: 1.55;
+}
+.w2-es-brief-callout .body p strong {
+  color: var(--w-fg); font-weight: 600;
+}
+.w2-es-brief-callout .cta {
+  background: var(--w-brand); color: #fff; text-decoration: none;
+  padding: 10px 20px; border-radius: 8px;
+  font-weight: 700; font-size: 13px;
+  white-space: nowrap; transition: background 0.12s;
+}
+.w2-es-brief-callout .cta:hover { background: #e63b00; }
+
+/* ── 9-artefact grid ─────────────────────────────────────────────── */
+.w2-es-artefact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+@media (max-width: 900px) {
+  .w2-es-artefact-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .w2-es-artefact-grid { grid-template-columns: 1fr; }
+}
+
+.w2-es-art-card {
+  background: var(--w-surface);
+  border: 1px solid var(--w-border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  position: relative;
+  box-shadow: var(--w-shadow-xs);
+  min-height: 128px;
+  display: flex; flex-direction: column; gap: 4px;
+  color: inherit; text-decoration: none;
+  transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+}
+a.w2-es-art-card:hover {
+  border-color: var(--w-brand);
+  transform: translateY(-1px);
+  box-shadow: var(--w-shadow-sm);
+}
+.w2-es-art-card .ic {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--w-brand-soft); color: var(--w-brand);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 8px;
+}
+.w2-es-art-card h4 {
+  font-size: 14px; margin: 0;
+  font-weight: 700; letter-spacing: -0.01em;
+}
+.w2-es-art-card p {
+  font-size: 12px; color: var(--w-fg-muted);
+  margin: 3px 0 0; line-height: 1.5;
+}
+.w2-es-art-card .action {
+  margin-top: auto; padding-top: 10px;
+  font-size: 12px; color: var(--w-brand);
+  font-weight: 600;
+}
+
+/* Locked variant */
+.w2-es-art-card.locked {
+  background: var(--w-surface-muted);
+  color: var(--w-fg-subtle);
+  cursor: default;
+}
+.w2-es-art-card.locked::before {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(255,255,255,0.4); border-radius: 12px;
+  pointer-events: none;
+}
+.w2-es-art-card.locked .ic {
+  background: #e7e5e4; color: var(--w-fg-subtle);
+}
+.w2-es-art-card.locked h4 { color: var(--w-fg-muted); }
+.w2-es-art-card.locked p { color: var(--w-fg-subtle); }
+.w2-es-art-card.locked .lock-tag {
+  position: absolute; top: 14px; right: 14px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--w-fg-muted);
+  background: var(--w-surface); padding: 3px 8px; border-radius: 4px;
+  border: 1px solid var(--w-border); z-index: 1;
+}
+.w2-es-art-card.locked .lock-tag::before {
+  content: "🔒"; margin-right: 4px; font-size: 9px;
+}
+
+/* ── Side row: Engineering Intelligence + Known Challenges ──────── */
+.w2-es-side-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px; margin-bottom: 22px;
+}
+@media (max-width: 800px) {
+  .w2-es-side-row { grid-template-columns: 1fr; }
+}
+.w2-es-side-panel {
+  background: var(--w-surface);
+  border: 1px solid var(--w-border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: var(--w-shadow-xs);
+}
+.w2-es-side-panel h3 {
+  font-size: 11.5px; margin: 0 0 10px;
+  font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--w-fg-muted);
+}
+.w2-es-side-panel .empty-msg {
+  padding: 22px;
+  background: var(--w-surface-muted);
+  border: 1px dashed var(--w-border-strong);
+  border-radius: 10px;
+  font-size: 12.5px; color: var(--w-fg-muted);
+  line-height: 1.55; text-align: center;
+}
+.w2-es-side-panel .empty-msg strong {
+  color: var(--w-fg); font-weight: 600;
+}
