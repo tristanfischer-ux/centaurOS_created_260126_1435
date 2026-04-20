@@ -10070,9 +10070,11 @@ export type Database = {
           legacy_source_id: string | null
           legacy_source_table: string | null
           marketplace_listing_id: string | null
+          match_breakdown_json: Json | null
           match_score_cached: number | null
           match_score_computed_at: string | null
           match_score_thesis_version: number | null
+          match_scored_at: string | null
           pass_reason: string | null
           probability_pct: number | null
           round_id: string | null
@@ -10093,9 +10095,11 @@ export type Database = {
           legacy_source_id?: string | null
           legacy_source_table?: string | null
           marketplace_listing_id?: string | null
+          match_breakdown_json?: Json | null
           match_score_cached?: number | null
           match_score_computed_at?: string | null
           match_score_thesis_version?: number | null
+          match_scored_at?: string | null
           pass_reason?: string | null
           probability_pct?: number | null
           round_id?: string | null
@@ -10116,9 +10120,11 @@ export type Database = {
           legacy_source_id?: string | null
           legacy_source_table?: string | null
           marketplace_listing_id?: string | null
+          match_breakdown_json?: Json | null
           match_score_cached?: number | null
           match_score_computed_at?: string | null
           match_score_thesis_version?: number | null
+          match_scored_at?: string | null
           pass_reason?: string | null
           probability_pct?: number | null
           round_id?: string | null
@@ -12839,39 +12845,51 @@ export type Database = {
       money_scenarios: {
         Row: {
           archived_at: string | null
+          cost_delay_weeks: number
           created_at: string
           foundry_id: string
           id: string
           is_default: boolean
           legacy_source_id: string | null
           name: string
+          opening_balance_cents: number | null
           question: string | null
+          revenue_delay_weeks: number
+          revenue_growth_pct: number
           template_source: string | null
           updated_at: string
           visibility: string
         }
         Insert: {
           archived_at?: string | null
+          cost_delay_weeks?: number
           created_at?: string
           foundry_id: string
           id?: string
           is_default?: boolean
           legacy_source_id?: string | null
           name: string
+          opening_balance_cents?: number | null
           question?: string | null
+          revenue_delay_weeks?: number
+          revenue_growth_pct?: number
           template_source?: string | null
           updated_at?: string
           visibility?: string
         }
         Update: {
           archived_at?: string | null
+          cost_delay_weeks?: number
           created_at?: string
           foundry_id?: string
           id?: string
           is_default?: boolean
           legacy_source_id?: string | null
           name?: string
+          opening_balance_cents?: number | null
           question?: string | null
+          revenue_delay_weeks?: number
+          revenue_growth_pct?: number
           template_source?: string | null
           updated_at?: string
           visibility?: string
@@ -24705,6 +24723,13 @@ export type Database = {
       merge_provider_result: {
         Args: { p_project_id: string; p_provider: string; p_result: Json }
         Returns: undefined
+      }
+      migrate_legacy_to_money_v2: {
+        Args: { p_foundry_id: string }
+        Returns: {
+          count: number
+          op: string
+        }[]
       }
       plan_can: {
         Args: { p_action: string; p_foundry_id: string; p_user_id: string }

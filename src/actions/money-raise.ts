@@ -1020,7 +1020,7 @@ export async function scoreInvestorsAgainstThesis(args: {
             .from('investor_pipeline_state')
             .update({
               match_score_cached: s.breakdown.total,
-              match_breakdown_json: s.breakdown as unknown as Record<string, unknown>,
+              match_breakdown_json: JSON.parse(JSON.stringify(s.breakdown)),
               match_scored_at: scoredAt,
               match_score_computed_at: scoredAt,
               match_score_thesis_version: active.version,
