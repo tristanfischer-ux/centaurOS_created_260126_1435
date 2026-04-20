@@ -392,6 +392,19 @@ export async function createCadLabProject(
       subject: subject.slice(0, 50),
     })
 
+    // Wave 1d: auto-fire Chase research on project creation. Fire-and-forget —
+    // any failure surfaces on Chase's pipeline_run row, not here. Dynamic
+    // import avoids a circular "use server" module-init cycle between
+    // cad-lab-projects.ts and run-chase-research.ts (Chase imports
+    // saveCadLabResearch from this file).
+    import("@/actions/specialists/run-chase-research").then(({ runChaseResearch }) =>
+      runChaseResearch(data.id, "auto.project-create").catch((err) => {
+        console.error("[createCadLabProject] auto-trigger Chase failed:", err)
+      }),
+    ).catch((err) => {
+      console.error("[createCadLabProject] Chase import failed:", err)
+    })
+
     return { projectId: data.id }
   })
 }

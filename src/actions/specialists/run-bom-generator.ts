@@ -69,6 +69,8 @@ import {
     loadLatestRunForStage,
     startPipelineRun,
 } from "@/actions/pipeline-runs"
+// Wave 1d: auto-fire Finn cost on BOM success.
+import { runFinnCost } from "@/actions/specialists/run-finn-cost"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -342,6 +344,12 @@ export async function runBomGenerator(
                     moduleCount: modules.length,
                     generationTimeMs: gen.generationTimeMs ?? null,
                 },
+            })
+
+            // Wave 1d: auto-fire Finn cost on BOM success. Fire-and-forget —
+            // any failure surfaces on the Finn pipeline_run row, not here.
+            void runFinnCost(projectId, "auto.bom-complete").catch((err) => {
+                console.error("[run-bom-generator] Finn auto-fire failed:", err)
             })
 
             return {
