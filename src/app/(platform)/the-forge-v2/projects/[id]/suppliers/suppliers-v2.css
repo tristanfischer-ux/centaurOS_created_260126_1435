@@ -146,6 +146,15 @@
 }
 .sp2-annot strong { color: var(--sp-fg); font-weight: 600; margin-right: 4px; }
 
+/* Honest data-model caption — single line under the header */
+.sp2-caption {
+  font-size: 12px;
+  color: var(--sp-fg-muted);
+  line-height: 1.55;
+  margin: 0 0 20px;
+  max-width: 720px;
+}
+
 /* Summary row — 5 tiles in mockup */
 .sp2-summary {
   display: grid;
@@ -292,13 +301,6 @@
   color: var(--sp-fg-muted);
   margin-top: 2px;
   line-height: 1.35;
-}
-.sp2-card-title .sp2-reference-note {
-  font-size: 10.5px;
-  color: var(--sp-fg-faint);
-  margin-top: 2px;
-  line-height: 1.35;
-  font-style: italic;
 }
 .sp2-card-title .type-chip {
   display: inline-block;
