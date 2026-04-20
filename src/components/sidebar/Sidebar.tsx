@@ -40,7 +40,7 @@ import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 
 import { welcomeNavItem, todayNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
-import { planNavigation } from "@/components/sidebar/data/plan"
+import { getPlanNavigation } from "@/components/sidebar/data/plan"
 import {
     getMoneyIntroRoute,
     getMoneyNavigation,
@@ -111,6 +111,13 @@ interface SidebarProps {
      * current legacy experience.
      */
     newMoneyExperienceEnabled?: boolean
+    /**
+     * Phase 3 feature flag. When true, the PLAN section collapses from
+     * 7 legacy items (Strategy · Objectives · Tasks · Review · Reports ·
+     * Red Team · Knowledge) to 3 new items (Plan · Report · History).
+     * Default false preserves current behaviour.
+     */
+    newPlanExperienceEnabled?: boolean
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -221,6 +228,7 @@ export function Sidebar({
     isSupplier,
     newForgeExperienceEnabled = false,
     newMoneyExperienceEnabled = false,
+    newPlanExperienceEnabled = false,
 }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
@@ -301,6 +309,9 @@ export function Sidebar({
     const moneyNavigation = getMoneyNavigation(newMoneyExperienceEnabled)
     const moneySectionLabel = getMoneySectionLabel(newMoneyExperienceEnabled)
     const moneyIntroRoute = getMoneyIntroRoute(newMoneyExperienceEnabled)
+    // Plan nav is flag-aware — legacy 7-item group under flag-off,
+    // 3-item Plan · Report · History group under flag-on.
+    const planNavigation = getPlanNavigation(newPlanExperienceEnabled)
 
     return (
         <aside

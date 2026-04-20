@@ -74,6 +74,7 @@ import { WeeklyBrief } from "@/components/insights/weekly-brief"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { GettingStartedHero } from "@/components/onboarding/getting-started-hero"
 import { FractionalExecPromoCard } from "@/components/today/fractional-exec-promo"
+import { PlanPanel } from "@/components/today/PlanPanel"
 import { PageTour } from "@/components/guidance/page-tour"
 import { CreateCompanyDialog } from "@/components/create-company-dialog"
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
@@ -937,6 +938,9 @@ export function TodayView({
                     dueThisWeek={dueToday}
                 />
             </div>
+
+            {/* Chunk D — Plan live feed (PLAN-SCHEMA §14.5, Supabase Realtime). */}
+            <PlanPanel foundryId={foundryId} />
 
             {/* Strategy spotlight — preserved below V9 per map §3 row 22 */}
             {strategyHealth.length > 0 && (
