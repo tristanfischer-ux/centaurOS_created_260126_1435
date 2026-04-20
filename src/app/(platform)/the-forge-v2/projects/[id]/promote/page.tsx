@@ -1,36 +1,45 @@
 /**
- * @file promote/page.tsx — /the-forge-v2/projects/:id/promote
+ * @file promote/page.tsx — /the-forge-v2/projects/:id/promote (V2 — mockup-faithful rebuild).
  *
- * @description Action-intent page that explains what "Promote to Product" does
- * before the founder commits. Reads the CAD Lab project + any pre-existing
- * linked product (via `getProductByCadLabProjectId`) and renders a preview of
- * the product row that would be created — name, description, hero image, seeded
- * lifecycle (concept vs prototyping), and rollup unit cost.
+ * @description Confirm-screen for promoting a Forge project into a Product line.
+ * This is NOT the supplier promotion the mockup file (FORGE-MOCKUP-PROMOTE.html)
+ * was originally drawn for — the mockup's wizard shell (head + step nav +
+ * side-by-side compare + "what this will create" checklist + wizard-foot) is
+ * re-used here for the project → product lifecycle promotion that lives at this
+ * URL.
  *
- * The wired-up action is `promoteFromCadLab` (src/actions/products.ts), which
- * is also fired automatically via `autoPromoteIfComplete` when a design reaches
- * `generated`. This page is the deliberate / pre-auto surface — it explains the
- * outcome before committing, so the decision stays legible for founders who
- * haven't hit "complete" yet. The primary CTA still routes to Products (since
- * autoPromote landed the row) rather than executing a mutation here — we do
- * not want a second promote path that can diverge from autoPromote.
+ * The promote mutation itself (`promoteFromCadLab` in src/actions/products.ts)
+ * already runs automatically via `autoPromoteIfComplete` when a design reaches
+ * `generated` state. This page is the deliberate / pre-auto surface: it
+ * previews what the Product row will carry, but the CTA is intentionally
+ * disabled so we don't ship a second mutation path that can diverge from the
+ * auto flow. When the dedicated promote action lands this page flips the
+ * button live.
  *
- * Mockup refs: FORGE-MOCKUP-PROMOTE.html, FORGE-MOCKUP-PROMOTE-TO-FORGE.html.
+ * Data sources, slot by slot:
+ *   - loadCadLabProject(id).project.name / subject / stage       → breadcrumb + title + left compare card
+ *   - getProductByCadLabProjectId(id)                            → already-promoted variant (linked row)
+ *   - project.stage                                              → isDesignComplete gate
+ *   - project.modules[].keyParts                                 → part count (sum of keyParts arrays)
+ *   - project.modules[].leadTimeSource === "supplier-quote"      → supplier-contact proxy count
+ *   - project.aiCostEstimates[moduleId].totalPerUnit             → rolled-up COGS (null when zero)
+ *   - project.systemIllustrationUrl                              → "hero image will be seeded" checklist row
+ *   - project.productOverview                                    → "description will carry over" checklist row
+ *
+ * Empty-state policy: every compare row + checklist row renders "—" /
+ * "Not declared" / "No estimate" when the underlying field is missing. We
+ * never synthesise the mockup's Zimmermann / Astra example content.
+ *
+ * Mockup ref: FORGE-MOCKUP-PROMOTE.html.
  */
 
-import Link from "next/link"
-import Image from "next/image"
-import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { ShieldCheck, ArrowRight, Sparkles, CheckCircle2, Circle } from "lucide-react"
+import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { getProductByCadLabProjectId } from "@/actions/products"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 
-import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { PromoteView, type PromoteChecklistItem, type PromoteViewProps } from "./promote-view"
 
 export const dynamic = "force-dynamic"
 
@@ -38,237 +47,158 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const { id } = await params
     const result = await loadCadLabProject(id)
     if ("error" in result) return { title: "Promote · The Forge" }
-    return { title: `Promote · ${result.project.name}` }
+    return {
+        title: `Promote · ${result.project.name}`,
+        description: "Promote a Forge project into a commercial Product line.",
+    }
 }
 
-export default async function ForgeV2PromotePage({ params }: { params: Promise<{ id: string }> }): Promise<React.ReactNode> {
+export default async function ForgeV2PromotePage({
+    params,
+}: {
+    params: Promise<{ id: string }>
+}): Promise<React.ReactNode> {
     const { id } = await params
-    const result = await loadCadLabProject(id)
-    if ("error" in result) notFound()
-    const project = result.project
-    const projectHref = `/the-forge-v2/projects/${project.id}`
 
-    const linked = await getProductByCadLabProjectId(project.id)
-    const existingProduct = "error" in linked ? null : linked.data
+    const loadResult = await loadCadLabProject(id)
+    if ("error" in loadResult || !loadResult.project) {
+        notFound()
+    }
+    const project = loadResult.project
 
-    const isComplete = project.stage === 'generated' || project.stage === 'complete'
-    const targetLifecycle = isComplete ? 'prototyping' : 'concept'
+    // Check for an existing linked Product row. Service returns `{ data: ... }`
+    // on success and `{ error: ... }` on failure — we treat failure as "no
+    // linked product" (the surface still renders; the user just won't see
+    // the success banner).
+    const linkedResult = await getProductByCadLabProjectId(project.id)
+    const linkedProduct = "error" in linkedResult ? null : linkedResult.data
 
+    // ── Lifecycle gate ────────────────────────────────────────────────
+    // Design-complete projects seed the Products row at "prototyping";
+    // everything earlier lands at "concept" so the commercial surface
+    // knows this is still a hypothesis.
+    const isDesignComplete = project.stage === "generated" || project.stage === "complete"
+    const targetLifecycle: "concept" | "prototyping" = isDesignComplete ? "prototyping" : "concept"
+
+    // ── Aggregate stats (honest counts, no fabrication) ───────────────
+    const modules = project.modules ?? []
+    const moduleCount = modules.length
+
+    // partCount = sum of keyParts across modules. keyParts can be undefined
+    // on pre-2026 modules so we coerce safely.
+    const partCount = modules.reduce((acc, m) => acc + (Array.isArray(m.keyParts) ? m.keyParts.length : 0), 0)
+
+    // supplierCount proxy: modules whose leadTimeSource is a supplier quote.
+    // When the dedicated supplier_shortlists table lands this becomes a
+    // direct count; for now it's the most honest signal available.
+    const supplierCount = modules.filter((m) => m.leadTimeSource === "supplier-quote").length
+
+    // rollupCogsGbp: sum of per-module AI cost estimates (totalPerUnit). We
+    // only report a number when at least one module has a non-zero estimate
+    // — otherwise null so the compare card shows "—" instead of "£0".
     const costEstimates = project.aiCostEstimates ?? {}
-    const rollupCogs = Object.values(costEstimates).reduce((sum: number, est) => {
-        const v = (est as { totalCostPerUnit?: number })?.totalCostPerUnit
-        return sum + (typeof v === 'number' ? v : 0)
+    const rollupCogsRaw = Object.values(costEstimates).reduce((sum, est) => {
+        const v = (est as { totalPerUnit?: number })?.totalPerUnit
+        return sum + (typeof v === "number" && Number.isFinite(v) ? v : 0)
     }, 0)
-    const hasCogs = rollupCogs > 0
+    const rollupCogsGbp = rollupCogsRaw > 0 ? rollupCogsRaw : null
 
-    const moduleTotal = (project.modules ?? []).length
-    const readinessItems: Array<{ label: string; detail: string; done: boolean }> = [
+    const hasOverview = typeof project.productOverview === "string" && project.productOverview.trim().length > 0
+    const hasHeroImage = typeof project.systemIllustrationUrl === "string" && project.systemIllustrationUrl.trim().length > 0
+
+    // ── Pre-promote checklist ─────────────────────────────────────────
+    // Mirrors the mockup's "What this will create" block. Each row is a
+    // concrete assertion about what the Products row will inherit — tick
+    // means the source field is populated; pending means it's missing but
+    // promotion is still allowed (the Product row just starts thinner).
+    const checklist: PromoteChecklistItem[] = [
         {
-            label: 'Brief captured',
-            detail: project.productOverview ? 'Product overview populated' : 'No overview — product description will be thin',
-            done: Boolean(project.productOverview),
+            title: "Product name seeded",
+            meta: `Product row will be named "${project.name}".`,
+            status: "Ready",
+            done: true,
         },
         {
-            label: 'Modules decomposed',
-            detail: moduleTotal > 0 ? `${moduleTotal} modules ready for product-side rollup` : 'No modules yet — promote anyway or decompose first',
-            done: moduleTotal > 0,
+            title: "Description carries over",
+            meta: hasOverview
+                ? `${countWords(project.productOverview ?? "")} words of product overview flow into the Product description field.`
+                : "No product overview authored yet — the Product row will start with an empty description until the brief is written.",
+            status: hasOverview ? "Ready" : "Thin",
+            done: hasOverview,
         },
         {
-            label: 'Cost envelope seeded',
-            detail: hasCogs ? `£${Math.round(rollupCogs).toLocaleString()}/unit rolls up to Product COGS` : 'No specialist cost estimates — Product starts without unit economics',
-            done: hasCogs,
+            title: "Hero illustration carries over",
+            meta: hasHeroImage
+                ? "The system illustration seeds the Product hero image."
+                : "No system illustration yet — the Product row will render without a hero until one is generated.",
+            status: hasHeroImage ? "Ready" : "No image",
+            done: hasHeroImage,
         },
         {
-            label: 'Hero illustration',
-            detail: project.systemIllustrationUrl ? 'Will seed the Product hero image' : 'No illustration — Product will render without hero',
-            done: Boolean(project.systemIllustrationUrl),
+            title: "Module rollup seeded",
+            meta: moduleCount > 0
+                ? `${moduleCount} module${moduleCount === 1 ? "" : "s"} roll up into the Product build tab (${partCount} key part${partCount === 1 ? "" : "s"} declared).`
+                : "No modules decomposed yet — Product build tab starts empty.",
+            status: moduleCount > 0 ? "Ready" : "Empty",
+            done: moduleCount > 0,
         },
         {
-            label: 'Design complete',
-            detail: isComplete ? 'Lifecycle will start at prototyping' : 'Lifecycle will start at concept (earlier-stage row)',
-            done: isComplete,
+            title: "Supplier links carried",
+            meta: supplierCount > 0
+                ? `${supplierCount} module${supplierCount === 1 ? "" : "s"} quoted by a real supplier — those links flow into the Product supplier tab.`
+                : "No supplier quotes recorded — Product supplier tab starts empty.",
+            status: supplierCount > 0 ? "Ready" : "Empty",
+            done: supplierCount > 0,
+        },
+        {
+            title: "Unit COGS rolled up",
+            meta: rollupCogsGbp != null
+                ? `£${Math.round(rollupCogsGbp).toLocaleString("en-GB")}/unit rolls up from AI cost estimates across the decomposed modules.`
+                : "No AI cost estimates yet — Product starts without unit economics until the Cost artefact is run.",
+            status: rollupCogsGbp != null ? "Ready" : "No estimate",
+            done: rollupCogsGbp != null,
+        },
+        {
+            title: "Lifecycle seed",
+            meta: isDesignComplete
+                ? `Design is ${project.stage} — Product row lands at "prototyping".`
+                : `Design stage is "${project.stage || "pending"}" — Product row lands at "concept" (earlier-stage row).`,
+            status: targetLifecycle,
+            done: true,
+        },
+        {
+            title: "Archive link back to project",
+            meta: "Product row keeps a cad_lab_project_id pointer back to this Forge project for the full lineage.",
+            status: "On confirm",
+            done: false,
         },
     ]
 
-    return (
-        <WorkspaceShell
-            crumbs={[
-                { label: "Workspace", href: "/the-forge-v2" },
-                { label: project.name, href: projectHref },
-                { label: "Promote to Product" },
-            ]}
-            subtitle="Create a Product row that carries this design into the commercial surface."
-            maxWidth="narrow"
-        >
-            {/* Intent callout */}
-            <Card className="rounded-xl border border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.03]">
-                <CardContent className="py-5 px-5 flex items-start gap-3">
-                    <ShieldCheck className="h-5 w-5 text-international-orange mt-0.5 shrink-0" />
-                    <div className="space-y-1.5">
-                        <p className="text-sm font-semibold text-foreground">What promoting does</p>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            Promoting creates a row in the <span className="font-semibold text-foreground">Products</span> surface, linked back to this Forge project. Products owns the commercial story (pricing, assumption tests, LOIs, market sizing); the Forge project keeps owning the build artefacts. Nothing in this workspace changes — the Forge project remains editable and canonical for engineering.
-                        </p>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            <span className="font-semibold text-foreground">Reversible:</span> you can delete the Product row at any time; the Forge project is untouched.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+    const viewProps: PromoteViewProps = {
+        project: {
+            id: project.id,
+            name: project.name,
+            subject: project.subject,
+            stage: project.stage,
+        },
+        linkedProduct,
+        targetLifecycle,
+        isDesignComplete,
+        stats: {
+            moduleCount,
+            partCount,
+            supplierCount,
+            rollupCogsGbp,
+        },
+        checklist,
+    }
 
-            {/* If already promoted: show linked product */}
-            {existingProduct ? (
-                <Card className="rounded-xl border">
-                    <CardContent className="py-5 px-5 space-y-4">
-                        <div className="flex items-start gap-3">
-                            <CheckCircle2 className="h-5 w-5 text-status-success mt-0.5 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold text-foreground">Already linked to a Product</p>
-                                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                                    This project is already promoted as <span className="font-semibold text-foreground">{existingProduct.name}</span>
-                                    {' '}({existingProduct.lifecycle}). Changes to the Forge project flow through as build signals; Products owns market validation.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 pt-2 border-t border-border">
-                            <Button asChild size="sm" variant="secondary">
-                                <Link href={projectHref}>Back to project</Link>
-                            </Button>
-                            <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                <Link href={`/products/${existingProduct.id}`}>
-                                    Open Product <ArrowRight className="h-3.5 w-3.5" />
-                                </Link>
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            ) : (
-                <>
-                    {/* Preview card of the Product row that would be created */}
-                    <section aria-labelledby="preview-heading" className="space-y-3">
-                        <div className="flex items-center gap-2">
-                            <div className="w-1 h-5 rounded-full bg-international-orange" />
-                            <Sparkles className="h-4 w-4 text-international-orange" />
-                            <h2 id="preview-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                Preview · what the Product row will look like
-                            </h2>
-                        </div>
-                        <Card className="rounded-xl border overflow-hidden">
-                            {project.systemIllustrationUrl && (
-                                <div className="aspect-[16/5] relative bg-muted">
-                                    <Image
-                                        src={project.systemIllustrationUrl}
-                                        alt={`${project.name} hero`}
-                                        fill
-                                        className="object-cover"
-                                        unoptimized
-                                    />
-                                </div>
-                            )}
-                            <CardContent className="py-5 px-5 space-y-4">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                            Product name
-                                        </p>
-                                        <p className="text-lg font-bold text-foreground leading-tight mt-0.5">
-                                            {project.name}
-                                        </p>
-                                    </div>
-                                    <Badge variant="outline" className="text-xs font-semibold bg-international-orange/10 text-international-orange border-international-orange/30 shrink-0">
-                                        {targetLifecycle}
-                                    </Badge>
-                                </div>
-                                <div>
-                                    <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        Description
-                                    </p>
-                                    <p className="text-sm text-foreground leading-relaxed mt-1">
-                                        {project.productOverview ?? project.subject ?? (
-                                            <span className="italic text-muted-foreground">No description — Products row will start empty.</span>
-                                        )}
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border">
-                                    <div>
-                                        <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">Lifecycle seed</p>
-                                        <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{targetLifecycle}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">Unit COGS</p>
-                                        <p className="text-sm font-semibold text-foreground mt-0.5 tabular-nums">
-                                            {hasCogs ? `£${Math.round(rollupCogs).toLocaleString()}` : '—'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">Link</p>
-                                        <p className="text-sm font-semibold text-foreground mt-0.5">This Forge project</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </section>
+    return <PromoteView {...viewProps} />
+}
 
-                    {/* Readiness checklist */}
-                    <section aria-labelledby="readiness-heading" className="space-y-3">
-                        <div className="flex items-center gap-2">
-                            <div className="w-1 h-5 rounded-full bg-status-success" />
-                            <h2 id="readiness-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                                Readiness signals
-                            </h2>
-                        </div>
-                        <Card className="rounded-xl border">
-                            <CardContent className="py-4 px-5">
-                                <ul className="space-y-0">
-                                    {readinessItems.map((item, idx) => (
-                                        <li key={idx} className={`flex items-start gap-3 py-3 ${idx < readinessItems.length - 1 ? 'border-b border-border/40' : ''}`}>
-                                            {item.done ? (
-                                                <CheckCircle2 className="h-4 w-4 text-status-success mt-0.5 shrink-0" />
-                                            ) : (
-                                                <Circle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                                            )}
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                                                <p className="text-[12.5px] text-muted-foreground leading-relaxed mt-0.5">{item.detail}</p>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </CardContent>
-                        </Card>
-                    </section>
+// ─── Helpers ───────────────────────────────────────────────────────────
 
-                    {/* CTA strip — promote is handled by autoPromoteIfComplete on design
-                        completion. We surface the intent + preview but do not run a
-                        second mutation here, to avoid divergent paths. The CTA points
-                        at Products where the row lands after auto-promote. */}
-                    <Card className="rounded-xl border">
-                        <CardContent className="py-5 px-5 flex flex-wrap items-center justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="text-sm font-semibold text-foreground">
-                                    Auto-promotion on completion
-                                </p>
-                                <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed max-w-xl">
-                                    Promotion runs automatically when this design reaches <span className="font-semibold">generated</span> status or an RFQ is created.
-                                    {isComplete
-                                        ? ' This design is ready — refresh in a few seconds or open Products to confirm.'
-                                        : ' Complete the design (or issue an RFQ) to trigger automatic promotion.'}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <Button asChild size="sm" variant="secondary">
-                                    <Link href={projectHref}>Back to project</Link>
-                                </Button>
-                                <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                    <Link href="/products">
-                                        Open Products <ArrowRight className="h-3.5 w-3.5" />
-                                    </Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </>
-            )}
-        </WorkspaceShell>
-    )
+/** Counts whitespace-separated tokens in a string, ignoring empties. */
+function countWords(s: string): number {
+    return s.split(/\s+/).filter(Boolean).length
 }
