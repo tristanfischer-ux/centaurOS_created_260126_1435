@@ -236,7 +236,7 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                     icon={Hammer}
                     label="Workshop"
                     subtitle="From idea to manufactured product"
-                    startHref="/the-forge"
+                    startHref="/the-forge-v2"
                     startLabel="Start in The Forge"
                     intro="Type your product idea in one paragraph. Max, your CTO specialist, returns a system architecture diagram, a module decomposition (your product broken into 5–8 functional modules, each with its interface contract), a skeleton Bill of Materials, reference images of each module, and a design report with research, risks, and next steps."
                     rows={[
