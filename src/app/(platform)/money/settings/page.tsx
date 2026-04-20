@@ -23,11 +23,11 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 
+import { loadMoneySettings } from "@/actions/money-settings"
 import {
     DEFAULT_MONEY_SETTINGS,
-    loadMoneySettings,
     type MoneySettingsRow,
-} from "@/actions/money-settings"
+} from "@/actions/money-settings-types"
 
 import { SettingsView } from "./settings-view"
 

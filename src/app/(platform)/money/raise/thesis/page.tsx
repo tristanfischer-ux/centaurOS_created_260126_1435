@@ -27,7 +27,8 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 
-import { DEFAULT_THESIS, loadThesis } from "@/actions/money-thesis"
+import { loadThesis } from "@/actions/money-thesis"
+import { DEFAULT_THESIS } from "@/actions/money-thesis-types"
 
 import { ThesisView } from "./thesis-view"
 

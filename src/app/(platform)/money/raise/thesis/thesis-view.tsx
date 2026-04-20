@@ -47,15 +47,15 @@
 import Link from "next/link"
 import { useMemo, useState, useTransition } from "react"
 
+import { saveThesis } from "@/actions/money-thesis"
 import {
     DEFAULT_WEIGHTS,
-    saveThesis,
     type LeadFollowerPref,
     type ThesisDataSources,
     type ThesisPatch,
     type ThesisRow,
     type ThesisWeights,
-} from "@/actions/money-thesis"
+} from "@/actions/money-thesis-types"
 
 import "./ths2.css"
 

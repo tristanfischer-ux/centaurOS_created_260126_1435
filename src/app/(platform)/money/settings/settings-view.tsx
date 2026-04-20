@@ -36,17 +36,17 @@
 import Link from "next/link"
 import { useMemo, useState, useTransition } from "react"
 
-import {
-    saveMoneySettings,
-    type DigestSchedule,
-    type FiscalYearStartMonth,
-    type MoneySettingsPatch,
-    type MoneySettingsRow,
-    type NumberFormatLocale,
-    type ReportingCurrency,
-    type SpecialistModelTier,
-    type SpecialistsEnabled,
-} from "@/actions/money-settings"
+import { saveMoneySettings } from "@/actions/money-settings"
+import type {
+    DigestSchedule,
+    FiscalYearStartMonth,
+    MoneySettingsPatch,
+    MoneySettingsRow,
+    NumberFormatLocale,
+    ReportingCurrency,
+    SpecialistModelTier,
+    SpecialistsEnabled,
+} from "@/actions/money-settings-types"
 
 import "./mst2.css"
 

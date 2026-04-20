@@ -4,7 +4,7 @@
  * without leaking into their page-level scoped CSS (.bm2-, .c2-, .op2-, etc.).
  *
  * Palette mirrors the tokens used by the forge V2 scoped stylesheets
- * (see src/app/(platform)/the-forge-v2/projects/[id]/*/*.css).
+ * (see the scoped stylesheets under the V2 project routes).
  */
 
 .chip {
