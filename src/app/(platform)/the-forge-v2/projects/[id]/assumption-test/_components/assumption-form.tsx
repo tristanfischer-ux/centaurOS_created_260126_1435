@@ -136,6 +136,7 @@ export function AssumptionForm({ projectId }: { projectId: string }): React.Reac
                             value={hypothesis}
                             onChange={e => setHypothesis(e.target.value)}
                             required
+                            maxLength={5000}
                         />
                     </div>
 
@@ -148,6 +149,7 @@ export function AssumptionForm({ projectId }: { projectId: string }): React.Reac
                             value={expected}
                             onChange={e => setExpected(e.target.value)}
                             required
+                            maxLength={5000}
                         />
                     </div>
 
