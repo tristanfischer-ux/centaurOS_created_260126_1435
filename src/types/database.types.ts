@@ -15136,6 +15136,107 @@ export type Database = {
           },
         ]
       }
+      pipeline_runs: {
+        Row: {
+          cost_gbp_pence: number | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          finished_at: string | null
+          foundry_id: string
+          id: string
+          input_ref: Json | null
+          input_tokens: number | null
+          model_id: string | null
+          model_provider: string | null
+          output_ref: Json | null
+          output_tokens: number | null
+          project_id: string | null
+          specialist_id: string
+          stage: string
+          started_at: string | null
+          status: string
+          trigger: string
+          triggered_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          cost_gbp_pence?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id: string
+          id?: string
+          input_ref?: Json | null
+          input_tokens?: number | null
+          model_id?: string | null
+          model_provider?: string | null
+          output_ref?: Json | null
+          output_tokens?: number | null
+          project_id?: string | null
+          specialist_id: string
+          stage: string
+          started_at?: string | null
+          status?: string
+          trigger: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cost_gbp_pence?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id?: string
+          id?: string
+          input_ref?: Json | null
+          input_tokens?: number | null
+          model_id?: string | null
+          model_provider?: string | null
+          output_ref?: Json | null
+          output_tokens?: number | null
+          project_id?: string | null
+          specialist_id?: string
+          stage?: string
+          started_at?: string | null
+          status?: string
+          trigger?: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_runs_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pitch_prep_requests: {
         Row: {
           additional_files: string[] | null
