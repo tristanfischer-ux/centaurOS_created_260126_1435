@@ -10,22 +10,21 @@ import {
 import type { SidebarNavItem } from './types'
 
 /**
- * WORKSHOP section — Forge cutover 2026-04-19.
+ * WORKSHOP section — Forge routing.
  *
- * The Forge entry now routes unconditionally to /the-forge-v2 (Phase 1
- * Forge rebuild). The `new_forge_experience` flag parameter is retained
- * for signature compatibility but ignored. Legacy /the-forge route stays
- * functional for deep links + is preserved for fallback while the v2
- * surfaces continue to iterate. CAD Lab remains at /the-forge/cad-lab
- * and is deep-linked from every v2 page.
+ * The Forge entry is flag-aware: when `new_forge_experience` is true the
+ * link routes to /the-forge-v2 (Phase 1 rebuild); otherwise to legacy
+ * /the-forge. DEFAULT IS OFF to preserve the original experience — users
+ * opt in per-profile when ready. CAD Lab remains at /the-forge/cad-lab
+ * regardless.
  *
- * Rollback if needed: revert this file and users fall back to legacy
- * /the-forge via the flag-off path.
+ * Rollback 2026-04-20: unconditional cutover to /the-forge-v2 reverted
+ * because the V2 experience had unaddressed issues in production. Per-user
+ * opt-in via new_forge_experience flag is the safer path.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function getWorkshopNavigation(newForgeExperience: boolean = true): SidebarNavItem[] {
-  const forgeHref = '/the-forge-v2'
+export function getWorkshopNavigation(newForgeExperience: boolean = false): SidebarNavItem[] {
+  const forgeHref = newForgeExperience ? '/the-forge-v2' : '/the-forge'
   return [
     { name: 'The Forge', href: forgeHref, icon: Hammer, tooltip: 'Explore materials, manufacturing approaches, and find suppliers' },
     { name: 'Products', href: '/products', icon: Package, tooltip: 'Your hardware products — from concept to market' },
