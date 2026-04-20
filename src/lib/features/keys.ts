@@ -12,18 +12,24 @@ export const FLAG_NEW_FORGE_EXPERIENCE = 'new_forge_experience'
 export const FLAG_NEW_PRODUCTS_EXPERIENCE = 'new_products_experience'
 export const FLAG_NEW_PLAN_EXPERIENCE = 'new_plan_experience'
 export const FLAG_NEW_MONEY_EXPERIENCE = 'new_money_experience'
+export const FLAG_NEW_MARKETPLACE_EXPERIENCE = 'new_marketplace_experience'
+export const FLAG_NEW_PEOPLE_EXPERIENCE = 'new_people_experience'
 
 export type FeatureFlagKey =
   | typeof FLAG_NEW_FORGE_EXPERIENCE
   | typeof FLAG_NEW_PRODUCTS_EXPERIENCE
   | typeof FLAG_NEW_PLAN_EXPERIENCE
   | typeof FLAG_NEW_MONEY_EXPERIENCE
+  | typeof FLAG_NEW_MARKETPLACE_EXPERIENCE
+  | typeof FLAG_NEW_PEOPLE_EXPERIENCE
 
 export const ALL_FLAG_KEYS: readonly FeatureFlagKey[] = [
   FLAG_NEW_FORGE_EXPERIENCE,
   FLAG_NEW_PRODUCTS_EXPERIENCE,
   FLAG_NEW_PLAN_EXPERIENCE,
   FLAG_NEW_MONEY_EXPERIENCE,
+  FLAG_NEW_MARKETPLACE_EXPERIENCE,
+  FLAG_NEW_PEOPLE_EXPERIENCE,
 ] as const
 
 export function isFeatureFlagKey(value: string): value is FeatureFlagKey {
