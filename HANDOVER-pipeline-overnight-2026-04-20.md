@@ -218,3 +218,35 @@ From the prior fixes — these are NOT regressed:
 - Watchdog sweep is idempotent and fires on status loaders
 
 Screenshots from the E2E agent at `/tmp/forge-v2-pipeline-e2e-round3/` (28 PNGs).
+
+---
+
+## Overnight fix agents dispatched (status pending at write time)
+
+Four agents fired in parallel after docs committed. Each has 15-30 min. Their reports will land in the session log; any successful commits land on the branch for you to pull in the morning.
+
+| Agent | Priority | Task | Target files |
+|---|---|---|---|
+| `ac0e9c2f` BOM-GENERATOR | P0 | Fix BOM parse + timeout — concurrency cap + JSON repair + partial-success recovery | `src/actions/specialists/run-bom-generator.ts`, `src/actions/bom.ts` |
+| `a36be2be` FANG-SAVE | P0 | Fix SAVE_FAILED — align orchestrator's review persistence to the known-working jsonb shape | `src/actions/specialists/run-fang-review.ts`, `src/actions/cad-lab-reviews.ts` |
+| `a68b39d4` CHASE-AUTO-RETRY | P1 | One-shot automatic retry when Chase auto-fire hits "Claude synthesis failed" transient | `src/actions/specialists/run-chase-research.ts` |
+| `afa8ce04` ASK-MAX-CHAT-PATH | P1 | Apply per-provider max_tokens clamp on the chat-path code too (fix `ed91313a` only covered pipeline execute path) | Chat route handlers + shared chat wrapper |
+
+If you `git log feat/forge-v2-cutover -5` when you wake and see four new commits beyond `ddeb2361`, all four agents succeeded.
+
+## Standing not-yet-fixed (for the morning after)
+
+| # | Bug | Notes |
+|---|---|---|
+| E | Workspace lock-state cache stale | Cheap win, not in tonight's wave. Likely a `staleTimes.dynamic` or revalidate tag issue on `/the-forge-v2/projects/[id]/page.tsx`. |
+| F | V2 wizard submit second-pass | `d1fe724b` worked in the agent's test but not in my retest. Maybe cache miss or maybe subtler Flight-level issue. Suggest a 30-min diagnostic pass with fresh DevTools inspection of the POST response bodies. |
+
+## If you want to see the project
+
+**URL** (new preview): `https://centaur-os-created-260126-1435-bmseykk8i.vercel.app/the-forge-v2/projects/8c3e08f0-3e01-4235-9a8b-2cad1443b005`
+
+Or whatever preview the next deploy lands on — check `vercel ls`.
+
+Log in as your real account OR the test user (`claude-test@forgeos.test`). The foundry on the Wheelhouse project is `claude-test-foundry` — if you're logged in as yourself, you'll need to either (a) be added to the claude-test-foundry membership or (b) switch active foundry. Alternatively, look at it DB-side: `select * from cad_lab_projects where id = '8c3e08f0-3e01-4235-9a8b-2cad1443b005';`
+
+Tracker doc with every stage + decision: `FOUNDER-WALKTHROUGH-TRACKER.md`.
