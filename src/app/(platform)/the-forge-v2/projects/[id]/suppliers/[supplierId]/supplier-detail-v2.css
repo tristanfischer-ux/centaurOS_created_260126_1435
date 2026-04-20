@@ -134,6 +134,12 @@
 }
 .sd2-header-body .sub a { color: var(--sd-fg); font-weight: 600; }
 .sd2-header-body .sub a:hover { text-decoration: underline; }
+.sd2-header-body .sub.sd2-reference-note {
+  font-size: 11.5px;
+  color: var(--sd-fg-subtle);
+  font-style: italic;
+  margin-top: 2px;
+}
 
 .cta-group {
   display: flex;

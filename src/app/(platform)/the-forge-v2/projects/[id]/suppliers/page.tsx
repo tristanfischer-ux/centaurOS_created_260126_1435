@@ -229,10 +229,6 @@ async function safeShortlistWithJoin(projectId: string): Promise<SuppliersSuppli
                 modulesMatched: Array.isArray(r.module_ids) ? (r.module_ids as string[]).length : 0,
                 matchReasons: extractReasons(r.all_match_reasons),
                 capabilities: extractCapabilities(g?.capabilities),
-                communityRating: g?.community_rating ?? null,
-                reviewCount: g?.review_count ?? null,
-                usedByCount: g?.used_by_count ?? null,
-                verificationStatus: g?.verification_status ?? null,
                 domainCategories: g?.domain_categories ?? [],
             }
         })

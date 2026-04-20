@@ -293,6 +293,13 @@
   margin-top: 2px;
   line-height: 1.35;
 }
+.sp2-card-title .sp2-reference-note {
+  font-size: 10.5px;
+  color: var(--sp-fg-faint);
+  margin-top: 2px;
+  line-height: 1.35;
+  font-style: italic;
+}
 .sp2-card-title .type-chip {
   display: inline-block;
   margin-top: 4px;

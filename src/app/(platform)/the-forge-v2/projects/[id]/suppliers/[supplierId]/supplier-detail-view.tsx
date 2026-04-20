@@ -9,12 +9,22 @@
  *   - No fabricated RFQ history / awards / NDAs — those surfaces render
  *     honest "RFQ lifecycle ships in a later round" copy.
  *
+ * Trust-signal honesty (2026-04-20): the fabricated "Verified" badge,
+ * community rating, review count, and used_by_count cells were removed
+ * from this surface. Those columns are still present on the seed row in
+ * `scripts/seed-haps-suppliers.ts` (so real data can back-fill them in
+ * future), but we do NOT render them — there is no live verification
+ * workflow, no ratings system, and zero real foundry usage today. A single
+ * muted subtitle "Reference data · not yet live platform usage" replaces
+ * them under the supplier name.
+ *
  * Sections (top to bottom, matching the mockup order):
  *   1. Breadcrumb (Forge › {project} › Suppliers › {supplier})
  *   2. Page header — supplier initials block + name + orange title-dot
  *      + ramp-role chip + CTAs (Send RFQ disabled, Open in directory soon)
- *   3. Hero meta strip — verification / community rating / review count /
- *      used_by_count / HQ / employees / founded
+ *   3. Hero meta strip — HQ / employees / founded (only the 3 cells that
+ *      come from real company_info data — the 4 fabricated trust-signal
+ *      cells were removed).
  *   4. Why-matched panel — match score (big) + ramp role + match reasons
  *      (teal diamond pills) + matched modules (chips linking to module)
  *   5. Capabilities card — iterates the capabilities jsonb
@@ -60,10 +70,6 @@ export interface SupplierDetailViewProps {
         description: string | null
         website: string | null
         supplierType: string
-        verificationStatus: string | null
-        communityRating: number | null
-        reviewCount: number | null
-        usedByCount: number | null
         hq: string | null
         employees: number | null
         founded: number | null
@@ -90,7 +96,6 @@ export function SupplierDetailView(props: SupplierDetailViewProps): React.ReactE
 
     const suppliersHref = `/the-forge-v2/projects/${project.id}/suppliers`
     const rampLabel = RAMP_LABELS[shortlist.rampRole]
-    const isVerified = supplier.verificationStatus === "verified"
 
     return (
         <div className="sd2">
@@ -116,16 +121,9 @@ export function SupplierDetailView(props: SupplierDetailViewProps): React.ReactE
                             <span className={`sd2-role-dot role-${shortlist.rampRole}`} aria-hidden="true" />
                             {rampLabel}
                         </span>
-                        {isVerified && (
-                            <span className="sd2-chip success solid" style={{ marginLeft: 6 }}>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                                Verified
-                            </span>
-                        )}
                     </h1>
                     <div className="sub">{formatSupplierType(supplier.supplierType)} · shortlisted against <Link href={suppliersHref}>{project.name}</Link></div>
+                    <div className="sub sd2-reference-note">Reference data · not yet live platform usage</div>
                 </div>
                 <div className="cta-group">
                     <button type="button" className="sd2-btn primary" disabled title="RFQ lifecycle ships in a later round">Send RFQ</button>
@@ -280,30 +278,6 @@ export function SupplierDetailView(props: SupplierDetailViewProps): React.ReactE
 
 function HeroMetaStrip({ supplier }: { supplier: SupplierDetailViewProps["supplier"] }): React.ReactElement {
     const items: Array<{ label: string; value: React.ReactNode }> = [
-        {
-            label: "Verification",
-            value: supplier.verificationStatus === "verified" ? (
-                <span className="sd2-meta-value ok">Verified</span>
-            ) : (
-                <span className="sd2-meta-value muted">{capitalise(supplier.verificationStatus ?? "pending")}</span>
-            ),
-        },
-        {
-            label: "Community rating",
-            value: supplier.communityRating != null
-                ? <>{supplier.communityRating.toFixed(1)}<small> / 5</small></>
-                : <span className="sd2-meta-empty">—</span>,
-        },
-        {
-            label: "Reviews",
-            value: supplier.reviewCount != null ? supplier.reviewCount.toLocaleString("en-GB") : <span className="sd2-meta-empty">—</span>,
-        },
-        {
-            label: "Used by",
-            value: supplier.usedByCount != null
-                ? <>{supplier.usedByCount.toLocaleString("en-GB")}<small> foundries</small></>
-                : <span className="sd2-meta-empty">—</span>,
-        },
         {
             label: "HQ",
             value: supplier.hq ?? <span className="sd2-meta-empty">—</span>,

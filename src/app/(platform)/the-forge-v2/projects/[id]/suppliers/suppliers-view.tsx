@@ -21,6 +21,14 @@
  *
  * RFQ / quote / awarded numbers are honest zeros — no RFQ lifecycle exists
  * yet on this project, so we never fabricate "3 RFQs out · £18.1k exposure".
+ *
+ * Trust-signal honesty (2026-04-20): fabricated signals removed from this
+ * surface. `used_by_count` (seeded 12–210), `community_rating` (seeded
+ * 4.3–4.8), and the `verification_status = "verified"` badge all derive from
+ * hardcoded seed rows — there is no real foundry usage, ratings system, or
+ * verification workflow. They are NOT rendered here; each card shows a single
+ * muted "Reference data · not yet live platform usage" subtitle instead. The
+ * seed data is left untouched so future real usage can populate the columns.
  */
 
 "use client"
@@ -53,14 +61,6 @@ export interface SuppliersSupplierRow {
     matchReasons: string[]
     /** Capabilities summary — top 3 process / product strings from capabilities JSONB. */
     capabilities: string[]
-    /** Global: community_rating 0..5. Null if no global row. */
-    communityRating: number | null
-    /** Global: review_count. Null if no global row. */
-    reviewCount: number | null
-    /** Global: used_by_count. Null if no global row. */
-    usedByCount: number | null
-    /** Global: verification_status — "verified" | "pending" | anything else treated as unverified. */
-    verificationStatus: string | null
     /** Domain categories pulled from global row — used for the type sub-chip. */
     domainCategories: string[]
 }
@@ -324,11 +324,6 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                 <div className="sp2-grid">
                     {suppliers.map((s) => {
                         const role = s.rampRole
-                        const verify = s.verificationStatus === "verified"
-                            ? "verified"
-                            : s.verificationStatus === "pending"
-                                ? "pending"
-                                : "unverified"
                         const reasons = s.matchReasons.slice(0, 3)
                         return (
                             <Link
@@ -345,6 +340,7 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                                     <div className="sp2-card-title">
                                         <div className="name">{s.name}</div>
                                         <div className="where">{s.hq ?? "Location not shared"}</div>
+                                        <div className="sp2-reference-note">Reference data · not yet live platform usage</div>
                                         {s.type && <span className="type-chip">{s.type}</span>}
                                     </div>
                                     <span className={`sp2-role-chip role-${role}`}>
@@ -403,31 +399,6 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                                         ))}
                                     </div>
                                 )}
-
-                                {/* Foot: rating + verification */}
-                                <div className="sp2-card-foot">
-                                    {s.communityRating != null ? (
-                                        <span className="sp2-rating">
-                                            <span className="star" aria-hidden="true">★</span>
-                                            {s.communityRating.toFixed(1)}
-                                            {s.reviewCount != null && s.reviewCount > 0 && (
-                                                <span style={{ color: "var(--sp-fg-faint)" }}>
-                                                    · {s.reviewCount} review{s.reviewCount === 1 ? "" : "s"}
-                                                </span>
-                                            )}
-                                            {s.usedByCount != null && s.usedByCount > 0 && (
-                                                <span style={{ color: "var(--sp-fg-faint)" }}>
-                                                    · {s.usedByCount} used
-                                                </span>
-                                            )}
-                                        </span>
-                                    ) : (
-                                        <span className="sp2-rating muted">No community rating yet</span>
-                                    )}
-                                    <span className={`sp2-verify ${verify}`}>
-                                        {verify === "verified" ? "✓ Verified" : verify === "pending" ? "Pending" : "Unverified"}
-                                    </span>
-                                </div>
 
                                 <div className="sp2-open-link">
                                     Open supplier →
