@@ -1,0 +1,395 @@
+/**
+ * expert-profile-v2.css — scoped (`.epf2`) styles for the global specialist
+ * profile page. Port of FORGE-MOCKUP-EXPERT-PROFILE.html. Tokens mirror
+ * ask-specialist-v2.css so the two sibling specialist surfaces share palette.
+ */
+
+.epf2 {
+  /* Palette — mirrors forge-mockup.css tokens for this page only */
+  --epf-fg:             #1c1917;
+  --epf-fg-muted:       #78716c;
+  --epf-fg-faint:       #a8a29e;
+  --epf-fg-subtle:      #d6d3d1;
+  --epf-surface:        #ffffff;
+  --epf-surface-muted:  #f5f5f4;
+  --epf-surface-soft:   #fafaf9;
+  --epf-border:         #e7e5e4;
+  --epf-border-soft:    #ececeb;
+  --epf-border-strong:  #d6d3d1;
+  --epf-brand:          #ff4500;
+  --epf-brand-soft:     rgba(255,69,0,0.10);
+  --epf-brand-dim:      rgba(255,69,0,0.30);
+  --epf-success:        #15803d;
+  --epf-success-soft:   #dcfce7;
+  --epf-success-fg:     #166534;
+  --epf-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
+
+  color: var(--epf-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 28px 36px 60px;
+  max-width: 1260px;
+  margin: 0 auto;
+}
+
+/* Breadcrumb */
+.epf2-breadcrumb {
+  font-size: 12px;
+  color: var(--epf-fg-muted);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.epf2-breadcrumb a {
+  color: var(--epf-fg-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.epf2-breadcrumb a:hover { color: var(--epf-brand); }
+.epf2-breadcrumb .sep { color: var(--epf-fg-subtle); }
+.epf2-breadcrumb .current { color: var(--epf-fg); font-weight: 500; }
+
+/* Hero strip */
+.epf2-hero {
+  background: var(--epf-surface);
+  border: 1px solid var(--epf-border);
+  border-radius: 14px;
+  padding: 24px 28px;
+  margin-bottom: 22px;
+  box-shadow: var(--epf-shadow-xs);
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  gap: 22px;
+  align-items: center;
+}
+@media (max-width: 820px) {
+  .epf2-hero { grid-template-columns: 72px 1fr; }
+  .epf2-hero .epf2-match-block { grid-column: 1 / -1; }
+}
+.epf2-avatar-lg {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  box-shadow: 0 6px 16px rgba(234,88,12,0.25);
+}
+@media (max-width: 820px) {
+  .epf2-avatar-lg { width: 72px; height: 72px; font-size: 26px; }
+}
+.epf2-hero-body h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.epf2-title-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--epf-brand);
+  border-radius: 100%;
+  flex-shrink: 0;
+}
+.epf2-hero-body .tagline {
+  font-size: 13px;
+  color: var(--epf-fg-muted);
+  margin-bottom: 12px;
+  max-width: 680px;
+  line-height: 1.5;
+}
+.epf2-hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 12px;
+}
+.epf2-hero-facts .fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.epf2-hero-facts .fact .k {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--epf-fg-muted);
+}
+.epf2-hero-facts .fact .v {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--epf-fg);
+}
+
+.epf2-match-block {
+  background: var(--epf-brand-soft);
+  border: 1px solid var(--epf-brand-dim);
+  border-radius: 10px;
+  padding: 14px 18px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.epf2-match-block .num {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--epf-brand);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.epf2-match-block .lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--epf-brand);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.epf2-match-block .for {
+  font-size: 11px;
+  color: var(--epf-fg-muted);
+  text-align: center;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+/* Annotation band */
+.epf2-annot {
+  background: var(--epf-surface-soft);
+  border-left: 3px solid var(--epf-fg-subtle);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--epf-fg-muted);
+  margin: 0 0 22px;
+  line-height: 1.6;
+}
+.epf2-annot strong { color: var(--epf-fg); font-weight: 600; margin-right: 4px; }
+
+/* Section wrapper */
+.epf2-section {
+  margin-bottom: 24px;
+  background: var(--epf-surface);
+  border: 1px solid var(--epf-border);
+  border-radius: 12px;
+  padding: 22px 26px;
+  box-shadow: var(--epf-shadow-xs);
+}
+.epf2-section h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.epf2-section h2 .tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--epf-surface-muted);
+  color: var(--epf-fg-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.epf2-section p {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--epf-fg);
+  max-width: 860px;
+}
+.epf2-section p:last-child { margin-bottom: 0; }
+
+/* About — philosophy quote inside the bio card */
+.epf2-philosophy {
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--epf-brand-dim);
+  background: var(--epf-surface-soft);
+  border-radius: 0 6px 6px 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--epf-fg);
+  line-height: 1.6;
+  max-width: 860px;
+}
+
+/* Rules-of-engagement rows (replaces mockup's match breakdown) */
+.epf2-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.epf2-row {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--epf-border-soft);
+}
+.epf2-row:last-child { border-bottom: none; padding-bottom: 0; }
+.epf2-row:first-child { padding-top: 0; }
+.epf2-row .idx {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--epf-brand-soft);
+  color: var(--epf-brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--epf-brand-dim);
+  margin-top: 2px;
+}
+.epf2-row .body {
+  font-size: 13px;
+  color: var(--epf-fg);
+  line-height: 1.55;
+}
+
+/* Expertise pills */
+.epf2-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.epf2-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 999px;
+  background: var(--epf-surface-muted);
+  border: 1px solid var(--epf-border);
+  color: var(--epf-fg);
+}
+
+/* Portfolio / engagements grid */
+.epf2-portfolio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .epf2-portfolio { grid-template-columns: 1fr; }
+}
+.epf2-port-card {
+  background: var(--epf-surface-soft);
+  border: 1px solid var(--epf-border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.epf2-port-card .role {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--epf-brand);
+  margin-bottom: 4px;
+}
+.epf2-port-card .name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+.epf2-port-card .year {
+  font-size: 11px;
+  color: var(--epf-fg-muted);
+  margin-bottom: 10px;
+}
+.epf2-port-card .outcome {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--epf-fg);
+}
+
+/* Honest empty state (engagements / references) */
+.epf2-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px dashed var(--epf-border-strong);
+  border-radius: 10px;
+  background: var(--epf-surface-soft);
+  color: var(--epf-fg-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.epf2-empty strong { color: var(--epf-fg); font-weight: 600; }
+
+/* Engagement CTAs */
+.epf2-cta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 6px;
+}
+@media (max-width: 900px) {
+  .epf2-cta-grid { grid-template-columns: 1fr; }
+}
+.epf2-cta-card {
+  background: var(--epf-surface);
+  border: 1px solid var(--epf-border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  text-decoration: none;
+  color: var(--epf-fg);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  display: block;
+}
+.epf2-cta-card:hover {
+  border-color: var(--epf-brand);
+  box-shadow: 0 4px 14px rgba(255,69,0,0.08);
+  transform: translateY(-1px);
+}
+.epf2-cta-card.primary {
+  background: var(--epf-brand);
+  border-color: var(--epf-brand);
+  color: #fff;
+}
+.epf2-cta-card.primary:hover {
+  background: #e63b00;
+  border-color: #e63b00;
+}
+.epf2-cta-card .cta-icon {
+  font-size: 22px;
+  margin-bottom: 10px;
+  display: inline-block;
+}
+.epf2-cta-card .cta-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+.epf2-cta-card .cta-sub {
+  font-size: 11.5px;
+  opacity: 0.85;
+  line-height: 1.45;
+}
+.epf2-cta-card.primary .cta-sub { color: rgba(255,255,255,0.85); }
