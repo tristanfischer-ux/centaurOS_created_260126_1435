@@ -1,0 +1,199 @@
+/*
+ * RunSpecialistButton scoped styles.
+ *
+ * Uses semantic design tokens (CSS variables) exposed by globals.css:
+ *   --background, --foreground, --muted, --muted-foreground,
+ *   --accent, --accent-foreground, --border,
+ *   --destructive, --destructive-foreground,
+ *   --radius
+ *
+ * No hardcoded colours. No globals. CSS module keeps everything local.
+ */
+
+.wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 44px;
+  border-radius: var(--radius, 0.5rem);
+  border: 2px solid transparent;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    transform 150ms ease,
+    box-shadow 200ms ease;
+  box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.05);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--background)),
+    0 0 0 4px hsl(var(--ring, var(--accent)));
+}
+
+.button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px 0 hsl(var(--foreground) / 0.08);
+}
+
+.button:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.05);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Primary — International Orange CTA */
+.primary {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  border-color: hsl(var(--accent));
+}
+
+.primary:not(:disabled):hover {
+  background-color: hsl(var(--accent) / 0.92);
+  border-color: hsl(var(--accent) / 0.92);
+}
+
+/* Secondary — outline */
+.secondary {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+.secondary:not(:disabled):hover {
+  background-color: hsl(var(--accent) / 0.08);
+  border-color: hsl(var(--accent) / 0.35);
+  color: hsl(var(--foreground));
+}
+
+/* Success flash — overrides whatever variant is underneath */
+.button.success {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  border-color: hsl(var(--accent));
+  opacity: 1;
+}
+
+/* Running — lock the hover transform so the spinner stays put */
+.button.running {
+  cursor: progress;
+  transform: none;
+}
+
+.button.running:hover {
+  transform: none;
+  box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.05);
+}
+
+/* Subtle error edge when an error message is showing */
+.button.hasError {
+  border-color: hsl(var(--destructive) / 0.55);
+}
+
+.iconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.spin {
+  animation: run-specialist-spin 900ms linear infinite;
+}
+
+@keyframes run-specialist-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.labels {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  opacity: 0.82;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Error message — inline, short-lived */
+.errorMessage {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius, 0.5rem);
+  background-color: hsl(var(--destructive) / 0.08);
+  border: 1px solid hsl(var(--destructive) / 0.25);
+  color: hsl(var(--destructive));
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+  max-width: 32rem;
+}
+
+.errorIcon {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+  .spin {
+    animation-duration: 2400ms;
+  }
+}
