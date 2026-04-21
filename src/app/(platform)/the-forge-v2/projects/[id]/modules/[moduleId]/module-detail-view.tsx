@@ -440,6 +440,48 @@ export function ModuleDetailView(props: ModuleDetailViewProps): React.ReactEleme
                 fangDisabledReason={fangDisabledReason}
             />
 
+            {/* ── Ask other specialists about this module ────
+              *
+              * Rather than spin up a parallel per-module pipeline for every
+              * specialist (runJianReview, runMaxReview, etc. — each a
+              * multi-day build), we deep-link into Ask-a-Specialist with
+              * the specialist preselected and the topic pre-scoped to this
+              * module. The Ask panel already has the project context (brief,
+              * modules, BOM, risks, cost) pre-loaded, so the specialist can
+              * speak about THIS module specifically without a new orchestrator.
+              *
+              * Covers the "I want Jian's engineering take on this module"
+              * gap without paying pipeline-scale cost.
+              */}
+            <div className="md2-section-block">
+                <h4 className="md2-section-head">Other specialist views</h4>
+                <div className="md2-other-specialists">
+                    {[
+                        { id: "vp-engineering", name: "Jian", title: "VP Engineering", angle: "engineering risk, interfaces, verification path" },
+                        { id: "cto", name: "Max", title: "CTO", angle: "architectural trade-offs, build-vs-buy, first principles" },
+                        { id: "vp-supply-chain", name: "Chase", title: "VP Supply", angle: "long-lead parts, supplier qualification, single-string risk" },
+                    ].map((s) => {
+                        const topic = `${s.name}'s view on ${mod.name} for ${project.name}`
+                        const href =
+                            `/the-forge-v2/projects/${project.id}/ask` +
+                            `?specialist=${s.id}` +
+                            `&topic=${encodeURIComponent(topic)}`
+                        return (
+                            <Link
+                                key={s.id}
+                                href={href}
+                                className="md2-other-specialist-chip"
+                                title={`Ask ${s.name} about ${mod.name} — ${s.angle}`}
+                            >
+                                <strong>Ask {s.name}</strong>
+                                <span className="title"> · {s.title}</span>
+                                <span className="angle"> — {s.angle}</span>
+                            </Link>
+                        )
+                    })}
+                </div>
+            </div>
+
             {/* ── Lead time pill ──────────────────────── */}
             {mod.leadWeeks != null ? (
                 <div className="md2-lead-time-pill">

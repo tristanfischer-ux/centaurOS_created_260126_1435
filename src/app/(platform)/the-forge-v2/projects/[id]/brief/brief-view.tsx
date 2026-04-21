@@ -21,8 +21,10 @@
 
 "use client"
 
+import { useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Sparkles } from "lucide-react"
 
 import {
@@ -121,6 +123,28 @@ export interface BriefViewProps {
 
 export function BriefView(props: BriefViewProps): React.ReactElement {
     const { project, lockState, narrative, constraints, regulatory, cost, mass, revisions, chaseRun, hasResearchReport, runChaseAction } = props
+    const router = useRouter()
+
+    // INTENT: re-fetch the server component while Chase is working so the
+    // founder sees the draft the moment `research.designBrief` lands — no
+    // manual refresh required.
+    //
+    // TRIED: not polling. Problem: run-chase-research.ts writes the
+    // research jsonb then `completePipelineRun()` flips the pipeline_runs
+    // row to 'done', but the brief page is a server component that only
+    // re-renders on route change. Founders were stuck on "Chase is
+    // working…" for minutes after Chase finished (observed 2026-04-21,
+    // project bb371c71).
+    //
+    // DECISION: 8s poll while live, 30s once-post-completion safety net,
+    // stop when status !== running/queued. router.refresh() is cheap — it
+    // only re-runs the server component that owns this route.
+    useEffect(() => {
+        const isLive = chaseRun.status === "running" || chaseRun.status === "queued"
+        if (!isLive) return
+        const tick = setInterval(() => router.refresh(), 8_000)
+        return () => clearInterval(tick)
+    }, [chaseRun.status, router])
 
     const briefHref = `/the-forge-v2/projects/${project.id}/brief`
     const forkHref = `/the-forge-v2/projects/${project.id}/fork`

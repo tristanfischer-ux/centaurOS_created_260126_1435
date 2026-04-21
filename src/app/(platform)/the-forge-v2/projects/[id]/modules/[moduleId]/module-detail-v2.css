@@ -630,3 +630,44 @@
   color: var(--md-danger);
   margin: 4px 0 12px 0;
 }
+
+/* ── Other-specialist deep-link chips (Jian / Max / Chase entries) ── */
+.md2 .md2-other-specialists {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.md2 .md2-other-specialist-chip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--foreground);
+    font-size: 13px;
+    text-decoration: none;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.md2 .md2-other-specialist-chip:hover {
+    border-color: var(--international-orange);
+    background: color-mix(in oklab, var(--international-orange) 4%, var(--card));
+}
+
+.md2 .md2-other-specialist-chip strong {
+    font-weight: 600;
+    color: var(--international-orange);
+}
+
+.md2 .md2-other-specialist-chip .title {
+    color: var(--muted-foreground);
+}
+
+.md2 .md2-other-specialist-chip .angle {
+    color: var(--muted-foreground);
+    font-size: 12px;
+}
