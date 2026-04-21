@@ -6,27 +6,27 @@
  */
 
 .lp2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --lp-fg:             #1c1917;
-  --lp-fg-muted:       #78716c;
-  --lp-fg-faint:       #a8a29e;
-  --lp-fg-subtle:      #d6d3d1;
-  --lp-surface:        #ffffff;
-  --lp-surface-muted:  #f5f5f4;
-  --lp-surface-soft:   #fafaf9;
-  --lp-border:         #e7e5e4;
-  --lp-border-strong:  #d6d3d1;
-  --lp-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --lp-fg:             var(--fg);
+  --lp-fg-muted:       var(--fg-muted);
+  --lp-fg-faint:       var(--fg-subtle);
+  --lp-fg-subtle:      var(--fg-faint);
+  --lp-surface:        var(--surface);
+  --lp-surface-muted:  var(--surface-muted);
+  --lp-surface-soft:   var(--surface-soft);
+  --lp-border:         var(--border);
+  --lp-border-strong:  var(--border-strong);
+  --lp-brand:          var(--brand);
   --lp-brand-soft:     rgba(255,69,0,0.10);
   --lp-success:        #15803d;
-  --lp-success-soft:   #dcfce7;
+  --lp-success-soft:   var(--success-soft);
   --lp-warning:        #b45309;
   --lp-warning-soft:   #fef3c7;
   --lp-warning-border: #fde68a;
   --lp-danger:         #b91c1c;
-  --lp-danger-soft:    #fee2e2;
+  --lp-danger-soft:    var(--danger-soft);
   --lp-info:           #1d4ed8;
-  --lp-info-soft:      #dbeafe;
+  --lp-info-soft:      var(--info-soft);
   --lp-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
   --lp-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
 

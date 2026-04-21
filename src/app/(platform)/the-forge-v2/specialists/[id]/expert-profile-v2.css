@@ -5,22 +5,22 @@
  */
 
 .epf2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --epf-fg:             #1c1917;
-  --epf-fg-muted:       #78716c;
-  --epf-fg-faint:       #a8a29e;
-  --epf-fg-subtle:      #d6d3d1;
-  --epf-surface:        #ffffff;
-  --epf-surface-muted:  #f5f5f4;
-  --epf-surface-soft:   #fafaf9;
-  --epf-border:         #e7e5e4;
+  /* Token layer — resolves to forge-mockup.css. */
+  --epf-fg:             var(--fg);
+  --epf-fg-muted:       var(--fg-muted);
+  --epf-fg-faint:       var(--fg-subtle);
+  --epf-fg-subtle:      var(--fg-faint);
+  --epf-surface:        var(--surface);
+  --epf-surface-muted:  var(--surface-muted);
+  --epf-surface-soft:   var(--surface-soft);
+  --epf-border:         var(--border);
   --epf-border-soft:    #ececeb;
-  --epf-border-strong:  #d6d3d1;
-  --epf-brand:          #ff4500;
+  --epf-border-strong:  var(--border-strong);
+  --epf-brand:          var(--brand);
   --epf-brand-soft:     rgba(255,69,0,0.10);
   --epf-brand-dim:      rgba(255,69,0,0.30);
   --epf-success:        #15803d;
-  --epf-success-soft:   #dcfce7;
+  --epf-success-soft:   var(--success-soft);
   --epf-success-fg:     #166534;
   --epf-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
 

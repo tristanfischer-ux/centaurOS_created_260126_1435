@@ -7,33 +7,33 @@
  */
 
 .rc2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --rc-fg:             #1c1917;
-  --rc-fg-muted:       #78716c;
-  --rc-fg-faint:       #a8a29e;
-  --rc-fg-subtle:      #d6d3d1;
-  --rc-surface:        #ffffff;
-  --rc-surface-muted:  #f5f5f4;
-  --rc-surface-soft:   #fafaf9;
-  --rc-border:         #e7e5e4;
-  --rc-border-strong:  #d6d3d1;
-  --rc-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --rc-fg:             var(--fg);
+  --rc-fg-muted:       var(--fg-muted);
+  --rc-fg-faint:       var(--fg-subtle);
+  --rc-fg-subtle:      var(--fg-faint);
+  --rc-surface:        var(--surface);
+  --rc-surface-muted:  var(--surface-muted);
+  --rc-surface-soft:   var(--surface-soft);
+  --rc-border:         var(--border);
+  --rc-border-strong:  var(--border-strong);
+  --rc-brand:          var(--brand);
   --rc-brand-soft:     rgba(255,69,0,0.10);
   --rc-brand-dim:      rgba(255,69,0,0.35);
   --rc-success:        #15803d;
-  --rc-success-soft:   #dcfce7;
+  --rc-success-soft:   var(--success-soft);
   --rc-success-dim:    #86efac;
   --rc-warning:        #b45309;
   --rc-warning-soft:   #fef3c7;
   --rc-warning-dim:    #fcd34d;
   --rc-danger:         #b91c1c;
-  --rc-danger-soft:    #fee2e2;
+  --rc-danger-soft:    var(--danger-soft);
   --rc-danger-dim:     #fca5a5;
   --rc-info:           #1d4ed8;
-  --rc-info-soft:      #dbeafe;
+  --rc-info-soft:      var(--info-soft);
   --rc-info-dim:       #93c5fd;
-  --rc-purple:         #7c3aed;
-  --rc-purple-soft:    #ede9fe;
+  --rc-purple:         var(--purple);
+  --rc-purple-soft:    var(--purple-soft);
   --rc-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
   --rc-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
 
