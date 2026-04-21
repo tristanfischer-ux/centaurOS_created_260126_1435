@@ -42,6 +42,7 @@
 
 import Link from "next/link"
 import "./suppliers-v2.css"
+import { MatchWithChaseButton } from "./match-with-chase-button"
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -131,9 +132,10 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                 </div>
                 <div className="cta-group">
                     <span className="sp2-btn soon" title="Ships when the RFQ lifecycle lands">Broadcast RFQ</span>
-                    <Link href={`/the-forge/cad-lab?project=${project.id}&action=rfq`} className="sp2-btn primary">
-                        Find more suppliers
-                    </Link>
+                    <MatchWithChaseButton
+                        projectId={project.id}
+                        hasExisting={totalShortlisted > 0}
+                    />
                 </div>
             </div>
 
@@ -147,7 +149,8 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                 <div className="sp2-empty">
                     <strong>No suppliers shortlisted yet</strong>
                     <p>
-                        Run supplier matching from the CAD lab to populate this roster.
+                        Click <em>Match suppliers with Chase</em> above — he&rsquo;ll score every module
+                        against the global directory and populate this roster with the top candidates.
                     </p>
                 </div>
             ) : (
