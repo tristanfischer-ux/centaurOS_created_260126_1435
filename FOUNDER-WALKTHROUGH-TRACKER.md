@@ -83,6 +83,27 @@ _Updated as I go. Format: stage · timestamp · outcome · evidence._
 - [x] 2026-04-21 02:12 · Tracker doc written, brief composed, plan agreed
 - [x] 2026-04-21 02:30 · Logged in on preview `https://centaur-os-created-260126-1435-1s5twf72l.vercel.app` as `claude-test@forgeos.test` (HEAD `a34944e4`)
 
+---
+
+## RESTART — Real founder walk 2026-04-21 03:xx (HEAD `87019a75` then `0ebccfa9` then `3396c2bf`)
+
+The previous attempt (see sections below) substituted admin-SQL writes for UI clicks after hitting Bug #1. Project CLAUDE.md §"Walking a User Flow" now forbids that. This is the compliant walk.
+
+### Pass 2 — New project via UI
+
+- [x] 2026-04-21 02:50 · Logged in via UI (email+password submit → /today) on preview `1xh7dvk6r`.
+- [x] 02:52 · Clicked `<a>New project</a>` from /the-forge-v2 — landed on /the-forge-v2/new wizard step 1.
+- [x] 02:53 · Typed 491-char cubesat brief into `#pc2-subject`. Clicked "Draft Brief rev 0.1 →". **Submit worked — project bb371c71-04c1-4320-9e1b-548a05aca45f created.** (Bug #1 from Pass 1 may have already been fixed by d1fe724b; verified.)
+- [x] 02:54 · Chase auto-fired. pipeline_runs `research.seed` status=running. Duration ended up 123s — completed at 01:52:06 UTC.
+- [x] 03:00 · Refresh of brief page shows Chase output: Mission / Target customers / Why now / Constraints (cost + mass) / 8-item Regulatory posture (CDS 12U / ECSS-E-ST-32C / ECSS-Q-ST-60 / ECSS-E-ST-10 series / ECSS-Q-ST-80 / AS9100D / MIL-HDBK-5J / ECSS-E-ST-10-03). Real Chase content.
+- [x] **Bug 2 found:** brief page shows "Chase is working…" even after research.designBrief is written. Manual refresh reveals content. Logged for follow-up.
+- [x] 03:02 · Navigated to /brief-lock, clicked "Lock Rev A and hand off to Forge" — lock committed at 01:57:52 UTC. Revision `brief_locked_at` populated.
+- [ ] **Bug 3 found:** Max auto-fire from brief-lock sat "running" for 36 min. `void runMaxDecomposition(...)` fire-and-forget was killed by Vercel container teardown. **Fix landed in commit `0ebccfa9`** — switched to `after()` + dynamic import.
+- [x] 03:37 · Watchdog swept stalled run → "Failed: Run exceeded 6-minute threshold." Modules page offered "Decompose with Max" button.
+- [x] 03:38 · Clicked "Decompose with Max" — Max retry via direct server action completed in **134 seconds**. 10 real modules saved (Primary Structure, Avionics Stack, EPS & Battery, Port/Starboard Solar Wings, ADCS, Rendezvous Sensors, Propulsion, Net-Capture Deployer, RF Comms). Total mass 16.00 kg vs 24 kg target. 48 interface contracts inferred.
+- [ ] **Bug 4 found:** BOM auto-fire from Max has the same fire-and-forget bug — `void runBomGenerator(...)` at run-max-decomposition.ts:405 and `void runFinnCost(...)` at run-bom-generator.ts:352. **Fix landed in commit `3396c2bf`** — both wrapped in `after()` + dynamic import.
+- [ ] 03:55 · Awaiting preview deploy of `3396c2bf` — on deploy ready, will create FRESH project and walk from the top to verify both auto-fire chains.
+
 ### Stage 1 — Create project — BUG found
 - [x] Navigate `/the-forge-v2/new` — page renders
 - [x] Type brief into `subject` field via `agent-browser type @e25` — 839 chars accepted, submit button enables
