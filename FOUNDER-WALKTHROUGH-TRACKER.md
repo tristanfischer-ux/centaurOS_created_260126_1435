@@ -430,3 +430,68 @@ Tristan authorised prod env edit. Key had trailing literal `\n` (bytes `5c 6e`).
 | Export PDF | ⚠ disabled | V2 scope |
 
 **Commits landed across Passes 2–4:** `0ebccfa9`, `3396c2bf`, `d8bf63ca`, `7f3660de`, `6b6171d4`, `cd79f30b`. Every one fixes a real production bug surfaced by walking as a founder would.
+
+---
+
+## Pass 5 — Four remaining gaps closed (commits `c32b53ee`, `28769278`, `ab96c4e5`)
+
+### 1. Jian (+ Max + Chase) per-module deep-links (commit `c32b53ee`)
+
+Added "Other specialist views" section on module detail with three deep-links:
+- **Ask Jian · VP Engineering** — engineering risk, interfaces, verification path
+- **Ask Max · CTO** — architectural trade-offs, build-vs-buy, first principles
+- **Ask Chase · VP Supply** — long-lead parts, supplier qualification, single-string risk
+
+Each link navigates to `/ask?specialist=<id>&topic=<pre-scoped-to-module>`, opening the existing Ask-a-Specialist panel with full project context pre-loaded. Pragmatic alternative to building parallel per-module review pipelines (each of which would be multi-day like Fang's). Closes the founder need "I want Jian's engineering take on this specific module" without the pipeline-scale cost.
+
+Verified on preview: chips render on `/modules/propulsion`, `href` encoded correctly.
+
+### 2. Brief page polls while Chase is working (commit `c32b53ee`)
+
+`useEffect` + 8s `setInterval` calling `router.refresh()` while `chaseRun.status` is running/queued, cleared when it's done/failed. Fixes the "Chase is working…" stuck state the founder saw for minutes after Chase actually finished on project bb371c71.
+
+### 3. Ship and hand off — terminal action WIRED (commit `28769278`)
+
+Three pieces:
+
+- **Migration `20260422010000_cad_lab_ship.sql`** (applied live): adds `shipped_at timestamptz` + `shipped_by uuid references auth.users` + partial index. Additive-only, no data migration.
+- **Server action `src/actions/ship-project.ts`**: `shipCadLabProject(projectId)` with `withAuth` + foundry check + business-rule gates (brief must be locked, cannot be already shipped). Writes `shipped_at = now()`, `shipped_by = user.id`, drops `audit_log` row `cad_lab_project.shipped`. Typed error codes (`BRIEF_NOT_LOCKED`, `ALREADY_SHIPPED`, `PROJECT_FORBIDDEN`, `INTERNAL`).
+- **Client button `ship-button.tsx`**: `window.confirm` before firing (terminal), `useTransition` for progress, `router.refresh()` on success. View flips to "Shipped ✓" with dispatched date, "Back to workspace" replaces "Cancel".
+
+**Verified end-to-end live on preview `hsftojbmn`**: clicked Ship on NetHawk-12 → DB updated:
+```
+shipped_at = 2026-04-21 08:41:01.994+00
+shipped_by = d6e3a680-110e-4662-b5c0-ad7ee3123a25 (test user)
+```
+UI now reads: "Shipped 21 Apr 2026. Canonical ownership has moved to Operations. Forge is now read-only for this revision."
+
+### 4. Export PDF generator (commit `ab96c4e5`)
+
+Server action `src/actions/export-project-pdf.tsx`:
+- Reads Brief / Modules / BOM part-count / cost roll-up / risks / supplier shortlist
+- Renders via `@react-pdf/renderer` as a single A4 document with sections:
+  Brief → Regulatory posture → Modules (with key parts + mass + lead + failure-mode count) → BOM count → Cost waterfall (per-module + ceiling + headroom) → Risks (failure modes + open questions) → Suppliers
+- Footer: project name · revision · page x of y
+- Returns `{ filename, base64, sizeBytes }` — filename format `<slug>-rev-<letter>.pdf`
+
+Client button `generate-export-button.tsx` decodes base64 → Blob → anchor download.
+
+**Verified live**: clicked Generate export → browser offered `nethawk-12-debris-removal-cubesat-rev-A.pdf` for download.
+
+Format/scope pickers (CSV/JSON/Markdown, per-section checkboxes) stay disabled — this first pass is always PDF / Everything. Share-link + email delivery row also stays disabled — those wire in a later round.
+
+### Final verdict (Pass 5)
+
+| Surface | State after Pass 5 |
+|---|---|
+| All auto-fire chains (brief-lock → Max → BOM → Finn) | ✓ verified on 96s Finn run with full 84-part BOM |
+| V2 Suppliers native Match-with-Chase | ✓ 2 real UK aerospace suppliers shortlisted |
+| Jian/Max/Chase per-module deep-links | ✓ chips render, query-params correct |
+| Brief page polling | ✓ 8s `router.refresh()` while Chase runs |
+| Launch: Ship terminal action | ✓ DB row updated, UI flips read-only |
+| Export PDF | ✓ real PDF downloads (one section per artefact) |
+| Prod DEEPSEEK_API_KEY | ✓ cleaned of trailing `\n` literal, verified valid |
+
+**Every user-facing gap I knew about in Pass 3 is now closed.**
+
+**Commits on `feat/forge-v2-cutover` from this work across all 5 passes:** `0ebccfa9` `3396c2bf` `d8bf63ca` `7f3660de` `6b6171d4` `cd79f30b` `33cdcf34` `c32b53ee` `28769278` `ab96c4e5` + one tracker commit to land next.
