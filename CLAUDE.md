@@ -84,6 +84,78 @@ After every `git push`, you MUST verify the deployment succeeded:
 
 ---
 
+## Walking a User Flow — No DB Shortcuts, No Impersonation
+
+This rule exists because this failure has already happened once (2026-04-21, Wheelhouse cubesat walkthrough). Agents asked to walk an app end-to-end as a user hit the first broken action, could not make it work in the UI, and silently substituted admin-SQL writes + Claude-impersonating-specialists to "populate" the flow. They called the DB-seeded screenshots "the walkthrough". This is a fundamental reframing of the task and must never happen again.
+
+**When the user says "act as a user", "go through the app", "do what a founder would do", "walk the flow":**
+
+1. **Do exactly what a user would do.** Click buttons. Type into forms. Follow links. Navigate through the UI. Never use URL-typing shortcuts a real user wouldn't use; never use keyboard shortcuts that aren't part of the app's UX; never call the Supabase admin API; never write to the database directly from SQL or MCP.
+2. **If a button fails, the task pauses — the task does not reroute.** A broken button becomes THE task until it works. Fix the code, redeploy, verify the deploy is green, click the button again, confirm the expected effect landed. Then resume the walk.
+3. **Never seed fake specialist output to paper over a broken orchestrator.** If Chase's server action is broken, the user-flow walk pauses until Chase's server action works. Seeding `research.report` via SQL and calling it "Chase's research" is a specific, named forbidden move.
+4. **"The DB has data, so the page renders" is not equivalent to "the flow works".** The pass criterion is: from a fresh project created by clicking `+ New`, can the user reach a populated Brief / Modules / BOM / Cost / Suppliers / Risks / Operations / Export / Launch by clicking only? If no, the flow is not working, regardless of what any individual page renders in isolation.
+5. **Screenshots of DB-seeded pages are not verification.** Screenshots of a user-driven walk are verification. If the screenshot pipeline depends on admin-SQL state that a real founder couldn't produce, the screenshot proves nothing about the product.
+
+**Named exception:** if the user EXPLICITLY says "seed some test data so we can see the UI render" or equivalent, DB writes are fine for that specific pre-seeding. The walkthrough itself still must not use them.
+
+**If the walk ever pauses:** update the tracker with the exact failing action, dispatch a fix, wait for the deploy to complete, then **restart the walk from the top** to confirm the fix didn't regress anything upstream.
+
+---
+
+## Completion Checks — "Did I Actually Do What Was Asked?"
+
+After every user request, before declaring done, run this check explicitly IN THE TRACKER or the response message:
+
+> **Was the user's literal request completed, or did I substitute a simpler thing I could accomplish?**
+>
+> If I read the user's original message back now, would they say "yes, that's what I asked for" — or would they say "that's not what I asked for"?
+>
+> What specifically did I do that differs from the request?
+
+If any answer is "substituted" or "different from", the task is NOT done. Either:
+- Resume it — fix what's missing, then re-check.
+- OR stop and tell the user explicitly: "I did X, which is not what you asked for Y. Here is why, here is what Y actually requires."
+
+Never silently re-scope and declare done.
+
+---
+
+## Sub-Agent Claims Are Hypotheses, Not Facts
+
+When a fix sub-agent reports "fixed" or "verified", that is:
+- A **hypothesis** that the fix works.
+- Based on the sub-agent's **sandbox test**, which may not replicate the main-thread scenario.
+- Worth acting on — but NOT worth declaring "done" on behalf of the user.
+
+Before the MAIN thread declares anything fixed for the USER:
+
+1. Redeploy (if needed) and wait for the preview to show READY at the new SHA.
+2. Re-run the **original failing scenario** from the main thread, in the same way the user would hit it — through the UI, not via the sub-agent's test harness.
+3. Only after the main-thread retest passes, update the tracker with "VERIFIED".
+
+If the retest fails, the "fix" is a fresh hypothesis; dispatch another round. Never write "fixed in SHA X" when the only evidence is a sub-agent's self-report.
+
+---
+
+## The Iteration Loop — "Keep Going Until Perfect"
+
+When the user says "keep going until it works", "until perfect", "all the way through", etc., this is a LOOP task, not a linear task. Never exit on the first attempt.
+
+```
+while !DONE:
+    attempt
+    verify from the main thread, user-side
+    if DONE: break
+    else: diagnose root cause → dispatch or apply fix → redeploy → wait green → restart walk
+    if 3 iterations in a row with same root cause: escalate to user with specifics
+```
+
+**"Redeploy → wait green → restart walk"** is mandatory. Each loop iteration restarts the walk from the top. Never resume mid-walk with a fresh fix — the fix may have regressed upstream steps.
+
+**Never declare DONE after a single attempt and a plausible fix.** The user is entitled to a demonstration that it works NOW, from a clean start, end-to-end, via user actions.
+
+---
+
 ## Mockup-Faithful Build Rule (MANDATORY when a mockup exists)
 
 When a static HTML mockup has been approved for a page, the production code MUST match the mockup visually and structurally. **"Inspired by the mockup" is not acceptable. "Ships next round" is not acceptable. The mockup IS the V1 spec.**
