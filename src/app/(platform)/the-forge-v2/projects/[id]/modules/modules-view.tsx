@@ -27,6 +27,7 @@ import {
     type PipelineRunStatus,
 } from "@/components/pipeline/pipeline-run-chip"
 import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
+import { GenerateSystemIllustrationButton } from "../_components/generate-system-illustration-button"
 
 import "./modules-v2.css"
 
@@ -305,6 +306,16 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                             ) : (
                                 <BlueprintFallback label="Plan view pending" />
                             )}
+                        </div>
+                        <div
+                            className="pane-action"
+                            style={{ padding: "10px 12px", borderTop: "1px solid var(--border, #e5e7eb)" }}
+                        >
+                            <GenerateSystemIllustrationButton
+                                projectId={project.id}
+                                hasModules={cards.length > 0}
+                                hasExisting={Boolean(project.systemIllustrationUrl)}
+                            />
                         </div>
                     </div>
                 </div>
