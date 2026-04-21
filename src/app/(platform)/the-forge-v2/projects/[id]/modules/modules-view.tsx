@@ -30,6 +30,7 @@ import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button
 import { GenerateSystemIllustrationButton } from "../_components/generate-system-illustration-button"
 import { GenerateModuleImagesButton } from "./generate-module-images-button"
 import { ReviewImageCoherenceButton } from "./review-image-coherence-button"
+import type { ImageRenderState } from "@/actions/forge-v2-render-all-modules"
 
 import "./modules-v2.css"
 
@@ -142,6 +143,11 @@ export interface ModulesViewProps {
     runMaxAction: () => Promise<
         { ok: true; runId: string } | { ok: false; error: string; errorCode?: string }
     >
+    /** Current server-side render state, read from
+     *  cad_lab_projects.image_render_state. Null when the chain has
+     *  never run on this project. Drives the progress + resume
+     *  semantics on the Generate Renders button. */
+    imageRenderState: ImageRenderState | null
 }
 
 // ─── View ───────────────────────────────────────────────────────────────
@@ -261,6 +267,7 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                             hasImage: c.hasImage,
                             mirrorOf: c.mirrorOf,
                         }))}
+                        initialRenderState={props.imageRenderState}
                     />
                     {/* Layer D of the image-coherence plan: once the cover
                         and at least one module render exist, offer an

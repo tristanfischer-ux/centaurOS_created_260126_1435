@@ -4676,6 +4676,7 @@ export type Database = {
           accepted_risks: Json | null
           ai_cost_estimates: Json | null
           archived_at: string | null
+          autopilot_state: Json | null
           batch_started_at: string | null
           batch_status: string
           brief_locked_at: string | null
@@ -4694,6 +4695,7 @@ export type Database = {
           generated_code: string | null
           id: string
           illustration_style: string
+          image_render_state: Json | null
           images_generated_at_revision: number
           integrated_assembly_code: string | null
           integrated_assembly_step_url: string | null
@@ -4715,6 +4717,8 @@ export type Database = {
           review_skipped: boolean | null
           reviews: Json | null
           seeded_brief_content: Json | null
+          shipped_at: string | null
+          shipped_by: string | null
           stage: string
           status: string
           subject: string
@@ -4730,6 +4734,7 @@ export type Database = {
           accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
           archived_at?: string | null
+          autopilot_state?: Json | null
           batch_started_at?: string | null
           batch_status?: string
           brief_locked_at?: string | null
@@ -4748,6 +4753,7 @@ export type Database = {
           generated_code?: string | null
           id?: string
           illustration_style?: string
+          image_render_state?: Json | null
           images_generated_at_revision?: number
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
@@ -4769,6 +4775,8 @@ export type Database = {
           review_skipped?: boolean | null
           reviews?: Json | null
           seeded_brief_content?: Json | null
+          shipped_at?: string | null
+          shipped_by?: string | null
           stage?: string
           status?: string
           subject: string
@@ -4784,6 +4792,7 @@ export type Database = {
           accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
           archived_at?: string | null
+          autopilot_state?: Json | null
           batch_started_at?: string | null
           batch_status?: string
           brief_locked_at?: string | null
@@ -4802,6 +4811,7 @@ export type Database = {
           generated_code?: string | null
           id?: string
           illustration_style?: string
+          image_render_state?: Json | null
           images_generated_at_revision?: number
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
@@ -4823,6 +4833,8 @@ export type Database = {
           review_skipped?: boolean | null
           reviews?: Json | null
           seeded_brief_content?: Json | null
+          shipped_at?: string | null
+          shipped_by?: string | null
           stage?: string
           status?: string
           subject?: string

@@ -1,159 +1,131 @@
 "use client"
 
 /**
- * @file generate-module-images-button.tsx — per-module loop trigger.
+ * @file generate-module-images-button.tsx — trigger for the tab-close-safe
+ * per-module render chain.
  *
- * @description Generates Nano Banana blueprints for every module by calling
- * the per-module server action `generateOneModuleImage(projectId, moduleId)`
- * once per module, sequentially, with live progress.
+ * @description Previous implementation ran a sequential client-side for-
+ * loop via generateOneModuleImage. That loop died whenever the browser
+ * navigated away, closed the tab, or hit a network blip — modules past
+ * the in-flight call never dispatched. Observed 2026-04-21: Container
+ * Farm CF-40's Starboard Grow Rack was never rendered because I
+ * navigated agent-browser to /suppliers mid-loop.
  *
- * TRIED: a batch server action that rendered every module in one call
- * (`generateModuleImagesForProject`). Problem: 10 modules × ~30–60s per image
- * pushed the wall-clock past Vercel's 300s `maxDuration`, the function was
- * killed before the persist step, the button silently reset, and zero
- * modules landed. Evidence: project 352f5660 on 2026-04-21 — three attempts,
- * 0 modules persisted, no error surfaced.
+ * New pattern: one server action call (startRenderAllRemainingModuleImages)
+ * seeds state + schedules stage 1 via after(); the server chain then
+ * walks every unrendered module with its own <300s Vercel budget per
+ * stage. Browser closes / navigates / crashes — doesn't matter, server
+ * keeps going. Progress surfaces via router.refresh() polling the
+ * image_render_state jsonb column.
  *
- * The per-module loop gives each call its own <300s budget (~60s typical).
- * On tab-close or network blip we can resume from the first module still
- * missing an imageUrl — no special state needed because the DB already
- * records progress.
+ * Founders re-clicking after coming back to the tab hit ALREADY_RUNNING
+ * if the chain is still in flight (UI shows live progress); if it
+ * finished with failures they can click again to pick up the stragglers.
  *
  * @related
- * - Per-module action: src/actions/forge-v2-generate-one-module-image.ts
- * - Legacy batch:      src/actions/forge-v2-generate-module-images.ts (retained)
- * - Sibling pattern:   src/app/(platform)/the-forge-v2/projects/[id]/suppliers/
- *                      match-with-chase-button.tsx
+ *   - Server chain: src/actions/forge-v2-render-all-modules.ts
+ *   - Migration: applied 2026-04-21 via Supabase MCP
+ *     (adds image_render_state jsonb)
+ *   - Single-module engine: src/actions/forge-v2-generate-one-module-image.ts
  */
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
-import { generateOneModuleImage } from "@/actions/forge-v2-generate-one-module-image"
+import {
+    startRenderAllRemainingModuleImages,
+    type ImageRenderState,
+} from "@/actions/forge-v2-render-all-modules"
 
 interface GenerateModuleImagesButtonProps {
     projectId: string
-    /** Every module on the project. Mirror modules (those with `mirrorOf`)
-     *  are reordered internally so their primary renders first — the
-     *  per-module server action then produces the mirror's image by
-     *  flipping the primary's PNG instead of burning another Gemini call. */
+    /** Every module on the project, passed so the button can render
+     *  labels ("Render remaining N of M"). Not used for loop driving
+     *  anymore — the server owns that. */
     modules: Array<{
         id: string
         name: string
         hasImage: boolean
         mirrorOf: string | null
     }>
+    /** Current server-side render state. Null if the chain has never
+     *  run on this project. Loaded in the page and passed through so
+     *  the initial render doesn't need to wait for a fetch. */
+    initialRenderState: ImageRenderState | null
 }
 
-interface ProgressState {
-    kind: "running"
-    total: number
-    completed: number
-    failed: number
-    currentName: string
-}
-
-type Status =
-    | { kind: "idle" }
-    | ProgressState
-    | { kind: "done"; successCount: number; failedCount: number }
-    | { kind: "error"; message: string }
+const POLL_INTERVAL_MS = 10_000
 
 export function GenerateModuleImagesButton({
     projectId,
     modules,
+    initialRenderState,
 }: GenerateModuleImagesButtonProps): React.ReactElement {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
-    const [status, setStatus] = useState<Status>({ kind: "idle" })
+    const [clickError, setClickError] = useState<string | null>(null)
 
     const moduleCount = modules.length
     const renderedCount = modules.filter((m) => m.hasImage).length
-    const allRendered = moduleCount > 0 && renderedCount === moduleCount
+
+    const state = initialRenderState
+    const isRunning =
+        state !== null && state.finished_at === null
+    const isFinished =
+        state !== null && state.finished_at !== null
+
+    // ── Polling ─────────────────────────────────────────────────────────
+    // router.refresh() re-reads image_render_state from the server
+    // component tree. Stops as soon as the chain finishes. No cleanup
+    // needed on isRunning = false — setInterval is already cleared by
+    // the previous effect run.
+    useEffect(() => {
+        if (!isRunning) return
+        const t = setInterval(() => {
+            router.refresh()
+        }, POLL_INTERVAL_MS)
+        return () => clearInterval(t)
+    }, [isRunning, router])
 
     const handleClick = (): void => {
         if (moduleCount === 0) return
-        // Resume semantics: only render modules that don't have an image
-        // yet. Founders re-clicking after a tab close shouldn't re-pay for
-        // images that already landed.
-        const raw = modules.filter((m) => !m.hasImage)
-        const base = raw.length === 0 ? [...modules] : raw
-
-        // Reorder so primaries render BEFORE their mirrors. The per-module
-        // server action short-circuits a mirror render by flipping the
-        // primary's PNG (~100ms) instead of burning a fresh Gemini call
-        // (~30-60s), but only when the primary already has an imageUrl.
-        // The most common ordering bug ("Starboard Solar Wing rendered
-        // first, Port Solar Wing rendered second, both take full time
-        // and diverge visibly") is fixed here once.
-        const primaries = base.filter((m) => !m.mirrorOf)
-        const mirrors = base.filter((m) => m.mirrorOf)
-        const queue = [...primaries, ...mirrors]
-
-        setStatus({
-            kind: "running",
-            total: queue.length,
-            completed: 0,
-            failed: 0,
-            currentName: queue[0]?.name ?? "",
-        })
-
+        setClickError(null)
         startTransition(() => {
             void (async () => {
-                let completed = 0
-                let failed = 0
-                for (const m of queue) {
-                    setStatus({
-                        kind: "running",
-                        total: queue.length,
-                        completed,
-                        failed,
-                        currentName: m.name,
-                    })
-                    try {
-                        const res = await generateOneModuleImage(projectId, m.id)
-                        if (res.ok) {
-                            completed += 1
-                            // Progressive refresh — founder sees each module
-                            // flip from placeholder to real render as it
-                            // lands, not a single snap at the end.
-                            router.refresh()
-                        } else {
-                            failed += 1
-                            console.warn(
-                                `[generate-module-images] ${m.id} failed:`,
-                                res.error,
-                                res.errorCode,
-                            )
-                        }
-                    } catch (err) {
-                        failed += 1
-                        console.error(
-                            `[generate-module-images] ${m.id} threw:`,
-                            err instanceof Error ? err.message : err,
-                        )
+                const res = await startRenderAllRemainingModuleImages(projectId)
+                if (!res.ok) {
+                    // ALREADY_RUNNING is a valid no-op — the server is
+                    // already doing what we wanted. Don't show as error.
+                    if (res.errorCode === "ALREADY_RUNNING") {
+                        router.refresh()
+                        return
                     }
+                    setClickError(res.error)
+                    return
                 }
-                setStatus({
-                    kind: "done",
-                    successCount: completed,
-                    failedCount: failed,
-                })
                 router.refresh()
             })()
         })
     }
 
-    const running = isPending || status.kind === "running"
-    const disabled = running || moduleCount === 0
+    const disabled = isRunning || isPending || moduleCount === 0
+    const showingLive = isRunning || isPending
 
-    const runningLabel =
-        status.kind === "running"
-            ? `Rendering ${status.completed + 1} of ${status.total}${
-                  status.currentName ? " · " + status.currentName : ""
-              }…`
-            : "Generating…"
+    // ── Labels ──────────────────────────────────────────────────────────
+    const currentModule = state?.current_id
+        ? modules.find((m) => m.id === state.current_id)
+        : null
+    const progress = state
+        ? state.completed_ids.length + state.failed_ids.length
+        : 0
 
+    const runningLabel = state
+        ? `Rendering ${progress + 1} of ${state.total}${
+              currentModule ? " · " + currentModule.name : ""
+          }…`
+        : "Starting…"
+
+    const allRendered = moduleCount > 0 && renderedCount === moduleCount
     const idleLabel = allRendered
         ? "Re-render all modules"
         : renderedCount > 0
@@ -163,7 +135,7 @@ export function GenerateModuleImagesButton({
     const disabledTitle =
         moduleCount === 0
             ? "Run Max's decomposition first — module renders generate once modules exist."
-            : "Each module gets its own Nano Banana blueprint (~30–60s per module)."
+            : "Each module gets its own Nano Banana blueprint (~30–60s). The render chain lives server-side — you can close the tab."
 
     return (
         <div
@@ -175,41 +147,45 @@ export function GenerateModuleImagesButton({
                 className="m2-btn"
                 onClick={handleClick}
                 disabled={disabled}
-                aria-busy={running}
+                aria-busy={showingLive}
                 title={disabledTitle}
             >
-                {running ? runningLabel : idleLabel}
+                {showingLive ? runningLabel : idleLabel}
             </button>
-            {status.kind === "running" && (
+            {isRunning && state && (
                 <span
                     className="m2-gen-images-progress"
                     style={{ fontSize: 13, color: "var(--muted-foreground, #6b7280)" }}
+                    title="The render chain lives on the server — you can close this tab and come back, progress keeps going."
                 >
-                    {status.completed} done
-                    {status.failed > 0 ? ` · ${status.failed} failed` : ""}
+                    {state.completed_ids.length} done
+                    {state.failed_ids.length > 0
+                        ? ` · ${state.failed_ids.length} failed`
+                        : ""}
+                    {" · server-side (safe to close tab)"}
                 </span>
             )}
-            {status.kind === "done" && (
+            {isFinished && state && !isRunning && (
                 <span
                     className="m2-gen-images-result"
                     style={{ fontSize: 13, color: "var(--muted-foreground, #6b7280)" }}
                 >
-                    {status.successCount > 0
-                        ? `Generated ${status.successCount} render${status.successCount === 1 ? "" : "s"}` +
-                          (status.failedCount > 0
-                              ? ` · ${status.failedCount} failed (retry the button)`
+                    {state.completed_ids.length > 0
+                        ? `Generated ${state.completed_ids.length} render${state.completed_ids.length === 1 ? "" : "s"}` +
+                          (state.failed_ids.length > 0
+                              ? ` · ${state.failed_ids.length} failed (click to retry)`
                               : "")
-                        : status.failedCount > 0
-                            ? `${status.failedCount} render${status.failedCount === 1 ? "" : "s"} failed — please retry.`
+                        : state.failed_ids.length > 0
+                            ? `${state.failed_ids.length} render${state.failed_ids.length === 1 ? "" : "s"} failed — please retry.`
                             : "No renders generated."}
                 </span>
             )}
-            {status.kind === "error" && (
+            {clickError && (
                 <span
                     className="m2-gen-images-result"
                     style={{ fontSize: 13, color: "#dc2626" }}
                 >
-                    {status.message}
+                    {clickError}
                 </span>
             )}
         </div>

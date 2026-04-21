@@ -22,6 +22,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import { loadImageRenderState } from "@/actions/forge-v2-render-all-modules"
 import { loadMaxRunStatus, runMaxDecomposition } from "@/actions/specialists/run-max-decomposition"
 import { loadFangRunStatusesForProject } from "@/actions/specialists/run-fang-review"
 import type { CadLabModule } from "@/lib/cad-lab-types"
@@ -56,10 +57,11 @@ export default async function ForgeV2ModulesPage({
     // single DB round-trip for every module's latest Fang run (see
     // loadFangRunStatusesForProject header — N queries is the first thing
     // to blow Vercel's 300s budget once projects exceed 20 modules).
-    const [result, maxRunStatus, fangStatuses] = await Promise.all([
+    const [result, maxRunStatus, fangStatuses, imageRenderState] = await Promise.all([
         loadCadLabProject(id),
         loadMaxRunStatus(id),
         loadFangRunStatusesForProject(id),
+        loadImageRenderState(id),
     ])
     if ("error" in result || !result.project) {
         notFound()
@@ -212,6 +214,7 @@ export default async function ForgeV2ModulesPage({
             moduleCount: maxRunStatus.moduleCount ?? null,
         },
         runMaxAction,
+        imageRenderState,
     }
 
     return <ModulesView {...viewProps} />
