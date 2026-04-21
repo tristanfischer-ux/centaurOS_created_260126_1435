@@ -176,7 +176,18 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
         !project.conceptRenderUrl
 
     if (isEmpty) {
-        return <EmptyWorkspaceView project={project} base={base} chaseRun={chaseRun} />
+        // Autopilot is primarily a fresh-project affordance — once the
+        // founder has locked the brief but not yet run Max, they need a
+        // one-click way to trigger the rest. Pass it through so the
+        // empty-state view can surface the CTA alongside the Brief nudge.
+        return (
+            <EmptyWorkspaceView
+                project={project}
+                base={base}
+                chaseRun={chaseRun}
+                autopilotState={autopilot ?? null}
+            />
+        )
     }
 
     const subjectText = project.subject?.trim() || null
@@ -890,10 +901,12 @@ function EmptyWorkspaceView({
     project,
     base,
     chaseRun,
+    autopilotState,
 }: {
     project: EmptyProjectHeader
     base: string
     chaseRun: WorkspaceViewProps["chaseRun"]
+    autopilotState: AutopilotState | null
 }): React.ReactElement {
     const createdRelative = formatRelative(project.createdAt)
     const briefFieldsDone = 0
@@ -971,7 +984,15 @@ function EmptyWorkspaceView({
                         Finish the 6 Key Requirements to unlock Modules, BOM, Suppliers, Risks, Cost, Specialists, Geometry, and Launch. <strong>{briefFieldsDone} of {briefFieldsTotal}</strong> done — <strong>{remaining} remaining</strong>: intended use, target cost, performance envelope, regulatory surface, materials constraint, launch window.
                     </p>
                 </div>
-                <Link href={`${base}/brief`} className="cta">Continue drafting →</Link>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <Link href={`${base}/brief`} className="cta">Continue drafting →</Link>
+                    {/* Autopilot CTA alongside the Brief nudge. Once the
+                        brief has been locked, autopilot can chain Max →
+                        BOM → Finn → illustration → suppliers → Fang. On
+                        unlocked briefs the action surfaces the lock
+                        requirement, not an error. */}
+                    <AutopilotButton projectId={project.id} autopilotState={autopilotState} />
+                </div>
             </div>
 
             {/* ── 9-artefact grid ──────────────────────────── */}
