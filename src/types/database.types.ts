@@ -4685,6 +4685,7 @@ export type Database = {
           created_at: string
           created_by: string
           decomposition_connections: Json | null
+          design_change_log: Json
           design_revision: number
           diagnostic_answers: Json | null
           diagnostic_enrichment: Json | null
@@ -4738,6 +4739,7 @@ export type Database = {
           created_at?: string
           created_by: string
           decomposition_connections?: Json | null
+          design_change_log?: Json
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
@@ -4791,6 +4793,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           decomposition_connections?: Json | null
+          design_change_log?: Json
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null

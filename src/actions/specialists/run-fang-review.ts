@@ -307,6 +307,39 @@ export async function runFangReview(
                 }
             }
 
+            // 8. Cascade high-severity recommendations into module fields.
+            //
+            // INTENT: a review that says "wall thickness is 1.2mm, will warp at
+            // injection moulding" is useless if the module still claims 1.2mm
+            // in the BOM half an hour later. V1 had this cascade; V2 review-
+            // only regressed it (see FANG-CASCADE-AUDIT.md in repo root).
+            //
+            // Gate: verdict ∈ {warn, fail} AND at least one critical issue.
+            // Only numeric mass is auto-applied (module has no material/process
+            // field yet). Every other critical issue lands in design_change_log
+            // as kind='pending' so the founder sees there's something to action.
+            const cascade = await applyFangRecommendationsToModule(
+                projectId,
+                moduleId,
+                foundryId,
+                user.id,
+                reviewResult.review,
+            )
+            let cascadeApplied = 0
+            let cascadePending = 0
+            if (cascade.ok) {
+                cascadeApplied = cascade.appliedCount
+                cascadePending = cascade.pendingCount
+            } else {
+                // Non-fatal: the review is saved, the chip can go green. Just
+                // log — the cascade is a best-effort enhancement, not the core
+                // contract of the pipeline run.
+                console.warn(
+                    "[run-fang-review] cascade failed (non-fatal):",
+                    cascade.error,
+                )
+            }
+
             await completePipelineRun(runId, {
                 output_ref: {
                     table: "cad_lab_projects",
@@ -315,6 +348,8 @@ export async function runFangReview(
                     verdict: reviewResult.review.verdict,
                     issueCount: reviewResult.review.issues.length,
                     reviewTimeMs: reviewResult.review.reviewTimeMs,
+                    cascadeApplied,
+                    cascadePending,
                 },
             })
 
@@ -621,6 +656,273 @@ async function loadFangReviewForModule(
     if (!reviews) return null
     const forModule = reviews[moduleId] ?? []
     return forModule.find((r) => r.specialistId === SPECIALIST_ID) ?? null
+}
+
+// ─── Fang → module cascade ─────────────────────────────────────────────
+
+type CascadeResult =
+    | { ok: true; appliedCount: number; pendingCount: number }
+    | { ok: false; error: string }
+
+/**
+ * A single log entry appended to `cad_lab_projects.design_change_log`.
+ *
+ * Applied entries represent fields the cascade actually mutated on the
+ * module; pending entries represent critical recommendations the cascade
+ * can't auto-apply (no matching module field exists) and must be actioned
+ * by the founder from the UI. Both are append-only — the log is the
+ * history of every specialist-driven suggestion, not just the ones that
+ * landed.
+ */
+interface DesignChangeLogEntry {
+    at: string
+    moduleId: string
+    specialistId: string
+    specialistName: string
+    source: "review:fang"
+    kind: "applied" | "pending"
+    field: "budgetMassKg" | null
+    oldValue: unknown
+    newValue: unknown
+    reason: string
+    severity: "critical" | "warning" | "info"
+    category: string
+    suggestion: string | null
+}
+
+/**
+ * Extract a kg mass value from a free-text suggestion or message. Handles
+ * "1.2 kg", "1200 g", "850g", "2.4kg" — i.e. the shapes Fang naturally
+ * writes into issue.suggestion. Returns null when no unambiguous value
+ * can be extracted (conservative by design — a wrong mass is worse than
+ * no mass).
+ */
+function extractMassKg(...sources: Array<string | undefined>): number | null {
+    for (const src of sources) {
+        if (!src) continue
+        // kg pattern first (preferred unit)
+        const kgMatch = src.match(/(\d+(?:\.\d+)?)\s*kg\b/i)
+        if (kgMatch) {
+            const v = Number.parseFloat(kgMatch[1])
+            if (Number.isFinite(v) && v > 0 && v < 10000) return v
+        }
+        // gram pattern — convert to kg
+        const gMatch = src.match(/(\d+(?:\.\d+)?)\s*g(?:rams?)?\b/i)
+        if (gMatch) {
+            const v = Number.parseFloat(gMatch[1])
+            if (Number.isFinite(v) && v > 0 && v < 10_000_000) return v / 1000
+        }
+    }
+    return null
+}
+
+/**
+ * Decide whether a review issue is a "mass" issue. Fang's category field
+ * is free-form in the JSON schema — we match on substrings so "Mass",
+ * "Mass Budget", "Part Mass" all hit. Defensive against casing drift.
+ */
+function isMassCategory(category: string): boolean {
+    return /mass|weight/i.test(category)
+}
+
+/**
+ * Apply Fang's high-severity recommendations to the target module, with
+ * every change mirrored into `design_change_log` and `audit_log`.
+ *
+ * GATE: cascade runs only when verdict ∈ {warn, fail} AND at least one
+ * issue has severity='critical'. A `pass` verdict with zero critical
+ * issues never mutates the module — Fang passing the module is the
+ * green-light case.
+ *
+ * Currently auto-applies:
+ *   - `budgetMassKg` — when a mass-category critical issue includes an
+ *     extractable numeric value (kg or g). Only updates when the value
+ *     actually differs from the current budget.
+ *
+ * Logs as kind='pending' (no mutation):
+ *   - Every other critical issue (material, process, wall thickness,
+ *     tolerance). The module has no per-module material / process field
+ *     to write to — those live on the brief, and cross-brief mutation
+ *     from a module review is out of scope for V2 (risk: one module's
+ *     review flips the material for every other module too).
+ *
+ * Returns a counting result so the caller can surface cascade stats on
+ * the pipeline_runs output_ref. Never throws — failures are logged and
+ * swallowed because the review itself has already been persisted.
+ */
+async function applyFangRecommendationsToModule(
+    projectId: string,
+    moduleId: string,
+    foundryId: string,
+    userId: string,
+    review: SpecialistReview,
+): Promise<CascadeResult> {
+    // Gate 1: verdict must indicate something is wrong.
+    if (review.verdict !== "warn" && review.verdict !== "fail") {
+        return { ok: true, appliedCount: 0, pendingCount: 0 }
+    }
+    // Gate 2: at least one critical issue.
+    const criticalIssues = review.issues.filter((i) => i.severity === "critical")
+    if (criticalIssues.length === 0) {
+        return { ok: true, appliedCount: 0, pendingCount: 0 }
+    }
+
+    const admin = createAdminClient()
+
+    // Read current module + current design_change_log in one shot.
+    const { data: row, error: readErr } = await admin
+        .from("cad_lab_projects")
+        .select("modules, design_change_log")
+        .eq("id", projectId)
+        .eq("foundry_id", foundryId)
+        .maybeSingle()
+    if (readErr || !row) {
+        return { ok: false, error: readErr?.message ?? "project read failed" }
+    }
+
+    const modules = (row.modules as CadLabModule[] | null) ?? []
+    const targetIdx = modules.findIndex((m) => m.id === moduleId)
+    if (targetIdx === -1) {
+        return { ok: false, error: "module not found during cascade" }
+    }
+    const existingModule = modules[targetIdx]
+    const log = Array.isArray(row.design_change_log)
+        ? (row.design_change_log as unknown[] as DesignChangeLogEntry[])
+        : []
+
+    const now = new Date().toISOString()
+    const newEntries: DesignChangeLogEntry[] = []
+    const auditWrites: Array<{
+        field: "budgetMassKg"
+        oldValue: unknown
+        newValue: unknown
+        reason: string
+    }> = []
+
+    // Take a deep-enough copy so we can mutate budgetMassKg without
+    // aliasing the incoming array (which came from a .select call).
+    let mutatedModule = existingModule
+    let appliedCount = 0
+    let pendingCount = 0
+
+    for (const issue of criticalIssues) {
+        const baseEntry = {
+            at: now,
+            moduleId,
+            specialistId: review.specialistId,
+            specialistName: review.specialistName,
+            source: "review:fang" as const,
+            reason: issue.message,
+            severity: issue.severity,
+            category: issue.category,
+            suggestion: issue.suggestion ?? null,
+        }
+
+        // Auto-apply: numeric mass when category matches AND we can
+        // extract a value from the suggestion or message.
+        if (isMassCategory(issue.category)) {
+            const extracted = extractMassKg(issue.suggestion, issue.message)
+            if (extracted !== null && extracted !== mutatedModule.budgetMassKg) {
+                const oldValue = mutatedModule.budgetMassKg ?? null
+                mutatedModule = { ...mutatedModule, budgetMassKg: extracted }
+                newEntries.push({
+                    ...baseEntry,
+                    kind: "applied",
+                    field: "budgetMassKg",
+                    oldValue,
+                    newValue: extracted,
+                })
+                auditWrites.push({
+                    field: "budgetMassKg",
+                    oldValue,
+                    newValue: extracted,
+                    reason: issue.message,
+                })
+                appliedCount += 1
+                continue
+            }
+        }
+
+        // Fall-through: record as pending for human review. The review is
+        // already saved under reviews[moduleId] — design_change_log gives
+        // the UI a focused, actionable queue without having to parse every
+        // past review.
+        newEntries.push({
+            ...baseEntry,
+            kind: "pending",
+            field: null,
+            oldValue: null,
+            newValue: null,
+        })
+        pendingCount += 1
+    }
+
+    if (newEntries.length === 0) {
+        return { ok: true, appliedCount: 0, pendingCount: 0 }
+    }
+
+    // Write the mutated modules array + the appended log in a single update.
+    const nextModules =
+        appliedCount > 0
+            ? modules.map((m, i) => (i === targetIdx ? mutatedModule : m))
+            : modules
+    const nextLog = [...log, ...newEntries]
+
+    type CadLabProjectsRow = Database["public"]["Tables"]["cad_lab_projects"]["Row"]
+    const updatePayload: Partial<CadLabProjectsRow> = {
+        design_change_log: nextLog as unknown as CadLabProjectsRow["design_change_log"],
+    }
+    if (appliedCount > 0) {
+        updatePayload.modules = nextModules as unknown as CadLabProjectsRow["modules"]
+    }
+
+    const { error: writeErr } = await admin
+        .from("cad_lab_projects")
+        .update(updatePayload)
+        .eq("id", projectId)
+        .eq("foundry_id", foundryId)
+
+    if (writeErr) {
+        return { ok: false, error: writeErr.message }
+    }
+
+    // Best-effort audit log — one row per applied mutation. A failed insert
+    // doesn't unwind the module update; design_change_log already contains
+    // the same information and the audit_log is the tenant-wide history.
+    for (const w of auditWrites) {
+        await admin
+            .from("audit_log")
+            .insert({
+                foundry_id: foundryId,
+                user_id: userId,
+                actor_specialist: SPECIALIST_ID,
+                actor_user_id: userId,
+                section: "module:cascade",
+                action: "fang-applied",
+                event: "module field updated by Fang review cascade",
+                entity_type: "cad_lab_module",
+                entity_id: `${projectId}:${moduleId}`,
+                metadata: {
+                    field: w.field,
+                    oldValue: w.oldValue,
+                    newValue: w.newValue,
+                    reason: w.reason,
+                    projectId,
+                    moduleId,
+                    specialistId: SPECIALIST_ID,
+                } as Database["public"]["Tables"]["audit_log"]["Insert"]["metadata"],
+            })
+            .then(({ error }) => {
+                if (error) {
+                    console.warn(
+                        "[run-fang-review] audit_log insert failed (non-fatal):",
+                        error.message,
+                    )
+                }
+            })
+    }
+
+    return { ok: true, appliedCount, pendingCount }
 }
 
 type PipelineRunRow = Database["public"]["Tables"]["pipeline_runs"]["Row"]
