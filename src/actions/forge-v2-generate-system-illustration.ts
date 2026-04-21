@@ -31,6 +31,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
 import { generateCadLabSystemIllustrationAction } from "@/actions/cad-lab-images"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import { DEFAULT_ILLUSTRATION_STYLE, isIllustrationStyle } from "@/lib/cad-lab/illustration-styles"
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ export async function generateSystemIllustrationForProject(
         const admin = createAdminClient()
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, modules")
+            .select("id, foundry_id, subject, modules, illustration_style")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -105,20 +106,31 @@ export async function generateSystemIllustrationForProject(
         const moduleNames = modules.map((m) => m.name ?? "")
         const modulePurposes = modules.map((m) => m.purpose ?? "")
 
+        // Honour the project's illustration_style so the hero renders in the
+        // same visual language as the per-module blueprints (the per-module
+        // path in forge-v2-generate-one-module-image.ts reads this same
+        // column). Without this, the hero defaulted to iso-illustrative
+        // while modules defaulted to thin-line blueprint and the two
+        // looked like two different projects in the PDF.
+        const illustrationStyle = isIllustrationStyle(project.illustration_style)
+            ? project.illustration_style
+            : DEFAULT_ILLUSTRATION_STYLE
+
         try {
             const res = await generateCadLabSystemIllustrationAction(
                 projectId,
                 subject,
                 moduleNames,
                 modulePurposes,
-                // All remaining args (visualStyle, researchExcerpt, heroPrompt,
-                // referenceImageUrls, illustrationStyle) are left as defaults
-                // — the V2 surface doesn't expose them yet and the inner
-                // action has sensible defaults for each.
+                // visualStyle, researchExcerpt, heroPrompt, referenceImageUrls:
+                // V2 doesn't expose these yet; inner action has sensible
+                // defaults. illustrationStyle IS passed through so the hero
+                // + module paths share a style contract.
                 undefined,
                 undefined,
                 undefined,
                 undefined,
+                illustrationStyle,
             )
             if ("error" in res) {
                 return {

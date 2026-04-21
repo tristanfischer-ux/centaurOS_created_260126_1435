@@ -1075,17 +1075,25 @@ export async function generateModuleImage(
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
   moduleCropBase64?: string,
+  stylePreamble?: string,
 ): Promise<{ url: string; modelUsed: string }> {
   // DECISION: Prefer AI-crafted prompt from reconciliation when available — these are
   // crafted together across all modules for visual consistency. Fall through to
   // existing programmatic prompts (reference-aware or text-only) when unset.
   // DECISION: Same white-background + full-colour prepend as the hero path.
   // Without this, Opus-crafted module prompts produce dark/monochrome renders.
-  const prompt = module.moduleImagePrompt
+  //
+  // stylePreamble (optional): project-level illustration style contract
+  // prepended at the very top so image models anchor style on it. Provided
+  // by the V2 orchestrator (reads cad_lab_projects.illustration_style).
+  // Without it, hero + per-module paths drift apart because only the V1
+  // reconciliation path committed both to the same style.
+  const rawPrompt = module.moduleImagePrompt
     ? MANDATORY_RENDERING_PREAMBLE + enforceNoText(module.moduleImagePrompt) + COHESIVE_STYLE_SUFFIX
     : referenceBase64
       ? buildReferenceAwareModulePrompt(module, visualStyle, !!moduleCropBase64)
       : buildModulePrompt(module, brief, visualStyle)
+  const prompt = stylePreamble ? stylePreamble + rawPrompt : rawPrompt
 
   let imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
@@ -1207,6 +1215,7 @@ export async function generateResearchIllustration(
   researchExcerpt?: string,
   customPrompt?: string,
   referenceImageUrls?: string[],
+  stylePreamble?: string,
 ): Promise<string> {
   let prompt: string
 
@@ -1254,6 +1263,15 @@ export async function generateResearchIllustration(
 Create a clean, professional technical illustration of a ${subject}.${moduleContext}${formDescription}${structuralContext}${styleDirective}
 
 Style: Modern technical product render on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration. Remember: absolutely no text, labels, annotations, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
+  }
+
+  // Prepend the project-level style preamble so the hero is framed the same
+  // way the per-module blueprints are framed (both paths receive the same
+  // preamble from the V2 orchestrator). Without this, the programmatic hero
+  // prompt above defaults to iso-illustrative while modules render thin-line
+  // blueprint — two different projects in the PDF.
+  if (stylePreamble) {
+    prompt = stylePreamble + prompt
   }
 
   // INTENT: When user reference images are available, fetch them as base64 and

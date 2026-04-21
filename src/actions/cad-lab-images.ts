@@ -30,7 +30,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { ensureCadLabProjectOwnership, isSafeStorageUrl } from "@/lib/cad-lab/project-ownership"
 import { scoreRenderVision } from "@/lib/cad-lab/vision-scorer"
-import { DEFAULT_ILLUSTRATION_STYLE, getRubricOverridesForStyle, getStyleDirectivesForReconciliation, type IllustrationStyle } from "@/lib/cad-lab/illustration-styles"
+import { DEFAULT_ILLUSTRATION_STYLE, getRubricOverridesForStyle, getStyleDirectivesForReconciliation, getStylePreambleForModulePrompt, type IllustrationStyle } from "@/lib/cad-lab/illustration-styles"
 
 /** Lean return type for single-image generation — avoids React Flight serialization limits */
 interface ImageGenResult {
@@ -174,6 +174,9 @@ interface GenerateImagesResult {
  * @param visualStyleOrUrl - VisualStyleSpec object OR Supabase Storage URL to fetch it from
  * @param referenceBase64OrUrl - Base64 PNG string OR Supabase Storage URL to fetch it from
  * @param moduleCropBase64 - Optional base64 PNG of this module's cropped region (unique per module)
+ * @param illustrationStyle - Project-level illustration style. When provided, a
+ *   style preamble is prepended to the final prompt so every module + the hero
+ *   share the same visual language. Defaults to DEFAULT_ILLUSTRATION_STYLE.
  * @returns Updated module with imageUrl/imageStatus set
  */
 export async function generateCadLabSingleImageAction(
@@ -182,6 +185,7 @@ export async function generateCadLabSingleImageAction(
   visualStyleOrUrl?: VisualStyleSpec | string,
   referenceBase64OrUrl?: string,
   moduleCropBase64?: string,
+  illustrationStyle?: IllustrationStyle,
 ): Promise<ImageGenResult | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     // SECURITY: Block cross-foundry projectId — generateModuleImage writes to
@@ -229,7 +233,27 @@ export async function generateCadLabSingleImageAction(
       }
 
       const adapted = cadLabModuleToModuleSpec(module)
-      const { url, modelUsed } = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64, moduleCropBase64)
+      // Inject the project-level style preamble so the hero and every module
+      // render commit to the same visual language. When the module already
+      // has a reconciliation-crafted moduleImagePrompt the preamble is still
+      // valuable: Opus-crafted prompts sometimes drift (e.g. mentioning
+      // "photorealistic lighting" on a blueprint project). The preamble at
+      // the top is where image models anchor style decisions.
+      const stylePreamble = illustrationStyle
+        ? getStylePreambleForModulePrompt(illustrationStyle)
+        : undefined
+      if (stylePreamble && adapted.moduleImagePrompt) {
+        adapted.moduleImagePrompt = stylePreamble + adapted.moduleImagePrompt
+      }
+      const { url, modelUsed } = await generateModuleImage(
+        projectId,
+        adapted,
+        undefined,
+        visualStyle,
+        referenceBase64,
+        moduleCropBase64,
+        stylePreamble,
+      )
 
       return {
         imageUrl: url,
@@ -381,6 +405,13 @@ export async function generateCadLabSystemIllustrationAction(
     let bestScoredIssues: string[] = []
     let fallbackUrl: string | null = null // first successful gen, kept if no attempt is ever scored
 
+    // Same preamble the per-module path prepends to each module prompt, so
+    // the hero's programmatic prompt is framed in the same visual language.
+    // Applied even when a heroPrompt (Opus-crafted) is passed — Opus
+    // sometimes drifts off-style and the preamble at the TOP is where image
+    // models anchor style decisions.
+    const heroStylePreamble = getStylePreambleForModulePrompt(illustrationStyle)
+
     try {
       for (let attempt = 1; attempt <= HERO_MAX_ATTEMPTS; attempt++) {
         const url = await generateResearchIllustration(
@@ -392,6 +423,7 @@ export async function generateCadLabSystemIllustrationAction(
           researchExcerpt,
           heroPrompt,
           referenceImageUrls,
+          heroStylePreamble,
         )
         if (!fallbackUrl) fallbackUrl = url
         // Fetch the rendered hero bytes and base64-encode for the scorer.

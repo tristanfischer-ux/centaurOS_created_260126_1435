@@ -31,6 +31,7 @@ import { withAuth } from "@/lib/server-action-utils"
 import { generateCadLabSingleImageAction } from "@/actions/cad-lab-images"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
+import { DEFAULT_ILLUSTRATION_STYLE, isIllustrationStyle } from "@/lib/cad-lab/illustration-styles"
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ export async function generateOneModuleImage(
         // 1. Load project (auth + foundry check) and its current modules.
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, modules, visual_style")
+            .select("id, foundry_id, modules, visual_style, illustration_style")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -143,6 +144,15 @@ export async function generateOneModuleImage(
                 ? (rawStyle as Parameters<typeof generateCadLabSingleImageAction>[2])
                 : undefined
 
+        // Honour the project's illustration_style so every module renders
+        // in the same visual language as the hero (the hero orchestrator
+        // in forge-v2-generate-system-illustration.ts reads the same
+        // column). Without this, hero and modules defaulted to different
+        // programmatic prompts and the two diverged visibly in the PDF.
+        const illustrationStyle = isIllustrationStyle(project.illustration_style)
+            ? project.illustration_style
+            : DEFAULT_ILLUSTRATION_STYLE
+
         // 3. Run ONE image-gen call — typically 20–60s wall-clock.
         let result: Awaited<ReturnType<typeof generateCadLabSingleImageAction>>
         try {
@@ -156,6 +166,7 @@ export async function generateOneModuleImage(
                 //               reference (same pattern as V1 when no hero
                 //               has been generated yet).
                 undefined, // moduleCropBase64
+                illustrationStyle,
             )
         } catch (err) {
             console.error(

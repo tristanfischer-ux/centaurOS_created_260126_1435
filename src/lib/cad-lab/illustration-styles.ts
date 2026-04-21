@@ -137,6 +137,52 @@ Every heroImagePrompt and perModuleImagePrompts entry MUST describe a real-world
   }
 }
 
+// ─── Module + hero prompt preamble (shared across BOTH image-gen paths) ─────
+
+/**
+ * Short style preamble prepended to BOTH the system-illustration ("cover")
+ * prompt and every per-module blueprint prompt, so a project on `blueprint`
+ * renders the hero AND all its module cards in the same visual language.
+ *
+ * V1 historically hit this via `reconcileDesignAction` — Opus crafted a
+ * `heroImagePrompt` + `perModuleImagePrompts` that all committed to the
+ * same style internally. V2 never runs reconciliation, so both surfaces
+ * fell back to their own programmatic prompts and drifted apart — the
+ * hero came out iso-illustrative, the modules came out thin-line
+ * blueprint, and founders saw "two different projects" in the PDF.
+ *
+ * This preamble is the minimum shared contract: prepended verbatim at the
+ * TOP of the final prompt string (image models weight the start most
+ * heavily) so every caller — V1 or V2, hero or module — ships with a
+ * consistent style framing. The existing prompt bodies still run
+ * underneath; this layer just ensures the style line the model reads
+ * first matches across surfaces.
+ *
+ * @param style - The project's `illustration_style` column value.
+ * @returns A ~3-5 line style preamble. Ends with two newlines so the
+ *   existing prompt body starts on a fresh paragraph.
+ */
+export function getStylePreambleForModulePrompt(style: IllustrationStyle): string {
+  switch (style) {
+    case "blueprint":
+      return `PROJECT ILLUSTRATION STYLE: Technical blueprint. Every illustration in this project — hero and per-module — MUST render as a technical engineering drawing on a pure white (#FFFFFF) background with thin precise black line work, flat material colour fills, a subtle engineering grid, and a 30-degree isometric camera. No photographic lighting, no depth-of-field, no background scene.
+
+`
+    case "photoreal":
+      return `PROJECT ILLUSTRATION STYLE: Photorealistic studio render. Every illustration in this project — hero and per-module — MUST render as a photorealistic product render on a seamless cyclorama (light neutral grey or off-white), with physically-correct materials (brushed aluminium, anodised finishes, matte polymer, glass), studio lighting (key + fill + rim), subtle contact shadows, and a 30-degree 3/4 hero angle. No blueprint linework, no engineering grid, no callout arrows.
+
+`
+    case "isometric_vector":
+      return `PROJECT ILLUSTRATION STYLE: Isometric vector. Every illustration in this project — hero and per-module — MUST render as a flat isometric vector illustration (true 30°/30°), vibrant flat colours with gentle two-tone shading, crisp vector edges, on a light pastel or white background with a soft drop shadow. SaaS-landing-page aesthetic. No photorealistic textures, no engineering blueprint conventions.
+
+`
+    case "photography":
+      return `PROJECT ILLUSTRATION STYLE: Editorial photography. Every illustration in this project — hero and per-module — MUST render as a real-world editorial photograph with lifestyle context, naturalistic lighting, convincing microsurface detail, shallow depth-of-field, and rule-of-thirds framing. No blueprint linework, no exploded-view callouts, no cyclorama.
+
+`
+  }
+}
+
 // ─── Vision-QA rubric overrides ──────────────────────────────────────────────
 
 /**
