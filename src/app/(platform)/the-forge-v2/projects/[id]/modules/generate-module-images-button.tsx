@@ -33,8 +33,16 @@ import { generateOneModuleImage } from "@/actions/forge-v2-generate-one-module-i
 
 interface GenerateModuleImagesButtonProps {
     projectId: string
-    /** Every module on the project in the order they should be rendered. */
-    modules: Array<{ id: string; name: string; hasImage: boolean }>
+    /** Every module on the project. Mirror modules (those with `mirrorOf`)
+     *  are reordered internally so their primary renders first — the
+     *  per-module server action then produces the mirror's image by
+     *  flipping the primary's PNG instead of burning another Gemini call. */
+    modules: Array<{
+        id: string
+        name: string
+        hasImage: boolean
+        mirrorOf: string | null
+    }>
 }
 
 interface ProgressState {
@@ -68,11 +76,19 @@ export function GenerateModuleImagesButton({
         // Resume semantics: only render modules that don't have an image
         // yet. Founders re-clicking after a tab close shouldn't re-pay for
         // images that already landed.
-        const queue = modules.filter((m) => !m.hasImage)
-        if (queue.length === 0) {
-            // Fall through to re-render all if the founder wants a refresh.
-            queue.push(...modules)
-        }
+        const raw = modules.filter((m) => !m.hasImage)
+        const base = raw.length === 0 ? [...modules] : raw
+
+        // Reorder so primaries render BEFORE their mirrors. The per-module
+        // server action short-circuits a mirror render by flipping the
+        // primary's PNG (~100ms) instead of burning a fresh Gemini call
+        // (~30-60s), but only when the primary already has an imageUrl.
+        // The most common ordering bug ("Starboard Solar Wing rendered
+        // first, Port Solar Wing rendered second, both take full time
+        // and diverge visibly") is fixed here once.
+        const primaries = base.filter((m) => !m.mirrorOf)
+        const mirrors = base.filter((m) => m.mirrorOf)
+        const queue = [...primaries, ...mirrors]
 
         setStatus({
             kind: "running",

@@ -68,6 +68,12 @@ export interface ModuleCardRow {
      *  Drives the "Render remaining N of M" / "Re-render all" label and
      *  the resume-from-first-missing semantics on the render button. */
     hasImage: boolean
+    /** If this module is the mirror of another (e.g. Starboard Solar Wing
+     *  mirrors Port Solar Wing), the id of its primary. The render button
+     *  uses this to order primaries first — the mirror server action then
+     *  produces the mirror's image by flipping the primary's PNG instead
+     *  of running a fresh Gemini call. */
+    mirrorOf: string | null
     /** Issue chips shown at the bottom of the card. */
     issues: Array<{ label: string; severity: "warning" | "danger" }>
     /** Which thumbnail SVG to use for the card preview. */
@@ -252,6 +258,7 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                             id: c.id,
                             name: c.name,
                             hasImage: c.hasImage,
+                            mirrorOf: c.mirrorOf,
                         }))}
                     />
                     <Link href={geometryHref} className="m2-btn">View geometry →</Link>

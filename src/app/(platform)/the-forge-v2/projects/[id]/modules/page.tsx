@@ -139,6 +139,10 @@ export default async function ForgeV2ModulesPage({
             leadSource: leadSourceLabel((m as CadLabModule & { leadTimeSource?: string }).leadTimeSource),
             tone,
             hasImage: typeof m.imageUrl === "string" && m.imageUrl.length > 0,
+            mirrorOf:
+                typeof m.mirrorOf === "string" && m.mirrorOf.trim().length > 0
+                    ? m.mirrorOf.trim()
+                    : null,
             issues,
             thumbKind: pickThumbKind(m),
             massOver: delta != null && delta > 0.05,

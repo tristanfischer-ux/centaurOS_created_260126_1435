@@ -28,7 +28,11 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
-import { generateCadLabSingleImageAction } from "@/actions/cad-lab-images"
+import {
+    generateCadLabSingleImageAction,
+    flipCadLabImageForMirrorAction,
+    type MirrorAxis,
+} from "@/actions/cad-lab-images"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { DEFAULT_ILLUSTRATION_STYLE, isIllustrationStyle } from "@/lib/cad-lab/illustration-styles"
@@ -109,6 +113,105 @@ export async function generateOneModuleImage(
         }
 
         const target = modules[idx]
+
+        // 1b. Mirror-pair short-circuit. If this module is marked as the
+        //     mirror of another (via CadLabModule.mirrorOf, populated by
+        //     Max's decomposition on pairs like Port/Starboard Solar Wing)
+        //     AND the primary already has a rendered image, produce this
+        //     module's asset by flipping the primary with sharp — much
+        //     faster than regenerating AND the two cards end up pixel-for-
+        //     pixel mirror copies instead of two independent renders that
+        //     Gemini can't keep identical.
+        //
+        //     V1 context had this logic; V2 previously did not — every
+        //     NetHawk-12 solar wing rendered separately and the two
+        //     diverged visibly in the PDF.
+        //
+        //     Fallback path: if the primary hasn't been rendered yet,
+        //     or if the flip action fails, fall through to normal
+        //     regeneration so we never ship worse than before. The
+        //     per-module-images button reorders primaries first so the
+        //     common case hits the flip happy path.
+        const mirrorOfId =
+            typeof target.mirrorOf === "string" && target.mirrorOf.trim()
+                ? target.mirrorOf.trim()
+                : undefined
+        if (mirrorOfId) {
+            const primary = modules.find((m) => m.id === mirrorOfId)
+            const primaryImageUrl =
+                typeof primary?.imageUrl === "string" ? primary.imageUrl : undefined
+            if (
+                primary &&
+                primaryImageUrl &&
+                primary.imageStatus === "complete"
+            ) {
+                // Axis: vertical for Upper/Lower/Top/Bottom pairs, horizontal
+                // otherwise. Same dead-simple detection V1 uses — no regex
+                // gymnastics, the flip server action also re-checks via the
+                // name prefix as defence-in-depth.
+                const nameLc = target.name.trim().toLowerCase()
+                const axis: MirrorAxis = /^(lower|bottom|upper|top)\s/.test(nameLc)
+                    ? "vertical"
+                    : "horizontal"
+                const flipRes = await flipCadLabImageForMirrorAction(
+                    projectId,
+                    target.id,
+                    primaryImageUrl,
+                    axis,
+                    target.name,
+                )
+                if ("imageUrl" in flipRes) {
+                    // Persist the flipped URL to just this module's slot,
+                    // same re-read + splice pattern as the main path below
+                    // so concurrent loops can't clobber each other.
+                    const { data: fresh, error: reloadErr } = await admin
+                        .from("cad_lab_projects")
+                        .select("modules")
+                        .eq("id", projectId)
+                        .maybeSingle()
+                    if (!reloadErr && fresh) {
+                        const freshModules =
+                            (fresh.modules as unknown as CadLabModule[]) ?? []
+                        const freshIdx = freshModules.findIndex(
+                            (m) => m.id === moduleId,
+                        )
+                        if (freshIdx !== -1) {
+                            const updatedModules: CadLabModule[] = [...freshModules]
+                            updatedModules[freshIdx] = {
+                                ...freshModules[freshIdx],
+                                imageUrl: flipRes.imageUrl,
+                                imageStatus: "complete",
+                                // Re-use the primary's model label so the UI
+                                // can tell they came from the same pipeline.
+                                imageModelUsed: primary.imageModelUsed,
+                            }
+                            const { error: updateErr } = await admin
+                                .from("cad_lab_projects")
+                                .update({ modules: updatedModules })
+                                .eq("id", projectId)
+                            if (!updateErr) {
+                                console.log(
+                                    `[forge-v2-generate-one-module-image] flipped primary ${mirrorOfId} → mirror ${target.id} (${axis})`,
+                                )
+                                return { ok: true, imageUrl: flipRes.imageUrl }
+                            }
+                            console.warn(
+                                `[forge-v2-generate-one-module-image] flip succeeded but persist failed for ${target.id}:`,
+                                updateErr.message ?? updateErr,
+                            )
+                        }
+                    }
+                } else {
+                    console.warn(
+                        `[forge-v2-generate-one-module-image] flip failed for ${target.id}, falling back to regen: ${flipRes.error}`,
+                    )
+                }
+            }
+            // If we reach here, the fallback path (full regeneration below)
+            // kicks in — either the primary wasn't ready yet, the flip
+            // action failed, or the persist failed. Better to regen than
+            // to surface an error for a recoverable case.
+        }
 
         // 2. Build the subset input shape the inner action needs. Safe
         //    defaults for missing CadLabModule fields match what the
