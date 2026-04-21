@@ -6,22 +6,22 @@
  */
 
 .lh2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --lh-fg:             #1c1917;
-  --lh-fg-muted:       #78716c;
-  --lh-fg-faint:       #a8a29e;
-  --lh-fg-subtle:      #d6d3d1;
-  --lh-surface:        #ffffff;
-  --lh-surface-muted:  #f5f5f4;
-  --lh-surface-soft:   #fafaf9;
-  --lh-border:         #e7e5e4;
-  --lh-border-soft:    #f0efed;
-  --lh-border-strong:  #d6d3d1;
-  --lh-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --lh-fg:             var(--fg);
+  --lh-fg-muted:       var(--fg-muted);
+  --lh-fg-faint:       var(--fg-subtle);
+  --lh-fg-subtle:      var(--fg-faint);
+  --lh-surface:        var(--surface);
+  --lh-surface-muted:  var(--surface-muted);
+  --lh-surface-soft:   var(--surface-soft);
+  --lh-border:         var(--border);
+  --lh-border-soft:    var(--border-soft);
+  --lh-border-strong:  var(--border-strong);
+  --lh-brand:          var(--brand);
   --lh-brand-soft:     rgba(255,69,0,0.10);
   --lh-brand-dim:      rgba(255,69,0,0.28);
   --lh-success:        #15803d;
-  --lh-success-soft:   #dcfce7;
+  --lh-success-soft:   var(--success-soft);
   --lh-success-dim:    #bbf7d0;
   --lh-warning:        #b45309;
   --lh-warning-soft:   #fef3c7;

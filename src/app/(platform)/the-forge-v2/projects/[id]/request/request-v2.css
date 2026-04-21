@@ -6,28 +6,28 @@
  */
 
 .rq2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --rq-fg:             #1c1917;
-  --rq-fg-muted:       #78716c;
-  --rq-fg-faint:       #a8a29e;
-  --rq-fg-subtle:      #d6d3d1;
-  --rq-surface:        #ffffff;
-  --rq-surface-muted:  #f5f5f4;
-  --rq-surface-soft:   #fafaf9;
-  --rq-border:         #e7e5e4;
-  --rq-border-soft:    #f5f5f4;
-  --rq-border-strong:  #d6d3d1;
-  --rq-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --rq-fg:             var(--fg);
+  --rq-fg-muted:       var(--fg-muted);
+  --rq-fg-faint:       var(--fg-subtle);
+  --rq-fg-subtle:      var(--fg-faint);
+  --rq-surface:        var(--surface);
+  --rq-surface-muted:  var(--surface-muted);
+  --rq-surface-soft:   var(--surface-soft);
+  --rq-border:         var(--border);
+  --rq-border-soft:    var(--surface-muted);
+  --rq-border-strong:  var(--border-strong);
+  --rq-brand:          var(--brand);
   --rq-brand-soft:     rgba(255,69,0,0.10);
   --rq-brand-dim:      rgba(255,69,0,0.35);
   --rq-success:        #15803d;
-  --rq-success-soft:   #dcfce7;
+  --rq-success-soft:   var(--success-soft);
   --rq-warning:        #b45309;
   --rq-warning-soft:   #fef3c7;
   --rq-danger:         #b91c1c;
-  --rq-danger-soft:    #fee2e2;
+  --rq-danger-soft:    var(--danger-soft);
   --rq-info:           #1d4ed8;
-  --rq-info-soft:      #dbeafe;
+  --rq-info-soft:      var(--info-soft);
   --rq-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
   --rq-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
 

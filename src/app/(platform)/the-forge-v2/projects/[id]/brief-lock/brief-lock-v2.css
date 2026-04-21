@@ -3,22 +3,23 @@
    Convention mirrors brief-v2.css (`.b2`) — same token palette, different scope. */
 
 .bl2 {
-  --bl-bg: #fafaf9;
-  --bl-surface: #ffffff;
-  --bl-surface-muted: #f5f5f4;
-  --bl-surface-soft: #fafaf9;
-  --bl-border: #e7e5e4;
-  --bl-border-strong: #d6d3d1;
-  --bl-border-soft: #f0efed;
-  --bl-fg: #1c1917;
-  --bl-fg-muted: #78716c;
-  --bl-fg-subtle: #a8a29e;
-  --bl-fg-faint: #d6d3d1;
-  --bl-brand: #ff4500;
-  --bl-brand-soft: #fff0ea;
-  --bl-brand-dim: #ffdcc7;
-  --bl-success: #16a34a;
-  --bl-success-soft: #dcfce7;
+  /* Token layer — resolves to forge-mockup.css. */
+  --bl-bg: var(--bg);
+  --bl-surface: var(--surface);
+  --bl-surface-muted: var(--surface-muted);
+  --bl-surface-soft: var(--surface-soft);
+  --bl-border: var(--border);
+  --bl-border-strong: var(--border-strong);
+  --bl-border-soft: var(--border-soft);
+  --bl-fg: var(--fg);
+  --bl-fg-muted: var(--fg-muted);
+  --bl-fg-subtle: var(--fg-subtle);
+  --bl-fg-faint: var(--fg-faint);
+  --bl-brand: var(--brand);
+  --bl-brand-soft: var(--brand-soft);
+  --bl-brand-dim: var(--brand-dim);
+  --bl-success: var(--success);
+  --bl-success-soft: var(--success-soft);
   --bl-success-dim: #bbf7d0;
   --bl-warning: #ca8a04;
   --bl-warning-soft: #fef9c3;

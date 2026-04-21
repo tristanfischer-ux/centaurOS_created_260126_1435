@@ -2,22 +2,23 @@
    Every rule is prefixed with .ra2 so nothing leaks to other pages. */
 
 .ra2 {
-  --r-bg: #fafaf9;
-  --r-surface: #ffffff;
-  --r-surface-muted: #f5f5f4;
-  --r-surface-soft: #fafaf9;
-  --r-border: #e7e5e4;
-  --r-border-strong: #d6d3d1;
-  --r-border-soft: #f0efed;
-  --r-fg: #1c1917;
-  --r-fg-muted: #78716c;
-  --r-fg-subtle: #a8a29e;
-  --r-fg-faint: #d6d3d1;
-  --r-brand: #ff4500;
-  --r-brand-soft: #fff0ea;
-  --r-brand-dim: #ffdcc7;
-  --r-success: #16a34a;
-  --r-success-soft: #dcfce7;
+  /* Token layer — resolves to forge-mockup.css. */
+  --r-bg: var(--bg);
+  --r-surface: var(--surface);
+  --r-surface-muted: var(--surface-muted);
+  --r-surface-soft: var(--surface-soft);
+  --r-border: var(--border);
+  --r-border-strong: var(--border-strong);
+  --r-border-soft: var(--border-soft);
+  --r-fg: var(--fg);
+  --r-fg-muted: var(--fg-muted);
+  --r-fg-subtle: var(--fg-subtle);
+  --r-fg-faint: var(--fg-faint);
+  --r-brand: var(--brand);
+  --r-brand-soft: var(--brand-soft);
+  --r-brand-dim: var(--brand-dim);
+  --r-success: var(--success);
+  --r-success-soft: var(--success-soft);
   --r-success-dim: #bbf7d0;
   --r-warning: #ca8a04;
   --r-warning-soft: #fef9c3;

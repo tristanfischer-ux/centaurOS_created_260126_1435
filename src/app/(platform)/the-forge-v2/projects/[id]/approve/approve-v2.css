@@ -7,22 +7,22 @@
  */
 
 .ap2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --ap-fg:             #1c1917;
-  --ap-fg-muted:       #78716c;
-  --ap-fg-faint:       #a8a29e;
-  --ap-fg-subtle:      #d6d3d1;
-  --ap-surface:        #ffffff;
-  --ap-surface-muted:  #f5f5f4;
-  --ap-surface-soft:   #fafaf9;
-  --ap-border:         #e7e5e4;
-  --ap-border-soft:    #f0efed;
-  --ap-border-strong:  #d6d3d1;
-  --ap-brand:          #ff4500;
-  --ap-brand-soft:     #fff0ea;
-  --ap-brand-dim:      #ffdcc7;
-  --ap-success:        #16a34a;
-  --ap-success-soft:   #dcfce7;
+  /* Token layer — resolves to forge-mockup.css. */
+  --ap-fg:             var(--fg);
+  --ap-fg-muted:       var(--fg-muted);
+  --ap-fg-faint:       var(--fg-subtle);
+  --ap-fg-subtle:      var(--fg-faint);
+  --ap-surface:        var(--surface);
+  --ap-surface-muted:  var(--surface-muted);
+  --ap-surface-soft:   var(--surface-soft);
+  --ap-border:         var(--border);
+  --ap-border-soft:    var(--border-soft);
+  --ap-border-strong:  var(--border-strong);
+  --ap-brand:          var(--brand);
+  --ap-brand-soft:     var(--brand-soft);
+  --ap-brand-dim:      var(--brand-dim);
+  --ap-success:        var(--success);
+  --ap-success-soft:   var(--success-soft);
   --ap-success-dim:    #bbf7d0;
   --ap-success-strong: #166534;
   --ap-warning-soft:   #fef9c3;
