@@ -127,6 +127,28 @@ export async function generateSystemIllustrationForProject(
                     errorCode: "GENERATION_FAILED",
                 }
             }
+
+            // The inner action does NOT write to cad_lab_projects — it only
+            // uploads the PNG to xray-images/<projectId>/ and returns the URL.
+            // Persisting to system_illustration_url is the caller's job (V1
+            // had its own writer; V2 did not have one, so this wrapper owns
+            // the write).
+            const { error: persistErr } = await admin
+                .from("cad_lab_projects")
+                .update({ system_illustration_url: res.url })
+                .eq("id", projectId)
+            if (persistErr) {
+                console.error(
+                    `[forge-v2-generate-system-illustration] persist failed for ${projectId}:`,
+                    persistErr.message ?? persistErr,
+                )
+                return {
+                    ok: false,
+                    error: "Generated but couldn't persist the illustration URL.",
+                    errorCode: "INTERNAL",
+                }
+            }
+
             return { ok: true, url: res.url }
         } catch (err) {
             console.error(
