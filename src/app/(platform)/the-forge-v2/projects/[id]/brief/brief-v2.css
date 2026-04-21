@@ -2,31 +2,33 @@
    Every rule is prefixed with .b2 so nothing leaks to other pages. */
 
 .b2 {
-  --b-bg: #fafaf9;
-  --b-surface: #ffffff;
-  --b-surface-muted: #f5f5f4;
-  --b-surface-soft: #fafaf9;
-  --b-border: #e7e5e4;
-  --b-border-strong: #d6d3d1;
-  --b-border-soft: #f0efed;
-  --b-fg: #1c1917;
-  --b-fg-muted: #78716c;
-  --b-fg-subtle: #a8a29e;
-  --b-fg-faint: #d6d3d1;
-  --b-brand: #ff4500;
-  --b-brand-soft: #fff0ea;
-  --b-brand-dim: #ffdcc7;
-  --b-success: #16a34a;
-  --b-success-soft: #dcfce7;
+  /* Token layer — values resolve to forge-mockup.css imported globally.
+     Per MOCKUP-AS-CODE-PATTERN.md. */
+  --b-bg: var(--bg);
+  --b-surface: var(--surface);
+  --b-surface-muted: var(--surface-muted);
+  --b-surface-soft: var(--surface-soft);
+  --b-border: var(--border);
+  --b-border-strong: var(--border-strong);
+  --b-border-soft: var(--border-soft);
+  --b-fg: var(--fg);
+  --b-fg-muted: var(--fg-muted);
+  --b-fg-subtle: var(--fg-subtle);
+  --b-fg-faint: var(--fg-faint);
+  --b-brand: var(--brand);
+  --b-brand-soft: var(--brand-soft);
+  --b-brand-dim: var(--brand-dim);
+  --b-success: var(--success);
+  --b-success-soft: var(--success-soft);
   --b-success-dim: #bbf7d0;
-  --b-warning: #ca8a04;
-  --b-warning-soft: #fef9c3;
+  --b-warning: var(--warning);
+  --b-warning-soft: var(--warning-soft);
   --b-warning-dim: #fef08a;
-  --b-danger: #dc2626;
-  --b-danger-soft: #fee2e2;
+  --b-danger: var(--danger);
+  --b-danger-soft: var(--danger-soft);
   --b-danger-dim: #fecaca;
-  --b-teal: #0d9488;
-  --b-teal-soft: #ccfbf1;
+  --b-teal: var(--teal);
+  --b-teal-soft: var(--teal-soft);
   --b-shadow-xs: 0 1px 2px rgba(28,25,23,0.03);
   --b-shadow-sm: 0 2px 4px rgba(28,25,23,0.04);
   --b-shadow-md: 0 4px 16px rgba(28,25,23,0.08);

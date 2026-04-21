@@ -2,32 +2,40 @@
    Every rule is prefixed with .w2 so nothing leaks to other pages. */
 
 .w2 {
-  --w-bg: #fafaf9;
-  --w-surface: #ffffff;
-  --w-surface-muted: #f5f5f4;
-  --w-surface-soft: #fafaf9;
-  --w-border: #e7e5e4;
-  --w-border-strong: #d6d3d1;
-  --w-border-soft: #f0efed;
-  --w-fg: #1c1917;
-  --w-fg-muted: #78716c;
-  --w-fg-subtle: #a8a29e;
-  --w-fg-faint: #d6d3d1;
-  --w-brand: #ff4500;
-  --w-brand-soft: #fff0ea;
-  --w-brand-dim: #ffdcc7;
-  --w-success: #16a34a;
-  --w-success-soft: #dcfce7;
-  --w-warning: #ca8a04;
-  --w-warning-soft: #fef9c3;
-  --w-danger: #dc2626;
-  --w-danger-soft: #fee2e2;
-  --w-info: #2563eb;
-  --w-info-soft: #dbeafe;
-  --w-purple: #7c3aed;
-  --w-purple-soft: #ede9fe;
-  --w-teal: #0d9488;
-  --w-teal-soft: #ccfbf1;
+  /* Token layer: values now resolve to the shared forge-mockup.css
+     tokens imported globally (@import "../styles/forge-mockup.css" in
+     src/app/globals.css). Single source of truth for the palette —
+     this file's `--w-*` prefix stays for class-scoped use but the
+     values authoritatively come from the mockup stylesheet. Following
+     the mockup-as-code pattern (MOCKUP-AS-CODE-PATTERN.md). Was literal
+     hex duplicates before 2026-04-22; that same-values drift risk is
+     gone. First scoped-v2.css converted; others follow in the audit. */
+  --w-bg: var(--bg);
+  --w-surface: var(--surface);
+  --w-surface-muted: var(--surface-muted);
+  --w-surface-soft: var(--surface-soft);
+  --w-border: var(--border);
+  --w-border-strong: var(--border-strong);
+  --w-border-soft: var(--border-soft);
+  --w-fg: var(--fg);
+  --w-fg-muted: var(--fg-muted);
+  --w-fg-subtle: var(--fg-subtle);
+  --w-fg-faint: var(--fg-faint);
+  --w-brand: var(--brand);
+  --w-brand-soft: var(--brand-soft);
+  --w-brand-dim: var(--brand-dim);
+  --w-success: var(--success);
+  --w-success-soft: var(--success-soft);
+  --w-warning: var(--warning);
+  --w-warning-soft: var(--warning-soft);
+  --w-danger: var(--danger);
+  --w-danger-soft: var(--danger-soft);
+  --w-info: var(--info);
+  --w-info-soft: var(--info-soft);
+  --w-purple: var(--purple);
+  --w-purple-soft: var(--purple-soft);
+  --w-teal: var(--teal);
+  --w-teal-soft: var(--teal-soft);
   --w-shadow-xs: 0 1px 2px rgba(28,25,23,0.03);
   --w-shadow-sm: 0 2px 4px rgba(28,25,23,0.04);
   --w-shadow-md: 0 4px 16px rgba(28,25,23,0.08);

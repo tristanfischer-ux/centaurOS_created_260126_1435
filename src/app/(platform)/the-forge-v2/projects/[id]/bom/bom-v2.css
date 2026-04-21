@@ -5,28 +5,31 @@
  */
 
 .bm2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --bm-fg:             #1c1917;
-  --bm-fg-muted:       #78716c;
-  --bm-fg-faint:       #a8a29e;
-  --bm-fg-subtle:      #d6d3d1;
-  --bm-surface:        #ffffff;
-  --bm-surface-muted:  #f5f5f4;
-  --bm-surface-soft:   #fafaf9;
-  --bm-border:         #e7e5e4;
-  --bm-border-strong:  #d6d3d1;
-  --bm-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. Darker status shades
+     (success/warning/danger) kept as literals for this page's table
+     contrast, per MOCKUP-AS-CODE-PATTERN.md "legitimate page-local
+     diff" carve-out. */
+  --bm-fg:             var(--fg);
+  --bm-fg-muted:       var(--fg-muted);
+  --bm-fg-faint:       var(--fg-subtle);
+  --bm-fg-subtle:      var(--fg-faint);
+  --bm-surface:        var(--surface);
+  --bm-surface-muted:  var(--surface-muted);
+  --bm-surface-soft:   var(--surface-soft);
+  --bm-border:         var(--border);
+  --bm-border-strong:  var(--border-strong);
+  --bm-brand:          var(--brand);
   --bm-brand-soft:     rgba(255,69,0,0.10);
   --bm-success:        #15803d;
-  --bm-success-soft:   #dcfce7;
+  --bm-success-soft:   var(--success-soft);
   --bm-warning:        #b45309;
   --bm-warning-soft:   #fef3c7;
   --bm-danger:         #b91c1c;
-  --bm-danger-soft:    #fee2e2;
+  --bm-danger-soft:    var(--danger-soft);
   --bm-info:           #1d4ed8;
-  --bm-info-soft:      #dbeafe;
+  --bm-info-soft:      var(--info-soft);
   --bm-purple:         #6d28d9;
-  --bm-purple-soft:    #ede9fe;
+  --bm-purple-soft:    var(--purple-soft);
   --bm-teal-soft:      #f0fdfa;
   --bm-teal-border:    #99f6e4;
   --bm-teal-fg:        #0f766e;
