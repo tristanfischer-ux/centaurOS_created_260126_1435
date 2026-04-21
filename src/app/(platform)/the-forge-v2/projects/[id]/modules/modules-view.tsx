@@ -28,6 +28,7 @@ import {
 } from "@/components/pipeline/pipeline-run-chip"
 import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
 import { GenerateSystemIllustrationButton } from "../_components/generate-system-illustration-button"
+import { GenerateModuleImagesButton } from "./generate-module-images-button"
 
 import "./modules-v2.css"
 
@@ -238,6 +239,13 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                             }
                         />
                     )}
+                    {/* Per-module render generation. Disabled with an honest
+                        tooltip when modules empty — the button itself handles
+                        the disabled / running states internally. */}
+                    <GenerateModuleImagesButton
+                        projectId={project.id}
+                        moduleCount={cards.length}
+                    />
                     <Link href={geometryHref} className="m2-btn">View geometry →</Link>
                 </div>
             </div>
