@@ -103,8 +103,18 @@ export async function updateSession(request: NextRequest) {
 
     // ── Unauthenticated users ──────────────────────────────────────────
     if (!user && !isPublicRoute) {
-        const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://fractionalforge.app'
-        const loginUrl = new URL('/login', appDomain)
+        // Stay on the CURRENT host for the login bounce. Previously this
+        // redirected to NEXT_PUBLIC_APP_DOMAIN (hardcoded
+        // https://fractionalforge.app) which broke preview deploys:
+        // anyone clicking a preview URL got kicked to production login,
+        // signed in there, and never reached the preview they wanted
+        // to test. Using request.nextUrl.origin keeps them on the same
+        // domain (vercel.app preview → preview login, fractionalforge.app
+        // → prod login, forgeos.io → that host's login) — which is what
+        // the caller wants in every case. Legacy-domain bounces (centauros.io
+        // → fractionalforge.app) happen earlier in the root middleware,
+        // not here.
+        const loginUrl = new URL('/login', request.nextUrl.origin)
         loginUrl.searchParams.set('redirect', pathname)
         return NextResponse.redirect(loginUrl)
     }
