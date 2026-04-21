@@ -50,6 +50,15 @@ interface NanoBananaResponse {
 
 const NO_TEXT_SUFFIX = "\n\nCRITICAL: This image must contain ZERO text, letters, words, numbers, labels, annotations, dimensions, or writing of any kind. The image should be purely visual with no readable characters anywhere."
 
+// INTENT: Image models (Nano Banana 2 especially) respond more reliably to an
+// explicit NEGATIVE: clause than to positive "no text" framing buried in the
+// prompt. This suffix is ALWAYS appended (independent of the ZERO-TEXT guard
+// above) so every render — module, hero, system P&ID, reference-aware — ships
+// with the same terminal instruction. Keeping it separate from NO_TEXT_SUFFIX
+// means idempotent retries don't double-apply the positive clause but DO
+// guarantee the negative clause rides every call.
+const NEGATIVE_PROMPT_SUFFIX = "\n\nNEGATIVE: no text, no labels, no callouts, no annotations, no numbering, no dimensions written on the drawing, no watermarks, no title blocks, no revision tags."
+
 // INTENT: Prepended to all AI-crafted prompts (heroImagePrompt, moduleImagePrompt,
 // brief.imagePrompt) to enforce white background + full colour. Image models weight
 // the start of the prompt most heavily — rules buried at the end get ignored.
@@ -65,10 +74,24 @@ const MANDATORY_RENDERING_PREAMBLE = `MANDATORY RENDERING RULES (override any co
  * Applied as the last step before sending to the image API, ensuring
  * ALL codepaths (hardcoded fallback, Opus-generated briefs, research
  * banners) get the same guardrail.
+ *
+ * Two-part guard:
+ *   1. Positive clause (NO_TEXT_SUFFIX) — added only if the prompt doesn't
+ *      already contain equivalent language (case-insensitive so we don't
+ *      double up when COHESIVE_STYLE_SUFFIX already carries "ZERO TEXT").
+ *   2. Negative clause (NEGATIVE_PROMPT_SUFFIX) — ALWAYS added. Image
+ *      models weight explicit NEGATIVE: directives more reliably than
+ *      positive "no text" instructions.
  */
 function enforceNoText(prompt: string): string {
-  if (prompt.includes("ZERO text")) return prompt
-  return prompt + NO_TEXT_SUFFIX
+  let out = prompt
+  if (!/zero text/i.test(out)) {
+    out += NO_TEXT_SUFFIX
+  }
+  if (!/^NEGATIVE:/m.test(out)) {
+    out += NEGATIVE_PROMPT_SUFFIX
+  }
+  return out
 }
 
 // ─── Cohesive Style Suffix ───────────────────────────────────────────
