@@ -24,6 +24,7 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
 import { generateSystemIllustrationForProject } from "@/actions/forge-v2-generate-system-illustration"
+import { generateConceptRenderForProject } from "@/actions/forge-v2-generate-concept-render"
 
 interface GenerateSystemIllustrationButtonProps {
     projectId: string
@@ -55,17 +56,39 @@ export function GenerateSystemIllustrationButton({
         startTransition(() => {
             void (async () => {
                 try {
-                    const res = await generateSystemIllustrationForProject(projectId)
-                    if (!res.ok) {
+                    // Fire BOTH hero images in parallel — system blueprint
+                    // (right panel) + photoreal concept render (left panel).
+                    // Promise.allSettled so one failing doesn't mask the
+                    // other's success.
+                    const [systemRes, conceptRes] = await Promise.allSettled([
+                        generateSystemIllustrationForProject(projectId),
+                        generateConceptRenderForProject(projectId),
+                    ])
+                    const systemOk =
+                        systemRes.status === "fulfilled" && systemRes.value.ok
+                    const conceptOk =
+                        conceptRes.status === "fulfilled" && conceptRes.value.ok
+                    if (systemOk) {
                         setStatus({
-                            kind: "error",
-                            message: res.error,
+                            kind: "done",
+                            url: (systemRes as PromiseFulfilledResult<{ ok: true; url: string }>).value.url,
                         })
+                    } else if (conceptOk) {
+                        setStatus({
+                            kind: "done",
+                            url: (conceptRes as PromiseFulfilledResult<{ ok: true; url: string }>).value.url,
+                        })
+                    } else {
+                        const err =
+                            systemRes.status === "fulfilled" && !systemRes.value.ok
+                                ? systemRes.value.error
+                                : conceptRes.status === "fulfilled" && !conceptRes.value.ok
+                                    ? conceptRes.value.error
+                                    : "Both illustrations failed. Retry in a moment."
+                        setStatus({ kind: "error", message: err })
                         return
                     }
-                    setStatus({ kind: "done", url: res.url })
-                    // Re-render the Modules server component so the new
-                    // system_illustration_url flows into the hero pane.
+                    // Re-render so both hero panes pick up the new URLs.
                     router.refresh()
                 } catch (err) {
                     setStatus({
@@ -83,13 +106,13 @@ export function GenerateSystemIllustrationButton({
     const label = running
         ? "Generating…"
         : hasExisting
-            ? "Re-generate illustration"
-            : "Generate system illustration"
+            ? "Re-generate illustrations"
+            : "Generate illustrations"
 
     const disabledReason = !hasModules
         ? "Decompose with Max first — there's nothing to illustrate."
         : running
-            ? "Generating system illustration…"
+            ? "Generating both hero illustrations…"
             : undefined
 
     return (
@@ -105,7 +128,7 @@ export function GenerateSystemIllustrationButton({
                 aria-busy={running}
                 title={
                     disabledReason ??
-                    "Generates a 16:9 system illustration from the project subject + module list."
+                    "Generates both hero images in parallel: the photoreal concept render (left) and the technical system blueprint (right). ~60–90s total."
                 }
             >
                 {label}
@@ -115,7 +138,7 @@ export function GenerateSystemIllustrationButton({
                     className="m2-sysillus-result"
                     style={{ fontSize: 13, color: "var(--muted-foreground, #6b7280)" }}
                 >
-                    New illustration ready.
+                    New illustrations ready.
                 </span>
             )}
             {status.kind === "error" && (
