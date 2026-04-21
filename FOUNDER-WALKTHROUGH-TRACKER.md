@@ -155,7 +155,43 @@ After fixing the DEEPSEEK_API_KEY env (the trailing `\n` literal), the entire pi
 - Export PDF — UI explicitly says "BETA — Download links run a dry run today; wire-up ships next round"
 - Launch handoff — not yet wired in V2
 
-**Ask-a-Specialist** — opens specialist chooser dialog, but clicking Max in the chooser closes the dialog without rendering a chat panel. Bug 6.
+**Ask-a-Specialist** — retested after understanding the selector. The advisor panel uses `role="complementary"` (not `role="dialog"`). Panel opens correctly on Max select, loads context, streams a substantive reply (Max did a proper ΔV budget calc: ~200 m/s for rendezvous + deorbit, Isp calculations for cold gas vs electric propulsion, ~7,950-char response in ~30s). Bug 6 was a false alarm from my earlier wrong selector.
+
+**BOM partial-coverage bug (Bug 5) root cause + fix:** `skeletonBom()` at `src/actions/bom.ts:342` was capped at `max_tokens: 2048`. For 10-module projects the JSON skeleton gets truncated mid-array; `tryParseJsonWithRepair` closes off the unfinished parts[] after ~3 modules, so BOM silently succeeds covering only those modules, and every downstream cost number is wrong. Fixed in commit `d8bf63ca` by raising skeleton to `BOM_MAX_TOKENS = 8192` (matches the expand batches). Will verify on next fresh project.
+
+**Launch page is functional (Pass 3 extra check):** `/the-forge-v2/projects/[id]/launch` renders a real pre-launch checklist with gates derived from project state:
+- ✓ Brief locked
+- ! Modules specified (0 of 10 fully specified — this gate needs more spec work per module)
+- ! Specialist reviews (1 of 10 modules reviewed — only Fang on M1)
+- ✓ Cost estimates (10 modules costed — Finn ran)
+- ✓ Risks logged (41 failure modes + 30 open questions auto-surfaced)
+- ! Suppliers shortlisted (0 — V2 page redirects to V1 for this)
+- ! CAD geometry uploaded (0)
+
+"Ship NetHawk-12 debris-removal cubesat and hand off to Operations" header, "1 blocker: Suppliers shortlisted" summary. Not an empty placeholder — a working checklist that reads real data. Promote/ship action may still be un-wired (didn't click through) but the surface itself is live.
+
+### Final walkthrough verdict
+
+| Surface | State | Notes |
+|---|---|---|
+| `/the-forge-v2/new` wizard | ✓ works | Submit creates project, Chase auto-fires |
+| Chase research (auto) | ✓ works | 128s, `research.designBrief` populated |
+| Brief page | ✓ works | Bug 2: page doesn't refresh on Chase completion |
+| `/brief-lock` page | ✓ works | Lock commits, Max auto-fires via after() |
+| Max decomposition (auto) | ✓ works (was broken before `0ebccfa9`) | 136s, 10 modules + 48 interface contracts |
+| BOM generate (auto) | ✓ works (was broken before `3396c2bf`) | 70s on old cap, Bug 5 fix landed in `d8bf63ca` |
+| Finn cost estimate (auto) | ✓ works (was 401 before DEEPSEEK fix) | 161s, £82k unit cost roll-up |
+| Module detail + Fang review | ✓ works | 142s, substantive review with Al 7075 vs Ti-6Al-4V call-out |
+| Risks page | ✓ works | Auto-surfaced from module failureModes + unknowns |
+| Operations page | ✓ works | Roll-up of lead times, first-ship date |
+| Ask-a-Specialist chat | ✓ works | Streaming replies from Max with real engineering math |
+| `/launch` pre-flight checklist | ✓ works | Real gates computed from project state |
+| Suppliers / RFQ / Approve | ⚠ V1 | V2 shell redirects to V1 CAD lab; V2 scope-deferred |
+| Export PDF | ⚠ BETA | Buttons disabled, UI explicitly says "dry run" |
+| Jian per-module review | ⚠ not-exposed | Only Fang button on V2 module detail |
+
+**Commits:** `0ebccfa9`, `3396c2bf`, `d8bf63ca` on `feat/forge-v2-cutover`.
+**Infra:** preview env keys (DEEPSEEK/OPENAI/MINIMAX) corrected on branch `feat/forge-v2-cutover`. Production DEEPSEEK_API_KEY still has trailing `\n` literal — recovery instructions saved as memory.
 
 ### Stage 1 — Create project — BUG found
 - [x] Navigate `/the-forge-v2/new` — page renders
