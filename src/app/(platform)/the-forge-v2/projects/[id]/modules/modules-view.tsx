@@ -64,6 +64,10 @@ export interface ModuleCardRow {
     leadSource: string | null
     /** Ring colour driven by mass breach — 'green' | 'amber' | 'red'. */
     tone: "green" | "amber" | "red"
+    /** Whether this module already has a generated render (imageUrl present).
+     *  Drives the "Render remaining N of M" / "Re-render all" label and
+     *  the resume-from-first-missing semantics on the render button. */
+    hasImage: boolean
     /** Issue chips shown at the bottom of the card. */
     issues: Array<{ label: string; severity: "warning" | "danger" }>
     /** Which thumbnail SVG to use for the card preview. */
@@ -244,7 +248,11 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                         the disabled / running states internally. */}
                     <GenerateModuleImagesButton
                         projectId={project.id}
-                        moduleCount={cards.length}
+                        modules={cards.map((c) => ({
+                            id: c.id,
+                            name: c.name,
+                            hasImage: c.hasImage,
+                        }))}
                     />
                     <Link href={geometryHref} className="m2-btn">View geometry →</Link>
                 </div>

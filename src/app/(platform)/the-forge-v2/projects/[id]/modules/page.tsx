@@ -138,6 +138,7 @@ export default async function ForgeV2ModulesPage({
             leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
             leadSource: leadSourceLabel((m as CadLabModule & { leadTimeSource?: string }).leadTimeSource),
             tone,
+            hasImage: typeof m.imageUrl === "string" && m.imageUrl.length > 0,
             issues,
             thumbKind: pickThumbKind(m),
             massOver: delta != null && delta > 0.05,

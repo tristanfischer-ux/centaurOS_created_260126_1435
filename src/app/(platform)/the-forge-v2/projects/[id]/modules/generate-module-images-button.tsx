@@ -1,82 +1,129 @@
 "use client"
 
 /**
- * @file generate-module-images-button.tsx — V2 Modules trigger for per-module
- *   render generation.
+ * @file generate-module-images-button.tsx — per-module loop trigger.
  *
- * @description Calls `generateModuleImagesForProject()`, which fans out the
- * existing CAD Lab per-module image generator across every module on the
- * project and persists each new `imageUrl` back onto `cad_lab_projects.modules`.
- * On success we `router.refresh()` so the Modules page re-reads the now-
- * populated modules array and the module detail pages' Nano Banana slots
- * flip from "Concept render not yet generated" to the real blueprint.
+ * @description Generates Nano Banana blueprints for every module by calling
+ * the per-module server action `generateOneModuleImage(projectId, moduleId)`
+ * once per module, sequentially, with live progress.
  *
- * Generation is slow (~15–30s per module × up to 10 modules ≈ 2.5–5 min end
- * to end). Inside Vercel's 300s cap for typical 8–10-module projects, but
- * the UI needs to make the wait explicit or founders will assume the app
- * froze and refresh. We surface the module count in the spinner label and
- * disable the button while pending.
+ * TRIED: a batch server action that rendered every module in one call
+ * (`generateModuleImagesForProject`). Problem: 10 modules × ~30–60s per image
+ * pushed the wall-clock past Vercel's 300s `maxDuration`, the function was
+ * killed before the persist step, the button silently reset, and zero
+ * modules landed. Evidence: project 352f5660 on 2026-04-21 — three attempts,
+ * 0 modules persisted, no error surfaced.
+ *
+ * The per-module loop gives each call its own <300s budget (~60s typical).
+ * On tab-close or network blip we can resume from the first module still
+ * missing an imageUrl — no special state needed because the DB already
+ * records progress.
  *
  * @related
- * - Action:   src/actions/forge-v2-generate-module-images.ts
- * - Sibling:  src/app/(platform)/the-forge-v2/projects/[id]/suppliers/
- *             match-with-chase-button.tsx (pattern reference)
- * - Parent:   modules-view.tsx
+ * - Per-module action: src/actions/forge-v2-generate-one-module-image.ts
+ * - Legacy batch:      src/actions/forge-v2-generate-module-images.ts (retained)
+ * - Sibling pattern:   src/app/(platform)/the-forge-v2/projects/[id]/suppliers/
+ *                      match-with-chase-button.tsx
  */
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
-import { generateModuleImagesForProject } from "@/actions/forge-v2-generate-module-images"
+import { generateOneModuleImage } from "@/actions/forge-v2-generate-one-module-image"
 
 interface GenerateModuleImagesButtonProps {
     projectId: string
-    /** How many modules exist on the project — used for the spinner label
-     *  ("Generating 9 module renders…") and to disable the button when 0. */
-    moduleCount: number
+    /** Every module on the project in the order they should be rendered. */
+    modules: Array<{ id: string; name: string; hasImage: boolean }>
+}
+
+interface ProgressState {
+    kind: "running"
+    total: number
+    completed: number
+    failed: number
+    currentName: string
 }
 
 type Status =
     | { kind: "idle" }
-    | { kind: "running" }
+    | ProgressState
     | { kind: "done"; successCount: number; failedCount: number }
     | { kind: "error"; message: string }
 
 export function GenerateModuleImagesButton({
     projectId,
-    moduleCount,
+    modules,
 }: GenerateModuleImagesButtonProps): React.ReactElement {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [status, setStatus] = useState<Status>({ kind: "idle" })
 
+    const moduleCount = modules.length
+    const renderedCount = modules.filter((m) => m.hasImage).length
+    const allRendered = moduleCount > 0 && renderedCount === moduleCount
+
     const handleClick = (): void => {
-        setStatus({ kind: "running" })
+        if (moduleCount === 0) return
+        // Resume semantics: only render modules that don't have an image
+        // yet. Founders re-clicking after a tab close shouldn't re-pay for
+        // images that already landed.
+        const queue = modules.filter((m) => !m.hasImage)
+        if (queue.length === 0) {
+            // Fall through to re-render all if the founder wants a refresh.
+            queue.push(...modules)
+        }
+
+        setStatus({
+            kind: "running",
+            total: queue.length,
+            completed: 0,
+            failed: 0,
+            currentName: queue[0]?.name ?? "",
+        })
+
         startTransition(() => {
             void (async () => {
-                try {
-                    const res = await generateModuleImagesForProject(projectId)
-                    if (!res.ok) {
-                        setStatus({
-                            kind: "error",
-                            message: res.error ?? "Couldn't generate module renders.",
-                        })
-                        return
+                let completed = 0
+                let failed = 0
+                for (const m of queue) {
+                    setStatus({
+                        kind: "running",
+                        total: queue.length,
+                        completed,
+                        failed,
+                        currentName: m.name,
+                    })
+                    try {
+                        const res = await generateOneModuleImage(projectId, m.id)
+                        if (res.ok) {
+                            completed += 1
+                            // Progressive refresh — founder sees each module
+                            // flip from placeholder to real render as it
+                            // lands, not a single snap at the end.
+                            router.refresh()
+                        } else {
+                            failed += 1
+                            console.warn(
+                                `[generate-module-images] ${m.id} failed:`,
+                                res.error,
+                                res.errorCode,
+                            )
+                        }
+                    } catch (err) {
+                        failed += 1
+                        console.error(
+                            `[generate-module-images] ${m.id} threw:`,
+                            err instanceof Error ? err.message : err,
+                        )
                     }
-                    setStatus({
-                        kind: "done",
-                        successCount: res.successCount,
-                        failedCount: res.failedCount,
-                    })
-                    // Re-render the server components so the persisted
-                    // imageUrls flow through to module detail pages.
-                    router.refresh()
-                } catch (err) {
-                    setStatus({
-                        kind: "error",
-                        message: err instanceof Error ? err.message : "Unknown error",
-                    })
                 }
+                setStatus({
+                    kind: "done",
+                    successCount: completed,
+                    failedCount: failed,
+                })
+                router.refresh()
             })()
         })
     }
@@ -85,18 +132,22 @@ export function GenerateModuleImagesButton({
     const disabled = running || moduleCount === 0
 
     const runningLabel =
-        moduleCount === 1
-            ? "Generating 1 module render…"
-            : `Generating ${moduleCount} module renders…`
+        status.kind === "running"
+            ? `Rendering ${status.completed + 1} of ${status.total}${
+                  status.currentName ? " · " + status.currentName : ""
+              }…`
+            : "Generating…"
 
-    const idleLabel = "Generate module renders"
+    const idleLabel = allRendered
+        ? "Re-render all modules"
+        : renderedCount > 0
+            ? `Render remaining ${moduleCount - renderedCount} of ${moduleCount}`
+            : "Generate module renders"
 
-    // Honest tooltip when disabled — never pretend the action is available
-    // before decomposition has produced modules.
     const disabledTitle =
         moduleCount === 0
             ? "Run Max's decomposition first — module renders generate once modules exist."
-            : "Each module gets a Nano Banana blueprint (~15–30s per module)."
+            : "Each module gets its own Nano Banana blueprint (~30–60s per module)."
 
     return (
         <div
@@ -113,6 +164,15 @@ export function GenerateModuleImagesButton({
             >
                 {running ? runningLabel : idleLabel}
             </button>
+            {status.kind === "running" && (
+                <span
+                    className="m2-gen-images-progress"
+                    style={{ fontSize: 13, color: "var(--muted-foreground, #6b7280)" }}
+                >
+                    {status.completed} done
+                    {status.failed > 0 ? ` · ${status.failed} failed` : ""}
+                </span>
+            )}
             {status.kind === "done" && (
                 <span
                     className="m2-gen-images-result"
@@ -121,7 +181,7 @@ export function GenerateModuleImagesButton({
                     {status.successCount > 0
                         ? `Generated ${status.successCount} render${status.successCount === 1 ? "" : "s"}` +
                           (status.failedCount > 0
-                              ? ` · ${status.failedCount} failed`
+                              ? ` · ${status.failedCount} failed (retry the button)`
                               : "")
                         : status.failedCount > 0
                             ? `${status.failedCount} render${status.failedCount === 1 ? "" : "s"} failed — please retry.`
