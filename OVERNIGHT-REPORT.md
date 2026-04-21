@@ -1,6 +1,8 @@
 # Overnight report — 2026-04-21 → 22
 
-**Period:** ~22:45 BST Apr 21 → ~23:20 BST Apr 21 (short run, quality baseline first then queued work)
+**Period:** ~22:45 BST Apr 21 → ~00:55 BST Apr 22 (~2 hours of work + 1 hr idle for verification)
+
+**2026-04-22 00:55 BST — Verified clean:** latest 2 preview deploys (`bz7yztq1n` + `dtt31xa2x`) both ● Ready. CF-40 v2 state: 8/8 modules rendered, system + concept illustrations both present, render chain `finished_at: 22:01:03.250Z`, zero failed ids, zero errors. No regressions to report.
 
 **Context:** Tristan went to bed after I shipped the coherence plan + Jarvis plan + supplier-discovery plan + flagged a chain-stall problem. Tonight's mandate was: finish the render-chain fix, prove quality baseline, ship everything remaining on the backlog.
 
