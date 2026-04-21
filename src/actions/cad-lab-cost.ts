@@ -73,6 +73,10 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 interface EstimateResult {
   success: true
   estimates: Record<string, AiCostEstimate>
+  /** Aggregate token usage across all batches. Null when DeepSeek didn't
+   *  return a usage payload (pre-flight error, empty batch). Surfaced to
+   *  the pipeline_runs writer so the audit PDF can show real tokens. */
+  usage: { inputTokens: number; outputTokens: number; modelId: string } | null
 }
 
 interface EstimateError {
@@ -84,6 +88,9 @@ interface BatchResult {
   success: boolean
   estimates?: Record<string, AiCostEstimate>
   error?: string
+  inputTokens?: number
+  outputTokens?: number
+  modelId?: string
 }
 
 // ─── Main Action ──────────────────────────────────────────────────────
@@ -290,11 +297,21 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
       const batchEstimates =
         (parsed.estimates as Record<string, AiCostEstimate>) ??
         (parsed as unknown as Record<string, AiCostEstimate>)
+      const inTok = typeof responseData.usage?.prompt_tokens === "number"
+        ? responseData.usage.prompt_tokens : 0
+      const outTok = typeof responseData.usage?.completion_tokens === "number"
+        ? responseData.usage.completion_tokens : 0
       console.info(
         `[CAD-LAB-COST] Batch of ${batchSummaries.length} → ${Object.keys(batchEstimates).length} estimates ` +
-        `(${responseData.usage?.prompt_tokens ?? 0} in / ${responseData.usage?.completion_tokens ?? 0} out)`,
+        `(${inTok} in / ${outTok} out)`,
       )
-      return { success: true, estimates: batchEstimates }
+      return {
+        success: true,
+        estimates: batchEstimates,
+        inputTokens: inTok,
+        outputTokens: outTok,
+        modelId: typeof responseData.model === "string" ? responseData.model : "deepseek-chat",
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown batch error"
       console.error("[CAD-LAB-COST] Batch failed:", msg)
@@ -316,9 +333,22 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
     const estimates: Record<string, AiCostEstimate> = {}
     let failedBatches = 0
     let firstError: string | undefined
+    let totalIn = 0
+    let totalOut = 0
+    let anyTokens = false
+    let firstModelId: string | undefined
     for (const r of batchResults) {
       if (r.success && r.estimates) {
         Object.assign(estimates, r.estimates)
+        if (typeof r.inputTokens === "number") {
+          totalIn += r.inputTokens
+          anyTokens = true
+        }
+        if (typeof r.outputTokens === "number") {
+          totalOut += r.outputTokens
+          anyTokens = true
+        }
+        if (!firstModelId && r.modelId) firstModelId = r.modelId
       } else {
         failedBatches += 1
         if (!firstError) firstError = r.error
@@ -395,7 +425,17 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
     console.info(`[CAD-LAB-COST] Distribution: ${buyCount} buy, ${makeCount} make, ${processes.size} unique processes: ${[...processes].join(", ")}`)
     if (buyCount === 0) console.warn("[CAD-LAB-COST] WARNING: Zero buy parts detected — prompt may need strengthening")
 
-    return { success: true, estimates }
+    return {
+      success: true,
+      estimates,
+      usage: anyTokens
+        ? {
+            inputTokens: totalIn,
+            outputTokens: totalOut,
+            modelId: firstModelId ?? "deepseek-chat",
+          }
+        : null,
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error"
     console.error("[CAD-LAB-COST] AI estimation failed:", msg)

@@ -342,11 +342,14 @@ export async function runFinnCost(
                 }
             }
 
-            // 7. Done. Token counts stay null — see file header for why.
+            // 7. Done. Token counts surface from the inner estimator's
+            //    usage aggregate (summed across batches). When DeepSeek
+            //    didn't return usage on any batch, stays null — audit
+            //    renders "tokens not recorded" rather than zero.
             await completePipelineRun(runId, {
-                input_tokens: null,
-                output_tokens: null,
-                model_id: null,
+                input_tokens: estimateResult.usage?.inputTokens ?? null,
+                output_tokens: estimateResult.usage?.outputTokens ?? null,
+                model_id: estimateResult.usage?.modelId ?? null,
                 output_ref: {
                     table: "cad_lab_projects",
                     column: "ai_cost_estimates",
