@@ -5,31 +5,31 @@
  */
 
 .ed2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --ed-fg:             #1c1917;
-  --ed-fg-muted:       #78716c;
-  --ed-fg-subtle:      #a8a29e;
-  --ed-fg-faint:       #d6d3d1;
-  --ed-surface:        #ffffff;
-  --ed-surface-muted:  #f5f5f4;
-  --ed-surface-soft:   #fafaf9;
-  --ed-border:         #e7e5e4;
-  --ed-border-soft:    #f5f5f4;
-  --ed-border-strong:  #d6d3d1;
-  --ed-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --ed-fg:             var(--fg);
+  --ed-fg-muted:       var(--fg-muted);
+  --ed-fg-subtle:      var(--fg-subtle);
+  --ed-fg-faint:       var(--fg-faint);
+  --ed-surface:        var(--surface);
+  --ed-surface-muted:  var(--surface-muted);
+  --ed-surface-soft:   var(--surface-soft);
+  --ed-border:         var(--border);
+  --ed-border-soft:    var(--surface-muted);
+  --ed-border-strong:  var(--border-strong);
+  --ed-brand:          var(--brand);
   --ed-brand-soft:     rgba(255,69,0,0.10);
   --ed-brand-dim:      rgba(255,69,0,0.35);
-  --ed-success:        #16a34a;
-  --ed-success-soft:   #dcfce7;
+  --ed-success:        var(--success);
+  --ed-success-soft:   var(--success-soft);
   --ed-success-dim:    rgba(22,163,74,0.25);
   --ed-warning:        #b45309;
   --ed-warning-soft:   #fef3c7;
   --ed-warning-dim:    rgba(180,83,9,0.25);
   --ed-danger:         #b91c1c;
-  --ed-danger-soft:    #fee2e2;
+  --ed-danger-soft:    var(--danger-soft);
   --ed-danger-dim:     rgba(185,28,28,0.25);
   --ed-info:           #1d4ed8;
-  --ed-info-soft:      #dbeafe;
+  --ed-info-soft:      var(--info-soft);
 
   color: var(--ed-fg);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

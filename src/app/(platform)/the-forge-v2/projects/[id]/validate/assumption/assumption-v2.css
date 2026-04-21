@@ -3,22 +3,23 @@
    mirror brief-v2.css so the two pages read as siblings. */
 
 .at2 {
-  --a-bg: #fafaf9;
-  --a-surface: #ffffff;
-  --a-surface-muted: #f5f5f4;
-  --a-surface-soft: #fafaf9;
-  --a-border: #e7e5e4;
-  --a-border-strong: #d6d3d1;
-  --a-border-soft: #f0efed;
-  --a-fg: #1c1917;
-  --a-fg-muted: #78716c;
-  --a-fg-subtle: #a8a29e;
-  --a-fg-faint: #d6d3d1;
-  --a-brand: #ff4500;
-  --a-brand-soft: #fff0ea;
-  --a-brand-dim: #ffdcc7;
-  --a-success: #16a34a;
-  --a-success-soft: #dcfce7;
+  /* Token layer — resolves to forge-mockup.css. */
+  --a-bg: var(--bg);
+  --a-surface: var(--surface);
+  --a-surface-muted: var(--surface-muted);
+  --a-surface-soft: var(--surface-soft);
+  --a-border: var(--border);
+  --a-border-strong: var(--border-strong);
+  --a-border-soft: var(--border-soft);
+  --a-fg: var(--fg);
+  --a-fg-muted: var(--fg-muted);
+  --a-fg-subtle: var(--fg-subtle);
+  --a-fg-faint: var(--fg-faint);
+  --a-brand: var(--brand);
+  --a-brand-soft: var(--brand-soft);
+  --a-brand-dim: var(--brand-dim);
+  --a-success: var(--success);
+  --a-success-soft: var(--success-soft);
   --a-success-dim: #bbf7d0;
   --a-warning: #ca8a04;
   --a-warning-soft: #fef9c3;
