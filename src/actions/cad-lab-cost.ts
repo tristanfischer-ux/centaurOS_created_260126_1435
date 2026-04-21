@@ -23,6 +23,51 @@ import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import { classifyPart } from "@/lib/part-classification"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 
+// ─── Batching constants ───────────────────────────────────────────────
+//
+// Finn's single-shot call to DeepSeek for all modules stopped scaling past
+// ~9 modules / ~60 keyParts: response approached the 8192-token ceiling,
+// the outer server action ran past Vercel's 300s maxDuration, and the
+// pipeline_run row hung in 'running' until the watchdog swept it.
+//
+// 3 modules/batch with 3 concurrent workers: each call produces ~3k tokens
+// of output (well under 8192), each batch wall-clocks ~25–40s against
+// DeepSeek, 10 modules fan out to 4 batches → two rounds of three workers
+// ≈ 60–90s end-to-end. Comfortably inside fetchWithTimeout's 90s and
+// Vercel's 300s.
+const COST_BATCH_SIZE = 3
+const COST_CONCURRENCY = 3
+
+/** Lightweight concurrency pool — matches bom.ts's local helper. */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let cursor = 0
+  const workerCount = Math.max(1, Math.min(limit, items.length))
+  async function runOne(): Promise<void> {
+    while (true) {
+      const idx = cursor++
+      if (idx >= items.length) return
+      results[idx] = await mapper(items[idx], idx)
+    }
+  }
+  const workers: Array<Promise<void>> = []
+  for (let i = 0; i < workerCount; i += 1) workers.push(runOne())
+  await Promise.all(workers)
+  return results
+}
+
+/** Partition an array into chunks of at most `size` elements. */
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items]
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
 // ─── Types ────────────────────────────────────────────────────────────
 
 interface EstimateResult {
@@ -33,6 +78,12 @@ interface EstimateResult {
 interface EstimateError {
   success: false
   error: string
+}
+
+interface BatchResult {
+  success: boolean
+  estimates?: Record<string, AiCostEstimate>
+  error?: string
 }
 
 // ─── Main Action ──────────────────────────────────────────────────────
@@ -183,66 +234,105 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
   }
 }`
 
-  const userPrompt = `Estimate costs for these ${modules.length} modules. Be CONCISE.
-${productOverview ? `\nProduct: ${productOverview.slice(0, 200)}\n` : ""}${materialPricingContext}
+  const userPromptPrefix = `Estimate costs. Be CONCISE.${productOverview ? `\nProduct: ${productOverview.slice(0, 200)}\n` : ""}${materialPricingContext}`
 
-MODULES:
-${JSON.stringify(moduleSummaries, null, 2)}
-
-Return ONLY valid JSON.`
+  // Inner: single-batch DeepSeek call for a subset of modules. The outer
+  // loop fans out batches for concurrency. See COST_BATCH_SIZE comment for
+  // why we no longer do one monolithic call.
+  async function estimateBatch(
+    batchSummaries: Array<Record<string, unknown>>,
+  ): Promise<BatchResult> {
+    const userPrompt = `${userPromptPrefix}\n\nMODULES:\n${JSON.stringify(batchSummaries, null, 2)}\n\nReturn ONLY valid JSON.`
+    try {
+      // DECISION: fetchWithTimeout (90s) not raw fetch — per rule R4/R5 in
+      // ~/.claude/projects/-Users-tristanfischer/memory/forgeos-rules.md,
+      // letting Vercel's 300s be the only ceiling means a single hung
+      // upstream call can burn the whole function budget. 90s + batching
+      // keeps wall-clock predictable.
+      const response = await fetchWithTimeout(
+        "https://api.deepseek.com/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            max_tokens: 8192,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+          }),
+        },
+        90_000,
+      )
+      if (!response.ok) {
+        return { success: false, error: `DeepSeek API error: ${response.status}` }
+      }
+      const responseData = await response.json()
+      const text: string = responseData.choices?.[0]?.message?.content ?? ""
+      if (!text) {
+        return { success: false, error: "Empty response from DeepSeek" }
+      }
+      let jsonStr = text.trim()
+      jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "")
+      jsonStr = jsonStr.replace(/\s*```\s*$/i, "")
+      jsonStr = jsonStr.trim()
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(jsonStr)
+      } catch {
+        console.error("[CAD-LAB-COST] Batch JSON parse failed. Raw (first 500):", text.slice(0, 500))
+        return { success: false, error: "Failed to parse AI response as JSON" }
+      }
+      const batchEstimates =
+        (parsed.estimates as Record<string, AiCostEstimate>) ??
+        (parsed as unknown as Record<string, AiCostEstimate>)
+      console.info(
+        `[CAD-LAB-COST] Batch of ${batchSummaries.length} → ${Object.keys(batchEstimates).length} estimates ` +
+        `(${responseData.usage?.prompt_tokens ?? 0} in / ${responseData.usage?.completion_tokens ?? 0} out)`,
+      )
+      return { success: true, estimates: batchEstimates }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown batch error"
+      console.error("[CAD-LAB-COST] Batch failed:", msg)
+      return { success: false, error: msg }
+    }
+  }
 
   try {
-    // DECISION: fetchWithTimeout (90s) not the raw fetch — per rule R4/R5 in
-    // ~/.claude/projects/-Users-tristanfischer/memory/forgeos-rules.md, letting
-    // Vercel's 300s maxDuration be the only ceiling means a single hung
-    // upstream call can burn the whole function budget and starve downstream
-    // fallbacks. 90s fits comfortably under the cap with room for retries.
-    const response = await fetchWithTimeout(
-      "https://api.deepseek.com/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          max_tokens: 8192,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-        }),
-      },
-      90_000,
+    const batches = chunkArray(moduleSummaries, COST_BATCH_SIZE)
+    const batchResults = await runWithConcurrency(
+      batches,
+      COST_CONCURRENCY,
+      (batch) => estimateBatch(batch),
     )
 
-    if (!response.ok) {
-      return { success: false, error: `DeepSeek API error: ${response.status}` }
+    // Merge successful batches. Partial success is acceptable: missing
+    // modules will be absent from the estimates map and the caller's
+    // waterfall UI surfaces that honestly ("estimate pending").
+    const estimates: Record<string, AiCostEstimate> = {}
+    let failedBatches = 0
+    let firstError: string | undefined
+    for (const r of batchResults) {
+      if (r.success && r.estimates) {
+        Object.assign(estimates, r.estimates)
+      } else {
+        failedBatches += 1
+        if (!firstError) firstError = r.error
+      }
     }
-
-    const responseData = await response.json()
-    const text: string = responseData.choices?.[0]?.message?.content ?? ""
-
-    if (!text) {
-      return { success: false, error: "Empty response from DeepSeek" }
+    if (failedBatches === batchResults.length && batchResults.length > 0) {
+      return { success: false, error: firstError ?? "All cost batches failed" }
     }
-
-    // Parse JSON — strip markdown fences if present
-    let jsonStr = text.trim()
-    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "")
-    jsonStr = jsonStr.replace(/\s*```\s*$/i, "")
-    jsonStr = jsonStr.trim()
-
-    let parsed: Record<string, unknown>
-    try {
-      parsed = JSON.parse(jsonStr)
-    } catch {
-      console.error("[CAD-LAB-COST] JSON parse failed. Raw text (first 500 chars):", text.slice(0, 500))
-      console.error("[CAD-LAB-COST] Raw text (last 200 chars):", text.slice(-200))
-      return { success: false, error: "Failed to parse AI response as JSON" }
+    if (failedBatches > 0) {
+      console.warn(
+        `[CAD-LAB-COST] ${failedBatches}/${batchResults.length} batches failed. ` +
+        `Returning partial estimates for ${Object.keys(estimates).length} modules.`,
+      )
     }
-    const estimates: Record<string, AiCostEstimate> = (parsed.estimates as Record<string, AiCostEstimate>) ?? (parsed as unknown as Record<string, AiCostEstimate>)
 
     // Validate each estimate
     for (const mod of modules) {
@@ -292,8 +382,10 @@ Return ONLY valid JSON.`
       }
     }
 
-    console.info("[CAD-LAB-COST] AI estimates produced for", Object.keys(estimates).length, "modules",
-      `(${responseData.usage?.prompt_tokens ?? 0} in / ${responseData.usage?.completion_tokens ?? 0} out)`)
+    console.info(
+      `[CAD-LAB-COST] AI estimates produced for ${Object.keys(estimates).length} modules ` +
+      `(${batchResults.length} batches, ${failedBatches} failed)`,
+    )
 
     // Log category distribution for debugging
     const allParts = Object.values(estimates).flatMap(e => e.parts ?? [])
