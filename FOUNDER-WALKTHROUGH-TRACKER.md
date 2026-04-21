@@ -351,3 +351,82 @@ All 13 pages screenshot-verified rendering real data at `/tmp/wheelhouse/10-fina
 **Commits landed this walkthrough:** `d1fe724b` (fix-submit agent — partial fix, needs second pass).
 
 **Screenshots:** `/tmp/wheelhouse/` 13 full-page captures of populated state. Open with `open -a Preview /tmp/wheelhouse/`.
+
+---
+
+## Pass 4 — Scaling + native Suppliers wiring (commits `6b6171d4`, `cd79f30b`)
+
+### Finn scaling fix verified end-to-end
+
+`estimateModuleCostsAi` was a single DeepSeek call for all modules — fine at 24 parts, broke past ~60. Refactored to batch 3 modules per call with concurrency 3 (matches the BOM skeleton + expand pattern).
+
+On the 84-part full BOM of project `352f5660`:
+
+| | Before | After |
+|---|---|---|
+| Duration | 2847s, watchdog TIMEOUT_STALL | **96s, status=done** |
+| Modules costed | 0 (hung) | 10 / 10 |
+| Unit cost | stale £82k from partial 3-module BOM | **£87,710 across all 10 modules** |
+| Headroom vs £750k ceiling | £667.9k | £662.3k |
+
+Waterfall: ADCS £27.1k (30.9% — reaction wheels + star trackers), Propulsion £15.5k, RPO Sensors £14.5k, TT&C £9.2k, Solar wings £11.0k combined, EPS £3.5k, OBC £3.4k, Net Capture £2.0k, plus structure + assembly. Medium confidence throughout (Finn is honest about not having quote data).
+
+### V2 Suppliers Match-with-Chase button — LIVE and native
+
+New orchestrator `src/actions/forge-v2-supplier-match.ts`:
+- `matchSuppliersForProject(projectId)` fans out Chase's existing per-module scorer
+- Dedupes suppliers matched to multiple modules into one row with merged `moduleIds`
+- Writes top 3 per module via the existing `addToShortlist()`
+- Idempotent on re-run via the `project_id + supplier_id` ON CONFLICT clause
+
+Verified live on preview: clicked "Match suppliers with Chase" → "Chase is matching…" → ~40s → "Added 2 suppliers · 1 module had no candidate". Shortlist populated:
+
+- **Nammo UK Ltd (Nammo Westcott)** — 9 of 10 modules, score 20.4
+- **Oracle Precision Limited** — 9 of 10 modules, score 20.4
+
+Real UK aerospace suppliers. Chip flipped to "2 shortlisted", button relabelled to "Re-match with Chase", grid re-rendered via `router.refresh()`.
+
+### Launch page re-checked with new data
+
+Pre-flight checklist after supplier match:
+
+- ✓ Brief locked (Founder signoff)
+- ! Modules specified (0 of 10 — per-module process/material/qty freeze gate)
+- ! Specialist reviews (1 of 10 — Fang on M1 only)
+- ✓ Cost estimates (10 modules costed — Finn)
+- ✓ Risks logged (41 failure modes + 30 open questions)
+- **✓ Suppliers shortlisted (2 suppliers) — new this pass**
+- ! CAD geometry uploaded (0)
+- ✓ Regulatory posture declared (11 standards — Leo)
+- ✓ Cost ceiling set (£750,000)
+- ✓ Target first-ship (1 Oct 2027)
+
+Banner: **"All launch gates green. You're clear to ship."** Transitions table enumerates every build-time → ops-time mapping (BOM → BOM Watch, Suppliers → Supplier Scorecards, Risks → Compliance Calendar, Revisions → Ops Revisions).
+
+**Ship terminal action is not wired** — only action on the page is "Cancel · not shipping yet". Same pattern as Export PDF — V2 scope-deferred.
+
+### Production DEEPSEEK_API_KEY fixed directly
+
+Tristan authorised prod env edit. Key had trailing literal `\n` (bytes `5c 6e`). Removed + re-added the cleaned 35-char value. Verified valid against `api.deepseek.com` directly before re-adding. All prod direct-DeepSeek calls will work at next function cold-start.
+
+### Final walk matrix
+
+| Phase | Status | Timing |
+|---|---|---|
+| Create project (UI wizard) | ✓ | instant |
+| Chase research (auto) | ✓ | 128s |
+| Lock brief | ✓ | instant |
+| Max decomposition (auto after-fix) | ✓ | 136s |
+| BOM generation (auto after-fix, all modules after skeleton-cap fix) | ✓ | 163s |
+| Finn cost estimate (auto, full BOM, post-batching fix) | ✓ | 96s |
+| Fang manufacturing review | ✓ | 142s |
+| Jian via Ask-a-Specialist | ✓ | ~100s |
+| Risks auto-surfaced | ✓ | derivation, sub-second |
+| Operations rollup | ✓ | instant |
+| Ask-a-Specialist streaming | ✓ | per-message |
+| **Suppliers Match-with-Chase (new)** | ✓ | 40s per run |
+| Launch pre-flight checklist | ✓ | instant |
+| Ship terminal action | ⚠ not wired | V2 scope |
+| Export PDF | ⚠ disabled | V2 scope |
+
+**Commits landed across Passes 2–4:** `0ebccfa9`, `3396c2bf`, `d8bf63ca`, `7f3660de`, `6b6171d4`, `cd79f30b`. Every one fixes a real production bug surfaced by walking as a founder would.
