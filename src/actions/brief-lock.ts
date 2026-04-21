@@ -41,7 +41,8 @@
  *       - src/app/(platform)/the-forge-v2/projects/[id]/workspace-view.tsx
  */
 
-import { runMaxDecomposition } from "@/actions/specialists/run-max-decomposition"
+import { after } from "next/server"
+
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
@@ -334,22 +335,37 @@ export async function lockCadLabBrief(projectId: string): Promise<BriefLockResul
             )
         }
 
-        // ── 8. Fire-and-forget: kick Max's decomposition in the background.
+        // ── 8. Fire Max's decomposition as post-response work via after().
         //      The founder sees the lock succeed immediately; Max's run
         //      lands asynchronously and surfaces via pipeline_runs on the
         //      Modules / Workspace pages.
         //
-        //      We deliberately do NOT await — even though `runMaxDecomposition`
-        //      is itself a server action, Vercel lets us defer its Promise
-        //      beyond the outer handler's return. Any unhandled rejection
-        //      here would crash the Node function, so we attach `.catch`.
-        void runMaxDecomposition(projectId, "auto.brief-lock").catch((err) => {
-            console.error(
-                "[brief-lock] auto-trigger Max failed (non-fatal for lock):",
-                err instanceof Error ? err.message : err,
-            )
-            // pipeline_runs will show the failure with errorCode=INTERNAL
-            // for observability — the founder's lock still succeeded.
+        //      TRIED: plain `void runMaxDecomposition(...)` fire-and-forget.
+        //      Problem: Vercel terminates the serverless container as soon
+        //      as the outer server action's Promise resolves — Max's run
+        //      gets its pipeline_runs row written but the container is torn
+        //      down before skeletonDecompose returns, leaving the row
+        //      stuck in 'running' until the watchdog sweeps it (6+ min).
+        //      Evidence: project bb371c71 sat stuck for 36 min after lock
+        //      on 2026-04-21; same failure mode as project 8c3e08f0 before
+        //      createCadLabProject was switched to after() for Chase.
+        //
+        //      Dynamic import avoids a circular "use server" init cycle
+        //      between brief-lock and run-max-decomposition.
+        after(async () => {
+            try {
+                const { runMaxDecomposition } = await import(
+                    "@/actions/specialists/run-max-decomposition"
+                )
+                await runMaxDecomposition(projectId, "auto.brief-lock")
+            } catch (err) {
+                console.error(
+                    "[brief-lock] auto-trigger Max failed (non-fatal for lock):",
+                    err instanceof Error ? err.message : err,
+                )
+                // pipeline_runs will show the failure with errorCode=INTERNAL
+                // for observability — the founder's lock still succeeded.
+            }
         })
 
         return {
