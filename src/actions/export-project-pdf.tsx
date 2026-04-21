@@ -99,8 +99,12 @@ const styles = StyleSheet.create({
         paddingTop: 42,
         color: "white",
     },
-    coverBandTitle: { fontSize: 28, fontWeight: "bold", color: "white", marginBottom: 6 },
-    coverBandSub: { fontSize: 11, color: "white", opacity: 0.9 },
+    // marginBottom must exceed the h1's font descender to prevent the
+    // subtitle visually colliding with the title at certain widths — 18
+    // is safe for 28pt bold. Subtitle also gets explicit marginTop as
+    // belt-and-braces against line-height round-off in react-pdf.
+    coverBandTitle: { fontSize: 28, fontWeight: "bold", color: "white", marginBottom: 18, lineHeight: 1.2 },
+    coverBandSub: { fontSize: 11, color: "white", opacity: 0.9, marginTop: 4 },
     coverBody: { padding: 48 },
     coverGridRow: { flexDirection: "row", marginBottom: 4 },
     coverGridLabel: { width: 160, color: MUTED, fontSize: 10 },
@@ -265,6 +269,62 @@ function fmtDuration(seconds: number | null | undefined): string {
     return `${m}m ${s}s`
 }
 
+// Map a specialist id / display name → "Name (Role — specialist AI)".
+// Tristan's feedback: every time a specialist is named we need to tell
+// the reader both what they do and that they're an AI specialist, so
+// the PDF doesn't read like a team of humans wrote it.
+const SPECIALIST_ROLES: Record<string, string> = {
+    strategist: "Strategy Lead",
+    sage: "Strategy Lead",
+    cto: "CTO",
+    max: "CTO",
+    "vp-engineering": "VP Engineering",
+    jian: "VP Engineering",
+    "vp-manufacturing": "VP Manufacturing",
+    fang: "VP Manufacturing",
+    "vp-supply-chain": "VP Supply Chain",
+    chase: "VP Supply Chain",
+    "product-lead": "Product Lead",
+    priya: "Product Lead",
+    "growth-marketer": "Marketing Lead",
+    mia: "Marketing Lead",
+    "sales-lead": "Sales Lead",
+    sal: "Sales Lead",
+    "chief-of-staff": "Chief of Staff",
+    cal: "Chief of Staff",
+    "finance-lead": "Finance Lead",
+    finn: "Finance Lead",
+    "fundraising-advisor": "Fundraising Advisor",
+    fiona: "Fundraising Advisor",
+    "hiring-team": "HR Lead",
+    harper: "HR Lead",
+    "legal-counsel": "Legal Counsel",
+    leo: "Legal Counsel",
+}
+
+function specialistRole(idOrName: string | null | undefined): string | null {
+    if (!idOrName) return null
+    const key = String(idOrName).trim().toLowerCase()
+    if (SPECIALIST_ROLES[key]) return SPECIALIST_ROLES[key]
+    // "Finn — Finance Lead" / "Finn (Finance Lead)" — try the first word.
+    const firstWord = key.split(/[\s—:(-]+/)[0]
+    return SPECIALIST_ROLES[firstWord] ?? null
+}
+
+/**
+ * Returns "Finn (Finance Lead — specialist AI)" when a role is known,
+ * or just "Finn (specialist AI)" when not — we never drop the "specialist
+ * AI" tag because Tristan wants every specialist mention flagged.
+ */
+function specialistLabel(idOrName: string | null | undefined): string {
+    const name = typeof idOrName === "string" ? idOrName : ""
+    const role = specialistRole(name)
+    const display = name.length > 0 ? name : "Specialist"
+    return role
+        ? `${display} (${role} — specialist AI)`
+        : `${display} (specialist AI)`
+}
+
 // ─── Types passed to the PDF component ────────────────────────────────
 
 interface Regulatory {
@@ -394,6 +454,38 @@ interface PdfInput {
         reviewCount: number
         pipelineRunCount: number
     }
+    /**
+     * Source-attribution counts + freshness. Captured at export time so
+     * the PDF can tell the reader WHERE the numbers came from — which
+     * Supabase table, how many rows were available to draw from, and how
+     * fresh that data is. Nulls are rendered as "—" (honest signal that
+     * the count couldn't be read at export time).
+     */
+    sources: {
+        materialPropertyCount: number | null
+        materialPropertyFreshestIso: string | null
+        processCapabilityCount: number | null
+        processCapabilityFreshestIso: string | null
+        supplierDirectoryCount: number | null
+        marketplaceListingCount: number | null
+        bomModel: string
+        bomProvider: string
+    }
+    /**
+     * Model-usage breakdown across this project's pipeline runs. Feeds
+     * the "Which models did the work" section on the audit page so
+     * Tristan (and anyone else reading) can see the answer without
+     * having to read every audit row individually.
+     */
+    modelUsage: Array<{
+        provider: string
+        model: string
+        runCount: number
+        successCount: number
+        failCount: number
+        totalInputTokens: number | null
+        totalOutputTokens: number | null
+    }>
 }
 
 // ─── PDF Component ─────────────────────────────────────────────────────
@@ -457,7 +549,10 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                     </View>
                 )}
 
-                <View style={{ marginTop: 24 }}>
+                {/* wrap=false keeps the full 3-row grid together — before
+                    this, the last row (unit cost / ceiling / headroom /
+                    reviews) would orphan onto page 2. */}
+                <View style={{ marginTop: 24 }} wrap={false}>
                     <Text style={styles.h5}>Totals at a glance</Text>
                     <View style={styles.statRow}>
                         <View style={styles.stat}>
@@ -667,22 +762,26 @@ function ModulePage({
                 </View>
             )}
 
+            {/* Order: Purpose → Why it matters → Description. "Why it
+                matters" carries the strategic stake and belongs before the
+                physical description so readers hit the importance signal
+                before the implementation detail. */}
             {mod.purpose && (
                 <View style={styles.para}>
                     <Text style={styles.h5}>Purpose</Text>
                     <Text>{mod.purpose}</Text>
                 </View>
             )}
-            {mod.description && (
-                <View style={styles.para}>
-                    <Text style={styles.h5}>Description</Text>
-                    <Text>{mod.description}</Text>
-                </View>
-            )}
             {mod.whyItMatters && (
                 <View style={styles.para}>
                     <Text style={styles.h5}>Why it matters</Text>
                     <Text>{mod.whyItMatters}</Text>
+                </View>
+            )}
+            {mod.description && (
+                <View style={styles.para}>
+                    <Text style={styles.h5}>Description</Text>
+                    <Text>{mod.description}</Text>
                 </View>
             )}
 
@@ -743,7 +842,7 @@ function ModulePage({
             {mod.cost && (
                 <View style={{ marginTop: 10 }}>
                     <Text style={styles.h5}>
-                        Finn's cost breakdown
+                        {specialistLabel("Finn")}'s cost breakdown
                         {mod.cost.confidence
                             ? ` · ${mod.cost.confidence} confidence`
                             : ""}
@@ -822,7 +921,7 @@ function ModulePage({
                     {mod.reviews.map((r, i) => (
                         <View key={i} style={{ marginBottom: 8 }}>
                             <Text style={{ fontWeight: "bold", fontSize: 10 }}>
-                                {r.reviewer}
+                                {specialistLabel(r.reviewer)}
                                 {r.verdict ? ` · ${r.verdict}` : ""}
                                 {r.reviewedAtIso ? ` · ${fmtDateTime(r.reviewedAtIso)}` : ""}
                             </Text>
@@ -880,10 +979,17 @@ function ModulePage({
     )
 }
 
-function BomMasterPage({ parts }: { parts: PartRow[] }): React.ReactElement {
+function BomMasterPage({ parts, sources }: { parts: PartRow[]; sources: PdfInput["sources"] }): React.ReactElement {
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>4. BOM master ({parts.length} rows)</Text>
+            <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
+                BOM derived from {specialistLabel("Max")}&apos;s module decomposition
+                (`keyParts`), expanded into typed part rows by the bom.generate
+                pipeline using {sources.bomModel} ({sources.bomProvider}).
+                Part records live in the `parts` table and are joined back to
+                modules via source_module_id.
+            </Text>
             {parts.length === 0 ? (
                 <Text style={styles.muted}>No parts generated yet.</Text>
             ) : (
@@ -934,6 +1040,18 @@ function BomMasterPage({ parts }: { parts: PartRow[] }): React.ReactElement {
     )
 }
 
+function fmtDateShort(iso: string | null | undefined): string {
+    if (!iso) return "unknown"
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return "unknown"
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+}
+
+function fmtInt(n: number | null | undefined): string {
+    if (typeof n !== "number" || !Number.isFinite(n)) return "—"
+    return n.toLocaleString("en-GB")
+}
+
 function CostPage({ data }: { data: PdfInput }): React.ReactElement {
     const hasCeiling = typeof data.cost.ceilingGbp === "number"
     const hasUnit = typeof data.cost.unitTotalGbp === "number"
@@ -941,6 +1059,17 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>5. Cost waterfall</Text>
+            <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
+                Estimates generated by {specialistLabel("Finn")} (DeepSeek V3.2),
+                grounded against the `material_properties` table
+                ({fmtInt(data.sources.materialPropertyCount)} rows, freshest
+                {" "}{fmtDateShort(data.sources.materialPropertyFreshestIso)}) and
+                the `process_capabilities` table
+                ({fmtInt(data.sources.processCapabilityCount)} rows, freshest
+                {" "}{fmtDateShort(data.sources.processCapabilityFreshestIso)}).
+                Costs sit in the project&apos;s ai_cost_estimates jsonb, keyed by
+                module id.
+            </Text>
             <View style={styles.statRow}>
                 <View style={styles.stat}>
                     <Text style={styles.statLabel}>Unit cost (all-in)</Text>
@@ -1040,10 +1169,21 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
     )
 }
 
-function SuppliersPage({ suppliers }: { suppliers: SupplierPdf[] }): React.ReactElement {
+function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sources: PdfInput["sources"] }): React.ReactElement {
+    const dirCount = fmtInt(sources.supplierDirectoryCount)
+    const listingCount = fmtInt(sources.marketplaceListingCount)
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>7. Supplier shortlist ({suppliers.length})</Text>
+            <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
+                Shortlist built by {specialistLabel("Chase")} scoring each
+                supplier in the `suppliers` directory ({dirCount} companies) and
+                the `marketplace_listings` table ({listingCount} listings) against
+                each module&apos;s declared process + material. Scoring logic:
+                src/actions/cad-lab-supplier-match.ts. A low shortlist count
+                usually means the directory doesn&apos;t yet have coverage for
+                the project&apos;s niche — not that no match exists globally.
+            </Text>
             {suppliers.length === 0 && (
                 <Text style={styles.muted}>No suppliers shortlisted yet.</Text>
             )}
@@ -1082,7 +1222,7 @@ function SuppliersPage({ suppliers }: { suppliers: SupplierPdf[] }): React.React
                         )}
                         {s.matchReasons.length > 0 && (
                             <View style={{ marginTop: 4 }}>
-                                <Text style={styles.h5}>Why Chase picked them</Text>
+                                <Text style={styles.h5}>Why {specialistLabel("Chase")} picked them</Text>
                                 {s.matchReasons.map((r, j) => (
                                     <View key={j} style={styles.bullet}>
                                         <Text style={styles.bulletDot}>•</Text>
@@ -1101,39 +1241,189 @@ function SuppliersPage({ suppliers }: { suppliers: SupplierPdf[] }): React.React
     )
 }
 
+/**
+ * Normalise a provider + modelId pair to a single human-readable string.
+ * pipeline_runs is populated by many call-sites and they don't agree on
+ * casing / provider-prefix / model id shape. Tristan's feedback flagged
+ * "OPUS 4.7" vs "Anthropic Claude OPUS 4.7" vs plain "Anthropic" in the
+ * same audit. This function fixes that at render-time.
+ */
+function normaliseModelLabel(
+    provider: string | null | undefined,
+    modelId: string | null | undefined,
+): string {
+    const p = (provider ?? "").trim()
+    const m = (modelId ?? "").trim()
+    if (!p && !m) return "—"
+    const lower = `${p} ${m}`.toLowerCase()
+
+    if (lower.includes("claude") || lower.includes("anthropic")) {
+        if (lower.includes("opus-4-7") || lower.includes("opus 4.7")) {
+            return "Anthropic · Claude Opus 4.7"
+        }
+        if (lower.includes("sonnet-4") || lower.includes("sonnet 4")) {
+            return "Anthropic · Claude Sonnet 4"
+        }
+        if (lower.includes("haiku-4") || lower.includes("haiku 4")) {
+            return "Anthropic · Claude Haiku 4.5"
+        }
+        return m ? `Anthropic · ${m}` : "Anthropic · Claude"
+    }
+    if (lower.includes("deepseek")) {
+        if (lower.includes("v4") || lower.includes("-chat-v4")) {
+            return "DeepSeek · V4"
+        }
+        if (lower.includes("v3") || lower.includes("deepseek-chat")) {
+            return "DeepSeek · V3.2"
+        }
+        return m ? `DeepSeek · ${m}` : "DeepSeek"
+    }
+    if (lower.includes("gemini") || lower.includes("google")) {
+        return m ? `Google · ${m}` : "Google · Gemini"
+    }
+    if (lower.includes("nano-banana") || lower.includes("nano banana")) {
+        return "Google · Gemini 2.5 (Nano Banana)"
+    }
+    if (lower.includes("openai") || lower.includes("gpt-")) {
+        return m ? `OpenAI · ${m}` : "OpenAI"
+    }
+    if (lower.includes("stability") || lower.includes("sdxl") || lower.includes("stable-diff")) {
+        return m ? `Stability · ${m}` : "Stability"
+    }
+    if (lower.includes("flux") || lower.includes("replicate")) {
+        return m ? `Replicate · ${m}` : "Replicate"
+    }
+    // Fallback: render whatever we got, cleanly joined.
+    return [p, m].filter(Boolean).join(" · ")
+}
+
+/**
+ * Dedupe pipeline_runs so that retried (specialist, stage) keys surface
+ * as one row — the latest status wins. The count of earlier failed
+ * attempts is attached so the audit still signals reliability.
+ *
+ * Tristan's feedback: "Finance-lead `failed` rows appear before the
+ * final `done` row. Since Tristan retried and it succeeded, hide or
+ * de-duplicate the earlier failures."
+ */
+function dedupePipelineRuns(runs: PipelineRunPdf[]): Array<
+    PipelineRunPdf & { earlierAttempts: number }
+> {
+    // Assume input is already ordered by started_at asc (the data loader
+    // sorts it that way). Keep the LAST entry per (specialist, stage).
+    const bucket = new Map<string, { last: PipelineRunPdf; earlierFails: number }>()
+    for (const r of runs) {
+        const key = `${r.specialist}::${r.stage}`
+        const prev = bucket.get(key)
+        if (!prev) {
+            bucket.set(key, { last: r, earlierFails: 0 })
+        } else {
+            const earlierFails = prev.earlierFails + (prev.last.status === "failed" ? 1 : 0)
+            bucket.set(key, { last: r, earlierFails })
+        }
+    }
+    // Re-sort by the last-attempt startedAtIso to preserve chronological
+    // flow in the table.
+    return Array.from(bucket.values())
+        .map((b) => ({ ...b.last, earlierAttempts: b.earlierFails }))
+        .sort((a, b) => {
+            const ta = new Date(a.startedAtIso).getTime()
+            const tb = new Date(b.startedAtIso).getTime()
+            return ta - tb
+        })
+}
+
 function PipelineAuditPage({
     runs,
+    modelUsage,
 }: {
     runs: PipelineRunPdf[]
+    modelUsage: PdfInput["modelUsage"]
 }): React.ReactElement {
+    const deduped = dedupePipelineRuns(runs)
+    const hiddenFailures = runs.length - deduped.length
     return (
         <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>8. Specialist-run audit ({runs.length})</Text>
+            <Text style={styles.h2}>8. Specialist-run audit ({deduped.length})</Text>
             <Text style={styles.muted}>
                 Every pipeline orchestrator call against this project — who ran, when,
-                how long, model used, tokens, and any error.
+                how long, model used, tokens, and any error. Retried (specialist,
+                stage) pairs are deduped to the latest attempt; earlier failures are
+                counted inline.
+                {hiddenFailures > 0
+                    ? ` ${hiddenFailures} earlier retried attempt${hiddenFailures === 1 ? "" : "s"} collapsed into the rows below.`
+                    : ""}
             </Text>
-            <View style={[styles.table, { marginTop: 8 }]}>
+
+            {/* Multi-model audit — answers "which models did the work". */}
+            {modelUsage.length > 0 && (
+                <View style={{ marginTop: 10 }} wrap={false}>
+                    <Text style={styles.h5}>Models used on this project</Text>
+                    <View style={styles.table}>
+                        <View style={styles.tableHead}>
+                            <Text style={[styles.tableHeadCell, { flex: 2.2 }]}>Model</Text>
+                            <Text style={[styles.tableHeadCell, { width: 50, textAlign: "right" }]}>Runs</Text>
+                            <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Success</Text>
+                            <Text style={[styles.tableHeadCell, { width: 50, textAlign: "right" }]}>Fail</Text>
+                            <Text style={[styles.tableHeadCell, { width: 80, textAlign: "right" }]}>In tokens</Text>
+                            <Text style={[styles.tableHeadCell, { width: 80, textAlign: "right" }]}>Out tokens</Text>
+                        </View>
+                        {modelUsage.map((u, i) => (
+                            <View key={i} style={styles.tableRow} wrap={false}>
+                                <Text style={[styles.tableCell, { flex: 2.2 }]}>
+                                    {normaliseModelLabel(u.provider, u.model)}
+                                </Text>
+                                <Text style={[styles.tableCell, { width: 50, textAlign: "right" }]}>{u.runCount}</Text>
+                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{u.successCount}</Text>
+                                <Text style={[styles.tableCell, { width: 50, textAlign: "right" }]}>{u.failCount}</Text>
+                                <Text style={[styles.tableCell, { width: 80, textAlign: "right" }]}>
+                                    {fmtInt(u.totalInputTokens)}
+                                </Text>
+                                <Text style={[styles.tableCell, { width: 80, textAlign: "right" }]}>
+                                    {fmtInt(u.totalOutputTokens)}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            <Text style={[styles.h5, { marginTop: 12 }]}>Run-by-run log</Text>
+            <View style={[styles.table, { marginTop: 4 }]}>
                 <View style={styles.tableHead}>
                     <Text style={[styles.tableHeadCell, { flex: 1.3 }]}>Specialist</Text>
                     <Text style={[styles.tableHeadCell, { flex: 1.4 }]}>Stage</Text>
-                    <Text style={[styles.tableHeadCell, { width: 50 }]}>Status</Text>
+                    <Text style={[styles.tableHeadCell, { width: 56 }]}>Status</Text>
                     <Text style={[styles.tableHeadCell, { width: 90 }]}>Started</Text>
                     <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>
                         Duration
                     </Text>
-                    <Text style={[styles.tableHeadCell, { width: 90 }]}>Model</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 1.4 }]}>Model</Text>
                     <Text style={[styles.tableHeadCell, { width: 70, textAlign: "right" }]}>
                         In / out tokens
                     </Text>
                 </View>
-                {runs.map((r, i) => (
+                {deduped.map((r, i) => {
+                    const role = specialistRole(r.specialist)
+                    const tokensMissingButRan =
+                        r.status === "done" &&
+                        r.inputTokens == null &&
+                        r.outputTokens == null
+                    return (
                     <View key={i} style={styles.tableRow} wrap={false}>
-                        <Text style={[styles.tableCell, { flex: 1.3 }]}>{r.specialist}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.3 }]}>
+                            {r.specialist}
+                            {role ? (
+                                <Text style={{ color: MUTED, fontSize: 7.5 }}>{"\n"}{role} · specialist AI</Text>
+                            ) : null}
+                        </Text>
                         <Text style={[styles.tableCell, { flex: 1.4 }]}>{r.stage}</Text>
-                        <Text style={[styles.tableCell, { width: 50 }]}>
+                        <Text style={[styles.tableCell, { width: 56 }]}>
                             {r.status}
                             {r.errorCode ? ` (${r.errorCode})` : ""}
+                            {r.earlierAttempts > 0 ? (
+                                <Text style={{ color: MUTED, fontSize: 7.5 }}>{"\n"}after {r.earlierAttempts} retry{r.earlierAttempts === 1 ? "" : "s"}</Text>
+                            ) : null}
                         </Text>
                         <Text style={[styles.tableCell, { width: 90 }]}>
                             {fmtDateTime(r.startedAtIso)}
@@ -1141,15 +1431,18 @@ function PipelineAuditPage({
                         <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>
                             {fmtDuration(r.durationSec)}
                         </Text>
-                        <Text style={[styles.tableCell, { width: 90 }]}>
-                            {r.modelProvider ? `${r.modelProvider}` : "—"}
-                            {r.modelId ? ` ${r.modelId}` : ""}
+                        <Text style={[styles.tableCell, { flex: 1.4 }]}>
+                            {normaliseModelLabel(r.modelProvider, r.modelId)}
                         </Text>
                         <Text style={[styles.tableCell, { width: 70, textAlign: "right" }]}>
                             {r.inputTokens ?? "—"} / {r.outputTokens ?? "—"}
+                            {tokensMissingButRan ? (
+                                <Text style={{ color: MUTED, fontSize: 7.5 }}>{"\n"}tokens not recorded</Text>
+                            ) : null}
                         </Text>
                     </View>
-                ))}
+                    )
+                })}
             </View>
             {runs.some((r) => r.errorMessage) && (
                 <View style={{ marginTop: 10 }}>
@@ -1243,7 +1536,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             ))}
 
             {/* 4. BOM master */}
-            <BomMasterPage parts={data.parts} />
+            <BomMasterPage parts={data.parts} sources={data.sources} />
 
             {/* 5. Cost */}
             <CostPage data={data} />
@@ -1252,10 +1545,10 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             <RisksPage modules={data.modules} />
 
             {/* 7. Suppliers */}
-            <SuppliersPage suppliers={data.suppliers} />
+            <SuppliersPage suppliers={data.suppliers} sources={data.sources} />
 
             {/* 8. Pipeline audit */}
-            <PipelineAuditPage runs={data.pipelineRuns} />
+            <PipelineAuditPage runs={data.pipelineRuns} modelUsage={data.modelUsage} />
 
             {/* 9. Audit log */}
             <AuditLogPage rows={data.auditLog} />
@@ -1562,6 +1855,119 @@ export async function exportProjectPdf(
             }
         })
 
+        // Source-attribution counts — so the PDF can tell the reader
+        // how much reference data the specialists drew on when they
+        // generated costs / BOM / supplier picks. Queried in parallel to
+        // keep export wall-clock down. `count: "exact", head: true` is
+        // an index-only count, not a full row scan.
+        const [
+            matPropsRes,
+            procCapsRes,
+            suppliersDirRes,
+            marketRes,
+            freshMatRes,
+            freshProcRes,
+        ] = await Promise.all([
+            admin
+                .from("material_properties")
+                .select("id", { count: "exact", head: true }),
+            admin
+                .from("process_capabilities")
+                .select("id", { count: "exact", head: true }),
+            admin
+                .from("suppliers")
+                .select("id", { count: "exact", head: true }),
+            admin
+                .from("marketplace_listings")
+                .select("id", { count: "exact", head: true }),
+            admin
+                .from("material_properties")
+                .select("updated_at")
+                .order("updated_at", { ascending: false, nullsFirst: false })
+                .limit(1),
+            admin
+                .from("process_capabilities")
+                .select("updated_at")
+                .order("updated_at", { ascending: false, nullsFirst: false })
+                .limit(1),
+        ])
+
+        const sources: PdfInput["sources"] = {
+            materialPropertyCount: matPropsRes.count ?? null,
+            materialPropertyFreshestIso:
+                (freshMatRes.data?.[0] as { updated_at?: string } | undefined)
+                    ?.updated_at ?? null,
+            processCapabilityCount: procCapsRes.count ?? null,
+            processCapabilityFreshestIso:
+                (freshProcRes.data?.[0] as { updated_at?: string } | undefined)
+                    ?.updated_at ?? null,
+            supplierDirectoryCount: suppliersDirRes.count ?? null,
+            marketplaceListingCount: marketRes.count ?? null,
+            // Kept as strings here so the PDF can render provenance
+            // without importing BOM internals. Updating this when BOM's
+            // model changes is a manual sync — caveat acknowledged.
+            bomModel: "Claude Opus 4.7",
+            bomProvider: "Anthropic",
+        }
+
+        // Model-usage breakdown — groups runs by provider+model so the
+        // pipeline audit can show which LLMs actually did the work.
+        const modelUsageMap = new Map<
+            string,
+            {
+                provider: string
+                model: string
+                runCount: number
+                successCount: number
+                failCount: number
+                totalInputTokens: number
+                totalOutputTokens: number
+                anyInput: boolean
+                anyOutput: boolean
+            }
+        >()
+        for (const r of pipelineRuns) {
+            const provider = r.modelProvider ?? "unknown"
+            const model = r.modelId ?? "unknown"
+            const key = `${provider}::${model}`
+            const row = modelUsageMap.get(key) ?? {
+                provider,
+                model,
+                runCount: 0,
+                successCount: 0,
+                failCount: 0,
+                totalInputTokens: 0,
+                totalOutputTokens: 0,
+                anyInput: false,
+                anyOutput: false,
+            }
+            row.runCount += 1
+            if (r.status === "done") row.successCount += 1
+            if (r.status === "failed") row.failCount += 1
+            if (typeof r.inputTokens === "number") {
+                row.totalInputTokens += r.inputTokens
+                row.anyInput = true
+            }
+            if (typeof r.outputTokens === "number") {
+                row.totalOutputTokens += r.outputTokens
+                row.anyOutput = true
+            }
+            modelUsageMap.set(key, row)
+        }
+        const modelUsage: PdfInput["modelUsage"] = Array.from(
+            modelUsageMap.values(),
+        )
+            .sort((a, b) => b.runCount - a.runCount)
+            .map((r) => ({
+                provider: r.provider,
+                model: r.model,
+                runCount: r.runCount,
+                successCount: r.successCount,
+                failCount: r.failCount,
+                totalInputTokens: r.anyInput ? r.totalInputTokens : null,
+                totalOutputTokens: r.anyOutput ? r.totalOutputTokens : null,
+            }))
+
         // Audit log rows.
         const { data: auditRowsRaw } = await admin
             .from("audit_log")
@@ -1676,6 +2082,8 @@ export async function exportProjectPdf(
                 reviewCount,
                 pipelineRunCount: pipelineRuns.length,
             },
+            sources,
+            modelUsage,
         }
 
         try {
