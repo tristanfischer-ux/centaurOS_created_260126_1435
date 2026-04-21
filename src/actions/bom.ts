@@ -257,9 +257,23 @@ export interface BomExpansionResult {
  * Phase 1 of progressive BOM generation: returns lightweight skeleton
  * with part names, hierarchy, process type, and isPurchased flag.
  *
- * @description Uses a focused prompt with max_tokens: 2048 for fast response (~10s).
- * Caller should display skeleton parts immediately (specs show "—"),
- * then call expandBomParts() for full specifications.
+ * @description Caller should display skeleton parts immediately (specs show
+ * "—"), then call expandBomParts() for full specifications.
+ *
+ * TRIED max_tokens: 2048 on 2026-03-29 (original progressive-BOM commit).
+ * Problem: truncates mid-JSON for projects with ≥7 modules. A 10-module
+ * cubesat project with 62 key parts + 10 assemblies needs ~6k tokens of
+ * skeleton JSON. tryParseJsonWithRepair salvaged the truncated array by
+ * closing it at the 3rd module, so BOM silently succeeded with 3 of 10
+ * modules covered and every downstream cost number was wrong.
+ *
+ * Evidence: project bb371c71 (2026-04-21) — parts table had only
+ * primary_structure (13), avionics_stack (6), eps_battery (5). Modules
+ * 4–10 silently missing; Finn's cost estimate off by ≥50%.
+ *
+ * Now 8192 to match expand batches — covers ~80 skeleton parts even for
+ * content-heavy modules. Response time ~12–15s (vs ~8s at 2048) is
+ * acceptable for a once-per-project call.
  */
 export async function skeletonBom(
   projectId: string,
@@ -339,7 +353,7 @@ Respond with ONLY valid JSON:
 
     const response = await client.messages.create({
       model: BOM_MODEL,
-      max_tokens: 2048,
+      max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     })
