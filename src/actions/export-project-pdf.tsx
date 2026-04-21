@@ -1394,30 +1394,18 @@ function PipelineAuditPage({
                     <View style={styles.table}>
                         <View style={styles.tableHead}>
                             <Text style={[styles.tableHeadCell, { flex: 2.2 }]}>Model</Text>
-                            <Text style={[styles.tableHeadCell, { width: 50, textAlign: "right" }]}>Runs</Text>
-                            <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Success</Text>
-                            <Text style={[styles.tableHeadCell, { width: 50, textAlign: "right" }]}>Fail</Text>
-                            <Text style={[styles.tableHeadCell, { width: 80, textAlign: "right" }]}>In tokens</Text>
-                            <Text style={[styles.tableHeadCell, { width: 80, textAlign: "right" }]}>Out tokens</Text>
+                            <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Runs</Text>
+                            <Text style={[styles.tableHeadCell, { width: 70, textAlign: "right" }]}>Success</Text>
+                            <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Fail</Text>
                         </View>
                         {modelUsage.map((u, i) => (
                             <View key={i} style={styles.tableRow} wrap={false}>
                                 <Text style={[styles.tableCell, { flex: 2.2 }]}>
-                                    {/* provider field already holds the
-                                        canonical label — aggregation
-                                        keyed by normaliseModelLabel in
-                                        the loader. model is empty. */}
                                     {u.provider}
                                 </Text>
-                                <Text style={[styles.tableCell, { width: 50, textAlign: "right" }]}>{u.runCount}</Text>
-                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{u.successCount}</Text>
-                                <Text style={[styles.tableCell, { width: 50, textAlign: "right" }]}>{u.failCount}</Text>
-                                <Text style={[styles.tableCell, { width: 80, textAlign: "right" }]}>
-                                    {fmtInt(u.totalInputTokens)}
-                                </Text>
-                                <Text style={[styles.tableCell, { width: 80, textAlign: "right" }]}>
-                                    {fmtInt(u.totalOutputTokens)}
-                                </Text>
+                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{u.runCount}</Text>
+                                <Text style={[styles.tableCell, { width: 70, textAlign: "right" }]}>{u.successCount}</Text>
+                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{u.failCount}</Text>
                             </View>
                         ))}
                     </View>
@@ -1435,16 +1423,9 @@ function PipelineAuditPage({
                         Duration
                     </Text>
                     <Text style={[styles.tableHeadCell, { flex: 1.4 }]}>Model</Text>
-                    <Text style={[styles.tableHeadCell, { width: 70, textAlign: "right" }]}>
-                        In / out tokens
-                    </Text>
                 </View>
                 {deduped.map((r, i) => {
                     const role = specialistRole(r.specialist)
-                    const tokensMissingButRan =
-                        r.status === "done" &&
-                        r.inputTokens == null &&
-                        r.outputTokens == null
                     return (
                     <View key={i} style={styles.tableRow} wrap={false}>
                         <Text style={[styles.tableCell, { flex: 1.3 }]}>
@@ -1474,12 +1455,6 @@ function PipelineAuditPage({
                         </Text>
                         <Text style={[styles.tableCell, { flex: 1.4 }]}>
                             {normaliseModelLabel(r.modelProvider, r.modelId)}
-                        </Text>
-                        <Text style={[styles.tableCell, { width: 70, textAlign: "right" }]}>
-                            {r.inputTokens ?? "—"} / {r.outputTokens ?? "—"}
-                            {tokensMissingButRan ? (
-                                <Text style={{ color: MUTED, fontSize: 7.5 }}>{"\n"}tokens not recorded</Text>
-                            ) : null}
                         </Text>
                     </View>
                     )
