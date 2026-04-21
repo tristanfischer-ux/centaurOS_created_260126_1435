@@ -5,27 +5,27 @@
  */
 
 .ex2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --ex-fg:            #1c1917;
-  --ex-fg-muted:      #78716c;
-  --ex-fg-faint:      #a8a29e;
-  --ex-fg-subtle:     #d6d3d1;
-  --ex-surface:       #ffffff;
-  --ex-surface-muted: #f5f5f4;
-  --ex-surface-soft:  #fafaf9;
-  --ex-border:        #e7e5e4;
-  --ex-border-strong: #d6d3d1;
-  --ex-border-soft:   #f0efed;
-  --ex-brand:         #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --ex-fg:            var(--fg);
+  --ex-fg-muted:      var(--fg-muted);
+  --ex-fg-faint:      var(--fg-subtle);
+  --ex-fg-subtle:     var(--fg-faint);
+  --ex-surface:       var(--surface);
+  --ex-surface-muted: var(--surface-muted);
+  --ex-surface-soft:  var(--surface-soft);
+  --ex-border:        var(--border);
+  --ex-border-strong: var(--border-strong);
+  --ex-border-soft:   var(--border-soft);
+  --ex-brand:         var(--brand);
   --ex-brand-soft:    rgba(255,69,0,0.10);
   --ex-success:       #15803d;
-  --ex-success-soft:  #dcfce7;
+  --ex-success-soft:  var(--success-soft);
   --ex-warning:       #b45309;
   --ex-warning-soft:  #fef3c7;
   --ex-danger:        #b91c1c;
-  --ex-danger-soft:   #fee2e2;
+  --ex-danger-soft:   var(--danger-soft);
   --ex-info:          #1d4ed8;
-  --ex-info-soft:     #dbeafe;
+  --ex-info-soft:     var(--info-soft);
   --ex-teal-soft:     #f0fdfa;
   --ex-teal-border:   #99f6e4;
   --ex-teal-fg:       #0f766e;

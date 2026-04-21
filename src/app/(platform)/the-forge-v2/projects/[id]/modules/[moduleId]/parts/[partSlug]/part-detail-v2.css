@@ -6,28 +6,28 @@
  */
 
 .pd2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --pd-fg:             #1c1917;
-  --pd-fg-muted:       #78716c;
-  --pd-fg-faint:       #a8a29e;
-  --pd-fg-subtle:      #d6d3d1;
-  --pd-surface:        #ffffff;
-  --pd-surface-muted:  #f5f5f4;
-  --pd-surface-soft:   #fafaf9;
-  --pd-border:         #e7e5e4;
-  --pd-border-soft:    #f5f5f4;
-  --pd-border-strong:  #d6d3d1;
-  --pd-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --pd-fg:             var(--fg);
+  --pd-fg-muted:       var(--fg-muted);
+  --pd-fg-faint:       var(--fg-subtle);
+  --pd-fg-subtle:      var(--fg-faint);
+  --pd-surface:        var(--surface);
+  --pd-surface-muted:  var(--surface-muted);
+  --pd-surface-soft:   var(--surface-soft);
+  --pd-border:         var(--border);
+  --pd-border-soft:    var(--surface-muted);
+  --pd-border-strong:  var(--border-strong);
+  --pd-brand:          var(--brand);
   --pd-brand-soft:     rgba(255,69,0,0.10);
   --pd-brand-dim:      rgba(255,69,0,0.30);
   --pd-success:        #15803d;
-  --pd-success-soft:   #dcfce7;
+  --pd-success-soft:   var(--success-soft);
   --pd-warning:        #b45309;
   --pd-warning-soft:   #fef3c7;
   --pd-danger:         #b91c1c;
-  --pd-danger-soft:    #fee2e2;
+  --pd-danger-soft:    var(--danger-soft);
   --pd-info:           #1d4ed8;
-  --pd-info-soft:      #dbeafe;
+  --pd-info-soft:      var(--info-soft);
   --pd-teal-soft:      #f0fdfa;
   --pd-teal-border:    #99f6e4;
   --pd-teal-fg:        #0f766e;

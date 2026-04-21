@@ -8,28 +8,28 @@
  */
 
 .md2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --md-fg:             #1c1917;
-  --md-fg-muted:       #78716c;
-  --md-fg-faint:       #a8a29e;
-  --md-fg-subtle:      #d6d3d1;
-  --md-surface:        #ffffff;
-  --md-surface-muted:  #f5f5f4;
-  --md-surface-soft:   #fafaf9;
-  --md-border:         #e7e5e4;
-  --md-border-soft:    #f0efed;
-  --md-border-strong:  #d6d3d1;
-  --md-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --md-fg:             var(--fg);
+  --md-fg-muted:       var(--fg-muted);
+  --md-fg-faint:       var(--fg-subtle);
+  --md-fg-subtle:      var(--fg-faint);
+  --md-surface:        var(--surface);
+  --md-surface-muted:  var(--surface-muted);
+  --md-surface-soft:   var(--surface-soft);
+  --md-border:         var(--border);
+  --md-border-soft:    var(--border-soft);
+  --md-border-strong:  var(--border-strong);
+  --md-brand:          var(--brand);
   --md-brand-soft:     rgba(255,69,0,0.10);
   --md-brand-dim:      rgba(255,69,0,0.35);
   --md-success:        #15803d;
-  --md-success-soft:   #dcfce7;
+  --md-success-soft:   var(--success-soft);
   --md-warning:        #b45309;
   --md-warning-soft:   #fef3c7;
   --md-danger:         #b91c1c;
-  --md-danger-soft:    #fee2e2;
+  --md-danger-soft:    var(--danger-soft);
   --md-info:           #1d4ed8;
-  --md-info-soft:      #dbeafe;
+  --md-info-soft:      var(--info-soft);
   --md-teal-soft:      #f0fdfa;
   --md-teal-border:    #99f6e4;
   --md-teal-fg:        #0f766e;
