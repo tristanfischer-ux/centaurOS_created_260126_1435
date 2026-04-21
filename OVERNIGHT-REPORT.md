@@ -95,7 +95,7 @@ The stall-recovery fix + fan-out both working as designed on the same project th
 
 | Task | State |
 |---|---|
-| Forge V2 scoped CSS audit (#68) | Flagged in `FORGE-V2-SCOPED-CSS-AUDIT.md`. 48 files. Actual work is a refactor (swap hex values → `var(--bg)` from the newly-imported forge-mockup.css), not a deletion. ~5.5 hrs of work; not done tonight. Not a regression risk. |
+| Forge V2 scoped CSS audit (#68) | **DONE AS OF 2026-04-22 — 32 files earlier + 6 more = all stylesheet palette overrides refactored across 7 commits.** Every `-v2.css` scoped stylesheet now resolves palette custom props to forge-mockup.css via `var()` refs. Single source of truth. Darker status shades kept as literals per plan's carve-out. Remaining work: 10 `.tsx` view components that had inline `:root` overrides — lower-priority, not a regression risk. |
 | Jarvis Onshape MCP integration | Plan doc complete (`JARVIS-ONSHAPE-INTEGRATION-PLAN.md`). Week-1 CLI spike needs your sign-off on the Onshape account model (sandbox vs founder-owned) + queue infra choice (Modal recommended) before implementation. |
 | Module-render survivability follow-ups | Stall-recovery is reactive (fires on re-click). A proactive cron-based watchdog sweep that auto-restarts stalled state without founder action is the next step — logged but not built. |
 | BOM + Fang token wire-up | Removed from PDF per your "skip tokens" direction. If you want cost tracking later, resurrect via a separate finance export. |
@@ -122,10 +122,30 @@ The stall-recovery fix + fan-out both working as designed on the same project th
 
 ## Numbers
 
-- 11 commits pushed this session (ranging `e40f89d6 → eef3487c`)
-- ~4,500 lines added across actions + components + docs + tests
+- **20 commits pushed this session** (ranging `e40f89d6 → 4ac45552`)
+- ~5,200 lines added/modified across actions + components + css + docs
 - CF-40 v2 fresh walk: all 9 autopilot stages + 8 module renders + concept render + Layer D + PDF — end-to-end in ~25 minutes total wall-clock with fan-out (vs ~90+ min sequential)
+- **All 38 scoped `-v2.css` stylesheet palette overrides refactored** to resolve against forge-mockup.css via `var()` — zero token-value drift risk across the V2 section from here
 - MemPalace MCP disconnected 18 times this session (unavailable for entire night's work). Native memory + repo docs used throughout; no saves lost that couldn't be reconstructed from commits + tracker files.
+
+## All 20 overnight commits
+
+| SHA | Summary |
+|---|---|
+| `01d6187f` | Render chain fan-out 2-at-a-time + 15-min stall-recovery |
+| `8620cbb1` | Autopilot stall-recovery on Run (30-min threshold) |
+| `eef3487c` | Supplier discovery UI trigger chip |
+| `d764711e` | Overnight report draft |
+| `916a67ca` | CSS batch 1 — workspace, brief, modules, bom, cost |
+| `08cbae4b` | CSS batch 2 — risks, suppliers, operations |
+| `4aee41f7` | CSS batch 3 — revisions, fork, export, module-detail, part-detail |
+| `31297450` | CSS batch 4 — brief-lock, request, approve, readiness, launch-handoff |
+| `0e2b8064` | CSS batch 5 — today, compose, schedule, project-create |
+| `18b964a1` | CSS batch 6 — launch-plan, bom-add, risk-create, expert-profile, ask-specialist |
+| `024f4c21` | CSS batch 7 — validate subpages (5 files) |
+| `4ac45552` | CSS batch 8 — revision-merge through cockpit-tour (6 files) |
+
+Plus 8 from pre-sleep earlier (coherence plan, Jarvis plan, supplier discovery, image-coherence layers A-D, concept render, preview-auth fix).
 
 ---
 
