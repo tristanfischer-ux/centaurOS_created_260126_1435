@@ -29,6 +29,7 @@
 
 import Link from "next/link"
 import "./export-v2.css"
+import { GenerateExportButton } from "./generate-export-button"
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -157,9 +158,7 @@ export function ExportView(props: ExportViewProps): React.ReactElement {
                     <button type="button" className="ex2-btn soon" disabled title={shareTooltip}>
                         Share link
                     </button>
-                    <button type="button" className="ex2-btn primary soon" disabled title={generateTooltip}>
-                        Generate export
-                    </button>
+                    <GenerateExportButton projectId={project.id} />
                 </div>
             </div>
 
