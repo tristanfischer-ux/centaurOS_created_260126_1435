@@ -165,7 +165,33 @@ Every heroImagePrompt and perModuleImagePrompts entry MUST describe a real-world
 export function getStylePreambleForModulePrompt(style: IllustrationStyle): string {
   switch (style) {
     case "blueprint":
-      return `PROJECT ILLUSTRATION STYLE: Technical blueprint. Every illustration in this project — hero and per-module — MUST render as a technical engineering drawing on a pure white (#FFFFFF) background with thin precise black line work, flat material colour fills, a subtle engineering grid, and a 30-degree isometric camera. No photographic lighting, no depth-of-field, no background scene.
+      // Tight spec — hex palette, pixel line weights, fill rule,
+      // composition lock. Each constraint removes one common Gemini
+      // drift pattern: palette stops the cover's green racks / orange
+      // HVAC diverging from a module's blue+yellow; line-weight stops
+      // cutaway-heavy renders; "assembled, not cutaway" stops
+      // cross-section vs exterior drift.
+      return `PROJECT ILLUSTRATION STYLE: Technical engineering blueprint. Every illustration in this project — hero and per-module — MUST match the following spec exactly. Drift between cover and module renders makes the design pack read as "stitched together from different projects", which is the single thing we are preventing here.
+
+PALETTE (use these exact hex values, no others):
+- Background: pure white #FFFFFF
+- Main structural edges: near-black #1A1F26
+- Engineering grid: very light grey #EAEDF1
+- Structural steel / chassis: slate blue #6B8FB5
+- Aluminium / extrusion profiles: cool grey-blue #8FA5B8
+- Plastics / HDPE / moulded polymer: off-white #F5F6F8 with #1A1F26 outline
+- Plant material / organics: muted green #7FAF5A
+- Water / fluid lines: steel blue #3A7BAF
+- Electrical / control boxes: warm ochre #D18B2A
+- Warning / hot paths / refrigerant: muted red #C85C4E
+
+LINE WEIGHT: ~2-pixel uniform stroke on main edges at #1A1F26. Grid at 1-pixel #EAEDF1. No anti-aliasing halos, no soft glow, no bloom.
+
+FILL RULE: Flat solid colour per material class (palette above). NO gradients, NO two-tone shading, NO ambient-occlusion darkening, NO specular highlights. Single solid fill per surface.
+
+COMPOSITION: 30-degree isometric camera, slightly above-and-right. Assembled view — full module visible from outside. NO cutaways, NO cross-sections, NO interior-view cuts, NO pipes/cables disappearing into other modules. NO exploded views unless the prompt explicitly asks for one.
+
+NEGATIVE (banned): 3D photorealistic rendering; architectural drafting hatching; watercolour or ink-wash effects; vignette; drop shadows under the subject; perspective distortion; fisheye; atmospheric fog; background scenery; text, labels, callouts, annotations, title blocks, revision tags.
 
 `
     case "photoreal":

@@ -72,9 +72,16 @@ export async function generateOneModuleImage(
         const admin = createAdminClient()
 
         // 1. Load project (auth + foundry check) and its current modules.
+        // system_illustration_url is included so every per-module render
+        // can be anchored to the already-rendered cover — Gemini 3.1
+        // Flash Image copies palette, line weight, and composition from
+        // the reference, which is the biggest single lever for the
+        // "every image looks different" problem.
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, modules, visual_style, illustration_style")
+            .select(
+                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url",
+            )
             .eq("id", projectId)
             .maybeSingle()
 
@@ -256,6 +263,46 @@ export async function generateOneModuleImage(
             ? project.illustration_style
             : DEFAULT_ILLUSTRATION_STYLE
 
+        // 2b. Fetch the system illustration (cover) as bytes so we can
+        //     pass it to Gemini as a multimodal reference — the single
+        //     biggest lever for visual coherence between cover and per-
+        //     module renders. The previous comment about
+        //     "~800KB through React Flight blows the limit" applied
+        //     when the client passed base64 to a server action; here we
+        //     fetch server-side so that limit doesn't apply.
+        //
+        //     Non-critical: if the fetch fails (cover not yet rendered,
+        //     CDN hiccup, large file), fall through to a text-only
+        //     render. A module without a reference is still valid — we
+        //     just lose the palette-anchor benefit.
+        let systemIllustrationRefBase64: string | undefined
+        const sysUrl = project.system_illustration_url
+        if (typeof sysUrl === "string" && sysUrl.length > 0) {
+            try {
+                const res = await fetch(sysUrl)
+                if (res.ok) {
+                    const buf = Buffer.from(await res.arrayBuffer())
+                    // Cap at ~1.5MB after base64 expansion — larger than
+                    // that and we risk blowing the provider's upload limit.
+                    // Gemini accepts multi-MB; OpenAI fallback is tighter.
+                    if (buf.length < 1_200_000) {
+                        systemIllustrationRefBase64 = buf.toString("base64")
+                    } else {
+                        console.warn(
+                            `[forge-v2-generate-one-module-image] system illustration too large ` +
+                                `(${buf.length} bytes) to use as reference for ${moduleId}; text-only fallback.`,
+                        )
+                    }
+                }
+            } catch (err) {
+                console.warn(
+                    `[forge-v2-generate-one-module-image] failed to fetch system illustration ` +
+                        `as reference for ${moduleId}:`,
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        }
+
         // 3. Run ONE image-gen call — typically 20–60s wall-clock.
         let result: Awaited<ReturnType<typeof generateCadLabSingleImageAction>>
         try {
@@ -263,11 +310,7 @@ export async function generateOneModuleImage(
                 projectId,
                 input,
                 visualStyle,
-                undefined, // referenceBase64 — intentionally absent. ~800KB
-                //               through React Flight would blow the limit;
-                //               per-module renders ship without a hero-crop
-                //               reference (same pattern as V1 when no hero
-                //               has been generated yet).
+                systemIllustrationRefBase64, // reference: cover sets the style
                 undefined, // moduleCropBase64
                 illustrationStyle,
             )
