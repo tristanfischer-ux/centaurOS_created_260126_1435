@@ -3,26 +3,27 @@
    other pages. */
 
 .cm2 {
-  --c-bg: #fafaf9;
-  --c-surface: #ffffff;
-  --c-surface-muted: #f5f5f4;
-  --c-surface-soft: #fafaf9;
-  --c-border: #e7e5e4;
-  --c-border-strong: #d6d3d1;
-  --c-border-soft: #f0efed;
-  --c-fg: #1c1917;
-  --c-fg-muted: #78716c;
-  --c-fg-subtle: #a8a29e;
-  --c-fg-faint: #d6d3d1;
-  --c-brand: #ff4500;
-  --c-brand-soft: #fff0ea;
-  --c-brand-dim: #ffdcc7;
-  --c-success: #16a34a;
-  --c-success-soft: #dcfce7;
-  --c-warning: #ca8a04;
-  --c-warning-soft: #fef9c3;
-  --c-danger: #dc2626;
-  --c-danger-soft: #fee2e2;
+  /* Token layer — resolves to forge-mockup.css. */
+  --c-bg: var(--bg);
+  --c-surface: var(--surface);
+  --c-surface-muted: var(--surface-muted);
+  --c-surface-soft: var(--surface-soft);
+  --c-border: var(--border);
+  --c-border-strong: var(--border-strong);
+  --c-border-soft: var(--border-soft);
+  --c-fg: var(--fg);
+  --c-fg-muted: var(--fg-muted);
+  --c-fg-subtle: var(--fg-subtle);
+  --c-fg-faint: var(--fg-faint);
+  --c-brand: var(--brand);
+  --c-brand-soft: var(--brand-soft);
+  --c-brand-dim: var(--brand-dim);
+  --c-success: var(--success);
+  --c-success-soft: var(--success-soft);
+  --c-warning: var(--warning);
+  --c-warning-soft: var(--warning-soft);
+  --c-danger: var(--danger);
+  --c-danger-soft: var(--danger-soft);
   --c-shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.03);
   --c-shadow-sm: 0 2px 4px rgba(28, 25, 23, 0.04);
 

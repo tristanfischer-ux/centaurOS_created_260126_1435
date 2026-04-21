@@ -14,30 +14,31 @@
  */
 
 .sh2 {
-  --sh-fg:             #1c1917;
-  --sh-fg-muted:       #78716c;
-  --sh-fg-faint:       #a8a29e;
-  --sh-fg-subtle:      #d6d3d1;
-  --sh-surface:        #ffffff;
-  --sh-surface-muted:  #f5f5f4;
-  --sh-surface-soft:   #fafaf9;
-  --sh-border:         #e7e5e4;
+  /* Token layer — resolves to forge-mockup.css. */
+  --sh-fg:             var(--fg);
+  --sh-fg-muted:       var(--fg-muted);
+  --sh-fg-faint:       var(--fg-subtle);
+  --sh-fg-subtle:      var(--fg-faint);
+  --sh-surface:        var(--surface);
+  --sh-surface-muted:  var(--surface-muted);
+  --sh-surface-soft:   var(--surface-soft);
+  --sh-border:         var(--border);
   --sh-border-soft:    #eeece9;
-  --sh-border-strong:  #d6d3d1;
-  --sh-brand:          #ff4500;
+  --sh-border-strong:  var(--border-strong);
+  --sh-brand:          var(--brand);
   --sh-brand-soft:     rgba(255,69,0,0.10);
   --sh-brand-dim:      rgba(255,69,0,0.35);
   --sh-success:        #15803d;
-  --sh-success-soft:   #dcfce7;
+  --sh-success-soft:   var(--success-soft);
   --sh-warning:        #b45309;
   --sh-warning-soft:   #fef3c7;
   --sh-warning-border: #fde68a;
   --sh-danger:         #b91c1c;
-  --sh-danger-soft:    #fee2e2;
+  --sh-danger-soft:    var(--danger-soft);
   --sh-info:           #1d4ed8;
-  --sh-info-soft:      #dbeafe;
+  --sh-info-soft:      var(--info-soft);
   --sh-purple:         #6d28d9;
-  --sh-purple-soft:    #ede9fe;
+  --sh-purple-soft:    var(--purple-soft);
   --sh-shadow-xs:      0 1px 2px rgba(0,0,0,0.04);
   --sh-shadow-md:      0 4px 12px rgba(0,0,0,0.08);
 
