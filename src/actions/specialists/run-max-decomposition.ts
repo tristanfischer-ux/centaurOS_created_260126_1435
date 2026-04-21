@@ -62,8 +62,8 @@ import {
     startPipelineRun,
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
-// Wave 1c: auto-fire BOM generator on Max success.
-import { runBomGenerator } from "@/actions/specialists/run-bom-generator"
+import { after } from "next/server"
+
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -400,10 +400,29 @@ export async function runMaxDecomposition(
                 },
             })
 
-            // Wave 1c: auto-fire BOM generator on Max success. Fire-and-forget —
-            // any failure surfaces on the BOM pipeline_run row, not here.
-            void runBomGenerator(projectId, "auto.max-complete").catch((err) => {
-                console.error("[run-max-decomposition] BOM auto-fire failed:", err)
+            // Wave 1c: auto-fire BOM generator on Max success.
+            //
+            // Must use after() (not plain `void`) so Vercel keeps the container
+            // alive past this server action's Promise resolution — otherwise
+            // BOM's pipeline_runs row writes 'running' and the container is
+            // torn down mid-generation, leaving the row stuck until the 6-min
+            // watchdog sweeps it. Same pattern as brief-lock → Max.
+            //
+            // Dynamic import avoids a "use server" module-init cycle between
+            // run-max-decomposition and run-bom-generator (BOM also imports
+            // from this file indirectly via shared types).
+            after(async () => {
+                try {
+                    const { runBomGenerator } = await import(
+                        "@/actions/specialists/run-bom-generator"
+                    )
+                    await runBomGenerator(projectId, "auto.max-complete")
+                } catch (err) {
+                    console.error(
+                        "[run-max-decomposition] BOM auto-fire failed:",
+                        err instanceof Error ? err.message : err,
+                    )
+                }
             })
 
             return {

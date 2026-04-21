@@ -70,8 +70,8 @@ import {
     startPipelineRun,
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
-// Wave 1d: auto-fire Finn cost on BOM success.
-import { runFinnCost } from "@/actions/specialists/run-finn-cost"
+import { after } from "next/server"
+
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -347,10 +347,24 @@ export async function runBomGenerator(
                 },
             })
 
-            // Wave 1d: auto-fire Finn cost on BOM success. Fire-and-forget —
-            // any failure surfaces on the Finn pipeline_run row, not here.
-            void runFinnCost(projectId, "auto.bom-complete").catch((err) => {
-                console.error("[run-bom-generator] Finn auto-fire failed:", err)
+            // Wave 1d: auto-fire Finn cost on BOM success.
+            //
+            // Uses after() so Vercel keeps the container alive past this
+            // action's return — see brief-lock.ts and run-max-decomposition.ts
+            // for the same pattern. Plain `void` fire-and-forget leaves Finn's
+            // pipeline_runs row stuck in 'running' until the watchdog sweeps.
+            after(async () => {
+                try {
+                    const { runFinnCost } = await import(
+                        "@/actions/specialists/run-finn-cost"
+                    )
+                    await runFinnCost(projectId, "auto.bom-complete")
+                } catch (err) {
+                    console.error(
+                        "[run-bom-generator] Finn auto-fire failed:",
+                        err instanceof Error ? err.message : err,
+                    )
+                }
             })
 
             return {
