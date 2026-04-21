@@ -3,22 +3,23 @@
    Convention mirrors brief-lock-v2.css (`.bl2`) — same token palette, different scope. */
 
 .pm2 {
-  --pm-bg: #fafaf9;
-  --pm-surface: #ffffff;
-  --pm-surface-muted: #f5f5f4;
-  --pm-surface-soft: #fafaf9;
-  --pm-border: #e7e5e4;
-  --pm-border-strong: #d6d3d1;
-  --pm-border-soft: #f0efed;
-  --pm-fg: #1c1917;
-  --pm-fg-muted: #78716c;
-  --pm-fg-subtle: #a8a29e;
-  --pm-fg-faint: #d6d3d1;
-  --pm-brand: #ff4500;
-  --pm-brand-soft: #fff0ea;
-  --pm-brand-dim: #ffdcc7;
-  --pm-success: #16a34a;
-  --pm-success-soft: #dcfce7;
+  /* Token layer — resolves to forge-mockup.css. */
+  --pm-bg: var(--bg);
+  --pm-surface: var(--surface);
+  --pm-surface-muted: var(--surface-muted);
+  --pm-surface-soft: var(--surface-soft);
+  --pm-border: var(--border);
+  --pm-border-strong: var(--border-strong);
+  --pm-border-soft: var(--border-soft);
+  --pm-fg: var(--fg);
+  --pm-fg-muted: var(--fg-muted);
+  --pm-fg-subtle: var(--fg-subtle);
+  --pm-fg-faint: var(--fg-faint);
+  --pm-brand: var(--brand);
+  --pm-brand-soft: var(--brand-soft);
+  --pm-brand-dim: var(--brand-dim);
+  --pm-success: var(--success);
+  --pm-success-soft: var(--success-soft);
   --pm-success-dim: #bbf7d0;
   --pm-warning: #ca8a04;
   --pm-warning-soft: #fef9c3;

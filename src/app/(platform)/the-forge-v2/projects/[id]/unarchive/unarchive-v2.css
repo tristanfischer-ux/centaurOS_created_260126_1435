@@ -3,25 +3,27 @@
    Design tokens mirror fork-v2.css so Unarchive and Fork read as siblings. */
 
 .uar2 {
-  --b-bg: #fafaf9;
-  --b-surface: #ffffff;
-  --b-surface-muted: #f5f5f4;
-  --b-surface-soft: #fafaf9;
-  --b-border: #e7e5e4;
-  --b-border-strong: #d6d3d1;
-  --b-border-soft: #f0efed;
-  --b-fg: #1c1917;
-  --b-fg-muted: #78716c;
-  --b-fg-subtle: #a8a29e;
-  --b-fg-faint: #d6d3d1;
-  --b-brand: #ff4500;
-  --b-brand-soft: #fff0ea;
-  --b-brand-dim: #ffdcc7;
-  --b-info: #2563eb;
-  --b-info-soft: #dbeafe;
+  /* Token layer — resolves to forge-mockup.css. --b-* prefix preserved
+     from fork-v2.css sibling for consistency. */
+  --b-bg: var(--bg);
+  --b-surface: var(--surface);
+  --b-surface-muted: var(--surface-muted);
+  --b-surface-soft: var(--surface-soft);
+  --b-border: var(--border);
+  --b-border-strong: var(--border-strong);
+  --b-border-soft: var(--border-soft);
+  --b-fg: var(--fg);
+  --b-fg-muted: var(--fg-muted);
+  --b-fg-subtle: var(--fg-subtle);
+  --b-fg-faint: var(--fg-faint);
+  --b-brand: var(--brand);
+  --b-brand-soft: var(--brand-soft);
+  --b-brand-dim: var(--brand-dim);
+  --b-info: var(--info);
+  --b-info-soft: var(--info-soft);
   --b-info-dim: #bfdbfe;
-  --b-success: #16a34a;
-  --b-success-soft: #dcfce7;
+  --b-success: var(--success);
+  --b-success-soft: var(--success-soft);
   --b-success-dim: #bbf7d0;
   --b-error: #b91c1c;
   --b-error-soft: #fee2e2;

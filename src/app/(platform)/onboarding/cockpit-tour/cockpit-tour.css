@@ -5,15 +5,15 @@
  */
 
 .oct2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --oct-fg:             #1c1917;
-  --oct-fg-muted:       #78716c;
-  --oct-fg-faint:       #a8a29e;
-  --oct-surface:        #ffffff;
-  --oct-surface-muted:  #f5f5f4;
-  --oct-border:         #e7e5e4;
-  --oct-border-strong:  #d6d3d1;
-  --oct-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. */
+  --oct-fg:             var(--fg);
+  --oct-fg-muted:       var(--fg-muted);
+  --oct-fg-faint:       var(--fg-subtle);
+  --oct-surface:        var(--surface);
+  --oct-surface-muted:  var(--surface-muted);
+  --oct-border:         var(--border);
+  --oct-border-strong:  var(--border-strong);
+  --oct-brand:          var(--brand);
   --oct-brand-hover:    #e63b00;
   --oct-brand-dim:      rgba(255, 69, 0, 0.24);
   --oct-brand-soft:     rgba(255, 69, 0, 0.08);

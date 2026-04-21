@@ -3,25 +3,26 @@
    DO NOT MODIFY the prefix — sibling pages rely on scope isolation. */
 
 .otm2 {
-  --otm-bg: #fafaf9;
-  --otm-surface: #ffffff;
-  --otm-surface-muted: #f5f5f4;
-  --otm-surface-soft: #fafaf9;
-  --otm-border: #e7e5e4;
-  --otm-border-strong: #d6d3d1;
-  --otm-border-soft: #f0efed;
-  --otm-fg: #1c1917;
-  --otm-fg-muted: #78716c;
-  --otm-fg-subtle: #a8a29e;
-  --otm-fg-faint: #d6d3d1;
-  --otm-brand: #ff4500;
-  --otm-brand-soft: #fff0ea;
-  --otm-brand-dim: #ffdcc7;
-  --otm-success: #16a34a;
-  --otm-success-soft: #dcfce7;
-  --otm-info: #2563eb;
-  --otm-info-soft: #dbeafe;
-  --otm-danger: #dc2626;
+  /* Token layer — resolves to forge-mockup.css. */
+  --otm-bg: var(--bg);
+  --otm-surface: var(--surface);
+  --otm-surface-muted: var(--surface-muted);
+  --otm-surface-soft: var(--surface-soft);
+  --otm-border: var(--border);
+  --otm-border-strong: var(--border-strong);
+  --otm-border-soft: var(--border-soft);
+  --otm-fg: var(--fg);
+  --otm-fg-muted: var(--fg-muted);
+  --otm-fg-subtle: var(--fg-subtle);
+  --otm-fg-faint: var(--fg-faint);
+  --otm-brand: var(--brand);
+  --otm-brand-soft: var(--brand-soft);
+  --otm-brand-dim: var(--brand-dim);
+  --otm-success: var(--success);
+  --otm-success-soft: var(--success-soft);
+  --otm-info: var(--info);
+  --otm-info-soft: var(--info-soft);
+  --otm-danger: var(--danger);
   --otm-shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.03);
   --otm-shadow-sm: 0 2px 4px rgba(28, 25, 23, 0.04);
 
