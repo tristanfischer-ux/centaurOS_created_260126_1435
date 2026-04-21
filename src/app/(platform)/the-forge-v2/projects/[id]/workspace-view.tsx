@@ -30,10 +30,12 @@
 import Link from "next/link"
 import "./workspace-v2.css"
 import type { ProjectActivityEvent, ProjectResumeState } from "@/actions/project-workspace"
+import type { AutopilotState } from "@/actions/forge-v2-autopilot"
 import {
     PipelineRunChip,
     type PipelineRunStatus,
 } from "@/components/pipeline/pipeline-run-chip"
+import { AutopilotButton } from "./_components/autopilot-button"
 
 // ─── Props ────────────────────────────────────────────────────────────
 
@@ -136,6 +138,10 @@ export interface WorkspaceViewProps {
         /** ISO timestamp; null while draft. */
         lockedAt: string | null
     }
+    /** Autopilot pipeline walker state. Null when autopilot has never been
+     *  invoked on this project — drives the "Run autopilot" CTA in the
+     *  header. Populated while running or after completion. */
+    autopilot?: AutopilotState | null
 }
 
 export interface SupplierShortlistRow {
@@ -148,7 +154,7 @@ export interface SupplierShortlistRow {
 // ─── View ─────────────────────────────────────────────────────────────
 
 export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
-    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun, bomRun, chaseRun, finnRun, briefLock } = props
+    const { project, header, resume, activity, cost, challenges, engineering, topMaterials, topProcesses, suppliers, maxRun, bomRun, chaseRun, finnRun, briefLock, autopilot } = props
 
     // Base URL for the artefact deep-links. All routes are placeholders that
     // will resolve once the per-artefact pages ship in later rounds.
@@ -219,6 +225,7 @@ export function WorkspaceView(props: WorkspaceViewProps): React.ReactElement {
                     </div>
                 </div>
                 <div className="w2-cta-stack">
+                    <AutopilotButton projectId={project.id} autopilotState={autopilot ?? null} />
                     <Link href={`${base}/request`} className="w2-btn primary">Get quote</Link>
                     <Link href={`${base}/export`} className="w2-btn sm">Download report</Link>
                     <Link href={`${base}/fork`} className="w2-btn sm ghost">Fork revision →</Link>
