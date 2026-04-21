@@ -9,26 +9,27 @@
  */
 
 .rk2 {
-  /* Palette — mirrors forge-mockup.css tokens for this page only */
-  --rk-fg:             #1c1917;
-  --rk-fg-muted:       #78716c;
-  --rk-fg-faint:       #a8a29e;
-  --rk-fg-subtle:      #d6d3d1;
-  --rk-surface:        #ffffff;
-  --rk-surface-muted:  #f5f5f4;
-  --rk-surface-soft:   #fafaf9;
-  --rk-border:         #e7e5e4;
-  --rk-border-strong:  #d6d3d1;
-  --rk-brand:          #ff4500;
+  /* Token layer — resolves to forge-mockup.css. Darker status shades
+     kept as literals per MOCKUP-AS-CODE-PATTERN.md carve-out. */
+  --rk-fg:             var(--fg);
+  --rk-fg-muted:       var(--fg-muted);
+  --rk-fg-faint:       var(--fg-subtle);
+  --rk-fg-subtle:      var(--fg-faint);
+  --rk-surface:        var(--surface);
+  --rk-surface-muted:  var(--surface-muted);
+  --rk-surface-soft:   var(--surface-soft);
+  --rk-border:         var(--border);
+  --rk-border-strong:  var(--border-strong);
+  --rk-brand:          var(--brand);
   --rk-brand-soft:     rgba(255,69,0,0.10);
   --rk-success:        #15803d;
-  --rk-success-soft:   #dcfce7;
+  --rk-success-soft:   var(--success-soft);
   --rk-warning:        #b45309;
   --rk-warning-soft:   #fef3c7;
   --rk-danger:         #b91c1c;
-  --rk-danger-soft:    #fee2e2;
+  --rk-danger-soft:    var(--danger-soft);
   --rk-info:           #1d4ed8;
-  --rk-info-soft:      #dbeafe;
+  --rk-info-soft:      var(--info-soft);
   --rk-teal-soft:      #f0fdfa;
   --rk-teal-border:    #99f6e4;
   --rk-teal-fg:        #0f766e;
