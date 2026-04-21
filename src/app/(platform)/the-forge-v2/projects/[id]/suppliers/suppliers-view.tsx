@@ -43,6 +43,7 @@
 import Link from "next/link"
 import "./suppliers-v2.css"
 import { MatchWithChaseButton } from "./match-with-chase-button"
+import { DiscoverSuppliersButton } from "./discover-suppliers-button"
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -65,6 +66,10 @@ export interface SuppliersViewProps {
     suppliers: SuppliersSupplierRow[]
     /** Total rows on the shortlist — single honest count in the header. */
     totalShortlisted: number
+    /** First module on the project — used as the gap key when the
+     *  founder clicks "Ask Chase to research the web" from the empty
+     *  state. Null if the project has no modules yet. */
+    firstModule: { id: string; name: string } | null
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -96,7 +101,7 @@ function avatarGradient(id: string): string {
 // ─── View ───────────────────────────────────────────────────────────────
 
 export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
-    const { project, suppliers, totalShortlisted } = props
+    const { project, suppliers, totalShortlisted, firstModule } = props
 
     const base = `/the-forge-v2/projects/${project.id}`
 
@@ -152,6 +157,18 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                         Click <em>Match suppliers with Chase</em> above — he&rsquo;ll score every module
                         against the global directory and populate this roster with the top candidates.
                     </p>
+                    {firstModule && (
+                        <>
+                            <p style={{ marginTop: 14 }}>
+                                If the directory comes back empty, it usually means your niche isn&rsquo;t covered yet (the current 651-row directory is automotive / aerospace / electronics / medical-heavy). Chase can search the web for real UK/EU suppliers and add them directly:
+                            </p>
+                            <DiscoverSuppliersButton
+                                projectId={project.id}
+                                moduleId={firstModule.id}
+                                moduleName={firstModule.name}
+                            />
+                        </>
+                    )}
                 </div>
             ) : (
                 <div className="sp2-grid">

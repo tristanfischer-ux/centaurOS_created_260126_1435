@@ -95,6 +95,18 @@ export default async function ForgeV2SuppliersPage({
 
     const shortlistRows = await safeShortlistWithJoin(id)
 
+    // Pass through the first module so the empty-state discovery CTA
+    // has something to key the gap search on. modules[0] is usually
+    // the biggest structural subsystem (container shell, main chassis,
+    // airframe) — a reasonable default for the "find me suppliers for
+    // anything" first click. Later we'll surface per-module discovery
+    // chips on each module card that comes back with < 3 matches.
+    const modules = project.modules ?? []
+    const firstModule =
+        modules.length > 0
+            ? { id: modules[0].id, name: modules[0].name }
+            : null
+
     const viewProps: SuppliersViewProps = {
         project: {
             id: project.id,
@@ -102,6 +114,7 @@ export default async function ForgeV2SuppliersPage({
         },
         suppliers: shortlistRows,
         totalShortlisted: shortlistRows.length,
+        firstModule,
     }
 
     return <SuppliersView {...viewProps} />
