@@ -206,16 +206,50 @@ export async function startAutopilot(
             }
         }
 
-        // Idempotency — refuse to start a second autopilot over a walk
-        // that's still in flight. `finished_at` being null + state being
-        // non-null is "running".
+        // Idempotency + stall recovery. A running walk (non-null state,
+        // null finished_at) should refuse a second start — EXCEPT when
+        // the walk is stalled because after() died mid-chain on a
+        // Vercel container teardown. Observed 2026-04-21: autopilot
+        // stuck in "running_fang_reviews" indefinitely, Run autopilot
+        // rejected with ALREADY_RUNNING, needed SQL to reset.
+        //
+        // Rule: if started_at was more than STALL_THRESHOLD_MS ago,
+        // stamp finished_at on the old state (with the stall note) and
+        // fall through to seed a fresh walk. 30 min threshold matches
+        // the real typical-case envelope: Chase 2m + Max 3m + BOM 3m +
+        // Finn 3m + illustration 2m + match 1m + Fang 10m ≈ 24m upper
+        // bound.
+        const AUTOPILOT_STALL_THRESHOLD_MS = 30 * 60 * 1000
         const existing = project.autopilot_state as AutopilotState | null
         if (existing && existing.finished_at === null) {
-            return {
-                ok: false,
-                error: "Autopilot is already running on this project.",
-                errorCode: "ALREADY_RUNNING",
+            const startedMs = Date.parse(existing.started_at)
+            const stalled =
+                !Number.isNaN(startedMs) &&
+                Date.now() - startedMs > AUTOPILOT_STALL_THRESHOLD_MS
+            if (!stalled) {
+                return {
+                    ok: false,
+                    error: "Autopilot is already running on this project.",
+                    errorCode: "ALREADY_RUNNING",
+                }
             }
+            console.warn(
+                `[autopilot:start] detected stalled state for ${projectId} ` +
+                    `(started ${existing.started_at}, stage=${existing.stage}). ` +
+                    `Auto-recovering — marking old state finished and starting fresh walk.`,
+            )
+            await admin
+                .from("cad_lab_projects")
+                .update({
+                    autopilot_state: {
+                        ...existing,
+                        finished_at: new Date().toISOString(),
+                        error:
+                            existing.error ??
+                            `Stalled at stage ${existing.stage} after ${(Date.now() - startedMs) / 1000}s; auto-recovered.`,
+                    },
+                } as unknown as never)
+                .eq("id", projectId)
         }
 
         // ── 2. Seed the initial state ────────────────────────────────
