@@ -71,6 +71,23 @@ async function countShortlistedSuppliers(projectId: string): Promise<number> {
     }
 }
 
+/** Read shipped_at directly — loadCadLabProject doesn't expose it yet.
+ *  Null means still-in-Forge; string ISO means the Ship button has fired. */
+async function loadShippedAt(projectId: string): Promise<string | null> {
+    try {
+        const supabase = await createClient()
+        const { data } = await supabase
+            .from("cad_lab_projects")
+            .select("shipped_at")
+            .eq("id", projectId)
+            .maybeSingle()
+        const raw = (data as { shipped_at?: string | null } | null)?.shipped_at ?? null
+        return typeof raw === "string" && raw.length > 0 ? raw : null
+    } catch {
+        return null
+    }
+}
+
 /** Best-effort CAD file count — returns 0 on any failure. */
 async function countCadFiles(projectId: string): Promise<number> {
     try {
@@ -101,9 +118,10 @@ export default async function ForgeV2LaunchPage({
     const modules = project.modules ?? []
 
     // ── Parallel side-fetches (each swallows errors → 0) ────────
-    const [supplierCount, cadFileCount] = await Promise.all([
+    const [supplierCount, cadFileCount, shippedAt] = await Promise.all([
         countShortlistedSuppliers(id),
         countCadFiles(id),
+        loadShippedAt(id),
     ])
 
     // ── Brief-derived data ──────────────────────────────────────
@@ -284,6 +302,7 @@ export default async function ForgeV2LaunchPage({
             name: project.name,
             designRevision: project.designRevision,
         },
+        shippedAt,
         isReady,
         blockers,
         gates,

@@ -33,6 +33,7 @@
 
 import Link from "next/link"
 import "./launch-handoff-v2.css"
+import { ShipButton } from "./ship-button"
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -57,6 +58,8 @@ export interface LaunchHandoffViewProps {
         name: string
         designRevision: number
     }
+    /** ISO timestamp of when the project was shipped — null while still in Forge. */
+    shippedAt: string | null
     /** Overall readiness — when false the ship button is disabled. */
     isReady: boolean
     /** Ordered list of specific blockers to show in the not-ready banner. */
@@ -94,8 +97,9 @@ function formatGbp(n: number | null): string {
 // ─── View ───────────────────────────────────────────────────────────────
 
 export function LaunchHandoffView(props: LaunchHandoffViewProps): React.ReactElement {
-    const { project, isReady, blockers, gates, snapshot } = props
+    const { project, shippedAt, isReady, blockers, gates, snapshot } = props
     const base = `/the-forge-v2/projects/${project.id}`
+    const hasShipped = shippedAt != null
 
     return (
         <div className="lh2">
@@ -369,29 +373,39 @@ export function LaunchHandoffView(props: LaunchHandoffViewProps): React.ReactEle
 
                     {/* ── Decision strip ─────────────────── */}
                     <div className="lh2-decision-strip">
-                        <div className="hint">
-                            Shipping is a deliberate act — British understatement, not confetti.
-                            Reviewed and ready, or not at all.
-                        </div>
-                        <Link href={base} className="lh2-btn-ghost">
-                            Cancel · not shipping yet
-                        </Link>
-                        {isReady ? (
-                            <span
-                                className="lh2-btn-ship disabled"
-                                aria-disabled="true"
-                                title="Handoff package generation wires in a later round"
-                            >
-                                Ship and hand off
-                            </span>
+                        {hasShipped ? (
+                            <>
+                                <div className="hint">
+                                    Shipped {formatShipDate(shippedAt)}. Canonical ownership
+                                    has moved to Operations. Forge is now read-only for this
+                                    revision.
+                                </div>
+                                <Link href={base} className="lh2-btn-ghost">
+                                    Back to workspace
+                                </Link>
+                                <span
+                                    className="lh2-btn-ship disabled"
+                                    aria-disabled="true"
+                                    title="Already shipped — fork the project to start a new build"
+                                >
+                                    Shipped ✓
+                                </span>
+                            </>
                         ) : (
-                            <span
-                                className="lh2-btn-ship disabled"
-                                aria-disabled="true"
-                                title={`Close ${blockers.length || "the remaining"} blocker${blockers.length === 1 ? "" : "s"} first`}
-                            >
-                                Ship and hand off
-                            </span>
+                            <>
+                                <div className="hint">
+                                    Shipping is a deliberate act — British understatement, not confetti.
+                                    Reviewed and ready, or not at all.
+                                </div>
+                                <Link href={base} className="lh2-btn-ghost">
+                                    Cancel · not shipping yet
+                                </Link>
+                                <ShipButton
+                                    projectId={project.id}
+                                    isReady={isReady}
+                                    blockerCount={blockers.length}
+                                />
+                            </>
                         )}
                     </div>
 
