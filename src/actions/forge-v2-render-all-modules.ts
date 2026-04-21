@@ -138,16 +138,45 @@ export async function startRenderAllRemainingModuleImages(
             }
         }
 
-        // Idempotency — refuse to start a second walk over one that's
-        // still in flight. `finished_at === null` with a non-null state
-        // is "running".
+        // Idempotency + recovery. `finished_at === null` with a non-null
+        // state is "running" in the happy path. BUT — we observed
+        // 2026-04-21 that `after()` callbacks can silently die mid-chain
+        // on Vercel container teardown: state persists as "current_id:
+        // hvac_system, finished_at: null" forever, and every subsequent
+        // Run click hits ALREADY_RUNNING. That's a wedge, not idempotency.
+        //
+        // Recovery rule: if state is non-null, finished_at is null, AND
+        // started_at was more than STALL_THRESHOLD_MS ago (no render
+        // would legitimately take that long since per-module budget is
+        // 300s × 2 parallel), treat it as stalled. We stamp finished_at
+        // on the old state, then continue into the fresh seeding below
+        // so the founder's click actually restarts the chain.
+        const STALL_THRESHOLD_MS = 15 * 60 * 1000
         const existing = project.image_render_state as ImageRenderState | null
         if (existing && existing.finished_at === null) {
-            return {
-                ok: false,
-                error: "A render loop is already running on this project.",
-                errorCode: "ALREADY_RUNNING",
+            const startedMs = Date.parse(existing.started_at)
+            const stalled =
+                !Number.isNaN(startedMs) &&
+                Date.now() - startedMs > STALL_THRESHOLD_MS
+            if (!stalled) {
+                return {
+                    ok: false,
+                    error: "A render loop is already running on this project.",
+                    errorCode: "ALREADY_RUNNING",
+                }
             }
+            console.warn(
+                `[render-all-modules:start] detected stalled state for ${projectId} ` +
+                    `(started ${existing.started_at}, current_id=${existing.current_id ?? "null"}). ` +
+                    `Auto-recovering — marking old state finished and starting fresh chain.`,
+            )
+            await persistState(projectId, {
+                ...existing,
+                finished_at: new Date().toISOString(),
+                error:
+                    existing.error ??
+                    `Chain stalled after ${(Date.now() - startedMs) / 1000}s; auto-recovered.`,
+            })
         }
 
         // ── 2. Find unrendered modules ───────────────────────────────
@@ -265,12 +294,25 @@ export async function renderNextModuleStage(
         return
     }
 
-    // 2. Find next unrendered module
+    // 2. Find next batch of unrendered modules. Fan-out 2-at-a-time:
+    //    the old single-module sequential chain meant 8 modules took
+    //    10-25 minutes wall-clock because each stage waited on the
+    //    prior to finish. At 2-at-a-time each stage covers two
+    //    concurrent ~60s Gemini calls = ~120s typical, well under
+    //    Vercel's 300s cap even if one retries. Cuts total wall-clock
+    //    by ~2x.
+    //
+    //    We avoid concurrency=3 because if all three retry (happens
+    //    ~1/8 runs in practice) the total nudges the 300s cap and the
+    //    stage gets killed mid-persist, which is exactly the failure
+    //    mode we're here to prevent.
+    const RENDER_BATCH_SIZE = 2
     const modules = (project.modules as CadLabModule[] | null) ?? []
     const ordered = orderForRender(modules)
-    const next = ordered.find((m) => !hasImage(m))
+    const unrenderedQueue = ordered.filter((m) => !hasImage(m))
+    const batch = unrenderedQueue.slice(0, RENDER_BATCH_SIZE)
 
-    if (!next) {
+    if (batch.length === 0) {
         // Nothing left to render — stamp finished_at and stop.
         await persistState(projectId, {
             ...state,
@@ -280,39 +322,47 @@ export async function renderNextModuleStage(
         return
     }
 
-    // 3. Mark current_id so the UI can say "rendering X"
+    // 3. Mark current_id to show progress. With batch=2 we note the
+    //    first of the pair; the UI progress line is an approximation
+    //    either way.
     await persistState(projectId, {
         ...state,
-        current_id: next.id,
+        current_id: batch[0].id,
     })
 
-    // 4. Run the single-module render (30-60s typical)
-    let renderOk = false
-    let renderError: string | null = null
-    try {
-        const res = await generateOneModuleImage(projectId, next.id)
-        if (res.ok) {
-            renderOk = true
-        } else {
-            renderError = res.error
+    // 4. Fire the batch in parallel. Promise.allSettled so one failing
+    //    doesn't drop the other's successful write.
+    const results = await Promise.allSettled(
+        batch.map((m) => generateOneModuleImage(projectId, m.id)),
+    )
+
+    // 5. Tally per-module outcomes.
+    const batchOutcomes = batch.map((m, i) => {
+        const r = results[i]
+        if (r.status === "fulfilled") {
+            if (r.value.ok) return { id: m.id, ok: true, error: null }
+            return { id: m.id, ok: false, error: r.value.error }
+        }
+        return {
+            id: m.id,
+            ok: false,
+            error:
+                r.reason instanceof Error ? r.reason.message : "render threw",
+        }
+    })
+    const lastError =
+        batchOutcomes.find((o) => !o.ok)?.error ?? null
+    for (const o of batchOutcomes) {
+        if (!o.ok) {
             console.warn(
-                `[render-all-modules:stage] module ${next.id} failed:`,
-                res.error,
-                res.errorCode,
+                `[render-all-modules:stage] module ${o.id} failed:`,
+                o.error,
             )
         }
-    } catch (err) {
-        renderError = errMessage(err)
-        console.error(
-            `[render-all-modules:stage] module ${next.id} threw:`,
-            err instanceof Error ? err.message : err,
-        )
     }
 
-    // 5. Persist progress (re-read so parallel edits to modules/state
-    //    don't clobber each other; the module render itself updates
-    //    modules[].imageUrl in a separate splice, which we don't want
-    //    to overwrite here).
+    // 6. Persist progress (re-read so concurrent imageUrl splices from
+    //    generateOneModuleImage don't get clobbered by our state write).
     const { data: fresh } = await admin
         .from("cad_lab_projects")
         .select("image_render_state, modules")
@@ -326,16 +376,18 @@ export async function renderNextModuleStage(
         return
     }
 
-    const completed = renderOk
-        ? Array.from(new Set([...current.completed_ids, next.id]))
-        : current.completed_ids
-    const failed = renderOk
-        ? current.failed_ids
-        : Array.from(new Set([...current.failed_ids, next.id]))
+    const newlyCompleted = batchOutcomes.filter((o) => o.ok).map((o) => o.id)
+    const newlyFailed = batchOutcomes.filter((o) => !o.ok).map((o) => o.id)
+    const completed = Array.from(
+        new Set([...current.completed_ids, ...newlyCompleted]),
+    )
+    const failed = Array.from(
+        new Set([...current.failed_ids, ...newlyFailed]),
+    )
 
-    // 6. Figure out if more work remains. We re-read the modules list
-    //    here so a concurrent Max re-run that added modules is picked
-    //    up, and so the decision uses the most recent imageUrl splice.
+    // 7. Figure out if more work remains. Re-read modules so a
+    //    concurrent Max re-run that added modules is picked up, and
+    //    the decision uses the most recent imageUrl splice.
     const freshModules = (fresh?.modules as CadLabModule[] | null) ?? modules
     const orderedFresh = orderForRender(freshModules)
     const remaining = orderedFresh.find(
@@ -347,13 +399,13 @@ export async function renderNextModuleStage(
         completed_ids: completed,
         failed_ids: failed,
         current_id: remaining?.id ?? null,
-        error: renderError,
+        error: lastError,
         finished_at: remaining ? null : new Date().toISOString(),
     }
 
     await persistState(projectId, updated)
 
-    // 7. If more work remains, schedule the next stage
+    // 8. If more work remains, schedule the next stage
     if (remaining) {
         after(async () => {
             try {
