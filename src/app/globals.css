@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+/*
+ * Mockup-as-code pattern (see MOCKUP-AS-CODE-PATTERN.md at repo root).
+ *
+ * The Forge section's HTML mockups (FORGE-MOCKUP-*.html) ship with a
+ * shared <style> block that's been extracted verbatim into
+ * forge-mockup.css. Importing it here at the top of globals means
+ * every V2 React page can use its class names + CSS custom-property
+ * tokens directly without a per-page -v2.css file re-declaring the
+ * palette. Several existing -v2.css files carry the comment
+ * "Palette — mirrors forge-mockup.css tokens for this page only" —
+ * those duplicates can now be deleted because the shared sheet is
+ * in scope everywhere. Follow-up tracker: FORGE-V2-SCOPED-CSS-AUDIT.
+ *
+ * CSS @import must precede all other rules. Tailwind v4's
+ * `@import "tailwindcss"` above registers Tailwind's own @imports;
+ * we slot our extracted mockup sheet before @plugin so mockup tokens
+ * are defined by the time component styles reference them.
+ */
+@import "../styles/forge-mockup.css";
+
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:where(.dark, .dark *));
