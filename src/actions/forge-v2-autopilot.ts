@@ -534,27 +534,63 @@ async function stepWaitForFinn(projectId: string): Promise<void> {
     })
 }
 
-/** Stage 6: kick the system illustration generator. */
+/**
+ * Stage 6: generates BOTH hero images for the project workspace —
+ *   - system_illustration_url (technical blueprint, right panel)
+ *   - concept_render_url       (photoreal product shot, left panel)
+ *
+ * Fired in parallel via Promise.allSettled so one failing doesn't block
+ * the other. The system illustration is the multimodal reference anchor
+ * for per-module renders (Layer C of the image coherence plan), so it
+ * needs to land first in the common case — but concept render IS
+ * independent, so we take the parallel-and-tolerate-failure path.
+ *
+ * Both are nice-to-have for the rest of the pipeline — a failed
+ * illustration doesn't trap the founder at this stage.
+ */
 async function stepGenerateIllustration(projectId: string): Promise<void> {
     try {
-        const { generateSystemIllustrationForProject } = await import(
-            "@/actions/forge-v2-generate-system-illustration"
-        )
-        const res = await generateSystemIllustrationForProject(projectId)
-        if (!res.ok) {
+        const [{ generateSystemIllustrationForProject }, { generateConceptRenderForProject }] =
+            await Promise.all([
+                import("@/actions/forge-v2-generate-system-illustration"),
+                import("@/actions/forge-v2-generate-concept-render"),
+            ])
+        const [systemRes, conceptRes] = await Promise.allSettled([
+            generateSystemIllustrationForProject(projectId),
+            generateConceptRenderForProject(projectId),
+        ])
+        if (systemRes.status === "rejected") {
+            console.warn(
+                "[autopilot] system illustration threw (non-fatal):",
+                systemRes.reason instanceof Error
+                    ? systemRes.reason.message
+                    : systemRes.reason,
+            )
+        } else if (!systemRes.value.ok) {
             await recordFailure(
                 projectId,
                 "generating_illustration",
-                res.error,
+                systemRes.value.error,
             )
-            return
+            // Continue anyway — concept render may still have succeeded
+            // and suppliers stage doesn't need the illustration.
+        }
+        if (conceptRes.status === "rejected") {
+            console.warn(
+                "[autopilot] concept render threw (non-fatal):",
+                conceptRes.reason instanceof Error
+                    ? conceptRes.reason.message
+                    : conceptRes.reason,
+            )
+        } else if (!conceptRes.value.ok) {
+            console.warn(
+                "[autopilot] concept render returned error (non-fatal):",
+                conceptRes.value.error,
+            )
         }
     } catch (err) {
-        // Illustration is nice-to-have but not a hard blocker for the
-        // rest of the walk. Record it as a non-fatal failure and
-        // continue, rather than trap the founder at illustration.
         console.warn(
-            "[autopilot] system illustration failed (non-fatal):",
+            "[autopilot] illustration stage threw (non-fatal):",
             err instanceof Error ? err.message : err,
         )
     }

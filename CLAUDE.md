@@ -12,6 +12,7 @@
 - NEVER suggest a simpler approach to "save time" or "reduce complexity." Time and complexity cost the user nothing.
 - NEVER say "this would take a while" or "this is complex, so let's simplify." Your speed is not human speed — you write code 100x faster than a human. Estimates calibrated for human developers do not apply.
 - NEVER offer a "quick and dirty" option alongside a proper one. Just build the proper one.
+- **Given the choice of doing something properly and taking a long time versus doing it badly and taking a short time, ALWAYS prefer doing it properly.** Tristan's words, 2026-04-21. The effort does not register as a cost; the badly-done version always registers as a regret. When you are tempted to cut scope, you are wrong — ship the proper version.
 - If there's a choice between a hack that works and a clean solution that works, **always choose the clean solution**. There is no deadline pressure.
 - The bar is: would a staff engineer at a top company approve this in code review? If not, keep going until they would.
 
