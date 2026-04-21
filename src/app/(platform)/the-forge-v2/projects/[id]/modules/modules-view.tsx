@@ -29,6 +29,7 @@ import {
 import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button"
 import { GenerateSystemIllustrationButton } from "../_components/generate-system-illustration-button"
 import { GenerateModuleImagesButton } from "./generate-module-images-button"
+import { ReviewImageCoherenceButton } from "./review-image-coherence-button"
 
 import "./modules-v2.css"
 
@@ -260,6 +261,17 @@ export function ModulesView(props: ModulesViewProps): React.ReactElement {
                             hasImage: c.hasImage,
                             mirrorOf: c.mirrorOf,
                         }))}
+                    />
+                    {/* Layer D of the image-coherence plan: once the cover
+                        and at least one module render exist, offer an
+                        Opus-vision cross-check that flags out-of-family
+                        modules and regenerates the top 3 outliers. */}
+                    <ReviewImageCoherenceButton
+                        projectId={project.id}
+                        ready={
+                            (project.systemIllustrationUrl?.length ?? 0) > 0 &&
+                            cards.some((c) => c.hasImage)
+                        }
                     />
                     <Link href={geometryHref} className="m2-btn">View geometry →</Link>
                 </div>
