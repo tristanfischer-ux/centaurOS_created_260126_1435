@@ -102,7 +102,60 @@ The previous attempt (see sections below) substituted admin-SQL writes for UI cl
 - [x] 03:37 · Watchdog swept stalled run → "Failed: Run exceeded 6-minute threshold." Modules page offered "Decompose with Max" button.
 - [x] 03:38 · Clicked "Decompose with Max" — Max retry via direct server action completed in **134 seconds**. 10 real modules saved (Primary Structure, Avionics Stack, EPS & Battery, Port/Starboard Solar Wings, ADCS, Rendezvous Sensors, Propulsion, Net-Capture Deployer, RF Comms). Total mass 16.00 kg vs 24 kg target. 48 interface contracts inferred.
 - [ ] **Bug 4 found:** BOM auto-fire from Max has the same fire-and-forget bug — `void runBomGenerator(...)` at run-max-decomposition.ts:405 and `void runFinnCost(...)` at run-bom-generator.ts:352. **Fix landed in commit `3396c2bf`** — both wrapped in `after()` + dynamic import.
-- [ ] 03:55 · Awaiting preview deploy of `3396c2bf` — on deploy ready, will create FRESH project and walk from the top to verify both auto-fire chains.
+- [x] 03:55 · Preview deploy of `3396c2bf` green (lzpnfxem0). Created FRESH project `352f5660-fdf7-4674-a676-9e0f4438a1f2` via UI click.
+
+### Pass 3 — Fresh walk on deploy with all fixes (commit `5abec8d5`)
+
+- [x] 04:00 · New project `352f5660` created via "Draft Brief rev 0.1" button. Chase auto-fired via `after()` → completed in 128s.
+- [x] 04:03 · Locked brief Rev A via "Lock Rev A and hand off to Forge" button.
+- [x] 04:03 · **Max auto-fire WORKED this time** — `after()` + dynamic import kept the container alive. Max `brief.decompose` completed in **136 seconds** without any manual intervention.
+- [x] 04:05 · **BOM auto-fire WORKED** — fired from Max via new `after()` pattern. `bom.generate` completed in **70 seconds**.
+- [ ] 04:05 · **Finn auto-fire fired but failed** — got HTTP 401 from DeepSeek. Preview env missing `DEEPSEEK_API_KEY`. Added via `vercel env add` for the branch. Empty commit `5abec8d5` pushed to trigger redeploy that picks up the new env. Waiting on redeploy before retesting Finn.
+- [ ] **End-to-end chain verified as far as BOM:** brief submit → Chase auto → lock → Max auto → BOM auto. Three fire-and-forget bugs now confirmed fixed on the real walk, not just in code review.
+- [ ] Bug 4 (Finn) is now env-config, not code. No further code changes required once redeploy lands.
+
+### Bugs discovered during walk
+
+| # | What | Where | Status |
+|---|---|---|---|
+| 1 | V2 submit silent fail (Pass 1) | `/the-forge-v2/new` handler | Already fixed in `d1fe724b` before walk |
+| 2 | Brief page polling misses research completion | `/the-forge-v2/projects/[id]/brief` polling | Noted; not blocking walk (manual refresh recovers) |
+| 3 | Max auto-fire dies with fire-and-forget | `src/actions/brief-lock.ts:346` | **Fixed in `0ebccfa9`** (after() + dynamic import) |
+| 4 | BOM + Finn auto-fire same bug | `run-max-decomposition.ts:405`, `run-bom-generator.ts:352` | **Fixed in `3396c2bf`** |
+| 5 | BOM covers only 3 of 10 modules | `src/actions/bom.ts` expandBomPartsBatchInternal | Noted; needs investigation — partial-success returned done too early |
+| 6 | Ask-a-Specialist chat panel doesn't open | `AskSpecialistButton` after clicking Max in chooser dialog | Noted; not blocking walk |
+| 7 | Preview env missing DEEPSEEK/OPENAI/MINIMAX keys | Vercel env | **Fixed via `vercel env add` for branch** |
+| 8 | Suppliers page is a V1 → V2 redirect | Suppliers V2 shell | Expected — V2 cutover scope, not a bug |
+| 9 | Production DEEPSEEK_API_KEY has trailing literal `\n` | Vercel Production env | Tristan needs to fix at source. Saved as memory `forgeos_prod_deepseek_key_has_trailing_literal_newline.md`. Preview env now clean (35 chars). |
+
+### Pass 3 — End-to-end SUCCESS on deploy `45308ia1g` (commit `b58a7663`)
+
+After fixing the DEEPSEEK_API_KEY env (the trailing `\n` literal), the entire pipeline now runs end-to-end via UI clicks on project `352f5660`:
+
+| Stage | Specialist | Trigger | Status | Duration |
+|---|---|---|---|---|
+| research.seed | Chase (vp-supply-chain) | auto from project create | ✓ done | 128s |
+| brief.decompose | Max (cto) | auto from brief-lock via after() | ✓ done | 136s |
+| bom.generate | (cto) | auto from Max via after() | ✓ done | 70s |
+| cost.estimate | Finn (finance-lead) | manual click "Estimate with Finn" | ✓ done | 161s |
+| module.review.fang | Fang (vp-manufacturing) | manual click "Review with Fang" on M1 | ✓ done | 142s |
+
+**Real outputs verified in UI:**
+- Brief: Mission / Target customers / Why now / 8 regulatory standards (CDS 12U, ECSS-E-ST-32C, ECSS-Q-ST-60, ECSS-E-ST-10, ECSS-Q-ST-80, AS9100D, MIL-HDBK-5J, ECSS-E-ST-10-03)
+- Modules: 10 cubesat subsystems, 18.0 kg current vs 24 kg target, 48 interface contracts
+- Risks: 41 known failure modes + 31 open questions auto-surfaced from modules
+- Operations: target ship 1 Oct 2027, longest module lead 32 wk, per-module lead-time roll-up
+- BOM: parts populated for 3 of 10 modules (Bug 5 — partial coverage)
+- Cost: £82,095 unit / £667.9k under £750k ceiling, per-module waterfall with confidence levels
+- Fang review: critical M1 issues identified — material freeze, thrust block Al 7075 vs Ti-6Al-4V, ISO 2768-fH GD&T, qty 6 ship-sets
+
+**Out of scope for V2 walk:**
+- Jian per-module review — no UI button on V2 module detail page (only Fang exposed)
+- Suppliers list / RFQ / Approve — V2 page redirects to V1 CAD lab (`/the-forge/cad-lab?action=rfq`)
+- Export PDF — UI explicitly says "BETA — Download links run a dry run today; wire-up ships next round"
+- Launch handoff — not yet wired in V2
+
+**Ask-a-Specialist** — opens specialist chooser dialog, but clicking Max in the chooser closes the dialog without rendering a chat panel. Bug 6.
 
 ### Stage 1 — Create project — BUG found
 - [x] Navigate `/the-forge-v2/new` — page renders
