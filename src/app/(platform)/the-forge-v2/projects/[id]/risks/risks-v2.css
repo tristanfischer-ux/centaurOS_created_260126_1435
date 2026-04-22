@@ -110,6 +110,8 @@
 .rk2-btn:hover { background: var(--rk-surface-muted); border-color: var(--rk-fg-muted); }
 .rk2-btn.primary { background: var(--rk-fg); color: #fff; border-color: var(--rk-fg); }
 .rk2-btn.primary:hover { background: #0f172a; }
+.rk2-btn.ghost { background: transparent; border-color: var(--rk-border); color: var(--rk-fg-muted); }
+.rk2-btn.ghost:hover { background: var(--rk-surface-muted); color: var(--rk-fg); }
 .rk2-btn.soon { opacity: 0.55; pointer-events: none; }
 .rk2-btn.sm { padding: 5px 10px; font-size: 11.5px; }
 
@@ -371,6 +373,13 @@
   margin-bottom: 12px;
 }
 .rk2-item-body strong { font-weight: 600; }
+/* Honest empty state for the body paragraph when a risk row has only a
+   headline (the common case today — rows come from module failureModes[]
+   / unknowns[] with no longer-form description captured yet). */
+.rk2-item-body .rk2-empty-inline {
+  color: var(--rk-fg-muted);
+  font-style: italic;
+}
 
 .rk2-meta-grid {
   display: grid;

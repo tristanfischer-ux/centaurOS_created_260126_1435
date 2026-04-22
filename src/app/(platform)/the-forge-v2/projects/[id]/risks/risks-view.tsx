@@ -7,18 +7,23 @@
  * Data contract: there is no `risks` table yet. Every row in the list is
  * sourced from the modules JSONB — specifically `module.failureModes[]`
  * (rendered as "known failure modes", medium severity) and
- * `module.unknowns[]` (rendered as "open questions", low severity).
+ * `module.unknowns[]` (rendered as "open questions", low severity). Fields
+ * the mockup shows but we don't yet store (owner, pivot-by date, impact
+ * chip, body prose, grounding provenance) render honest "Not yet declared"
+ * placeholders — never mockup-specific example text.
  *
  * When both arrays are empty across every module, the view falls back to
  * the empty-state hero from FORGE-MOCKUP-EMPTY-RISKS.html.
  *
  * Sections (top to bottom):
  *   1. Breadcrumb
- *   2. Page header — risk icon + title + counts chip + CTAs
+ *   2. Page header — risk icon + title + counts chip + CTAs (Export / Filter / Raise)
  *   3. Annotation note
- *   4. Summary strip — 4 stat tiles (blocking / medium / low / resolved)
+ *   4. Summary strip — 4 stat tiles (Blocking / Medium / Low · info / Resolved this week)
  *   5. Controls bar — search + filter chips (stubbed)
- *   6a. Populated: risk list grouped by severity with meta grid
+ *   6a. Populated: risk card stack grouped by severity
+ *       Each card: severity banner + kicker + headline + impact chip + body
+ *       paragraph + 4-field meta-grid + actions row + grounding strip.
  *   6b. Empty:     empty-state hero + risk library card
  *   7. Specialist recommendations card (empty-state for now)
  *   8. Design grounded in — teal pills + footnote
@@ -48,6 +53,17 @@ export interface RiskRow {
     moduleId: string
     /** Owning module display name. */
     moduleName: string
+    /** Optional longer-form body paragraph. Null when not yet captured. */
+    body?: string | null
+    /** Optional right-aligned impact chip copy (e.g. "Costs £860 if unresolved").
+     *  Null when impact hasn't been scored yet. */
+    impact?: string | null
+    /** Optional named owner. Null until risks table ships. */
+    owner?: string | null
+    /** Optional pivot-by date copy. Null until risks table ships. */
+    pivotByDate?: string | null
+    /** Optional grounding/provenance copy for the teal strip. */
+    groundingNote?: string | null
 }
 
 export interface RisksViewProps {
@@ -139,14 +155,14 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
                     </div>
                 </div>
                 <div className="cta-group">
-                    <span className="rk2-btn soon" title="Raising dedicated risks ships with the risks table">
-                        + Raise risk
-                    </span>
                     <span className="rk2-btn soon" title="Export for board ships with the risks table">
                         Export for board
                     </span>
-                    <Link href={`${base}/modules`} className="rk2-btn primary">
-                        Open modules
+                    <span className="rk2-btn soon" title="Risk filtering ships with the risks table">
+                        Filter: Open
+                    </span>
+                    <Link href={`${base}/risks/new`} className="rk2-btn primary">
+                        + Raise risk
                     </Link>
                 </div>
             </div>
@@ -163,7 +179,7 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
                 <div className="rk2-sum-card sev-high">
                     <div className="label">Blocking</div>
                     <div className={`value ${counts.blocking > 0 ? "red" : ""}`}>{counts.blocking}</div>
-                    <div className="sub">No severity tracking yet · 0 auto-derived</div>
+                    <div className="sub">Severity tracking ships with risks table</div>
                 </div>
                 <div className="rk2-sum-card sev-med">
                     <div className="label">Medium</div>
@@ -176,9 +192,9 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
                     <div className="sub">Open questions from modules</div>
                 </div>
                 <div className="rk2-sum-card sev-resolved">
-                    <div className="label">Resolved</div>
+                    <div className="label">Resolved this week</div>
                     <div className={`value ${counts.resolved > 0 ? "green" : ""}`}>{counts.resolved}</div>
-                    <div className="sub">Status tracking ships with the risks table</div>
+                    <div className="sub">Closure log ships with risks table</div>
                 </div>
             </div>
 
@@ -365,6 +381,15 @@ export function RisksView(props: RisksViewProps): React.ReactElement {
 }
 
 // ─── Risk item row ──────────────────────────────────────────────────────
+// Ports FORGE-MOCKUP-RISKS.html's `.risk-item` card 1:1. Every mockup slot
+// is rendered: severity banner + kicker + title + impact chip (right) +
+// body paragraph + 4-field meta-grid (Owner / Affects / Pivot-by date /
+// Grounding) + actions row + teal grounding strip. Fields we don't yet
+// store (body, impact, owner, pivotByDate, groundingNote) fall back to an
+// honest "Not yet declared" — never the mockup's Astra / Zimmermann /
+// CFRP example text.
+
+const NOT_DECLARED = "Not yet declared"
 
 function RiskItem({ row, moduleHref }: { row: RiskRow; moduleHref: string }): React.ReactElement {
     const sevClass =
@@ -373,9 +398,12 @@ function RiskItem({ row, moduleHref }: { row: RiskRow; moduleHref: string }): Re
         row.severity === "high" ? "high" : row.severity === "med" ? "med" : "low"
     const pillLabel =
         row.severity === "high" ? "Blocking" : row.severity === "med" ? "Medium" : "Low · info"
+    const chipClass =
+        row.severity === "high" ? "danger" : row.severity === "med" ? "warning" : "info"
 
     return (
         <div className={`rk2-item ${sevClass}`}>
+            {/* Header: kicker + title on the left, impact chip on the right */}
             <div className="rk2-item-header">
                 <div className="rk2-item-title">
                     <div className="kicker">
@@ -385,37 +413,87 @@ function RiskItem({ row, moduleHref }: { row: RiskRow; moduleHref: string }): Re
                     </div>
                     <h3>{row.title}</h3>
                 </div>
-                <Link href={moduleHref} className="rk2-btn sm" style={{ flexShrink: 0 }}>
-                    Open module
-                </Link>
+                {row.impact ? (
+                    <span className={`rk2-chip ${chipClass} solid`} style={{ flexShrink: 0 }}>
+                        {row.impact}
+                    </span>
+                ) : (
+                    <span className="rk2-chip neutral" style={{ flexShrink: 0 }} title="Impact scoring ships with the risks table">
+                        Impact not yet scored
+                    </span>
+                )}
             </div>
 
-            <div className="rk2-meta-grid cols-2">
+            {/* Body: risk description paragraph. Honest empty state when we
+                only have the headline (which is the vast majority of rows
+                today — they come from module failureModes[] / unknowns[]). */}
+            <div className="rk2-item-body">
+                {row.body ?? (
+                    <span className="rk2-empty-inline">
+                        Longer-form description ships with the risks table. Open the module to add
+                        mitigation context and a clearer narrative for this risk.
+                    </span>
+                )}
+            </div>
+
+            {/* 4-field meta-grid — matches the mockup's Owner / Affects /
+                Pivot-by date / Grounding row. Every slot renders honestly:
+                real data when present, "Not yet declared" when absent. */}
+            <div className="rk2-meta-grid">
+                <div className="m">
+                    <div className="k">Owner</div>
+                    <div className={`v ${row.owner ? "" : "muted"}`}>
+                        {row.owner ?? NOT_DECLARED}
+                    </div>
+                </div>
                 <div className="m">
                     <div className="k">Affects</div>
                     <div className="v">
-                        <Link href={moduleHref} style={{ color: "var(--rk-brand)", textDecoration: "none", fontWeight: 600 }}>
+                        <Link
+                            href={moduleHref}
+                            style={{ color: "var(--rk-brand)", textDecoration: "none", fontWeight: 600 }}
+                        >
                             {row.moduleName}
                         </Link>
                     </div>
                 </div>
                 <div className="m">
-                    <div className="k">Status</div>
-                    <div className="v">
-                        <span className="rk2-sev-pill low" style={{ textTransform: "uppercase" }}>Noted</span>
+                    <div className="k">Pivot-by date</div>
+                    <div className={`v tnum ${row.pivotByDate ? "" : "muted"}`}>
+                        {row.pivotByDate ?? NOT_DECLARED}
+                    </div>
+                </div>
+                <div className="m">
+                    <div className="k">Grounding</div>
+                    <div className={`v ${row.groundingNote ? "" : "muted"}`}>
+                        {row.groundingNote ?? "Module decomposition"}
                     </div>
                 </div>
             </div>
 
+            {/* Actions row — matches the mockup's button cluster at the
+                bottom of each card. Open-module is always available; the
+                other two surface as "soon" until the risks table lands. */}
             <div className="rk2-item-actions">
-                <Link href={moduleHref} className="rk2-btn sm">
-                    View in module
+                <Link href={moduleHref} className="rk2-btn primary sm">
+                    Open module
                 </Link>
-                <span className="rk2-btn sm soon" title="Mitigation authoring ships with the risks table">
+                <span
+                    className="rk2-btn sm soon"
+                    title="Mitigation authoring ships with the risks table"
+                >
                     Add mitigation
+                </span>
+                <span
+                    className="rk2-btn ghost sm soon"
+                    title="Accept-risk flow ships with the risks table"
+                >
+                    Accept risk + document
                 </span>
             </div>
 
+            {/* Grounding strip — teal dot + provenance hint, matches the
+                mockup's `.grounding-strip` block at the foot of each card. */}
             <div className="rk2-grounding-strip">
                 <span className="dot" aria-hidden="true" />
                 Sourced from module decomposition · deep-link opens the module&apos;s failure-mode section
