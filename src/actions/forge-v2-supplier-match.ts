@@ -19,6 +19,8 @@
  * - Table:  forge_supplier_shortlist
  */
 
+import { after } from "next/server"
+
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
 import {
@@ -202,6 +204,67 @@ export async function matchSuppliersForProject(
                     res.error,
                 )
             }
+        }
+
+        // Auto-fire gap discovery when the shortlist comes back thin.
+        // Triggers `discoverSuppliersForGap` against the first module
+        // without a match, which runs Claude Opus + web_search and
+        // persists real UK/EU companies as unverified-ai-discovery
+        // rows — same mechanism the founder can trigger manually from
+        // the /suppliers empty state. Scheduled via after() so the
+        // match action returns immediately and the discovery happens
+        // post-response with its own <300s Vercel budget.
+        //
+        // Threshold: suppliersAdded < 3 OR at least one module has
+        // zero matches. For non-core-domain projects (horticulture,
+        // HVAC, shipping containers) this will nearly always fire,
+        // which is the intent — founders shouldn't have to know to
+        // click "research the web" for the directory to catch up.
+        const AUTO_DISCOVERY_THRESHOLD = 3
+        const shouldAutoDiscover =
+            suppliersAdded < AUTO_DISCOVERY_THRESHOLD || modulesEmpty > 0
+        if (shouldAutoDiscover && modules.length > 0) {
+            // Identify the first module with zero matches by
+            // computing the set of module ids that WERE matched
+            // across all shortlisted suppliers.
+            const matchedModuleIds = new Set<string>()
+            for (const { moduleIds } of bySupplier.values()) {
+                for (const mid of moduleIds) matchedModuleIds.add(mid)
+            }
+            const moduleWithoutMatch =
+                modules.find((m) => !matchedModuleIds.has(m.id)) ??
+                modules[0]
+            console.info(
+                `[forge-v2-supplier-match] auto-firing gap discovery for ${projectId} ` +
+                    `(${suppliersAdded} suppliers, ${modulesEmpty} empty modules)`,
+            )
+            after(async () => {
+                try {
+                    const { discoverSuppliersForGap } = await import(
+                        "./forge-v2-supplier-discovery"
+                    )
+                    const res = await discoverSuppliersForGap(
+                        projectId,
+                        moduleWithoutMatch.id,
+                    )
+                    if (!res.ok) {
+                        console.warn(
+                            `[forge-v2-supplier-match] auto-discovery did not persist: ` +
+                                `${res.error} (${res.errorCode})`,
+                        )
+                    } else {
+                        console.info(
+                            `[forge-v2-supplier-match] auto-discovery added ` +
+                                `${res.job.candidatesPersisted} candidates`,
+                        )
+                    }
+                } catch (err) {
+                    console.error(
+                        "[forge-v2-supplier-match] auto-discovery threw:",
+                        err instanceof Error ? err.message : err,
+                    )
+                }
+            })
         }
 
         return {
