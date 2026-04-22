@@ -952,20 +952,12 @@ export async function cropModuleRegion(
   return cropped.toString("base64")
 }
 
-// ─── Ghosted-Context Crop (Deterministic Module Rendering) ──────────
+// ─── Ghosted-Context Highlight (Deterministic Module Rendering) ────────
 
 /**
- * Options for {@link cropWithGhostedContext}.
+ * Options for {@link highlightModuleInContext}.
  */
 export interface GhostedCropOptions {
-  /**
-   * Padding around the bounding box as a fraction of bbox size (per side).
-   * `0.25` means the output crop extends by 25% of the bbox width on the
-   * left and right, and 25% of the bbox height on top and bottom — so the
-   * target subsystem keeps peripheral context around it. Clamped to image
-   * bounds. Default: `0.25`.
-   */
-  paddingPct?: number
   /**
    * Saturation multiplier applied to the peripheral (outside-bbox) pixels.
    * `0` = fully desaturated grey. Default: `0`.
@@ -974,76 +966,77 @@ export interface GhostedCropOptions {
   /**
    * Opacity of the white "lift" layer composited over the desaturated
    * peripheral pixels (0-1). Higher values push the peripheral further into
-   * the background. Default: `0.45`.
+   * the background. Default: `0.4`.
    */
   whiteLiftAlpha?: number
   /**
    * Feather radius applied to the color patch alpha mask, as a fraction of
    * the smaller bbox dimension. `0` disables feathering (hard rectangle
-   * edge). Default: `0.04` (~4% feather, soft but not blurry).
+   * edge). Default: `0.12` — noticeably soft, avoids rectangular artifacts.
    */
   featherPct?: number
   /**
-   * Maximum output width in pixels. The final crop is resized to fit
-   * within `outputWidth` × `outputHeight` preserving aspect. Default: `1536`.
+   * @deprecated No-op in the highlight-based implementation. Retained so
+   *   legacy callers compile without edits. The output is always the full
+   *   hero dimensions — never cropped.
+   */
+  paddingPct?: number
+  /**
+   * @deprecated No-op. Output always matches hero dimensions.
    */
   outputWidth?: number
   /**
-   * Maximum output height in pixels. Default: `1024`.
+   * @deprecated No-op. Output always matches hero dimensions.
    */
   outputHeight?: number
 }
 
 /**
- * Deterministic Sharp-based "ghosted context" crop.
+ * Deterministic Sharp-based "ghosted-highlight" render.
  *
- * Produces a per-module tile FROM an existing hero image rather than
- * regenerating it with an image model. The target subsystem (defined by
- * `bbox`) keeps its full-colour pixels; the peripheral area (inside the
- * padded crop but outside the bbox) is desaturated and lifted toward white
- * so peripheral context is visible but clearly de-emphasised.
+ * Produces a per-module tile FROM an existing hero image by preserving the
+ * FULL HERO at its original dimensions, desaturating the whole frame, and
+ * then compositing the bbox region back in full colour at its original
+ * position. The reader sees the entire system with only the target
+ * subsystem in colour — spatial context is preserved, tiny modules
+ * (fire suppression, SCADA) stay visible within the whole layout.
  *
  * Because the output pixels are copies of the hero, geometric consistency
- * with the hero is 100%. Replaces the gpt-image-2 per-module render chain
- * for V2 projects that have an `interior_overview_url` set.
+ * with the hero is 100%. All module tiles are IDENTICAL dimensions — only
+ * the highlight region changes — so the PDF feels cohesive.
+ *
+ * Replaces the earlier crop-to-bbox behaviour which lost spatial context
+ * and made every module page feel like a different image.
  *
  * @param heroBase64 - Base64 PNG of the hero image (interior-exploded view)
  * @param bbox - Normalised (0-1) bounding box of the target subsystem
  * @param options - See {@link GhostedCropOptions}
- * @returns Base64 PNG of the ghosted-context tile
+ * @returns Base64 PNG of the full-hero tile with bbox in colour
  */
-export async function cropWithGhostedContext(
+export async function highlightModuleInContext(
   heroBase64: string,
   bbox: ModuleBoundingBox,
   options: GhostedCropOptions = {},
 ): Promise<string> {
-  const paddingPct = options.paddingPct ?? 0.25
   const saturationOutside = options.saturationOutside ?? 0
-  const whiteLiftAlpha = Math.max(0, Math.min(1, options.whiteLiftAlpha ?? 0.45))
-  const featherPct = Math.max(0, options.featherPct ?? 0.04)
-  const outputWidth = options.outputWidth ?? 1536
-  const outputHeight = options.outputHeight ?? 1024
+  const whiteLiftAlpha = Math.max(0, Math.min(1, options.whiteLiftAlpha ?? 0.4))
+  const featherPct = Math.max(0, options.featherPct ?? 0.12)
 
   const heroBuf = Buffer.from(heroBase64, "base64")
   const meta = await sharp(heroBuf).metadata()
   const imgW = meta.width ?? 1536
   const imgH = meta.height ?? 1024
 
-  // 1. Padded-crop region (the final output window). Clamped to image bounds.
-  const padX = Math.max(0, Math.round((bbox.x - bbox.w * paddingPct) * imgW))
-  const padY = Math.max(0, Math.round((bbox.y - bbox.h * paddingPct) * imgH))
-  const padW = Math.min(imgW - padX, Math.round(bbox.w * (1 + 2 * paddingPct) * imgW))
-  const padH = Math.min(imgH - padY, Math.round(bbox.h * (1 + 2 * paddingPct) * imgH))
-
-  // 2. Inner (color-kept) region — the bbox itself, clamped to image bounds.
+  // 1. Inner (color-kept) region — the bbox itself, clamped to image bounds.
   const colorX = Math.max(0, Math.round(bbox.x * imgW))
   const colorY = Math.max(0, Math.round(bbox.y * imgH))
   const colorW = Math.min(imgW - colorX, Math.max(1, Math.round(bbox.w * imgW)))
   const colorH = Math.min(imgH - colorY, Math.max(1, Math.round(bbox.h * imgH)))
 
-  // 3. Desaturated + lightened full-hero layer (the "ghost" background).
+  // 2. Desaturated + lightened full-hero layer (the "ghost" background).
   //    modulate({saturation:0}) -> full greyscale; composite a white rectangle
-  //    at whiteLiftAlpha opacity to push the peripherals back.
+  //    at whiteLiftAlpha opacity to push the peripherals back toward paper
+  //    without erasing them entirely.
   const whiteRect = {
     create: {
       width: imgW,
@@ -1058,18 +1051,19 @@ export async function cropWithGhostedContext(
     .png()
     .toBuffer()
 
-  // 4. Color patch — the pixels inside the bbox, pulled straight from the hero.
+  // 3. Color patch — the pixels inside the bbox, pulled straight from the hero.
   let colorPatch = await sharp(heroBuf)
     .extract({ left: colorX, top: colorY, width: colorW, height: colorH })
     .png()
     .toBuffer()
 
-  // 5. Optional feathered alpha on the patch so it blends into the ghost
-  //    instead of landing as a hard rectangle. We construct a soft-edged
-  //    white mask via SVG+blur, then use blend:"dest-in" to apply it as
-  //    alpha on the colour patch.
+  // 4. Feathered alpha on the patch so it blends into the ghost instead of
+  //    landing as a hard rectangle. We construct a soft-edged white mask via
+  //    SVG+blur, then use blend:"dest-in" to apply it as alpha on the colour
+  //    patch. Feather is generous (~12% of the short side) to give a soft
+  //    circular-looking falloff even when the bbox itself is rectangular.
   if (featherPct > 0) {
-    const feather = Math.max(1, Math.round(Math.min(colorW, colorH) * featherPct))
+    const feather = Math.max(2, Math.round(Math.min(colorW, colorH) * featherPct))
     const inset = Math.max(1, feather)
     const innerW = Math.max(1, colorW - inset * 2)
     const innerH = Math.max(1, colorH - inset * 2)
@@ -1085,29 +1079,26 @@ export async function cropWithGhostedContext(
       .toBuffer()
   }
 
-  // 6. Composite the (optionally feathered) colour patch onto the desaturated
-  //    full hero at the patch's original position, then crop to the padded
-  //    region and resize to fit the output box preserving aspect ratio.
+  // 5. Composite the feathered colour patch onto the desaturated full hero
+  //    at its ORIGINAL position. No crop, no translate, no resize — the
+  //    output keeps full hero dimensions (typically 1536×1024) so every
+  //    module tile is identical in size and composition.
   const composed = await sharp(desaturatedFull)
     .composite([{ input: colorPatch, left: colorX, top: colorY }])
-    .extract({
-      left: padX,
-      top: padY,
-      width: Math.max(1, padW),
-      height: Math.max(1, padH),
-    })
-    .resize({
-      width: outputWidth,
-      height: outputHeight,
-      fit: "inside",
-      withoutEnlargement: true,
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
-    })
     .png()
     .toBuffer()
 
   return composed.toString("base64")
 }
+
+/**
+ * @deprecated Renamed to {@link highlightModuleInContext}. The implementation
+ * changed from crop-to-bbox to full-hero-with-highlight — the output is now
+ * the full hero dimensions with only the bbox in colour, not a tight crop.
+ * This alias is kept so any external import continues to compile; prefer the
+ * new name in all new code.
+ */
+export const cropWithGhostedContext = highlightModuleInContext
 
 /**
  * Renders a module tile by cropping a ghosted-context region from a
@@ -1135,7 +1126,7 @@ export async function generateModuleImageFromCrop(
   bbox: ModuleBoundingBox,
   options: GhostedCropOptions = {},
 ): Promise<{ url: string; modelUsed: string }> {
-  const tileBase64 = await cropWithGhostedContext(
+  const tileBase64 = await highlightModuleInContext(
     interiorOverviewBase64,
     bbox,
     options,
@@ -1552,7 +1543,7 @@ export async function generateModuleImageWithReference(
  * - `"interior-exploded"` — SINGLE high-detail interior view showing every
  *   sub-assembly in its spatial position with NO exterior walls / enclosure
  *   visible. Source image for the deterministic Sharp ghosted-context crop
- *   pipeline (see `cropWithGhostedContext` / `generateModuleImageFromCrop`).
+ *   pipeline (see `highlightModuleInContext` / `generateModuleImageFromCrop`).
  *   Stored on `cad_lab_projects.interior_overview_url`.
  * - `"exterior-shell"` — the standalone exterior enclosure (e.g. 40ft ISO
  *   container for BESS). Used on the PDF cover / marketing. Reuses the

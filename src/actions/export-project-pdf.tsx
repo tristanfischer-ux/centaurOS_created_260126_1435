@@ -449,6 +449,14 @@ interface PdfInput {
     briefLockedAtIso: string | null
     foundryName: string | null
     systemIllustrationUrl: string | null
+    /**
+     * Interior-exploded hero (walls removed, interior contents visible).
+     * When present, preferred over {@link systemIllustrationUrl} on the
+     * cover page because the rest of the PDF shows interior contents —
+     * the walls-visible hero misrepresents what the reader is about to
+     * see. Falls back to systemIllustrationUrl when null.
+     */
+    interiorOverviewUrl: string | null
     conceptRenderUrl: string | null
     brief: {
         subject: string | null
@@ -548,10 +556,22 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                     <Text style={styles.coverGridValue}>{fmtDateTime(data.generatedAtIso)}</Text>
                 </View>
 
-                {/* System illustration (or honest placeholder) */}
-                {data.systemIllustrationUrl ? (
+                {/* System illustration (or honest placeholder).
+                    Prefer the interior-exploded hero when present — the
+                    rest of the PDF shows interior contents, and the old
+                    walls-visible hero misrepresents what the reader sees
+                    on the following pages. Fall back to the walls-visible
+                    illustration when the interior render hasn't been
+                    produced yet. */}
+                {data.interiorOverviewUrl ?? data.systemIllustrationUrl ? (
                     <>
-                        <Image src={data.systemIllustrationUrl} style={styles.coverImage} />
+                        <Image
+                            src={
+                                (data.interiorOverviewUrl ??
+                                    data.systemIllustrationUrl) as string
+                            }
+                            style={styles.coverImage}
+                        />
                         <Text style={styles.imageDisclaimer}>
                             Illustrative only — not a technical specification. All renders in this document are generated for visual reference; component arrangement, proportions, and identities may differ from the final engineered assembly.
                         </Text>
@@ -1385,7 +1405,7 @@ export async function exportProjectPdf(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, concept_render_url",
+                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -1701,6 +1721,10 @@ export async function exportProjectPdf(
             systemIllustrationUrl:
                 typeof project.system_illustration_url === "string"
                     ? project.system_illustration_url
+                    : null,
+            interiorOverviewUrl:
+                typeof project.interior_overview_url === "string"
+                    ? project.interior_overview_url
                     : null,
             conceptRenderUrl:
                 typeof project.concept_render_url === "string"

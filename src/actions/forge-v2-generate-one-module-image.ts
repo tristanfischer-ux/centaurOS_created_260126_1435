@@ -247,10 +247,51 @@ export async function generateOneModuleImage(
         //     Fallback: any failure (hero fetch, vision miss, sharp error)
         //     falls through to the existing gpt-image-2 path below so we
         //     never ship worse than before.
-        const interiorUrl = project.interior_overview_url
-        if (typeof interiorUrl === "string" && interiorUrl.length > 0) {
+        // Container-shell special case. The container-shell module IS the
+        // exterior walls — the interior-exploded hero literally doesn't show
+        // it (walls are removed so the interior is visible). For THIS module
+        // we anchor on the original walls-visible `system_illustration_url`
+        // instead of `interior_overview_url`. Detected by id suffix OR a
+        // name match on "shell" / "structural envelope" / "iso container" so
+        // Max's decomposition labelling style doesn't matter.
+        //
+        // One source for 7 modules, different source for 1 module.
+        const targetIdLc = target.id.trim().toLowerCase()
+        const targetNameLc = target.name.trim().toLowerCase()
+        const isContainerShellModule =
+            targetIdLc === "container_shell" ||
+            targetIdLc === "container_enclosure" ||
+            targetIdLc.endsWith("-container_shell") ||
+            targetIdLc.endsWith("-container_enclosure") ||
+            /\bshell\b/.test(targetNameLc) ||
+            /structural envelope/.test(targetNameLc) ||
+            /iso container/.test(targetNameLc)
+
+        const sysUrlPre = project.system_illustration_url
+        const interiorUrlRaw = project.interior_overview_url
+        const ghostedSourceUrl: string | null = isContainerShellModule
+            ? typeof sysUrlPre === "string" && sysUrlPre.length > 0
+                ? sysUrlPre
+                : null
+            : typeof interiorUrlRaw === "string" && interiorUrlRaw.length > 0
+              ? interiorUrlRaw
+              : null
+        if (isContainerShellModule) {
+            console.log(
+                "[forge-v2-generate-one-module-image] gate: container-shell-using-exterior",
+                {
+                    projectId,
+                    moduleId,
+                    moduleName: target.name,
+                    exteriorUrlPresent:
+                        typeof sysUrlPre === "string" && sysUrlPre.length > 0,
+                },
+            )
+        }
+
+        if (ghostedSourceUrl) {
             try {
-                const heroRes = await fetch(interiorUrl)
+                const heroRes = await fetch(ghostedSourceUrl)
                 if (!heroRes.ok) {
                     console.error(
                         "[forge-v2-generate-one-module-image] interior hero fetch non-ok; falling through to gpt-image-2",
