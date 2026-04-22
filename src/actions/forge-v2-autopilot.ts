@@ -250,6 +250,46 @@ export async function startAutopilot(
                     },
                 } as unknown as never)
                 .eq("id", projectId)
+
+            // Clean up stale open pipeline_runs rows for this project BEFORE
+            // seeding the fresh walk. Without this, the next stage's
+            // waitForStage() reads the previous walk's 'failed' or orphaned
+            // 'running' row (from e.g. a 6-min TIMEOUT_STALL sweep, or a
+            // Vercel container teardown mid-run) and immediately surfaces
+            // a misleading "autopilot stopped" error to the founder — a
+            // ghost failure from the prior walk, not the fresh one.
+            //
+            // We mark any non-terminal row (queued/running) AND any 'failed'
+            // row as 'cancelled' with error_code='AUTOPILOT_SUPERSEDED'. The
+            // reason we sweep 'failed' too: waitForStage short-circuits on
+            // the most-recent row per (specialist_id, stage), so a lingering
+            // 'failed' row from the stalled walk would instantly fail the
+            // fresh walk's corresponding stage before any new run is even
+            // inserted. 'done' rows are left alone — they represent real
+            // completed work (e.g. Chase's research) that the fresh walk
+            // can validly reuse without re-running. Matches the existing
+            // status-taxonomy convention (see migration 20260422000000).
+            const { error: supersedeErr } = await admin
+                .from("pipeline_runs")
+                .update({
+                    status: "cancelled",
+                    error_code: "AUTOPILOT_SUPERSEDED",
+                    error_message:
+                        "Superseded by autopilot restart after stall.",
+                    finished_at: new Date().toISOString(),
+                })
+                .eq("project_id", projectId)
+                .in("status", ["queued", "running", "failed"])
+            if (supersedeErr) {
+                // Non-fatal — the fresh walk may still succeed, it will just
+                // surface the old ghost failure to the founder if the next
+                // stage's poll reads the stale row first. Log loudly so we
+                // notice in Vercel logs.
+                console.error(
+                    "[autopilot:start] failed to supersede stale pipeline_runs:",
+                    supersedeErr.message,
+                )
+            }
         }
 
         // ── 2. Seed the initial state ────────────────────────────────
