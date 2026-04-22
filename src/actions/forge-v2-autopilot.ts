@@ -630,6 +630,34 @@ async function stepGenerateIllustration(projectId: string): Promise<void> {
     }
 
     await advance(projectId, "generating_illustration", "matching_suppliers")
+
+    // Kick off per-module render chain in parallel with supplier matching.
+    // The render chain uses its own `after()` + `image_render_state` idempotency
+    // gate (ALREADY_RUNNING is a no-op), so a concurrent page-load auto-fire
+    // from modules/page.tsx won't double-render. Module renders take ~3 min
+    // for a typical project — firing here means founders land on the modules
+    // page with renders already in progress, matching Tristan's "feels faster"
+    // goal (2026-04-22 decision: swap to gpt-image-2 + auto-fire the chain).
+    after(async () => {
+        try {
+            const { startRenderAllRemainingModuleImages } = await import(
+                "./forge-v2-render-all-modules"
+            )
+            const res = await startRenderAllRemainingModuleImages(projectId)
+            if (!res.ok && res.errorCode !== "ALREADY_RUNNING" && res.errorCode !== "NO_UNRENDERED_MODULES") {
+                console.warn(
+                    "[autopilot] auto-fire module renders failed (non-fatal):",
+                    res.error,
+                )
+            }
+        } catch (err) {
+            console.warn(
+                "[autopilot] auto-fire module renders threw (non-fatal):",
+                err instanceof Error ? err.message : err,
+            )
+        }
+    })
+
     after(async () => {
         try {
             await stepMatchSuppliers(projectId)

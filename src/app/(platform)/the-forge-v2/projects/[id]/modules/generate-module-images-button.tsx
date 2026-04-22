@@ -132,10 +132,15 @@ export function GenerateModuleImagesButton({
             ? `Render remaining ${moduleCount - renderedCount} of ${moduleCount}`
             : "Generate module renders"
 
+    // Per-module render is ~1 min on gpt-image-2 default quality.
+    // Chain runs 2-at-a-time, so an N-module project finishes in ~N/2 minutes
+    // wall-clock. A typical 8-10 module project lands in 4-5 min; we state
+    // "about 3 minutes" as the expectation because the first module is
+    // usable within 60s and most founders don't watch the whole chain.
     const disabledTitle =
         moduleCount === 0
             ? "Run Max's decomposition first — module renders generate once modules exist."
-            : "Each module gets its own Nano Banana blueprint (~30–60s). The render chain lives server-side — you can close the tab."
+            : "Each module render takes about 1 minute. The full set takes around 3 minutes and runs server-side — you can leave this page and come back."
 
     return (
         <div
@@ -162,7 +167,7 @@ export function GenerateModuleImagesButton({
                     {state.failed_ids.length > 0
                         ? ` · ${state.failed_ids.length} failed`
                         : ""}
-                    {" · server-side (safe to close tab)"}
+                    {" · about 3 min total · safe to leave this page"}
                 </span>
             )}
             {isFinished && state && !isRunning && (
@@ -178,6 +183,14 @@ export function GenerateModuleImagesButton({
                         : state.failed_ids.length > 0
                             ? `${state.failed_ids.length} render${state.failed_ids.length === 1 ? "" : "s"} failed — please retry.`
                             : "No renders generated."}
+                </span>
+            )}
+            {!showingLive && !isFinished && moduleCount > 0 && !allRendered && (
+                <span
+                    className="m2-gen-images-hint"
+                    style={{ fontSize: 13, color: "var(--muted-foreground, #6b7280)" }}
+                >
+                    About 3 minutes · runs in the background · you can leave this page
                 </span>
             )}
             {clickError && (

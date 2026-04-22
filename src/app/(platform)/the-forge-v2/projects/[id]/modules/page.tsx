@@ -20,9 +20,13 @@
 
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
+import { after } from "next/server"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
-import { loadImageRenderState } from "@/actions/forge-v2-render-all-modules"
+import {
+    loadImageRenderState,
+    startRenderAllRemainingModuleImages,
+} from "@/actions/forge-v2-render-all-modules"
 import { loadMaxRunStatus, runMaxDecomposition } from "@/actions/specialists/run-max-decomposition"
 import { loadFangRunStatusesForProject } from "@/actions/specialists/run-fang-review"
 import type { CadLabModule } from "@/lib/cad-lab-types"
@@ -68,6 +72,38 @@ export default async function ForgeV2ModulesPage({
     }
     const project = result.project
     const modules = project.modules ?? []
+
+    // Auto-fire the per-module render chain on page load when there is
+    // unrendered work AND no chain is currently in flight. The server action
+    // has its own idempotency gate (ALREADY_RUNNING no-op) + stall recovery,
+    // so this is safe to call on every page load — redundant calls are free.
+    // Runs via after() so the page response isn't blocked.
+    //
+    // Together with the autopilot auto-fire in stepGenerateIllustration(),
+    // this covers both the autopilot-driven happy path and the deep-link
+    // case where a founder navigates straight to /modules after decomposition.
+    const needsAutoFire =
+        modules.length > 0 &&
+        modules.some((m) => !m.imageUrl || m.imageUrl.length === 0) &&
+        (imageRenderState === null || imageRenderState.finished_at !== null)
+    if (needsAutoFire) {
+        after(async () => {
+            try {
+                const res = await startRenderAllRemainingModuleImages(id)
+                if (!res.ok && res.errorCode !== "ALREADY_RUNNING" && res.errorCode !== "NO_UNRENDERED_MODULES") {
+                    console.warn(
+                        "[modules/page] auto-fire render chain failed (non-fatal):",
+                        res.error,
+                    )
+                }
+            } catch (err) {
+                console.warn(
+                    "[modules/page] auto-fire render chain threw (non-fatal):",
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        })
+    }
 
     // Bind the Max orchestrator to this project id so the client button
     // component doesn't need to pass it explicitly. The `"use server"`

@@ -2,18 +2,26 @@
  * @file image-generator.ts — Image generation for X-Ray blueprints
  *
  * @description Image generation with automatic provider fallback:
- * - Primary: Nano Banana 2 (gemini-3.1-flash-image-preview) — 2K resolution, native 3:2 support
- * - Fallback: OpenAI gpt-image-1 — activated on any Nano Banana failure
+ * - Primary: OpenAI gpt-image-2 (default quality) — selected 2026-04-22 after
+ *   a 4-way shootout vs Nano Banana 2 and gpt-image-1. gpt-image-2 produces
+ *   more physically-accurate industrial renders on engineering prompts; default
+ *   quality beat "high"/thinking mode on proportion correctness.
+ * - Fallback 1: Nano Banana 2 multimodal (reference-aware) or text-only
+ * - Fallback 2: Nano Banana stable (gemini-2.5-flash-image)
+ * - Fallback 3: OpenAI gpt-image-1 (deep fallback — kept so module renders
+ *   don't fail outright if gpt-image-2 has a regional outage)
  *
- * Uses Nano Banana 2 generateContent API for high-quality technical illustrations.
- * Falls back to OpenAI SDK when Nano Banana is unavailable.
+ * gpt-image-2 is slower than banana (~50s vs ~10s) — the module render chain
+ * compensates by running 2-at-a-time with `after()` so founders can leave
+ * the page while the chain completes server-side.
  *
- * @security Requires GOOGLE_AI_API_KEY; optionally OPENAI_API_KEY for fallback
+ * @security Requires OPENAI_API_KEY; optionally GOOGLE_AI_API_KEY for fallback
  *
  * @related
  * - AI provider registry: src/lib/ai-providers/registry.ts (existing Gemini pattern)
  * - Server actions: src/actions/xray.ts (orchestrates generation)
  * - Error classification: src/lib/agents/error-classification.ts (retryable error detection)
+ * - Shootout evidence: ~/Downloads/image-shootout/compare.html (2026-04-22)
  */
 
 import sharp from "sharp"
@@ -30,7 +38,12 @@ import type { VisualStyleSpec } from "@/lib/cad-lab-types"
 const GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 const NANO_BANANA_MODEL = "gemini-3.1-flash-image-preview" // Nano Banana 2 — 2K resolution, native 3:2 support
 const NANO_BANANA_STABLE_MODEL = "gemini-2.5-flash-image" // Nano Banana (original) — confirmed available via ListModels
-const OPENAI_IMAGE_MODEL = "gpt-image-1" // OpenAI fallback — high-quality technical illustrations
+// INTENT: gpt-image-2 is the primary model (selected 2026-04-22 after a 4-way
+// shootout). Default quality is deliberate — the "high"/thinking mode was
+// evaluated and rejected for producing less physically-accurate proportions
+// on engineering illustrations. Don't silently add `quality: "high"`.
+const OPENAI_PRIMARY_MODEL = "gpt-image-2"
+const OPENAI_FALLBACK_MODEL = "gpt-image-1" // Deep fallback — gpt-image-2 regional outage protection
 const STORAGE_BUCKET = "xray-images"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -480,8 +493,8 @@ async function callNanoBananaImageWithReference(
 // ─── OpenAI Fallback ─────────────────────────────────────────────────
 
 /**
- * Maps Gemini aspect ratio strings to OpenAI gpt-image-1 size strings.
- * gpt-image-1 supports: "1024x1024", "1024x1536", "1536x1024".
+ * Maps Gemini aspect ratio strings to OpenAI image size strings.
+ * Both gpt-image-1 and gpt-image-2 support: "1024x1024", "1024x1536", "1536x1024".
  */
 function geminiAspectToOpenAISize(
   aspectRatio?: string,
@@ -499,56 +512,69 @@ function geminiAspectToOpenAISize(
 }
 
 /**
- * Calls the OpenAI gpt-image-1 API to generate an image.
- * Used as a fallback when Gemini is unavailable.
+ * Calls the OpenAI images.generate API.
  *
- * @returns Base64 image data and mime type (same shape as callNanoBananaImage)
+ * Defaults to gpt-image-2 (primary, default quality — see header for shootout
+ * evidence). Falls through to gpt-image-1 with quality:"high" only when
+ * explicitly routed there as a deep fallback.
+ *
  * @throws Error if OPENAI_API_KEY is missing or API call fails
  */
 async function callOpenAIImage(
   prompt: string,
   size: "1024x1024" | "1024x1536" | "1536x1024",
+  model: string = OPENAI_PRIMARY_MODEL,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    throw new Error("[XRayImageGen] OPENAI_API_KEY is not configured — cannot use OpenAI fallback")
+    throw new Error("[XRayImageGen] OPENAI_API_KEY is not configured")
   }
 
   const OpenAI = (await import("openai")).default
-  // RELIABILITY: 120s timeout + no retries. OpenAI SDK default is 10min
-  // with 2 retries, which can blow past Vercel's 300s function ceiling.
-  const client = new OpenAI({ apiKey, timeout: 120_000, maxRetries: 0 })
+  // RELIABILITY: 180s timeout + no retries. gpt-image-2 default-quality
+  // renders land in ~50s typical; gpt-image-1 high-quality ~45s typical.
+  // 180s gives headroom for pathological prompts without blowing past
+  // Vercel's 300s function ceiling.
+  const client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 0 })
 
-  // DECISION: gpt-image-1 only supports b64_json (not URL).
-  // This is ideal — we need base64 for Supabase upload anyway.
-  const response = await client.images.generate({
-    model: OPENAI_IMAGE_MODEL,
-    prompt,
-    n: 1,
-    size,
-    quality: "high",
-  })
+  // DECISION: Tristan explicitly chose gpt-image-2 DEFAULT quality over
+  // "high"/thinking mode after the 4-way shootout — high mode produced
+  // less-accurate industrial proportions. quality:"high" is kept ONLY for
+  // gpt-image-1 (the deep fallback) since that's where it's been validated.
+  //
+  // GOTCHA: OpenAI SDK v6's client.images.generate() has a union return type
+  // (streaming vs non-streaming). Pass stream:false explicitly so TS infers
+  // the ImagesResponse overload and we can access response.data.
+  const response = model === OPENAI_FALLBACK_MODEL
+    ? await client.images.generate({ model, prompt, n: 1, size, quality: "high", stream: false })
+    : await client.images.generate({ model, prompt, n: 1, size, stream: false })
 
   const b64Data = response.data?.[0]?.b64_json
   if (!b64Data) {
-    throw new Error("[XRayImageGen] No image data returned from OpenAI")
+    throw new Error(`[XRayImageGen] No image data returned from OpenAI (${model})`)
   }
 
-  return { mimeType: "image/png", data: b64Data, modelUsed: OPENAI_IMAGE_MODEL }
+  return { mimeType: "image/png", data: b64Data, modelUsed: model }
 }
 
 /**
  * Generates an image with automatic multi-model fallback.
  *
+ * PRIMARY: OpenAI gpt-image-2 (default quality). Selected 2026-04-22 after a
+ * 4-way shootout vs Nano Banana 2 and gpt-image-1. Default quality was chosen
+ * over "high"/thinking mode because it produced more physically-accurate
+ * industrial proportions on engineering illustrations.
+ *
  * When referenceBase64 is provided:
- * FLOW: Nano Banana 2 multimodal → Nano Banana 2 text-only → Nano Banana (2.5, stable) → GPT Image 1
+ * FLOW: gpt-image-2 edit → gpt-image-2 generate → Nano Banana 2 multimodal →
+ *       Nano Banana 2 text → Nano Banana stable → gpt-image-1 (deep fallback)
  *
  * When no reference:
- * FLOW: Nano Banana 2 text-only → Nano Banana (2.5, stable) → GPT Image 1
+ * FLOW: gpt-image-2 generate → Nano Banana 2 text → Nano Banana stable → gpt-image-1
  *
- * INTENT: gemini-3.1-flash-image-preview is a preview model with intermittent 500 errors.
- * gemini-2.5-flash-image is the stable GA model — same API, same key, reliable fallback
- * before leaving Google's ecosystem entirely for OpenAI.
+ * gemini-3.1-flash-image-preview is a preview model with intermittent 500 errors;
+ * gemini-2.5-flash-image is the stable GA model — same API, same key, reliable
+ * mid-chain fallback. gpt-image-1 sits at the bottom as a regional-outage cushion.
  */
 async function callImageWithFallback(
   prompt: string,
@@ -556,9 +582,39 @@ async function callImageWithFallback(
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   // Enforce no-text guardrail on ALL prompts regardless of source
   const safePrompt = enforceNoText(prompt)
+  const openaiSize = geminiAspectToOpenAISize(imageConfig.aspectRatio)
+  const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY?.trim())
 
-  // DECISION: When reference images are available, try the multimodal path first.
-  // Build array of reference images: full hero + optional per-module crop.
+  // ── Step 1: OpenAI gpt-image-2 edit (multimodal path) ─────────────
+  // When a reference image is available, prefer gpt-image-2 in edit mode —
+  // the shootout winner at the reference-aware path too (trial 2026-04-22).
+  if (hasOpenAIKey && imageConfig.referenceBase64) {
+    try {
+      const result = await callOpenAIEdit(
+        safePrompt,
+        imageConfig.referenceBase64,
+        openaiSize,
+        OPENAI_PRIMARY_MODEL,
+      )
+      console.log("[XRayImageGen] gpt-image-2 edit succeeded (reference-aware)")
+      return result
+    } catch (editErr) {
+      const msg = editErr instanceof Error ? editErr.message : String(editErr)
+      console.warn("[XRayImageGen] gpt-image-2 edit failed, falling to generate:", { error: msg.slice(0, 200) })
+    }
+  }
+
+  // ── Step 2: OpenAI gpt-image-2 generate (primary text-to-image) ───
+  if (hasOpenAIKey) {
+    try {
+      return await callOpenAIImage(safePrompt, openaiSize, OPENAI_PRIMARY_MODEL)
+    } catch (primaryErr) {
+      const msg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr)
+      console.warn("[XRayImageGen] gpt-image-2 generate failed, falling to Gemini:", { error: msg.slice(0, 200) })
+    }
+  }
+
+  // ── Step 3: Nano Banana 2 multimodal (reference path) ─────────────
   if (imageConfig.referenceBase64) {
     const refs: ReferenceImage[] = [
       { mimeType: "image/png", base64: imageConfig.referenceBase64 },
@@ -567,40 +623,78 @@ async function callImageWithFallback(
       refs.push({ mimeType: "image/png", base64: imageConfig.moduleCropBase64 })
     }
     try {
-      const result = await callNanoBananaImageWithReference(safePrompt, refs, imageConfig.aspectRatio)
-      console.log("[XRayImageGen] Multimodal generation succeeded (hero reference used)")
-      return result
-    } catch (multimodalError) {
-      const msg = multimodalError instanceof Error ? multimodalError.message : String(multimodalError)
+      return await callNanoBananaImageWithReference(safePrompt, refs, imageConfig.aspectRatio)
+    } catch (multimodalErr) {
+      const msg = multimodalErr instanceof Error ? multimodalErr.message : String(multimodalErr)
       console.warn("[XRayImageGen] Nano Banana 2 multimodal failed, trying text-only:", { error: msg.slice(0, 200) })
     }
   }
 
-  // Step 2: Nano Banana 2 text-only
+  // ── Step 4: Nano Banana 2 text-only ───────────────────────────────
   try {
     return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio)
-  } catch (nb2Error) {
-    const msg = nb2Error instanceof Error ? nb2Error.message : String(nb2Error)
-    console.warn("[XRayImageGen] Nano Banana 2 text-only failed, trying stable model:", { error: msg.slice(0, 200) })
+  } catch (nb2Err) {
+    const msg = nb2Err instanceof Error ? nb2Err.message : String(nb2Err)
+    console.warn("[XRayImageGen] Nano Banana 2 text-only failed, trying stable:", { error: msg.slice(0, 200) })
   }
 
-  // Step 3: Nano Banana stable (gemini-2.5-flash-image) — same API, more reliable
+  // ── Step 5: Nano Banana stable (gemini-2.5-flash-image) ──────────
   try {
     return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio, NANO_BANANA_STABLE_MODEL)
-  } catch (nbStableError) {
-    const msg = nbStableError instanceof Error ? nbStableError.message : String(nbStableError)
-
-    if (!process.env.OPENAI_API_KEY?.trim()) {
-      console.warn("[XRayImageGen] All Gemini models failed and OPENAI_API_KEY is not set — no fallback available")
-      throw nbStableError
+  } catch (nbStableErr) {
+    const msg = nbStableErr instanceof Error ? nbStableErr.message : String(nbStableErr)
+    if (!hasOpenAIKey) {
+      console.warn("[XRayImageGen] All Gemini models failed and OPENAI_API_KEY is not set — no deep fallback")
+      throw nbStableErr
     }
-
-    console.warn("[XRayImageGen] All Gemini models failed, falling back to OpenAI gpt-image-1:", { error: msg.slice(0, 200) })
+    console.warn("[XRayImageGen] All Gemini models failed, dropping to gpt-image-1:", { error: msg.slice(0, 200) })
   }
 
-  // Step 4: OpenAI GPT Image 1 — final fallback
-  const size = geminiAspectToOpenAISize(imageConfig.aspectRatio)
-  return await callOpenAIImage(safePrompt, size)
+  // ── Step 6: OpenAI gpt-image-1 (deep fallback) ────────────────────
+  return await callOpenAIImage(safePrompt, openaiSize, OPENAI_FALLBACK_MODEL)
+}
+
+/**
+ * Calls OpenAI images.edit with a reference image. Used by step 1 of the
+ * fallback chain and by the dedicated generateModuleImageWithReference entry
+ * point. Returns in the same shape as callOpenAIImage.
+ */
+async function callOpenAIEdit(
+  prompt: string,
+  referenceBase64: string,
+  size: "1024x1024" | "1024x1536" | "1536x1024",
+  model: string = OPENAI_PRIMARY_MODEL,
+): Promise<{ mimeType: string; data: string; modelUsed: string }> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!apiKey) {
+    throw new Error("[XRayImageGen] OPENAI_API_KEY is not configured")
+  }
+
+  const openaiModule = await import("openai")
+  const OpenAI = openaiModule.default
+  const { toFile } = openaiModule
+  // Same 180s + no-retries rationale as callOpenAIImage.
+  const client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 0 })
+
+  const imageFile = await toFile(
+    Buffer.from(referenceBase64, "base64"),
+    "reference.png",
+    { type: "image/png" },
+  )
+
+  const response = await client.images.edit({
+    model,
+    image: imageFile,
+    prompt,
+    size,
+  })
+
+  const b64Data = response.data?.[0]?.b64_json
+  if (!b64Data) {
+    throw new Error(`[XRayImageGen] No image data returned from OpenAI edit (${model})`)
+  }
+
+  return { mimeType: "image/png", data: b64Data, modelUsed: model }
 }
 
 // ─── Storage Upload ──────────────────────────────────────────────────
@@ -912,7 +1006,7 @@ async function tryOpenAIEdit(
     const imageFile = await toFile(Buffer.from(referenceBase64, "base64"), "reference.png", { type: "image/png" })
 
     const response = await client.images.edit({
-      model: OPENAI_IMAGE_MODEL,
+      model: OPENAI_PRIMARY_MODEL,
       image: imageFile,
       prompt,
       size: "1536x1024",
@@ -1169,7 +1263,7 @@ export async function generateModuleImageWithReference(
 
   let imageData: { mimeType: string; data: string; modelUsed: string }
   if (editResult) {
-    imageData = { ...editResult, modelUsed: OPENAI_IMAGE_MODEL }
+    imageData = { ...editResult, modelUsed: OPENAI_PRIMARY_MODEL }
   } else {
     // Fallback to text-only ghost prompt
     const prompt = buildModulePrompt(module, undefined, visualStyle)
