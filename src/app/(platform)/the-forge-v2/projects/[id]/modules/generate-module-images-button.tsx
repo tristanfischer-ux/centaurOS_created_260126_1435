@@ -55,6 +55,13 @@ interface GenerateModuleImagesButtonProps {
 }
 
 const POLL_INTERVAL_MS = 10_000
+// Mirrors STALL_THRESHOLD_MS in src/actions/forge-v2-render-all-modules.ts.
+// If a chain's started_at is older than this with finished_at still null,
+// the server-side recovery branch will restart the chain on next click —
+// but the client has to let founders actually click. Without this check
+// the button stays disabled forever and the stall is unrecoverable from
+// the UI. See bug 2026-04-22: OpenAI/Gemini per-module calls hang >15 min.
+const STALL_MS = 15 * 60 * 1000
 
 export function GenerateModuleImagesButton({
     projectId,
@@ -69,8 +76,12 @@ export function GenerateModuleImagesButton({
     const renderedCount = modules.filter((m) => m.hasImage).length
 
     const state = initialRenderState
+    const isStalled =
+        state !== null &&
+        state.finished_at === null &&
+        Date.now() - Date.parse(state.started_at) > STALL_MS
     const isRunning =
-        state !== null && state.finished_at === null
+        state !== null && state.finished_at === null && !isStalled
     const isFinished =
         state !== null && state.finished_at !== null
 
@@ -126,11 +137,13 @@ export function GenerateModuleImagesButton({
         : "Starting…"
 
     const allRendered = moduleCount > 0 && renderedCount === moduleCount
-    const idleLabel = allRendered
-        ? "Re-render all modules"
-        : renderedCount > 0
-            ? `Render remaining ${moduleCount - renderedCount} of ${moduleCount}`
-            : "Generate module renders"
+    const idleLabel = isStalled
+        ? "Previous run stalled — click to restart"
+        : allRendered
+            ? "Re-render all modules"
+            : renderedCount > 0
+                ? `Render remaining ${moduleCount - renderedCount} of ${moduleCount}`
+                : "Generate module renders"
 
     // Per-module render is ~1 min on gpt-image-2 default quality.
     // Chain runs 2-at-a-time, so an N-module project finishes in ~N/2 minutes
@@ -185,7 +198,15 @@ export function GenerateModuleImagesButton({
                             : "No renders generated."}
                 </span>
             )}
-            {!showingLive && !isFinished && moduleCount > 0 && !allRendered && (
+            {isStalled && (
+                <span
+                    className="m2-gen-images-stalled"
+                    style={{ fontSize: 13, color: "#b45309" }}
+                >
+                    Previous chain stalled — click to resume from where it left off.
+                </span>
+            )}
+            {!showingLive && !isFinished && !isStalled && moduleCount > 0 && !allRendered && (
                 <span
                     className="m2-gen-images-hint"
                     style={{ fontSize: 13, color: "var(--muted-foreground, #6b7280)" }}
