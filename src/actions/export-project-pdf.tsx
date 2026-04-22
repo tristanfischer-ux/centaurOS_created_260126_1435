@@ -175,9 +175,13 @@ const styles = StyleSheet.create({
     moduleName: { fontSize: 13, fontWeight: "bold", flex: 1 },
     moduleMeta: { fontSize: 9, color: MUTED, textAlign: "right" },
     moduleImage: {
-        height: 140,
-        backgroundColor: BG_SOFT,
-        borderRadius: 4,
+        // Full-page-width module image, no background fill. Earlier
+        // version used backgroundColor: BG_SOFT which looked like a
+        // dark/grey box around images when the rendered aspect ratio
+        // didn't exactly match the container. width:100% + no
+        // background gives edge-to-edge visibility.
+        width: "100%",
+        height: 260,
         marginTop: 6,
         marginBottom: 6,
         objectFit: "contain",
@@ -192,11 +196,12 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     coverImage: {
+        // Full-page-width cover illustration, no background fill.
+        // A4 content area at default react-pdf margins is ~515pt
+        // wide; width:100% fills it.
         width: "100%",
-        height: 280,
-        backgroundColor: BG_SOFT,
+        height: 340,
         marginTop: 14,
-        borderRadius: 4,
         objectFit: "contain",
     },
 
