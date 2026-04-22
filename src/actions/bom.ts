@@ -37,21 +37,33 @@ const MAX_BOM_DEPTH = 20
 /** Max length for user-provided strings interpolated into prompts */
 const MAX_PROMPT_FIELD_LENGTH = 500
 /**
- * Max skeleton parts to expand in a single Claude call. A single expansion
- * response for N parts is roughly 400-800 tokens/part. At 15 parts, a worst
- * case response fits comfortably under BOM_MAX_TOKENS (8192). This was the
- * root cause of the 84s parse failures in production: a 9-module project
- * with 45+ skeleton parts would truncate the monolithic response at 8192
- * tokens and produce invalid JSON.
+ * Max skeleton parts to expand in a single Claude call. Industrial/electrical
+ * projects (BESS, 40ft battery container, HV switchgear) have a larger COTS
+ * catalogue injected via fetchCatalogueForPrompt() which inflates the input
+ * prompt AND the response needs to reference more domain-specific parts.
+ * A single batch of 15 industrial parts pushed Opus inference close to 120s
+ * per call (the SDK timeout). Two successive near-timeout batches crossed
+ * Vercel's 300s lambda cap, stranding the pipeline_runs row in 'running'.
+ *
+ * Dropping to 8 parts per batch roughly halves the response size, which in
+ * practice cuts Opus inference latency by ~40% (inference is super-linear
+ * in output length). Net effect: more batches, but each batch is well under
+ * the SDK timeout, and the total run stays inside the 300s cap even on
+ * 70+ skeleton parts from dense electrical projects.
+ *
+ * Historical context (still valid): above 15 parts, the monolithic response
+ * truncates at BOM_MAX_TOKENS=8192 and produces invalid JSON. 8 is below
+ * that bound too.
  */
-const EXPAND_BATCH_SIZE = 15
+const EXPAND_BATCH_SIZE = 8
 /**
- * Max concurrent Anthropic requests for BOM expansion batches. Matches the
- * Max decomposition orchestrator's EXPAND_CONCURRENCY so we don't starve the
- * rate limiter when both pipelines run back-to-back. A 9-module project with
- * ~45 parts → 3 batches → wall-clock ~60-90s (vs 226s serial monolithic).
+ * Max concurrent Anthropic requests for BOM expansion batches. Bumped from
+ * 3 to 4 (2026-04-22) to shorten wall-clock on dense projects. Anthropic
+ * org-level rate limit is 50 RPM at our tier — 4 concurrent BOM + 3
+ * concurrent Max = 7 in flight, still safely under the ceiling even with
+ * back-to-back Max→BOM pipelines.
  */
-const EXPAND_CONCURRENCY = 3
+const EXPAND_CONCURRENCY = 4
 
 const VALID_PROCESSES = new Set<string>([
   "cnc", "injection_molding", "sheet_metal",
