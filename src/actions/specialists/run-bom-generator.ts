@@ -6,80 +6,84 @@
  * @description The canonical entry point that runs BOM generation over a V2
  * project once Max has decomposed the modules. Every caller (BOM empty-state
  * CTA, auto-fire from Max's success path, future re-runs) funnels through
- * this action so the pipeline_runs row is always written atomically alongside
- * the mutation.
+ * this action.
  *
- * Stage is `bom.generate`. Trigger is either `manual` (founder clicked the
- * "Generate BOM" CTA), `auto.max-complete` (Max's orchestrator auto-fires on
- * success) or `manual.rerun` (future — not yet wired by any caller).
+ * Stage is `bom.generate`. Trigger is `manual`, `auto.max-complete`, or
+ * `manual.rerun`.
  *
- * Specialist attribution: per the V2 architect doc (§1), BOM is owned by
- * Fang (VP-Mfg) for manufacturability review, but the generation step itself
- * is an architectural derivation from Max's decomposition. We record
- * specialist_id='cto' (Max) on the pipeline_runs row because the generator
- * is Max's artefact — Fang's role is the follow-on DFM review, which runs
- * separately. When specialists-config.ts grows a dedicated `bom-generator`
- * id, swap it in here. See SPECIALIST_ID constant below.
+ * ──────────────────────────────────────────────────────────────────────
+ * ARCHITECTURE (2026-04-22): DISTRIBUTED STAGE CHAIN
+ * ──────────────────────────────────────────────────────────────────────
+ *
+ * The BOM generator no longer runs inside one lambda. On industrial projects
+ * (BESS, HV switchgear, 40ft battery container) a skeleton of ~60-70 parts
+ * plus batched expansion plus the merge/persist pass repeatedly exceeded
+ * Vercel's 300s lambda cap, stranding the `pipeline_runs` row in
+ * `status='running'` forever (no code ran to stamp it failed).
+ *
+ * The fix splits generation into chained stages in `bom.ts`:
+ *
+ *   runBomSkeletonStage   (~15s)  — Claude skeleton call + chunk into batches
+ *   runBomBatchStage      (~60s)  — one batch of up to EXPAND_BATCH_SIZE parts;
+ *                                   reschedules itself until queue empty
+ *   runBomMergeStage      (~30s)  — merge skeleton + expansions, write parts +
+ *                                   bom_lines, stamp pipeline_run done
+ *
+ * `runBomGenerator` seeds `cad_lab_projects.bom_generation_state`, inserts
+ * the `pipeline_runs` row, schedules the skeleton stage via `after()`, and
+ * returns immediately with `ok: true, runId`. `partCount` on the return type
+ * is always 0 from the entry point — the UI polls `loadBomRunStatus` (which
+ * reads the pipeline_runs row) and picks up the real count from
+ * `output_ref.partCount` once the merge stage stamps it.
+ *
+ * Specialist attribution: specialist_id='cto' (Max). BOM generation is Max's
+ * artefact; Fang's DFM review runs separately. If specialists-config.ts adds
+ * a dedicated `bom-generator` id, swap SPECIALIST_ID below.
  *
  * Pipeline:
  *   1. withAuth → user + foundryId
  *   2. Load project via admin client, verify foundry ownership
  *   3. Precondition: project.modules must be non-empty (NO_MODULES otherwise)
  *   4. Pre-flight tier budget check via checkAILimit(foundryId)
- *   5. startPipelineRun (specialist_id='cto', stage='bom.generate')
- *   6. Call generateBomFromModules — inner action wraps its own withAIGate
- *      (which re-checks the limit) and persists parts + bom_lines itself
- *   7. completePipelineRun with part_count + output_ref
- *
- * Token tracking: `generateBomFromModules` (src/actions/bom.ts) does not
- * surface token counts today — the Anthropic SDK response isn't threaded
- * back to the caller. We record input_tokens/output_tokens as null here
- * rather than fabricate; the existing `trackAIUsage` path inside
- * `withAIGate` still enforces the monthly quota. When bom.ts is extended
- * to return usage, wire it in (see GOTCHA below).
- *
- * GOTCHA: generateBomFromModules's signature is
- *   Promise<BomGenerationResult | { error: string }>
- * The `{ error }` branch fires when withAIGate's limit check refuses. We
- * treat both branches as `GENERATE_FAILED` on the pipeline_run.
+ *   5. Idempotency + stall-recovery check on existing bom_generation_state
+ *   6. startPipelineRun (specialist_id='cto', stage='bom.generate')
+ *   7. Seed bom_generation_state with pipeline_run_id + started_at
+ *   8. Schedule runBomSkeletonStage via after()
+ *   9. Return { ok: true, runId, partCount: 0 }
  *
  * Error codes exposed to callers:
- *   - BUDGET_CAPPED          — tier AI budget exhausted; outer check refused
+ *   - BUDGET_CAPPED          — tier AI budget exhausted
  *   - BUDGET_NOT_CHECKABLE   — foundry tier / usage lookup threw
  *   - PROJECT_NOT_FOUND      — id doesn't exist
  *   - PROJECT_FORBIDDEN      — project belongs to a different foundry
- *   - NO_MODULES             — Max hasn't decomposed yet (project.modules empty)
- *   - GENERATE_FAILED        — inner generateBomFromModules returned success=false
- *   - SAVE_FAILED            — inner path returned a parts-saved-but-BOM-failed error
+ *   - NO_MODULES             — Max hasn't decomposed yet
+ *   - ALREADY_RUNNING        — fresh run refused; another chain in flight
  *   - INTERNAL               — unclassified throw
  *
  * @related
- *   - Pre-read arch doc: /tmp/forge-v2-pipeline-arch/PIPELINE-ARCHITECTURE.md §1, §7
- *   - Sibling orchestrator: src/actions/specialists/run-max-decomposition.ts
- *   - Inner engine: src/actions/bom.ts (generateBomFromModules)
+ *   - Stage runners:     src/actions/bom.ts (runBomSkeletonStage, runBomBatchStage, runBomMergeStage)
+ *   - Sibling pattern:   src/actions/forge-v2-render-all-modules.ts
  *   - Pipeline wrappers: src/actions/pipeline-runs.ts
- *   - UI consumers: src/app/(platform)/the-forge-v2/projects/[id]/bom/
- *                   src/app/(platform)/the-forge-v2/projects/[id]/page.tsx
+ *   - Migration:         supabase/migrations/20260422130000_cad_lab_bom_generation_state.sql
+ *   - UI consumers:      src/app/(platform)/the-forge-v2/projects/[id]/bom/
  */
 
-import { generateBomFromModules } from "@/actions/bom"
+import { after } from "next/server"
+
 import {
-    completePipelineRun,
     failPipelineRun,
     loadLatestRunForStage,
     startPipelineRun,
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
-import { after } from "next/server"
 
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type {
-    CadLabDesignBrief,
     CadLabModule,
 } from "@/lib/cad-lab-types"
-import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import type { BomGenerationState } from "@/actions/bom"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -94,6 +98,11 @@ export type BomRunStatusChip =
 export interface RunBomGeneratorResult {
     ok: true
     runId: string
+    /**
+     * Always 0 at start — BOM generation is now asynchronous. The UI polls
+     * `loadBomRunStatus` for the real count once `runBomMergeStage` stamps
+     * `pipeline_runs.output_ref.partCount`.
+     */
     partCount: number
 }
 
@@ -119,38 +128,40 @@ export interface LoadBomRunStatusResult {
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
-/**
- * Specialist id recorded on the pipeline_run row. BOM is owned by Max's
- * decomposition artefact — see file header for the full rationale. If a
- * dedicated `bom-generator` id is added to specialists-config.ts later,
- * update this single constant.
- */
 const SPECIALIST_ID = "cto"
 const STAGE = "bom.generate"
+
+/**
+ * Idempotency window. Matches `forge-v2-render-all-modules.ts`:
+ * `bom_generation_state.finished_at === null` with a recent `started_at`
+ * means another chain is legitimately in flight; older than this we treat
+ * it as a stalled run (Vercel container died mid-chain) and sweep so the
+ * founder's Retry actually restarts things. Covers Vercel's 300s cap
+ * three times over — a healthy chain finishes well inside 15 minutes.
+ */
+const STALL_THRESHOLD_MS = 15 * 60 * 1000
 
 // ─── runBomGenerator ───────────────────────────────────────────────────
 
 /**
- * Runs BOM generation over the given project's decomposed modules and
- * persists structured parts + bom_lines. Wraps the call in a pipeline_runs
- * row for observability.
- *
- * @param projectId - V2 project UUID
- * @param trigger   - Why this run was kicked off (routed to pipeline_runs.trigger)
+ * Kicks off the distributed BOM generation chain. Returns immediately after
+ * seeding `bom_generation_state` + `pipeline_runs` and scheduling the
+ * skeleton stage via `after()`. The stage chain drives itself to completion.
  */
 export async function runBomGenerator(
     projectId: string,
     trigger: "manual" | "auto.max-complete" | "manual.rerun",
 ): Promise<RunBomGeneratorReturn> {
     return withAuth<RunBomGeneratorReturn>(async ({ user, foundryId }) => {
-        // 1. Load + verify project (foundry scope check via admin client —
-        //    identical rationale to runMaxDecomposition: RLS on
-        //    cad_lab_projects is keyed on foundry membership, and we never
-        //    want to silently operate on another tenant's project.)
         const admin = createAdminClient()
+
+        // 1. Load + verify project (ownership check via admin; RLS would also
+        //    enforce this but we want explicit codes back to the caller).
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, modules, research, diagnostic_answers")
+            .select(
+                "id, foundry_id, subject, modules, bom_generation_state",
+            )
             .eq("id", projectId)
             .maybeSingle()
 
@@ -161,7 +172,6 @@ export async function runBomGenerator(
                 errorCode: "INTERNAL",
             }
         }
-
         if (!project) {
             return {
                 ok: false,
@@ -169,9 +179,8 @@ export async function runBomGenerator(
                 errorCode: "PROJECT_NOT_FOUND",
             }
         }
-
         if (project.foundry_id !== foundryId) {
-            // SECURITY: don't leak the existence of other-foundry projects
+            // SECURITY: don't leak other-foundry project existence.
             return {
                 ok: false,
                 error: "Project not found",
@@ -179,12 +188,11 @@ export async function runBomGenerator(
             }
         }
 
-        // 2. Precondition: BOM needs Max's modules to exist. Without modules
-        //    there's nothing to decompose parts from — fail fast with a
-        //    clean error code so the UI can route the founder to Modules.
+        // 2. Precondition: need Max's modules.
         const modulesRaw = project.modules as unknown
-        const modules = (Array.isArray(modulesRaw) ? modulesRaw : []) as CadLabModule[]
-
+        const modules = (Array.isArray(modulesRaw)
+            ? modulesRaw
+            : []) as CadLabModule[]
         if (modules.length === 0) {
             return {
                 ok: false,
@@ -194,32 +202,21 @@ export async function runBomGenerator(
             }
         }
 
-        // Brief + diagnostic answers are optional context for BOM generation.
-        // When missing we pass undefined through; the inner action handles it.
-        const research = project.research as {
-            designBrief?: CadLabDesignBrief
-        } | null
-        const designBrief = research?.designBrief
-        const diagnosticAnswers = project.diagnostic_answers as DiagnosticAnswers | null
-
-        // 3. Pre-flight tier budget check.
-        //    The inner generateBomFromModules wraps itself in withAIGate
-        //    which re-checks this. That duplicate check is authoritative for
-        //    per-run enforcement; this outer check exists so the orchestrator
-        //    can return a clean BUDGET_CAPPED code before writing a
-        //    pipeline_runs row that would otherwise be immediately 'failed'.
-        let budgetOk = true
-        let budgetMessage: string | null = null
+        // 3. Pre-flight tier budget check. Kept BEFORE state seeding so a
+        //    BUDGET_CAPPED refusal doesn't leave a half-baked state + orphan
+        //    pipeline_runs row behind.
         try {
             const gate = await checkAILimit(foundryId)
             if (!gate.allowed) {
-                budgetOk = false
-                budgetMessage =
-                    gate.message ?? "AI usage limit reached for this billing period."
+                return {
+                    ok: false,
+                    error:
+                        gate.message ??
+                        "AI usage limit reached for this billing period.",
+                    errorCode: "BUDGET_CAPPED",
+                }
             }
         } catch (err) {
-            // Fail closed with a distinct errorCode so a bad lookup doesn't
-            // silently turn into uncharged spend.
             console.error(
                 "[run-bom-generator] checkAILimit threw:",
                 err instanceof Error ? err.message : err,
@@ -232,17 +229,60 @@ export async function runBomGenerator(
             }
         }
 
-        if (!budgetOk) {
-            return {
-                ok: false,
-                error: budgetMessage ?? "AI usage limit reached.",
-                errorCode: "BUDGET_CAPPED",
+        // 4. Idempotency + stall recovery. Mirrors the pattern in
+        //    `startRenderAllRemainingModuleImages`. If bom_generation_state
+        //    is non-null with finished_at=null AND started_at is within the
+        //    stall window, a chain is legitimately in flight — reject.
+        //    Older than the window: treat as stalled (Vercel container
+        //    died mid-chain), stamp the old state finished, sweep stale
+        //    pipeline_runs, and fall through to seed fresh.
+        const existingRaw = (project as unknown as {
+            bom_generation_state?: unknown
+        }).bom_generation_state
+        const existingState = (existingRaw ?? null) as BomGenerationState | null
+        if (existingState && existingState.finished_at === null) {
+            const startedMs = Date.parse(existingState.started_at)
+            const stalled =
+                !Number.isNaN(startedMs) &&
+                Date.now() - startedMs > STALL_THRESHOLD_MS
+            if (!stalled) {
+                return {
+                    ok: false,
+                    error:
+                        "BOM generation is already running on this project.",
+                    errorCode: "ALREADY_RUNNING",
+                    runId: existingState.pipeline_run_id ?? undefined,
+                }
             }
+            console.warn(
+                `[run-bom-generator] stalled bom_generation_state for ${projectId} ` +
+                    `(started ${existingState.started_at}). Auto-recovering.`,
+            )
+            // Stamp old state finished (for audit) + sweep stale runs (flips
+            // any hung pipeline_runs row to 'failed' so the UI stops lying).
+            const recovered: BomGenerationState = {
+                ...existingState,
+                finished_at: new Date().toISOString(),
+                error:
+                    existingState.error ??
+                    `Chain stalled after ${(Date.now() - startedMs) / 1000}s; auto-recovered.`,
+            }
+            await admin
+                .from("cad_lab_projects")
+                .update({
+                    bom_generation_state: recovered,
+                } as unknown as never)
+                .eq("id", projectId)
+            await sweepStalledRuns(projectId).catch(() => {})
         }
 
-        // 4. Start pipeline_run. Once this returns, every exit path MUST
-        //    either complete or fail the run — otherwise the row hangs in
-        //    'running' forever and the UI chip lies.
+        // 5. Also sweep any dangling running row for this stage that isn't
+        //    tied to state (belt + braces — handles pre-distributed legacy
+        //    runs that hung before the schema change).
+        await sweepStalledRuns(projectId).catch(() => {})
+
+        // 6. Start pipeline_run. Once this returns, every exit path MUST
+        //    either complete or fail it.
         let runId: string
         try {
             const started = await startPipelineRun({
@@ -260,6 +300,7 @@ export async function runBomGenerator(
                         (acc, m) => acc + (m.keyParts?.length ?? 0),
                         0,
                     ),
+                    orchestration: "distributed",
                 },
             })
             runId = started.runId
@@ -275,121 +316,86 @@ export async function runBomGenerator(
             }
         }
 
-        // From here on: wrap everything in a try/catch that falls through to
-        // failPipelineRun so the chip reflects reality even if something
-        // unexpected throws.
-        try {
-            // 5. Call the inner generator. It wraps its own withAIGate +
-            //    validates Claude's output + clears + inserts parts + inserts
-            //    bom_lines in the same action. Returns the structured result
-            //    or { success: false, error }.
-            const result = await generateBomFromModules(
-                projectId,
-                modules,
-                designBrief,
-                diagnosticAnswers ?? undefined,
+        // 7. Seed bom_generation_state. The skeleton stage will fill
+        //    skeleton_parts + pending_batch_ids; we only record the
+        //    lifecycle markers here.
+        const initialState: BomGenerationState = {
+            started_at: new Date().toISOString(),
+            finished_at: null,
+            skeleton_parts: null,
+            skeleton_bom_lines: null,
+            expansions: {},
+            pending_batch_ids: [],
+            failed_batch_count: 0,
+            error: null,
+            pipeline_run_id: runId,
+        }
+        const { error: seedErr } = await admin
+            .from("cad_lab_projects")
+            .update({
+                bom_generation_state: initialState,
+            } as unknown as never)
+            .eq("id", projectId)
+            .eq("foundry_id", foundryId)
+        if (seedErr) {
+            console.error(
+                "[run-bom-generator] seed state failed:",
+                seedErr.message,
             )
-
-            // The `{ error }` branch fires when withAIGate refuses (limit
-            // reached) or anything else inside the gate throws without a
-            // success field. Both surface as GENERATE_FAILED with the
-            // upstream message preserved so the UI can show it verbatim.
-            if ("error" in result && !("success" in result)) {
-                await failPipelineRun(runId, "GENERATE_FAILED", result.error)
-                return {
-                    ok: false,
-                    runId,
-                    error: result.error,
-                    errorCode: "GENERATE_FAILED",
-                }
-            }
-
-            // TypeScript narrow: result is now BomGenerationResult
-            const gen = result as Extract<typeof result, { success: boolean }>
-
-            if (!gen.success) {
-                // Parts-saved-but-BOM-hierarchy-failed is the documented
-                // "Parts saved but BOM hierarchy failed. Try regenerating."
-                // case in bom.ts. Treat it as SAVE_FAILED so the UI copy
-                // mirrors the upstream message.
-                const code = gen.error?.toLowerCase().includes("hierarchy")
-                    ? "SAVE_FAILED"
-                    : "GENERATE_FAILED"
+            // Fail the pipeline_run we already inserted so the UI chip
+            // doesn't lie.
+            try {
                 await failPipelineRun(
                     runId,
-                    code,
-                    gen.error || "BOM generation failed.",
+                    "INTERNAL",
+                    "Failed to seed bom_generation_state.",
                 )
-                return {
-                    ok: false,
-                    runId,
-                    error: gen.error || "BOM generation failed.",
-                    errorCode: code,
-                }
-            }
-
-            const partCount = gen.parts?.length ?? 0
-            const bomLineCount = gen.bomLines?.length ?? 0
-
-            // 6. Done. generateBomFromModules doesn't surface token counts
-            //    yet — input/output_tokens stay null. See file header for
-            //    why we don't fabricate them.
-            await completePipelineRun(runId, {
-                input_tokens: null,
-                output_tokens: null,
-                model_id: null,
-                output_ref: {
-                    table: "parts",
-                    partCount,
-                    bomLineCount,
-                    moduleCount: modules.length,
-                    generationTimeMs: gen.generationTimeMs ?? null,
-                },
-            })
-
-            // Wave 1d: auto-fire Finn cost on BOM success.
-            //
-            // Uses after() so Vercel keeps the container alive past this
-            // action's return — see brief-lock.ts and run-max-decomposition.ts
-            // for the same pattern. Plain `void` fire-and-forget leaves Finn's
-            // pipeline_runs row stuck in 'running' until the watchdog sweeps.
-            after(async () => {
-                try {
-                    const { runFinnCost } = await import(
-                        "@/actions/specialists/run-finn-cost"
-                    )
-                    await runFinnCost(projectId, "auto.bom-complete")
-                } catch (err) {
-                    console.error(
-                        "[run-bom-generator] Finn auto-fire failed:",
-                        err instanceof Error ? err.message : err,
-                    )
-                }
-            })
-
-            return {
-                ok: true,
-                runId,
-                partCount,
-            }
-        } catch (err) {
-            const message =
-                err instanceof Error ? err.message : "Unknown BOM generation error"
-            console.error("[run-bom-generator] unexpected throw:", message)
-            try {
-                await failPipelineRun(runId, "INTERNAL", message)
             } catch (failErr) {
                 console.error(
-                    "[run-bom-generator] failPipelineRun also threw:",
+                    "[run-bom-generator] failPipelineRun after seed error threw:",
                     failErr instanceof Error ? failErr.message : failErr,
                 )
             }
             return {
                 ok: false,
-                runId,
-                error: message,
+                error: "Couldn't start BOM generation.",
                 errorCode: "INTERNAL",
+                runId,
             }
+        }
+
+        // 8. Schedule the skeleton stage. Dynamic import inside after()
+        //    avoids module-init cycles (see forge-v2-render-all-modules.ts).
+        after(async () => {
+            try {
+                const { runBomSkeletonStage } = await import("@/actions/bom")
+                await runBomSkeletonStage(projectId)
+            } catch (err) {
+                console.error(
+                    "[run-bom-generator] skeleton stage schedule threw:",
+                    err instanceof Error ? err.message : err,
+                )
+                try {
+                    await failPipelineRun(
+                        runId,
+                        "INTERNAL",
+                        err instanceof Error
+                            ? err.message
+                            : "Skeleton stage schedule threw.",
+                    )
+                } catch (failErr) {
+                    console.error(
+                        "[run-bom-generator] failPipelineRun threw:",
+                        failErr instanceof Error ? failErr.message : failErr,
+                    )
+                }
+            }
+        })
+
+        return {
+            ok: true,
+            runId,
+            partCount: 0,
         }
     })
 }
@@ -397,18 +403,15 @@ export async function runBomGenerator(
 // ─── loadBomRunStatus ──────────────────────────────────────────────────
 
 /**
- * Reads the latest pipeline_runs row for (project_id, specialist='cto',
- * stage='bom.generate') and returns a chip-friendly shape. Used by the
- * BOM page loader and the Workspace page loader.
- *
- * When no row exists the chip shows "not-started". The orchestrator is
- * still safe to call from that state — it writes the first row atomically.
+ * Reads the latest pipeline_runs row for (project, 'cto', 'bom.generate')
+ * and returns a chip-friendly shape. Unchanged from the monolithic
+ * implementation — the UI still polls this and picks up `partCount` from
+ * `output_ref` once the merge stage stamps it.
  */
 export async function loadBomRunStatus(
     projectId: string,
 ): Promise<LoadBomRunStatusResult> {
     return withAuth<LoadBomRunStatusResult>(async ({ foundryId }) => {
-        // Ownership check — same rationale as runBomGenerator.
         const admin = createAdminClient()
         const { data: project } = await admin
             .from("cad_lab_projects")
@@ -420,8 +423,6 @@ export async function loadBomRunStatus(
         }
 
         // Watchdog: flip any stale 'running' row to 'failed' before reading.
-        // Prevents infinite-spinner UI when a run hit Vercel's 300s cap.
-        // Errors swallowed — a failed sweep must never block the status read.
         await sweepStalledRuns(projectId).catch(() => {})
 
         const row = await loadLatestRunForStage(projectId, SPECIALIST_ID, STAGE)
@@ -431,8 +432,12 @@ export async function loadBomRunStatus(
 
         const status = mapDbStatusToChip(row.status)
         const partCount =
-            row.output_ref && typeof row.output_ref === "object" && row.output_ref !== null
-                ? ((row.output_ref as { partCount?: unknown }).partCount as number | undefined)
+            row.output_ref &&
+            typeof row.output_ref === "object" &&
+            row.output_ref !== null
+                ? ((row.output_ref as { partCount?: unknown }).partCount as
+                      | number
+                      | undefined)
                 : undefined
         return {
             status,

@@ -10,10 +10,39 @@
  * @security All actions use withAuth for foundry-scoped access control.
  * RLS on parts/bom_lines provides defense-in-depth via cad_lab_projects
  * foundry_id subquery.
+ *
+ * @architecture Distributed BOM orchestration (2026-04-22):
+ *   For industrial projects (BESS, HV switchgear, 40ft battery container),
+ *   the monolithic `generateBomFromModules` pathway blew Vercel's 300s
+ *   lambda cap — skeleton (15s) + N × batch expansions (60-120s each) + merge
+ *   frequently summed to > 300s on 60+ skeleton parts, stranding the
+ *   `pipeline_runs` row in `status='running'` forever.
+ *
+ *   The fix splits BOM generation into three chained stages, each its own
+ *   lambda invocation via next/server `after()`, mirroring the pattern in
+ *   `forge-v2-render-all-modules.ts`:
+ *
+ *     runBomSkeletonStage (~15s)  →  seeds bom_generation_state.skeleton_parts
+ *     runBomBatchStage    (~60s)  →  one batch of up to EXPAND_BATCH_SIZE parts;
+ *                                    reschedules itself until pending_batch_ids empty
+ *     runBomMergeStage    (~30s)  →  merges skeleton + expansions, writes parts +
+ *                                    bom_lines, stamps pipeline_run 'done'
+ *
+ *   Every stage is idempotent: null/finished state returns early, and the
+ *   `runBomGenerator` entry point rejects re-starts inside STALL_THRESHOLD_MS
+ *   (see `run-bom-generator.ts`). The legacy `generateBomFromModules`
+ *   single-lambda pathway is retained for local tests and back-compat.
  */
 
+import { after } from "next/server"
+
+import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import {
+  completePipelineRun,
+  failPipelineRun,
+} from "@/actions/pipeline-runs"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import type {
   StructuredPart,
@@ -1402,5 +1431,727 @@ export async function deleteBomLine(
 
     if (error) return { error: sanitizeErrorMessage(error) }
     return { success: true }
+  })
+}
+
+// ─── Distributed BOM orchestration — stage runners ──────────────────
+//
+// The three functions below implement the chained-stage pattern described
+// in the file header. They mirror `forge-v2-render-all-modules.ts`: each
+// stage reads the latest `bom_generation_state`, does one bounded unit of
+// work, persists progress, and either reschedules itself via `after()` or
+// transitions to the next stage (skeleton → batch → batch → ... → merge).
+//
+// Entry point is `runBomGenerator` in `run-bom-generator.ts`, which seeds
+// initial state, inserts the `pipeline_runs` row, and schedules stage 1.
+// Stage runners use the admin client directly (project ownership is
+// validated by the entry point) so they work from `after()` callbacks.
+
+// ─── Shared state type ─────────────────────────────────────────────
+
+export interface BomExpansionSpec {
+  description: string
+  material: string
+  materialSpec: string
+  finish: string
+  tolerance: string
+  massKg: number
+  envelopeXMm: number
+  envelopeYMm: number
+  envelopeZMm: number
+  estimatedUnitCostGbp: number
+  aiConfidence: number
+}
+
+/**
+ * Shape persisted to `cad_lab_projects.bom_generation_state` (jsonb).
+ *
+ * Lifecycle:
+ *   - seeded by `runBomGenerator` with `started_at`, empty expansions,
+ *     empty pending_batch_ids, null skeleton_parts
+ *   - skeleton stage fills `skeleton_parts` + chunks into `pending_batch_ids`
+ *   - each batch stage drains `pending_batch_ids[0]` into `expansions`
+ *   - merge stage writes parts/bom_lines, stamps pipeline_runs 'done',
+ *     and clears the column back to null
+ *   - on terminal failure: stamps `finished_at`, fills `error`,
+ *     fails the pipeline_run
+ */
+export interface BomGenerationState {
+  started_at: string
+  finished_at: string | null
+  /** Populated after skeleton stage; null before. */
+  skeleton_parts: SkeletonPart[] | null
+  /** Skeleton bomLines (parent/child hierarchy), populated with skeleton_parts. */
+  skeleton_bom_lines: Array<{
+    parentPartNumber: string | null
+    childPartNumber: string
+    quantity: number
+  }> | null
+  /** Accumulates after each batch stage. Keyed by SkeletonPart.partNumber. */
+  expansions: Record<string, BomExpansionSpec>
+  /** Queue of batches; each inner array is a list of skeleton partNumbers. */
+  pending_batch_ids: string[][]
+  /** Count of batch stages that failed; used for observability, not control flow. */
+  failed_batch_count: number
+  /** Non-null if a stage hit a terminal failure. */
+  error: string | null
+  /** Link to the single pipeline_runs row owned by this generation. */
+  pipeline_run_id: string | null
+}
+
+// ─── State persistence helpers ─────────────────────────────────────
+
+/**
+ * Read the current `bom_generation_state` for a project using the admin
+ * client. Stage runners must NOT use the cookie-based client because the
+ * `after()` container may outlive the cookie-bearing request.
+ */
+async function loadBomGenerationState(
+  projectId: string,
+): Promise<{
+  foundryId: string
+  state: BomGenerationState | null
+  modules: CadLabModule[]
+  subject: string
+  designBrief?: CadLabDesignBrief
+  diagnosticAnswers?: DiagnosticAnswers
+} | null> {
+  const admin = createAdminClient()
+  const { data: project, error } = await admin
+    .from("cad_lab_projects")
+    .select(
+      "foundry_id, subject, modules, research, diagnostic_answers, bom_generation_state",
+    )
+    .eq("id", projectId)
+    .maybeSingle()
+  if (error || !project) {
+    console.error(
+      "[bom-distributed:load] project lookup failed:",
+      error?.message ?? "not found",
+    )
+    return null
+  }
+  const modulesRaw = project.modules as unknown
+  const modules = (Array.isArray(modulesRaw) ? modulesRaw : []) as CadLabModule[]
+  const research = project.research as {
+    designBrief?: CadLabDesignBrief
+  } | null
+  const diagRaw = project.diagnostic_answers as DiagnosticAnswers | null
+  // bom_generation_state isn't in database.types yet (migration 20260422130000
+  // was applied, types not yet regenerated). Cast through unknown.
+  const stateRaw = (project as unknown as {
+    bom_generation_state?: unknown
+  }).bom_generation_state
+  const state = (stateRaw ?? null) as BomGenerationState | null
+  return {
+    foundryId: project.foundry_id,
+    state,
+    modules,
+    subject: project.subject,
+    designBrief: research?.designBrief,
+    diagnosticAnswers: diagRaw ?? undefined,
+  }
+}
+
+/**
+ * Persist `bom_generation_state`. Last-writer-wins is acceptable because
+ * stage runners are chained sequentially (never concurrent for the same
+ * project — the skeleton stage seeds pending_batch_ids, batch stages drain
+ * them one at a time, and merge clears the column).
+ */
+async function persistBomGenerationState(
+  projectId: string,
+  state: BomGenerationState | null,
+): Promise<void> {
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("cad_lab_projects")
+    .update({
+      // bom_generation_state is not in the regenerated types yet; cast.
+      bom_generation_state: state,
+    } as unknown as never)
+    .eq("id", projectId)
+  if (error) {
+    console.error(
+      "[bom-distributed:persist] state write failed:",
+      error.message,
+    )
+  }
+}
+
+/**
+ * Terminal failure: stamps `finished_at` + `error` on the state, and fails
+ * the owning pipeline_runs row so the UI chip reflects reality. Safe to
+ * call from any stage — idempotent against already-finished state.
+ */
+async function recordBomStageFailure(
+  projectId: string,
+  state: BomGenerationState,
+  errorCode: string,
+  errorMessage: string,
+): Promise<void> {
+  if (state.finished_at !== null) return
+  const next: BomGenerationState = {
+    ...state,
+    finished_at: new Date().toISOString(),
+    error: errorMessage,
+  }
+  await persistBomGenerationState(projectId, next)
+  if (state.pipeline_run_id) {
+    try {
+      await failPipelineRun(state.pipeline_run_id, errorCode, errorMessage)
+    } catch (err) {
+      console.error(
+        "[bom-distributed:fail] failPipelineRun threw:",
+        err instanceof Error ? err.message : err,
+      )
+    }
+  }
+}
+
+/** Look up SkeletonPart records by partNumber. */
+function pickSkeletonPartsByIds(
+  skeleton: SkeletonPart[],
+  partNumbers: string[],
+): SkeletonPart[] {
+  const byNumber = new Map<string, SkeletonPart>()
+  for (const p of skeleton) byNumber.set(p.partNumber, p)
+  const out: SkeletonPart[] = []
+  for (const id of partNumbers) {
+    const p = byNumber.get(id)
+    if (p) out.push(p)
+  }
+  return out
+}
+
+// ─── Stage 1: skeleton ─────────────────────────────────────────────
+
+/**
+ * Stage 1 of distributed BOM. Calls `skeletonBom`, chunks its output
+ * into batches, and schedules the first `runBomBatchStage`.
+ *
+ * Budget: ~15s (one Anthropic call + a state write). Well under Vercel's
+ * 300s cap even on the heaviest industrial projects.
+ *
+ * Idempotency:
+ *   - If state is null: no-op (someone reset it mid-run).
+ *   - If state.finished_at is already set: no-op.
+ *   - If state.skeleton_parts is already populated: re-seeds nothing,
+ *     schedules the next batch (lets retries after a stage crash pick up
+ *     where they stopped).
+ *
+ * Terminal failure is stamped on state + pipeline_run so the UI chip
+ * flips from `running` to `failed` instead of hanging.
+ */
+export async function runBomSkeletonStage(projectId: string): Promise<void> {
+  const loaded = await loadBomGenerationState(projectId)
+  if (!loaded) return
+  const { state, modules, designBrief, diagnosticAnswers } = loaded
+  if (!state) return
+  if (state.finished_at !== null) return
+
+  // If skeleton already done (e.g. a crashed-and-retried skeleton stage),
+  // just jump to batch scheduling.
+  if (state.skeleton_parts && state.pending_batch_ids.length > 0) {
+    after(async () => {
+      try {
+        const { runBomBatchStage } = await import("./bom")
+        await runBomBatchStage(projectId)
+      } catch (err) {
+        console.error(
+          "[bom-distributed:skeleton] batch re-schedule threw:",
+          err instanceof Error ? err.message : err,
+        )
+      }
+    })
+    return
+  }
+
+  if (modules.length === 0) {
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "NO_MODULES",
+      "Project has no modules to decompose.",
+    )
+    return
+  }
+
+  // Run the skeleton call. `skeletonBom` wraps itself in withAIGate — cookie
+  // context is still available inside the first-stage `after()` because the
+  // same request container is alive; for deeper chains Next.js preserves
+  // request-scoped state across after() invocations (same pattern as
+  // forge-v2-render-all-modules.ts).
+  let skeleton
+  try {
+    skeleton = await skeletonBom(
+      projectId,
+      modules,
+      designBrief,
+      diagnosticAnswers,
+    )
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "skeleton threw"
+    console.error("[bom-distributed:skeleton] skeleton threw:", msg)
+    await recordBomStageFailure(projectId, state, "SKELETON_FAILED", msg)
+    return
+  }
+
+  if (!skeleton.success || !skeleton.parts.length) {
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "SKELETON_FAILED",
+      skeleton.error ?? "Failed to generate BOM skeleton.",
+    )
+    return
+  }
+
+  // Chunk skeleton into batches of partNumbers (not SkeletonPart objects —
+  // keeps the persisted state compact and resolves the objects on demand).
+  const partNumberBatches: string[][] = chunkArray(
+    skeleton.parts.map((p) => p.partNumber),
+    EXPAND_BATCH_SIZE,
+  )
+
+  const nextState: BomGenerationState = {
+    ...state,
+    skeleton_parts: skeleton.parts,
+    skeleton_bom_lines: skeleton.bomLines,
+    pending_batch_ids: partNumberBatches,
+  }
+  await persistBomGenerationState(projectId, nextState)
+
+  // Schedule the first batch. after() keeps the container alive past this
+  // function's return; the dynamic import avoids module-init cycles
+  // (see forge-v2-render-all-modules.ts for the same pattern).
+  after(async () => {
+    try {
+      const { runBomBatchStage } = await import("./bom")
+      await runBomBatchStage(projectId)
+    } catch (err) {
+      console.error(
+        "[bom-distributed:skeleton] first batch schedule threw:",
+        err instanceof Error ? err.message : err,
+      )
+    }
+  })
+}
+
+// ─── Stage 2: batch (one batch per invocation) ─────────────────────
+
+/**
+ * Stage 2 of distributed BOM. Drains the first entry in
+ * `pending_batch_ids`, expands it via `expandBomPartsBatchInternal`, and
+ * either reschedules itself (more batches pending) or transitions to the
+ * merge stage.
+ *
+ * Budget: ~60-120s (one Anthropic call for up to EXPAND_BATCH_SIZE parts,
+ * plus a state write). Hard upper bound is the SDK timeout of 120s inside
+ * `expandBomPartsBatchInternal`, well under Vercel's 300s cap.
+ *
+ * Failure policy matches the original monolithic implementation at
+ * `bom.ts:795-813`: one batch failing doesn't abort the whole run.
+ * `failed_batch_count` is incremented and execution continues. Parts whose
+ * batch failed will be persisted in the merge stage with skeleton-only
+ * fields (aiConfidence=0) so the UI can flag "specs pending".
+ */
+export async function runBomBatchStage(projectId: string): Promise<void> {
+  const loaded = await loadBomGenerationState(projectId)
+  if (!loaded) return
+  const { state, modules, designBrief, diagnosticAnswers } = loaded
+  if (!state) return
+  if (state.finished_at !== null) return
+  if (!state.skeleton_parts) {
+    // Skeleton not yet done — something scheduled us prematurely.
+    console.warn(
+      `[bom-distributed:batch] skeleton_parts missing for ${projectId}; skipping.`,
+    )
+    return
+  }
+
+  // No more batches — transition to merge.
+  if (state.pending_batch_ids.length === 0) {
+    after(async () => {
+      try {
+        const { runBomMergeStage } = await import("./bom")
+        await runBomMergeStage(projectId)
+      } catch (err) {
+        console.error(
+          "[bom-distributed:batch] merge schedule threw:",
+          err instanceof Error ? err.message : err,
+        )
+      }
+    })
+    return
+  }
+
+  const [currentBatchIds, ...remainingBatches] = state.pending_batch_ids
+  const batchParts = pickSkeletonPartsByIds(
+    state.skeleton_parts,
+    currentBatchIds,
+  )
+
+  // Build shared prompt context for this batch. Recomputed per-stage rather
+  // than persisted in state — fetchCatalogueForPrompt is a DB read (cheap),
+  // extractSearchKeywords is local-only, and keeping the state jsonb small
+  // matters when it's written on every stage transition.
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!apiKey) {
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "NO_API_KEY",
+      "Anthropic API key not configured.",
+    )
+    return
+  }
+
+  const briefContext = designBrief
+    ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
+    : ""
+
+  const moduleContext = modules.map((m) => {
+    const diagInfo = diagnosticAnswers?.[m.id]
+      ? ` | Diagnostics: ${JSON.stringify(diagnosticAnswers[m.id])}`
+      : ""
+    return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${diagInfo}`
+  }).join("\n")
+
+  const allKeyParts = modules.flatMap((m) => m.keyParts)
+  const domain = detectDomainFromKeyParts(allKeyParts)
+  const keywords = await extractSearchKeywords(modules)
+  let catalogueRef = ""
+  try {
+    catalogueRef = await fetchCatalogueForPrompt(domain, keywords)
+  } catch (err) {
+    // Catalogue is optional grounding — log and continue with empty ref.
+    console.warn(
+      "[bom-distributed:batch] fetchCatalogueForPrompt threw:",
+      err instanceof Error ? err.message : err,
+    )
+  }
+
+  // Run the expansion for this one batch. Matches the monolithic flow's
+  // per-batch behaviour exactly — same prompt, same validation.
+  const batchResult = await expandBomPartsBatchInternal({
+    apiKey,
+    batchParts,
+    moduleContext,
+    briefContext,
+    catalogueRef,
+  })
+
+  // Re-read state to avoid clobbering a concurrent write. In practice
+  // batches are sequential for the same project, but the re-read keeps us
+  // safe if a founder kicks off a second run that somehow slipped past the
+  // idempotency gate.
+  const refreshed = await loadBomGenerationState(projectId)
+  if (!refreshed || !refreshed.state) return
+  const current = refreshed.state
+  if (current.finished_at !== null) return
+
+  let nextFailedCount = current.failed_batch_count
+  let mergedExpansions = { ...current.expansions }
+
+  if (batchResult.success) {
+    mergedExpansions = { ...mergedExpansions, ...batchResult.expansions }
+  } else {
+    nextFailedCount += 1
+    console.warn(
+      `[bom-distributed:batch] batch failed for ${projectId}: ${batchResult.error ?? "unknown"}; continuing with ${remainingBatches.length} batches remaining.`,
+    )
+  }
+
+  const nextState: BomGenerationState = {
+    ...current,
+    expansions: mergedExpansions,
+    pending_batch_ids: remainingBatches,
+    failed_batch_count: nextFailedCount,
+  }
+  await persistBomGenerationState(projectId, nextState)
+
+  // Schedule the next step. More batches → next batch. Empty queue → merge.
+  after(async () => {
+    try {
+      if (nextState.pending_batch_ids.length > 0) {
+        const { runBomBatchStage: selfRef } = await import("./bom")
+        await selfRef(projectId)
+      } else {
+        const { runBomMergeStage } = await import("./bom")
+        await runBomMergeStage(projectId)
+      }
+    } catch (err) {
+      console.error(
+        "[bom-distributed:batch] next-stage schedule threw:",
+        err instanceof Error ? err.message : err,
+      )
+    }
+  })
+}
+
+// ─── Stage 3: merge ────────────────────────────────────────────────
+
+/**
+ * Stage 3 of distributed BOM. Merges skeleton + expansions into validated
+ * parts, writes `parts` + `bom_lines`, stamps `pipeline_runs` done, and
+ * clears `bom_generation_state` back to null.
+ *
+ * Budget: ~10-30s (two DB deletes + two inserts). On 70-part projects this
+ * is measured at ~15s; well under Vercel's 300s cap.
+ *
+ * On success: auto-fires the Finn cost generator via `after()`, matching
+ * the behaviour of the original monolithic `runBomGenerator` return path.
+ */
+export async function runBomMergeStage(projectId: string): Promise<void> {
+  const loaded = await loadBomGenerationState(projectId)
+  if (!loaded) return
+  const { state } = loaded
+  if (!state) return
+  if (state.finished_at !== null) return
+  if (!state.skeleton_parts) {
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "MERGE_PRECONDITION",
+      "Merge stage ran without a populated skeleton.",
+    )
+    return
+  }
+
+  const admin = createAdminClient()
+  const skeletonParts = state.skeleton_parts
+  const expansions = state.expansions
+  const skeletonBomLines = state.skeleton_bom_lines ?? []
+
+  // ── Merge skeleton + expansions → validated parts (Phase 3 logic,
+  //    lifted verbatim from `generateBomFromModules`). ──
+  const validatedParts = skeletonParts.map((s) => {
+    const exp = expansions[s.partNumber]
+    return {
+      partNumber: s.partNumber,
+      name: s.name,
+      description: exp?.description ? truncate(exp.description, 500) : null,
+      sourceModuleId: s.sourceModuleId || null,
+      process: validateProcess(s.process),
+      material: exp?.material ? truncate(exp.material, 200) : null,
+      materialSpec: exp?.materialSpec ? truncate(exp.materialSpec, 200) : null,
+      finish: exp?.finish ? truncate(exp.finish, 200) : null,
+      tolerance: exp?.tolerance ? truncate(exp.tolerance, 100) : null,
+      massKg: exp?.massKg ?? null,
+      envelopeXMm: exp?.envelopeXMm ?? null,
+      envelopeYMm: exp?.envelopeYMm ?? null,
+      envelopeZMm: exp?.envelopeZMm ?? null,
+      estimatedUnitCostGbp: exp?.estimatedUnitCostGbp ?? null,
+      isPurchased: s.isPurchased,
+      // Skeleton-only rows get aiConfidence=0 so UI can flag "specs pending".
+      aiConfidence: exp?.aiConfidence ?? 0,
+    }
+  })
+
+  // Duplicate check — skeleton already guards, defence in depth.
+  const partNumbers = new Set<string>()
+  for (const p of validatedParts) {
+    if (!p.partNumber) {
+      await recordBomStageFailure(
+        projectId,
+        state,
+        "MERGE_FAILED",
+        "Skeleton returned a part without a part number.",
+      )
+      return
+    }
+    if (partNumbers.has(p.partNumber)) {
+      await recordBomStageFailure(
+        projectId,
+        state,
+        "MERGE_FAILED",
+        `Duplicate part number: ${p.partNumber}`,
+      )
+      return
+    }
+    partNumbers.add(p.partNumber)
+  }
+
+  // ── Delete existing data (response validated) ──
+  const { error: bomDelErr } = await admin
+    .from("bom_lines")
+    .delete()
+    .eq("cad_lab_project_id", projectId)
+  if (bomDelErr) {
+    console.error("[bom-distributed:merge] delete bom_lines failed:", bomDelErr)
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "SAVE_FAILED",
+      "Failed to clear existing BOM data.",
+    )
+    return
+  }
+
+  const { error: partsDelErr } = await admin
+    .from("parts")
+    .delete()
+    .eq("cad_lab_project_id", projectId)
+  if (partsDelErr) {
+    console.error("[bom-distributed:merge] delete parts failed:", partsDelErr)
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "SAVE_FAILED",
+      "Failed to clear existing parts data.",
+    )
+    return
+  }
+
+  // ── Insert parts ──
+  const partsToInsert = validatedParts.map((p) => ({
+    cad_lab_project_id: projectId,
+    part_number: p.partNumber,
+    name: p.name,
+    description: p.description,
+    source_module_id: p.sourceModuleId,
+    process: p.process,
+    material: p.material,
+    material_spec: p.materialSpec,
+    finish: p.finish,
+    tolerance: p.tolerance,
+    mass_kg: p.massKg,
+    envelope_x_mm: p.envelopeXMm,
+    envelope_y_mm: p.envelopeYMm,
+    envelope_z_mm: p.envelopeZMm,
+    estimated_unit_cost_gbp: p.estimatedUnitCostGbp,
+    ai_generated: true,
+    ai_confidence: p.aiConfidence,
+    is_purchased: p.isPurchased,
+  }))
+
+  const { data: insertedParts, error: insertErr } = await admin
+    .from("parts")
+    .insert(partsToInsert)
+    .select("id, part_number")
+
+  if (insertErr || !insertedParts) {
+    console.error("[bom-distributed:merge] insert parts failed:", insertErr)
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "SAVE_FAILED",
+      "Failed to save parts to database.",
+    )
+    return
+  }
+
+  const partNumberToId = new Map<string, string>()
+  for (const p of insertedParts) {
+    partNumberToId.set(p.part_number, p.id)
+  }
+
+  // ── Insert BOM lines (from skeleton hierarchy) ──
+  let droppedLineCount = 0
+  const bomLinesToInsert = skeletonBomLines
+    .map((bl, idx) => {
+      const childPartNumber = bl.childPartNumber
+      const parentPartNumber = bl.parentPartNumber
+      const childId = partNumberToId.get(childPartNumber)
+      const parentId = parentPartNumber
+        ? partNumberToId.get(parentPartNumber)
+        : null
+
+      if (!childId) {
+        droppedLineCount++
+        console.warn(
+          `[bom-distributed:merge] unknown child part: ${childPartNumber}`,
+        )
+        return null
+      }
+      // SECURITY: prevent self-referencing BOM lines.
+      if (parentId && parentId === childId) {
+        droppedLineCount++
+        console.warn(
+          `[bom-distributed:merge] self-referencing BOM line dropped: ${childPartNumber}`,
+        )
+        return null
+      }
+      return {
+        cad_lab_project_id: projectId,
+        parent_part_id: parentId ?? null,
+        child_part_id: childId,
+        quantity: bl.quantity,
+        reference_designator: null as string | null,
+        notes: null as string | null,
+        sort_order: idx,
+      }
+    })
+    .filter((bl): bl is NonNullable<typeof bl> => bl !== null)
+
+  if (droppedLineCount > 0) {
+    console.warn(
+      `[bom-distributed:merge] dropped ${droppedLineCount} invalid BOM lines`,
+    )
+  }
+
+  if (bomLinesToInsert.length > 0) {
+    const { error: bomInsertErr } = await admin
+      .from("bom_lines")
+      .insert(bomLinesToInsert)
+    if (bomInsertErr) {
+      console.error(
+        "[bom-distributed:merge] insert bom_lines failed:",
+        bomInsertErr,
+      )
+      // Parts saved but hierarchy failed — same classification as the
+      // monolithic path.
+      await recordBomStageFailure(
+        projectId,
+        state,
+        "SAVE_FAILED",
+        "Parts saved but BOM hierarchy failed. Try regenerating.",
+      )
+      return
+    }
+  }
+
+  // ── Stamp pipeline_run done. ──
+  const partCount = validatedParts.length
+  const bomLineCount = bomLinesToInsert.length
+  if (state.pipeline_run_id) {
+    try {
+      await completePipelineRun(state.pipeline_run_id, {
+        input_tokens: null,
+        output_tokens: null,
+        model_id: null,
+        output_ref: {
+          table: "parts",
+          partCount,
+          bomLineCount,
+          moduleCount: loaded.modules.length,
+          failedBatchCount: state.failed_batch_count,
+        },
+      })
+    } catch (err) {
+      console.error(
+        "[bom-distributed:merge] completePipelineRun threw:",
+        err instanceof Error ? err.message : err,
+      )
+    }
+  }
+
+  // ── Clear state (ephemeral — parts + bom_lines are the artefact). ──
+  await persistBomGenerationState(projectId, null)
+
+  // ── Auto-fire Finn cost on BOM success, same as the legacy path. ──
+  after(async () => {
+    try {
+      const { runFinnCost } = await import(
+        "@/actions/specialists/run-finn-cost"
+      )
+      await runFinnCost(projectId, "auto.bom-complete")
+    } catch (err) {
+      console.error(
+        "[bom-distributed:merge] Finn auto-fire failed:",
+        err instanceof Error ? err.message : err,
+      )
+    }
   })
 }
