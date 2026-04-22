@@ -205,6 +205,29 @@ async function runWithConcurrency<T, R>(
   return results
 }
 
+/**
+ * Total wall-clock deadline for the entire batched expansion phase.
+ *
+ * @description Per-batch timeouts (120s on `expandBomPartsBatchInternal`) guard
+ * each Anthropic call, but they don't protect the orchestrator from cumulative
+ * wall-clock blow-up on industrial projects. A BESS / battery-storage project
+ * with 8 modules can produce 5+ batches that queue through 3 concurrent workers.
+ * If two successive batches stall near their 120s cap, the orchestrator crosses
+ * Vercel's 300s function cap and the lambda dies mid-await — leaving the
+ * `pipeline_runs` row stuck in `status='running'` forever (until the watchdog
+ * sweeps it). Confirmed in prod 2026-04-22: two BESS projects in a row had BOM
+ * runs stuck >70 min with no `finished_at`.
+ *
+ * 240s leaves a ~60s tail for the DB delete/insert phase inside Vercel's 300s
+ * cap, which on a 45-part project takes ~5-15s plus orchestration overhead.
+ * When the deadline trips we return a clean, structured error so the
+ * `pipeline_runs` row gets stamped `failed` rather than hanging.
+ */
+const EXPANSION_WALL_CLOCK_DEADLINE_MS = 240_000
+
+/** Sentinel rejection marker so we can distinguish deadline-expiry from real errors. */
+const EXPANSION_DEADLINE_ERROR = "BOM_EXPANSION_WALL_CLOCK_EXCEEDED"
+
 /** Partition an array into chunks of at most `size` elements. */
 function chunkArray<T>(items: T[], size: number): T[][] {
   if (size <= 0) return [items]
@@ -778,17 +801,49 @@ export async function generateBomFromModules(
     const catalogueRef = await fetchCatalogueForPrompt(domain, keywords)
 
     const batches = chunkArray(skeleton.parts, EXPAND_BATCH_SIZE)
-    const batchResults = await runWithConcurrency(
-      batches,
-      EXPAND_CONCURRENCY,
-      (batch) => expandBomPartsBatchInternal({
-        apiKey,
-        batchParts: batch,
-        moduleContext,
-        briefContext,
-        catalogueRef,
-      }),
-    )
+
+    // Race the whole fan-out against a total wall-clock deadline. Without this,
+    // an industrial project with 5+ batches can queue past Vercel's 300s cap
+    // (see EXPANSION_WALL_CLOCK_DEADLINE_MS JSDoc above). A deadline hit gets
+    // classified as a structured failure so the pipeline_run row is stamped
+    // rather than left running forever.
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined
+    let batchResults: Array<{
+      success: boolean
+      error?: string
+      expansions: BomExpansionResult["expansions"]
+    }>
+    try {
+      batchResults = await Promise.race([
+        runWithConcurrency(
+          batches,
+          EXPAND_CONCURRENCY,
+          (batch) => expandBomPartsBatchInternal({
+            apiKey,
+            batchParts: batch,
+            moduleContext,
+            briefContext,
+            catalogueRef,
+          }),
+        ),
+        new Promise<never>((_, reject) => {
+          deadlineTimer = setTimeout(
+            () => reject(new Error(EXPANSION_DEADLINE_ERROR)),
+            EXPANSION_WALL_CLOCK_DEADLINE_MS,
+          )
+        }),
+      ])
+    } catch (err) {
+      if (err instanceof Error && err.message === EXPANSION_DEADLINE_ERROR) {
+        return {
+          success: false,
+          error: `BOM expansion exceeded ${EXPANSION_WALL_CLOCK_DEADLINE_MS / 1000}s wall-clock deadline. Try reducing scope or re-running.`,
+        }
+      }
+      throw err
+    } finally {
+      if (deadlineTimer) clearTimeout(deadlineTimer)
+    }
 
     // Merge all successful expansions. Failed batches leave their parts
     // without expansions — filled with skeleton-only defaults below.
