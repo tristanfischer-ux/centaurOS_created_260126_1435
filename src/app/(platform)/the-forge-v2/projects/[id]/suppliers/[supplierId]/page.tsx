@@ -68,24 +68,37 @@ export default async function ForgeV2SupplierDetailPage(
     const project = projectResult.project
 
     // ── 2. Parallel fetch: shortlist membership + global supplier row ───
+    //   Wrap in try/catch so invalid supplierId syntax (e.g. non-UUID like
+    //   "any") — or any transient Supabase error — resolves to a clean 404
+    //   rather than propagating to the generic ErrorBoundary.
     const supabase = await createClient()
-    const [shortlistRes, supplierRes] = await Promise.all([
-        supabase
-            .from("forge_supplier_shortlist")
-            .select("id")
-            .eq("project_id", id)
-            .eq("supplier_id", supplierId)
-            .maybeSingle(),
-        supabase
-            .from("suppliers")
-            .select("id, name, website, company_info")
-            .eq("id", supplierId)
-            .maybeSingle(),
-    ])
-
-    const shortlist = shortlistRes.data
-    const supplier = supplierRes.data
-    if (!shortlist || !supplier) notFound()
+    let shortlist: { id: string } | null = null
+    let supplier: {
+        id: string
+        name: string
+        website: string | null
+        company_info: unknown
+    } | null = null
+    try {
+        const [shortlistRes, supplierRes] = await Promise.all([
+            supabase
+                .from("forge_supplier_shortlist")
+                .select("id")
+                .eq("project_id", id)
+                .eq("supplier_id", supplierId)
+                .maybeSingle(),
+            supabase
+                .from("suppliers")
+                .select("id, name, website, company_info")
+                .eq("id", supplierId)
+                .maybeSingle(),
+        ])
+        shortlist = shortlistRes.data
+        supplier = supplierRes.data
+    } catch {
+        notFound()
+    }
+    if (!shortlist || !supplier || !supplier.name) notFound()
 
     // ── 3. Resolve HQ from company_info jsonb ───────────────────────────
     const companyInfo = isObject(supplier.company_info) ? supplier.company_info : {}

@@ -3,9 +3,9 @@
  *
  * @description Ask-specialist entry surface. This is the route-level wrapper
  * around the existing client-side specialist-chat (AskSpecialistButton) so
- * every &ldquo;Ask X&rdquo; action across the app collapses to one URL. The button opens
+ * every “Ask X” action across the app collapses to one URL. The button opens
  * the persistent advisor panel on desktop and the specialist dialog on mobile,
- * both pre-loaded with this project&rsquo;s context.
+ * both pre-loaded with this project’s context.
  *
  * @related
  * - Mockup: FORGE-MOCKUP-ASK-SPECIALIST.html
@@ -44,7 +44,7 @@ export async function generateMetadata(
     if ("error" in result) return { title: "Ask a specialist · The Forge" }
     return {
         title: `Ask a specialist · ${result.project.name}`,
-        description: "Scoped specialist chat with this project&rsquo;s context pre-loaded.",
+        description: "Scoped specialist chat with this project\u2019s context pre-loaded.",
     }
 }
 
@@ -91,8 +91,8 @@ export default async function ForgeV2AskPage({
                 { label: "Ask a specialist" },
             ]}
             subtitle={topicLabel
-                ? `Scoped to: ${topicLabel}. The specialist already has this project&rsquo;s artefacts loaded.`
-                : "Pick a specialist and ask &mdash; they already have this project&rsquo;s artefacts loaded."}
+                ? `Scoped to: ${topicLabel}. The specialist already has this project\u2019s artefacts loaded.`
+                : "Pick a specialist and ask \u2014 they already have this project\u2019s artefacts loaded."}
             maxWidth="narrow"
         >
             {/* Topic card */}
@@ -120,7 +120,7 @@ export default async function ForgeV2AskPage({
                         <p className="text-sm text-muted-foreground leading-relaxed max-w-prose">
                             Tap below to open the scoped specialist chat. On desktop the advisor panel slides in
                             beside this page; on mobile a dialog takes over the screen. Either way, the specialist
-                            already knows the project&rsquo;s brief, modules, BOM, risks and cost posture.
+                            already knows the project’s brief, modules, BOM, risks and cost posture.
                         </p>
                     </div>
                     <AskSpecialistButton
@@ -142,7 +142,7 @@ export default async function ForgeV2AskPage({
                     <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-foreground">
                         <li className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-status-success shrink-0" />
-                            Brief &amp; design revision <span className="text-muted-foreground">(v{project.designRevision})</span>
+                            Brief & design revision <span className="text-muted-foreground">(v{project.designRevision})</span>
                         </li>
                         <li className="flex items-center gap-2">
                             <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -150,7 +150,7 @@ export default async function ForgeV2AskPage({
                         </li>
                         <li className="flex items-center gap-2">
                             <ListChecks className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            BOM key parts &amp; cost rollup
+                            BOM key parts & cost rollup
                         </li>
                         <li className="flex items-center gap-2">
                             <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
