@@ -28,7 +28,7 @@ import sharp from "sharp"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 
-import { overlayModuleLabels, overlaySystemLegend } from "./image-overlay"
+import { overlaySystemLegend } from "./image-overlay"
 import type { ModuleSpec, XRaySpec } from "./xray-schema"
 import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 import type { VisualStyleSpec } from "@/lib/cad-lab-types"
@@ -1218,13 +1218,15 @@ export async function generateModuleImage(
     }
   }
 
-  // Post-process: add engineering annotation frame with labels
-  const labeledData = await overlayModuleLabels(imageData.data, {
-    name: module.name,
-    purpose: module.purpose,
-    keyParts: module.keyParts,
-    io: module.io,
-  })
+  // INTENT: overlayModuleLabels() was removed here because Sharp's SVG composite
+  // falls back to missing-glyph tofu boxes on Vercel's Linux container — the
+  // font family we pass ("system-ui, -apple-system, Helvetica, Arial, sans-serif")
+  // doesn't resolve in the build image, so every module render baked in a black
+  // frame + red corner brackets + rows of □□□□ where text should be. The PDF
+  // export surface (src/actions/export-project-pdf.tsx) renders the module name,
+  // weight, and lead-time as proper text outside the image, so the overlay was
+  // also redundant. Pass the raw render through unchanged.
+  const labeledData = imageData.data
 
   const url = await uploadToStorage(
     scanId,
@@ -1270,13 +1272,15 @@ export async function generateModuleImageWithReference(
     imageData = await callImageWithFallback(prompt, { aspectRatio: "3:2" })
   }
 
-  // Post-process: add engineering annotation frame with labels
-  const labeledData = await overlayModuleLabels(imageData.data, {
-    name: module.name,
-    purpose: module.purpose,
-    keyParts: module.keyParts,
-    io: module.io,
-  })
+  // INTENT: overlayModuleLabels() was removed here because Sharp's SVG composite
+  // falls back to missing-glyph tofu boxes on Vercel's Linux container — the
+  // font family we pass ("system-ui, -apple-system, Helvetica, Arial, sans-serif")
+  // doesn't resolve in the build image, so every module render baked in a black
+  // frame + red corner brackets + rows of □□□□ where text should be. The PDF
+  // export surface (src/actions/export-project-pdf.tsx) renders the module name,
+  // weight, and lead-time as proper text outside the image, so the overlay was
+  // also redundant. Pass the raw render through unchanged.
+  const labeledData = imageData.data
 
   const url = await uploadToStorage(
     scanId,
