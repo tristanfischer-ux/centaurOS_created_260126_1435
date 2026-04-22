@@ -199,6 +199,19 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
+    // INTENT: every AI-generated illustration carries a small disclaimer
+    // caption. Founders consistently mistook renders for authored technical
+    // specifications. The disclaimer makes the legal + engineering status
+    // unambiguous at a glance. Applied under hero, concept, and every
+    // module render. Tone: neutral, not apologetic.
+    imageDisclaimer: {
+        fontSize: 8,
+        color: MUTED,
+        fontStyle: "italic",
+        textAlign: "center",
+        marginTop: -2,
+        marginBottom: 8,
+    },
     coverImage: {
         // Full-page-width cover illustration, no background fill.
         // A4 content area at default react-pdf margins is ~515pt
@@ -537,7 +550,12 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
 
                 {/* System illustration (or honest placeholder) */}
                 {data.systemIllustrationUrl ? (
-                    <Image src={data.systemIllustrationUrl} style={styles.coverImage} />
+                    <>
+                        <Image src={data.systemIllustrationUrl} style={styles.coverImage} />
+                        <Text style={styles.imageDisclaimer}>
+                            Illustrative only — not a technical specification. All renders in this document are generated for visual reference; component arrangement, proportions, and identities may differ from the final engineered assembly.
+                        </Text>
+                    </>
                 ) : (
                     <View
                         style={[
@@ -752,7 +770,12 @@ function ModulePage({
 
             {/* Module image — generated render or honest empty placeholder */}
             {mod.imageUrl ? (
-                <Image src={mod.imageUrl} style={styles.moduleImage} />
+                <>
+                    <Image src={mod.imageUrl} style={styles.moduleImage} />
+                    <Text style={styles.imageDisclaimer}>
+                        Illustrative only — not a technical specification. Generated for visual reference; component arrangement, proportions, and identities may differ from the final engineered assembly.
+                    </Text>
+                </>
             ) : (
                 <View style={styles.moduleImageEmpty}>
                     <Text style={{ color: MUTED, fontSize: 9 }}>
