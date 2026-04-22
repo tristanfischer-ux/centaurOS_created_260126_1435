@@ -311,6 +311,31 @@ const SPECIALIST_ROLES: Record<string, string> = {
     leo: "Legal Counsel",
 }
 
+/**
+ * Maps a module's `leadTimeSource` tag to the founder-friendly provenance
+ * caption shown in the PDF. Mirrors the label convention from
+ * `src/app/(platform)/the-forge-v2/projects/[id]/modules/page.tsx` so the
+ * PDF and the workspace agree on what each tag reads as.
+ *
+ * Empty-state policy: when `source` is null/unknown we surface
+ * "Provenance: not yet declared" rather than hiding the caption. The PDF
+ * goes to investors / suppliers and an un-captioned lead time reads as an
+ * authoritative number — founders must see that the provenance is missing.
+ * See Tristan's note 2026-04-22: "I'm not convinced that we actually know
+ * how the lead time information happens."
+ */
+function leadSourcePdfCaption(source: string | null | undefined): string {
+    switch (source) {
+        case "supplier-quote":       return "Supplier quote"
+        // NOTE: `ai-estimate` reads as "Specialist estimate" per
+        // CLAUDE.md §No AI Emphasis — matches the workspace list page.
+        case "ai-estimate":          return "Specialist estimate"
+        case "historical-analogue":  return "Historical analogue"
+        case "specialist-judgement": return "Specialist judgement"
+        default:                     return "Provenance: not yet declared"
+    }
+}
+
 function specialistRole(idOrName: string | null | undefined): string | null {
     if (!idOrName) return null
     const key = String(idOrName).trim().toLowerCase()
@@ -718,8 +743,9 @@ function ModulePage({
                 <Text style={styles.moduleMeta}>
                     {fmtKg(mod.massKg)}
                     {mod.budgetMassKg != null ? ` / budget ${fmtKg(mod.budgetMassKg)}` : ""}
-                    {typeof mod.leadWeeks === "number" ? ` · ${mod.leadWeeks} wk lead` : ""}
-                    {mod.leadTimeSource ? ` (${mod.leadTimeSource})` : ""}
+                    {typeof mod.leadWeeks === "number"
+                        ? ` · ${mod.leadWeeks} wk lead · ${leadSourcePdfCaption(mod.leadTimeSource)}`
+                        : ""}
                     {mod.mirrorOf ? ` · mirrors ${mod.mirrorOf}` : ""}
                 </Text>
             </View>

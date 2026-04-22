@@ -505,7 +505,21 @@ export async function loadMaxRunStatus(
 
 // ─── Internals ─────────────────────────────────────────────────────────
 
-/** Merges a skeleton module with its expanded detail (if present). */
+/** Merges a skeleton module with its expanded detail (if present).
+ *
+ * leadTimeSource: Max's expansion prompt returns a raw `leadWeeks: number` but
+ * does NOT self-tag its provenance. Without a tag the UI helpers (`leadSourceLabel`
+ * on the modules list page, `leadSourceCaption` on the module detail page) and
+ * the PDF all render the number with no caption — founders see "14 wk lead"
+ * and have no way to judge whether it's a supplier quote or a best-guess.
+ *
+ * Max IS the specialist and the number IS his estimate, so the honest tag is
+ * `specialist-judgement` ("Specialist judgement" in the UI). If a supplier quote
+ * or historical analogue later supersedes this, a downstream specialist (Chase
+ * via RFQ wins, Sage via benchmark analogue) will overwrite the field. We do
+ * NOT backfill pre-existing rows — legacy modules with `leadTimeSource: null`
+ * continue to render the honest "Provenance: not yet declared" empty-state in
+ * the PDF and nothing (caption hidden) on the list card. */
 function buildCadLabModule(
     sk: SkeletonModule,
     expansion:
@@ -522,7 +536,9 @@ function buildCadLabModule(
 ): CadLabModule {
     if (!expansion) {
         // Expansion failed for this module — keep the skeleton so the UI
-        // can still render it, with honest empty details.
+        // can still render it, with honest empty details. leadWeeks=0 means
+        // "no estimate" so we deliberately leave leadTimeSource unset —
+        // there is no provenance to declare.
         return {
             id: sk.id,
             name: sk.name,
@@ -547,6 +563,7 @@ function buildCadLabModule(
         outputs: sk.outputs,
         keyParts: expansion.keyParts,
         leadWeeks: expansion.leadWeeks,
+        leadTimeSource: "specialist-judgement",
         description: expansion.description,
         whyItMatters: expansion.whyItMatters,
         failureModes: expansion.failureModes,
