@@ -578,12 +578,23 @@ async function callOpenAIImage(
  */
 async function callImageWithFallback(
   prompt: string,
-  imageConfig: { aspectRatio?: string; referenceBase64?: string; moduleCropBase64?: string } = {},
+  imageConfig: {
+    aspectRatio?: string
+    referenceBase64?: string
+    referenceMimeType?: string
+    moduleCropBase64?: string
+  } = {},
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   // Enforce no-text guardrail on ALL prompts regardless of source
   const safePrompt = enforceNoText(prompt)
   const openaiSize = geminiAspectToOpenAISize(imageConfig.aspectRatio)
   const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY?.trim())
+  // INTENT: Hero re-encoding in forge-v2-generate-one-module-image.ts outputs
+  // JPEG to stay under provider upload caps (root cause: 2.52MB PNG hero → skipped
+  // every coherence mechanism before this fix). Propagate the mimeType end-to-end
+  // so OpenAI edit and Gemini multimodal both see the matching content-type.
+  // Defaults to image/png for backwards-compat with paths that still pass PNG bytes.
+  const referenceMimeType = imageConfig.referenceMimeType ?? "image/png"
 
   // ── Step 1: OpenAI gpt-image-2 edit (multimodal path) ─────────────
   // When a reference image is available, prefer gpt-image-2 in edit mode —
@@ -595,6 +606,7 @@ async function callImageWithFallback(
         imageConfig.referenceBase64,
         openaiSize,
         OPENAI_PRIMARY_MODEL,
+        referenceMimeType,
       )
       console.log("[XRayImageGen] gpt-image-2 edit succeeded (reference-aware)")
       return result
@@ -617,9 +629,11 @@ async function callImageWithFallback(
   // ── Step 3: Nano Banana 2 multimodal (reference path) ─────────────
   if (imageConfig.referenceBase64) {
     const refs: ReferenceImage[] = [
-      { mimeType: "image/png", base64: imageConfig.referenceBase64 },
+      { mimeType: referenceMimeType, base64: imageConfig.referenceBase64 },
     ]
     if (imageConfig.moduleCropBase64) {
+      // Module crops are always PNG — produced by cropModuleRegion() which
+      // pipes through sharp().png(). The hero mime only affects the hero ref.
       refs.push({ mimeType: "image/png", base64: imageConfig.moduleCropBase64 })
     }
     try {
@@ -664,6 +678,7 @@ async function callOpenAIEdit(
   referenceBase64: string,
   size: "1024x1024" | "1024x1536" | "1536x1024",
   model: string = OPENAI_PRIMARY_MODEL,
+  referenceMimeType: string = "image/png",
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
@@ -676,10 +691,16 @@ async function callOpenAIEdit(
   // Same 180s + no-retries rationale as callOpenAIImage.
   const client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 0 })
 
+  // INTENT: filename extension + type header must match the actual bytes.
+  // The hero re-encoder ships JPEG; an earlier hardcoded "reference.png"
+  // caused OpenAI to reject mismatched JPEG bytes with 400 on upload.
+  const isJpeg = /jpe?g/i.test(referenceMimeType)
+  const filename = isJpeg ? "reference.jpg" : "reference.png"
+  const normalizedMime = isJpeg ? "image/jpeg" : "image/png"
   const imageFile = await toFile(
     Buffer.from(referenceBase64, "base64"),
-    "reference.png",
-    { type: "image/png" },
+    filename,
+    { type: normalizedMime },
   )
 
   const response = await client.images.edit({
@@ -694,6 +715,8 @@ async function callOpenAIEdit(
     throw new Error(`[XRayImageGen] No image data returned from OpenAI edit (${model})`)
   }
 
+  // The rendered output from images.edit is always PNG regardless of the
+  // reference mimeType we sent in — do not echo the reference mime here.
   return { mimeType: "image/png", data: b64Data, modelUsed: model }
 }
 
@@ -799,6 +822,7 @@ export interface ModuleBoundingBox {
 export async function analyseHeroBoundingBoxes(
   heroBase64: string,
   moduleNames: string[],
+  heroMimeType: string = "image/png",
 ): Promise<Record<string, ModuleBoundingBox>> {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
@@ -807,6 +831,10 @@ export async function analyseHeroBoundingBoxes(
   }
 
   if (!heroBase64 || moduleNames.length === 0) return {}
+
+  const normalizedMime = /^image\/(png|jpe?g|gif|webp)$/i.test(heroMimeType)
+    ? heroMimeType.replace(/jpg/i, "jpeg")
+    : "image/png"
 
   try {
     const response = await fetchWithTimeout(
@@ -834,7 +862,7 @@ If a module is not clearly visible, omit it from the result. Do not include text
                 type: "image",
                 source: {
                   type: "base64",
-                  media_type: "image/png",
+                  media_type: normalizedMime,
                   data: heroBase64,
                 },
               },
@@ -1047,9 +1075,16 @@ async function scoreImageConsistency(
   heroBase64: string,
   moduleBase64: string,
   moduleName: string,
+  heroMimeType: string = "image/png",
 ): Promise<ConsistencyScoreResult | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) return null
+
+  // Claude Vision accepts image/png, image/jpeg, image/gif, image/webp.
+  // Normalise anything else back to PNG so the API call doesn't 400.
+  const normalizedHeroMime = /^image\/(png|jpe?g|gif|webp)$/i.test(heroMimeType)
+    ? heroMimeType.replace(/jpg/i, "jpeg")
+    : "image/png"
 
   try {
     const response = await fetchWithTimeout(
@@ -1080,10 +1115,11 @@ Do not include text outside JSON.`,
             content: [
               {
                 type: "image",
-                source: { type: "base64", media_type: "image/png", data: heroBase64 },
+                source: { type: "base64", media_type: normalizedHeroMime, data: heroBase64 },
               },
               {
                 type: "image",
+                // Module renders come from the provider as PNG — see uploadToStorage callsite.
                 source: { type: "base64", media_type: "image/png", data: moduleBase64 },
               },
               {
@@ -1170,6 +1206,7 @@ export async function generateModuleImage(
   referenceBase64?: string,
   moduleCropBase64?: string,
   stylePreamble?: string,
+  referenceMimeType?: string,
 ): Promise<{ url: string; modelUsed: string }> {
   // DECISION: Prefer AI-crafted prompt from reconciliation when available — these are
   // crafted together across all modules for visual consistency. Fall through to
@@ -1192,12 +1229,20 @@ export async function generateModuleImage(
   let imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
     referenceBase64,
+    referenceMimeType,
     moduleCropBase64,
   })
 
   // Layer 3: Geometric consistency verification + single retry
   if (referenceBase64 && process.env.ANTHROPIC_API_KEY?.trim()) {
-    const consistencyResult = await scoreImageConsistency(referenceBase64, imageData.data, module.name)
+    // Pass the hero's actual mime-type — when it's a JPEG re-encoded hero
+    // (Fix 1) Claude Vision needs the matching media_type or it 400s.
+    const consistencyResult = await scoreImageConsistency(
+      referenceBase64,
+      imageData.data,
+      module.name,
+      referenceMimeType,
+    )
     if (consistencyResult) {
       console.log(`[XRayImageGen] Geometric consistency score ${consistencyResult.score}/10 for ${module.name}`)
       if (consistencyResult.shouldRegenerate) {
@@ -1207,6 +1252,7 @@ export async function generateModuleImage(
           const retryData = await callImageWithFallback(retryPrompt, {
             aspectRatio: "3:2",
             referenceBase64,
+            referenceMimeType,
             moduleCropBase64,
           })
           imageData = retryData

@@ -26,6 +26,8 @@
  *                 retained for back-compat but no longer used by the button)
  */
 
+import sharp from "sharp"
+
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
 import {
@@ -33,9 +35,14 @@ import {
     flipCadLabImageForMirrorAction,
     type MirrorAxis,
 } from "@/actions/cad-lab-images"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabModule, VisualStyleSpec } from "@/lib/cad-lab-types"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { DEFAULT_ILLUSTRATION_STYLE, isIllustrationStyle } from "@/lib/cad-lab/illustration-styles"
+import {
+    analyseHeroBoundingBoxes,
+    cropModuleRegion,
+} from "@/app/(platform)/the-forge/services/image-generator"
+import type { Json } from "@/types/database.types"
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -80,7 +87,7 @@ export async function generateOneModuleImage(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url",
+                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url, subject",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -246,9 +253,49 @@ export async function generateOneModuleImage(
         }
 
         // Visual style is optional — if the project has one saved we pass
-        // it through for cross-module cohesion, otherwise the inner action
-        // falls back to its own default.
-        const rawStyle = project.visual_style as unknown
+        // it through for cross-module cohesion, otherwise we synthesise a
+        // minimum-viable VisualStyleSpec from project subject + modules so
+        // gpt-image-2 at least has a dimensional anchor (e.g. "40ft ISO
+        // container") instead of rendering modules with no context. The
+        // absence of visualStyle was one of four documented root causes for
+        // drift in the BESS 931e0220 forensic diagnosis — every module
+        // rendered as an untethered "LFP Battery Rack" with no enclosure.
+        let rawStyle = project.visual_style as unknown
+        if (!rawStyle || typeof rawStyle !== "object") {
+            const subject =
+                typeof project.subject === "string" ? project.subject : ""
+            const synthesized = buildMinimalVisualStyleFromProject(
+                subject,
+                modules,
+            )
+            if (synthesized) {
+                console.log(
+                    "[forge-v2-generate-one-module-image] visual_style was null; synthesised minimum spec from project subject.",
+                    { projectId, moduleId, subjectHead: subject.slice(0, 120) },
+                )
+                // Persist so sibling module renders (and subsequent full-chain
+                // runs) reuse the same anchor. Non-fatal on write failure —
+                // we still pass the in-memory spec to the current render.
+                const { error: styleSaveErr } = await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        visual_style: synthesized as unknown as Json,
+                    })
+                    .eq("id", projectId)
+                if (styleSaveErr) {
+                    console.error(
+                        "[forge-v2-generate-one-module-image] failed to persist synthesised visual_style:",
+                        {
+                            projectId,
+                            moduleId,
+                            error:
+                                styleSaveErr.message ?? String(styleSaveErr),
+                        },
+                    )
+                }
+                rawStyle = synthesized
+            }
+        }
         const visualStyle =
             rawStyle && typeof rawStyle === "object"
                 ? (rawStyle as Parameters<typeof generateCadLabSingleImageAction>[2])
@@ -271,34 +318,158 @@ export async function generateOneModuleImage(
         //     when the client passed base64 to a server action; here we
         //     fetch server-side so that limit doesn't apply.
         //
-        //     Non-critical: if the fetch fails (cover not yet rendered,
-        //     CDN hiccup, large file), fall through to a text-only
-        //     render. A module without a reference is still valid — we
-        //     just lose the palette-anchor benefit.
+        //     Fix 1 (2026-04-22): Always re-encode the PNG hero to JPEG-85.
+        //     The BESS 931e0220 forensic diagnosis traced image-drift to a
+        //     2.52 MB PNG hero hitting the old 1.2 MB cap → base64
+        //     undefined → every downstream coherence mechanism skipped
+        //     (edit-mode, Gemini multimodal, consistency-score retry,
+        //     bbox crop). sharp.jpeg({ quality: 85 }) gives 3-5x compression
+        //     so a fresh hero now lands well under every provider's limit.
+        //
+        //     Fix 4 (2026-04-22): warn → error with structured context so
+        //     silent drift never ships again — Vercel log search on "gate"
+        //     surfaces it immediately.
         let systemIllustrationRefBase64: string | undefined
+        let systemIllustrationRefMimeType: string | undefined
         const sysUrl = project.system_illustration_url
         if (typeof sysUrl === "string" && sysUrl.length > 0) {
             try {
                 const res = await fetch(sysUrl)
                 if (res.ok) {
-                    const buf = Buffer.from(await res.arrayBuffer())
-                    // Cap at ~1.5MB after base64 expansion — larger than
-                    // that and we risk blowing the provider's upload limit.
-                    // Gemini accepts multi-MB; OpenAI fallback is tighter.
-                    if (buf.length < 1_200_000) {
-                        systemIllustrationRefBase64 = buf.toString("base64")
+                    const pngBuf = Buffer.from(await res.arrayBuffer())
+                    // flatten({background:'#fff'}) composites alpha onto white
+                    // so the JPEG doesn't pick up the alpha channel as black,
+                    // matching the white background the prompt already asks for.
+                    const jpegBuf = await sharp(pngBuf)
+                        .flatten({ background: { r: 255, g: 255, b: 255 } })
+                        .jpeg({ quality: 85 })
+                        .toBuffer()
+                    // gpt-image-2 accepts up to 25 MB; OpenAI edit is tighter
+                    // at ~20 MB. A JPEG over 20 MB is pathological — bail to
+                    // text-only rather than throwing.
+                    if (jpegBuf.length >= 20_000_000) {
+                        console.error(
+                            "[forge-v2-generate-one-module-image] hero too large even after jpeg re-encode — text-only fallback",
+                            {
+                                projectId,
+                                moduleId,
+                                heroBytesPng: pngBuf.length,
+                                heroBytesJpeg: jpegBuf.length,
+                                gate: "hero-size-post-encode",
+                            },
+                        )
                     } else {
-                        console.warn(
-                            `[forge-v2-generate-one-module-image] system illustration too large ` +
-                                `(${buf.length} bytes) to use as reference for ${moduleId}; text-only fallback.`,
+                        systemIllustrationRefBase64 =
+                            jpegBuf.toString("base64")
+                        systemIllustrationRefMimeType = "image/jpeg"
+                        console.log(
+                            "[forge-v2-generate-one-module-image] hero re-encoded PNG→JPEG for reference",
+                            {
+                                projectId,
+                                moduleId,
+                                heroBytesPng: pngBuf.length,
+                                heroBytesJpeg: jpegBuf.length,
+                                compressionRatio: Number(
+                                    (pngBuf.length / jpegBuf.length).toFixed(2),
+                                ),
+                            },
                         )
                     }
+                } else {
+                    console.error(
+                        "[forge-v2-generate-one-module-image] hero fetch returned non-ok",
+                        {
+                            projectId,
+                            moduleId,
+                            status: res.status,
+                            gate: "hero-fetch-non-ok",
+                        },
+                    )
                 }
             } catch (err) {
-                console.warn(
-                    `[forge-v2-generate-one-module-image] failed to fetch system illustration ` +
-                        `as reference for ${moduleId}:`,
-                    err instanceof Error ? err.message : err,
+                console.error(
+                    "[forge-v2-generate-one-module-image] hero fetch/encode threw",
+                    {
+                        projectId,
+                        moduleId,
+                        gate: "hero-fetch-throw",
+                        error: err instanceof Error ? err.message : String(err),
+                    },
+                )
+            }
+        }
+
+        // Fix 2 (2026-04-22): bounding-box crop.
+        // When 2+ modules are being rendered and a hero is present, use
+        // Claude Vision to locate each module's region in the hero, then
+        // crop + upscale that region to 1024×1024 as IMAGE 2 for the
+        // multimodal render. This unlocks the `hasModuleCrop=true` branch
+        // in buildReferenceAwareModulePrompt() which tells the image model
+        // to "reproduce IMAGE 2's geometry exactly" — the tightest
+        // instruction the prompt chain supports.
+        //
+        // Cost: ~5s per module (bbox call) + ~1s (sharp crop). Accepted.
+        // On any failure (vision timeout, bbox missing, sharp error) we
+        // fall through to hero-only reference, which is still better than
+        // text-only.
+        let moduleCropBase64: string | undefined
+        if (
+            systemIllustrationRefBase64 &&
+            systemIllustrationRefMimeType &&
+            modules.length >= 2 &&
+            process.env.ANTHROPIC_API_KEY?.trim()
+        ) {
+            try {
+                const moduleNames = modules.map((m) => m.name)
+                const boxes = await analyseHeroBoundingBoxes(
+                    systemIllustrationRefBase64,
+                    moduleNames,
+                    systemIllustrationRefMimeType,
+                )
+                const box =
+                    boxes[target.name] ??
+                    // case-insensitive fallback — Claude sometimes returns
+                    // a title-cased variant of the supplied name.
+                    Object.entries(boxes).find(
+                        ([k]) =>
+                            k.trim().toLowerCase() ===
+                            target.name.trim().toLowerCase(),
+                    )?.[1]
+                if (box) {
+                    moduleCropBase64 = await cropModuleRegion(
+                        systemIllustrationRefBase64,
+                        box,
+                    )
+                    console.log(
+                        "[forge-v2-generate-one-module-image] module crop generated",
+                        {
+                            projectId,
+                            moduleId,
+                            moduleName: target.name,
+                            box,
+                        },
+                    )
+                } else {
+                    console.error(
+                        "[forge-v2-generate-one-module-image] no bbox found for module; hero-only reference",
+                        {
+                            projectId,
+                            moduleId,
+                            moduleName: target.name,
+                            availableBoxes: Object.keys(boxes),
+                            gate: "bbox-miss",
+                        },
+                    )
+                }
+            } catch (err) {
+                console.error(
+                    "[forge-v2-generate-one-module-image] bbox analysis / crop threw; hero-only reference",
+                    {
+                        projectId,
+                        moduleId,
+                        gate: "bbox-throw",
+                        error: err instanceof Error ? err.message : String(err),
+                    },
                 )
             }
         }
@@ -311,8 +482,9 @@ export async function generateOneModuleImage(
                 input,
                 visualStyle,
                 systemIllustrationRefBase64, // reference: cover sets the style
-                undefined, // moduleCropBase64
+                moduleCropBase64,
                 illustrationStyle,
+                systemIllustrationRefMimeType,
             )
         } catch (err) {
             console.error(
@@ -406,4 +578,59 @@ export async function generateOneModuleImage(
 
         return { ok: true, imageUrl: result.imageUrl }
     })
+}
+
+// ─── Minimum-viable VisualStyleSpec synthesis ─────────────────────────
+//
+// Fix 3 (2026-04-22): when cad_lab_projects.visual_style IS NULL the prompt
+// chain loses its dimensional anchor (productFormDescription), unifying
+// context, palette, and per-module geometry notes. The BESS 931e0220
+// diagnosis found gpt-image-2 rendering a bare "LFP Battery Rack" with no
+// container enclosure because the prompt had no hint the product is a
+// 40ft ISO container.
+//
+// The proper fix is Max's decomposition calling generateVisualStyleAction
+// (Claude Sonnet, ~1-2s) once the modules land. Until that wiring exists
+// OR when a legacy project is rendered without it, synthesise a minimum
+// spec deterministically from the subject + module names so renders have
+// SOMETHING to anchor on. Cheap (no API call), fires server-side once per
+// render chain (then persisted), and costs ~5 lines of extra prompt.
+function buildMinimalVisualStyleFromProject(
+    subject: string,
+    modules: CadLabModule[],
+): VisualStyleSpec | null {
+    const trimmedSubject = subject.trim()
+    if (!trimmedSubject) return null
+
+    // The first sentence of the project subject usually describes the overall
+    // product form — for BESS this is "40ft ISO container pre-fitted with LFP
+    // battery racks…". Using it verbatim gives the image model a dimensional
+    // anchor without us having to parse "shipping container" out of arbitrary
+    // free text.
+    const firstSentence =
+        trimmedSubject.split(/(?<=[.!?])\s+/)[0]?.slice(0, 400).trim() ||
+        trimmedSubject.slice(0, 400)
+
+    // Per-module geometry notes: one line per module describing it in the
+    // context of the overall product. Cheap but materially better than the
+    // default "draw a generic X" that happens without the map.
+    const moduleGeometryMap: Record<string, string> = {}
+    for (const m of modules) {
+        const purpose =
+            typeof m.purpose === "string" && m.purpose.trim().length > 0
+                ? ` — ${m.purpose.trim()}`
+                : ""
+        moduleGeometryMap[m.name] =
+            `${m.name}${purpose}. Render this sub-assembly in its correct position and proportion within the overall product form.`
+    }
+
+    return {
+        colorPalette:
+            "industrial steel blue, warm cool gray, brushed-aluminium silver, subtle copper/orange accent for active surfaces",
+        materialRendering:
+            "clean industrial engineering blueprint: thin uniform line weights, semi-realistic metal surfaces, soft specular highlights, matte composite / painted steel panels where appropriate",
+        unifyingContext: trimmedSubject.slice(0, 400),
+        productFormDescription: firstSentence,
+        moduleGeometryMap,
+    }
 }

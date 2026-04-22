@@ -186,6 +186,7 @@ export async function generateCadLabSingleImageAction(
   referenceBase64OrUrl?: string,
   moduleCropBase64?: string,
   illustrationStyle?: IllustrationStyle,
+  referenceMimeType?: string,
 ): Promise<ImageGenResult | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     // SECURITY: Block cross-foundry projectId — generateModuleImage writes to
@@ -253,6 +254,7 @@ export async function generateCadLabSingleImageAction(
         referenceBase64,
         moduleCropBase64,
         stylePreamble,
+        referenceMimeType,
       )
 
       return {
