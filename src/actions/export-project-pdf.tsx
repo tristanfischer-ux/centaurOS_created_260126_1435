@@ -6,10 +6,9 @@
  * @description Pulls every readable artefact on a V2 project (brief +
  * regulatory + modules + key parts + failure modes + unknowns + parts
  * table + BOM lines + per-module cost breakdown + Finn assumptions +
- * Fang / Jian / Max reviews + supplier match reasons + pipeline_runs
- * audit log + project audit log) and renders one long, properly
- * sectioned PDF. Intended to be the "put the kitchen sink in" board /
- * supplier / data-room pack.
+ * Fang / Jian / Max reviews + supplier match reasons + project audit
+ * log) and renders one long, properly sectioned PDF. Intended to be
+ * the "put the kitchen sink in" board / supplier / data-room pack.
  *
  * Design:
  *   - Cover page: brand bar + project title + revision + generated + ship state
@@ -24,7 +23,6 @@
  *   - Cost waterfall: unit cost + per-module + Finn's per-part breakdown
  *   - Risks register: every failure mode + every unknown, per module
  *   - Suppliers: each with match reasons + score breakdown + modules
- *   - Pipeline audit: every specialist run
  *   - Audit log: project audit rows
  *
  * @security withAuth + foundry check before every read. Never includes
@@ -391,26 +389,6 @@ interface SupplierPdf {
     rampRole: string | null
 }
 
-interface PipelineRunPdf {
-    specialist: string
-    stage: string
-    status: string
-    trigger: string | null
-    startedAtIso: string
-    durationSec: number | null
-    modelProvider: string | null
-    modelId: string | null
-    inputTokens: number | null
-    outputTokens: number | null
-    errorCode: string | null
-    errorMessage: string | null
-    /** From pipeline_runs.input_ref->>'moduleId'. Distinguishes per-module
-     *  specialists (Fang's module.review.fang fires once per module) so
-     *  the dedupe key doesn't collapse legitimate separate runs into one
-     *  row. Null for non-per-module stages. */
-    moduleId: string | null
-}
-
 interface AuditRowPdf {
     action: string
     section: string | null
@@ -451,7 +429,6 @@ interface PdfInput {
         perModule: Array<{ moduleName: string; totalGbp: number | null }>
     }
     suppliers: SupplierPdf[]
-    pipelineRuns: PipelineRunPdf[]
     auditLog: AuditRowPdf[]
     totals: {
         moduleCount: number
@@ -462,7 +439,6 @@ interface PdfInput {
         regulatoryCount: number
         supplierCount: number
         reviewCount: number
-        pipelineRunCount: number
     }
     /**
      * Source-attribution counts + freshness. Captured at export time so
@@ -481,21 +457,6 @@ interface PdfInput {
         bomModel: string
         bomProvider: string
     }
-    /**
-     * Model-usage breakdown across this project's pipeline runs. Feeds
-     * the "Which models did the work" section on the audit page so
-     * Tristan (and anyone else reading) can see the answer without
-     * having to read every audit row individually.
-     */
-    modelUsage: Array<{
-        provider: string
-        model: string
-        runCount: number
-        successCount: number
-        failCount: number
-        totalInputTokens: number | null
-        totalOutputTokens: number | null
-    }>
 }
 
 // ─── PDF Component ─────────────────────────────────────────────────────
@@ -596,8 +557,8 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                             <Text style={styles.statValue}>{data.totals.regulatoryCount}</Text>
                         </View>
                         <View style={styles.stat}>
-                            <Text style={styles.statLabel}>Specialist runs</Text>
-                            <Text style={styles.statValue}>{data.totals.pipelineRunCount}</Text>
+                            <Text style={styles.statLabel}>Reviews</Text>
+                            <Text style={styles.statValue}>{data.totals.reviewCount}</Text>
                         </View>
                     </View>
                     <View style={styles.statRow}>
@@ -616,10 +577,6 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                                     ? fmtGbp(data.cost.ceilingGbp - data.cost.unitTotalGbp)
                                     : "—"}
                             </Text>
-                        </View>
-                        <View style={styles.stat}>
-                            <Text style={styles.statLabel}>Reviews</Text>
-                            <Text style={styles.statValue}>{data.totals.reviewCount}</Text>
                         </View>
                     </View>
                 </View>
@@ -1251,272 +1208,10 @@ function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sourc
     )
 }
 
-/**
- * Normalise a provider + modelId pair to a single human-readable string.
- * pipeline_runs is populated by many call-sites and they don't agree on
- * casing / provider-prefix / model id shape. Tristan's feedback flagged
- * "OPUS 4.7" vs "Anthropic Claude OPUS 4.7" vs plain "Anthropic" in the
- * same audit. This function fixes that at render-time.
- */
-function normaliseModelLabel(
-    provider: string | null | undefined,
-    modelId: string | null | undefined,
-): string {
-    const p = (provider ?? "").trim()
-    // Treat null, empty string, and the string literal "unknown" all as
-    // model-not-recorded. Specialist actions that don't pass model_id back
-    // into pipeline_runs surface here; the normaliser must not display
-    // literal "unknown" as a distinct model bucket — that spawns fake
-    // duplicate rows in the audit summary.
-    const rawM = (modelId ?? "").trim()
-    const m = rawM.toLowerCase() === "unknown" ? "" : rawM
-    if (!p && !m) return "—"
-    const lower = `${p} ${m}`.toLowerCase()
-
-    if (lower.includes("claude") || lower.includes("anthropic")) {
-        // Match both wire-format ids (claude-opus-4-7) and the casual
-        // "Opus" / "Opus 4.7" labels some actions write today. Any
-        // mention of opus collapses to the canonical label.
-        if (
-            lower.includes("opus-4-7") ||
-            lower.includes("opus 4.7") ||
-            /\bopus\b/.test(lower)
-        ) {
-            return "Anthropic · Claude Opus 4.7"
-        }
-        if (
-            lower.includes("sonnet-4") ||
-            lower.includes("sonnet 4") ||
-            /\bsonnet\b/.test(lower)
-        ) {
-            return "Anthropic · Claude Sonnet 4"
-        }
-        if (
-            lower.includes("haiku-4") ||
-            lower.includes("haiku 4") ||
-            /\bhaiku\b/.test(lower)
-        ) {
-            return "Anthropic · Claude Haiku 4.5"
-        }
-        return m ? `Anthropic · ${m}` : "Anthropic · Claude"
-    }
-    if (lower.includes("deepseek")) {
-        if (lower.includes("v4") || lower.includes("-chat-v4")) {
-            return "DeepSeek · V4"
-        }
-        if (lower.includes("v3") || lower.includes("deepseek-chat")) {
-            return "DeepSeek · V3.2"
-        }
-        // Plain "deepseek" with no version — fold into the most-used
-        // tier so the audit doesn't split one provider into two
-        // buckets just because the action omitted a version string.
-        return m ? `DeepSeek · ${m}` : "DeepSeek · V3.2"
-    }
-    if (lower.includes("nano-banana") || lower.includes("nano banana")) {
-        return "Google · Gemini (Nano Banana)"
-    }
-    if (lower.includes("gemini") || lower.includes("google")) {
-        return m ? `Google · ${m}` : "Google · Gemini"
-    }
-    if (lower.includes("openai") || lower.includes("gpt-")) {
-        return m ? `OpenAI · ${m}` : "OpenAI"
-    }
-    if (lower.includes("stability") || lower.includes("sdxl") || lower.includes("stable-diff")) {
-        return m ? `Stability · ${m}` : "Stability"
-    }
-    if (lower.includes("flux") || lower.includes("replicate")) {
-        return m ? `Replicate · ${m}` : "Replicate"
-    }
-    // Fallback: render whatever we got, cleanly joined.
-    return [p, m].filter(Boolean).join(" · ")
-}
-
-/**
- * Dedupe pipeline_runs so that retried (specialist, stage) keys surface
- * as one row — the latest status wins. The count of earlier failed
- * attempts is attached so the audit still signals reliability.
- *
- * Tristan's feedback: "Finance-lead `failed` rows appear before the
- * final `done` row. Since Tristan retried and it succeeded, hide or
- * de-duplicate the earlier failures."
- */
-function dedupePipelineRuns(runs: PipelineRunPdf[]): Array<
-    PipelineRunPdf & { earlierAttempts: number }
-> {
-    // Assume input is already ordered by started_at asc (the data loader
-    // sorts it that way). Keep the LAST entry per (specialist, stage,
-    // moduleId). Including moduleId is critical for per-module
-    // specialists — Fang runs once per reviewed module, and without the
-    // module key all reviews collapse into one audit row.
-    const bucket = new Map<string, { last: PipelineRunPdf; earlierFails: number }>()
-    for (const r of runs) {
-        const key = `${r.specialist}::${r.stage}::${r.moduleId ?? ""}`
-        const prev = bucket.get(key)
-        if (!prev) {
-            bucket.set(key, { last: r, earlierFails: 0 })
-        } else {
-            const earlierFails = prev.earlierFails + (prev.last.status === "failed" ? 1 : 0)
-            bucket.set(key, { last: r, earlierFails })
-        }
-    }
-    // Re-sort by the last-attempt startedAtIso to preserve chronological
-    // flow in the table.
-    return Array.from(bucket.values())
-        .map((b) => ({ ...b.last, earlierAttempts: b.earlierFails }))
-        .sort((a, b) => {
-            const ta = new Date(a.startedAtIso).getTime()
-            const tb = new Date(b.startedAtIso).getTime()
-            return ta - tb
-        })
-}
-
-function PipelineAuditPage({
-    runs,
-    modelUsage,
-}: {
-    runs: PipelineRunPdf[]
-    modelUsage: PdfInput["modelUsage"]
-}): React.ReactElement {
-    const deduped = dedupePipelineRuns(runs)
-    const hiddenFailures = runs.length - deduped.length
-    return (
-        <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>8. Specialist-run audit ({deduped.length})</Text>
-            <Text style={styles.muted}>
-                Every pipeline orchestrator call against this project — who ran, when,
-                how long, model used, tokens, and any error. Retried (specialist,
-                stage) pairs are deduped to the latest attempt; earlier failures are
-                counted inline.
-                {hiddenFailures > 0
-                    ? ` ${hiddenFailures} earlier retried attempt${hiddenFailures === 1 ? "" : "s"} collapsed into the rows below.`
-                    : ""}
-            </Text>
-
-            {/* Multi-model audit — answers "which models did the work". */}
-            {modelUsage.length > 0 && (
-                <View style={{ marginTop: 10 }} wrap={false}>
-                    <Text style={styles.h5}>Models used on this project</Text>
-                    <View style={styles.table}>
-                        <View style={styles.tableHead}>
-                            <Text style={[styles.tableHeadCell, { flex: 2.2 }]}>Model</Text>
-                            <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Runs</Text>
-                            <Text style={[styles.tableHeadCell, { width: 70, textAlign: "right" }]}>Success</Text>
-                            <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Fail</Text>
-                        </View>
-                        {modelUsage.map((u, i) => (
-                            <View key={i} style={styles.tableRow} wrap={false}>
-                                <Text style={[styles.tableCell, { flex: 2.2 }]}>
-                                    {u.provider}
-                                </Text>
-                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{u.runCount}</Text>
-                                <Text style={[styles.tableCell, { width: 70, textAlign: "right" }]}>{u.successCount}</Text>
-                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{u.failCount}</Text>
-                            </View>
-                        ))}
-                    </View>
-                </View>
-            )}
-
-            <Text style={[styles.h5, { marginTop: 12 }]}>Run-by-run log</Text>
-            <View style={[styles.table, { marginTop: 4 }]}>
-                <View style={styles.tableHead}>
-                    <Text style={[styles.tableHeadCell, { flex: 1.3 }]}>Specialist</Text>
-                    <Text style={[styles.tableHeadCell, { flex: 1.4 }]}>Stage</Text>
-                    <Text style={[styles.tableHeadCell, { width: 56 }]}>Status</Text>
-                    <Text style={[styles.tableHeadCell, { width: 90 }]}>Started</Text>
-                    <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>
-                        Duration
-                    </Text>
-                    <Text style={[styles.tableHeadCell, { flex: 1.4 }]}>Model</Text>
-                </View>
-                {deduped.map((r, i) => {
-                    const role = specialistRole(r.specialist)
-                    return (
-                    <View key={i} style={styles.tableRow} wrap={false}>
-                        <Text style={[styles.tableCell, { flex: 1.3 }]}>
-                            {r.specialist}
-                            {role ? (
-                                <Text style={{ color: MUTED, fontSize: 7.5 }}>{"\n"}{role} · specialist AI</Text>
-                            ) : null}
-                        </Text>
-                        <Text style={[styles.tableCell, { flex: 1.4 }]}>
-                            {r.stage}
-                            {r.moduleId ? (
-                                <Text style={{ color: MUTED, fontSize: 7.5 }}>{"\n"}module: {r.moduleId}</Text>
-                            ) : null}
-                        </Text>
-                        <Text style={[styles.tableCell, { width: 56 }]}>
-                            {r.status}
-                            {r.errorCode ? ` (${r.errorCode})` : ""}
-                            {r.earlierAttempts > 0 ? (
-                                <Text style={{ color: MUTED, fontSize: 7.5 }}>{"\n"}after {r.earlierAttempts} retry{r.earlierAttempts === 1 ? "" : "s"}</Text>
-                            ) : null}
-                        </Text>
-                        <Text style={[styles.tableCell, { width: 90 }]}>
-                            {fmtDateTime(r.startedAtIso)}
-                        </Text>
-                        <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>
-                            {fmtDuration(r.durationSec)}
-                        </Text>
-                        <Text style={[styles.tableCell, { flex: 1.4 }]}>
-                            {normaliseModelLabel(r.modelProvider, r.modelId)}
-                        </Text>
-                    </View>
-                    )
-                })}
-            </View>
-            {(() => {
-                // Only surface errors whose (specialist, stage, moduleId)
-                // triplet did NOT ultimately succeed on a retry. If a
-                // finance-lead cost.estimate failed once then succeeded,
-                // the earlier error is noise — the audit row already
-                // carries an "after 1 retry" tag.
-                const latestStatusByKey = new Map<string, string>()
-                for (const r of runs) {
-                    const key = `${r.specialist}::${r.stage}::${r.moduleId ?? ""}`
-                    latestStatusByKey.set(key, r.status)
-                }
-                const unresolvedErrors = runs.filter((r) => {
-                    if (!r.errorMessage) return false
-                    const key = `${r.specialist}::${r.stage}::${r.moduleId ?? ""}`
-                    return latestStatusByKey.get(key) !== "done"
-                })
-                if (unresolvedErrors.length === 0) return null
-                return (
-                    <View style={{ marginTop: 10 }}>
-                        <Text style={styles.h5}>Unresolved errors</Text>
-                        <Text style={[styles.muted, { fontSize: 8.5, marginBottom: 4 }]}>
-                            Errors from attempts that never succeeded on a
-                            retry. Errors from retried-then-succeeded runs
-                            are already indicated inline on the relevant
-                            row above.
-                        </Text>
-                        {unresolvedErrors.map((r, i) => (
-                            <View key={i} style={{ marginBottom: 4 }}>
-                                <Text style={{ fontSize: 9 }}>
-                                    <Text style={{ fontWeight: "bold" }}>
-                                        {r.specialist} · {r.stage}
-                                        {r.moduleId ? ` · ${r.moduleId}` : ""}
-                                        {" · "}{fmtDateTime(r.startedAtIso)}:{" "}
-                                    </Text>
-                                    {r.errorMessage}
-                                </Text>
-                            </View>
-                        ))}
-                    </View>
-                )
-            })()}
-            <Text style={styles.footer} fixed>
-                <Text>Specialist audit</Text>
-            </Text>
-        </Page>
-    )
-}
-
 function AuditLogPage({ rows }: { rows: AuditRowPdf[] }): React.ReactElement {
     return (
         <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>9. Project audit log ({rows.length})</Text>
+            <Text style={styles.h2}>8. Project audit log ({rows.length})</Text>
             <Text style={styles.muted}>
                 Actions recorded against this project — brief lock, ship, other auditable
                 mutations.
@@ -1554,8 +1249,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
         "5. Cost waterfall",
         "6. Risks register",
         "7. Supplier shortlist",
-        "8. Specialist-run audit",
-        "9. Project audit log",
+        "8. Project audit log",
     ]
     return (
         <Document>
@@ -1591,10 +1285,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             {/* 7. Suppliers */}
             <SuppliersPage suppliers={data.suppliers} sources={data.sources} />
 
-            {/* 8. Pipeline audit */}
-            <PipelineAuditPage runs={data.pipelineRuns} modelUsage={data.modelUsage} />
-
-            {/* 9. Audit log */}
+            {/* 8. Audit log */}
             <AuditLogPage rows={data.auditLog} />
         </Document>
     )
@@ -1859,58 +1550,6 @@ export async function exportProjectPdf(
             rampRole: typeof r.ramp_role === "string" ? r.ramp_role : null,
         }))
 
-        // Pipeline runs audit. input_ref is joined so per-module
-        // specialists (Fang runs once per module) can be kept as
-        // separate audit rows instead of collapsing under a single
-        // (specialist, stage) dedupe key.
-        const { data: runsRaw } = await admin
-            .from("pipeline_runs")
-            .select(
-                "specialist_id, stage, status, trigger, started_at, finished_at, model_provider, model_id, input_tokens, output_tokens, error_code, error_message, input_ref",
-            )
-            .eq("project_id", projectId)
-            .order("started_at", { ascending: true })
-
-        const pipelineRuns: PipelineRunPdf[] = (runsRaw ?? []).map((r) => {
-            const startIso = String(r.started_at ?? "")
-            const finIso = r.finished_at ? String(r.finished_at) : null
-            let durationSec: number | null = null
-            if (startIso && finIso) {
-                const start = new Date(startIso).getTime()
-                const fin = new Date(finIso).getTime()
-                if (!Number.isNaN(start) && !Number.isNaN(fin)) {
-                    durationSec = (fin - start) / 1000
-                }
-            }
-            // Extract moduleId from input_ref so per-module specialists
-            // (Fang) keep each module's review as a distinct audit row.
-            let moduleId: string | null = null
-            const inputRef = r.input_ref as unknown
-            if (inputRef && typeof inputRef === "object") {
-                const mid = (inputRef as Record<string, unknown>).moduleId
-                if (typeof mid === "string" && mid.length > 0) moduleId = mid
-            }
-            return {
-                specialist: String(r.specialist_id ?? ""),
-                stage: String(r.stage ?? ""),
-                status: String(r.status ?? ""),
-                trigger: typeof r.trigger === "string" ? r.trigger : null,
-                startedAtIso: startIso,
-                durationSec,
-                modelProvider:
-                    typeof r.model_provider === "string" ? r.model_provider : null,
-                modelId: typeof r.model_id === "string" ? r.model_id : null,
-                inputTokens:
-                    typeof r.input_tokens === "number" ? r.input_tokens : null,
-                outputTokens:
-                    typeof r.output_tokens === "number" ? r.output_tokens : null,
-                errorCode: typeof r.error_code === "string" ? r.error_code : null,
-                errorMessage:
-                    typeof r.error_message === "string" ? r.error_message : null,
-                moduleId,
-            }
-        })
-
         // Source-attribution counts — so the PDF can tell the reader
         // how much reference data the specialists drew on when they
         // generated costs / BOM / supplier picks. Queried in parallel to
@@ -1965,68 +1604,6 @@ export async function exportProjectPdf(
             bomModel: "Claude Opus 4.7",
             bomProvider: "Anthropic",
         }
-
-        // Model-usage breakdown — groups runs by the NORMALISED model
-        // label, not the raw (provider, modelId) pair. Raw pairs leak
-        // label drift ("Anthropic" + "Opus" vs "Anthropic" + "Claude
-        // Opus 4.7" vs "Anthropic" + null) into the audit as separate
-        // rows for the same model. Keying by normaliseModelLabel folds
-        // those together.
-        const modelUsageMap = new Map<
-            string,
-            {
-                label: string
-                runCount: number
-                successCount: number
-                failCount: number
-                totalInputTokens: number
-                totalOutputTokens: number
-                anyInput: boolean
-                anyOutput: boolean
-            }
-        >()
-        for (const r of pipelineRuns) {
-            const label = normaliseModelLabel(r.modelProvider, r.modelId)
-            const row = modelUsageMap.get(label) ?? {
-                label,
-                runCount: 0,
-                successCount: 0,
-                failCount: 0,
-                totalInputTokens: 0,
-                totalOutputTokens: 0,
-                anyInput: false,
-                anyOutput: false,
-            }
-            row.runCount += 1
-            if (r.status === "done") row.successCount += 1
-            if (r.status === "failed") row.failCount += 1
-            if (typeof r.inputTokens === "number") {
-                row.totalInputTokens += r.inputTokens
-                row.anyInput = true
-            }
-            if (typeof r.outputTokens === "number") {
-                row.totalOutputTokens += r.outputTokens
-                row.anyOutput = true
-            }
-            modelUsageMap.set(label, row)
-        }
-        const modelUsage: PdfInput["modelUsage"] = Array.from(
-            modelUsageMap.values(),
-        )
-            .sort((a, b) => b.runCount - a.runCount)
-            .map((r) => ({
-                // Store the canonical label on both fields so downstream
-                // rendering continues to read `.provider` + `.model`
-                // unchanged. Splitting back out on "·" is unreliable
-                // (some labels like "DeepSeek" have no separator).
-                provider: r.label,
-                model: "",
-                runCount: r.runCount,
-                successCount: r.successCount,
-                failCount: r.failCount,
-                totalInputTokens: r.anyInput ? r.totalInputTokens : null,
-                totalOutputTokens: r.anyOutput ? r.totalOutputTokens : null,
-            }))
 
         // Audit log rows.
         const { data: auditRowsRaw } = await admin
@@ -2129,7 +1706,6 @@ export async function exportProjectPdf(
                         : null,
             },
             suppliers,
-            pipelineRuns,
             auditLog,
             totals: {
                 moduleCount: modules.length,
@@ -2140,10 +1716,8 @@ export async function exportProjectPdf(
                 regulatoryCount: regulatory.length,
                 supplierCount: suppliers.length,
                 reviewCount,
-                pipelineRunCount: pipelineRuns.length,
             },
             sources,
-            modelUsage,
         }
 
         try {
