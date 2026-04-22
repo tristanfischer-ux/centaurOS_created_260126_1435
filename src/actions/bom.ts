@@ -345,39 +345,70 @@ export async function skeletonBom(
   designBrief?: CadLabDesignBrief,
   diagnosticAnswers?: DiagnosticAnswers,
 ): Promise<BomSkeletonResult> {
-  return withAIGate('bom', async ({ supabase }) => {
-    if (!modules.length) {
-      return { success: false, error: "No modules to generate BOM from", parts: [], bomLines: [] }
+  return withAIGate('bom', async () => {
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    if (!apiKey) {
+      return { success: false, error: "Anthropic API key not configured", parts: [], bomLines: [] }
     }
+    return skeletonBomInternal(projectId, modules, apiKey, designBrief, diagnosticAnswers)
+  })
+}
 
-    const { data: project, error: projErr } = await supabase
-      .from("cad_lab_projects")
-      .select("id, subject")
-      .eq("id", projectId)
-      .single()
+/**
+ * Internal, cookie-free skeleton generator. Identical behaviour to
+ * `skeletonBom` but requires the caller to pass `apiKey` and performs the
+ * project lookup via `createAdminClient()`.
+ *
+ * INTENT: Stage runners (`runBomSkeletonStage`) execute inside `after()`
+ * post-response containers where cookies from `next/headers` are no longer
+ * available. `withAIGate` calls `withAuth` which reads those cookies, so
+ * stages cannot go through the gated public variant. Auth + budget checks
+ * happen once in `runBomGenerator` before the stage chain starts; per-stage
+ * usage tracking is deliberately deferred (see the TODO in the stage body).
+ *
+ * TODO: track usage via admin-variant of trackAIUsage once the stage pattern
+ * is proven.
+ */
+async function skeletonBomInternal(
+  projectId: string,
+  modules: CadLabModule[],
+  apiKey: string,
+  designBrief?: CadLabDesignBrief,
+  diagnosticAnswers?: DiagnosticAnswers,
+): Promise<BomSkeletonResult> {
+  if (!modules.length) {
+    return { success: false, error: "No modules to generate BOM from", parts: [], bomLines: [] }
+  }
 
-    if (projErr || !project) {
-      return { success: false, error: "Project not found", parts: [], bomLines: [] }
-    }
+  const admin = createAdminClient()
+  const { data: project, error: projErr } = await admin
+    .from("cad_lab_projects")
+    .select("id, subject")
+    .eq("id", projectId)
+    .single()
 
-    const moduleDescriptions = modules.map((m) => {
-      const diagInfo = diagnosticAnswers?.[m.id]
-        ? `\nDiagnostic answers: ${JSON.stringify(diagnosticAnswers[m.id])}`
-        : ""
-      return `## Module: ${truncate(m.name, 100)} (id: ${truncate(m.id, 50)})
+  if (projErr || !project) {
+    return { success: false, error: "Project not found", parts: [], bomLines: [] }
+  }
+
+  const moduleDescriptions = modules.map((m) => {
+    const diagInfo = diagnosticAnswers?.[m.id]
+      ? `\nDiagnostic answers: ${JSON.stringify(diagnosticAnswers[m.id])}`
+      : ""
+    return `## Module: ${truncate(m.name, 100)} (id: ${truncate(m.id, 50)})
 Purpose: ${truncate(m.purpose, MAX_PROMPT_FIELD_LENGTH)}
 Key Parts: ${m.keyParts.map((p) => truncate(p, 100)).join(", ")}
 Description: ${truncate(m.description, MAX_PROMPT_FIELD_LENGTH)}${diagInfo}`
-    }).join("\n\n")
+  }).join("\n\n")
 
-    const briefContext = designBrief
-      ? `\n\nDesign Brief:
+  const briefContext = designBrief
+    ? `\n\nDesign Brief:
 - Use case: ${truncate(designBrief.useCase, 200) || "not specified"}
 - Target process: ${truncate(designBrief.targetProcess, 100) || "not specified"}
 - Target material: ${truncate(designBrief.targetMaterial, 100) || "not specified"}`
-      : ""
+    : ""
 
-    const systemPrompt = `You are a manufacturing engineer creating a Bill of Materials skeleton from product module decomposition data.
+  const systemPrompt = `You are a manufacturing engineer creating a Bill of Materials skeleton from product module decomposition data.
 
 Your task (SKELETON ONLY — no detailed specs):
 1. Expand each module's keyParts into named parts with a manufacturing process type
@@ -405,73 +436,77 @@ Respond with ONLY valid JSON:
   ]
 }`
 
-    const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
+  const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      return { success: false, error: "Anthropic API key not configured", parts: [], bomLines: [] }
-    }
+  const Anthropic = (await import("@anthropic-ai/sdk")).default
+  const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
-
-    const response = await client.messages.create({
+  let response
+  try {
+    response = await client.messages.create({
       model: BOM_MODEL,
       max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     })
-
-    const textBlock = response.content.find((b) => b.type === "text")
-    if (!textBlock || textBlock.type !== "text") {
-      return { success: false, error: "No text response from Claude", parts: [], bomLines: [] }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Anthropic request failed",
+      parts: [],
+      bomLines: [],
     }
+  }
 
-    const jsonStr = extractJson(textBlock.text)
-    const parsed = tryParseJsonWithRepair<{
-      parts: Array<Record<string, unknown>>
-      bomLines: Array<Record<string, unknown>>
-    }>(jsonStr)
+  const textBlock = response.content.find((b) => b.type === "text")
+  if (!textBlock || textBlock.type !== "text") {
+    return { success: false, error: "No text response from Claude", parts: [], bomLines: [] }
+  }
 
-    if (!parsed) {
-      console.error("[skeletonBom] Failed to parse AI response (even with repair):", jsonStr.slice(0, 200))
-      return { success: false, error: "Failed to parse skeleton response", parts: [], bomLines: [] }
+  const jsonStr = extractJson(textBlock.text)
+  const parsed = tryParseJsonWithRepair<{
+    parts: Array<Record<string, unknown>>
+    bomLines: Array<Record<string, unknown>>
+  }>(jsonStr)
+
+  if (!parsed) {
+    console.error("[skeletonBomInternal] Failed to parse AI response (even with repair):", jsonStr.slice(0, 200))
+    return { success: false, error: "Failed to parse skeleton response", parts: [], bomLines: [] }
+  }
+
+  if (!Array.isArray(parsed.parts) || !parsed.parts.length) {
+    return { success: false, error: "No parts in skeleton", parts: [], bomLines: [] }
+  }
+
+  // Validate skeleton parts
+  const skeletonParts: SkeletonPart[] = parsed.parts.map((p) => ({
+    partNumber: truncate(String(p.partNumber ?? ""), 50),
+    name: truncate(String(p.name ?? ""), 200),
+    sourceModuleId: truncate(String(p.sourceModuleId ?? ""), 50),
+    process: validateProcess(p.process) ?? "other",
+    isPurchased: Boolean(p.isPurchased),
+    parentPartNumber: p.parentPartNumber ? truncate(String(p.parentPartNumber), 50) : null,
+  }))
+
+  // Check for duplicate part numbers
+  const partNumbers = new Set<string>()
+  for (const p of skeletonParts) {
+    if (!p.partNumber) {
+      return { success: false, error: "Skeleton part missing part number", parts: [], bomLines: [] }
     }
-
-    if (!Array.isArray(parsed.parts) || !parsed.parts.length) {
-      return { success: false, error: "No parts in skeleton", parts: [], bomLines: [] }
+    if (partNumbers.has(p.partNumber)) {
+      return { success: false, error: `Duplicate skeleton part: ${p.partNumber}`, parts: [], bomLines: [] }
     }
+    partNumbers.add(p.partNumber)
+  }
 
-    // Validate skeleton parts
-    const skeletonParts: SkeletonPart[] = parsed.parts.map((p) => ({
-      partNumber: truncate(String(p.partNumber ?? ""), 50),
-      name: truncate(String(p.name ?? ""), 200),
-      sourceModuleId: truncate(String(p.sourceModuleId ?? ""), 50),
-      process: validateProcess(p.process) ?? "other",
-      isPurchased: Boolean(p.isPurchased),
-      parentPartNumber: p.parentPartNumber ? truncate(String(p.parentPartNumber), 50) : null,
-    }))
+  const bomLines = (parsed.bomLines ?? []).map((bl) => ({
+    parentPartNumber: bl.parentPartNumber ? truncate(String(bl.parentPartNumber), 50) : null,
+    childPartNumber: truncate(String(bl.childPartNumber ?? ""), 50),
+    quantity: typeof bl.quantity === "number" && bl.quantity > 0 ? Math.round(bl.quantity) : 1,
+  }))
 
-    // Check for duplicate part numbers
-    const partNumbers = new Set<string>()
-    for (const p of skeletonParts) {
-      if (!p.partNumber) {
-        return { success: false, error: "Skeleton part missing part number", parts: [], bomLines: [] }
-      }
-      if (partNumbers.has(p.partNumber)) {
-        return { success: false, error: `Duplicate skeleton part: ${p.partNumber}`, parts: [], bomLines: [] }
-      }
-      partNumbers.add(p.partNumber)
-    }
-
-    const bomLines = (parsed.bomLines ?? []).map((bl) => ({
-      parentPartNumber: bl.parentPartNumber ? truncate(String(bl.parentPartNumber), 50) : null,
-      childPartNumber: truncate(String(bl.childPartNumber ?? ""), 50),
-      quantity: typeof bl.quantity === "number" && bl.quantity > 0 ? Math.round(bl.quantity) : 1,
-    }))
-
-    return { success: true, parts: skeletonParts, bomLines }
-  })
+  return { success: true, parts: skeletonParts, bomLines }
 }
 
 // ─── Progressive BOM: Phase 2 — Expand Specs ───────────────────────
@@ -1677,16 +1712,35 @@ export async function runBomSkeletonStage(projectId: string): Promise<void> {
     return
   }
 
-  // Run the skeleton call. `skeletonBom` wraps itself in withAIGate — cookie
-  // context is still available inside the first-stage `after()` because the
-  // same request container is alive; for deeper chains Next.js preserves
-  // request-scoped state across after() invocations (same pattern as
-  // forge-v2-render-all-modules.ts).
+  // GOTCHA: Stages run inside `after()` post-response containers where the
+  // cookie store from `next/headers` is no longer available. The public
+  // `skeletonBom` wraps itself in `withAIGate` → `withAuth`, which reads
+  // cookies and throws silently when they're missing — symptom was fresh
+  // BESS projects with `bom_generation_state.started_at` set but
+  // `skeleton_parts` never populated. We call the cookie-free internal
+  // variant with an explicit apiKey and the admin Supabase client instead.
+  // Auth + limit enforcement happens once in `runBomGenerator` before the
+  // stage chain starts; per-call usage tracking is deferred.
+  //
+  // TODO: track usage via admin-variant of trackAIUsage once the stage
+  // pattern is proven.
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!apiKey) {
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "NO_API_KEY",
+      "Anthropic API key not configured.",
+    )
+    return
+  }
+
   let skeleton
   try {
-    skeleton = await skeletonBom(
+    skeleton = await skeletonBomInternal(
       projectId,
       modules,
+      apiKey,
       designBrief,
       diagnosticAnswers,
     )
@@ -1796,6 +1850,14 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
   // than persisted in state — fetchCatalogueForPrompt is a DB read (cheap),
   // extractSearchKeywords is local-only, and keeping the state jsonb small
   // matters when it's written on every stage transition.
+  //
+  // GOTCHA: Stage runs inside `after()` post-response containers — no cookies
+  // from `next/headers` are available, so we never call `withAIGate`/`withAuth`
+  // here. Auth + budget are verified once in `runBomGenerator` before the chain
+  // starts. Per-batch usage tracking is deferred.
+  //
+  // TODO: track usage via admin-variant of trackAIUsage once the stage pattern
+  // is proven.
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     await recordBomStageFailure(
@@ -1904,6 +1966,11 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
  * the behaviour of the original monolithic `runBomGenerator` return path.
  */
 export async function runBomMergeStage(projectId: string): Promise<void> {
+  // GOTCHA: Like the other two stages, this runs inside an `after()`
+  // post-response container where `next/headers` cookies are unavailable.
+  // Merge has no AI calls, but it intentionally uses `createAdminClient()`
+  // end-to-end (via loadBomGenerationState / persistBomGenerationState and
+  // the direct admin client below) rather than any cookie-backed helper.
   const loaded = await loadBomGenerationState(projectId)
   if (!loaded) return
   const { state } = loaded
