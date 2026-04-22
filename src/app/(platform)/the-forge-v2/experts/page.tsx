@@ -1,16 +1,26 @@
 /**
  * @file experts/page.tsx — /the-forge-v2/experts
  *
- * @description Cross-project Experts roster. Lists the 13 in-product AI
- * specialists (from SPECIALISTS in @/lib/agents/specialists-config) plus
- * any fractional-executive profiles in the current foundry. Each card
- * links to the Expert profile drill-in at /the-forge-v2/experts/[id].
+ * @description Cross-project Experts roster. Renders TWO clearly-labelled
+ * groups:
+ *
+ *   1. "AI Specialists (13)" — the always-on in-product specialists
+ *      (from SPECIALISTS in @/lib/agents/specialists-config).
+ *   2. "Fractional Executives" — real humans who have opted in to being
+ *      listed as fractional executives on the Fractional Forge network
+ *      (profiles.is_fractional_executive = true). Data source is
+ *      network-wide, not limited to the caller's foundry, because the
+ *      whole point of fractional executives is cross-foundry hiring.
+ *
+ * Each card links to the profile drill-in at /the-forge-v2/experts/[id].
  *
  * Mockup reference: FORGE-MOCKUP-EXPERTS.html.
  *
  * @related
  * - Data (specialists): @/lib/agents/specialists-config
- * - Data (fractional execs): foundry profiles with role = 'Executive'
+ * - Data (fractional execs):
+ *     profiles.is_fractional_executive (opt-in flag, added 2026-04-16)
+ *     joined with provider_profiles (headline, day_rate, availability)
  * - Shell: ../_components/workspace-shell
  */
 
@@ -24,6 +34,7 @@ import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 import { WorkspaceShell } from "../_components/workspace-shell"
@@ -33,53 +44,103 @@ export const dynamic = "force-dynamic"
 export async function generateMetadata(): Promise<Metadata> {
     return {
         title: "Experts · The Forge",
-        description: "In-product specialists and fractional executives available to your foundry.",
+        description: "AI specialists and fractional executives available on Fractional Forge.",
     }
 }
 
 // ─── Fractional exec model ────────────────────────────────────────
 
+type FractionalExecStatus = "available" | "joining-soon"
+
 interface FractionalExec {
     id: string
     name: string
-    email: string | null
-    role: string
+    headline: string | null
+    dayRate: number | null
+    currency: string | null
+    status: FractionalExecStatus
 }
 
 /**
- * Loads the caller's foundry profiles with role 'Executive'. Returns an
- * empty array on any failure (no foundry resolved, RLS blocks, query
- * error) so the roster page can still render gracefully.
+ * Status rules:
+ *   - "available"   — provider_profiles exists AND is_active=true AND
+ *                     is_public=true AND out_of_office=false
+ *   - "joining-soon" — otherwise (opted in via flag, not yet active/public)
+ */
+function deriveStatus(pp: {
+    is_active?: boolean | null
+    is_public?: boolean | null
+    out_of_office?: boolean | null
+} | null): FractionalExecStatus {
+    if (!pp) return "joining-soon"
+    const active = pp.is_active === true
+    const pub = pp.is_public === true
+    const ooo = pp.out_of_office === true
+    return active && pub && !ooo ? "available" : "joining-soon"
+}
+
+/**
+ * Loads ALL opted-in fractional executives across the Fractional Forge
+ * network (not scoped to the caller's foundry — the whole point is
+ * cross-foundry visibility). Returns [] on any failure so the roster
+ * page still renders gracefully.
  */
 async function loadFractionalExecs(): Promise<FractionalExec[]> {
     try {
         const supabase = await createClient()
-        const { data: authData } = await supabase.auth.getUser()
-        const userId = authData.user?.id
-        if (!userId) return []
-
-        const { data: me } = await supabase
-            .from("profiles")
-            .select("foundry_id")
-            .eq("id", userId)
-            .maybeSingle()
-        const foundryId = (me as { foundry_id?: string | null } | null)?.foundry_id
-        if (!foundryId) return []
 
         const { data: rows } = await supabase
             .from("profiles")
-            .select("id, full_name, email, role")
-            .eq("foundry_id", foundryId)
-            .eq("role", "Executive")
+            .select(
+                "id, full_name, email, headline, provider_profiles(is_active, is_public, out_of_office, headline, day_rate, currency)",
+            )
+            .eq("is_fractional_executive", true)
+            .eq("is_active", true)
+            .limit(100)
 
         if (!rows) return []
-        return rows.map(r => {
-            const rec = r as { id: string; full_name: string | null; email: string | null; role: string }
+
+        type Row = {
+            id: string
+            full_name: string | null
+            email: string | null
+            headline: string | null
+            provider_profiles:
+                | {
+                      is_active: boolean | null
+                      is_public: boolean | null
+                      out_of_office: boolean | null
+                      headline: string | null
+                      day_rate: number | null
+                      currency: string | null
+                  }
+                | Array<{
+                      is_active: boolean | null
+                      is_public: boolean | null
+                      out_of_office: boolean | null
+                      headline: string | null
+                      day_rate: number | null
+                      currency: string | null
+                  }>
+                | null
+        }
+
+        return (rows as Row[]).map(r => {
+            // Supabase returns embedded relations as array for 1:many, object for 1:1.
+            // provider_profiles.user_id is unique per user, so at most one row —
+            // normalise both shapes to the single object we want.
+            const pp = Array.isArray(r.provider_profiles)
+                ? r.provider_profiles[0] ?? null
+                : r.provider_profiles
             return {
-                id: rec.id,
-                name: rec.full_name?.trim() || (rec.email ? rec.email.split("@")[0] : "Fractional Executive"),
-                email: rec.email,
-                role: rec.role,
+                id: r.id,
+                name:
+                    r.full_name?.trim() ||
+                    (r.email ? r.email.split("@")[0] : "Fractional Executive"),
+                headline: pp?.headline?.trim() || r.headline?.trim() || null,
+                dayRate: pp?.day_rate ?? null,
+                currency: pp?.currency ?? null,
+                status: deriveStatus(pp),
             }
         })
     } catch {
@@ -89,6 +150,21 @@ async function loadFractionalExecs(): Promise<FractionalExec[]> {
 
 export default async function ForgeV2ExpertsPage(): Promise<React.ReactNode> {
     const execs = await loadFractionalExecs()
+    const availableCount = execs.filter(e => e.status === "available").length
+
+    // Copy shown under the section header varies by how many real execs
+    // are on the network — small numbers get an honest "growing" line
+    // rather than silently rendering a near-empty grid.
+    const execsSubhead =
+        execs.length === 0
+            ? null
+            : execs.length < 5
+            ? `Our fractional exec roster is growing — ${execs.length} onboarded so far${
+                  availableCount > 0 ? `, ${availableCount} available now` : ""
+              }.`
+            : `${execs.length} on the network${
+                  availableCount > 0 ? ` · ${availableCount} available now` : ""
+              }.`
 
     return (
         <WorkspaceShell
@@ -96,7 +172,7 @@ export default async function ForgeV2ExpertsPage(): Promise<React.ReactNode> {
                 { label: "Workspace", href: "/the-forge-v2" },
                 { label: "Experts" },
             ]}
-            subtitle="13 in-product specialists · fractional executives from your foundry"
+            subtitle="Your bench of AI specialists and fractional executives"
         >
             {/* Summary strip */}
             <Card className="rounded-xl border border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.03]">
@@ -109,9 +185,18 @@ export default async function ForgeV2ExpertsPage(): Promise<React.ReactNode> {
                             Your bench
                         </p>
                         <p className="text-sm text-foreground leading-relaxed">
-                            <strong className="font-semibold tabular-nums">{SPECIALISTS.length}</strong> in-product specialists
-                            {execs.length > 0 && (
-                                <> plus <strong className="font-semibold tabular-nums">{execs.length}</strong> fractional {execs.length === 1 ? "executive" : "executives"} on your foundry</>
+                            <strong className="font-semibold tabular-nums">{SPECIALISTS.length}</strong> AI specialists always on
+                            {execs.length > 0 ? (
+                                <>
+                                    {" "}
+                                    plus{" "}
+                                    <strong className="font-semibold tabular-nums">
+                                        {execs.length}
+                                    </strong>{" "}
+                                    fractional {execs.length === 1 ? "executive" : "executives"} on the Fractional Forge network
+                                </>
+                            ) : (
+                                <> · our fractional executive roster is being assembled</>
                             )}
                             . Click any profile to brief them with project context.
                         </p>
@@ -119,13 +204,16 @@ export default async function ForgeV2ExpertsPage(): Promise<React.ReactNode> {
                 </CardContent>
             </Card>
 
-            {/* In-product specialists */}
+            {/* AI Specialists */}
             <section aria-labelledby="specialists-heading" className="space-y-3">
                 <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-international-orange" />
                     <Users className="h-4 w-4 text-international-orange" />
-                    <h2 id="specialists-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                        In-product specialists · always on
+                    <h2
+                        id="specialists-heading"
+                        className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground"
+                    >
+                        AI Specialists ({SPECIALISTS.length})
                     </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -135,19 +223,44 @@ export default async function ForgeV2ExpertsPage(): Promise<React.ReactNode> {
                 </div>
             </section>
 
-            {/* Fractional execs */}
+            {/* Fractional Executives */}
             <section aria-labelledby="execs-heading" className="space-y-3">
                 <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-international-orange" />
                     <UserCircle2 className="h-4 w-4 text-international-orange" />
-                    <h2 id="execs-heading" className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Fractional executives · humans on your foundry
+                    <h2
+                        id="execs-heading"
+                        className="text-[11.5px] font-bold uppercase tracking-widest text-muted-foreground"
+                    >
+                        Fractional Executives{execs.length > 0 ? ` (${execs.length})` : ""}
                     </h2>
                 </div>
+                {execsSubhead && (
+                    <p className="text-[12.5px] text-muted-foreground leading-relaxed">
+                        {execsSubhead}
+                    </p>
+                )}
                 {execs.length === 0 ? (
                     <Card className="rounded-xl border border-dashed bg-muted/30">
-                        <CardContent className="py-8 px-5 text-center text-sm text-muted-foreground">
-                            No fractional executives on this foundry yet. Invite one from Team to surface them here.
+                        <CardContent className="py-10 px-5 flex flex-col items-center text-center gap-3">
+                            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-international-orange/10 text-international-orange">
+                                <UserCircle2 className="h-5 w-5" />
+                            </span>
+                            <div className="space-y-1 max-w-md">
+                                <p className="text-sm font-semibold text-foreground">
+                                    Coming soon
+                                </p>
+                                <p className="text-[13px] text-muted-foreground leading-relaxed">
+                                    Our fractional executive network is being assembled. Real
+                                    humans with hardware pedigree, available to brief alongside
+                                    your AI specialists.
+                                </p>
+                            </div>
+                            <Button asChild size="sm" variant="outline" className="mt-1">
+                                <Link href="mailto:hello@fractionalforge.com?subject=Fractional%20exec%20network">
+                                    Contact us to be on the list
+                                </Link>
+                            </Button>
                         </CardContent>
                     </Card>
                 ) : (
@@ -215,6 +328,21 @@ function FractionalExecCard({ exec }: { exec: FractionalExec }): React.ReactElem
         .slice(0, 2)
         .map(s => s[0]?.toUpperCase() ?? "")
         .join("") || "FE"
+
+    const isAvailable = exec.status === "available"
+    const statusLabel = isAvailable ? "Available" : "Joining soon"
+    // Two colour vocabularies, both from the existing semantic-token set
+    // already used elsewhere on /the-forge-v2 — no new tokens introduced.
+    const statusClass = isAvailable
+        ? "bg-success/10 text-success border-success/30"
+        : "bg-muted text-muted-foreground border-border"
+
+    const currencySymbol = exec.currency === "USD" ? "$" : exec.currency === "EUR" ? "€" : "£"
+    const rateLine =
+        exec.dayRate != null
+            ? `${currencySymbol}${exec.dayRate.toLocaleString()}/day`
+            : "Day rate on request"
+
     return (
         <Link
             href={`/the-forge-v2/experts/${exec.id}`}
@@ -231,16 +359,23 @@ function FractionalExecCard({ exec }: { exec: FractionalExec }): React.ReactElem
                     <h3 className="text-base font-semibold text-foreground tracking-tight min-w-0 truncate">
                         {exec.name}
                     </h3>
-                    <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wide bg-teal-50 text-teal-700 border-teal-300 shrink-0">
-                        {exec.role}
+                    <Badge
+                        variant="outline"
+                        className={cn(
+                            "text-[10px] font-semibold uppercase tracking-wide shrink-0",
+                            statusClass,
+                        )}
+                    >
+                        {statusLabel}
                     </Badge>
                 </div>
                 <p className="text-[12.5px] text-muted-foreground line-clamp-2 leading-relaxed mb-3">
-                    Fractional executive on your foundry — pair them with in-product specialists on briefs that need human judgement.
+                    {exec.headline ??
+                        "Fractional executive on the Fractional Forge network. Profile details coming as they finish onboarding."}
                 </p>
                 <div className="flex items-center justify-between gap-2">
                     <span className="text-[10.5px] text-muted-foreground uppercase tracking-wide truncate">
-                        {exec.email ?? "Foundry member"}
+                        {rateLine}
                     </span>
                     <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-international-orange group-hover:underline shrink-0">
                         View profile <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
