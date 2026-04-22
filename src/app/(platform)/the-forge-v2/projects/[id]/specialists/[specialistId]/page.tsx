@@ -137,13 +137,18 @@ export async function generateMetadata(
 ): Promise<Metadata> {
     const { id, specialistId } = await params
     const specialist = getSpecialistById(specialistId)
-    const r = await loadCadLabProject(id)
-    if (!specialist || "error" in r) {
+    if (!specialist) return { title: "Ask a specialist · The Forge" }
+    try {
+        const r = await loadCadLabProject(id)
+        if ("error" in r || !r.project) {
+            return { title: "Ask a specialist · The Forge" }
+        }
+        return {
+            title: `Ask ${specialist.name} · ${r.project.name}`,
+            description: `Scoped specialist chat with ${r.project.name}'s context pre-loaded for ${specialist.name} (${specialist.title}).`,
+        }
+    } catch {
         return { title: "Ask a specialist · The Forge" }
-    }
-    return {
-        title: `Ask ${specialist.name} · ${r.project.name}`,
-        description: `Scoped specialist chat with ${r.project.name}'s context pre-loaded for ${specialist.name} (${specialist.title}).`,
     }
 }
 
@@ -160,8 +165,17 @@ export default async function ForgeV2AskSpecialistPage({
     const specialist: Specialist | undefined = getSpecialistById(specialistId)
     if (!specialist) notFound()
 
-    const result = await loadCadLabProject(id)
-    if ("error" in result || !result.project) notFound()
+    // Wrap project load in try/catch so an invalid project id, a thrown
+    // Supabase error, or any transient loader failure resolves to a clean
+    // 404 rather than propagating to the generic ErrorBoundary. Matches the
+    // pattern shipped for suppliers/[supplierId]/page.tsx in 0bc00a61.
+    let result: Awaited<ReturnType<typeof loadCadLabProject>> | null = null
+    try {
+        result = await loadCadLabProject(id)
+    } catch {
+        notFound()
+    }
+    if (!result || "error" in result || !result.project) notFound()
 
     const project = result.project
     const modules = project.modules ?? []
@@ -178,7 +192,11 @@ export default async function ForgeV2AskSpecialistPage({
     )
 
     // ── Specialist-facing fields (never fabricated) ──────────────
-    const initials = initialsFrom(specialist.name)
+    // Guard against malformed registry entries — initialsFrom already
+    // handles empty strings, but we normalise null/undefined → "" first
+    // so downstream consumers never see `undefined` in the chip.
+    const specialistName = typeof specialist.name === "string" ? specialist.name : ""
+    const initials = initialsFrom(specialistName)
     const voiceScore = VOICE_SCORES[specialist.id] ?? null
     const suggestions = SUGGESTIONS[specialist.id] ?? DEFAULT_SUGGESTIONS
 
@@ -195,7 +213,7 @@ export default async function ForgeV2AskSpecialistPage({
         },
         specialist: {
             id: specialist.id,
-            name: specialist.name,
+            name: specialistName,
             title: specialist.title,
             tagline: specialist.tagline?.trim() || null,
             description: specialist.description?.trim() || null,
