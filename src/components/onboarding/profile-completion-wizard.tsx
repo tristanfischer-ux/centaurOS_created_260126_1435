@@ -462,9 +462,15 @@ export function ProfileCompletionWizard({
   const experienceRanges = isApprentice ? APPRENTICE_EXPERIENCE_RANGES : EXPERIENCE_RANGES
 
   return (
-    <div ref={wizardRef} role="dialog" aria-modal="true" aria-label="Complete your profile" className="fixed inset-0 z-50 flex items-center justify-center bg-background" onKeyDown={handleKeyDown}>
-      {/* Progress bar */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-muted" role="progressbar" aria-valuenow={stepIndex + 1} aria-valuemin={1} aria-valuemax={STEPS.length} aria-label={`Step ${stepIndex + 1} of ${STEPS.length}`}>
+    // GOTCHA: Outer container scrolls. Inner wrapper uses min-h-full + flex
+    // so content centres vertically when it fits and scrolls when it doesn't.
+    // Previously `flex items-center justify-center` on the fixed container
+    // with no overflow pushed the Continue button off-screen whenever the
+    // identity step grew (e.g. when a LinkedIn URL reveals the reference
+    // banner + extra helper paragraphs). Reported by CB 2026-04-21.
+    <div ref={wizardRef} role="dialog" aria-modal="true" aria-label="Complete your profile" className="fixed inset-0 z-50 overflow-y-auto bg-background" onKeyDown={handleKeyDown}>
+      {/* Progress bar — sticky so it stays visible when the dialog scrolls */}
+      <div className="sticky top-0 left-0 right-0 h-1 bg-muted z-10" role="progressbar" aria-valuenow={stepIndex + 1} aria-valuemin={1} aria-valuemax={STEPS.length} aria-label={`Step ${stepIndex + 1} of ${STEPS.length}`}>
         <motion.div
           className="h-full bg-international-orange"
           initial={{ width: 0 }}
@@ -474,12 +480,14 @@ export function ProfileCompletionWizard({
       </div>
 
       {/* Step counter — announced to screen readers on change */}
-      <div className="absolute top-6 right-8 text-sm text-muted-foreground" aria-live="polite" aria-atomic="true">
+      <div className="absolute top-6 right-8 text-sm text-muted-foreground z-10" aria-live="polite" aria-atomic="true">
         Step {stepIndex + 1} of {STEPS.length}
       </div>
 
+      {/* Scroll wrapper — centres content when it fits, flows when it doesn't */}
+      <div className="flex min-h-full items-center justify-center px-6 py-10">
       {/* Content */}
-      <div className="w-full max-w-lg px-6">
+      <div className="w-full max-w-lg">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentStep}
@@ -875,6 +883,7 @@ export function ProfileCompletionWizard({
             </div>
           </motion.div>
         </AnimatePresence>
+      </div>
       </div>
     </div>
   )
