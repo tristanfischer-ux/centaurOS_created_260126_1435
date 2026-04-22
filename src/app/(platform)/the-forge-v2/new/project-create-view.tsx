@@ -485,26 +485,30 @@ export function ProjectCreateView(): React.ReactElement {
                                             setForm((s) => ({ ...s, starterReference: "blank" }))
                                         }
                                     />
+                                    {/* INTENT: Promote-from-Product and Fork-from-existing render as
+                                        disabled affordances in V1. The mockup shows all three as
+                                        selectable, but Products → Forge promotion and
+                                        project-fork-with-carry-over are not yet wired — `createCadLabProject`
+                                        takes only `subject` today, so picking these would silently
+                                        collapse to Start Blank. Showing them disabled with
+                                        honest "coming-soon" sub-copy keeps the three-tile mockup
+                                        grid visible (so founders know the entry shapes that ship
+                                        later) without faking an affordance that doesn't exist. */}
                                     <StarterReferenceCard
                                         icon="📦"
                                         title="Promote from a Product hypothesis"
-                                        sub="Bring your market-validated hypothesis from Products into build mode. Market signals, pricing, LOIs all carry over."
-                                        isSelected={form.starterReference === "product-hypothesis"}
-                                        onSelect={() =>
-                                            setForm((s) => ({
-                                                ...s,
-                                                starterReference: "product-hypothesis",
-                                            }))
-                                        }
+                                        sub="Lands once Products → Forge hand-off ships. For now, paste the hypothesis highlights into your brief above."
+                                        isSelected={false}
+                                        disabled
+                                        onSelect={() => {}}
                                     />
                                     <StarterReferenceCard
                                         icon="⑂"
                                         title="Fork from existing project"
-                                        sub="HAPS Maritime v1.1 was forked this way. BOM, modules, suppliers — all copied, then diverged."
-                                        isSelected={form.starterReference === "fork"}
-                                        onSelect={() =>
-                                            setForm((s) => ({ ...s, starterReference: "fork" }))
-                                        }
+                                        sub="Lands once the fork engine ships. For now, copy the brief text from the source project and paste it above."
+                                        isSelected={false}
+                                        disabled
+                                        onSelect={() => {}}
                                     />
                                 </div>
 
@@ -632,22 +636,29 @@ function StarterReferenceCard({
     sub,
     isSelected,
     onSelect,
+    disabled = false,
 }: {
     icon: string
     title: string
     sub: string
     isSelected: boolean
     onSelect: () => void
+    disabled?: boolean
 }): React.ReactElement {
     return (
         <button
             type="button"
-            className={`pc2-ref-card${isSelected ? " is-selected" : ""}`}
+            className={`pc2-ref-card${isSelected ? " is-selected" : ""}${disabled ? " is-disabled" : ""}`}
             onClick={onSelect}
             aria-pressed={isSelected}
+            aria-disabled={disabled || undefined}
+            disabled={disabled}
         >
             <div className="pc2-ref-icon" aria-hidden="true">{icon}</div>
-            <div className="pc2-ref-title">{title}</div>
+            <div className="pc2-ref-title">
+                {title}
+                {disabled ? <span className="pc2-ref-pill"> Coming soon</span> : null}
+            </div>
             <div className="pc2-ref-sub">{sub}</div>
         </button>
     )

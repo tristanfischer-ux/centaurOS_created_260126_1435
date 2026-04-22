@@ -413,6 +413,35 @@
   line-height: 1.45;
 }
 
+/* Disabled (coming-soon) starter reference tiles —
+   still visible so the full three-tile grid lands per mockup, but
+   non-interactive with clear "Coming soon" signal. */
+.pc2-ref-card.is-disabled,
+.pc2-ref-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.pc2-ref-card.is-disabled:hover,
+.pc2-ref-card:disabled:hover {
+  border-color: var(--pc-border);
+  box-shadow: none;
+  transform: none;
+}
+.pc2-ref-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--pc-surface-muted);
+  border: 1px solid var(--pc-border);
+  color: var(--pc-fg-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 /* ── Inline ann ("Note" boxes) ──────────────────────────────────────── */
 .pc2-annot {
   background: var(--pc-surface-soft);
