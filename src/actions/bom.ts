@@ -1792,23 +1792,45 @@ export async function runBomSkeletonStage(projectId: string): Promise<void> {
   })
 }
 
-// ─── Stage 2: batch (one batch per invocation) ─────────────────────
+// ─── Stage 2: batch (many batches per invocation) ──────────────────
 
 /**
- * Stage 2 of distributed BOM. Drains the first entry in
- * `pending_batch_ids`, expands it via `expandBomPartsBatchInternal`, and
- * either reschedules itself (more batches pending) or transitions to the
- * merge stage.
+ * Maximum number of batches a single `runBomBatchStage` invocation will
+ * process before persisting state and rescheduling itself. At
+ * EXPAND_CONCURRENCY=4 and a ~120s per-batch SDK cap, 8 batches = 2
+ * concurrency waves ≈ 240s, which fits comfortably under Vercel's 300s
+ * function cap with ~60s left for the DB state write + next-stage
+ * scheduling overhead.
  *
- * Budget: ~60-120s (one Anthropic call for up to EXPAND_BATCH_SIZE parts,
- * plus a state write). Hard upper bound is the SDK timeout of 120s inside
- * `expandBomPartsBatchInternal`, well under Vercel's 300s cap.
+ * With this cap, a dense 80-part / 10-batch industrial project lands in
+ * 2 batch stages + 1 merge stage = 3 hops total, versus the previous
+ * implementation's 11 hops (one batch per invocation) which routinely
+ * stalled on Vercel's `after()` continuation reliability limits around
+ * hop 7+.
+ */
+const MAX_BATCHES_PER_STAGE = 8
+
+/**
+ * Stage 2 of distributed BOM. Drains up to MAX_BATCHES_PER_STAGE entries
+ * from `pending_batch_ids`, expands them concurrently (fan-out of
+ * EXPAND_CONCURRENCY) via `expandBomPartsBatchInternal`, merges results
+ * into state, and either reschedules itself (more batches pending) or
+ * transitions to the merge stage.
+ *
+ * Budget: ~120-240s on dense projects (2 concurrency waves of 4 at
+ * up to 120s each). Per-batch SDK timeout is 120s inside
+ * `expandBomPartsBatchInternal`. Vercel's 300s function cap is the
+ * real backstop — we intentionally do NOT add a softer wall-clock race
+ * here: each batch's own timeout plus the hop cap is enough, and
+ * accepting a slightly-over-budget single batch is safer than losing
+ * completed work mid-wave.
  *
  * Failure policy matches the original monolithic implementation at
  * `bom.ts:795-813`: one batch failing doesn't abort the whole run.
- * `failed_batch_count` is incremented and execution continues. Parts whose
- * batch failed will be persisted in the merge stage with skeleton-only
- * fields (aiConfidence=0) so the UI can flag "specs pending".
+ * `failed_batch_count` is incremented per failed batch and execution
+ * continues with the next batch. Parts whose batch failed will be
+ * persisted in the merge stage with skeleton-only fields
+ * (aiConfidence=0) so the UI can flag "specs pending".
  */
 export async function runBomBatchStage(projectId: string): Promise<void> {
   const loaded = await loadBomGenerationState(projectId)
@@ -1840,13 +1862,21 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
     return
   }
 
-  const [currentBatchIds, ...remainingBatches] = state.pending_batch_ids
-  const batchParts = pickSkeletonPartsByIds(
-    state.skeleton_parts,
-    currentBatchIds,
+  // Take up to MAX_BATCHES_PER_STAGE batches off the front of the queue.
+  // The rest stay pending and get picked up by the next scheduled
+  // `runBomBatchStage` invocation.
+  const batchesThisStage = state.pending_batch_ids.slice(
+    0,
+    MAX_BATCHES_PER_STAGE,
+  )
+  const remainingBatches = state.pending_batch_ids.slice(
+    MAX_BATCHES_PER_STAGE,
+  )
+  const batchPartsList = batchesThisStage.map((ids) =>
+    pickSkeletonPartsByIds(state.skeleton_parts!, ids),
   )
 
-  // Build shared prompt context for this batch. Recomputed per-stage rather
+  // Build shared prompt context for this stage. Recomputed per-stage rather
   // than persisted in state — fetchCatalogueForPrompt is a DB read (cheap),
   // extractSearchKeywords is local-only, and keeping the state jsonb small
   // matters when it's written on every stage transition.
@@ -1894,15 +1924,21 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
     )
   }
 
-  // Run the expansion for this one batch. Matches the monolithic flow's
-  // per-batch behaviour exactly — same prompt, same validation.
-  const batchResult = await expandBomPartsBatchInternal({
-    apiKey,
-    batchParts,
-    moduleContext,
-    briefContext,
-    catalogueRef,
-  })
+  // Fan out up to EXPAND_CONCURRENCY batches in parallel. Matches the
+  // monolithic flow's per-batch behaviour exactly — same prompt, same
+  // validation — but runs multiple batches per stage invocation to cut
+  // the hop count. Results come back in the same order as input.
+  const batchResults = await runWithConcurrency(
+    batchPartsList,
+    EXPAND_CONCURRENCY,
+    (batchParts) => expandBomPartsBatchInternal({
+      apiKey,
+      batchParts,
+      moduleContext,
+      briefContext,
+      catalogueRef,
+    }),
+  )
 
   // Re-read state to avoid clobbering a concurrent write. In practice
   // batches are sequential for the same project, but the re-read keeps us
@@ -1916,13 +1952,16 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
   let nextFailedCount = current.failed_batch_count
   let mergedExpansions = { ...current.expansions }
 
-  if (batchResult.success) {
-    mergedExpansions = { ...mergedExpansions, ...batchResult.expansions }
-  } else {
-    nextFailedCount += 1
-    console.warn(
-      `[bom-distributed:batch] batch failed for ${projectId}: ${batchResult.error ?? "unknown"}; continuing with ${remainingBatches.length} batches remaining.`,
-    )
+  for (let i = 0; i < batchResults.length; i += 1) {
+    const batchResult = batchResults[i]
+    if (batchResult.success) {
+      mergedExpansions = { ...mergedExpansions, ...batchResult.expansions }
+    } else {
+      nextFailedCount += 1
+      console.warn(
+        `[bom-distributed:batch] batch ${i + 1}/${batchResults.length} failed for ${projectId}: ${batchResult.error ?? "unknown"}; continuing.`,
+      )
+    }
   }
 
   const nextState: BomGenerationState = {
@@ -1933,7 +1972,7 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
   }
   await persistBomGenerationState(projectId, nextState)
 
-  // Schedule the next step. More batches → next batch. Empty queue → merge.
+  // Schedule the next step. More batches → next batch stage. Empty queue → merge.
   after(async () => {
     try {
       if (nextState.pending_batch_ids.length > 0) {
