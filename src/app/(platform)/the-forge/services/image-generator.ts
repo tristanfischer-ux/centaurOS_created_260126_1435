@@ -1101,15 +1101,21 @@ export async function highlightModuleInContext(
 export const cropWithGhostedContext = highlightModuleInContext
 
 /**
+ * UNUSED (2026-04-22): the crop-based module render architecture was
+ * abandoned after Claude Vision could not reliably map component identities
+ * onto hero bounding boxes — modules ended up mis-labelled in the output
+ * tiles. Two variants were tried (ghosted-context crop, then highlight-no-
+ * crop); both failed the same way. The canonical render path is now per-
+ * module text-to-image via gpt-image-2 (see `generateModuleImage` and its
+ * caller `src/actions/forge-v2-generate-one-module-image.ts`). This function,
+ * `highlightModuleInContext`, and `cropWithGhostedContext` are retained as
+ * dead code in case the approach is worth revisiting once identity-mapping
+ * is solved. Do not wire them back without a fresh plan.
+ *
  * Renders a module tile by cropping a ghosted-context region from a
  * pre-existing interior hero image. NO gpt-image-2 / Gemini call involved —
  * the output pixels are deterministic copies of the hero with the peripheral
  * area desaturated, guaranteeing 100% geometric consistency with the hero.
- *
- * Used by the V2 per-module render path when
- * `cad_lab_projects.interior_overview_url` is set (see
- * `src/actions/forge-v2-generate-one-module-image.ts`). Falls back to the
- * existing gpt-image-2 path when the column is null.
  *
  * @param scanId - Storage namespace (project id)
  * @param moduleSpec - The target module; `id` is used in the filename, `name`
