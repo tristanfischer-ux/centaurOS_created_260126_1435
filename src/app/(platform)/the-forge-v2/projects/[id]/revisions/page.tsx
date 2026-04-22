@@ -23,8 +23,13 @@ import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import { createClient } from "@/lib/supabase/server"
+import type { CadLabModule } from "@/lib/cad-lab-types"
 
-import { RevisionsView, type RevisionRow } from "./revisions-view"
+import {
+    RevisionsView,
+    type RevisionRow,
+    type ChangeListModule,
+} from "./revisions-view"
 
 export const dynamic = "force-dynamic"
 
@@ -53,6 +58,16 @@ export default async function ForgeV2RevisionsPage({
     // instead of a 500. Errors are logged server-side for triage.
     const revisions = await loadBriefRevisions(id)
 
+    // ── Change-list grouping — subsystem cards built from the project's
+    // module list. Per-part diffs don't exist in the schema today, so each
+    // module card renders an honest empty state listing the *current* parts
+    // rather than a fabricated added/modified/removed diff. Once the diff
+    // engine ships, populate `changes` on each ChangeListModule and the UI
+    // will render add/modify/remove rows. Until then the cards document
+    // "this is what the current revision declares" so founders know what
+    // will participate in future diffs.
+    const changeListModules = normaliseModulesForChangeList(project.modules)
+
     return (
         <RevisionsView
             project={{
@@ -61,11 +76,36 @@ export default async function ForgeV2RevisionsPage({
                 designRevision: project.designRevision,
             }}
             revisions={revisions}
+            changeListModules={changeListModules}
         />
     )
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Maps the raw JSONB modules array on `cad_lab_projects.modules` into the
+ * ChangeListModule rows the view renders as subsystem cards. Per-part
+ * deltas (added / modified / removed with mass + cost) are not yet tracked
+ * in the schema — the UI renders an honest empty state inside each card
+ * listing the current `keyParts` so founders can see what the future diff
+ * engine will compare against.
+ */
+function normaliseModulesForChangeList(
+    modules: CadLabModule[] | null,
+): ChangeListModule[] {
+    if (!modules || modules.length === 0) return []
+    return modules.map((m, i) => ({
+        id: m.id,
+        // Module numbering mirrors the mockup's "M1 · Upper Fuselage" header.
+        code: `M${i + 1}`,
+        name: m.name,
+        purpose: m.purpose ?? "",
+        keyParts: Array.isArray(m.keyParts) ? m.keyParts : [],
+        estimatedMassKg:
+            typeof m.estimatedMassKg === "number" ? m.estimatedMassKg : null,
+    }))
+}
 
 async function loadBriefRevisions(projectId: string): Promise<RevisionRow[]> {
     try {

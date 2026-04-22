@@ -8,12 +8,16 @@
  * Sections (top to bottom):
  *   1. Breadcrumb
  *   2. Annotation note — explains what a revision is
- *   3. Dark header card — project name + rev arrow line (parent → current) + CTAs
- *   4. Diff summary strip — 4 stat tiles (parts / modules / mass / cost)
- *   5. "Inherited" diff-section — unchanged parts carried forward
- *   6. "Revision history" diff-section — list of every brief_revision row
- *   7. Compliance impact grid — 3 cells (new / new / re-test)
- *   8. Supplier overlap diff-section
+ *   3. Pedagogy card ("How this works") — only shown on first revision
+ *   4. Dense dark hero banner — project name + version chip + metric-row
+ *      (Parts changed · Mass delta · Cost delta · Outstanding issues) +
+ *      Accept / Promote CTAs. Metrics render "—" until the revision-diff
+ *      engine lands.
+ *   5. "Inherited from vX · unchanged" summary block
+ *   6. Change list by subsystem — one card per module with per-part chips
+ *   7. "Revision history" diff-section — list of every brief_revision row
+ *   8. Compliance impact grid — 3 cells (new / new / re-test)
+ *   9. Supplier overlap diff-section
  *
  * Empty-state policy: per-part diffs, mass, cost, compliance and supplier
  * specifics don't exist in the current data contract (brief_revisions only
@@ -44,6 +48,29 @@ export interface RevisionRow {
     createdAt: string
 }
 
+/**
+ * Subsystem row used by the "Change list" section. Represents one module in
+ * the current revision. Per-part diffs (added / modified / removed + mass
+ * delta + cost delta) don't exist in the schema today — when the diff
+ * engine lands, extend this interface with a `changes: ChangeRow[]` field
+ * and the view will swap its honest empty state for diff rows.
+ */
+export interface ChangeListModule {
+    id: string
+    /** Short badge used in the group header, e.g. "M1". */
+    code: string
+    /** Module display name, e.g. "Upper Fuselage Deck". */
+    name: string
+    /** One-line purpose, used as the group subtitle. */
+    purpose: string
+    /** Major parts currently declared on this module — shown as a chip list
+     *  so founders can see what will participate in future diffs. */
+    keyParts: string[]
+    /** Optional AI-estimated mass so the card shows a current-state tile even
+     *  before the diff engine ships mass deltas. */
+    estimatedMassKg: number | null
+}
+
 export interface RevisionsViewProps {
     project: {
         id: string
@@ -53,6 +80,9 @@ export interface RevisionsViewProps {
     /** All rows in `brief_revisions` for this project, ordered by
      *  `revision_number DESC` (newest first). May be empty. */
     revisions: RevisionRow[]
+    /** Current-revision module list used to drive the subsystem-grouped
+     *  change list. May be empty when decomposition hasn't run. */
+    changeListModules: ChangeListModule[]
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -71,8 +101,13 @@ function formatDate(iso: string | null): string {
 // ─── View ───────────────────────────────────────────────────────────────
 
 export function RevisionsView(props: RevisionsViewProps): React.ReactElement {
-    const { project, revisions } = props
+    const { project, revisions, changeListModules } = props
     const base = `/the-forge-v2/projects/${project.id}`
+
+    // Pedagogy card policy: show the "How this works" explainer only when
+    // the founder hasn't locked a second revision yet. Once they've built
+    // real history (2+ rows), dive straight into the data.
+    const showPedagogy = revisions.length <= 1
 
     // Empty state — no revisions yet. Per brief: render an empty-state card
     // that points at brief-lock. Never fake rows.
@@ -141,28 +176,71 @@ export function RevisionsView(props: RevisionsViewProps): React.ReactElement {
                 against it.
             </div>
 
-            {/* ── How this works ──────────────────────── */}
-            <div className="rv2-how">
-                <div className="rv2-how__head">How this works</div>
-                <ul className="rv2-how__list">
-                    <li>Create a new revision when your brief, BOM, or cost changes materially — say, after a supplier quote swap or a scope cut.</li>
-                    <li>Each revision is a named snapshot (Rev A / B / C…). Old revisions stay readable. You can compare any two side by side.</li>
-                    <li>Lock Rev N to send it to Forge — suppliers, specialists, and manufacturing plan all pin to the locked revision.</li>
-                </ul>
-                <div className="rv2-how__foot">
-                    Questions → <Link href="/the-forge/ask">/the-forge/ask</Link> — ask a specialist
+            {/* ── How this works — pedagogy card, hidden once the founder
+                 has built real revision history (2+ rows). First-revision
+                 visitors still get the explainer; power users dive straight
+                 into the data. */}
+            {showPedagogy && (
+                <div className="rv2-how">
+                    <div className="rv2-how__head">How this works</div>
+                    <ul className="rv2-how__list">
+                        <li>Create a new revision when your brief, BOM, or cost changes materially — say, after a supplier quote swap or a scope cut.</li>
+                        <li>Each revision is a named snapshot (Rev A / B / C…). Old revisions stay readable. You can compare any two side by side.</li>
+                        <li>Lock Rev N to send it to Forge — suppliers, specialists, and manufacturing plan all pin to the locked revision.</li>
+                    </ul>
+                    <div className="rv2-how__foot">
+                        Questions → <Link href="/the-forge/ask">/the-forge/ask</Link> — ask a specialist
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* ── Dark header card ────────────────────── */}
+            {/* ── Dense dark hero banner ──────────────────
+                 Combines the title · version chip · shipped date · metric-row
+                 · Accept/Promote CTAs in a single block so founders see the
+                 revision's state at a glance. Mirrors FORGE-MOCKUP-REVISIONS
+                 but with honest "—" placeholders for the metrics that the
+                 revision-diff engine doesn't yet emit. */}
             <div className="rv2-header-card">
-                <h1><span className="rv2-title-dot" aria-hidden="true" />{project.name}</h1>
-                <div className="sub">
-                    {parent
-                        ? `Forked from v${parent.revisionNumber} · ${revisions.length} revision${revisions.length === 1 ? "" : "s"} recorded`
-                        : `First revision on file · locked ${formatDate(current.lockedAt)}`
-                    }
+                <div className="rv2-header-top">
+                    <div>
+                        <h1>
+                            <span className="rv2-title-dot" aria-hidden="true" />
+                            {project.name}
+                            <span
+                                className={`rv2-version-chip ${hasLockedCurrent ? "locked" : "draft"}`}
+                            >
+                                v{current.revisionNumber}
+                                {hasLockedCurrent ? " · locked" : " · draft"}
+                            </span>
+                        </h1>
+                        <div className="sub">
+                            {parent
+                                ? `Forked from v${parent.revisionNumber} · ${hasLockedCurrent ? `locked ${formatDate(current.lockedAt)}` : `draft since ${formatDate(current.createdAt)}`}`
+                                : hasLockedCurrent
+                                    ? `First revision on file · locked ${formatDate(current.lockedAt)}`
+                                    : `First revision on file · draft since ${formatDate(current.createdAt)}`
+                            }
+                        </div>
+                    </div>
+                    <div className="rv2-header-ctas">
+                        <Link
+                            href={`${base}/revisions/merge`}
+                            className="rv2-btn on-dark"
+                            aria-label="Accept this revision"
+                        >
+                            Accept revision
+                        </Link>
+                        <Link
+                            href={`${base}/brief-lock`}
+                            className="rv2-btn primary"
+                            aria-label="Promote this revision to active"
+                        >
+                            {hasLockedCurrent ? "Promote to active" : "Lock revision"}
+                        </Link>
+                    </div>
                 </div>
+
+                {/* Rev line — parent → current chain, visual at-a-glance. */}
                 <div className="rv2-rev-line">
                     {parent && (
                         <>
@@ -177,62 +255,155 @@ export function RevisionsView(props: RevisionsViewProps): React.ReactElement {
                         v{current.revisionNumber}
                         {current.lockedAt ? ` · locked ${formatDate(current.lockedAt)}` : " · draft"}
                     </div>
-                    <div className="cta-spacer">
-                        <Link href={`${base}/brief-lock`} className="rv2-btn on-dark">
-                            {hasLockedCurrent ? "Fork new revision" : "Lock revision"}
-                        </Link>
-                        <Link href={`${base}/brief`} className="rv2-btn primary">
-                            View brief
-                        </Link>
-                    </div>
+                </div>
+
+                {/* Metric-row — four KPIs embedded in the dark banner.
+                    Values are honest "—" until the revision-diff engine
+                    lands. When parent === null there's nothing to diff
+                    against, so the sub-copy tells the reader that directly
+                    rather than suggesting the engine is broken. */}
+                <div className="rv2-hero-metrics" role="group" aria-label="Revision metrics">
+                    <HeroMetric
+                        label="Parts changed"
+                        value="—"
+                        sub={parent ? "diff engine not yet wired" : "no prior revision to diff"}
+                    />
+                    <HeroMetric
+                        label="Mass delta"
+                        value="—"
+                        sub={parent ? "mass roll-up pending" : "no prior revision to diff"}
+                    />
+                    <HeroMetric
+                        label="Cost delta"
+                        value="—"
+                        sub={parent ? "cost roll-up pending" : "no prior revision to diff"}
+                    />
+                    <HeroMetric
+                        label="Outstanding issues"
+                        value="—"
+                        sub="risk tracker wires next"
+                    />
                 </div>
             </div>
 
-            {/* ── Diff summary strip ──────────────────── */}
-            {/* Honest empty-state: the diff-engine for per-part/mass/cost/supplier
-                deltas hasn't shipped yet. Mirrors the mockup grid but shows "—" so
-                the reader can see what WILL land once the diff engine is wired. */}
-            <div className="rv2-diff-summary">
-                <div className="rv2-diff-card">
-                    <div className="label">Parts changed</div>
-                    <div className="value muted">—</div>
-                    <div className="sub">diff engine not yet wired</div>
-                </div>
-                <div className="rv2-diff-card">
-                    <div className="label">Modules affected</div>
-                    <div className="value muted">—</div>
-                    <div className="sub">per-module diff ships next</div>
-                </div>
-                <div className="rv2-diff-card">
-                    <div className="label">Mass impact</div>
-                    <div className="value muted">—</div>
-                    <div className="sub">mass roll-up pending</div>
-                </div>
-                <div className="rv2-diff-card">
-                    <div className="label">Cost impact</div>
-                    <div className="value muted">—</div>
-                    <div className="sub">cost roll-up pending</div>
-                </div>
-            </div>
-
-            {/* ── Inherited from parent ───────────────── */}
+            {/* ── Inherited from parent — summary block ──
+                 Mirrors the "Inherited from v1.0 · unchanged" card in the
+                 mockup. Lists what carries forward without fabricating
+                 module counts we don't track yet. */}
             <div className="rv2-diff-section">
                 <h3>
-                    Inherited from parent revision
+                    {parent
+                        ? `Inherited from v${parent.revisionNumber} · unchanged`
+                        : "Inherited from parent · origin revision"
+                    }
                     <span className="count">
                         {parent
                             ? `v${parent.revisionNumber} → v${current.revisionNumber}`
-                            : "origin revision"
+                            : "no parent yet"
                         }
                     </span>
                 </h3>
-                <p className="muted">
-                    BOM, supplier shortlist and compliance packet carry across from the parent
-                    revision by default. <strong>Only the diff re-runs the specialist pipeline.</strong>
-                    {" "}First-article inspection on shared parts does not re-run.
+                <ul className="rv2-inherited-list">
+                    <li><strong>BOM</strong> carries across from the parent revision. Parts, quantities and supplier bindings stay stable until an explicit change lands on this revision.</li>
+                    <li><strong>Supplier shortlist</strong> carries across. Suppliers already quoting the parent continue quoting — no RFQ re-runs on inherited parts.</li>
+                    <li><strong>Compliance packet</strong> (cert list, test reports, DOA evidence) carries across unless a diff invalidates a cert.</li>
+                    <li><strong>Modules and geometry spine</strong> carry across. Only changed modules re-run the specialist pipeline.</li>
+                </ul>
+                <p className="muted" style={{ marginTop: "12px" }}>
                     Part-level diff visibility lands once the revision-diff engine is wired —
-                    the list below is the canonical revision history today.
+                    until then, the subsystem cards below show what each module currently
+                    declares. The "Revision history" section further down is the canonical
+                    list of locked snapshots on this project.
                 </p>
+            </div>
+
+            {/* ── Change list by subsystem ──────────────
+                 One card per module in the current revision. Mockup shows
+                 add/modify/remove rows with per-part mass + cost deltas —
+                 that level of detail requires the diff engine. Until then,
+                 each card surfaces the module's current-state parts so
+                 founders can see what will participate in future diffs. */}
+            <div className="rv2-change-list">
+                <div className="rv2-change-list__head">
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700 }}>
+                            Change list by subsystem
+                        </h3>
+                        <div className="rv2-change-list__sub">
+                            {changeListModules.length > 0
+                                ? `${changeListModules.length} module${changeListModules.length === 1 ? "" : "s"} · diff engine not yet wired`
+                                : "No modules declared · decomposition hasn't run yet"
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                {changeListModules.length === 0 ? (
+                    <div className="rv2-change-empty">
+                        <p>
+                            Once Max runs decomposition on this project, each module will
+                            appear here as its own subsystem card. When the revision-diff
+                            engine ships, the cards show added / modified / removed parts
+                            with mass and cost deltas per row. Today the cards are a
+                            current-state preview of what will be compared.
+                        </p>
+                        <Link href={`${base}/modules`} className="rv2-btn">
+                            Open modules →
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="rv2-change-groups">
+                        {changeListModules.map((m) => (
+                            <div key={m.id} className="rv2-change-group">
+                                <div className="rv2-change-group__head">
+                                    <div className="rv2-change-group__title">
+                                        <span className="rv2-change-group__code">{m.code}</span>
+                                        <span className="rv2-change-group__name">{m.name}</span>
+                                    </div>
+                                    <div className="rv2-change-group__meta">
+                                        {m.estimatedMassKg != null ? (
+                                            <span>est. {m.estimatedMassKg.toFixed(2)} kg</span>
+                                        ) : (
+                                            <span className="muted">mass pending</span>
+                                        )}
+                                    </div>
+                                </div>
+                                {m.purpose && (
+                                    <div className="rv2-change-group__purpose">{m.purpose}</div>
+                                )}
+                                {m.keyParts.length > 0 ? (
+                                    <>
+                                        <div className="rv2-change-group__parts-head">
+                                            Current parts · {m.keyParts.length}
+                                        </div>
+                                        <ul className="rv2-change-group__parts">
+                                            {m.keyParts.map((p, i) => (
+                                                <li key={`${m.id}-part-${i}`} className="rv2-change-row">
+                                                    <div className="rv2-change-row__mark" aria-hidden="true">·</div>
+                                                    <div className="rv2-change-row__body">
+                                                        <div className="name">{p}</div>
+                                                    </div>
+                                                    <div className="rv2-change-row__delta muted">—</div>
+                                                    <div className="rv2-change-row__delta muted">—</div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <div className="rv2-change-group__note">
+                                            No per-part diffs yet — add/modify/remove rows with
+                                            mass and cost deltas land when the revision-diff
+                                            engine ships.
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="rv2-change-group__note">
+                                        No parts declared on this module yet. Open the module
+                                        to add parts — they'll appear here once saved.
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* ── Revision history — one row per brief_revision ── */}
@@ -320,6 +491,34 @@ export function RevisionsView(props: RevisionsViewProps): React.ReactElement {
                     {" "}to see the current shortlist.
                 </p>
             </div>
+        </div>
+    )
+}
+
+// ─── Subcomponents ─────────────────────────────────────────────────────
+
+/**
+ * HeroMetric — a single stat tile inside the dark hero banner.
+ *
+ * INTENT: Mockup shows four metric tiles on a dark background. The real diff
+ * engine doesn't yet emit these numbers, so every invocation currently passes
+ * `value="—"`. The component stays generic so it'll render real numbers
+ * (+2.4 kg, +£11.4k, etc.) unchanged once the engine lands.
+ */
+function HeroMetric({
+    label,
+    value,
+    sub,
+}: {
+    label: string
+    value: string
+    sub: string
+}): React.ReactElement {
+    return (
+        <div className="rv2-hero-metric">
+            <div className="rv2-hero-metric__label">{label}</div>
+            <div className="rv2-hero-metric__value">{value}</div>
+            <div className="rv2-hero-metric__sub">{sub}</div>
         </div>
     )
 }
