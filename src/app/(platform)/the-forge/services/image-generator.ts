@@ -952,6 +952,212 @@ export async function cropModuleRegion(
   return cropped.toString("base64")
 }
 
+// ─── Ghosted-Context Crop (Deterministic Module Rendering) ──────────
+
+/**
+ * Options for {@link cropWithGhostedContext}.
+ */
+export interface GhostedCropOptions {
+  /**
+   * Padding around the bounding box as a fraction of bbox size (per side).
+   * `0.25` means the output crop extends by 25% of the bbox width on the
+   * left and right, and 25% of the bbox height on top and bottom — so the
+   * target subsystem keeps peripheral context around it. Clamped to image
+   * bounds. Default: `0.25`.
+   */
+  paddingPct?: number
+  /**
+   * Saturation multiplier applied to the peripheral (outside-bbox) pixels.
+   * `0` = fully desaturated grey. Default: `0`.
+   */
+  saturationOutside?: number
+  /**
+   * Opacity of the white "lift" layer composited over the desaturated
+   * peripheral pixels (0-1). Higher values push the peripheral further into
+   * the background. Default: `0.45`.
+   */
+  whiteLiftAlpha?: number
+  /**
+   * Feather radius applied to the color patch alpha mask, as a fraction of
+   * the smaller bbox dimension. `0` disables feathering (hard rectangle
+   * edge). Default: `0.04` (~4% feather, soft but not blurry).
+   */
+  featherPct?: number
+  /**
+   * Maximum output width in pixels. The final crop is resized to fit
+   * within `outputWidth` × `outputHeight` preserving aspect. Default: `1536`.
+   */
+  outputWidth?: number
+  /**
+   * Maximum output height in pixels. Default: `1024`.
+   */
+  outputHeight?: number
+}
+
+/**
+ * Deterministic Sharp-based "ghosted context" crop.
+ *
+ * Produces a per-module tile FROM an existing hero image rather than
+ * regenerating it with an image model. The target subsystem (defined by
+ * `bbox`) keeps its full-colour pixels; the peripheral area (inside the
+ * padded crop but outside the bbox) is desaturated and lifted toward white
+ * so peripheral context is visible but clearly de-emphasised.
+ *
+ * Because the output pixels are copies of the hero, geometric consistency
+ * with the hero is 100%. Replaces the gpt-image-2 per-module render chain
+ * for V2 projects that have an `interior_overview_url` set.
+ *
+ * @param heroBase64 - Base64 PNG of the hero image (interior-exploded view)
+ * @param bbox - Normalised (0-1) bounding box of the target subsystem
+ * @param options - See {@link GhostedCropOptions}
+ * @returns Base64 PNG of the ghosted-context tile
+ */
+export async function cropWithGhostedContext(
+  heroBase64: string,
+  bbox: ModuleBoundingBox,
+  options: GhostedCropOptions = {},
+): Promise<string> {
+  const paddingPct = options.paddingPct ?? 0.25
+  const saturationOutside = options.saturationOutside ?? 0
+  const whiteLiftAlpha = Math.max(0, Math.min(1, options.whiteLiftAlpha ?? 0.45))
+  const featherPct = Math.max(0, options.featherPct ?? 0.04)
+  const outputWidth = options.outputWidth ?? 1536
+  const outputHeight = options.outputHeight ?? 1024
+
+  const heroBuf = Buffer.from(heroBase64, "base64")
+  const meta = await sharp(heroBuf).metadata()
+  const imgW = meta.width ?? 1536
+  const imgH = meta.height ?? 1024
+
+  // 1. Padded-crop region (the final output window). Clamped to image bounds.
+  const padX = Math.max(0, Math.round((bbox.x - bbox.w * paddingPct) * imgW))
+  const padY = Math.max(0, Math.round((bbox.y - bbox.h * paddingPct) * imgH))
+  const padW = Math.min(imgW - padX, Math.round(bbox.w * (1 + 2 * paddingPct) * imgW))
+  const padH = Math.min(imgH - padY, Math.round(bbox.h * (1 + 2 * paddingPct) * imgH))
+
+  // 2. Inner (color-kept) region — the bbox itself, clamped to image bounds.
+  const colorX = Math.max(0, Math.round(bbox.x * imgW))
+  const colorY = Math.max(0, Math.round(bbox.y * imgH))
+  const colorW = Math.min(imgW - colorX, Math.max(1, Math.round(bbox.w * imgW)))
+  const colorH = Math.min(imgH - colorY, Math.max(1, Math.round(bbox.h * imgH)))
+
+  // 3. Desaturated + lightened full-hero layer (the "ghost" background).
+  //    modulate({saturation:0}) -> full greyscale; composite a white rectangle
+  //    at whiteLiftAlpha opacity to push the peripherals back.
+  const whiteRect = {
+    create: {
+      width: imgW,
+      height: imgH,
+      channels: 4 as const,
+      background: { r: 255, g: 255, b: 255, alpha: whiteLiftAlpha },
+    },
+  }
+  const desaturatedFull = await sharp(heroBuf)
+    .modulate({ saturation: saturationOutside })
+    .composite([{ input: whiteRect, blend: "over" }])
+    .png()
+    .toBuffer()
+
+  // 4. Color patch — the pixels inside the bbox, pulled straight from the hero.
+  let colorPatch = await sharp(heroBuf)
+    .extract({ left: colorX, top: colorY, width: colorW, height: colorH })
+    .png()
+    .toBuffer()
+
+  // 5. Optional feathered alpha on the patch so it blends into the ghost
+  //    instead of landing as a hard rectangle. We construct a soft-edged
+  //    white mask via SVG+blur, then use blend:"dest-in" to apply it as
+  //    alpha on the colour patch.
+  if (featherPct > 0) {
+    const feather = Math.max(1, Math.round(Math.min(colorW, colorH) * featherPct))
+    const inset = Math.max(1, feather)
+    const innerW = Math.max(1, colorW - inset * 2)
+    const innerH = Math.max(1, colorH - inset * 2)
+    const maskSvg = `<svg width="${colorW}" height="${colorH}" xmlns="http://www.w3.org/2000/svg"><rect x="${inset}" y="${inset}" width="${innerW}" height="${innerH}" fill="white"/></svg>`
+    const alphaMask = await sharp(Buffer.from(maskSvg))
+      .blur(feather)
+      .toColourspace("b-w")
+      .toBuffer()
+    colorPatch = await sharp(colorPatch)
+      .ensureAlpha()
+      .composite([{ input: alphaMask, blend: "dest-in" }])
+      .png()
+      .toBuffer()
+  }
+
+  // 6. Composite the (optionally feathered) colour patch onto the desaturated
+  //    full hero at the patch's original position, then crop to the padded
+  //    region and resize to fit the output box preserving aspect ratio.
+  const composed = await sharp(desaturatedFull)
+    .composite([{ input: colorPatch, left: colorX, top: colorY }])
+    .extract({
+      left: padX,
+      top: padY,
+      width: Math.max(1, padW),
+      height: Math.max(1, padH),
+    })
+    .resize({
+      width: outputWidth,
+      height: outputHeight,
+      fit: "inside",
+      withoutEnlargement: true,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    })
+    .png()
+    .toBuffer()
+
+  return composed.toString("base64")
+}
+
+/**
+ * Renders a module tile by cropping a ghosted-context region from a
+ * pre-existing interior hero image. NO gpt-image-2 / Gemini call involved —
+ * the output pixels are deterministic copies of the hero with the peripheral
+ * area desaturated, guaranteeing 100% geometric consistency with the hero.
+ *
+ * Used by the V2 per-module render path when
+ * `cad_lab_projects.interior_overview_url` is set (see
+ * `src/actions/forge-v2-generate-one-module-image.ts`). Falls back to the
+ * existing gpt-image-2 path when the column is null.
+ *
+ * @param scanId - Storage namespace (project id)
+ * @param moduleSpec - The target module; `id` is used in the filename, `name`
+ *   in logs.
+ * @param interiorOverviewBase64 - Base64 PNG of the interior-exploded hero
+ * @param bbox - Normalised (0-1) bounding box of the module in the hero
+ * @param options - Ghosted-crop tuning knobs (see {@link GhostedCropOptions})
+ * @returns Public URL of the uploaded tile + a telemetry-friendly model label
+ */
+export async function generateModuleImageFromCrop(
+  scanId: string,
+  moduleSpec: { id: string; name: string },
+  interiorOverviewBase64: string,
+  bbox: ModuleBoundingBox,
+  options: GhostedCropOptions = {},
+): Promise<{ url: string; modelUsed: string }> {
+  const tileBase64 = await cropWithGhostedContext(
+    interiorOverviewBase64,
+    bbox,
+    options,
+  )
+
+  const url = await uploadToStorage(
+    scanId,
+    `module-${moduleSpec.id}.png`,
+    tileBase64,
+    "image/png",
+  )
+
+  console.log(
+    `[XRayImageGen] ghosted-crop tile generated for "${moduleSpec.name}" (${moduleSpec.id})`,
+  )
+
+  // DECISION: label telemetry "sharp:ghosted-crop" so downstream dashboards
+  // distinguish these from gpt-image-2 renders and so we can audit what
+  // share of the fleet moved to the deterministic pipeline.
+  return { url, modelUsed: "sharp:ghosted-crop" }
+}
+
 // ─── Reference Image Editing (Two-Pass) ─────────────────────────────
 
 /**
@@ -1339,6 +1545,93 @@ export async function generateModuleImageWithReference(
 }
 
 /**
+ * Hero render mode.
+ *
+ * - `"default"` (or undefined) — existing behaviour; produces the standard
+ *   research-illustration hero used historically.
+ * - `"interior-exploded"` — SINGLE high-detail interior view showing every
+ *   sub-assembly in its spatial position with NO exterior walls / enclosure
+ *   visible. Source image for the deterministic Sharp ghosted-context crop
+ *   pipeline (see `cropWithGhostedContext` / `generateModuleImageFromCrop`).
+ *   Stored on `cad_lab_projects.interior_overview_url`.
+ * - `"exterior-shell"` — the standalone exterior enclosure (e.g. 40ft ISO
+ *   container for BESS). Used on the PDF cover / marketing. Reuses the
+ *   existing `system_illustration_url` slot.
+ */
+export type ImageRenderMode = "default" | "interior-exploded" | "exterior-shell"
+
+/**
+ * Builds a prompt for an "interior-exploded" hero — a single high-detail
+ * cutaway showing the full internal arrangement of every module with NO
+ * exterior enclosure visible. This is the source image that ghosted-context
+ * crops are extracted from, so EVERY module must be visible, labelled
+ * spatially (via the geometry map when present), and non-overlapping.
+ */
+function buildInteriorExplodedPrompt(
+  subject: string,
+  moduleNames: string[],
+  modulePurposes: string[],
+  visualStyle?: VisualStyleSpec,
+): string {
+  const geometryMap = visualStyle?.moduleGeometryMap ?? {}
+  const moduleLines = moduleNames.map((name, i) => {
+    const purpose = modulePurposes[i]?.trim()
+    const geom = geometryMap[name]?.trim()
+    const parts: string[] = [name]
+    if (purpose) parts.push(purpose)
+    if (geom) parts.push(geom)
+    return `- ${parts.join(" — ")}`
+  }).join("\n")
+
+  const paletteLine = visualStyle?.colorPalette
+    ? `\nColor palette: ${visualStyle.colorPalette}.`
+    : ""
+  const materialLine = visualStyle?.materialRendering
+    ? `\nMaterial rendering: ${visualStyle.materialRendering}.`
+    : ""
+  const formLine = visualStyle?.productFormDescription
+    ? `\nOverall product form (peripheral shell only shown as faint ghost outline if at all): ${visualStyle.productFormDescription}`
+    : ""
+
+  return `Technical cutaway isometric illustration of the INTERIOR ARRANGEMENT of a ${subject}.
+
+CRITICAL: NO exterior walls, NO container shell, NO outer enclosure visible. The image must show only the internal sub-assemblies in their correct spatial positions, as if the exterior has been fully removed. Show every sub-assembly at maximum detail, clearly separable from its neighbours, non-overlapping.
+
+Every one of the following sub-assemblies must be visible and identifiable in the image:
+${moduleLines}
+
+Each sub-assembly is rendered in full colour using realistic industrial materials with thin precise line weights. Use distinct hues so neighbouring sub-assemblies do not visually blend. Maintain consistent proportions — the spatial relationships between sub-assemblies should match how they physically sit inside the assembled product.
+${formLine}${paletteLine}${materialLine}
+
+Perspective: 3D isometric view from front-right above (30-degree camera elevation). White background (#FFFFFF), thin 1px outlines, soft single drop shadow at 15% opacity. Engineering blueprint aesthetic. No exterior shell, no container walls, no outer frame — interior arrangement only.${COHESIVE_STYLE_SUFFIX}`
+}
+
+/**
+ * Builds a prompt for an "exterior-shell" hero — the standalone outer
+ * enclosure (e.g. the sealed 40ft ISO container for a BESS) with no internals
+ * shown. Used on the PDF cover.
+ */
+function buildExteriorShellPrompt(
+  subject: string,
+  visualStyle?: VisualStyleSpec,
+): string {
+  const formLine = visualStyle?.productFormDescription
+    ? `\nOverall enclosure form: ${visualStyle.productFormDescription}`
+    : ""
+  const paletteLine = visualStyle?.colorPalette
+    ? `\nColor palette: ${visualStyle.colorPalette}.`
+    : ""
+  const materialLine = visualStyle?.materialRendering
+    ? `\nMaterial rendering: ${visualStyle.materialRendering}.`
+    : ""
+
+  return `Clean professional product render of the EXTERIOR ENCLOSURE of a ${subject} — the sealed outer shell only, with no interior visible.
+${formLine}${paletteLine}${materialLine}
+
+Perspective: 3D isometric view from front-right above (30-degree camera elevation). Render the exterior walls, doors, vents, cable glands, and any externally-visible features. No internal sub-assemblies, no cutaway, no exploded view — the product as it appears when fully assembled and closed. White background (#FFFFFF). Subtle light gray engineering grid. Soft single drop shadow at 15% opacity. Generous whitespace.${COHESIVE_STYLE_SUFFIX}`
+}
+
+/**
  * Generates a 16:9 illustration banner for a CAD Lab research report.
  *
  * @param projectId - The CAD Lab project ID (storage namespace)
@@ -1346,6 +1639,12 @@ export async function generateModuleImageWithReference(
  * @param moduleNames - Names of decomposed modules (for context)
  * @param modulePurposes - One-line purposes per module (for context)
  * @param visualStyle - Optional shared visual style for cross-module cohesion
+ * @param mode - Hero render mode. See {@link ImageRenderMode}. When set to
+ *   `"interior-exploded"` or `"exterior-shell"`, this function builds a
+ *   mode-specific prompt and stores the output under a mode-distinct
+ *   filename so the URL returned is stable across the two modes (caller is
+ *   responsible for writing the URL to the correct column on
+ *   `cad_lab_projects`).
  * @returns The public URL of the generated illustration
  *
  * @throws Error if image generation or upload fails
@@ -1360,10 +1659,24 @@ export async function generateResearchIllustration(
   customPrompt?: string,
   referenceImageUrls?: string[],
   stylePreamble?: string,
+  mode?: ImageRenderMode,
 ): Promise<string> {
   let prompt: string
 
-  if (customPrompt) {
+  if (mode === "interior-exploded") {
+    // INTENT: Interior-exploded hero is the source image for the deterministic
+    // ghosted-context crop pipeline. A mode-specific prompt with explicit
+    // "no exterior walls" framing + per-module spatial positions gives the
+    // image model its best chance at producing every sub-assembly clearly
+    // separable in the output.
+    const base = buildInteriorExplodedPrompt(subject, moduleNames, modulePurposes, visualStyle)
+    prompt = MANDATORY_RENDERING_PREAMBLE + enforceNoText(base)
+  } else if (mode === "exterior-shell") {
+    // INTENT: Exterior-shell hero is the "cover art" — the sealed enclosure
+    // only. Used on PDF cover / marketing.
+    const base = buildExteriorShellPrompt(subject, visualStyle)
+    prompt = MANDATORY_RENDERING_PREAMBLE + enforceNoText(base)
+  } else if (customPrompt) {
     // INTENT: When Opus design synthesis provides a hero prompt, use it directly.
     // Prepend white-background + color + no-text enforcement (image models weight
     // the start of the prompt most heavily — putting these rules at the end caused
@@ -1436,9 +1749,18 @@ Style: Modern technical product render on a clean white background. Show the com
     referenceBase64: userRefBase64,
   })
 
+  // Mode-specific filename so the three hero variants (default, interior,
+  // exterior) don't overwrite each other in storage.
+  const filename =
+    mode === "interior-exploded"
+      ? "interior-overview.png"
+      : mode === "exterior-shell"
+        ? "exterior-shell.png"
+        : "research-illustration.png"
+
   const url = await uploadToStorage(
     projectId,
-    "research-illustration.png",
+    filename,
     imageData.data,
     imageData.mimeType,
   )

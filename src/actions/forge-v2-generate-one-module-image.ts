@@ -41,7 +41,9 @@ import { DEFAULT_ILLUSTRATION_STYLE, isIllustrationStyle } from "@/lib/cad-lab/i
 import {
     analyseHeroBoundingBoxes,
     cropModuleRegion,
+    generateModuleImageFromCrop,
 } from "@/app/(platform)/the-forge/services/image-generator"
+import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/image-generator"
 import type { Json } from "@/types/database.types"
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -87,7 +89,7 @@ export async function generateOneModuleImage(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url, subject",
+                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url, interior_overview_url, hero_bounding_boxes, subject",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -225,6 +227,204 @@ export async function generateOneModuleImage(
             // kicks in — either the primary wasn't ready yet, the flip
             // action failed, or the persist failed. Better to regen than
             // to surface an error for a recoverable case.
+        }
+
+        // 1c. Ghosted-context crop short-circuit.
+        //
+        //     When `interior_overview_url` is set, we render modules
+        //     DETERMINISTICALLY by cropping regions of that interior hero
+        //     with Sharp rather than regenerating each tile with gpt-image-2.
+        //     Geometric consistency is 100% because the output pixels are
+        //     literally copies of the hero with the peripheral area
+        //     desaturated — so the "container in a container" drift that
+        //     motivated this pipeline can't recur.
+        //
+        //     Cache policy: the bounding-box map is computed once per project
+        //     (Claude Vision, ~5s) and persisted to
+        //     `cad_lab_projects.hero_bounding_boxes`. Subsequent per-module
+        //     calls reuse the map and pay only the Sharp pipeline (~200ms).
+        //
+        //     Fallback: any failure (hero fetch, vision miss, sharp error)
+        //     falls through to the existing gpt-image-2 path below so we
+        //     never ship worse than before.
+        const interiorUrl = project.interior_overview_url
+        if (typeof interiorUrl === "string" && interiorUrl.length > 0) {
+            try {
+                const heroRes = await fetch(interiorUrl)
+                if (!heroRes.ok) {
+                    console.error(
+                        "[forge-v2-generate-one-module-image] interior hero fetch non-ok; falling through to gpt-image-2",
+                        {
+                            projectId,
+                            moduleId,
+                            status: heroRes.status,
+                            gate: "interior-fetch-non-ok",
+                        },
+                    )
+                } else {
+                    const heroBuf = Buffer.from(await heroRes.arrayBuffer())
+                    // flatten alpha to white so any PNG transparency in the
+                    // hero doesn't surface as black in the ghosted output.
+                    const flat = await sharp(heroBuf)
+                        .flatten({ background: { r: 255, g: 255, b: 255 } })
+                        .png()
+                        .toBuffer()
+                    const interiorBase64 = flat.toString("base64")
+
+                    // Reuse cached bbox map when available, otherwise compute
+                    // once via Claude Vision and persist.
+                    let bboxMap: Record<string, ModuleBoundingBox> = {}
+                    const cached = project.hero_bounding_boxes as unknown
+                    if (cached && typeof cached === "object") {
+                        bboxMap = cached as Record<string, ModuleBoundingBox>
+                    } else {
+                        const moduleNames = modules.map((m) => m.name)
+                        bboxMap = await analyseHeroBoundingBoxes(
+                            interiorBase64,
+                            moduleNames,
+                            "image/png",
+                        )
+                        if (Object.keys(bboxMap).length > 0) {
+                            const { error: saveErr } = await admin
+                                .from("cad_lab_projects")
+                                .update({
+                                    hero_bounding_boxes: bboxMap as unknown as Json,
+                                })
+                                .eq("id", projectId)
+                            if (saveErr) {
+                                console.warn(
+                                    "[forge-v2-generate-one-module-image] failed to persist hero_bounding_boxes:",
+                                    saveErr.message ?? String(saveErr),
+                                )
+                            }
+                        }
+                    }
+
+                    // Case-insensitive lookup — Claude Vision sometimes
+                    // title-cases supplied names.
+                    const bbox =
+                        bboxMap[target.name] ??
+                        Object.entries(bboxMap).find(
+                            ([k]) =>
+                                k.trim().toLowerCase() ===
+                                target.name.trim().toLowerCase(),
+                        )?.[1]
+
+                    if (!bbox) {
+                        console.error(
+                            "[forge-v2-generate-one-module-image] no bbox for module in interior hero; falling through to gpt-image-2",
+                            {
+                                projectId,
+                                moduleId,
+                                moduleName: target.name,
+                                availableBoxes: Object.keys(bboxMap),
+                                gate: "interior-bbox-miss",
+                            },
+                        )
+                    } else {
+                        const cropResult = await generateModuleImageFromCrop(
+                            projectId,
+                            { id: target.id, name: target.name },
+                            interiorBase64,
+                            bbox,
+                        )
+
+                        // Persist: re-read + splice pattern, same as the
+                        // mirror / gpt-image-2 paths below, so parallel
+                        // per-module loops can't clobber each other.
+                        const { data: fresh, error: reloadErr } = await admin
+                            .from("cad_lab_projects")
+                            .select("modules")
+                            .eq("id", projectId)
+                            .maybeSingle()
+                        if (reloadErr || !fresh) {
+                            console.error(
+                                "[forge-v2-generate-one-module-image] ghosted-crop succeeded but persist reload failed",
+                                {
+                                    projectId,
+                                    moduleId,
+                                    error:
+                                        reloadErr?.message ??
+                                        "missing row",
+                                },
+                            )
+                            return {
+                                ok: false,
+                                error:
+                                    "Generated the tile but couldn't persist — reload failed.",
+                                errorCode: "INTERNAL",
+                            }
+                        }
+                        const freshModules =
+                            (fresh.modules as unknown as CadLabModule[]) ?? []
+                        const freshIdx = freshModules.findIndex(
+                            (m) => m.id === moduleId,
+                        )
+                        if (freshIdx === -1) {
+                            return {
+                                ok: false,
+                                error:
+                                    "Module was removed from the project during generation.",
+                                errorCode: "MODULE_NOT_FOUND",
+                            }
+                        }
+                        const updatedModules: CadLabModule[] = [...freshModules]
+                        updatedModules[freshIdx] = {
+                            ...freshModules[freshIdx],
+                            imageUrl: `${cropResult.url}?v=${Date.now()}`,
+                            imageStatus: "complete",
+                            imageModelUsed: cropResult.modelUsed,
+                        }
+                        const { error: updateErr } = await admin
+                            .from("cad_lab_projects")
+                            .update({ modules: updatedModules })
+                            .eq("id", projectId)
+                        if (updateErr) {
+                            console.error(
+                                "[forge-v2-generate-one-module-image] ghosted-crop persist failed",
+                                {
+                                    projectId,
+                                    moduleId,
+                                    error:
+                                        updateErr.message ?? String(updateErr),
+                                },
+                            )
+                            return {
+                                ok: false,
+                                error:
+                                    "Generated the tile but couldn't save — please retry this module.",
+                                errorCode: "INTERNAL",
+                            }
+                        }
+
+                        console.log(
+                            "[forge-v2-generate-one-module-image] ghosted-crop render complete",
+                            {
+                                projectId,
+                                moduleId,
+                                moduleName: target.name,
+                                bbox,
+                            },
+                        )
+                        return {
+                            ok: true,
+                            imageUrl: updatedModules[freshIdx].imageUrl ?? cropResult.url,
+                        }
+                    }
+                }
+            } catch (err) {
+                // Any failure in the ghosted-crop path falls through to the
+                // existing gpt-image-2 flow — never ship worse than before.
+                console.error(
+                    "[forge-v2-generate-one-module-image] ghosted-crop threw; falling through to gpt-image-2",
+                    {
+                        projectId,
+                        moduleId,
+                        gate: "interior-crop-throw",
+                        error: err instanceof Error ? err.message : String(err),
+                    },
+                )
+            }
         }
 
         // 2. Build the subset input shape the inner action needs. Safe

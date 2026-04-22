@@ -4693,10 +4693,12 @@ export type Database = {
           forked_from_id: string | null
           foundry_id: string
           generated_code: string | null
+          hero_bounding_boxes: Json | null
           id: string
           illustration_style: string
           image_render_state: Json | null
           images_generated_at_revision: number
+          interior_overview_url: string | null
           integrated_assembly_code: string | null
           integrated_assembly_step_url: string | null
           integrated_assembly_stl_url: string | null
@@ -4751,10 +4753,12 @@ export type Database = {
           forked_from_id?: string | null
           foundry_id: string
           generated_code?: string | null
+          hero_bounding_boxes?: Json | null
           id?: string
           illustration_style?: string
           image_render_state?: Json | null
           images_generated_at_revision?: number
+          interior_overview_url?: string | null
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
@@ -4809,10 +4813,12 @@ export type Database = {
           forked_from_id?: string | null
           foundry_id?: string
           generated_code?: string | null
+          hero_bounding_boxes?: Json | null
           id?: string
           illustration_style?: string
           image_render_state?: Json | null
           images_generated_at_revision?: number
+          interior_overview_url?: string | null
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
