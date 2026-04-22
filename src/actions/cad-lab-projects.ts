@@ -60,7 +60,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 //
 // Pure, no awaits — kept as a non-exported const so "use server" semantics
 // are preserved (only async functions may be exported).
-const MAX_NAME_LEN = 60
+// Keep comfortably wide enough to fit most natural product names
+// without an ugly ellipsis. 60 was too tight — it truncated the BESS
+// container brief at "…a 40ft…" mid-phrase (see bug 2026-04-22,
+// project 878359d2-7fb5-49c0-8341-3032797daa05). 120 holds full
+// sentence-style names end-to-end while still preventing absurd
+// 400+ char briefs from flowing into sidebar chrome / PDF cover.
+const MAX_NAME_LEN = 120
 function deriveShortName(subject: string): string {
   const collapsed = subject.trim().replace(/\s+/g, " ")
   if (!collapsed) return "Untitled project"

@@ -90,11 +90,17 @@ const styles = StyleSheet.create({
     },
     coverBand: {
         backgroundColor: BRAND,
-        height: 140,
+        // `minHeight` (not fixed `height`) lets the band grow when the
+        // project title wraps onto 2 or 3 lines — 28pt bold at
+        // MAX_NAME_LEN=120 can produce a 2-line title for most briefs.
+        // Fixed 140pt clipped the second line and visually truncated
+        // the title. (Bug 2026-04-22, BESS container brief.)
+        minHeight: 140,
         width: "100%",
         paddingLeft: 48,
         paddingRight: 48,
         paddingTop: 42,
+        paddingBottom: 24,
         color: "white",
     },
     // marginBottom must exceed the h1's font descender to prevent the
