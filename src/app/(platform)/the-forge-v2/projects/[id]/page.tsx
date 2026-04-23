@@ -72,13 +72,22 @@ export default async function ForgeV2ProjectPage({
     // runner has its own self-healing check that fires the expected
     // pipeline_run if missing, so this is cheap + idempotent when autopilot
     // is already making progress but critical when the after()-chain dropped
-    // silently mid-stage (observed 2026-04-23). Fire-and-forget.
-    tickAutopilotStage(id).catch((err) => {
+    // silently mid-stage (observed 2026-04-23).
+    //
+    // AWAIT is critical: tickAutopilotStage wraps its work in withAuth, which
+    // returns a Promise. The after() that schedules the stage re-entry is
+    // INSIDE the withAuth callback. If we fire-and-forget the outer promise,
+    // Next.js may complete the page render + tear down the container before
+    // withAuth resolves — which means after() never runs, which means the
+    // nudge is a no-op. Await unblocks the chain end-to-end.
+    try {
+        await tickAutopilotStage(id)
+    } catch (err) {
         console.warn(
             "[WORKSPACE-PAGE] tickAutopilotStage failed (non-fatal):",
             err instanceof Error ? err.message : err,
         )
-    })
+    }
 
     // ── 2. Derived data — parallelised, all failure-tolerant ─────────
     // Each call's failure mode is local: we swallow errors and fall back to
