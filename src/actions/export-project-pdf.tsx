@@ -1342,7 +1342,7 @@ function SizingOptimisationSection({ sheet }: { sheet: PdfInput["dimensionSheet"
     }
 
     return (
-        <View break>
+        <View>
             <Text style={styles.h2}>3. Sizing optimisation</Text>
             <Text style={styles.muted}>
                 Forge ran a {(opt?.trials ?? []).length}-trial sweep to find the best fit for this envelope.
