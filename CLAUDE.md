@@ -30,6 +30,56 @@
 
 ---
 
+## Read the Logs — Vercel First, Before Theorising
+
+When something fails in production (autopilot drops a stage, a server action returns without writing, a background job never fires), **pull Vercel logs before you start guessing.** This rule exists because the failure mode has been catastrophic twice in one day on 2026-04-23:
+
+1. The months-long autopilot "locking_brief → Max drop" — I spent time enumerating six candidate early-return branches in `runMaxDecompositionBackground`. One `npx vercel logs` call surfaced the exact FK-constraint name (`pipeline_runs_triggered_by_fkey`) in seconds. The fix was a one-line null-passthrough.
+2. The HAPS per-module render "failures" — I assumed gpt-image-2 content-policy rejection because the brief mentioned defence / MOD. Logs showed `Vercel Runtime Timeout Error: Task timed out after 300 seconds`. Content wasn't the issue — the stage batch size was. Different fix entirely.
+
+### The rule
+
+**If a server-side action, autopilot stage, pipeline_run, or background job fails silently, misses progress, or returns `ok: false` without a clear error — your FIRST step is to pull Vercel logs for the deployment.** Not read the code. Not theorise about which branch fired. Not inspect DB state. Logs.
+
+```bash
+# Get the preview URL first
+npx vercel ls
+
+# Pull logs with the timestamp window you care about. --expand shows the
+# full console.log lines (not just the request line). --level error filters
+# down to the real problem.
+npx vercel logs <deployment-url> \
+  --no-follow \
+  --since 2026-04-23T13:40:00Z \
+  --until 2026-04-23T14:00:00Z \
+  --limit 100 \
+  --expand \
+  --level error
+```
+
+### Hygiene
+
+- **Vercel retains logs for ~1 hour.** If the failure is old, the logs are gone — grab them while the incident is fresh. If you wake up hours later, they may already be unrecoverable.
+- **Always pass `--expand`.** Without it, you get the request line only ("λ POST /..."), which tells you nothing. `--expand` shows the console.error lines beneath each request.
+- **Narrow the time window** (`--since` / `--until`). ForgeOS logs are noisy; a 5-minute window around the failure is much more useful than the full deployment.
+- **Use `--level error`** as a first cut. Most "why is this stuck" answers are in error-level lines.
+- **Search the output for the specialist prefix** (e.g. `[run-max-decomposition]`, `[render-all-modules]`, `[autopilot]`). Every server action logs under a consistent prefix — grep for it.
+
+### When NOT to rely on logs
+
+- A one-line output like "Task timed out after 300 seconds" is the START of your investigation, not the answer. You still have to find WHY the task took 300s — batch too large, runaway retry, external API hanging. Logs tell you where to look, not what to do.
+- If logs are empty for the window you're looking at, the container was torn down before writing — that's also a signal (the work never ran).
+- Logs expire. If you find something important, quote it verbatim into the commit message, handover doc, or MEMORY.md so it survives the 1-hour retention.
+
+### Pair with DB reads, not instead of them
+
+Vercel logs tell you what the code DID. Supabase MCP (`execute_sql`) tells you what state ENDED UP in. Use both together:
+1. Check DB state: was the row written? What's the autopilot stage? What's the pipeline_runs status?
+2. If the DB state is unexpected, pull Vercel logs for the window when the code should have run.
+3. The log error + the DB gap usually pinpoint the bug in one pass.
+
+---
+
 ## Tracking Documents for Autonomous Work
 
 **The user frequently works away from the terminal and expects fully autonomous execution.** You must be able to control yourself using reference documents — there is no one to catch mistakes.

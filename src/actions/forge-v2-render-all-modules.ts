@@ -294,19 +294,24 @@ export async function renderNextModuleStage(
         return
     }
 
-    // 2. Find next batch of unrendered modules. Fan-out 2-at-a-time:
-    //    the old single-module sequential chain meant 8 modules took
-    //    10-25 minutes wall-clock because each stage waited on the
-    //    prior to finish. At 2-at-a-time each stage covers two
-    //    concurrent ~60s Gemini calls = ~120s typical, well under
-    //    Vercel's 300s cap even if one retries. Cuts total wall-clock
-    //    by ~2x.
+    // 2. Find next module to render. batch=1 per stage.
     //
-    //    We avoid concurrency=3 because if all three retry (happens
-    //    ~1/8 runs in practice) the total nudges the 300s cap and the
-    //    stage gets killed mid-persist, which is exactly the failure
-    //    mode we're here to prevent.
-    const RENDER_BATCH_SIZE = 2
+    // GOTCHA: batch=2 looked safe on paper (two ~60s gpt-image-2 calls
+    // in parallel, 300s Vercel cap) but the reference-aware pipeline adds
+    // a geometric-consistency-score check that fires a second gpt-image-2
+    // call when score <7/10, and those retries compound in parallel
+    // enough that the stage busted 300s roughly 1/3 of the time. Observed
+    // 2026-04-23 on HAPS eadae45d: 2-at-a-time lost 2/4 modules to the
+    // Vercel cap mid-render, leaving the pipeline with `failed_ids: 2`
+    // entries and no way to distinguish "module is genuinely unrenderable"
+    // from "Vercel killed the container".
+    //
+    // batch=1 trades 2x wall-clock (7 modules × ~90s = ~10 min) for
+    // guaranteed per-module 300s budget. The tickImageRenderChain()
+    // recovery branch handles dropped after()s between stages, so the
+    // user doesn't feel the slower walk — they still see the chain make
+    // progress every ~90s until finished_at is stamped.
+    const RENDER_BATCH_SIZE = 1
     const modules = (project.modules as CadLabModule[] | null) ?? []
     const ordered = orderForRender(modules)
     const unrenderedQueue = ordered.filter((m) => !hasImage(m))
