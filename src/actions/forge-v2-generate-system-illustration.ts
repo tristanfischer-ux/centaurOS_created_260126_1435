@@ -64,7 +64,7 @@ export async function generateSystemIllustrationForProject(
         const admin = createAdminClient()
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, modules, illustration_style, visual_style, dimension_sheet")
+            .select("id, foundry_id, subject, modules, illustration_style, visual_style, dimension_sheet, spatial_plan")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -130,18 +130,37 @@ export async function generateSystemIllustrationForProject(
             project.visual_style && typeof project.visual_style === "object"
                 ? (project.visual_style as Parameters<typeof generateCadLabSystemIllustrationAction>[4])
                 : undefined
-        const enrichedStyle = enrichVisualStyleWithDimensions(
+        const dimensionEnrichedStyle = enrichVisualStyleWithDimensions(
             baseVisualStyle,
             sheet,
             modules,
         )
 
+        // INTENT: Layer the spatial plan on top of the sizing enrichment so
+        // each module's note carries BOTH its W×D×H and its placement. The
+        // adapter concatenates rather than overwrites, so every channel the
+        // sizing path already populates stays populated.
+        const { enrichVisualStyleWithSpatialPlan, formatHeroLayoutBriefing } =
+            await import("@/lib/layout/prompt-adapter")
+        const spatialPlan =
+            (project.spatial_plan as import("@/lib/layout/types").SpatialPlan | null) ?? null
+        const enrichedStyle = enrichVisualStyleWithSpatialPlan(
+            dimensionEnrichedStyle,
+            spatialPlan,
+            modules,
+        )
+
         // Hero gets the FULL dimension table as a research-excerpt-equivalent
         // string so the prompt builder renders a to-scale spatial layout.
+        // When a spatial plan exists we append the layout briefing so the
+        // hero sees per-module positions + non-module envelope features
+        // (aisles, doors, vents).
         const heroDimensionTable = formatHeroDimensionTable(sheet, modules)
-        const researchExcerptWithDimensions = heroDimensionTable
-            ? heroDimensionTable
-            : undefined
+        const heroLayoutBriefing = formatHeroLayoutBriefing(spatialPlan, modules)
+        const heroBriefing = [heroDimensionTable, heroLayoutBriefing]
+            .filter((s) => s && s.length > 0)
+            .join("\n\n")
+        const researchExcerptWithDimensions = heroBriefing.length > 0 ? heroBriefing : undefined
 
         try {
             const res = await generateCadLabSystemIllustrationAction(

@@ -43,7 +43,12 @@ import {
     cropModuleRegion,
 } from "@/app/(platform)/the-forge/services/image-generator"
 import { enrichVisualStyleWithDimensions } from "@/lib/sizing/prompt-adapter"
+import {
+    enrichVisualStyleWithSpatialPlan,
+    formatPerModuleContextBriefing,
+} from "@/lib/layout/prompt-adapter"
 import type { DimensionSheet } from "@/lib/sizing/types"
+import type { SpatialPlan } from "@/lib/layout/types"
 import type { Json } from "@/types/database.types"
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -89,7 +94,7 @@ export async function generateOneModuleImage(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url, interior_overview_url, hero_bounding_boxes, subject, dimension_sheet",
+                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url, interior_overview_url, hero_bounding_boxes, subject, dimension_sheet, spatial_plan",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -324,11 +329,46 @@ export async function generateOneModuleImage(
         // This is the whole point of the sizing engine — modules are
         // rendered aware of the space they'll take up inside the enclosure.
         const sheet = (project.dimension_sheet as DimensionSheet | null) ?? null
-        const visualStyle = enrichVisualStyleWithDimensions(
+        const dimensionEnrichedStyle = enrichVisualStyleWithDimensions(
             baseVisualStyle,
             sheet,
             modules,
         )
+
+        // INTENT: Layer the layout engine's spatial plan on top. Each
+        // module's note gets "layout: <placement + neighbours>" appended
+        // AND we synthesise a short per-module context briefing so
+        // buildDimensionalConstraints surfaces adjacency to the gpt-image-2
+        // prompt. Without this, per-module renders have no idea what's
+        // next to them and ghosted context can't be drawn coherently.
+        const spatialPlan = (project.spatial_plan as SpatialPlan | null) ?? null
+        const visualStyle = enrichVisualStyleWithSpatialPlan(
+            dimensionEnrichedStyle,
+            spatialPlan,
+            modules,
+        )
+
+        // Per-module context briefing — adjacent neighbours + nearby
+        // features. Appended onto the target module's note so it rides
+        // the existing VisualStyleSpec.moduleDimensionNotes[name] channel
+        // into buildDimensionalConstraints. If no plan, returns "" and
+        // nothing changes.
+        if (visualStyle) {
+            const perModuleBriefing = formatPerModuleContextBriefing(
+                spatialPlan,
+                target.id,
+                modules,
+            )
+            if (perModuleBriefing) {
+                const existing = visualStyle.moduleDimensionNotes?.[target.name]
+                visualStyle.moduleDimensionNotes = {
+                    ...(visualStyle.moduleDimensionNotes ?? {}),
+                    [target.name]: existing
+                        ? `${existing}\n\nSPATIAL CONTEXT:\n${perModuleBriefing}`
+                        : `SPATIAL CONTEXT:\n${perModuleBriefing}`,
+                }
+            }
+        }
 
         // Honour the project's illustration_style so every module renders
         // in the same visual language as the hero (the hero orchestrator
