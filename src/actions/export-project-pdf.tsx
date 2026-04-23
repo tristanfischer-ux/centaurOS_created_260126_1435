@@ -38,11 +38,17 @@ import {
     StyleSheet,
     pdf,
     Image,
+    Svg,
+    Rect,
+    Line,
+    Circle,
+    Polygon,
 } from "@react-pdf/renderer"
 
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
+import type { SpatialPlan, Placement, Feature } from "@/lib/layout/types"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -487,6 +493,14 @@ interface PdfInput {
      *  winner rationale, top alternatives, and levers. Nullable — projects
      *  from before v1.1 sizing engine won't have this. */
     dimensionSheet: import("@/lib/sizing/types").DimensionSheet | null
+    /** Spatial plan from Fang's layout engine. When present, renders a new
+     *  section ("Spatial plan") AFTER sizing optimisation and BEFORE the
+     *  per-module pages. Contains a to-scale 2D drawing (top-down / side
+     *  elevation) or a simplified layered diagram (stack / isometric
+     *  exploded) with placements, features, and constraints. Nullable —
+     *  projects from before v1.2 layout engine won't have this, and
+     *  rule libraries that don't yet implement layout return null. */
+    spatialPlan: SpatialPlan | null
     totals: {
         moduleCount: number
         keyPartCount: number
@@ -1320,7 +1334,13 @@ function AuditLogPage({ rows }: { rows: AuditRowPdf[] }): React.ReactElement {
     )
 }
 
-function SizingOptimisationSection({ sheet }: { sheet: PdfInput["dimensionSheet"] }): React.ReactElement | null {
+function SizingOptimisationSection({
+    sheet,
+    sectionNumber,
+}: {
+    sheet: PdfInput["dimensionSheet"]
+    sectionNumber: number
+}): React.ReactElement | null {
     if (!sheet) return null
     const opt = sheet.optimisation
     const feasibleLabel = sheet.feasible ? "FEASIBLE" : "INFEASIBLE"
@@ -1343,7 +1363,7 @@ function SizingOptimisationSection({ sheet }: { sheet: PdfInput["dimensionSheet"
 
     return (
         <View>
-            <Text style={styles.h2}>3. Sizing optimisation</Text>
+            <Text style={styles.h2}>{sectionNumber}. Sizing optimisation</Text>
             <Text style={styles.muted}>
                 Forge ran a {(opt?.trials ?? []).length}-trial sweep to find the best fit for this envelope.
                 Coefficient library: {sheet.rules_domain} v{sheet.rules_version}.
@@ -1457,30 +1477,652 @@ function SizingOptimisationSection({ sheet }: { sheet: PdfInput["dimensionSheet"
     )
 }
 
+// ─── Spatial plan (P2) ─────────────────────────────────────────────────
+
+/**
+ * Map a placement's `mount` to a fill + stroke colour pair used inside the
+ * SVG drawing. Kept as a helper (rather than inline Map) so the colour
+ * legend rendered under the drawing stays consistent.
+ */
+function mountColours(
+    mount: Placement["mount"],
+): { fill: string; stroke: string; dashed: boolean } {
+    switch (mount) {
+        case "floor":
+            return { fill: "#e5e7eb", stroke: "#6b7280", dashed: false }
+        case "wall":
+            return { fill: "#dbeafe", stroke: "#2563eb", dashed: false }
+        case "ceiling":
+            // Ceiling-mounted placements are ABOVE the top-down plane, so we
+            // hint at that with a dashed stroke + warm fill.
+            return { fill: "#fed7aa", stroke: "#ea580c", dashed: true }
+        case "envelope":
+            return { fill: "transparent", stroke: "#111827", dashed: false }
+    }
+}
+
+/**
+ * Colour for a non-module feature by kind. Architectural drawings use a
+ * small, distinct palette (aisle = light tint, door = warm accent,
+ * vent = dotted, cable tray = coloured line) — we follow the same.
+ */
+function featureStyle(
+    kind: Feature["kind"],
+): { stroke: string; fill: string; strokeDasharray?: string } {
+    switch (kind) {
+        case "aisle":
+            return { stroke: "#9ca3af", fill: "none", strokeDasharray: "4 3" }
+        case "door":
+            return { stroke: "#ea580c", fill: "#ffedd5" }
+        case "vent":
+            return { stroke: "#0ea5e9", fill: "none", strokeDasharray: "1 2" }
+        case "access_panel":
+            return { stroke: "#16a34a", fill: "none", strokeDasharray: "2 2" }
+        case "cable_tray":
+            return { stroke: "#a855f7", fill: "none" }
+        case "pipe_run":
+            return { stroke: "#0891b2", fill: "none" }
+        case "wall":
+            return { stroke: "#111827", fill: "none" }
+        case "structural_column":
+            return { stroke: "#374151", fill: "#d1d5db" }
+    }
+}
+
+/**
+ * Render the spatial plan section — the only new surface added by the
+ * layout engine (P2.112). Policy mirrors SizingOptimisationSection:
+ *
+ *   - null plan          → returns null, no section, no placeholder copy
+ *   - plan, no placements→ renders envelope outline + "No placements" note
+ *                          (valid for a rules library that authored features
+ *                          but matched zero modules)
+ *   - plan + placements  → full SVG drawing + two-column tables + notes
+ *
+ * Never fabricates coordinates — everything comes off the persisted plan.
+ */
+function SpatialPlanSection({
+    plan,
+    sectionNumber,
+    moduleNameById,
+}: {
+    plan: SpatialPlan | null
+    sectionNumber: number
+    moduleNameById: Map<string, string>
+}): React.ReactElement | null {
+    if (!plan) return null
+
+    const env = plan.envelope
+    const view = plan.view
+
+    // Label resolver — prefers placement.label_override, then the module name
+    // from the project's modules list, then falls back to the raw module_id
+    // so the reader never sees an empty rectangle.
+    const labelFor = (p: Placement): string =>
+        p.label_override ?? moduleNameById.get(p.module_id) ?? p.module_id
+
+    // ── Header ─────────────────────────────────────────────────────────
+    const header = (
+        <View>
+            <Text style={styles.h2}>
+                {sectionNumber}. Spatial plan — {env.label}
+            </Text>
+            <Text style={styles.muted}>
+                {view}, plan_type={plan.plan_type}, authored by {plan.authored_by},
+                generated {fmtDateTime(plan.generated_at)} ({plan.rules_domain} v
+                {plan.rules_version})
+            </Text>
+        </View>
+    )
+
+    // ── Drawing dispatch ───────────────────────────────────────────────
+    // top_down / side_elevation → to-scale 2D drawing.
+    // isometric_exploded / cutaway → simplified stacked-layer diagram
+    // (full 3D projection is too expensive inside react-pdf's SVG
+    // rasteriser, so we degrade to a legible layered list).
+    const is2D = view === "top_down" || view === "side_elevation"
+
+    // Drawing target dimensions — 450pt wide is the documented
+    // "fits inside page margins with room for a caption" figure. The
+    // height scales with the envelope's secondary axis.
+    const DRAWING_W_PT = 450
+    const axisInsetPt = 14 // room for axis labels around the drawing
+
+    // Axis selection — which envelope dimension is the X (primary) axis
+    // and which is the Y (secondary) axis inside the drawing.
+    const envelopeX_mm = env.interior_w_mm
+    const envelopeY_mm =
+        view === "top_down" ? env.interior_d_mm : env.interior_h_mm
+
+    const scale = envelopeX_mm > 0 ? DRAWING_W_PT / envelopeX_mm : 1
+    const drawingW = DRAWING_W_PT
+    const drawingH = Math.max(40, envelopeY_mm * scale)
+    const svgH = drawingH + axisInsetPt * 2
+
+    // Transform helpers — envelope-local mm → SVG pt.
+    // SVG origin is top-left; envelope origin is bottom-left of the view
+    // (per the SpatialPlan convention), so we flip Y.
+    const toSvgX = (x_mm: number): number => axisInsetPt + x_mm * scale
+    const toSvgY = (y_mm: number, size_mm: number): number =>
+        axisInsetPt + (envelopeY_mm - y_mm - size_mm) * scale
+    const toSvgPtY = (y_mm: number): number =>
+        axisInsetPt + (envelopeY_mm - y_mm) * scale
+
+    // For side-elevation, y_mm is the placement's FLOOR z-value and the
+    // secondary axis is height. Each placement's bounding size along the
+    // secondary axis is h_mm (not d_mm).
+    const sizeAlongY = (p: Placement): number =>
+        view === "top_down" ? p.d_mm : p.h_mm
+    const sizeAlongX = (p: Placement): number => p.w_mm
+    const originOnY = (p: Placement): number =>
+        view === "top_down" ? p.y_mm : (p.z_mm ?? 0)
+
+    // ── 2D drawing body ────────────────────────────────────────────────
+    const drawing2D = (
+        <Svg width={drawingW + axisInsetPt * 2} height={svgH}>
+            {/* Envelope outline */}
+            <Rect
+                x={axisInsetPt}
+                y={axisInsetPt}
+                width={drawingW}
+                height={drawingH}
+                fill="none"
+                stroke="#111827"
+                strokeWidth={1.2}
+            />
+
+            {/* Placements */}
+            {plan.placements.map((p, i) => {
+                const w = sizeAlongX(p) * scale
+                const h = sizeAlongY(p) * scale
+                const x = toSvgX(p.x_mm)
+                const y = toSvgY(originOnY(p), sizeAlongY(p))
+                const c = mountColours(p.mount)
+                const label = labelFor(p)
+                // Label font size shrinks on tight cells. We keep at least
+                // 5pt (react-pdf rasterises below this reliably) and never
+                // render a label larger than ~40% of the cell height.
+                const labelFontSize = Math.max(
+                    5,
+                    Math.min(8, Math.floor(Math.min(w, h) / 6)),
+                )
+                return (
+                    <React.Fragment key={`p-${i}`}>
+                        <Rect
+                            x={x}
+                            y={y}
+                            width={Math.max(1, w)}
+                            height={Math.max(1, h)}
+                            fill={c.fill}
+                            stroke={c.stroke}
+                            strokeWidth={0.8}
+                            strokeDasharray={c.dashed ? "3 2" : undefined}
+                        />
+                        {w > 24 && h > 12 && (
+                            <Text
+                                x={x + w / 2}
+                                y={y + h / 2 + labelFontSize / 3}
+                                style={{ fontSize: labelFontSize }}
+                                fill="#111827"
+                                textAnchor="middle"
+                            >
+                                {label}
+                            </Text>
+                        )}
+                    </React.Fragment>
+                )
+            })}
+
+            {/* Features overlay */}
+            {plan.features.map((f, i) => {
+                const style = featureStyle(f.kind)
+                if (f.geometry === "rect" && f.coords.length >= 4) {
+                    const [fx, fy, fw, fh] = f.coords
+                    return (
+                        <Rect
+                            key={`f-${i}`}
+                            x={toSvgX(fx)}
+                            y={toSvgY(fy, fh)}
+                            width={fw * scale}
+                            height={fh * scale}
+                            fill={style.fill}
+                            stroke={style.stroke}
+                            strokeWidth={0.7}
+                            strokeDasharray={style.strokeDasharray}
+                        />
+                    )
+                }
+                if (f.geometry === "line" && f.coords.length >= 4) {
+                    const [x1, y1, x2, y2] = f.coords
+                    return (
+                        <Line
+                            key={`f-${i}`}
+                            x1={toSvgX(x1)}
+                            y1={toSvgPtY(y1)}
+                            x2={toSvgX(x2)}
+                            y2={toSvgPtY(y2)}
+                            stroke={style.stroke}
+                            strokeWidth={Math.max(0.6, (f.width_mm ?? 40) * scale)}
+                            strokeDasharray={style.strokeDasharray}
+                        />
+                    )
+                }
+                if (f.geometry === "polygon" && f.coords.length >= 6) {
+                    const pts: string[] = []
+                    for (let k = 0; k + 1 < f.coords.length; k += 2) {
+                        pts.push(
+                            `${toSvgX(f.coords[k])},${toSvgPtY(f.coords[k + 1])}`,
+                        )
+                    }
+                    return (
+                        <Polygon
+                            key={`f-${i}`}
+                            points={pts.join(" ")}
+                            fill={style.fill}
+                            stroke={style.stroke}
+                            strokeWidth={0.7}
+                            strokeDasharray={style.strokeDasharray}
+                        />
+                    )
+                }
+                return null
+            })}
+
+            {/* Axis tick markers — origin circle at (0,0) of the envelope */}
+            <Circle
+                cx={axisInsetPt}
+                cy={axisInsetPt + drawingH}
+                r={1.5}
+                fill="#111827"
+            />
+        </Svg>
+    )
+
+    // ── Stack / isometric-exploded: layered list fallback ──────────────
+    const drawingStack = (() => {
+        // Sort top-to-bottom by z_mm (or layer if present) — highest first,
+        // because that matches the reader's expectation of looking down at
+        // an exploded stack.
+        const rows = [...plan.placements].sort((a, b) => {
+            const za = a.layer ?? a.z_mm ?? 0
+            const zb = b.layer ?? b.z_mm ?? 0
+            return zb - za
+        })
+        if (rows.length === 0) return null
+        return (
+            <View
+                style={{
+                    borderWidth: 1,
+                    borderColor: BORDER,
+                    borderRadius: 3,
+                    padding: 8,
+                    marginBottom: 10,
+                }}
+            >
+                {rows.map((p, i) => (
+                    <View
+                        key={`sk-${i}`}
+                        style={{
+                            flexDirection: "row",
+                            paddingVertical: 5,
+                            borderBottomWidth: i < rows.length - 1 ? 0.5 : 0,
+                            borderBottomColor: BORDER,
+                            backgroundColor:
+                                mountColours(p.mount).fill === "transparent"
+                                    ? undefined
+                                    : mountColours(p.mount).fill,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                width: 40,
+                                fontSize: 9,
+                                fontWeight: "bold",
+                                color: MUTED,
+                            }}
+                        >
+                            {p.layer != null ? `L${p.layer}` : `z=${Math.round(
+                                p.z_mm ?? 0,
+                            )}`}
+                        </Text>
+                        <Text style={{ flex: 1, fontSize: 9, fontWeight: "bold" }}>
+                            {labelFor(p)}
+                        </Text>
+                        <Text style={{ width: 110, fontSize: 8, color: MUTED }}>
+                            {Math.round(p.w_mm)}×{Math.round(p.d_mm)}×
+                            {Math.round(p.h_mm)} mm
+                        </Text>
+                        <Text style={{ width: 60, fontSize: 8, color: MUTED }}>
+                            {p.mount}
+                        </Text>
+                    </View>
+                ))}
+            </View>
+        )
+    })()
+
+    // ── Axis caption (only for 2D views) ───────────────────────────────
+    const axisCaption = is2D ? (
+        <View style={{ marginBottom: 6 }}>
+            <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 1 }}>
+                X — envelope length, mm (0 → {envelopeX_mm})
+            </Text>
+            <Text style={{ fontSize: 8.5, color: MUTED }}>
+                Y — {view === "top_down" ? "envelope depth" : "envelope height"},
+                mm (0 → {envelopeY_mm})
+            </Text>
+        </View>
+    ) : null
+
+    // ── Legend (mount colour key — mirrors what the drawing uses) ──────
+    const legend = (
+        <View
+            style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginTop: 4,
+                marginBottom: 8,
+            }}
+        >
+            {(
+                [
+                    { label: "Floor-mounted", mount: "floor" as const },
+                    { label: "Wall-mounted", mount: "wall" as const },
+                    { label: "Ceiling-mounted (above)", mount: "ceiling" as const },
+                    { label: "Envelope", mount: "envelope" as const },
+                ]
+            ).map((item) => {
+                const c = mountColours(item.mount)
+                return (
+                    <View
+                        key={item.mount}
+                        style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            marginRight: 12,
+                            marginBottom: 2,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: 10,
+                                height: 8,
+                                borderWidth: 0.8,
+                                borderColor: c.stroke,
+                                backgroundColor:
+                                    c.fill === "transparent" ? undefined : c.fill,
+                                borderStyle: c.dashed ? "dashed" : "solid",
+                                marginRight: 4,
+                            }}
+                        />
+                        <Text style={{ fontSize: 8, color: INK }}>{item.label}</Text>
+                    </View>
+                )
+            })}
+        </View>
+    )
+
+    // ── Placements table (left column) ─────────────────────────────────
+    const placementsTable = (
+        <View style={{ flex: 1, paddingRight: 6 }}>
+            <Text style={{ fontSize: 11, fontWeight: "bold", marginBottom: 4 }}>
+                Placements
+            </Text>
+            {plan.placements.length === 0 ? (
+                <Text style={{ fontSize: 9, color: MUTED, fontStyle: "italic" }}>
+                    No placements — this rules library authored features only.
+                </Text>
+            ) : (
+                <>
+                    <View
+                        style={{
+                            flexDirection: "row",
+                            borderBottomWidth: 0.5,
+                            borderBottomColor: BORDER,
+                            paddingBottom: 2,
+                            marginBottom: 2,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                flex: 1.6,
+                                fontSize: 7.5,
+                                fontWeight: "bold",
+                                color: MUTED,
+                            }}
+                        >
+                            Module
+                        </Text>
+                        <Text
+                            style={{
+                                width: 34,
+                                fontSize: 7.5,
+                                fontWeight: "bold",
+                                color: MUTED,
+                            }}
+                        >
+                            Mount
+                        </Text>
+                        <Text
+                            style={{
+                                width: 74,
+                                fontSize: 7.5,
+                                fontWeight: "bold",
+                                color: MUTED,
+                            }}
+                        >
+                            W×D×H mm
+                        </Text>
+                        <Text
+                            style={{
+                                width: 70,
+                                fontSize: 7.5,
+                                fontWeight: "bold",
+                                color: MUTED,
+                            }}
+                        >
+                            x,y,z mm
+                        </Text>
+                        <Text
+                            style={{
+                                width: 26,
+                                fontSize: 7.5,
+                                fontWeight: "bold",
+                                color: MUTED,
+                                textAlign: "right",
+                            }}
+                        >
+                            Rot°
+                        </Text>
+                    </View>
+                    {plan.placements.map((p, i) => (
+                        <View
+                            key={`pt-${i}`}
+                            style={{ flexDirection: "row", paddingVertical: 1.5 }}
+                        >
+                            <Text style={{ flex: 1.6, fontSize: 8 }}>
+                                {labelFor(p)}
+                            </Text>
+                            <Text style={{ width: 34, fontSize: 8 }}>{p.mount}</Text>
+                            <Text style={{ width: 74, fontSize: 8 }}>
+                                {Math.round(p.w_mm)}×{Math.round(p.d_mm)}×
+                                {Math.round(p.h_mm)}
+                            </Text>
+                            <Text style={{ width: 70, fontSize: 8 }}>
+                                {Math.round(p.x_mm)},{Math.round(p.y_mm)},
+                                {Math.round(p.z_mm ?? 0)}
+                            </Text>
+                            <Text
+                                style={{
+                                    width: 26,
+                                    fontSize: 8,
+                                    textAlign: "right",
+                                }}
+                            >
+                                {Math.round(p.orientation_deg)}
+                            </Text>
+                        </View>
+                    ))}
+                </>
+            )}
+        </View>
+    )
+
+    // ── Constraints list (right column) ────────────────────────────────
+    const constraintsList = (
+        <View style={{ flex: 1, paddingLeft: 6 }}>
+            <Text style={{ fontSize: 11, fontWeight: "bold", marginBottom: 4 }}>
+                Constraints
+            </Text>
+            {plan.constraints.length === 0 ? (
+                <Text style={{ fontSize: 9, color: MUTED, fontStyle: "italic" }}>
+                    No constraints recorded.
+                </Text>
+            ) : (
+                plan.constraints.map((c, i) => {
+                    const aName = moduleNameById.get(c.a) ?? c.a
+                    const bName = moduleNameById.get(c.b) ?? c.b
+                    const range =
+                        c.min_mm != null && c.max_mm != null
+                            ? `${c.min_mm}–${c.max_mm}mm`
+                            : c.min_mm != null
+                                ? `min ${c.min_mm}mm`
+                                : c.max_mm != null
+                                    ? `max ${c.max_mm}mm`
+                                    : "—"
+                    return (
+                        <View key={`c-${i}`} style={{ marginBottom: 3 }}>
+                            <Text style={{ fontSize: 8.5 }}>
+                                <Text style={{ fontWeight: "bold" }}>{c.kind}</Text>
+                                : {aName} ↔ {bName} · {range}
+                            </Text>
+                            {c.reason && (
+                                <Text
+                                    style={{
+                                        fontSize: 7.5,
+                                        color: MUTED,
+                                        marginLeft: 6,
+                                    }}
+                                >
+                                    {c.reason}
+                                </Text>
+                            )}
+                        </View>
+                    )
+                })
+            )}
+        </View>
+    )
+
+    return (
+        <View>
+            {header}
+            {plan.placements.length === 0 && (
+                <View
+                    style={{
+                        borderWidth: 1,
+                        borderColor: BORDER,
+                        borderStyle: "dashed",
+                        padding: 12,
+                        marginTop: 6,
+                        marginBottom: 10,
+                    }}
+                >
+                    <Text style={{ fontSize: 10, color: MUTED }}>
+                        No placements — envelope outline only. The rules library
+                        produced features or constraints but no module was matched.
+                    </Text>
+                </View>
+            )}
+            {is2D ? (
+                <>
+                    {axisCaption}
+                    <View wrap={false} style={{ marginBottom: 8 }}>
+                        {drawing2D}
+                    </View>
+                    {legend}
+                </>
+            ) : (
+                drawingStack
+            )}
+            <View
+                style={{
+                    flexDirection: "row",
+                    marginTop: 4,
+                    marginBottom: 8,
+                }}
+                wrap={false}
+            >
+                {placementsTable}
+                {constraintsList}
+            </View>
+            {plan.notes && plan.notes.length > 0 && (
+                <View wrap={false}>
+                    <Text
+                        style={{
+                            fontSize: 11,
+                            fontWeight: "bold",
+                            marginBottom: 4,
+                        }}
+                    >
+                        Notes
+                    </Text>
+                    {plan.notes.map((n, i) => (
+                        <Text
+                            key={`n-${i}`}
+                            style={{
+                                fontSize: 9,
+                                color: "#333",
+                                marginBottom: 2,
+                            }}
+                        >
+                            • {n}
+                        </Text>
+                    ))}
+                </View>
+            )}
+        </View>
+    )
+}
+
 function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
     const hasSheet = data.dimensionSheet != null
-    const sections = hasSheet
-        ? [
-              "1. Brief",
-              "2. Regulatory posture",
-              "3. Sizing optimisation",
-              "4. Modules (one page each)",
-              "5. BOM master",
-              "6. Cost waterfall",
-              "7. Risks register",
-              "8. Supplier shortlist",
-              "9. Project audit log",
-          ]
-        : [
-              "1. Brief",
-              "2. Regulatory posture",
-              "3. Modules (one page each)",
-              "4. BOM master",
-              "5. Cost waterfall",
-              "6. Risks register",
-              "7. Supplier shortlist",
-              "8. Project audit log",
-          ]
+    const hasPlan = data.spatialPlan != null
+
+    // Build the module-id → name map once here so SpatialPlanSection can
+    // resolve placement.module_id labels without re-walking the array.
+    const moduleNameById = new Map<string, string>()
+    for (const m of data.modules) moduleNameById.set(m.id, m.name)
+
+    // ── TOC renumbering (four cases) ───────────────────────────────────
+    // Optional sections (sizing optimisation, spatial plan) both slot in
+    // after Regulatory (2) and before Modules. Shift everything after
+    // the optional block by the number of optional sections present so
+    // the TOC stays correct regardless of which ones render.
+    const optionalSections: string[] = []
+    if (hasSheet) optionalSections.push("Sizing optimisation")
+    if (hasPlan) optionalSections.push("Spatial plan")
+    const fixedSections = [
+        "Modules (one page each)",
+        "BOM master",
+        "Cost waterfall",
+        "Risks register",
+        "Supplier shortlist",
+        "Project audit log",
+    ]
+    const allSections = [
+        "Brief",
+        "Regulatory posture",
+        ...optionalSections,
+        ...fixedSections,
+    ]
+    const sections = allSections.map((label, i) => `${i + 1}. ${label}`)
+
+    // Computed section numbers for the sections that render their own
+    // header (they need to show the right "N." prefix).
+    // Brief = 1, Regulatory = 2, Sizing = 3 (if present), Plan = next.
+    const sizingSectionNumber = hasSheet ? 3 : null
+    const planSectionNumber = hasPlan ? (hasSheet ? 4 : 3) : null
     return (
         <Document>
             {/* 0. Cover */}
@@ -1499,16 +2141,34 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             </Page>
 
             {/* 3. Sizing optimisation (P1 — only when dimension_sheet present) */}
-            {hasSheet && (
+            {hasSheet && sizingSectionNumber != null && (
                 <Page size="A4" style={styles.page} wrap>
-                    <SizingOptimisationSection sheet={data.dimensionSheet} />
+                    <SizingOptimisationSection
+                        sheet={data.dimensionSheet}
+                        sectionNumber={sizingSectionNumber}
+                    />
                     <Text style={styles.footer} fixed>
                         <Text>Sizing optimisation</Text>
                     </Text>
                 </Page>
             )}
 
-            {/* 3 or 4. one page per module */}
+            {/* Spatial plan (P2 — only when spatial_plan present; slots
+             *  AFTER sizing and BEFORE modules). */}
+            {hasPlan && planSectionNumber != null && (
+                <Page size="A4" style={styles.page} wrap>
+                    <SpatialPlanSection
+                        plan={data.spatialPlan}
+                        sectionNumber={planSectionNumber}
+                        moduleNameById={moduleNameById}
+                    />
+                    <Text style={styles.footer} fixed>
+                        <Text>Spatial plan</Text>
+                    </Text>
+                </Page>
+            )}
+
+            {/* 3–5 depending on presence. one page per module */}
             {data.modules.map((m, i) => (
                 <ModulePage key={m.id} mod={m} index={i} />
             ))}
@@ -1593,7 +2253,7 @@ async function exportProjectPdfInternal(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet",
+                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet, spatial_plan",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -1975,6 +2635,7 @@ async function exportProjectPdfInternal(
             suppliers,
             auditLog,
             dimensionSheet: (project.dimension_sheet ?? null) as PdfInput["dimensionSheet"],
+            spatialPlan: (project.spatial_plan ?? null) as PdfInput["spatialPlan"],
             totals: {
                 moduleCount: modules.length,
                 keyPartCount,
