@@ -16,45 +16,104 @@
 import { WAREHOUSE_BAY_100 } from "../envelopes"
 import type { DomainRules, DomainSolveInput, DomainSolveResult, ModuleDimensions, SolverIteration } from "../types"
 
+// ─── v1.1 FEEDBACK LOOP (2026-04-24) ───────────────────────────────────
+// v1.0 used thermal_kw_per_m2_canopy = 0.15 which only captures LED sensible
+// heat. The 40ft-container trial on 2026-04-24 exposed that leafy-green
+// transpiration adds a LATENT load of ~0.15 kW/m² canopy ON TOP, so real
+// peak cooling is ~0.30 kW/m² — and the HVAC coil must physically condense
+// 2.5-3 L/m²/day of transpired water or the farm drowns in humidity.
+//
+// v1.1 adds transpiration physics as first-class coefficients + derives
+// peak cooling load + peak dehumidification rate from them so downstream
+// (BOM, supplier match, Fang review) can specify a dehumidifier with
+// adequate condensing capacity.
+//
+// Sources: Kozai & Niu "Plant Factory" 2020 Ch.11, Fischer Farms internal
+// data on baby lettuce / basil / microgreens under 200 DLI LED.
 const VF_RULES = {
-    /** Growing tray stack — floor area → canopy area at N tiers.
-     *  Canopy-to-floor ratio = tiers × aisle_efficiency.  */
+    /** Growing tray stack. Tier spacing 500mm suits short leafy greens
+     *  (baby lettuce, basil, microgreens) with close-coupled LED bars
+     *  mounted directly under the next shelf. 800mm is the taller-crop
+     *  (kale, chard) default. Modern container farms pack 5 tiers at
+     *  500mm in a 2697mm 40ft-HC interior (tier_clearance_mm=200 —
+     *  verified against a real installation 2026-04-24). */
     trays: {
-        tier_h_mm: 800, // vertical spacing per tier
-        tier_footprint_d_mm: 1_200, // typical tray depth
-        aisle_efficiency: 0.65, // usable canopy after aisles + service gaps
+        tier_h_mm: 500, // v1.1: dropped from 800 — short-crop-optimised
+        tier_footprint_d_mm: 1_200,
+        aisle_efficiency: 0.85, // v1.1: lifted from 0.65 — narrow container
+                                // racks have less internal loss than wide
+                                // warehouse racks
+        tier_clearance_mm: 200, // v1.1: service space above top tier + deck
+                                // below bottom tier. Reduced from 400 after
+                                // a real-container check showed modern slim
+                                // LED bars + shallow trays pack tight.
     },
-    /** LED lighting power density for leafy greens (µmol/m²/s @ ~200 DLI). */
+    /** LED lighting for leafy greens at ~200 DLI. */
     lighting: {
-        kw_per_m2_canopy: 0.25, // 250 W/m² installed
-        fixture_m2_per_m2_canopy: 0.1, // ceiling-mounted, negligible floor
+        kw_per_m2_canopy: 0.25,
+        led_heat_fraction: 0.60, // 60% electrical → heat; 40% photons + losses
+        photoperiod_hours: 16,
     },
-    /** HVAC: vertical farms are dehumidification-dominated. */
+    /** Transpiration — v1.1 core addition. Leafy-green canopy transpires
+     *  ~2.5 L/m²/day under 200 DLI. Peak rate concentrates into the 16h
+     *  photoperiod. */
+    transpiration: {
+        l_per_m2_per_day: 2.5,
+        peak_multiplier: 1.5, // peak hourly rate vs daily-average
+        latent_heat_j_per_g: 2_257, // at 20°C, physics constant
+    },
+    /** HVAC: sized from peak_total_kw = sensible (LED heat during photoperiod)
+     *  + latent (transpiration condensing). v1.0's flat 0.15 kW/m² was an
+     *  under-size by ~2× for leafy-dominated designs; v1.1 derives it. */
     hvac: {
-        thermal_kw_per_m2_canopy: 0.15, // sensible + latent
-        floor_m2_per_kw_thermal: 0.08,
+        /** Retained for back-compat; NOT used by the solver any more. */
+        thermal_kw_per_m2_canopy: 0.30,
+        floor_m2_per_kw_thermal: 0.12, // realistic compact industrial coil + compressor
+        setpoint_rh_pct: 65,
+        setpoint_t_c: 22,
+        recommended_ach: 4,
     },
-    /** Water + nutrient delivery — scales with canopy. */
+    /** Water + nutrient delivery. */
     water: {
-        m2_per_m2_canopy: 0.02, // reservoir + pumps + dosers
-        min_m2: 2.0,
+        m2_per_m2_canopy: 0.02,
+        min_m2: 1.5, // v1.1: container-tuned (smaller dosing rack)
     },
-    /** CO₂ + air handling + fans (separate from HVAC chillers). */
+    /** CO₂ + air handling (fans + filters) — separate from HVAC coil. */
     air: {
-        m2_per_m2_canopy: 0.01,
-        min_m2: 1.0,
+        m2_per_m2_canopy: 0.015,
+        min_m2: 1.2,
     },
-    /** Climate + controls SCADA cabinet. */
+    /** Climate + controls. */
     controls: {
-        fixed_m2: 1.2,
+        fixed_m2: 0.5, // v1.1: wall-mounted, smaller than 1.2m² warehouse default
     },
-    /** Sanitation / harvest prep area — regulatory + workflow. */
+    /** Harvest prep — only for warehouse bay layouts, skipped inside
+     *  containers where prep happens externally. Solver treats zero
+     *  harvest_prep as a legitimate config. */
     harvest_prep: {
         m2_per_m2_canopy: 0.05,
-        min_m2: 4.0,
+        min_m2: 0, // v1.1: zero unless explicitly requested via targets
     },
-    aisle_width_mm: 900,
+    aisle_width_mm: 1_000, // v1.1: lifted from 900 for walkability in a
+                           // single-centre-aisle container layout
 } as const
+
+// ─── Derived helpers ───────────────────────────────────────────────────
+function peakLoadKw(canopy_m2: number) {
+    const t = VF_RULES.transpiration
+    const daily_l = canopy_m2 * t.l_per_m2_per_day
+    const peak_dehumid_lph = (daily_l * t.peak_multiplier) / VF_RULES.lighting.photoperiod_hours
+    // Peak latent kW: g/hr × J/g ÷ 3_600_000 J/kWh
+    const peak_latent_kw = (peak_dehumid_lph * 1_000 * t.latent_heat_j_per_g) / (3_600 * 1_000)
+    const peak_sensible_kw = canopy_m2 * VF_RULES.lighting.kw_per_m2_canopy * VF_RULES.lighting.led_heat_fraction
+    return {
+        daily_transpiration_l: daily_l,
+        peak_dehumid_lph,
+        peak_latent_kw,
+        peak_sensible_kw,
+        peak_total_kw: peak_latent_kw + peak_sensible_kw,
+    }
+}
 
 function solve(input: DomainSolveInput): DomainSolveResult {
     const { envelope, targets } = input
@@ -71,7 +130,9 @@ function solve(input: DomainSolveInput): DomainSolveResult {
     const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
 
     const lighting_kw = targetCanopy * VF_RULES.lighting.kw_per_m2_canopy
-    const thermal_kw = targetCanopy * VF_RULES.hvac.thermal_kw_per_m2_canopy
+    // v1.1: HVAC sized from transpiration physics, not flat 0.15 kW/m²
+    const peak = peakLoadKw(targetCanopy)
+    const thermal_kw = peak.peak_total_kw
     const hvac_floor_m2 = thermal_kw * VF_RULES.hvac.floor_m2_per_kw_thermal
 
     const water_m2 = Math.max(
@@ -112,7 +173,7 @@ function solve(input: DomainSolveInput): DomainSolveResult {
 
     const feasible = remaining_floor_m2 >= 0
 
-    const rack_h_mm = tiers * VF_RULES.trays.tier_h_mm + 400
+    const rack_h_mm = tiers * VF_RULES.trays.tier_h_mm + VF_RULES.trays.tier_clearance_mm
     const rack_w_total = Math.round(Math.sqrt(tray_floor_m2) * 1_000)
 
     const slot_dimensions: Record<string, ModuleDimensions> = {
@@ -141,18 +202,36 @@ function solve(input: DomainSolveInput): DomainSolveResult {
             prompt_hint: "Integrated LED light bars above each tray tier",
         },
         hvac: {
-            w_mm: 3_000,
-            d_mm: 1_200,
-            h_mm: 600,
+            w_mm: 1_500,
+            d_mm: 1_000,
+            h_mm: 1_800,
             floor_m2: +hvac_floor_m2.toFixed(2),
             mount: "floor",
-            scaled_by: "canopy_m² × thermal_kw/m²",
+            // v1.1: HVAC sized from transpiration-derived peak load.
+            scaled_by: `peak sensible ${peak.peak_sensible_kw.toFixed(1)}kW + peak latent ${peak.peak_latent_kw.toFixed(1)}kW`,
             requirement: {
-                label: "Thermal + dehumidification",
-                value: +thermal_kw.toFixed(1),
+                label: "Peak cooling load",
+                value: +peak.peak_total_kw.toFixed(1),
                 unit: "kW",
             },
-            prompt_hint: "Industrial HVAC + dehumidifier unit with ducting to grow area",
+            prompt_hint: `Floor-mounted HVAC + DEHUMIDIFIER cabinet with visible evaporator coil, condensate drip tray, and clear PVC condensate drain line exiting to a floor drain (dehumidification rate ${peak.peak_dehumid_lph.toFixed(1)} L/hour during photoperiod). Integrated reheat coil downstream of the evaporator to prevent supply-air over-cooling.`,
+        },
+        dehumidification: {
+            // v1.1: surface dehumidification as its own slot so downstream BOM
+            // + supplier-match can pick a unit with adequate pint-rating. No
+            // floor footprint (integrated into hvac); exposed for matchability.
+            w_mm: 0,
+            d_mm: 0,
+            h_mm: 0,
+            floor_m2: 0,
+            mount: "floor",
+            scaled_by: `transpiration ${peak.daily_transpiration_l.toFixed(0)} L/day × ${VF_RULES.transpiration.peak_multiplier}× peak / ${VF_RULES.lighting.photoperiod_hours}h photoperiod`,
+            requirement: {
+                label: "Dehumidification rate",
+                value: +peak.peak_dehumid_lph.toFixed(1),
+                unit: "L/hour",
+            },
+            prompt_hint: "Dehumidification integrated into HVAC cabinet — sized to condense transpired canopy water continuously during photoperiod",
         },
         water_nutrients: {
             w_mm: Math.max(1_200, Math.round(Math.sqrt(water_m2) * 1_000)),
@@ -233,10 +312,10 @@ function solve(input: DomainSolveInput): DomainSolveResult {
         }
     }
 
-    const required_ceiling_h = rack_h_mm + 400
+    const required_ceiling_h = rack_h_mm
     if (required_ceiling_h > envelope.interior_h_mm) {
         conflicts.push(
-            `Required ceiling height (${required_ceiling_h} mm for ${tiers} tiers + light clearance) exceeds envelope interior height (${envelope.interior_h_mm} mm). Drop to ${Math.floor((envelope.interior_h_mm - 400) / VF_RULES.trays.tier_h_mm)} tiers or raise the ceiling.`,
+            `Required ceiling height (${required_ceiling_h} mm for ${tiers} tiers × ${VF_RULES.trays.tier_h_mm}mm spacing + ${VF_RULES.trays.tier_clearance_mm}mm clearance) exceeds envelope interior height (${envelope.interior_h_mm} mm). Drop to ${Math.floor((envelope.interior_h_mm - VF_RULES.trays.tier_clearance_mm) / VF_RULES.trays.tier_h_mm)} tiers, tighten tier spacing, or raise the ceiling.`,
         )
     }
 
@@ -249,14 +328,18 @@ function solve(input: DomainSolveInput): DomainSolveResult {
         recommendations,
         notes: [
             `Canopy density: ${tiers} tiers × ${(VF_RULES.trays.aisle_efficiency * 100).toFixed(0)}% aisle-efficient packing.`,
-            `Lighting installed: ${VF_RULES.lighting.kw_per_m2_canopy * 1000} W/m² (leafy greens at ~200 DLI).`,
+            `Lighting installed: ${VF_RULES.lighting.kw_per_m2_canopy * 1_000} W/m² (leafy greens at ~200 DLI).`,
+            `Transpiration load: ${peak.daily_transpiration_l.toFixed(0)} L/day water evaporates from canopy — ALL of it must be condensed by the HVAC evaporator coil and drained out of the envelope or humidity spikes and powdery mildew appears within days.`,
+            `Peak cooling budget: ${peak.peak_sensible_kw.toFixed(1)} kW sensible (LED heat) + ${peak.peak_latent_kw.toFixed(1)} kW latent (condensing transpiration) = ${peak.peak_total_kw.toFixed(1)} kW total during photoperiod.`,
+            `Required dehumidification rate: ${peak.peak_dehumid_lph.toFixed(1)} L/hour. Size the dehumidifier pint-rating at ≥ ${Math.ceil(peak.peak_dehumid_lph * 1.2)} L/hr at 24°C/65% RH to keep a 20% safety margin.`,
+            `Setpoint: ${VF_RULES.hvac.setpoint_t_c}°C air temperature, ${VF_RULES.hvac.setpoint_rh_pct}% RH (below 70% prevents powdery mildew; above 60% keeps stomata open).`,
         ],
     }
 }
 
 export const verticalFarmV1: DomainRules = {
     domain: "vertical_farm",
-    version: "1.0.0",
+    version: "1.1.0",
     label: "Indoor vertical farm (controlled-environment agriculture)",
     applicableIndustries: [
         "vertical-farm",
@@ -300,8 +383,13 @@ export const verticalFarmV1: DomainRules = {
             defaultMount: "ceiling",
         },
         hvac: {
-            label: "HVAC / dehumidification",
-            matchAliases: ["hvac", "thermal", "cooling", "dehumid", "chiller", "climate"],
+            label: "HVAC / cooling",
+            matchAliases: ["hvac", "thermal", "cooling", "chiller", "climate"],
+            defaultMount: "floor",
+        },
+        dehumidification: {
+            label: "Dehumidification",
+            matchAliases: ["dehumid", "condensate", "moisture removal", "humidity control", "dew"],
             defaultMount: "floor",
         },
         water_nutrients: {
