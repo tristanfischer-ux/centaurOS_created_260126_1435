@@ -482,6 +482,11 @@ interface PdfInput {
     }
     suppliers: SupplierPdf[]
     auditLog: AuditRowPdf[]
+    /** Sizing optimisation + dimension sheet from Fang. When present, renders
+     *  a new section 3 ("Sizing optimisation") showing the trial sweep,
+     *  winner rationale, top alternatives, and levers. Nullable — projects
+     *  from before v1.1 sizing engine won't have this. */
+    dimensionSheet: import("@/lib/sizing/types").DimensionSheet | null
     totals: {
         moduleCount: number
         keyPartCount: number
@@ -1315,17 +1320,167 @@ function AuditLogPage({ rows }: { rows: AuditRowPdf[] }): React.ReactElement {
     )
 }
 
+function SizingOptimisationSection({ sheet }: { sheet: PdfInput["dimensionSheet"] }): React.ReactElement | null {
+    if (!sheet) return null
+    const opt = sheet.optimisation
+    const feasibleLabel = sheet.feasible ? "FEASIBLE" : "INFEASIBLE"
+    const feasibleColor = sheet.feasible ? "#0a6a1a" : "#a3001a"
+    const envelopeLine = `${sheet.envelope.label} · interior ${sheet.envelope.interior_w_mm}×${sheet.envelope.interior_d_mm}×${sheet.envelope.interior_h_mm}mm · ${sheet.envelope.interior_floor_m2.toFixed(2)} m² floor`
+    // Build the trial grid: rows = unique tier counts, columns = unique canopies
+    const tierValues = Array.from(
+        new Set((opt?.trials ?? []).map((t) => t.targets.tiers).filter((v): v is number => typeof v === "number")),
+    ).sort((a, b) => a - b)
+    const canopyValues = Array.from(
+        new Set((opt?.trials ?? []).map((t) => t.targets.canopy_m2).filter((v): v is number => typeof v === "number")),
+    ).sort((a, b) => a - b)
+    const lookup = new Map<string, { feasible: boolean; utilization_pct: number }>()
+    for (const t of opt?.trials ?? []) {
+        lookup.set(`${t.targets.tiers}|${t.targets.canopy_m2}`, {
+            feasible: t.feasible,
+            utilization_pct: t.utilization_pct,
+        })
+    }
+
+    return (
+        <View break>
+            <Text style={styles.h2}>3. Sizing optimisation</Text>
+            <Text style={styles.muted}>
+                Forge ran a {(opt?.trials ?? []).length}-trial sweep to find the best fit for this envelope.
+                Coefficient library: {sheet.rules_domain} v{sheet.rules_version}.
+            </Text>
+            <View style={{ marginBottom: 10 }}>
+                <Text style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>Envelope</Text>
+                <Text style={{ fontSize: 10, marginBottom: 6 }}>{envelopeLine}</Text>
+                <Text style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>Final config</Text>
+                <Text style={{ fontSize: 11, marginBottom: 6 }}>
+                    {Object.entries(sheet.target).map(([k, v]) => `${k}: ${v}`).join(" · ")}{" "}
+                    <Text style={{ color: feasibleColor, fontWeight: "bold" }}>[{feasibleLabel}]</Text>
+                </Text>
+                {opt?.winner?.rationale && (
+                    <Text style={{ fontSize: 10, fontStyle: "italic", color: "#444", marginBottom: 8 }}>
+                        {opt.winner.rationale}
+                    </Text>
+                )}
+            </View>
+            {opt && tierValues.length > 0 && canopyValues.length > 0 && (
+                <View style={{ marginBottom: 12 }} wrap={false}>
+                    <Text style={{ fontSize: 11, fontWeight: "bold", marginBottom: 4 }}>
+                        Trial grid (rows = tiers, columns = canopy m² · cell = floor util %)
+                    </Text>
+                    <View style={{ flexDirection: "row", borderBottom: "1 solid #e5e5e5" }}>
+                        <Text style={{ width: 40, fontSize: 9, fontWeight: "bold", padding: 4 }}>tiers ↓</Text>
+                        {canopyValues.map((c) => (
+                            <Text key={c} style={{ flex: 1, fontSize: 9, textAlign: "center", padding: 4, fontWeight: "bold" }}>
+                                {c}
+                            </Text>
+                        ))}
+                    </View>
+                    {tierValues.map((t) => (
+                        <View key={t} style={{ flexDirection: "row", borderBottom: "1 solid #f0f0f0" }}>
+                            <Text style={{ width: 40, fontSize: 9, padding: 4, fontWeight: "bold" }}>{t}</Text>
+                            {canopyValues.map((c) => {
+                                const cell = lookup.get(`${t}|${c}`)
+                                if (!cell) return (
+                                    <Text key={c} style={{ flex: 1, fontSize: 9, textAlign: "center", padding: 4, color: "#ccc" }}>—</Text>
+                                )
+                                const isWinner =
+                                    opt.winner?.targets.tiers === t && opt.winner?.targets.canopy_m2 === c
+                                const bg = !cell.feasible
+                                    ? "#fee0dc"
+                                    : cell.utilization_pct >= 90
+                                        ? "#fff3cd"
+                                        : cell.utilization_pct >= 60
+                                            ? "#d4edda"
+                                            : "#e8f5e9"
+                                return (
+                                    <View
+                                        key={c}
+                                        style={{
+                                            flex: 1,
+                                            backgroundColor: bg,
+                                            padding: 4,
+                                            borderRight: isWinner ? "2 solid #ff4500" : "1 solid #fff",
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 9, textAlign: "center" }}>
+                                            {cell.feasible ? `${Math.round(cell.utilization_pct)}%` : "✗"}
+                                        </Text>
+                                    </View>
+                                )
+                            })}
+                        </View>
+                    ))}
+                    <Text style={{ fontSize: 8, color: "#777", marginTop: 4 }}>
+                        Green = comfortable fit · Yellow = tight (≥90% floor used) · Red = infeasible ·
+                        Orange outline = winning config.
+                    </Text>
+                </View>
+            )}
+            {opt?.top_alternatives && opt.top_alternatives.length > 0 && (
+                <View style={{ marginBottom: 10 }} wrap={false}>
+                    <Text style={{ fontSize: 11, fontWeight: "bold", marginBottom: 4 }}>Top alternatives</Text>
+                    {opt.top_alternatives.map((alt, i) => (
+                        <View key={i} style={{ marginBottom: 4 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+                                {Object.entries(alt.targets).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                            </Text>
+                            <Text style={{ fontSize: 9, color: "#555" }}>{alt.trade_offs}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {opt?.levers && opt.levers.length > 0 && (
+                <View style={{ marginBottom: 10 }} wrap={false}>
+                    <Text style={{ fontSize: 11, fontWeight: "bold", marginBottom: 4 }}>
+                        Levers — what you could do next
+                    </Text>
+                    {opt.levers.map((lv, i) => (
+                        <View key={i} style={{ marginBottom: 5 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold" }}>{lv.action}</Text>
+                            <Text style={{ fontSize: 9, color: "#0a6a1a" }}>Gain: {lv.gain}</Text>
+                            <Text style={{ fontSize: 9, color: "#a3001a" }}>Cost: {lv.cost}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {sheet.notes && sheet.notes.length > 0 && (
+                <View style={{ marginBottom: 10 }} wrap={false}>
+                    <Text style={{ fontSize: 11, fontWeight: "bold", marginBottom: 4 }}>Engineering notes</Text>
+                    {sheet.notes.map((n, i) => (
+                        <Text key={i} style={{ fontSize: 9, color: "#333", marginBottom: 3 }}>
+                            • {n}
+                        </Text>
+                    ))}
+                </View>
+            )}
+        </View>
+    )
+}
+
 function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
-    const sections = [
-        "1. Brief",
-        "2. Regulatory posture",
-        "3. Modules (one page each)",
-        "4. BOM master",
-        "5. Cost waterfall",
-        "6. Risks register",
-        "7. Supplier shortlist",
-        "8. Project audit log",
-    ]
+    const hasSheet = data.dimensionSheet != null
+    const sections = hasSheet
+        ? [
+              "1. Brief",
+              "2. Regulatory posture",
+              "3. Sizing optimisation",
+              "4. Modules (one page each)",
+              "5. BOM master",
+              "6. Cost waterfall",
+              "7. Risks register",
+              "8. Supplier shortlist",
+              "9. Project audit log",
+          ]
+        : [
+              "1. Brief",
+              "2. Regulatory posture",
+              "3. Modules (one page each)",
+              "4. BOM master",
+              "5. Cost waterfall",
+              "6. Risks register",
+              "7. Supplier shortlist",
+              "8. Project audit log",
+          ]
     return (
         <Document>
             {/* 0. Cover */}
@@ -1343,7 +1498,17 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 </Text>
             </Page>
 
-            {/* 3. one page per module */}
+            {/* 3. Sizing optimisation (P1 — only when dimension_sheet present) */}
+            {hasSheet && (
+                <Page size="A4" style={styles.page} wrap>
+                    <SizingOptimisationSection sheet={data.dimensionSheet} />
+                    <Text style={styles.footer} fixed>
+                        <Text>Sizing optimisation</Text>
+                    </Text>
+                </Page>
+            )}
+
+            {/* 3 or 4. one page per module */}
             {data.modules.map((m, i) => (
                 <ModulePage key={m.id} mod={m} index={i} />
             ))}
@@ -1428,7 +1593,7 @@ async function exportProjectPdfInternal(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url",
+                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -1809,6 +1974,7 @@ async function exportProjectPdfInternal(
             },
             suppliers,
             auditLog,
+            dimensionSheet: (project.dimension_sheet ?? null) as PdfInput["dimensionSheet"],
             totals: {
                 moduleCount: modules.length,
                 keyPartCount,
