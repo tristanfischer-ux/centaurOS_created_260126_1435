@@ -85,6 +85,7 @@ export type AutopilotStage =
     | "locking_brief"
     | "waiting_max"
     | "waiting_sizing"  // v1.1: Fang sizing runs between Max and BOM
+    | "waiting_layout"  // v1.3: Fang spatial layout runs after sizing, before BOM
     | "waiting_bom"
     | "waiting_finn"
     | "generating_illustration"
@@ -712,7 +713,78 @@ async function stepWaitForSizing(projectId: string): Promise<void> {
         )
     }
 
-    await advance(projectId, "waiting_sizing", "waiting_bom")
+    await advance(projectId, "waiting_sizing", "waiting_layout")
+    after(async () => {
+        try {
+            await stepWaitForLayout(projectId)
+        } catch (err) {
+            await recordFailure(
+                projectId,
+                "waiting_layout",
+                errMessage(err),
+            )
+        }
+    })
+}
+
+/**
+ * Stage 3.75 (v1.3): Fang spatial layout — produces spatial_plan using the
+ * layout engine, anchored on the dimension_sheet from the sizing stage.
+ *
+ * Runs synchronously via runFangLayoutBackground. Fully optional: if the
+ * sizing stage didn't produce a feasible dimension_sheet, or no layout rules
+ * library matches the industry domain, the layout engine returns `null` and
+ * persists null to spatial_plan. That is a legitimate skip — autopilot
+ * continues to BOM either way.
+ *
+ * Idempotent: runFangLayout is safe to re-invoke — it overwrites spatial_plan
+ * and writes a fresh pipeline_runs row.
+ */
+async function stepWaitForLayout(projectId: string): Promise<void> {
+    const foundryId = await getProjectFoundryId(projectId)
+    if (!foundryId) {
+        await recordFailure(
+            projectId,
+            "waiting_layout",
+            "project disappeared during layout stage",
+        )
+        return
+    }
+
+    try {
+        const { runFangLayoutBackground } = await import(
+            "@/actions/specialists/run-fang-layout"
+        )
+        const result = await runFangLayoutBackground(
+            projectId,
+            foundryId,
+            null,
+            "auto.sizing-complete",
+        )
+        if (!result.ok && !("skipped" in result && result.skipped)) {
+            // Hard failure (save error, etc.). Layout is optional — log and
+            // continue to BOM anyway rather than block the walk. The pipeline_run
+            // row already captured the error for the UI to surface.
+            console.warn(
+                "[autopilot] stepWaitForLayout hard-errored — continuing:",
+                "error" in result ? result.error : "unknown",
+            )
+        }
+        // ok=true OR skipped=true — both are legitimate. 'skipped' happens
+        // when no rules library matches the industry domain OR the sizing
+        // stage didn't produce a feasible dimension_sheet; don't stop
+        // autopilot for that, just continue.
+    } catch (err) {
+        // Non-fatal: layout is an enhancement, not a hard requirement.
+        // Log but continue — image prompts + PDF section will degrade
+        // gracefully when spatial_plan IS NULL.
+        console.warn(
+            "[autopilot] stepWaitForLayout threw — continuing:",
+            err instanceof Error ? err.message : err,
+        )
+    }
+
+    await advance(projectId, "waiting_layout", "waiting_bom")
     after(async () => {
         try {
             await stepWaitForBom(projectId)
@@ -1361,6 +1433,9 @@ export async function tickAutopilotStage(
                         break
                     case "waiting_sizing":
                         await stepWaitForSizing(projectId)
+                        break
+                    case "waiting_layout":
+                        await stepWaitForLayout(projectId)
                         break
                     case "waiting_bom":
                         await stepWaitForBom(projectId)
