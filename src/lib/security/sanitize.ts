@@ -1,5 +1,43 @@
 /**
  * Security utilities for input sanitization
+ *
+ * ─── Three-surface error policy (P1.4, 2026-04-23) ─────────────────────
+ *
+ * Every server action has THREE distinct audiences for an error, and each
+ * needs a different level of detail. Historically `sanitizeErrorMessage()`
+ * collapsed all three into a single sanitised string, which got stored in
+ * `pipeline_runs.error_message` and `image_render_state.failed_ids` — total
+ * observability loss. Hence: three surfaces, one policy.
+ *
+ *   1. User-facing response        — SANITISED (this function)
+ *      Returned to the browser. Must not expose stacks, internal IDs, or
+ *      system internals. Uses SAFE_ERROR_MESSAGES + the lowercase-substring
+ *      mappings below. The default is the generic "Please try again"
+ *      message so callers never leak unintentionally.
+ *
+ *   2. DB-stored error_message / failure details  — RAW (not this function)
+ *      Persisted in `pipeline_runs.error_message`, `image_render_state.
+ *      failed_reasons[moduleId].rawError`, etc. This is the ground-truth
+ *      log for debugging failures hours or days after the fact, so it
+ *      must be the UNSANITISED message + stack. Truncate to ~2000 chars
+ *      before storage so a pathological provider-error-with-full-JSON
+ *      doesn't blow a TEXT column; never sanitise.
+ *
+ *   3. console.error / Vercel log  — RAW (not this function)
+ *      Real-time debugging. Same policy as DB storage: use the raw
+ *      Error.message + stack, never the sanitised version. Vercel logs
+ *      get pulled with `npx vercel logs --expand` when an autopilot run
+ *      drops a stage; seeing "An unexpected error occurred" there is the
+ *      bug-chasing nightmare the three-surface policy is designed to end.
+ *
+ * Server actions produce BOTH surfaces by returning
+ * `{ error: string, rawError?: string }`. Callers that persist to the DB
+ * or stream to logs read `rawError` (falling back to `error` if absent).
+ * The UI ignores `rawError` entirely.
+ *
+ * Do not rename `sanitizeErrorMessage` without updating this header and
+ * `src/lib/server-action-utils.ts` in the same commit — they are the two
+ * halves of the policy.
  */
 
 /**
@@ -234,4 +272,51 @@ export function sanitizeErrorMessage(error: unknown): string {
 
   // Default: return generic error to avoid exposing internal details
   return 'An unexpected error occurred. Please try again or contact support if the problem persists.'
+}
+
+/**
+ * Maximum character length for raw error messages persisted to the DB or
+ * returned in a `rawError` field. TEXT columns tolerate more, but a
+ * pathological provider error (e.g. full OpenAI JSON response body on a
+ * 400) can balloon to tens of KB and blow React Flight / query-result
+ * sizes. 2000 chars covers every message + stack I've seen in production.
+ */
+export const RAW_ERROR_MAX_LEN = 2000
+
+/**
+ * Extract a raw (UN-SANITISED) error message + stack trace from an
+ * arbitrary thrown value, for surface 2 (DB) and surface 3 (console/log)
+ * of the three-surface policy documented at the top of this file.
+ *
+ * Pairs with `sanitizeErrorMessage()` (surface 1) — always call BOTH and
+ * pass both fields through the server action's return shape.
+ *
+ * @returns A string truncated to `RAW_ERROR_MAX_LEN` characters that may
+ *          include an Error stack (joined with a newline). Never empty —
+ *          returns `'Unknown error'` as the ultimate fallback.
+ */
+export function extractRawErrorMessage(error: unknown): string {
+    if (!error) return 'Unknown error'
+
+    let raw: string
+    if (error instanceof Error) {
+        raw = error.stack ? `${error.message}\n${error.stack}` : error.message
+    } else if (typeof error === 'string') {
+        raw = error
+    } else if (typeof error === 'object' && 'message' in error) {
+        const msg = (error as { message: unknown }).message
+        raw = typeof msg === 'string' ? msg : String(msg)
+    } else {
+        try {
+            raw = JSON.stringify(error)
+        } catch {
+            raw = String(error)
+        }
+    }
+
+    if (!raw || raw.length === 0) return 'Unknown error'
+    if (raw.length > RAW_ERROR_MAX_LEN) {
+        return `${raw.slice(0, RAW_ERROR_MAX_LEN - 15)}…[truncated]`
+    }
+    return raw
 }

@@ -1,0 +1,41 @@
+-- P1.5 (2026-04-23): `failed_reasons` map on cad_lab_projects.image_render_state
+--
+-- This migration is DOCUMENTATION-ONLY — the `image_render_state` column
+-- is jsonb (added in 20260425000000_cad_lab_image_render_state.sql), so
+-- adding a new sub-field to the in-application shape does NOT require a
+-- schema change. The jsonb column accepts the new key transparently.
+--
+-- This migration refreshes the column comment so a SQL-first inspector
+-- (Supabase Studio, psql \d+) sees the new shape without having to read
+-- the TypeScript interface in forge-v2-render-all-modules.ts.
+--
+-- NEW SHAPE (enforced in application code, not SQL):
+--   {
+--     started_at: iso8601,
+--     finished_at: iso8601 | null,
+--     total: integer,
+--     completed_ids: string[],
+--     failed_ids: string[],
+--     failed_reasons: {                     -- NEW in P1.5
+--         [module_id]: {
+--             provider: string | null,      -- image provider that threw, null if pre-provider failure
+--             rawError: string,             -- RAW error + stack, truncated to 2000 chars
+--             attempt: integer,             -- 1-indexed attempt count for this module
+--             timestamp: iso8601            -- when this failure was recorded
+--         }
+--     },
+--     current_id: string | null,
+--     error: string | null
+--   }
+--
+-- WHY: before P1.5 the state recorded `failed_ids: [a, b, c, d]` and the
+-- console story was "40× module X failed — why?". The `failed_reasons`
+-- map persists the raw WHY per module, surviving container teardown and
+-- Vercel's ~1-hour log retention. See src/lib/security/sanitize.ts for
+-- the three-surface error policy that underpins the `rawError` field.
+--
+-- Additive-only. No existing rows touched. Older rows have the key
+-- absent; callers treat missing `failed_reasons` as `{}`.
+
+comment on column public.cad_lab_projects.image_render_state is
+    'State for the tab-close-safe module image render loop. Null = never run. Shape (P1.5, 2026-04-23): { started_at, finished_at (null while running), total, completed_ids, failed_ids, failed_reasons: Record<module_id, { provider, rawError, attempt, timestamp }>, current_id, error }. See src/actions/forge-v2-render-all-modules.ts for the state machine and src/lib/security/sanitize.ts for the three-surface error policy that populates rawError.';

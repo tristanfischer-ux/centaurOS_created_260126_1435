@@ -31,7 +31,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import {
+  sanitizeErrorMessage,
+  extractRawErrorMessage,
+} from '@/lib/security/sanitize'
 import type { User } from '@supabase/supabase-js'
 
 /**
@@ -49,9 +52,68 @@ export interface AuthContext {
 
 /**
  * Standard error return type for server actions.
- * Supports both `{ error: string }` and `{ success: false, error: string }` patterns.
+ *
+ * Supports both `{ error: string }` and `{ success: false, error: string }`
+ * patterns AND carries an optional `rawError` field for the three-surface
+ * error policy (see `src/lib/security/sanitize.ts` header for the full
+ * policy).
+ *
+ *   - `error`    — SANITISED message suitable for the UI (surface 1)
+ *   - `rawError` — RAW message + stack for DB persistence + console logs
+ *                  (surfaces 2 and 3). Truncated to `RAW_ERROR_MAX_LEN`.
+ *
+ * Callers that persist to the DB or write to Vercel logs MUST prefer
+ * `rawError` (falling back to `error` if the server action predates
+ * the three-surface policy). The UI MUST ignore `rawError`.
  */
-export type ActionError = { error: string; success?: false }
+export type ActionError = {
+  error: string
+  rawError?: string
+  success?: false
+}
+
+/**
+ * ServerActionError — the canonical shape returned by server actions on
+ * failure, carrying both the sanitised user-facing message AND the raw
+ * developer-facing message + stack.
+ *
+ * This type is the contract for the three-surface error policy:
+ *   - `userMessage` is surface 1 (UI-safe, sanitised)
+ *   - `rawMessage`  is surfaces 2/3 (DB + console, unsanitised, truncated)
+ *
+ * Use `buildServerActionError(err)` to construct one from any thrown
+ * value. Return it from server actions as
+ * `{ error: err.userMessage, rawError: err.rawMessage }` — the wire shape
+ * stays `ActionError` so existing callers keep working.
+ */
+export interface ServerActionError {
+  userMessage: string
+  rawMessage: string
+}
+
+/**
+ * Construct a `ServerActionError` from any thrown value. Always safe to
+ * call — never throws, always returns both fields populated.
+ *
+ * Use in `catch` blocks inside server actions to produce the two sides of
+ * the three-surface policy in one call:
+ *
+ * ```ts
+ * try {
+ *   // ...
+ * } catch (err) {
+ *   const e = buildServerActionError(err)
+ *   console.error('[my-action] failed:', e.rawMessage)  // surface 3
+ *   return { error: e.userMessage, rawError: e.rawMessage }  // surfaces 1+2
+ * }
+ * ```
+ */
+export function buildServerActionError(error: unknown): ServerActionError {
+  return {
+    userMessage: sanitizeErrorMessage(error),
+    rawMessage: extractRawErrorMessage(error),
+  }
+}
 
 /**
  * Wraps a server action with authentication and foundry context checks.
@@ -97,24 +159,43 @@ export async function withAuth<T>(
       // SAFETY: All server actions return objects with `error` property on failure.
       // This cast is safe because the pre-migration code returned { error: string }
       // from the same functions, and callers already handle this case.
-      return { error: 'Unauthorized' } as T
+      // Three-surface policy: sanitised message is also raw for auth-fail
+      // (no stack to hide), but we still populate rawError so DB writers
+      // don't fall back to "Unauthorized" verbatim when they could be
+      // recording a more specific authError.message. See sanitize.ts header.
+      const rawAuth = authError
+        ? extractRawErrorMessage(authError)
+        : 'Unauthorized: no authenticated user'
+      return { error: 'Unauthorized', rawError: rawAuth } as T
     }
 
     // AUTH: Resolve foundry context for multi-tenant isolation
     const foundryId = await getFoundryIdCached()
     if (!foundryId) {
-      return { error: 'User not in a foundry' } as T
+      return {
+        error: 'User not in a foundry',
+        rawError: `getFoundryIdCached returned null for user ${user.id}`,
+      } as T
     }
 
     // Execute the action with verified context
     return await action({ supabase, user, foundryId })
   } catch (error) {
-    // Log unexpected errors with context for debugging
+    // Three-surface policy (P1.4):
+    //   surface 3 (console/Vercel logs) — RAW Error.message + stack
+    //   surface 2 (DB-destined rawError field) — RAW, truncated
+    //   surface 1 (UI-destined error field) — SANITISED
+    // See src/lib/security/sanitize.ts header for the full policy.
+    const rawMessage = extractRawErrorMessage(error)
     console.error('[withAuth] Unexpected error in server action:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
+      rawMessage,
     })
-    return { error: sanitizeErrorMessage(error) } as T
+    return {
+      error: sanitizeErrorMessage(error),
+      rawError: rawMessage,
+    } as T
   }
 }
 
@@ -148,14 +229,24 @@ export async function withUser<T>(
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return { error: 'Unauthorized' } as T
+      const rawAuth = authError
+        ? extractRawErrorMessage(authError)
+        : 'Unauthorized: no authenticated user'
+      return { error: 'Unauthorized', rawError: rawAuth } as T
     }
 
     return await action({ supabase, user })
   } catch (error) {
+    // Three-surface policy (P1.4) — see sanitize.ts header.
+    const rawMessage = extractRawErrorMessage(error)
     console.error('[withUser] Unexpected error in server action:', {
       error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      rawMessage,
     })
-    return { error: sanitizeErrorMessage(error) } as T
+    return {
+      error: sanitizeErrorMessage(error),
+      rawError: rawMessage,
+    } as T
   }
 }

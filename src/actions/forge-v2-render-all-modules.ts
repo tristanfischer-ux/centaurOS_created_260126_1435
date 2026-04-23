@@ -59,12 +59,51 @@ import { generateOneModuleImage } from "./forge-v2-generate-one-module-image"
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
+/**
+ * Per-module failure detail, persisted alongside `failed_ids` so the
+ * DB records the WHY of every failure, not just the id. Added 2026-04-23
+ * (P1.5) to solve the "40× stage X failed, zero signal" debugging trap.
+ *
+ *   - `provider`   — which image provider threw (e.g. "gpt-image-2"),
+ *                    `null` when the failure happened before we reached
+ *                    a provider (project load, ownership, bad input).
+ *   - `rawError`   — RAW, un-sanitised error message + stack. Truncated
+ *                    to `RAW_ERROR_MAX_LEN` upstream by
+ *                    `extractRawErrorMessage()`. DO NOT surface this to
+ *                    the UI — it's surface 2 of the three-surface
+ *                    policy (see `src/lib/security/sanitize.ts` header).
+ *   - `attempt`    — 1-indexed attempt count for this module within the
+ *                    current render chain. Always 1 today; here so that
+ *                    when per-module retry lands the same field can
+ *                    carry "failed on attempt 3" without another
+ *                    migration.
+ *   - `timestamp`  — ISO-8601 wall clock for when the failure was
+ *                    recorded. Lets the log-pull helper correlate with
+ *                    Vercel logs whose retention is only ~1 hour.
+ */
+export interface ImageRenderFailureReason {
+    provider: string | null
+    rawError: string
+    attempt: number
+    timestamp: string
+}
+
 export interface ImageRenderState {
     started_at: string
     finished_at: string | null
     total: number
     completed_ids: string[]
     failed_ids: string[]
+    /**
+     * Per-module reason map. Key = module id (matches entries in
+     * `failed_ids`). Added in P1.5 (2026-04-23) — before this field
+     * existed, a failure chain produced `failed_ids: [a, b, c, d]` and
+     * the ops/console story was "40 identical lines, which module caused
+     * which one?". Optional for backwards compatibility with the JSONB
+     * column shape; callers that didn't populate it before the migration
+     * are treated as `{}`.
+     */
+    failed_reasons?: Record<string, ImageRenderFailureReason>
     current_id: string | null
     error: string | null
 }
@@ -201,6 +240,7 @@ export async function startRenderAllRemainingModuleImages(
             total: unrendered.length,
             completed_ids: [],
             failed_ids: [],
+            failed_reasons: {},
             current_id: unrendered[0].id,
             error: null,
         }
@@ -352,27 +392,64 @@ export async function renderNextModuleStage(
         batch.map((m) => generateOneModuleImage(projectId, m.id)),
     )
 
-    // 5. Tally per-module outcomes.
-    const batchOutcomes = batch.map((m, i) => {
+    // 5. Tally per-module outcomes. Captures BOTH the sanitised `error`
+    //    (surface 1) and the raw `rawError` + `provider` (surfaces 2/3)
+    //    so `failed_reasons` can record the real WHY per module. See
+    //    `src/lib/security/sanitize.ts` for the three-surface policy.
+    interface BatchOutcome {
+        id: string
+        ok: boolean
+        error: string | null
+        rawError: string | null
+        provider: string | null
+    }
+    const batchOutcomes: BatchOutcome[] = batch.map((m, i) => {
         const r = results[i]
         if (r.status === "fulfilled") {
-            if (r.value.ok) return { id: m.id, ok: true, error: null }
-            return { id: m.id, ok: false, error: r.value.error }
+            if (r.value.ok) {
+                return {
+                    id: m.id,
+                    ok: true,
+                    error: null,
+                    rawError: null,
+                    provider: null,
+                }
+            }
+            return {
+                id: m.id,
+                ok: false,
+                error: r.value.error,
+                rawError: r.value.rawError ?? r.value.error,
+                provider: r.value.provider ?? null,
+            }
         }
+        // Promise rejected — generateOneModuleImage contract is "never
+        // throws, always returns an object", so hitting this branch
+        // means a withAuth/withUser cookies-in-after() or similar
+        // pre-action explosion. Capture the raw reason for DB storage.
+        const rejectionMessage =
+            r.reason instanceof Error
+                ? r.reason.stack ?? r.reason.message
+                : String(r.reason ?? "render threw (unknown reason)")
         return {
             id: m.id,
             ok: false,
             error:
                 r.reason instanceof Error ? r.reason.message : "render threw",
+            rawError: rejectionMessage,
+            provider: null,
         }
     })
     const lastError =
         batchOutcomes.find((o) => !o.ok)?.error ?? null
     for (const o of batchOutcomes) {
         if (!o.ok) {
+            // Log raw + provider so Vercel log pulls surface the WHY,
+            // not the sanitised user-facing string. Mirrors the policy
+            // in withAuth's catch-all.
             console.warn(
-                `[render-all-modules:stage] module ${o.id} failed:`,
-                o.error,
+                `[render-all-modules:stage] module ${o.id} failed (provider=${o.provider ?? "none"}):`,
+                o.rawError ?? o.error,
             )
         }
     }
@@ -401,6 +478,29 @@ export async function renderNextModuleStage(
         new Set([...current.failed_ids, ...newlyFailed]),
     )
 
+    // P1.5 — build the failed_reasons map. Start from whatever the
+    // previous stage persisted (a module that failed two stages ago stays
+    // in the map), then overwrite/add entries for anything that failed
+    // THIS stage. Skip completed outcomes — only failures need a reason.
+    // Timestamp uses wall clock so log-pull tooling can correlate with
+    // Vercel's 1-hour log retention.
+    const nowIso = new Date().toISOString()
+    const failedReasons: Record<string, ImageRenderFailureReason> = {
+        ...(current.failed_reasons ?? {}),
+    }
+    for (const o of batchOutcomes) {
+        if (o.ok) continue
+        // attempt = 1 today (no per-module retry loop yet); incrementing
+        // when retry lands is a one-line change. Kept as a first-class
+        // field so the DB shape doesn't have to change again.
+        failedReasons[o.id] = {
+            provider: o.provider,
+            rawError: o.rawError ?? o.error ?? "Unknown error",
+            attempt: 1,
+            timestamp: nowIso,
+        }
+    }
+
     // 7. Figure out if more work remains. Re-read modules so a
     //    concurrent Max re-run that added modules is picked up, and
     //    the decision uses the most recent imageUrl splice.
@@ -414,6 +514,7 @@ export async function renderNextModuleStage(
         ...current,
         completed_ids: completed,
         failed_ids: failed,
+        failed_reasons: failedReasons,
         current_id: remaining?.id ?? null,
         error: lastError,
         finished_at: remaining ? null : new Date().toISOString(),

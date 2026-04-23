@@ -30,6 +30,7 @@ import sharp from "sharp"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
+import { extractRawErrorMessage } from "@/lib/security/sanitize"
 import {
     generateCadLabSingleImageAction,
     flipCadLabImageForMirrorAction,
@@ -60,12 +61,32 @@ export type GenerateOneModuleImageErrorCode =
     | "GENERATION_FAILED"
     | "INTERNAL"
 
+/**
+ * Three-surface error policy (P1.4 + P1.5, 2026-04-23):
+ *
+ *   - `error`       — SANITISED message suitable for the UI (surface 1)
+ *   - `rawError`    — RAW error + stack, for DB persistence in
+ *                     `image_render_state.failed_reasons[moduleId].rawError`
+ *                     and for console/Vercel log pulls (surfaces 2+3)
+ *   - `provider`    — Which image provider threw (e.g. "gpt-image-2",
+ *                     "openai-edit", null if we didn't get that far).
+ *                     Populated when we know; null for pre-provider
+ *                     failures (project not found, DB read failure).
+ *
+ * The render chain in `forge-v2-render-all-modules.ts` reads `rawError` +
+ * `provider` to populate `image_render_state.failed_reasons` so the DB
+ * has the real WHY for every failed module, not just its id.
+ *
+ * See `src/lib/security/sanitize.ts` header for the full policy.
+ */
 export type GenerateOneModuleImageResult =
     | { ok: true; imageUrl: string }
     | {
           ok: false
           error: string
           errorCode: GenerateOneModuleImageErrorCode
+          rawError: string
+          provider: string | null
       }
 
 // ─── Action ────────────────────────────────────────────────────────────
@@ -104,6 +125,8 @@ export async function generateOneModuleImage(
                 ok: false,
                 error: "Couldn't load project.",
                 errorCode: "INTERNAL",
+                rawError: extractRawErrorMessage(projectErr),
+                provider: null,
             }
         }
         if (!project) {
@@ -111,6 +134,8 @@ export async function generateOneModuleImage(
                 ok: false,
                 error: "Project not found.",
                 errorCode: "PROJECT_NOT_FOUND",
+                rawError: `cad_lab_projects row not found for id=${projectId}`,
+                provider: null,
             }
         }
         if (project.foundry_id !== foundryId) {
@@ -119,6 +144,8 @@ export async function generateOneModuleImage(
                 ok: false,
                 error: "Project not found.",
                 errorCode: "PROJECT_FORBIDDEN",
+                rawError: `foundry mismatch: project.foundry_id=${project.foundry_id} requester.foundryId=${foundryId}`,
+                provider: null,
             }
         }
 
@@ -130,6 +157,8 @@ export async function generateOneModuleImage(
                 ok: false,
                 error: "Module not found on this project.",
                 errorCode: "MODULE_NOT_FOUND",
+                rawError: `module id=${moduleId} not in project.modules (have ${modules.length} modules: ${modules.map((m) => m.id).join(",")})`,
+                provider: null,
             }
         }
 
@@ -556,29 +585,47 @@ export async function generateOneModuleImage(
                 systemIllustrationRefMimeType,
             )
         } catch (err) {
+            const rawError = extractRawErrorMessage(err)
             console.error(
                 `[forge-v2-generate-one-module-image] inner threw for ${moduleId}:`,
-                err instanceof Error ? err.message : err,
+                rawError,
             )
             return {
                 ok: false,
                 error: "Image generation threw — retry in a moment.",
                 errorCode: "GENERATION_FAILED",
+                rawError,
+                // We don't know which provider we reached when the inner
+                // call threw (could be pre-provider config error, could
+                // be mid-stream). Leave null; the logs have the stack.
+                provider: null,
             }
         }
 
         if ("error" in result) {
+            // ImageGenResult-error shape is `{ error: string }` — the inner
+            // action returns this when ownership / gate / SSRF checks fail
+            // before the provider is ever called. Provider is therefore
+            // null (no provider was reached).
             return {
                 ok: false,
                 error: result.error,
                 errorCode: "GENERATION_FAILED",
+                rawError: result.error,
+                provider: null,
             }
         }
         if (result.imageStatus === "failed") {
+            const rawError = result.imageError ?? "Image generation failed."
             return {
                 ok: false,
-                error: result.imageError ?? "Image generation failed.",
+                error: rawError,
                 errorCode: "GENERATION_FAILED",
+                rawError,
+                provider:
+                    typeof result.imageModelUsed === "string"
+                        ? result.imageModelUsed
+                        : null,
             }
         }
         if (!result.imageUrl) {
@@ -586,6 +633,12 @@ export async function generateOneModuleImage(
                 ok: false,
                 error: "Image generator returned no URL.",
                 errorCode: "GENERATION_FAILED",
+                rawError:
+                    "Image generator returned imageStatus!=failed but no imageUrl — inner action contract violation.",
+                provider:
+                    typeof result.imageModelUsed === "string"
+                        ? result.imageModelUsed
+                        : null,
             }
         }
 
@@ -604,6 +657,14 @@ export async function generateOneModuleImage(
                 ok: false,
                 error: "Generated OK but couldn't persist — reload failed.",
                 errorCode: "INTERNAL",
+                rawError:
+                    reloadErr
+                        ? extractRawErrorMessage(reloadErr)
+                        : `reload of cad_lab_projects id=${projectId} returned no row`,
+                provider:
+                    typeof result.imageModelUsed === "string"
+                        ? result.imageModelUsed
+                        : null,
             }
         }
 
@@ -617,6 +678,11 @@ export async function generateOneModuleImage(
                 ok: false,
                 error: "Module was removed from the project during generation.",
                 errorCode: "MODULE_NOT_FOUND",
+                rawError: `module id=${moduleId} no longer in cad_lab_projects.modules after generation (likely Max re-ran decomposition mid-render)`,
+                provider:
+                    typeof result.imageModelUsed === "string"
+                        ? result.imageModelUsed
+                        : null,
             }
         }
 
@@ -634,14 +700,20 @@ export async function generateOneModuleImage(
             .eq("id", projectId)
 
         if (updateErr) {
+            const rawError = extractRawErrorMessage(updateErr)
             console.error(
                 `[forge-v2-generate-one-module-image] persist failed for ${moduleId}:`,
-                updateErr.message ?? updateErr,
+                rawError,
             )
             return {
                 ok: false,
                 error: "Generated but couldn't save — please retry this module.",
                 errorCode: "INTERNAL",
+                rawError,
+                provider:
+                    typeof result.imageModelUsed === "string"
+                        ? result.imageModelUsed
+                        : null,
             }
         }
 
