@@ -133,6 +133,41 @@ export async function runFinnCost(
     trigger: "manual" | "auto.bom-complete",
 ): Promise<RunFinnCostReturn> {
     return withAuth<RunFinnCostReturn>(async ({ user, foundryId }) => {
+        return runFinnCostInternal(projectId, foundryId, user.id, trigger)
+    })
+}
+
+/**
+ * Background entry point — called from `after()` post-response contexts (the
+ * autopilot chain, BOM → Finn auto-fire) where cookies are gone and
+ * `withAuth` would fail with "Unauthorized". Caller MUST have already
+ * resolved `foundryId` from an authenticated request.
+ *
+ * This is the #90 fix applied to Finn — mirrors `runBomGeneratorBackground`
+ * and `runMaxDecompositionBackground`. See run-max-decomposition.ts header
+ * for the full rationale.
+ */
+export async function runFinnCostBackground(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "auto.bom-complete" | "manual.rerun" = "auto.bom-complete",
+): Promise<RunFinnCostReturn> {
+    return runFinnCostInternal(projectId, foundryId, userId, trigger)
+}
+
+async function runFinnCostInternal(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "manual" | "auto.bom-complete" | "manual.rerun",
+): Promise<RunFinnCostReturn> {
+    {
+        // GOTCHA: triggered_by FKs to auth.users and a zero UUID fails the
+        // constraint. For system-fired runs (autopilot after() chain,
+        // BOM → Finn auto-fire) userId is null and we pass it straight
+        // through — the column is nullable.
+        const user: { id: string | null } = { id: userId }
         // 1. Load + verify project. Same rationale as sibling orchestrators:
         //    RLS on cad_lab_projects is keyed on foundry membership and we
         //    never want to silently cost another tenant's project on behalf
@@ -270,7 +305,7 @@ export async function runFinnCost(
                 specialist_id: SPECIALIST_ID,
                 stage: STAGE,
                 trigger,
-                triggered_by: user.id,
+                triggered_by: user.id ?? undefined,
                 model_provider: "deepseek",
                 input_ref: {
                     source: "modules+diagnostics",
@@ -384,7 +419,7 @@ export async function runFinnCost(
                 errorCode: "INTERNAL",
             }
         }
-    })
+    }
 }
 
 // ─── loadFinnRunStatus ─────────────────────────────────────────────────

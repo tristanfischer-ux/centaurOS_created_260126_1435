@@ -895,10 +895,23 @@ async function stepWaitForFinn(projectId: string): Promise<void> {
                 }
             })
         },
-        // #88: Finn has no Background variant today; when it does, wire it
-        // here. For now, a stall-sweep will record a permanent failure
-        // rather than loop — matches prior behaviour but with the
-        // explicit TIMEOUT_STALL error code surfacing the cause.
+        // P2.9: re-fire Finn via Background variant if stall-swept. Previously
+        // Finn had no Background variant so a TIMEOUT_STALL ended the walk.
+        // Now runFinnCostBackground plumbs foundryId explicitly, mirroring
+        // runMaxDecompositionBackground / runBomGeneratorBackground.
+        reTrigger: async () => {
+            const foundryId = await getProjectFoundryId(projectId)
+            if (!foundryId) return
+            const { runFinnCostBackground } = await import(
+                "@/actions/specialists/run-finn-cost"
+            )
+            await runFinnCostBackground(
+                projectId,
+                foundryId,
+                null,
+                "auto.bom-complete",
+            )
+        },
     })
 }
 
@@ -1099,6 +1112,22 @@ async function stepMatchSuppliers(projectId: string): Promise<void> {
 async function stepRunFangReviews(projectId: string): Promise<void> {
     const admin = createAdminClient()
 
+    // P2.9: resolve foundryId up front so the per-module loop can call
+    // runFangReviewBackground — the withAuth-wrapped variant can't read
+    // cookies inside after() context and returns "Unauthorized", which
+    // sanitizeErrorMessage then destroys into "An unexpected error
+    // occurred" (Red Team 2 §P1 item 6). Background variant plumbs
+    // foundryId explicitly.
+    const foundryId = await getProjectFoundryId(projectId)
+    if (!foundryId) {
+        await recordFailure(
+            projectId,
+            "running_fang_reviews",
+            "project disappeared during Fang review stage",
+        )
+        return
+    }
+
     const { data: project, error: projectErr } = await admin
         .from("cad_lab_projects")
         .select("modules")
@@ -1148,7 +1177,12 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
         return
     }
 
-    const { runFangReview } = await import(
+    // P2.9: use the Background variant — this stage runs from an after()
+    // context (stepMatchSuppliers → after(stepRunFangReviews)) where cookies
+    // are gone and withAuth would return "Unauthorized". The Background
+    // variant plumbs foundryId + userId explicitly, mirroring the Max/BOM
+    // after() chain fix (#90).
+    const { runFangReviewBackground } = await import(
         "@/actions/specialists/run-fang-review"
     )
 
@@ -1158,7 +1192,13 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
     // ceiling. Serial keeps the runner's peak concurrency at 1.
     for (const mod of reviewable) {
         try {
-            await runFangReview(projectId, mod.id, "manual")
+            await runFangReviewBackground(
+                projectId,
+                mod.id,
+                foundryId,
+                null,
+                "auto.supplier-match-complete",
+            )
             // Failures inside the inner action are returned as { ok: false };
             // we don't short-circuit on them because some modules may still
             // land cleanly after one errors.

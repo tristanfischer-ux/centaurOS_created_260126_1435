@@ -114,6 +114,43 @@ export async function runFangReview(
     trigger: "manual",
 ): Promise<RunFangReviewReturn> {
     return withAuth<RunFangReviewReturn>(async ({ user, foundryId }) => {
+        return runFangReviewInternal(projectId, moduleId, foundryId, user.id, trigger)
+    })
+}
+
+/**
+ * Background entry point — called from `after()` post-response contexts (the
+ * autopilot chain's fang-review loop) where cookies are gone and `withAuth`
+ * would fail with "Unauthorized". Caller MUST have already resolved
+ * `foundryId` from an authenticated request.
+ *
+ * This is the #90 fix applied to Fang — mirrors `runBomGeneratorBackground`
+ * and `runMaxDecompositionBackground`. See run-max-decomposition.ts header
+ * for the full rationale.
+ */
+export async function runFangReviewBackground(
+    projectId: string,
+    moduleId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "auto.illustration-complete" | "auto.supplier-match-complete" = "auto.supplier-match-complete",
+): Promise<RunFangReviewReturn> {
+    return runFangReviewInternal(projectId, moduleId, foundryId, userId, trigger)
+}
+
+async function runFangReviewInternal(
+    projectId: string,
+    moduleId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "manual" | "auto.illustration-complete" | "auto.supplier-match-complete",
+): Promise<RunFangReviewReturn> {
+    {
+        // GOTCHA: triggered_by FKs to auth.users and a zero UUID fails the
+        // constraint. For system-fired runs (autopilot after() chain)
+        // userId is null and we pass it straight through — the column is
+        // nullable. Manual runs keep user.id.
+        const user: { id: string | null } = { id: userId }
         // 1. Ownership + module existence checks. Uses the admin client for
         //    the same reason run-max-decomposition does — withAuth has already
         //    proven the caller is in foundryId, now we prove the project
@@ -192,7 +229,7 @@ export async function runFangReview(
                 specialist_id: SPECIALIST_ID,
                 stage: STAGE,
                 trigger,
-                triggered_by: user.id,
+                triggered_by: user.id ?? undefined,
                 model_provider: "anthropic",
                 input_ref: { moduleId },
             })
@@ -377,7 +414,7 @@ export async function runFangReview(
                 errorCode: "INTERNAL",
             }
         }
-    })
+    }
 }
 
 // ─── loadFangRunStatus ─────────────────────────────────────────────────
@@ -754,7 +791,7 @@ async function applyFangRecommendationsToModule(
     projectId: string,
     moduleId: string,
     foundryId: string,
-    userId: string,
+    userId: string | null,
     review: SpecialistReview,
 ): Promise<CascadeResult> {
     // Gate 1: verdict must indicate something is wrong.
@@ -889,7 +926,13 @@ async function applyFangRecommendationsToModule(
     // Best-effort audit log — one row per applied mutation. A failed insert
     // doesn't unwind the module update; design_change_log already contains
     // the same information and the audit_log is the tenant-wide history.
+    //
+    // GOTCHA: audit_log.user_id is NOT NULL. For system-fired cascades
+    // (autopilot after() chain) we don't have a user — skip the audit row
+    // and rely on design_change_log (which DOES carry the system-run info)
+    // for traceability. Human-triggered reviews still log normally.
     for (const w of auditWrites) {
+        if (!userId) break
         await admin
             .from("audit_log")
             .insert({
