@@ -39,6 +39,7 @@ import { loadBomRunStatus } from "@/actions/specialists/run-bom-generator"
 import { loadChaseRunStatus } from "@/actions/specialists/run-chase-research"
 import { loadFinnRunStatus } from "@/actions/specialists/run-finn-cost"
 import { loadBriefLockStatus } from "@/actions/brief-lock"
+import { tickAutopilotStage } from "@/actions/forge-v2-autopilot"
 import { createClient } from "@/lib/supabase/server"
 
 import { WorkspaceView, type TopMaterialRow, type TopProcessRow, type WorkspaceViewProps } from "./workspace-view"
@@ -66,6 +67,18 @@ export default async function ForgeV2ProjectPage({
         notFound()
     }
     const project = loadResult.project
+
+    // INTENT: nudge autopilot on every workspace page load. Every stepWaitForX
+    // runner has its own self-healing check that fires the expected
+    // pipeline_run if missing, so this is cheap + idempotent when autopilot
+    // is already making progress but critical when the after()-chain dropped
+    // silently mid-stage (observed 2026-04-23). Fire-and-forget.
+    tickAutopilotStage(id).catch((err) => {
+        console.warn(
+            "[WORKSPACE-PAGE] tickAutopilotStage failed (non-fatal):",
+            err instanceof Error ? err.message : err,
+        )
+    })
 
     // ── 2. Derived data — parallelised, all failure-tolerant ─────────
     // Each call's failure mode is local: we swallow errors and fall back to

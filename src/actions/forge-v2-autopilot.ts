@@ -1299,6 +1299,93 @@ async function waitForStage(
     )
 }
 
+/**
+ * Tick — re-enter the current autopilot stage from outside the after() chain.
+ *
+ * @description The after()-within-after() cascade that drives autopilot is
+ * inherently fragile on Vercel: the serverless container can be terminated
+ * at any point between stages, silently dropping the in-flight poll loop
+ * and leaving autopilot_state stuck on a stage whose runner isn't actually
+ * running. Symptom: waiting_max in state but no brief.decompose pipeline_run.
+ *
+ * This function provides a "ping" entry point the UI can call whenever a
+ * founder lands on the workspace page. It reads autopilot_state and, if
+ * the current stage looks stuck (no recent pipeline_run activity for the
+ * expected specialist/stage), re-invokes the stage runner via `after()` so
+ * the chain can resume. Idempotent — if a runner is already in flight,
+ * the inner stepWaitForX self-healing check prevents double-firing.
+ *
+ * Call from:
+ *   - the workspace page on initial server render
+ *   - the autopilot-button's poll interval (every ~30s)
+ */
+export async function tickAutopilotStage(
+    projectId: string,
+): Promise<{ ok: true; ticked: boolean; stage: AutopilotStage | null }> {
+    return withAuth<{ ok: true; ticked: boolean; stage: AutopilotStage | null }>(async ({ foundryId }) => {
+        const admin = createAdminClient()
+        const { data: project } = await admin
+            .from("cad_lab_projects")
+            .select("foundry_id, autopilot_state")
+            .eq("id", projectId)
+            .maybeSingle()
+        if (!project || project.foundry_id !== foundryId) {
+            return { ok: true, ticked: false, stage: null }
+        }
+        const state = (project.autopilot_state as AutopilotState | null) ?? null
+        if (!state || state.finished_at) {
+            return { ok: true, ticked: false, stage: state?.stage ?? null }
+        }
+
+        // Re-enter the current stage. Each stepXxx has its own self-healing
+        // check + idempotency so a duplicate re-entry is safe.
+        const stage = state.stage
+        after(async () => {
+            try {
+                switch (stage) {
+                    case "waiting_chase":
+                        await stepWaitForChase(projectId)
+                        break
+                    case "locking_brief":
+                        await stepLockBrief(projectId)
+                        break
+                    case "waiting_max":
+                        await stepWaitForMax(projectId)
+                        break
+                    case "waiting_sizing":
+                        await stepWaitForSizing(projectId)
+                        break
+                    case "waiting_bom":
+                        await stepWaitForBom(projectId)
+                        break
+                    case "waiting_finn":
+                        await stepWaitForFinn(projectId)
+                        break
+                    case "generating_illustration":
+                        await stepGenerateIllustration(projectId)
+                        break
+                    case "matching_suppliers":
+                        await stepMatchSuppliers(projectId)
+                        break
+                    case "running_fang_reviews":
+                        await stepRunFangReviews(projectId)
+                        break
+                    case "generating_pdf":
+                        await stepGeneratePdf(projectId)
+                        break
+                }
+            } catch (err) {
+                console.error(
+                    `[autopilot:tick] re-enter ${stage} threw:`,
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        })
+
+        return { ok: true, ticked: true, stage }
+    })
+}
+
 /** Reads autopilot_state, flips stage, stamps completed_stages. */
 async function advance(
     projectId: string,
