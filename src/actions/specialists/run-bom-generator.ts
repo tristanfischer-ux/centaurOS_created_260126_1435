@@ -153,6 +153,35 @@ export async function runBomGenerator(
     trigger: "manual" | "auto.max-complete" | "manual.rerun",
 ): Promise<RunBomGeneratorReturn> {
     return withAuth<RunBomGeneratorReturn>(async ({ user, foundryId }) => {
+        return runBomGeneratorInternal(projectId, foundryId, user.id, trigger)
+    })
+}
+
+/**
+ * Background entry point — used by Max's after() chain (post-response,
+ * cookies gone, withAuth would fail). Caller MUST have already resolved
+ * foundryId from the authenticated context before scheduling.
+ *
+ * This is the fix for #90 (auto-fire after() can't read cookies). Every
+ * cross-stage handoff must use a *Background variant that plumbs foundryId
+ * explicitly instead of relying on withAuth.
+ */
+export async function runBomGeneratorBackground(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "auto.max-complete" | "manual.rerun" = "auto.max-complete",
+): Promise<RunBomGeneratorReturn> {
+    return runBomGeneratorInternal(projectId, foundryId, userId, trigger)
+}
+
+async function runBomGeneratorInternal(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "manual" | "auto.max-complete" | "manual.rerun",
+): Promise<RunBomGeneratorReturn> {
+    {
         const admin = createAdminClient()
 
         // 1. Load + verify project (ownership check via admin; RLS would also
@@ -291,7 +320,7 @@ export async function runBomGenerator(
                 specialist_id: SPECIALIST_ID,
                 stage: STAGE,
                 trigger,
-                triggered_by: user.id,
+                triggered_by: userId ?? undefined,
                 model_provider: "anthropic",
                 input_ref: {
                     source: "modules",
@@ -397,7 +426,7 @@ export async function runBomGenerator(
             runId,
             partCount: 0,
         }
-    })
+    }
 }
 
 // ─── loadBomRunStatus ──────────────────────────────────────────────────

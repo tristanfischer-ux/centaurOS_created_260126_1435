@@ -42,6 +42,8 @@ import {
     analyseHeroBoundingBoxes,
     cropModuleRegion,
 } from "@/app/(platform)/the-forge/services/image-generator"
+import { enrichVisualStyleWithDimensions } from "@/lib/sizing/prompt-adapter"
+import type { DimensionSheet } from "@/lib/sizing/types"
 import type { Json } from "@/types/database.types"
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -87,7 +89,7 @@ export async function generateOneModuleImage(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url, interior_overview_url, hero_bounding_boxes, subject",
+                "id, foundry_id, modules, visual_style, illustration_style, system_illustration_url, interior_overview_url, hero_bounding_boxes, subject, dimension_sheet",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -307,10 +309,26 @@ export async function generateOneModuleImage(
                 rawStyle = synthesized
             }
         }
-        const visualStyle =
+        const baseVisualStyle =
             rawStyle && typeof rawStyle === "object"
-                ? (rawStyle as Parameters<typeof generateCadLabSingleImageAction>[2])
+                ? (rawStyle as VisualStyleSpec)
                 : undefined
+
+        // INTENT: Sizing engine produces `dimension_sheet` (W×D×H + mount
+        // + neighbour awareness per module). Inject those into the visual
+        // style's `moduleDimensionNotes` / `overallDimensionsMm` channel so
+        // the image prompt builders (buildModulePrompt,
+        // buildReferenceAwareModulePrompt, buildDimensionalConstraints) see
+        // accurate spatial constraints at generation time.
+        //
+        // This is the whole point of the sizing engine — modules are
+        // rendered aware of the space they'll take up inside the enclosure.
+        const sheet = (project.dimension_sheet as DimensionSheet | null) ?? null
+        const visualStyle = enrichVisualStyleWithDimensions(
+            baseVisualStyle,
+            sheet,
+            modules,
+        )
 
         // Honour the project's illustration_style so every module renders
         // in the same visual language as the hero (the hero orchestrator

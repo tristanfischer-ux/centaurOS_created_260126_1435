@@ -64,7 +64,7 @@ export async function generateSystemIllustrationForProject(
         const admin = createAdminClient()
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, modules, illustration_style")
+            .select("id, foundry_id, subject, modules, illustration_style, visual_style, dimension_sheet")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -116,18 +116,41 @@ export async function generateSystemIllustrationForProject(
             ? project.illustration_style
             : DEFAULT_ILLUSTRATION_STYLE
 
+        // INTENT: Inject the sizing engine's DimensionSheet into the hero
+        // prompt path so the interior-exploded render honours real W×D×H
+        // + mount + neighbour relationships. The enrichment uses the
+        // existing VisualStyleSpec.{overallDimensionsMm,moduleDimensionNotes}
+        // channel — image-generator already consumes both — so no image-gen
+        // prompt-builder change is needed here.
+        const { enrichVisualStyleWithDimensions, formatHeroDimensionTable } =
+            await import("@/lib/sizing/prompt-adapter")
+        const sheet =
+            (project.dimension_sheet as import("@/lib/sizing/types").DimensionSheet | null) ?? null
+        const baseVisualStyle =
+            project.visual_style && typeof project.visual_style === "object"
+                ? (project.visual_style as Parameters<typeof generateCadLabSystemIllustrationAction>[4])
+                : undefined
+        const enrichedStyle = enrichVisualStyleWithDimensions(
+            baseVisualStyle,
+            sheet,
+            modules,
+        )
+
+        // Hero gets the FULL dimension table as a research-excerpt-equivalent
+        // string so the prompt builder renders a to-scale spatial layout.
+        const heroDimensionTable = formatHeroDimensionTable(sheet, modules)
+        const researchExcerptWithDimensions = heroDimensionTable
+            ? heroDimensionTable
+            : undefined
+
         try {
             const res = await generateCadLabSystemIllustrationAction(
                 projectId,
                 subject,
                 moduleNames,
                 modulePurposes,
-                // visualStyle, researchExcerpt, heroPrompt, referenceImageUrls:
-                // V2 doesn't expose these yet; inner action has sensible
-                // defaults. illustrationStyle IS passed through so the hero
-                // + module paths share a style contract.
-                undefined,
-                undefined,
+                enrichedStyle,
+                researchExcerptWithDimensions,
                 undefined,
                 undefined,
                 illustrationStyle,

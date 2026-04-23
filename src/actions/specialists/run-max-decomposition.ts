@@ -130,6 +130,44 @@ export async function runMaxDecomposition(
     trigger: "manual" | "auto.brief-lock",
 ): Promise<RunMaxDecompositionReturn> {
     return withAuth<RunMaxDecompositionReturn>(async ({ user, foundryId }) => {
+        return runMaxDecompositionInternal(
+            projectId,
+            foundryId,
+            user.id,
+            trigger,
+        )
+    })
+}
+
+/**
+ * Background entry — called from `after()` post-response contexts (e.g. the
+ * autopilot chain) where cookies are gone and `withAuth` would fail. Caller
+ * MUST have already resolved foundryId from an authenticated request.
+ *
+ * This is the fix for #90. Every chained post-response handoff calls a
+ * *Background variant that plumbs foundryId + userId explicitly.
+ */
+export async function runMaxDecompositionBackground(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "auto.brief-lock" = "auto.brief-lock",
+): Promise<RunMaxDecompositionReturn> {
+    return runMaxDecompositionInternal(projectId, foundryId, userId, trigger)
+}
+
+async function runMaxDecompositionInternal(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "manual" | "auto.brief-lock",
+): Promise<RunMaxDecompositionReturn> {
+    // Shim: expose `user.id` under the original closure name so the body
+    // below continues to work. We only need `user.id` for triggered_by;
+    // every other auth concern has already been resolved by the caller.
+    const user = { id: userId ?? "00000000-0000-0000-0000-000000000000" }
+    // Foundry is already known — skip the withAuth wrapper.
+    void foundryId
         // 1. Load + verify project (foundry scope check via admin client —
         //    we can't use the user-scoped client because RLS on cad_lab_projects
         //    is keyed on foundry membership. The withAuth wrapper has already
@@ -400,23 +438,68 @@ export async function runMaxDecomposition(
                 },
             })
 
-            // Wave 1c: auto-fire BOM generator on Max success.
+            // Wave 1c: auto-fire Fang sizing + BOM generator on Max success.
+            //
+            // Order: sizing → BOM. Sizing produces dimension_sheet which Fang
+            // review + the image prompt builders consume; BOM's part
+            // envelopes will eventually cross-check against it too. Both
+            // stages are independent of each other so we fire both in the
+            // same after() but sequence sizing FIRST because it writes a
+            // read-before-write row that BOM's dimension-aware part check
+            // (future) will read.
             //
             // Must use after() (not plain `void`) so Vercel keeps the container
             // alive past this server action's Promise resolution — otherwise
-            // BOM's pipeline_runs row writes 'running' and the container is
-            // torn down mid-generation, leaving the row stuck until the 6-min
-            // watchdog sweeps it. Same pattern as brief-lock → Max.
+            // downstream pipeline_runs rows write 'running' and the container
+            // is torn down mid-generation, leaving rows stuck until the 6-min
+            // watchdog sweeps them. Same pattern as brief-lock → Max.
+            //
+            // GOTCHA (#90): the `after()` callback runs AFTER the HTTP response
+            // has been sent to the client, which means cookies are gone. Any
+            // action invoked from inside after() that calls `withAuth` will
+            // fail. We plumb foundryId explicitly into `*Background` variants
+            // that re-resolve the tenant via the admin client instead. Every
+            // chained stage MUST use this pattern.
             //
             // Dynamic import avoids a "use server" module-init cycle between
-            // run-max-decomposition and run-bom-generator (BOM also imports
+            // run-max-decomposition and its successors (which also import
             // from this file indirectly via shared types).
+            const capturedFoundryId = foundryId
+            const capturedProjectId = projectId
+            const capturedUserId = user.id
             after(async () => {
+                // (1) Sizing first — deterministic solver, single DB write,
+                //     finishes in ~100ms. Safe to await before BOM.
                 try {
-                    const { runBomGenerator } = await import(
+                    const { runFangSizingBackground } = await import(
+                        "@/actions/specialists/run-fang-sizing"
+                    )
+                    await runFangSizingBackground(
+                        capturedProjectId,
+                        capturedFoundryId,
+                        "auto.max-complete",
+                    )
+                } catch (err) {
+                    console.error(
+                        "[run-max-decomposition] Fang sizing auto-fire failed:",
+                        err instanceof Error ? err.message : err,
+                    )
+                }
+
+                // (2) BOM generator — distributed, writes its own pipeline_run
+                //     + schedules subsequent stages via internal after() calls.
+                //     Use the Background variant which takes foundryId + userId
+                //     explicitly instead of reading cookies (#90 fix).
+                try {
+                    const { runBomGeneratorBackground } = await import(
                         "@/actions/specialists/run-bom-generator"
                     )
-                    await runBomGenerator(projectId, "auto.max-complete")
+                    await runBomGeneratorBackground(
+                        capturedProjectId,
+                        capturedFoundryId,
+                        capturedUserId,
+                        "auto.max-complete",
+                    )
                 } catch (err) {
                     console.error(
                         "[run-max-decomposition] BOM auto-fire failed:",
@@ -449,7 +532,6 @@ export async function runMaxDecomposition(
                 errorCode: "INTERNAL",
             }
         }
-    })
 }
 
 // ─── loadMaxRunStatus ──────────────────────────────────────────────────

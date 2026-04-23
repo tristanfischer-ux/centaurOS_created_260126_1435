@@ -4679,6 +4679,7 @@ export type Database = {
           autopilot_state: Json | null
           batch_started_at: string | null
           batch_status: string
+          bom_generation_state: Json | null
           brief_locked_at: string | null
           brief_locked_by: string | null
           checkpoints: Json | null
@@ -4690,6 +4691,7 @@ export type Database = {
           design_revision: number
           diagnostic_answers: Json | null
           diagnostic_enrichment: Json | null
+          dimension_sheet: Json | null
           forked_from_id: string | null
           foundry_id: string
           generated_code: string | null
@@ -4698,12 +4700,12 @@ export type Database = {
           illustration_style: string
           image_render_state: Json | null
           images_generated_at_revision: number
-          interior_overview_url: string | null
           integrated_assembly_code: string | null
           integrated_assembly_step_url: string | null
           integrated_assembly_stl_url: string | null
           interface_contracts: Json | null
           interface_definition: string | null
+          interior_overview_url: string | null
           model_id: string
           modules: Json | null
           name: string
@@ -4739,6 +4741,7 @@ export type Database = {
           autopilot_state?: Json | null
           batch_started_at?: string | null
           batch_status?: string
+          bom_generation_state?: Json | null
           brief_locked_at?: string | null
           brief_locked_by?: string | null
           checkpoints?: Json | null
@@ -4750,6 +4753,7 @@ export type Database = {
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
+          dimension_sheet?: Json | null
           forked_from_id?: string | null
           foundry_id: string
           generated_code?: string | null
@@ -4758,12 +4762,12 @@ export type Database = {
           illustration_style?: string
           image_render_state?: Json | null
           images_generated_at_revision?: number
-          interior_overview_url?: string | null
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
           interface_contracts?: Json | null
           interface_definition?: string | null
+          interior_overview_url?: string | null
           model_id?: string
           modules?: Json | null
           name?: string
@@ -4799,6 +4803,7 @@ export type Database = {
           autopilot_state?: Json | null
           batch_started_at?: string | null
           batch_status?: string
+          bom_generation_state?: Json | null
           brief_locked_at?: string | null
           brief_locked_by?: string | null
           checkpoints?: Json | null
@@ -4810,6 +4815,7 @@ export type Database = {
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
+          dimension_sheet?: Json | null
           forked_from_id?: string | null
           foundry_id?: string
           generated_code?: string | null
@@ -4818,12 +4824,12 @@ export type Database = {
           illustration_style?: string
           image_render_state?: Json | null
           images_generated_at_revision?: number
-          interior_overview_url?: string | null
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
           interface_contracts?: Json | null
           interface_definition?: string | null
+          interior_overview_url?: string | null
           model_id?: string
           modules?: Json | null
           name?: string
@@ -17586,6 +17592,91 @@ export type Database = {
           },
         ]
       }
+      quotes: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          foundry_id: string
+          id: string
+          lead_weeks: number | null
+          module_id: string | null
+          notes: string | null
+          project_id: string | null
+          quantity: number
+          replied_at: string | null
+          requested_by: string | null
+          sent_at: string | null
+          status: string
+          supplier_id: string | null
+          supplier_notes: string | null
+          terms: Json | null
+          unit_price_gbp_pence: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          foundry_id: string
+          id?: string
+          lead_weeks?: number | null
+          module_id?: string | null
+          notes?: string | null
+          project_id?: string | null
+          quantity?: number
+          replied_at?: string | null
+          requested_by?: string | null
+          sent_at?: string | null
+          status?: string
+          supplier_id?: string | null
+          supplier_notes?: string | null
+          terms?: Json | null
+          unit_price_gbp_pence?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          foundry_id?: string
+          id?: string
+          lead_weeks?: number | null
+          module_id?: string | null
+          notes?: string | null
+          project_id?: string | null
+          quantity?: number
+          replied_at?: string | null
+          requested_by?: string | null
+          sent_at?: string | null
+          status?: string
+          supplier_id?: string | null
+          supplier_notes?: string | null
+          terms?: Json | null
+          unit_price_gbp_pence?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limits: {
         Row: {
           count: number | null
@@ -20633,6 +20724,84 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      supplier_discovery_jobs: {
+        Row: {
+          candidates_persisted: number | null
+          candidates_returned: number | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          finished_at: string | null
+          foundry_id: string
+          gap_industry: string | null
+          gap_key_hash: string
+          gap_material: string | null
+          gap_process: string | null
+          gap_product_category: string | null
+          id: string
+          status: string
+          total_cost_gbp_pence: number | null
+          triggering_module_id: string | null
+          triggering_project_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          candidates_persisted?: number | null
+          candidates_returned?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id: string
+          gap_industry?: string | null
+          gap_key_hash: string
+          gap_material?: string | null
+          gap_process?: string | null
+          gap_product_category?: string | null
+          id?: string
+          status?: string
+          total_cost_gbp_pence?: number | null
+          triggering_module_id?: string | null
+          triggering_project_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          candidates_persisted?: number | null
+          candidates_returned?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id?: string
+          gap_industry?: string | null
+          gap_key_hash?: string
+          gap_material?: string | null
+          gap_process?: string | null
+          gap_product_category?: string | null
+          id?: string
+          status?: string
+          total_cost_gbp_pence?: number | null
+          triggering_module_id?: string | null
+          triggering_project_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_discovery_jobs_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_discovery_jobs_triggering_project_id_fkey"
+            columns: ["triggering_project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
           },
         ]
       }

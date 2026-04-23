@@ -517,12 +517,22 @@ async function stepLockBrief(projectId: string): Promise<void> {
 
     // Success — brief is now locked. Fire Max.
     await advance(projectId, "locking_brief", "waiting_max")
+    // GOTCHA (#90): this after() fires POST-response, so cookies are gone.
+    // `runMaxDecomposition` uses withAuth which reads cookies and would fail
+    // with "Not authenticated". We use the Background variant which takes
+    // foundryId explicitly — autopilot already proved ownership before the
+    // `locking_brief` stage opened, so passing foundry_id through is safe.
     after(async () => {
         try {
-            const { runMaxDecomposition } = await import(
+            const { runMaxDecompositionBackground } = await import(
                 "@/actions/specialists/run-max-decomposition"
             )
-            await runMaxDecomposition(projectId, "auto.brief-lock")
+            await runMaxDecompositionBackground(
+                projectId,
+                project.foundry_id,
+                null,
+                "auto.brief-lock",
+            )
         } catch (err) {
             console.error(
                 "[autopilot] runMaxDecomposition threw:",
@@ -537,6 +547,21 @@ async function stepLockBrief(projectId: string): Promise<void> {
             await recordFailure(projectId, "waiting_max", errMessage(err))
         }
     })
+}
+
+/**
+ * Resolve the foundryId for a project via the admin client. Used by
+ * stall-recovery re-trigger callbacks (which fire from background poll
+ * loops with no cookie context). Returns null when the project is gone.
+ */
+async function getProjectFoundryId(projectId: string): Promise<string | null> {
+    const admin = createAdminClient()
+    const { data } = await admin
+        .from("cad_lab_projects")
+        .select("foundry_id")
+        .eq("id", projectId)
+        .maybeSingle()
+    return data?.foundry_id ?? null
 }
 
 /** Stage 3: wait for Max's decomposition to land 'done'. */
@@ -558,6 +583,22 @@ async function stepWaitForMax(projectId: string): Promise<void> {
                     )
                 }
             })
+        },
+        // #88 Phase-2 fix: if the prior Max run was swept as TIMEOUT_STALL,
+        // re-invoke Max via the Background variant so the autopilot chain
+        // survives a Vercel 300s kill. One retry per stage.
+        reTrigger: async () => {
+            const foundryId = await getProjectFoundryId(projectId)
+            if (!foundryId) return
+            const { runMaxDecompositionBackground } = await import(
+                "@/actions/specialists/run-max-decomposition"
+            )
+            await runMaxDecompositionBackground(
+                projectId,
+                foundryId,
+                null,
+                "auto.brief-lock",
+            )
         },
     })
 }
@@ -582,6 +623,20 @@ async function stepWaitForBom(projectId: string): Promise<void> {
                 }
             })
         },
+        // #88: re-fire BOM via Background variant if stall-swept.
+        reTrigger: async () => {
+            const foundryId = await getProjectFoundryId(projectId)
+            if (!foundryId) return
+            const { runBomGeneratorBackground } = await import(
+                "@/actions/specialists/run-bom-generator"
+            )
+            await runBomGeneratorBackground(
+                projectId,
+                foundryId,
+                null,
+                "auto.max-complete",
+            )
+        },
     })
 }
 
@@ -605,6 +660,10 @@ async function stepWaitForFinn(projectId: string): Promise<void> {
                 }
             })
         },
+        // #88: Finn has no Background variant today; when it does, wire it
+        // here. For now, a stall-sweep will record a permanent failure
+        // rather than loop — matches prior behaviour but with the
+        // explicit TIMEOUT_STALL error code surfacing the cause.
     })
 }
 
@@ -834,12 +893,25 @@ interface WaitForStageOpts {
     stage: string
     stageSlug: AutopilotStage
     onDone: () => Promise<void>
+    /**
+     * Optional re-trigger callback. When the latest pipeline_runs row for
+     * this stage was swept as TIMEOUT_STALL (Vercel 300s cap killed the
+     * function mid-chain), waitForStage re-invokes this callback once to
+     * schedule a fresh run of the underlying action before giving up. #88
+     * fix — without this, a stalled stage stays failed forever and the UI
+     * chip lies "pipeline run failed" even though no action logic failed.
+     */
+    reTrigger?: () => Promise<void>
 }
 
 /**
  * Polls pipeline_runs for a matching row and dispatches based on status:
  *   - status='done'   → call onDone()
- *   - status='failed' → record failure, stop
+ *   - status='failed' + error_code='TIMEOUT_STALL' → call reTrigger (once),
+ *     then continue polling. If reTrigger isn't provided, fall through to
+ *     recordFailure so the chip doesn't lie.
+ *   - status='failed' (any other code) → record failure, stop
+ *   - status='cancelled' → record failure, stop
  *   - anything else   → sleep + re-poll until POLL_TIMEOUT_MS
  *
  * On timeout, records a failure with errorCode='TIMEOUT' so the UI can
@@ -851,11 +923,12 @@ async function waitForStage(
 ): Promise<void> {
     const admin = createAdminClient()
     const deadline = Date.now() + POLL_TIMEOUT_MS
+    let reTriggered = false
 
     while (Date.now() < deadline) {
         const { data: row } = await admin
             .from("pipeline_runs")
-            .select("status, error_code, error_message")
+            .select("id, status, error_code, error_message")
             .eq("project_id", projectId)
             .eq("specialist_id", opts.specialistId)
             .eq("stage", opts.stage)
@@ -867,6 +940,37 @@ async function waitForStage(
             if (row.status === "done") {
                 await opts.onDone()
                 return
+            }
+            const isStallSweep =
+                row.status === "failed" && row.error_code === "TIMEOUT_STALL"
+            if (isStallSweep && opts.reTrigger && !reTriggered) {
+                // Phase-2 recovery: the previous run got killed mid-flight by
+                // Vercel's 300s cap. Re-fire the underlying action from a
+                // fresh lambda and keep polling. One attempt only — if a
+                // second stall hits we fall through to permanent failure.
+                reTriggered = true
+                console.warn(
+                    `[autopilot] waitForStage re-triggering after TIMEOUT_STALL for ` +
+                        `${opts.specialistId}:${opts.stage} (project ${projectId})`,
+                )
+                try {
+                    await opts.reTrigger()
+                } catch (err) {
+                    console.error(
+                        "[autopilot] waitForStage reTrigger threw:",
+                        err instanceof Error ? err.message : err,
+                    )
+                    await recordFailure(
+                        projectId,
+                        opts.stageSlug,
+                        `Stall re-trigger failed: ${err instanceof Error ? err.message : String(err)}`,
+                    )
+                    return
+                }
+                // Keep polling — the new run will land a fresh row with
+                // status='running' which the next iteration picks up.
+                await sleep(POLL_INTERVAL_MS)
+                continue
             }
             if (row.status === "failed" || row.status === "cancelled") {
                 await recordFailure(
