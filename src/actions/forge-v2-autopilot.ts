@@ -1309,6 +1309,32 @@ async function waitForStage(
     let reTriggered = false
 
     while (Date.now() < deadline) {
+        // GOTCHA (2026-04-23): when the stage has duplicate runs (e.g.
+        // tickImageRenderChain + user "Run autopilot" both fire the same
+        // stage, or a TIMEOUT_STALL sweep runs concurrent with a live
+        // re-trigger), checking only the most-recent row by created_at
+        // hides an earlier `done` behind a later `running` / `failed`.
+        // Symptom: BESS dc8c1def's BOM actually succeeded at 17:24:36 but
+        // autopilot's poll picked the duplicate `running` row and waited
+        // 240s for it, timing out — even though the done row existed
+        // throughout. Fix: check for any done row first; any single success
+        // on the specialist+stage is a stage completion regardless of how
+        // many other rows are still running or failed.
+        const { data: doneRow } = await admin
+            .from("pipeline_runs")
+            .select("id")
+            .eq("project_id", projectId)
+            .eq("specialist_id", opts.specialistId)
+            .eq("stage", opts.stage)
+            .eq("status", "done")
+            .limit(1)
+            .maybeSingle()
+
+        if (doneRow) {
+            await opts.onDone()
+            return
+        }
+
         const { data: row } = await admin
             .from("pipeline_runs")
             .select("id, status, error_code, error_message")
