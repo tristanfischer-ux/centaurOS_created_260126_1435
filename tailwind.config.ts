@@ -28,6 +28,7 @@ const config: Config = {
                     DEFAULT: '#ff4500',
                     hover: '#e03e00',
                     light: '#ff6a33',
+                    strong: '#c23500',
                 },
                 'electric-blue': {
                     DEFAULT: '#3b82f6',
@@ -50,8 +51,8 @@ const config: Config = {
                 },
                 // Legacy accent mapping to brand
                 accent: {
-                    DEFAULT: '#ff4500',
-                    hover: '#e03e00',
+                    DEFAULT: '#c23500',
+                    hover: '#a32d00',
                     foreground: '#ffffff'
                 },
                 // Semantic status colors

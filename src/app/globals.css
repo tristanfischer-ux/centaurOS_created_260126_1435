@@ -89,6 +89,7 @@
 
   /* Fractional Forge Brand Colors */
   --color-international-orange: #ff4500;
+  --color-international-orange-strong: #c23500;
   --color-electric-blue: #3b82f6;
 
   /* Status Colors - Mapped from :root variables */
@@ -149,8 +150,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 14 100% 50%;
-    /* International Orange #ff4500 */
+    --primary: 16 100% 38%;
+    /* International Orange Strong #c23500 — WCAG AA compliant on white */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96.1%;
