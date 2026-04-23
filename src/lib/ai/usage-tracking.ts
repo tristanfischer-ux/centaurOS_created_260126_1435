@@ -16,6 +16,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // ==========================================
 // TYPES
@@ -283,7 +284,12 @@ export async function trackAIUsage(
   params: TrackAIUsageParams
 ): Promise<TrackAIUsageResult | null> {
   try {
-    const supabase = await createClient()
+    // GOTCHA: createClient() (user-scoped, cookie-backed) throws when called
+    // from after() contexts because cookies() isn't available there. Every
+    // background specialist that logs usage would lose the row. This is a
+    // system-level INSERT keyed by foundryId/userId — using admin is safe.
+    // See getCurrentMonthUsage() for the same fix.
+    const supabase = createAdminClient()
 
     const model = params.model || 'unknown'
     const promptTokens = params.promptTokens || 0
@@ -350,7 +356,18 @@ export async function getCurrentMonthUsage(
   foundryId: string
 ): Promise<MonthlyUsage> {
   try {
-    const supabase = await createClient()
+    // GOTCHA: previously used createClient() (user-scoped, cookie-backed).
+    // When called from an `after()` post-response context (e.g. autopilot's
+    // stepWaitForBom reTrigger → runBomGeneratorBackground → checkAILimit →
+    // here), cookies() throws with the canary error "Route used cookies()
+    // inside after() — not supported". The throw propagates up, checkAILimit
+    // fails closed, background specialists return { allowed: false } without
+    // ever writing a pipeline_run row → autopilot stage rots.
+    //
+    // Observed 2026-04-23 on BESS dc8c1def after BOM TIMEOUT_STALL retrigger.
+    // Fix: use admin client. This is a system-level quota read keyed by
+    // foundryId (not a user-permission check), so bypassing RLS is correct.
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase.rpc('get_ai_usage_current_month', {
       p_foundry_id: foundryId,
