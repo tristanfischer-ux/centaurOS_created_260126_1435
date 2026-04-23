@@ -593,22 +593,27 @@ async function stepWaitForMax(projectId: string): Promise<void> {
                 const { runMaxDecompositionBackground } = await import(
                     "@/actions/specialists/run-max-decomposition"
                 )
-                // Fire-and-forget — Max will land a pipeline_runs row via
-                // startPipelineRun which this stage then polls for.
-                runMaxDecompositionBackground(
+                // AWAIT: fire-and-forget was unreliable — the background fn
+                // runs inside its own container slice and Vercel can tear
+                // it down before startPipelineRun actually lands. Awaiting
+                // means this stepWaitForMax invocation (the tick-scheduled
+                // one, in its own lambda) blocks until Max's pipeline_run
+                // is written + Max completes. Budget: Max ~90-120s, we
+                // still have 180s left for waitForStage + Max's after()
+                // to fire BOM.
+                const maxResult = await runMaxDecompositionBackground(
                     projectId,
                     foundryId,
                     null,
                     "auto.brief-lock",
-                ).catch((err) => {
-                    console.error(
-                        "[autopilot] stepWaitForMax self-fire threw:",
-                        err instanceof Error ? err.message : err,
-                    )
-                })
+                )
+                console.info(
+                    "[autopilot] stepWaitForMax self-fire result:",
+                    maxResult.ok ? `ok runId=${maxResult.runId}` : `error=${"error" in maxResult ? maxResult.error : "unknown"}`,
+                )
             } catch (err) {
                 console.error(
-                    "[autopilot] stepWaitForMax dynamic import threw:",
+                    "[autopilot] stepWaitForMax self-fire threw:",
                     err instanceof Error ? err.message : err,
                 )
             }
@@ -741,20 +746,22 @@ async function stepWaitForBom(projectId: string): Promise<void> {
                 const { runBomGeneratorBackground } = await import(
                     "@/actions/specialists/run-bom-generator"
                 )
-                runBomGeneratorBackground(
+                // AWAIT: see stepWaitForMax for rationale — fire-and-forget
+                // on Vercel is unreliable; awaiting keeps this lambda alive
+                // until BOM's pipeline_runs row is written.
+                const bomResult = await runBomGeneratorBackground(
                     projectId,
                     foundryId,
                     null,
                     "auto.max-complete",
-                ).catch((err) => {
-                    console.error(
-                        "[autopilot] stepWaitForBom self-fire threw:",
-                        err instanceof Error ? err.message : err,
-                    )
-                })
+                )
+                console.info(
+                    "[autopilot] stepWaitForBom self-fire result:",
+                    bomResult.ok ? `ok runId=${bomResult.runId}` : `error=${"error" in bomResult ? bomResult.error : "unknown"}`,
+                )
             } catch (err) {
                 console.error(
-                    "[autopilot] stepWaitForBom dynamic import threw:",
+                    "[autopilot] stepWaitForBom self-fire threw:",
                     err instanceof Error ? err.message : err,
                 )
             }
