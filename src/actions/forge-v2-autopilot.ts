@@ -1386,7 +1386,22 @@ export async function tickAutopilotStage(
     })
 }
 
-/** Reads autopilot_state, flips stage, stamps completed_stages. */
+/**
+ * Reads autopilot_state, flips stage, stamps completed_stages.
+ *
+ * Forward-only guard (v1.2): `advance(from, to)` is a no-op when
+ *   - current.stage !== from (we're not at the from-stage any more), OR
+ *   - current.finished_at is set (autopilot already terminated), OR
+ *   - to is already in completed_stages (we've passed to before).
+ *
+ * This fixes the race the tickAutopilotStage introduced: when a tick
+ * re-enters stepWaitForX while the main pipeline has already moved
+ * forward, the tick's onDone would call advance(my-stage → next-stage)
+ * which then wrote `stage=next` unconditionally — reverting the pipeline
+ * backwards from wherever it actually was. Observed 2026-04-23 on project
+ * 0d48c88d: stage flipped back to waiting_chase after Max was already
+ * supposed to be running.
+ */
 async function advance(
     projectId: string,
     fromStage: AutopilotStage,
@@ -1402,6 +1417,27 @@ async function advance(
     if (!current) {
         // Someone reset the state mid-run. Silently no-op rather than
         // crash; the walk is effectively cancelled.
+        return
+    }
+    if (current.finished_at) {
+        // Autopilot already terminated (success or failure). Advances
+        // from stragglers are ignored — terminal state is final.
+        return
+    }
+    if (current.stage !== fromStage) {
+        // Someone else has moved the pipeline past fromStage already.
+        // A stale advance would revert stage backwards. No-op.
+        console.warn(
+            `[autopilot] advance(${fromStage} → ${toStage}) skipped: current stage is ${current.stage}`,
+        )
+        return
+    }
+    if (current.completed_stages.includes(toStage)) {
+        // Defensive: somehow toStage is already marked completed. Don't
+        // reopen a closed stage.
+        console.warn(
+            `[autopilot] advance(${fromStage} → ${toStage}) skipped: ${toStage} already in completed_stages`,
+        )
         return
     }
     const completed = Array.from(
@@ -1432,6 +1468,20 @@ async function recordFailure(
         .maybeSingle()
     const current = (project?.autopilot_state as AutopilotState | null) ?? null
     if (!current) return
+    if (current.finished_at) {
+        // Already terminal — don't re-stamp. Stale failure callbacks from a
+        // tick-duplicated runner must not overwrite a success with their
+        // own timeout error.
+        return
+    }
+    // Only record failure for the CURRENT stage. A stale runner that polled
+    // for an old stage and timed out must not flip the state backwards.
+    if (current.stage !== stageSlug) {
+        console.warn(
+            `[autopilot] recordFailure(${stageSlug}) skipped: current stage is ${current.stage}`,
+        )
+        return
+    }
     const failed = Array.from(new Set([...current.failed_stages, stageSlug]))
     const next: AutopilotState = {
         ...current,
