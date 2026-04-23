@@ -74,13 +74,13 @@ export function enrichVisualStyleWithDimensions(
         ...(visualStyle?.moduleDimensionNotes ?? {}),
     }
 
-    for (const module of modules) {
-        const dim = sheet.module_dimensions[module.id]
+    for (const mod of modules) {
+        const dim = sheet.module_dimensions[mod.id]
         if (!dim) continue
         // Only overwrite when the sizing engine has a better note; keep any
         // existing note (e.g. from Opus design synthesis) if the sheet didn't
         // match this module.
-        moduleNotes[module.name] = formatModuleDimensionNote(dim)
+        moduleNotes[mod.name] = formatModuleDimensionNote(dim)
     }
 
     const overallDimensionsMm =
@@ -124,10 +124,10 @@ export function formatHeroDimensionTable(
         "",
         "Per-module spatial layout (respect these dimensions + mount positions):",
     ]
-    for (const module of modules) {
-        const dim = sheet.module_dimensions[module.id]
+    for (const mod of modules) {
+        const dim = sheet.module_dimensions[mod.id]
         if (!dim) continue
-        lines.push(`  - ${module.name}: ${formatModuleDimensionNote(dim)}`)
+        lines.push(`  - ${mod.name}: ${formatModuleDimensionNote(dim)}`)
     }
     // Include any slot-only entries (container_shell, hvac that Max didn't
     // decompose but the rules library knows exists spatially).

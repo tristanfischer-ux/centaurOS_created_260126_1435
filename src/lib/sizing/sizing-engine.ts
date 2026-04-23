@@ -123,13 +123,13 @@ export function runSizing(input: RunSizingInput): RunSizingOutcome {
     const unmatched_module_ids: string[] = []
     const usedSlotIds = new Set<string>()
 
-    for (const module of modules) {
-        const slotName = matchModuleToSlot(module, rules.slots)
+    for (const mod of modules) {
+        const slotName = matchModuleToSlot(mod, rules.slots)
         if (slotName && solveResult.slot_dimensions[slotName]) {
-            matched[module.id] = solveResult.slot_dimensions[slotName]
+            matched[mod.id] = solveResult.slot_dimensions[slotName]
             usedSlotIds.add(slotName)
         } else {
-            unmatched_module_ids.push(module.id)
+            unmatched_module_ids.push(mod.id)
         }
     }
 
@@ -170,19 +170,19 @@ export function runSizing(input: RunSizingInput): RunSizingOutcome {
 // ─── Internal: slot matcher ────────────────────────────────────────────
 
 function matchModuleToSlot(
-    module: { name: string; keyParts?: string[]; purpose?: string },
+    mod: { name: string; keyParts?: string[]; purpose?: string },
     slots: Record<string, SlotDefinition>,
 ): string | null {
-    // Tiered match: a hit on `module.name` is ~10× more trustworthy than a
+    // Tiered match: a hit on the module name is ~10× more trustworthy than a
     // hit in keyParts (an HVAC module's keyParts might include "structural
     // mounting rails" which would falsely match container_shell). Scoring:
     //   name match    → alias.length * 10
     //   purpose match → alias.length * 3
     //   keyParts match → alias.length
     // Longest alias inside the strongest field wins.
-    const nameL = module.name.toLowerCase()
-    const purposeL = (module.purpose ?? "").toLowerCase()
-    const keyPartsL = (module.keyParts ?? []).join(" ").toLowerCase()
+    const nameL = mod.name.toLowerCase()
+    const purposeL = (mod.purpose ?? "").toLowerCase()
+    const keyPartsL = (mod.keyParts ?? []).join(" ").toLowerCase()
 
     let best: { slot: string; score: number } | null = null
     for (const [slotName, def] of Object.entries(slots)) {
