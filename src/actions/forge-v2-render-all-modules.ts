@@ -311,10 +311,21 @@ export async function renderNextModuleStage(
     // recovery branch handles dropped after()s between stages, so the
     // user doesn't feel the slower walk — they still see the chain make
     // progress every ~90s until finished_at is stamped.
+    //
+    // GOTCHA (2026-04-23): the batch queue must exclude failed_ids, not
+    // just !hasImage. A module that lands in failed_ids (e.g. payload_bay
+    // failed with a sanitized "unexpected error" on HAPS) has no imageUrl,
+    // so a plain !hasImage filter re-picks it forever. Every tick drives
+    // another stage, every stage re-tries the same dead module, logs flood
+    // with 40+ identical errors. Excluding failed_ids means the chain
+    // skips permanently-failed modules and moves to the next candidate.
     const RENDER_BATCH_SIZE = 1
     const modules = (project.modules as CadLabModule[] | null) ?? []
     const ordered = orderForRender(modules)
-    const unrenderedQueue = ordered.filter((m) => !hasImage(m))
+    const priorFailed = new Set(state.failed_ids ?? [])
+    const unrenderedQueue = ordered.filter(
+        (m) => !hasImage(m) && !priorFailed.has(m.id),
+    )
     const batch = unrenderedQueue.slice(0, RENDER_BATCH_SIZE)
 
     if (batch.length === 0) {
