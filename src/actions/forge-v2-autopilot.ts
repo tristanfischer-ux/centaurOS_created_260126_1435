@@ -566,8 +566,55 @@ async function getProjectFoundryId(projectId: string): Promise<string | null> {
     return data?.foundry_id ?? null
 }
 
-/** Stage 3: wait for Max's decomposition to land 'done'. */
+/** Stage 3: wait for Max's decomposition to land 'done'.
+ *
+ * Self-healing: if no brief.decompose pipeline_run exists by the time we
+ * start polling, fire Max directly. Accounts for Vercel's fragile after()
+ * cascade where the stage chain can drop mid-flight (observed 2026-04-23
+ * on project 1f2f56b5 — autopilot_state said waiting_max but no Max row
+ * ever got created). Mirrors the pattern in stepWaitForSizing. */
 async function stepWaitForMax(projectId: string): Promise<void> {
+    // Check if Max has a pipeline_run yet. If not, fire it ourselves —
+    // don't assume a previous after() successfully scheduled it.
+    const admin = createAdminClient()
+    const { data: existing } = await admin
+        .from("pipeline_runs")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("specialist_id", "cto")
+        .eq("stage", "brief.decompose")
+        .limit(1)
+        .maybeSingle()
+    if (!existing) {
+        console.info("[autopilot] stepWaitForMax: no Max run found, firing it now")
+        const foundryId = await getProjectFoundryId(projectId)
+        if (foundryId) {
+            try {
+                const { runMaxDecompositionBackground } = await import(
+                    "@/actions/specialists/run-max-decomposition"
+                )
+                // Fire-and-forget — Max will land a pipeline_runs row via
+                // startPipelineRun which this stage then polls for.
+                runMaxDecompositionBackground(
+                    projectId,
+                    foundryId,
+                    null,
+                    "auto.brief-lock",
+                ).catch((err) => {
+                    console.error(
+                        "[autopilot] stepWaitForMax self-fire threw:",
+                        err instanceof Error ? err.message : err,
+                    )
+                })
+            } catch (err) {
+                console.error(
+                    "[autopilot] stepWaitForMax dynamic import threw:",
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        }
+    }
+
     await waitForStage(projectId, {
         specialistId: "cto",
         stage: "brief.decompose",
@@ -674,8 +721,46 @@ async function stepWaitForSizing(projectId: string): Promise<void> {
     })
 }
 
-/** Stage 4: wait for BOM generator (auto-fired from Max) to land. */
+/** Stage 4: wait for BOM generator (auto-fired from Max) to land.
+ *  Self-healing like stepWaitForMax — if BOM has no pipeline_run, fire it. */
 async function stepWaitForBom(projectId: string): Promise<void> {
+    const admin = createAdminClient()
+    const { data: existing } = await admin
+        .from("pipeline_runs")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("specialist_id", "cto")
+        .eq("stage", "bom.generate")
+        .limit(1)
+        .maybeSingle()
+    if (!existing) {
+        console.info("[autopilot] stepWaitForBom: no BOM run found, firing it now")
+        const foundryId = await getProjectFoundryId(projectId)
+        if (foundryId) {
+            try {
+                const { runBomGeneratorBackground } = await import(
+                    "@/actions/specialists/run-bom-generator"
+                )
+                runBomGeneratorBackground(
+                    projectId,
+                    foundryId,
+                    null,
+                    "auto.max-complete",
+                ).catch((err) => {
+                    console.error(
+                        "[autopilot] stepWaitForBom self-fire threw:",
+                        err instanceof Error ? err.message : err,
+                    )
+                })
+            } catch (err) {
+                console.error(
+                    "[autopilot] stepWaitForBom dynamic import threw:",
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        }
+    }
+
     await waitForStage(projectId, {
         specialistId: "cto",
         stage: "bom.generate",

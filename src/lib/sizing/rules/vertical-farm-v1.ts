@@ -14,7 +14,15 @@
  */
 
 import { WAREHOUSE_BAY_100 } from "../envelopes"
-import type { DomainRules, DomainSolveInput, DomainSolveResult, ModuleDimensions, SolverIteration } from "../types"
+import type {
+    DomainRules,
+    DomainSolveInput,
+    DomainSolveResult,
+    Envelope,
+    ModuleDimensions,
+    OptimisationResult,
+    SolverIteration,
+} from "../types"
 
 // ─── v1.1 FEEDBACK LOOP (2026-04-24) ───────────────────────────────────
 // v1.0 used thermal_kw_per_m2_canopy = 0.15 which only captures LED sensible
@@ -115,10 +123,228 @@ function peakLoadKw(canopy_m2: number) {
     }
 }
 
+// ─── Single-config evaluator ───────────────────────────────────────────
+// Pure function that answers "given this canopy/tiers/envelope, does it fit
+// and with how much headroom?". Called by solve() for the founder's target
+// AND in a grid sweep to produce the optimisation trail.
+interface ConfigOutcome {
+    canopy_m2: number
+    tiers: number
+    feasible: boolean
+    floor_budget_m2: number
+    used_floor_m2: number
+    remaining_floor_m2: number
+    utilization_pct: number
+    rack_h_mm: number
+    ceiling_h_mm: number
+    ceiling_fits: boolean
+    allocations: Record<string, number>
+    conflict_summary: string | null
+}
+
+function evaluateConfig(
+    envelope: Envelope,
+    canopy_m2: number,
+    tiers: number,
+): ConfigOutcome {
+    const tray_floor_m2 = canopy_m2 / (tiers * VF_RULES.trays.aisle_efficiency)
+    const aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm * 2) / 1_000_000
+    const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
+    const peak = peakLoadKw(canopy_m2)
+    const hvac_floor_m2 = peak.peak_total_kw * VF_RULES.hvac.floor_m2_per_kw_thermal
+    const water_m2 = Math.max(canopy_m2 * VF_RULES.water.m2_per_m2_canopy, VF_RULES.water.min_m2)
+    const air_m2 = Math.max(canopy_m2 * VF_RULES.air.m2_per_m2_canopy, VF_RULES.air.min_m2)
+    const controls_m2 = VF_RULES.controls.fixed_m2
+    const harvest_m2 = Math.max(
+        canopy_m2 * VF_RULES.harvest_prep.m2_per_m2_canopy,
+        VF_RULES.harvest_prep.min_m2,
+    )
+    const used = tray_floor_m2 + hvac_floor_m2 + water_m2 + air_m2 + controls_m2 + harvest_m2
+    const remaining = floor_budget_m2 - used
+    const floor_fits = remaining >= 0
+    const rack_h_mm = tiers * VF_RULES.trays.tier_h_mm + VF_RULES.trays.tier_clearance_mm
+    const ceiling_fits = rack_h_mm <= envelope.interior_h_mm
+    const feasible = floor_fits && ceiling_fits
+
+    let conflict_summary: string | null = null
+    if (!floor_fits) {
+        conflict_summary = `Floor over by ${Math.abs(remaining).toFixed(1)} m² (${((Math.abs(remaining) / floor_budget_m2) * 100).toFixed(0)}%)`
+    }
+    if (!ceiling_fits) {
+        const suffix = `Rack ${rack_h_mm}mm > ${envelope.interior_h_mm}mm interior`
+        conflict_summary = conflict_summary ? `${conflict_summary}. ${suffix}` : suffix
+    }
+
+    return {
+        canopy_m2,
+        tiers,
+        feasible,
+        floor_budget_m2: +floor_budget_m2.toFixed(2),
+        used_floor_m2: +used.toFixed(2),
+        remaining_floor_m2: +remaining.toFixed(2),
+        utilization_pct: +((used / floor_budget_m2) * 100).toFixed(1),
+        rack_h_mm,
+        ceiling_h_mm: envelope.interior_h_mm,
+        ceiling_fits,
+        allocations: {
+            grow_racks: +tray_floor_m2.toFixed(2),
+            hvac: +hvac_floor_m2.toFixed(2),
+            water_nutrients: +water_m2.toFixed(2),
+            air_handling: +air_m2.toFixed(2),
+            controls: +controls_m2.toFixed(2),
+            harvest_prep: +harvest_m2.toFixed(2),
+        },
+        conflict_summary,
+    }
+}
+
+// ─── Grid-sweep optimiser ─────────────────────────────────────────────
+// Builds a {tiers × canopy} grid around the founder's target, evaluates
+// every cell, picks a winner, and composes the trade-off narrative.
+function buildOptimisationGrid(
+    envelope: Envelope,
+    targetCanopy: number,
+    targetTiers: number,
+): OptimisationResult {
+    const canopySteps = [
+        Math.round(targetCanopy * 0.5),
+        Math.round(targetCanopy * 0.75),
+        Math.round(targetCanopy * 0.9),
+        targetCanopy,
+        Math.round(targetCanopy * 1.15),
+        Math.round(targetCanopy * 1.3),
+        Math.round(targetCanopy * 1.5),
+    ].filter((v, i, a) => v >= 10 && a.indexOf(v) === i)
+    const tierSteps = Array.from(
+        new Set([
+            Math.max(1, targetTiers - 2),
+            Math.max(1, targetTiers - 1),
+            targetTiers,
+            targetTiers + 1,
+            targetTiers + 2,
+        ]),
+    ).filter((v) => v >= 1 && v <= 10)
+
+    const trials: OptimisationResult["trials"] = []
+    const cells: ConfigOutcome[] = []
+    for (const tiers of tierSteps) {
+        for (const canopy of canopySteps) {
+            const cell = evaluateConfig(envelope, canopy, tiers)
+            cells.push(cell)
+            trials.push({
+                targets: { canopy_m2: canopy, tiers },
+                feasible: cell.feasible,
+                utilization_pct: cell.utilization_pct,
+                used_floor_m2: cell.used_floor_m2,
+                conflict_summary: cell.conflict_summary,
+            })
+        }
+    }
+
+    // Winner selection: prefer the founder's exact target if feasible. Else
+    // nearest-feasible by canopy distance + tier distance.
+    const exact = cells.find(
+        (c) => c.canopy_m2 === targetCanopy && c.tiers === targetTiers,
+    )
+    let winner: ConfigOutcome
+    let rationale: string
+    if (exact && exact.feasible) {
+        winner = exact
+        rationale = `Founder's requested target (${targetCanopy} m² × ${targetTiers} tiers) fits with ${exact.remaining_floor_m2.toFixed(1)} m² headroom on the mechanical floor.`
+    } else {
+        const feasibleCells = cells.filter((c) => c.feasible)
+        if (feasibleCells.length === 0) {
+            // All infeasible — surface the exact target as winner (even though
+            // it fails) so downstream output is deterministic. Downstream
+            // conflicts + recommendations explain why.
+            winner = exact ?? cells[0]
+            rationale = "No configuration in the sweep was feasible — see conflicts for the binding constraint."
+        } else {
+            feasibleCells.sort((a, b) => {
+                const distA = Math.abs(a.canopy_m2 - targetCanopy) + Math.abs(a.tiers - targetTiers) * 5
+                const distB = Math.abs(b.canopy_m2 - targetCanopy) + Math.abs(b.tiers - targetTiers) * 5
+                return distA - distB
+            })
+            winner = feasibleCells[0]
+            rationale = `Founder's requested ${targetCanopy} m² × ${targetTiers} tiers didn't fit; nearest feasible is ${winner.canopy_m2} m² × ${winner.tiers} tiers (${winner.remaining_floor_m2.toFixed(1)} m² headroom).`
+        }
+    }
+
+    // Top alternatives: feasible cells that are NOT the winner, ranked by
+    // largest canopy + healthy headroom.
+    const top_alternatives = cells
+        .filter((c) => c.feasible && c !== winner)
+        .sort((a, b) => b.canopy_m2 * a.tiers - a.canopy_m2 * b.tiers)
+        .slice(0, 3)
+        .map((c) => ({
+            targets: { canopy_m2: c.canopy_m2, tiers: c.tiers },
+            trade_offs: `${c.canopy_m2 > winner.canopy_m2 ? "+" : ""}${(c.canopy_m2 - winner.canopy_m2).toFixed(0)} m² canopy vs winner, ${c.tiers === winner.tiers ? "same tiers" : `${c.tiers} tiers`}, ${c.utilization_pct}% floor used · headroom ${c.remaining_floor_m2.toFixed(1)} m²`,
+        }))
+
+    // Levers — generic guidance derived from what the sweep showed.
+    const levers: OptimisationResult["levers"] = []
+    const denserTierOption = cells.find(
+        (c) => c.canopy_m2 === winner.canopy_m2 && c.tiers === winner.tiers + 1 && c.feasible,
+    )
+    if (denserTierOption) {
+        levers.push({
+            action: `Add one more tier (${winner.tiers} → ${winner.tiers + 1})`,
+            gain: `Canopy could grow to ~${denserTierOption.canopy_m2} m² at same floor footprint`,
+            cost: `Rack height climbs to ${denserTierOption.rack_h_mm}mm — ${(envelope.interior_h_mm - denserTierOption.rack_h_mm)}mm ceiling headroom`,
+        })
+    }
+    const biggerCanopyOption = cells.find(
+        (c) => c.tiers === winner.tiers && c.canopy_m2 > winner.canopy_m2 && c.feasible,
+    )
+    if (biggerCanopyOption) {
+        levers.push({
+            action: `Push canopy from ${winner.canopy_m2} m² → ${biggerCanopyOption.canopy_m2} m² at ${winner.tiers} tiers`,
+            gain: `~${Math.round((biggerCanopyOption.canopy_m2 - winner.canopy_m2) * 200)} g/wk more leafy-green yield at 200 g/m²/week`,
+            cost: `Floor utilisation climbs from ${winner.utilization_pct}% → ${biggerCanopyOption.utilization_pct}%`,
+        })
+    }
+    const infeasibleCanopyOption = cells.find(
+        (c) => c.tiers === winner.tiers && c.canopy_m2 > winner.canopy_m2 && !c.feasible,
+    )
+    if (infeasibleCanopyOption) {
+        levers.push({
+            action: `Stretch to ${infeasibleCanopyOption.canopy_m2} m² canopy at ${winner.tiers} tiers`,
+            gain: `~${Math.round((infeasibleCanopyOption.canopy_m2 - winner.canopy_m2) * 200)} g/wk more yield`,
+            cost: `Infeasible with current envelope: ${infeasibleCanopyOption.conflict_summary}`,
+        })
+    }
+    levers.push({
+        action: "Upgrade to a 53ft high-cube container",
+        gain: "Adds ~20% floor area, ~300mm extra interior height — unlocks more tiers + more canopy in a single unit",
+        cost: "Container cost rises ~30% (roughly +£3,000 CAPEX)",
+    })
+
+    return {
+        trials,
+        winner: {
+            targets: { canopy_m2: winner.canopy_m2, tiers: winner.tiers },
+            rationale,
+        },
+        top_alternatives,
+        levers,
+    }
+}
+
 function solve(input: DomainSolveInput): DomainSolveResult {
     const { envelope, targets } = input
-    const targetCanopy = targets.canopy_m2 ?? 0
-    const tiers = Math.max(1, Math.round(targets.tiers ?? 4))
+    const requestedCanopy = targets.canopy_m2 ?? 0
+    const requestedTiers = Math.max(1, Math.round(targets.tiers ?? 4))
+
+    // v1.1 optimisation sweep — records every trial so the PDF can surface
+    // "how did Forge arrive at this config" rather than a single analytic
+    // answer. Pure — just arithmetic — so the cost is sub-millisecond even
+    // for 35 trials.
+    const optimisation = buildOptimisationGrid(envelope, requestedCanopy, requestedTiers)
+    // The winner config is the one actually written to dimension_sheet. The
+    // solver below recomputes the detailed allocation for the winner only,
+    // so images + BOM use the feasible config, not the requested one.
+    const targetCanopy = optimisation.winner.targets.canopy_m2
+    const tiers = optimisation.winner.targets.tiers
 
     // Effective floor footprint needed for the grow racks themselves:
     //   canopy ÷ (tiers × aisle_efficiency)
@@ -334,6 +560,7 @@ function solve(input: DomainSolveInput): DomainSolveResult {
             `Required dehumidification rate: ${peak.peak_dehumid_lph.toFixed(1)} L/hour. Size the dehumidifier pint-rating at ≥ ${Math.ceil(peak.peak_dehumid_lph * 1.2)} L/hr at 24°C/65% RH to keep a 20% safety margin.`,
             `Setpoint: ${VF_RULES.hvac.setpoint_t_c}°C air temperature, ${VF_RULES.hvac.setpoint_rh_pct}% RH (below 70% prevents powdery mildew; above 60% keeps stomata open).`,
         ],
+        optimisation,
     }
 }
 

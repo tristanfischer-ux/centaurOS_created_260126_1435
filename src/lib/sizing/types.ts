@@ -156,6 +156,9 @@ export interface DomainSolveResult {
     recommendations: string[]
     /** Notes / assumptions worth surfacing on the UI. */
     notes?: string[]
+    /** Optimisation grid + winner + alternatives + levers. Present when the
+     *  rule library opted into grid-sweeping instead of single-pass solve. */
+    optimisation?: OptimisationResult
 }
 
 export interface SolverIteration {
@@ -164,6 +167,50 @@ export interface SolverIteration {
     remaining_floor_m2: number
     utilization_pct: number
     allocations: Record<string, number>
+    /** Target parameters used for this trial (e.g. { canopy_m2: 40, tiers: 5 }).
+     *  Present when the library is running a grid sweep; omitted for
+     *  single-pass solves. */
+    targets?: Record<string, number>
+    feasible?: boolean
+    /** One-line conflict summary if infeasible — makes the grid readable. */
+    conflict_summary?: string | null
+}
+
+// ─── Optimisation output (P1 feedback-loop surface) ───────────────────
+
+/**
+ * The optimisation grid + winner + trade-off analysis that domain libraries
+ * can produce when they want to record the "how did we get here" trail
+ * rather than a single analytic pass. Surfaced in the PDF as the
+ * "Sizing optimisation" section.
+ */
+export interface OptimisationResult {
+    /** Every trial the engine ran, including infeasible ones. */
+    trials: Array<{
+        targets: Record<string, number>
+        feasible: boolean
+        utilization_pct: number
+        used_floor_m2: number
+        conflict_summary: string | null
+    }>
+    /** The chosen config — usually the founder's requested target, or the
+     *  nearest-feasible alternative when the request didn't fit. */
+    winner: {
+        targets: Record<string, number>
+        rationale: string
+    }
+    /** Other feasible configs worth considering, ranked by proximity to
+     *  the founder's target + headroom quality. */
+    top_alternatives: Array<{
+        targets: Record<string, number>
+        trade_offs: string
+    }>
+    /** "What you'd gain by" — actionable levers the founder can pull. */
+    levers: Array<{
+        action: string
+        gain: string
+        cost: string
+    }>
 }
 
 // ─── Module dimensions (the artefact downstream consumes) ──────────────
@@ -220,5 +267,7 @@ export interface DimensionSheet {
     recommendations: string[]
     notes: string[]
     iterations: SolverIteration[]
+    /** Present when the library ran a grid sweep rather than a single-pass solve. */
+    optimisation?: OptimisationResult
     generated_at: string
 }

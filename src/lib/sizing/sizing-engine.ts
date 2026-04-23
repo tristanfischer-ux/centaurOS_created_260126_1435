@@ -161,6 +161,7 @@ export function runSizing(input: RunSizingInput): RunSizingOutcome {
         recommendations: solveResult.recommendations,
         notes: solveResult.notes ?? [],
         iterations: solveResult.iterations,
+        ...(solveResult.optimisation ? { optimisation: solveResult.optimisation } : {}),
         generated_at: new Date().toISOString(),
     }
 
