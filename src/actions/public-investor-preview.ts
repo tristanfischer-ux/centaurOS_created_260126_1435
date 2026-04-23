@@ -19,7 +19,7 @@
 
 import { unstable_cache } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { nomicEmbedQuery } from '@/lib/search/nomic-embed'
+import { embedQuery } from '@/lib/embeddings'
 import { scoreFirmDashboard } from '@/lib/investor-match-dashboard'
 import type { InvestorFirm } from '@/actions/investors'
 
@@ -453,12 +453,15 @@ export const searchPublicInvestors = unstable_cache(
     const cleanQuery = query.trim().slice(0, 500)
     const supabase = createAdminClient()
 
-    // 1. Embed the query with the same Nomic model the For You tab uses.
+    // 1. Embed the query with OpenAI text-embedding-3-small (1536-dim) to
+    // match marketplace_listings.embedding column type. Was nomicEmbedQuery
+    // (768-dim) — silently returned 0 results because pgvector raised on
+    // dim mismatch and the try/catch swallowed the error. Fixed 2026-04-23.
     let queryEmbedding: number[]
     try {
-      queryEmbedding = await nomicEmbedQuery(cleanQuery)
+      queryEmbedding = await embedQuery(cleanQuery)
     } catch (err) {
-      console.error('[publicSearch] Nomic embed failed:', err)
+      console.error('[publicSearch] embedQuery failed:', err)
       return { results: [], totalMatches: 0 }
     }
 
