@@ -84,6 +84,7 @@ export type AutopilotStage =
     | "waiting_chase"
     | "locking_brief"
     | "waiting_max"
+    | "waiting_sizing"  // v1.1: Fang sizing runs between Max and BOM
     | "waiting_bom"
     | "waiting_finn"
     | "generating_illustration"
@@ -571,14 +572,14 @@ async function stepWaitForMax(projectId: string): Promise<void> {
         stage: "brief.decompose",
         stageSlug: "waiting_max",
         onDone: async () => {
-            await advance(projectId, "waiting_max", "waiting_bom")
+            await advance(projectId, "waiting_max", "waiting_sizing")
             after(async () => {
                 try {
-                    await stepWaitForBom(projectId)
+                    await stepWaitForSizing(projectId)
                 } catch (err) {
                     await recordFailure(
                         projectId,
-                        "waiting_bom",
+                        "waiting_sizing",
                         errMessage(err),
                     )
                 }
@@ -600,6 +601,75 @@ async function stepWaitForMax(projectId: string): Promise<void> {
                 "auto.brief-lock",
             )
         },
+    })
+}
+
+/**
+ * Stage 3.5: Fang sizing — produces dimension_sheet before BOM + images.
+ *
+ * Runs the sizing engine synchronously via runFangSizingBackground. Unlike
+ * the other stages that poll a pipeline_run fired by an earlier specialist's
+ * after() callback, this stage FIRES the sizing run itself — the run-max-
+ * decomposition.ts after() chain also fires sizing, but if Max was already
+ * done (autopilot running on a pre-existing project) that after() never
+ * fires and sizing would be skipped. This stage guarantees sizing lands.
+ *
+ * Idempotent: runFangSizing is safe to re-invoke — it overwrites
+ * dimension_sheet and writes a fresh pipeline_runs row.
+ */
+async function stepWaitForSizing(projectId: string): Promise<void> {
+    const foundryId = await getProjectFoundryId(projectId)
+    if (!foundryId) {
+        await recordFailure(
+            projectId,
+            "waiting_sizing",
+            "project disappeared during sizing stage",
+        )
+        return
+    }
+
+    try {
+        const { runFangSizingBackground } = await import(
+            "@/actions/specialists/run-fang-sizing"
+        )
+        const result = await runFangSizingBackground(
+            projectId,
+            foundryId,
+            "auto.max-complete",
+        )
+        if (!result.ok && !("skipped" in result && result.skipped)) {
+            // Hard failure (budget cap, save error). Stop.
+            await recordFailure(
+                projectId,
+                "waiting_sizing",
+                ("error" in result && result.error) || "sizing failed",
+            )
+            return
+        }
+        // ok=true OR skipped=true — both are legitimate. 'skipped' happens
+        // when no rules library matches the industry domain; don't stop
+        // autopilot for that, just continue.
+    } catch (err) {
+        // Non-fatal: sizing is an enhancement, not a hard requirement.
+        // Log but continue — BOM + images will degrade gracefully to
+        // visual_style-only prompts.
+        console.warn(
+            "[autopilot] stepWaitForSizing threw — continuing:",
+            err instanceof Error ? err.message : err,
+        )
+    }
+
+    await advance(projectId, "waiting_sizing", "waiting_bom")
+    after(async () => {
+        try {
+            await stepWaitForBom(projectId)
+        } catch (err) {
+            await recordFailure(
+                projectId,
+                "waiting_bom",
+                errMessage(err),
+            )
+        }
     })
 }
 
