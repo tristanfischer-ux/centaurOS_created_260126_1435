@@ -19,6 +19,7 @@ import {
   ArrowRight,
   X,
   CheckCircle2,
+  Mail,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -29,6 +30,7 @@ import type {
   PublicInvestorPreview,
   AnonymizedInvestorResult,
   InvestorSearchResult,
+  TeamReachability,
 } from '@/actions/public-investor-preview'
 import { useEffect } from 'react'
 
@@ -123,6 +125,42 @@ function SkeletonCard() {
   )
 }
 
+// ─── Reachability Badge ──────────────────────────────────────────────────────
+
+// INTENT: Surface the derived team_reachability bucket as a small status pill.
+// SECURITY: receives ONLY the bucket label — never an email, tier, or count.
+// Copy is intentionally vague — never reveals contact counts, email status, or
+// the underlying tier vocabulary. "Limited" covers both "no senior sendable"
+// and "only uncertain emails on file" so a curious visitor can't infer the
+// internal classification.
+const REACHABILITY_COPY: Record<TeamReachability, { label: string; tone: string }> = {
+  strong: {
+    label: 'Team reachable',
+    tone: 'bg-success/10 text-success border-success/30',
+  },
+  limited: {
+    label: 'Team reachable: limited',
+    tone: 'bg-warning/10 text-warning border-warning/30',
+  },
+  none: {
+    label: 'Team reachable: sign up to view',
+    tone: 'bg-muted text-muted-foreground border-border',
+  },
+}
+
+function ReachabilityBadge({ level }: { level: TeamReachability }) {
+  const { label, tone } = REACHABILITY_COPY[level]
+  return (
+    <div
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium ${tone}`}
+      aria-label={label}
+    >
+      <Mail className="h-3 w-3" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  )
+}
+
 // ─── Anonymized Result Card ──────────────────────────────────────────────────
 
 function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResult; signupUrl: string }) {
@@ -191,6 +229,26 @@ function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResul
             </span>
           )}
         </div>
+
+        {/* Portfolio themes (sector-only — no portfolio company names) */}
+        {result.portfolio_themes.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Portfolio
+            </span>
+            {result.portfolio_themes.map((theme) => (
+              <span
+                key={theme}
+                className="text-[10px] px-1.5 py-0.5 rounded-full border border-border bg-card text-foreground/70 font-medium"
+              >
+                {theme}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Team reachability (derived signal — never exposes the email or tier) */}
+        <ReachabilityBadge level={result.team_reachability} />
 
         {/* Lock CTA */}
         <div className="pt-2 border-t border-border">

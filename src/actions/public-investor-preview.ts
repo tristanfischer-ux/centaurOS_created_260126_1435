@@ -7,9 +7,12 @@
  * 2. Search — keyword-matched anonymized results for conversion
  *
  * @security Uses admin client. Search results are ANONYMIZED — no firm names,
- * contact emails, websites, LinkedIn, investment_thesis, or portfolio data.
- * Only exposes: subcategory, firm_type, hq_city, stage_focus (first 2),
- * sectors (first 3), is_active_deploying, fund_tier, cheque_min (partial).
+ * contact emails, websites, LinkedIn, investment_thesis, or portfolio company
+ * names. Only exposes: subcategory, firm_type, hq_city, stage_focus (first 2),
+ * sectors (first 3), is_active_deploying, fund_tier, cheque_min (partial),
+ * portfolio_themes (sector aggregation only — no company names), and a coarse
+ * team_reachability bucket derived from email_tier counts (never the tier or
+ * email itself).
  */
 
 "use server"
@@ -39,6 +42,8 @@ export type PublicInvestorPreview = {
   activeDeployingCount: number
 }
 
+export type TeamReachability = 'strong' | 'limited' | 'none'
+
 export type AnonymizedInvestorResult = {
   /** "Investor A", "Investor B", … assigned by composite-score rank. */
   placeholder: string
@@ -58,6 +63,35 @@ export type AnonymizedInvestorResult = {
   cheque_range_label: string | null
   /** First sentence (max ~80 chars) of the investor's thesis — flavour without identification. */
   thesis_excerpt: string | null
+  /**
+   * Top portfolio sectors (max 3, deduplicated, "Unknown"-stripped) aggregated
+   * from this firm's portfolio_companies JSONB. Never includes a portfolio
+   * company name — only the sector taxonomy values, which are generic enough
+   * to be safe (e.g. "FinTech", "Healthcare", "Robotics"). Empty array when
+   * the firm has no portfolio data or every sector is null/blank/Unknown.
+   */
+  portfolio_themes: string[]
+  /**
+   * Coarse derived signal from vc_pe_contacts.email_tier — surfaces whether
+   * the firm has reachable contacts WITHOUT exposing email addresses, the
+   * tier vocabulary, or counts.
+   *  - "strong"  → at least one decision-maker / partner / principal /
+   *                managing director / director with a sendable tier
+   *                (corresponded, hunter_verified, neverbounce_valid,
+   *                neverbounce_catchall).
+   *  - "limited" → some contacts on file but only uncertain tiers
+   *                (neverbounce_unknown, unverified, generic_blocked) OR
+   *                sendable contacts that aren't senior.
+   *  - "none"    → no contacts, or only invalid / disposable / bounced.
+   * Sendable / uncertain vocabulary mirrors InvestorContact.email_tier docs
+   * in src/actions/investors.ts.
+   */
+  team_reachability: TeamReachability
+  /** TODO: deep dossier excerpt — currently lives on the forge-capital-app
+   * Supabase project (kgkajatjyqfetdtbzmwg) in the investor_deep_profiles
+   * table. Wire here once that data is mirrored / pushed to ForgeOS
+   * (jyarhvinengfyrwgtskq). When added, must run through redactFirmNames()
+   * and trim to ≤140 chars. */
 }
 
 export type InvestorSearchResult = {
@@ -189,11 +223,145 @@ function placeholderName(index: number): string {
   return `Investor #${index + 1}`
 }
 
+// ─── Portfolio sector aggregation (anonymous) ───────────────────────────────
+
+/** Strip generic placeholder values that leak no signal. */
+const PORTFOLIO_SECTOR_BLOCKLIST = new Set([
+  '', 'unknown', 'other', 'n/a', 'na', 'none', 'tbd', 'misc',
+])
+
+/**
+ * Normalise a sector label for de-duplication keys.
+ * Keep "FinTech" / "CleanTech" / "BioTech" / "AI" / "SaaS" / "IoT" intact when
+ * the source already uses that casing — title-case only the all-lowercase
+ * inputs ("fintech" → "Fintech"). Aggregation key is the canonical lowercase
+ * value so casing variants still collapse.
+ */
+function canonicaliseSector(raw: string): string {
+  const t = raw.trim()
+  if (!t) return ''
+  // Already mixed-case (FinTech, CleanTech, BioTech) or all-caps acronym (AI,
+  // SaaS, IoT) — preserve the source casing.
+  if (/[A-Z]/.test(t)) return t
+  // All-lowercase / numeric only — title-case for display.
+  return t.replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/**
+ * Extracts top-3 portfolio sector themes from the portfolio_companies JSONB.
+ *
+ * @security Reads ONLY the `sector` field from each entry — never `company_name`,
+ * `description`, `amount_usd`, `stage`, or `why_appealing`. Returns generic
+ * sector labels (FinTech, Healthcare, AI, Robotics) which carry no firm or
+ * portfolio-company identity.
+ */
+function portfolioThemes(attrs: Record<string, unknown>): string[] {
+  const raw = attrs.portfolio_companies
+  if (!Array.isArray(raw)) return []
+
+  // Map<lowercase-key, { display, count }> so "FinTech" / "Fintech" / "fintech"
+  // collapse into one entry while preserving the first display casing seen.
+  const buckets = new Map<string, { display: string; count: number }>()
+  for (const entry of raw as Array<Record<string, unknown>>) {
+    if (!entry || typeof entry !== 'object') continue
+    const sectorField = entry.sector
+    if (typeof sectorField !== 'string') continue
+    // Some records store comma-delimited multi-sector strings ("Health Plans, Behavioral Economics").
+    for (const piece of sectorField.split(/[,/|]/)) {
+      const display = canonicaliseSector(piece)
+      if (!display) continue
+      const key = display.toLowerCase()
+      if (PORTFOLIO_SECTOR_BLOCKLIST.has(key)) continue
+      const existing = buckets.get(key)
+      if (existing) {
+        existing.count += 1
+      } else {
+        buckets.set(key, { display, count: 1 })
+      }
+    }
+  }
+
+  return [...buckets.values()]
+    .sort((a, b) => b.count - a.count || a.display.localeCompare(b.display))
+    .slice(0, 3)
+    .map((b) => b.display)
+}
+
+// ─── Team reachability (derived from email_tier — never exposes the tier) ───
+
+/** Tiers we consider sendable. Mirrors src/actions/investors.ts InvestorContact.email_tier docs. */
+const SENDABLE_TIERS = new Set([
+  'corresponded',
+  'hunter_verified',
+  'neverbounce_valid',
+  'neverbounce_catchall',
+])
+
+/** Tiers we treat as uncertain (not bad, not confirmed). */
+const UNCERTAIN_TIERS = new Set([
+  'neverbounce_unknown',
+  'unverified',
+  'generic_blocked',
+])
+
+/** Seniority values that count as "senior" (decision-making) when is_decision_maker is null/false. */
+const SENIOR_SENIORITY = new Set([
+  'partner',
+  'principal',
+  'managing_director',
+  'director',
+])
+
+type ContactRow = {
+  listing_id: string
+  is_decision_maker: boolean | null
+  seniority: string | null
+  email_tier: string | null
+}
+
+/**
+ * Classifies a listing's contact pool into a coarse reachability bucket.
+ *
+ * @security Returns ONLY the bucket label ("strong" | "limited" | "none").
+ * Never exposes counts, the email_tier vocabulary, or any contact identity.
+ */
+function teamReachability(contacts: ContactRow[]): TeamReachability {
+  if (contacts.length === 0) return 'none'
+
+  let hasSeniorSendable = false
+  let hasAnySendable = false
+  let hasAnyUncertain = false
+
+  for (const c of contacts) {
+    const tier = c.email_tier ?? ''
+    const sendable = SENDABLE_TIERS.has(tier)
+    const uncertain = UNCERTAIN_TIERS.has(tier)
+    if (sendable) hasAnySendable = true
+    if (uncertain) hasAnyUncertain = true
+    if (sendable) {
+      const senior = c.is_decision_maker === true || (c.seniority != null && SENIOR_SENIORITY.has(c.seniority))
+      if (senior) hasSeniorSendable = true
+    }
+  }
+
+  if (hasSeniorSendable) return 'strong'
+  if (hasAnySendable || hasAnyUncertain) return 'limited'
+  return 'none'
+}
+
 // ─── Default Preview (no search) ────────────────────────────────────────────
 
 /**
  * Fetches a small sample of investors for the public homepage preview.
  * Cached for 1 hour to avoid hammering the DB on every homepage visit.
+ *
+ * NOTE: As of 2026-04-23 the homepage component (investor-preview.tsx) only
+ * reads `totalCount` from this action's payload — the `investors` cards are
+ * not rendered. The new `portfolio_themes` and `team_reachability` fields
+ * therefore live ONLY on AnonymizedInvestorResult (search results), to avoid
+ * adding two pointless joins to every homepage hit. If/when this preview
+ * grows visible cards, mirror the `searchPublicInvestors` 5a contact-fetch
+ * + portfolioThemes() / teamReachability() helpers here.
  */
 export const getPublicInvestorPreview = unstable_cache(
   async (): Promise<PublicInvestorPreview> => {
@@ -339,6 +507,29 @@ export const searchPublicInvestors = unstable_cache(
     const strongMatches = scored.filter(s => s.composite >= 50)
     // 5. Anonymize. Show only top 10 to discourage scraping; CTA drives signup.
     const top = scored.slice(0, 10)
+
+    // 5a. Fetch contact-tier rows for the top 10 listings only (≤ a few hundred rows)
+    //     to derive the team_reachability badge. SECURITY: select ONLY the four
+    //     fields needed for classification — never email, name, linkedin, or tier_at.
+    const topListingIds = top.map((t) => String(t.row.id))
+    const contactsByListing = new Map<string, ContactRow[]>()
+    if (topListingIds.length > 0) {
+      const { data: contactRows, error: contactErr } = await supabase
+        .from('vc_pe_contacts')
+        .select('listing_id, is_decision_maker, seniority, email_tier')
+        .in('listing_id', topListingIds)
+      if (contactErr) {
+        console.error('[publicSearch] contact tier fetch failed:', contactErr.message)
+      } else {
+        for (const row of (contactRows ?? []) as ContactRow[]) {
+          if (!row.listing_id) continue
+          const list = contactsByListing.get(row.listing_id) ?? []
+          list.push(row)
+          contactsByListing.set(row.listing_id, list)
+        }
+      }
+    }
+
     const anonymized: AnonymizedInvestorResult[] = top.map((entry, idx) => {
       const attrs = (entry.row.attributes as Record<string, unknown>) ?? {}
       const cheque = (attrs.cheque_range_gbp as { min?: number; max?: number } | undefined) ?? null
@@ -359,6 +550,8 @@ export const searchPublicInvestors = unstable_cache(
         fund_tier: (attrs.fund_tier as string) ?? null,
         cheque_range_label: formatChequeRange(cheque?.min, cheque?.max),
         thesis_excerpt: thesisExcerpt(attrs),
+        portfolio_themes: portfolioThemes(attrs),
+        team_reachability: teamReachability(contactsByListing.get(String(entry.row.id)) ?? []),
       }
     })
 
@@ -367,6 +560,6 @@ export const searchPublicInvestors = unstable_cache(
       totalMatches: strongMatches.length,
     }
   },
-  ['public-investor-search-v2'],
+  ['public-investor-search-v3-themes-reachability'],
   { revalidate: 1800 }, // 30 min cache; identical queries reuse the same anon ranking
 )
