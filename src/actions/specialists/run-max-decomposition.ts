@@ -163,9 +163,13 @@ async function runMaxDecompositionInternal(
     trigger: "manual" | "auto.brief-lock",
 ): Promise<RunMaxDecompositionReturn> {
     // Shim: expose `user.id` under the original closure name so the body
-    // below continues to work. We only need `user.id` for triggered_by;
-    // every other auth concern has already been resolved by the caller.
-    const user = { id: userId ?? "00000000-0000-0000-0000-000000000000" }
+    // below continues to work. We only need `user.id` for triggered_by.
+    // GOTCHA: triggered_by has an FK to auth.users, so passing a zero UUID
+    // when the caller didn't supply a userId blows up with a FK violation
+    // and kills the whole pipeline_run insert — observed 2026-04-23 on HAPS
+    // autopilot run. triggered_by is nullable on the column, so pass null
+    // straight through for system-fired runs (autopilot after() chain).
+    const user: { id: string | null } = { id: userId }
     // Foundry is already known — skip the withAuth wrapper.
     void foundryId
         // 1. Load + verify project (foundry scope check via admin client —
@@ -287,7 +291,7 @@ async function runMaxDecompositionInternal(
                 specialist_id: SPECIALIST_ID,
                 stage: STAGE,
                 trigger,
-                triggered_by: user.id,
+                triggered_by: user.id ?? undefined,
                 model_provider: "anthropic",
                 input_ref: { source: "subject+research", charCount: report.length },
             })
