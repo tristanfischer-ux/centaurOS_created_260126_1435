@@ -45,6 +45,7 @@ const STAGE_LABELS: Record<AutopilotStage, string> = {
     locking_brief: "locking brief",
     waiting_max: "waiting for Max",
     waiting_sizing: "sizing the design (Fang)",
+    waiting_layout: "laying out spatial plan (Fang)",
     waiting_bom: "waiting for BOM",
     waiting_finn: "waiting for Finn",
     generating_illustration: "illustrating system",
