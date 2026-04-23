@@ -90,6 +90,7 @@ export type AutopilotStage =
     | "generating_illustration"
     | "matching_suppliers"
     | "running_fang_reviews"
+    | "generating_pdf"  // v1.2: final PDF export so founder gets a deliverable
     | "done"
 
 export interface AutopilotState {
@@ -926,8 +927,19 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
     if (reviewable.length === 0) {
         // Nothing to review — the brief decomposed into modules that all
         // have zero keyParts. That's unusual but not a failure of
-        // autopilot — it's a consequence of Max's output. Record as done.
-        await markDone(projectId, "running_fang_reviews")
+        // autopilot — skip Fang reviews and still generate the PDF.
+        await advance(projectId, "running_fang_reviews", "generating_pdf")
+        after(async () => {
+            try {
+                await stepGeneratePdf(projectId)
+            } catch (err) {
+                await recordFailure(
+                    projectId,
+                    "generating_pdf",
+                    errMessage(err),
+                )
+            }
+        })
         return
     }
 
@@ -953,7 +965,103 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
         }
     }
 
-    await markDone(projectId, "running_fang_reviews")
+    // v1.2: after Fang reviews finish, advance to the PDF-export stage
+    // rather than closing out. The founder wants a deliverable at the end
+    // of autopilot, not just a green chip.
+    await advance(projectId, "running_fang_reviews", "generating_pdf")
+    after(async () => {
+        try {
+            await stepGeneratePdf(projectId)
+        } catch (err) {
+            await recordFailure(
+                projectId,
+                "generating_pdf",
+                errMessage(err),
+            )
+        }
+    })
+}
+
+/**
+ * Stage 9 (v1.2): render the Forge project-pack PDF, upload it to Supabase
+ * Storage, and record a report_downloads row so the founder can find it
+ * from the workspace. Non-fatal on failure — autopilot still closes out
+ * "done" even if the PDF render fails (founder can retry from /export).
+ */
+async function stepGeneratePdf(projectId: string): Promise<void> {
+    const foundryId = await getProjectFoundryId(projectId)
+    if (!foundryId) {
+        await recordFailure(projectId, "generating_pdf", "project not found")
+        return
+    }
+
+    try {
+        const { exportProjectPdfBackground } = await import(
+            "@/actions/export-project-pdf"
+        )
+        const result = await exportProjectPdfBackground(projectId, foundryId)
+        if (!result.ok) {
+            console.warn(
+                "[autopilot] PDF render returned error (non-fatal):",
+                result.error,
+            )
+            // Still close out autopilot — founder can retry from the
+            // Export page manually.
+            await markDone(projectId, "generating_pdf")
+            return
+        }
+
+        // Upload to Supabase Storage bucket `report-downloads` so the
+        // founder has a persistent link. Bucket policy: public-signed,
+        // foundry-scoped paths. If the bucket doesn't exist or upload
+        // fails, log + continue — the PDF bytes were generated, we just
+        // can't persist the link.
+        const admin = createAdminClient()
+        const buffer = Buffer.from(result.base64, "base64")
+        const storagePath = `${foundryId}/${projectId}/${result.filename}`
+
+        try {
+            const { error: uploadErr } = await admin.storage
+                .from("report-downloads")
+                .upload(storagePath, buffer, {
+                    contentType: "application/pdf",
+                    upsert: true,
+                })
+            if (uploadErr) {
+                console.warn(
+                    "[autopilot] PDF upload failed (non-fatal):",
+                    uploadErr.message,
+                )
+            } else {
+                // Record a report_downloads row so the UI can surface it.
+                await admin
+                    .from("report_downloads")
+                    .insert({
+                        foundry_id: foundryId,
+                        report_name: result.filename,
+                        report_source: "forge-autopilot",
+                        file_format: "pdf",
+                        file_size_bytes: result.sizeBytes,
+                        storage_path: storagePath,
+                    })
+            }
+        } catch (uploadThrow) {
+            console.warn(
+                "[autopilot] PDF storage upload threw (non-fatal):",
+                uploadThrow instanceof Error ? uploadThrow.message : uploadThrow,
+            )
+        }
+
+        await markDone(projectId, "generating_pdf")
+    } catch (err) {
+        console.error(
+            "[autopilot] PDF export threw:",
+            err instanceof Error ? err.message : err,
+        )
+        // Still close out — the project is complete apart from the PDF
+        // artefact. Founder can regenerate from /export if needed.
+        await markDone(projectId, "generating_pdf")
+    }
 }
 
 // ─── Internals ─────────────────────────────────────────────────────────

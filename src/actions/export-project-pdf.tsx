@@ -1399,6 +1399,29 @@ export async function exportProjectPdf(
     projectId: string,
 ): Promise<ExportProjectPdfResult> {
     return withAuth<ExportProjectPdfResult>(async ({ foundryId }) => {
+        return exportProjectPdfInternal(projectId, foundryId)
+    })
+}
+
+/**
+ * Background entry — used by autopilot's generating_pdf stage which runs
+ * post-response with no cookies. Caller MUST have resolved foundryId from
+ * an authenticated request earlier in the chain. Mirrors the pattern
+ * shipped for Max + BOM + Fang-sizing (fix #90 — "use server" actions
+ * called from after() can't read cookies).
+ */
+export async function exportProjectPdfBackground(
+    projectId: string,
+    foundryId: string,
+): Promise<ExportProjectPdfResult> {
+    return exportProjectPdfInternal(projectId, foundryId)
+}
+
+async function exportProjectPdfInternal(
+    projectId: string,
+    foundryId: string,
+): Promise<ExportProjectPdfResult> {
+    {
         const admin = createAdminClient()
 
         // Parent project row — pulls every column we care about.
@@ -1823,5 +1846,5 @@ export async function exportProjectPdf(
                 errorCode: "RENDER_FAILED",
             }
         }
-    })
+    }
 }

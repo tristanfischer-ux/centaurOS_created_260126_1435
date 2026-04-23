@@ -1,0 +1,191 @@
+/* start-v2.css — scoped under .sv2. Keep this file self-contained.
+   Referenced from start-view.tsx. */
+
+.sv2 {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+    color: #111;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+.sv2-breadcrumb {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 18px;
+}
+.sv2-breadcrumb a {
+    color: #ff4500;
+    text-decoration: none;
+}
+.sv2-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.sv2-header {
+    border-left: 5px solid #ff4500;
+    padding: 4px 0 4px 16px;
+    margin-bottom: 24px;
+}
+.sv2-header h1 {
+    font-size: 32px;
+    margin: 0 0 8px;
+    letter-spacing: -0.4px;
+}
+.sv2-sub {
+    color: #444;
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0 0 10px;
+    max-width: 680px;
+}
+.sv2-advanced-link {
+    font-size: 13px;
+    color: #666;
+    margin: 0;
+}
+.sv2-advanced-link a {
+    color: #ff4500;
+    text-decoration: none;
+}
+.sv2-advanced-link a:hover {
+    text-decoration: underline;
+}
+
+.sv2-brief-card {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 22px;
+    margin: 16px 0 24px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.sv2-brief-card label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    color: #666;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+}
+.sv2-textarea {
+    width: 100%;
+    border: 1px solid #d4d4d4;
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #111;
+    background: #fafafa;
+    resize: vertical;
+    min-height: 220px;
+}
+.sv2-textarea:focus {
+    outline: 2px solid #ff4500;
+    outline-offset: -1px;
+    border-color: #ff4500;
+    background: #fff;
+}
+.sv2-textarea:disabled {
+    color: #777;
+    background: #f1f1f1;
+}
+.sv2-count {
+    font-size: 12px;
+    color: #777;
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+}
+.sv2-count-hint {
+    color: #ff4500;
+    font-weight: 500;
+}
+
+.sv2-error {
+    background: #ffe5e0;
+    color: #a3001a;
+    border-left: 3px solid #a3001a;
+    padding: 8px 12px;
+    margin: 10px 0 0;
+    font-size: 13px;
+    border-radius: 0 4px 4px 0;
+}
+
+.sv2-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+.sv2-btn {
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    transition: transform 0.12s ease, background 0.12s ease;
+}
+.sv2-btn-ghost {
+    background: #fff;
+    color: #444;
+    border-color: #d4d4d4;
+}
+.sv2-btn-ghost:hover {
+    background: #f5f5f5;
+}
+.sv2-btn-primary {
+    background: #ff4500;
+    color: #fff;
+}
+.sv2-btn-primary:hover:not(:disabled) {
+    background: #e63d00;
+    transform: translateY(-1px);
+}
+.sv2-btn-primary:disabled {
+    background: #d4d4d4;
+    color: #fff;
+    cursor: not-allowed;
+}
+
+.sv2-note {
+    font-size: 12px;
+    color: #666;
+    margin: 12px 0 0;
+    line-height: 1.5;
+}
+
+.sv2-what {
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 20px 22px 14px;
+    margin-top: 28px;
+}
+.sv2-what h2 {
+    font-size: 16px;
+    margin: 0 0 10px;
+    color: #ff4500;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+}
+.sv2-what-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 13px;
+    color: #333;
+    line-height: 1.6;
+}
+.sv2-what-list li {
+    margin-bottom: 4px;
+}
+.sv2-what-list li strong {
+    color: #111;
+    font-weight: 600;
+}

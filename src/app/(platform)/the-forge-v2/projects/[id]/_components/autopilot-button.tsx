@@ -50,6 +50,7 @@ const STAGE_LABELS: Record<AutopilotStage, string> = {
     generating_illustration: "illustrating system",
     matching_suppliers: "matching suppliers",
     running_fang_reviews: "running Fang reviews",
+    generating_pdf: "generating PDF pack",
     done: "done",
 }
 

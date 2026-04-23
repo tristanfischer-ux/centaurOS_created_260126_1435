@@ -160,6 +160,14 @@ export function ProjectCreateView(): React.ReactElement {
 
     function handleSubmit(): void {
         setSubmitError(null)
+        // Visible in Vercel function logs + devtools. If the wizard submit is
+        // silently failing in prod, this line confirms the click actually
+        // reached the handler (not blocked by overlay / event bubbling).
+        console.info("[ProjectCreateView] handleSubmit called", {
+            subjectLen: form.subject.length,
+            starterRef: form.starterReference,
+            subjectValid,
+        })
 
         if (!subjectValid) {
             // INTENT: the submit button is disabled in this state, but guard
@@ -188,8 +196,12 @@ export function ProjectCreateView(): React.ReactElement {
             // swallowed. Founders saw the click register, no redirect, no
             // error, no DB row. Fix: surface thrown errors to the UI via
             // `submitError` exactly like returned `{ error }` payloads.
+            console.info("[ProjectCreateView] calling createCadLabProject...", {
+                briefLen: brief.length,
+            })
             try {
                 const result = await createCadLabProject(brief)
+                console.info("[ProjectCreateView] createCadLabProject returned", result)
 
                 if ("error" in result) {
                     setSubmitError(result.error)
