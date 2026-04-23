@@ -26,6 +26,41 @@ function ensureProtocol(url: string): string {
   return `https://${url}`
 }
 
+// INTENT: Tier-aware email verification badge. The `email_tier` column tells us how an
+// email was verified (corresponded > Hunter > NeverBounce-valid > NeverBounce-catchall =
+// sendable; unknown/unverified/generic = uncertain; invalid/disposable/bounced = bad).
+// DECISION: Inlined here rather than extracted to a shared util because both call sites
+// (PartnerCard, ContactDetailDialog) want slightly different copy and sizing.
+function renderTierBadge(tier: string | null, verified: boolean | null): React.ReactElement | null {
+  // Sendable
+  if (tier === 'corresponded' || tier === 'hunter_verified' || tier === 'neverbounce_valid') {
+    return <Badge variant="success" className="text-[10px] ml-1 py-0">Verified</Badge>
+  }
+  if (tier === 'neverbounce_catchall') {
+    return <Badge variant="warning" className="text-[10px] ml-1 py-0">Catchall</Badge>
+  }
+  // Uncertain
+  if (tier === 'neverbounce_unknown') {
+    return <Badge variant="warning" className="text-[10px] ml-1 py-0">Unknown</Badge>
+  }
+  if (tier === 'unverified' || tier === 'generic_blocked') {
+    return <Badge variant="warning" className="text-[10px] ml-1 py-0">Unverified</Badge>
+  }
+  // Bad
+  if (tier === 'neverbounce_invalid' || tier === 'bounced') {
+    return <Badge variant="destructive" className="text-[10px] ml-1 py-0">Invalid</Badge>
+  }
+  if (tier === 'neverbounce_disposable') {
+    return <Badge variant="destructive" className="text-[10px] ml-1 py-0">Disposable</Badge>
+  }
+  // Fallback: legacy verified flag without a tier classification
+  if (!tier && verified) {
+    return <Badge variant="success" className="text-[10px] ml-1 py-0">Verified</Badge>
+  }
+  // No tier and no verification — render nothing
+  return null
+}
+
 export function PartnerCard({ contact, access, onViewDetails }: PartnerCardProps) {
   return (
     <div
@@ -86,9 +121,7 @@ export function PartnerCard({ contact, access, onViewDetails }: PartnerCardProps
             >
               <Mail className="h-3 w-3" />
               {contact.email}
-              {contact.email_verified && (
-                <Badge variant="outline" className="text-[10px] ml-1 py-0">Verified</Badge>
-              )}
+              {renderTierBadge(contact.email_tier, contact.email_verified)}
             </a>
           ) : !access.deepAccess && contact.has_email ? (
             <span className="text-xs text-muted-foreground flex items-center gap-1">

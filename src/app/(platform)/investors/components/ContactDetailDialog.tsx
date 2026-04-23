@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { formatDistanceToNow } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -26,6 +27,54 @@ import {
   FileText,
   Handshake,
 } from 'lucide-react'
+
+// INTENT: Tier-aware email verification badge mirroring PartnerCard logic. See
+// PartnerCard.tsx for full tier vocabulary commentary.
+function renderTierBadge(tier: string | null, verified: boolean | null): React.ReactElement | null {
+  if (tier === 'corresponded' || tier === 'hunter_verified' || tier === 'neverbounce_valid') {
+    return <Badge variant="success" className="text-[10px]">Verified</Badge>
+  }
+  if (tier === 'neverbounce_catchall') {
+    return <Badge variant="warning" className="text-[10px]">Catchall</Badge>
+  }
+  if (tier === 'neverbounce_unknown') {
+    return <Badge variant="warning" className="text-[10px]">Unknown</Badge>
+  }
+  if (tier === 'unverified' || tier === 'generic_blocked') {
+    return <Badge variant="warning" className="text-[10px]">Unverified</Badge>
+  }
+  if (tier === 'neverbounce_invalid' || tier === 'bounced') {
+    return <Badge variant="destructive" className="text-[10px]">Invalid</Badge>
+  }
+  if (tier === 'neverbounce_disposable') {
+    return <Badge variant="destructive" className="text-[10px]">Disposable</Badge>
+  }
+  if (!tier && verified) {
+    return <Badge variant="success" className="text-[10px]">Verified</Badge>
+  }
+  return null
+}
+
+// INTENT: Human-readable provenance line shown under the email in the detail dialog.
+// Returns e.g. "Verified by NeverBounce · 2 days ago" or null if no provenance available.
+function describeVerification(tier: string | null, verifiedAt: string | null): string | null {
+  if (!tier) return null
+  let source: string | null = null
+  if (tier === 'corresponded') source = "We've corresponded"
+  else if (tier === 'hunter_verified') source = 'Verified by Hunter'
+  else if (tier.startsWith('neverbounce_')) source = 'Verified by NeverBounce'
+  else if (tier === 'bounced') source = 'Bounced previously'
+  else if (tier === 'unverified' || tier === 'generic_blocked') source = 'Not yet verified'
+  if (!source) return null
+
+  if (!verifiedAt) return source
+  try {
+    const when = formatDistanceToNow(new Date(verifiedAt), { addSuffix: true })
+    return `${source} · ${when}`
+  } catch {
+    return source
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -126,16 +175,21 @@ export function ContactDetailDialog({ contactId, open, onOpenChange }: ContactDe
               {/* Contact Info */}
               <div className="space-y-2">
                 {contact.email ? (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <a
-                      href={`mailto:${contact.email}`}
-                      className="text-sm text-international-orange hover:underline"
-                    >
-                      {contact.email}
-                    </a>
-                    {contact.email_verified && (
-                      <Badge variant="success" className="text-[10px]">Verified</Badge>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <a
+                        href={`mailto:${contact.email}`}
+                        className="text-sm text-international-orange hover:underline"
+                      >
+                        {contact.email}
+                      </a>
+                      {renderTierBadge(contact.email_tier, contact.email_verified)}
+                    </div>
+                    {describeVerification(contact.email_tier, contact.email_verified_at) && (
+                      <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                        {describeVerification(contact.email_tier, contact.email_verified_at)}
+                      </p>
                     )}
                   </div>
                 ) : contact.has_email ? (

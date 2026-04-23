@@ -4723,6 +4723,7 @@ export type Database = {
           seeded_brief_content: Json | null
           shipped_at: string | null
           shipped_by: string | null
+          spatial_plan: Json | null
           stage: string
           status: string
           subject: string
@@ -4785,6 +4786,7 @@ export type Database = {
           seeded_brief_content?: Json | null
           shipped_at?: string | null
           shipped_by?: string | null
+          spatial_plan?: Json | null
           stage?: string
           status?: string
           subject: string
@@ -4847,6 +4849,7 @@ export type Database = {
           seeded_brief_content?: Json | null
           shipped_at?: string | null
           shipped_by?: string | null
+          spatial_plan?: Json | null
           stage?: string
           status?: string
           subject?: string
@@ -22977,7 +22980,11 @@ export type Database = {
           created_at: string | null
           deep_bio: string | null
           email: string | null
+          email_tier: string | null
+          email_tier_at: string | null
           email_verified: boolean | null
+          email_verified_at: string | null
+          email_verifier_raw: Json | null
           embedding: string | null
           full_name: string
           id: string
@@ -22996,7 +23003,11 @@ export type Database = {
           created_at?: string | null
           deep_bio?: string | null
           email?: string | null
+          email_tier?: string | null
+          email_tier_at?: string | null
           email_verified?: boolean | null
+          email_verified_at?: string | null
+          email_verifier_raw?: Json | null
           embedding?: string | null
           full_name: string
           id?: string
@@ -23015,7 +23026,11 @@ export type Database = {
           created_at?: string | null
           deep_bio?: string | null
           email?: string | null
+          email_tier?: string | null
+          email_tier_at?: string | null
           email_verified?: boolean | null
+          email_verified_at?: string | null
+          email_verifier_raw?: Json | null
           embedding?: string | null
           full_name?: string
           id?: string

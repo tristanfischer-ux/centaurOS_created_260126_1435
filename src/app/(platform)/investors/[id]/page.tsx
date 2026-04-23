@@ -601,6 +601,44 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </LockedSection>
             )}
 
+            {/* Synthesis Dossier (professional+) */}
+            {/*
+             * INTENT: Surface the deep-profile synthesis (signals, contradictions, recent
+             * moves, theses) once the Forge Capital pipeline lands its dossier table on
+             * ForgeOS Supabase. Until then, render a clean forward-looking placeholder so
+             * the slot exists on the page and design can be reasoned about.
+             *
+             * GOTCHA: investor_deep_profiles does NOT exist on the ForgeOS Supabase project
+             * (jyarhvinengfyrwgtskq) yet — confirmed via Supabase MCP execute_sql on
+             * 2026-04-23. When it lands, swap the placeholder body for the actual JOIN
+             * payload (add the JOIN to getInvestorById and pass attrs.deep_profile here).
+             */}
+            {access.intelligenceAccess ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground" />
+                    Synthesis Dossier
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    No dossier yet — this firm hasn&apos;t been through the deep-profile
+                    synthesis pipeline. Signals, contradictions, recent moves, and active
+                    theses will appear here once the next research cycle completes.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <LockedSection
+                title="Synthesis Dossier"
+                requiredTier="professional"
+                featureDescription="Cross-source synthesis: stated thesis vs actual investments, recent partner moves, contradictions, and active theses."
+              >
+                <div className="h-16 bg-muted/50 rounded" />
+              </LockedSection>
+            )}
+
             {/* Recent Activity */}
             {attrs.recent_deals_summary && (
               <Card>

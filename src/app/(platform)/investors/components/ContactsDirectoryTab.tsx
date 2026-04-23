@@ -317,7 +317,12 @@ function ContactRow({ contact, onSelect }: { contact: ContactSearchResult; onSel
 
       {/* Email — tier-gated */}
       <td className="px-4 py-2.5">
-        <EmailCell email={contact.email} hasEmail={contact.has_email} />
+        <EmailCell
+          email={contact.email}
+          hasEmail={contact.has_email}
+          emailTier={contact.email_tier}
+          emailVerified={contact.email_verified}
+        />
       </td>
 
       {/* LinkedIn */}
@@ -360,16 +365,57 @@ function ContactRow({ contact, onSelect }: { contact: ContactSearchResult; onSel
 // Email cell (blurred when gated)
 // ---------------------------------------------------------------------------
 
-function EmailCell({ email, hasEmail }: { email: string | null; hasEmail: boolean }): React.ReactElement {
+// INTENT: Compact tier-aware verification badge for the dense contacts directory table.
+// Smaller than the PartnerCard variant since it sits inline with the email address.
+function renderTierBadgeSmall(tier: string | null, verified: boolean | null): React.ReactElement | null {
+  if (tier === 'corresponded' || tier === 'hunter_verified' || tier === 'neverbounce_valid') {
+    return <Badge variant="success" size="sm" className="text-[10px] py-0">Verified</Badge>
+  }
+  if (tier === 'neverbounce_catchall') {
+    return <Badge variant="warning" size="sm" className="text-[10px] py-0">Catchall</Badge>
+  }
+  if (tier === 'neverbounce_unknown') {
+    return <Badge variant="warning" size="sm" className="text-[10px] py-0">Unknown</Badge>
+  }
+  if (tier === 'unverified' || tier === 'generic_blocked') {
+    return <Badge variant="warning" size="sm" className="text-[10px] py-0">Unverified</Badge>
+  }
+  if (tier === 'neverbounce_invalid' || tier === 'bounced') {
+    return <Badge variant="destructive" size="sm" className="text-[10px] py-0">Invalid</Badge>
+  }
+  if (tier === 'neverbounce_disposable') {
+    return <Badge variant="destructive" size="sm" className="text-[10px] py-0">Disposable</Badge>
+  }
+  if (!tier && verified) {
+    return <Badge variant="success" size="sm" className="text-[10px] py-0">Verified</Badge>
+  }
+  return null
+}
+
+function EmailCell({
+  email,
+  hasEmail,
+  emailTier,
+  emailVerified,
+}: {
+  email: string | null
+  hasEmail: boolean
+  emailTier: string | null
+  emailVerified: boolean | null
+}): React.ReactElement {
   // User has access and email exists
   if (email) {
+    const badge = renderTierBadgeSmall(emailTier, emailVerified)
     return (
-      <a
-        href={`mailto:${email}`}
-        className="text-foreground hover:text-international-orange transition-colors text-xs truncate block max-w-[200px]"
-      >
-        {email}
-      </a>
+      <span className="inline-flex items-center gap-1.5 max-w-[260px]">
+        <a
+          href={`mailto:${email}`}
+          className="text-foreground hover:text-international-orange transition-colors text-xs truncate block max-w-[200px]"
+        >
+          {email}
+        </a>
+        {badge}
+      </span>
     )
   }
 

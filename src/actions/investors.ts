@@ -1447,6 +1447,16 @@ export type InvestorContact = {
   seniority: string | null
   email: string | null
   email_verified: boolean | null
+  /**
+   * Tier classification of how this email was verified. Tier vocabulary:
+   * - 'corresponded' / 'hunter_verified' / 'neverbounce_valid' / 'neverbounce_catchall' = sendable (green)
+   * - 'neverbounce_unknown' / 'unverified' / 'generic_blocked' = uncertain (amber)
+   * - 'neverbounce_invalid' / 'neverbounce_disposable' / 'bounced' = bad (red)
+   * Tier-gated identically to email — null below professional tier.
+   */
+  email_tier: string | null
+  email_tier_at: string | null
+  email_verified_at: string | null
   linkedin_url: string | null
   is_decision_maker: boolean | null
   outreach_status: string | null
@@ -1486,7 +1496,8 @@ export async function getInvestorContacts(listingId: string, precomputedAccess?:
 
   const { data, error } = await supabase
     .from('vc_pe_contacts')
-    .select('id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, outreach_status, notes, deep_bio, warm_intro_path')
+    // SECURITY: Never SELECT email_verifier_raw — it's heavy jsonb meant for server-side audits only.
+    .select('id, full_name, title, seniority, email, email_verified, email_tier, email_tier_at, email_verified_at, linkedin_url, is_decision_maker, outreach_status, notes, deep_bio, warm_intro_path')
     .eq('listing_id', listingId)
     .order('is_decision_maker', { ascending: false })
     .order('full_name', { ascending: true })
@@ -1511,6 +1522,11 @@ export async function getInvestorContacts(listingId: string, precomputedAccess?:
       has_deep_bio: !!c.deep_bio,
       has_email: !!c.email,
       email: null,
+      // SECURITY: Tier-gate email verification provenance alongside the email itself.
+      // Lower tiers should not learn how/when contacts were verified.
+      email_tier: null,
+      email_tier_at: null,
+      email_verified_at: null,
       deep_bio: null,
     }))
   }
@@ -2355,6 +2371,13 @@ export interface ContactSearchResult {
   listing_id: string
   email: string | null
   email_verified: boolean | null
+  /**
+   * Tier classification of how this email was verified. See InvestorContact.email_tier.
+   * Tier-gated identically to email — null below professional tier.
+   */
+  email_tier: string | null
+  email_tier_at: string | null
+  email_verified_at: string | null
   linkedin_url: string | null
   seniority: string | null
   is_decision_maker: boolean | null
@@ -2422,8 +2445,9 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
   // Build query — join marketplace_listings for firm name (title)
   let dbQuery = supabase
     .from('vc_pe_contacts')
+    // SECURITY: Never SELECT email_verifier_raw — it's heavy jsonb meant for server-side audits only.
     .select(
-      'id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, notes, deep_bio, listing_id, marketplace_listings!inner(title)',
+      'id, full_name, title, seniority, email, email_verified, email_tier, email_tier_at, email_verified_at, linkedin_url, is_decision_maker, notes, deep_bio, listing_id, marketplace_listings!inner(title)',
       { count: 'exact' },
     )
 
@@ -2494,6 +2518,10 @@ export async function searchContacts(filters: ContactSearchFilters = {}): Promis
       // SECURITY: Strip sensitive fields for non-professional users
       email: access.deepAccess ? rawEmail : null,
       email_verified: access.deepAccess ? (row.email_verified as boolean | null) : null,
+      // SECURITY: email_tier provenance is tier-gated alongside the email itself.
+      email_tier: access.deepAccess ? ((row.email_tier as string | null) ?? null) : null,
+      email_tier_at: access.deepAccess ? ((row.email_tier_at as string | null) ?? null) : null,
+      email_verified_at: access.deepAccess ? ((row.email_verified_at as string | null) ?? null) : null,
       linkedin_url: (row.linkedin_url as string | null) ?? null,
       seniority: (row.seniority as string | null) ?? null,
       is_decision_maker: (row.is_decision_maker as boolean | null) ?? null,
@@ -2535,7 +2563,8 @@ export async function getContactById(contactId: string): Promise<ContactDetail |
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('vc_pe_contacts')
-    .select('id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, notes, deep_bio, warm_intro_path, outreach_status, last_contacted_at, listing_id, marketplace_listings!inner(title)')
+    // SECURITY: Never SELECT email_verifier_raw — it's heavy jsonb meant for server-side audits only.
+    .select('id, full_name, title, seniority, email, email_verified, email_tier, email_tier_at, email_verified_at, linkedin_url, is_decision_maker, notes, deep_bio, warm_intro_path, outreach_status, last_contacted_at, listing_id, marketplace_listings!inner(title)')
     .eq('id', contactId)
     .single()
 
@@ -2557,6 +2586,10 @@ export async function getContactById(contactId: string): Promise<ContactDetail |
     listing_id: data.listing_id,
     email: access.deepAccess ? rawEmail : null,
     email_verified: access.deepAccess ? data.email_verified : null,
+    // SECURITY: email_tier provenance is tier-gated alongside the email itself.
+    email_tier: access.deepAccess ? (data.email_tier ?? null) : null,
+    email_tier_at: access.deepAccess ? (data.email_tier_at ?? null) : null,
+    email_verified_at: access.deepAccess ? (data.email_verified_at ?? null) : null,
     linkedin_url: data.linkedin_url ?? null,
     seniority: data.seniority ?? null,
     is_decision_maker: data.is_decision_maker ?? null,
