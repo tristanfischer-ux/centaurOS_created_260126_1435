@@ -753,6 +753,47 @@ async function stepWaitForFinn(projectId: string): Promise<void> {
  * illustration doesn't trap the founder at this stage.
  */
 async function stepGenerateIllustration(projectId: string): Promise<void> {
+    // v1.2: clear the hero + per-module imageUrls before the render chain
+    // fires. On re-autopilot cycles — typical for a founder who adjusted the
+    // brief and is running autopilot again — old renders would otherwise be
+    // reused even if the dimension_sheet now implies different geometry.
+    // Clearing forces fresh renders that pick up the latest sizing.
+    try {
+        const admin = createAdminClient()
+        const { data: project } = await admin
+            .from("cad_lab_projects")
+            .select("modules, foundry_id")
+            .eq("id", projectId)
+            .maybeSingle()
+        if (project) {
+            const modules = (project.modules as CadLabModule[] | null) ?? []
+            const cleared = modules.map((m) => ({
+                ...m,
+                imageUrl: undefined,
+                imageStatus: undefined,
+                imageError: undefined,
+                imageModelUsed: undefined,
+            }))
+            await admin
+                .from("cad_lab_projects")
+                .update({
+                    modules: cleared as never,
+                    system_illustration_url: null,
+                    interior_overview_url: null,
+                    image_render_state: null,
+                })
+                .eq("id", projectId)
+        }
+    } catch (err) {
+        // Non-fatal: if we can't clear the urls, the render chain will
+        // still run on any missing modules. Worst case: founder sees stale
+        // images for modules that were already rendered.
+        console.warn(
+            "[autopilot] pre-render cleanup failed (non-fatal):",
+            err instanceof Error ? err.message : err,
+        )
+    }
+
     try {
         const [{ generateSystemIllustrationForProject }, { generateConceptRenderForProject }] =
             await Promise.all([
