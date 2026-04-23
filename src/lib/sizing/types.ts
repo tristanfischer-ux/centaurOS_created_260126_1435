@@ -1,0 +1,224 @@
+/**
+ * @file src/lib/sizing/types.ts — Shared types for the Forge sizing engine.
+ *
+ * @description The sizing engine solves the "circular allocation" problem that
+ * every physical product design has: given a bounded envelope (container /
+ * room / chassis / cabinet), a primary payload target (kWh, canopy m²,
+ * thermal kW, ...), and a library of engineering coefficients, produce a
+ * self-consistent per-module dimension sheet OR report infeasibility with
+ * ranked trade-offs.
+ *
+ * Per-domain rule libraries (bess-v1, vertical-farm-v1, heat-pump-v1, ...)
+ * plug into a single generic solver (`sizing-engine.ts::solveSizing`). The
+ * output is persisted on `cad_lab_projects.dimension_sheet` and injected
+ * downstream into image prompts + BOM validation + Fang manufacturability.
+ *
+ * Prototype reference: `/tmp/bess-sizing-engine.mjs` — the exact BESS trial
+ * that validated the approach on 5 configurations (500 → 3000 kWh).
+ */
+
+// ─── Envelope ──────────────────────────────────────────────────────────
+
+/**
+ * The physical boundary the design must fit inside. The solver treats
+ * envelope as read-only — if the domain target can't fit, the recommended
+ * fix is to grow the envelope (2×40ft, 53ft HC, larger bay, ...).
+ */
+export interface Envelope {
+    kind:
+        | "container_40ft_iso"
+        | "container_20ft_iso"
+        | "container_53ft_hc"
+        | "warehouse_bay"
+        | "room"
+        | "chassis"
+        | "cabinet"
+        | "plot"
+        | "custom"
+    label: string
+    interior_w_mm: number
+    interior_d_mm: number
+    interior_h_mm: number
+    /** Computed m² = (w * d) / 1_000_000. Provided by `makeEnvelope` helper. */
+    interior_floor_m2: number
+    /** Computed m³. */
+    interior_volume_m3: number
+}
+
+// ─── Domain rules contract ─────────────────────────────────────────────
+
+/**
+ * A domain rules library is the expertise bundle for one engineering domain
+ * (battery storage, vertical farming, heat pumps, ...). It declares:
+ *
+ *   - `domain` / `version` for provenance + compatibility
+ *   - `applicableIndustries` — strings Max's industryDomain classifier emits
+ *     that the registry matches against when auto-picking a library
+ *   - `targetSpec` — named numeric targets the solver expects (kWh, canopy_m², kW_thermal)
+ *   - `defaultEnvelope` — sensible default when the project hasn't declared one
+ *   - `slots` — canonical module kinds with coefficients, aliases, and mount
+ *   - `solve` — the actual allocation function
+ *
+ * Keeping `solve` per-library (rather than a fully-generic solver) lets each
+ * domain encode its own physics (BESS: payload is linear in kWh; vertical
+ * farm: layers × canopy × tier height; heat pump: compressor sized to
+ * thermal load + COP). The generic "solveSizing" wrapper handles module-id
+ * matching, envelope budgeting, and dimension-sheet assembly around it.
+ */
+export interface DomainRules {
+    domain: string
+    version: string
+    /** Human label shown in the UI ("BESS — 40ft ISO containerised"). */
+    label: string
+    applicableIndustries: string[]
+    /**
+     * What targets the solver needs to run. UI uses this to render the
+     * right sizing form (kWh + kW for BESS; canopy_m² + crop_turnover for VF).
+     * Numeric. Keys are domain-specific and mirrored into the persisted
+     * dimension_sheet under `target`.
+     */
+    targetSpec: Record<string, TargetFieldSpec>
+    defaultEnvelope: Envelope
+    slots: Record<string, SlotDefinition>
+    /**
+     * Allocation function. Receives the targets + envelope + (optional) module
+     * list from Max. Produces the allocation result — which the generic
+     * wrapper then matches back onto Max's module IDs.
+     */
+    solve: (input: DomainSolveInput) => DomainSolveResult
+}
+
+export interface TargetFieldSpec {
+    label: string
+    unit: string
+    min?: number
+    max?: number
+    default?: number
+    /** If true, the UI renders this as a required field. */
+    required: boolean
+}
+
+/**
+ * A canonical "slot" the domain knows how to size. Examples:
+ *   - BESS: `battery_racks`, `pcs_inverter`, `dc_distribution`, `hvac`, ...
+ *   - VF:    `grow_trays`, `lighting`, `water_delivery`, `climate`, ...
+ *   - HP:    `compressor`, `heat_exchanger`, `controls`, ...
+ *
+ * Aliases let a Max module named "Battery Subsystem" or "Battery Pack" map
+ * to the `battery_racks` slot without requiring Max to use canonical IDs.
+ * Matching is case-insensitive and substring-based, in priority order.
+ */
+export interface SlotDefinition {
+    /** Human label ("Battery racks"). */
+    label: string
+    /**
+     * Name substrings / keyParts hints that map Max modules to this slot.
+     * First match wins. Substring-matched case-insensitively against
+     * `module.name + " " + module.keyParts.join(" ")`.
+     */
+    matchAliases: string[]
+    /** Where this slot lives: floor / ceiling / wall / envelope. */
+    defaultMount: "floor" | "ceiling" | "wall" | "envelope"
+    /** Default visual-prompt hint when injected into image generation. */
+    promptHint?: string
+}
+
+// ─── Domain solve I/O ──────────────────────────────────────────────────
+
+export interface DomainSolveInput {
+    envelope: Envelope
+    targets: Record<string, number>
+    /**
+     * Optional Max modules. When provided, the solver can use keyParts to
+     * refine estimates (e.g. counting battery racks from the parts list
+     * rather than deriving it from kWh alone). When absent, solver works
+     * purely from targets + defaults.
+     */
+    modules?: Array<{
+        id: string
+        name: string
+        purpose?: string
+        keyParts?: string[]
+    }>
+}
+
+export interface DomainSolveResult {
+    feasible: boolean
+    /** floor area budget after deducting fixed overhead (aisle, walls). */
+    floor_budget_m2: number
+    /** Per-slot allocation: slot name → ModuleDimensions. */
+    slot_dimensions: Record<string, ModuleDimensions>
+    /** Iterations recorded during solve — useful for debugging + UI trace. */
+    iterations: SolverIteration[]
+    /** Human-readable conflicts when infeasible. */
+    conflicts: string[]
+    /** Human-readable ranked recommendations. */
+    recommendations: string[]
+    /** Notes / assumptions worth surfacing on the UI. */
+    notes?: string[]
+}
+
+export interface SolverIteration {
+    iter: number
+    used_floor_m2: number
+    remaining_floor_m2: number
+    utilization_pct: number
+    allocations: Record<string, number>
+}
+
+// ─── Module dimensions (the artefact downstream consumes) ──────────────
+
+/**
+ * The dimension record for a single slot / module. Shape is stable across
+ * all domains — downstream consumers (image prompts, BOM check, Fang
+ * cascade) rely on these fields existing, even if the slot itself is
+ * domain-specific.
+ */
+export interface ModuleDimensions {
+    w_mm: number
+    d_mm: number
+    h_mm: number
+    floor_m2: number
+    mount: "floor" | "ceiling" | "wall" | "envelope"
+    /**
+     * What this slot scales with, in human form.
+     * ("target_kWh", "target_kW", "canopy_m²", "thermal_kW × COP").
+     * Rendered as a one-liner provenance caption in the UI.
+     */
+    scaled_by: string
+    /** Optional rack/shelf/pallet count hint. */
+    count_hint?: string
+    /** Ceiling-mounted slots expose the thermal/agent requirement here. */
+    requirement?: { label: string; value: number; unit: string }
+    /** Prompt hint injected into image generation for this slot. */
+    prompt_hint?: string
+}
+
+// ─── Final persisted artefact ──────────────────────────────────────────
+
+/**
+ * The shape persisted as `cad_lab_projects.dimension_sheet` JSONB.
+ *
+ * `module_dimensions` is keyed by **Max module id** (not slot name) so the
+ * image-generator / BOM / UI can look up by the same id they already have.
+ * Slot → module-id matching happens inside `solveSizing`.
+ */
+export interface DimensionSheet {
+    /** Always present; downstream code checks this before trusting dimensions. */
+    feasible: boolean
+    rules_domain: string
+    rules_version: string
+    envelope: Envelope
+    target: Record<string, number>
+    floor_budget_m2: number
+    module_dimensions: Record<string, ModuleDimensions>
+    /** Unmatched module ids — Max produced a module the rules library doesn't recognise. */
+    unmatched_module_ids: string[]
+    /** Unmatched slot names — rules library expected this slot but Max didn't produce a module for it. */
+    unmatched_slot_ids: string[]
+    conflicts: string[]
+    recommendations: string[]
+    notes: string[]
+    iterations: SolverIteration[]
+    generated_at: string
+}
