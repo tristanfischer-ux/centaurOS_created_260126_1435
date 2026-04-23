@@ -424,6 +424,65 @@ export async function renderNextModuleStage(
     }
 }
 
+// ─── Auto-recovery tick ────────────────────────────────────────────────
+
+/**
+ * Self-healing poke for the render chain. Called from the workspace page
+ * render. Mirrors the pattern established by `tickAutopilotStage` — if the
+ * chain's `image_render_state` shows "running" (finished_at null, current_id
+ * set) but the row's `updated_at` hasn't moved for >90s, the `after()` that
+ * should have scheduled the next stage dropped on Vercel container teardown.
+ * We re-fire `renderNextModuleStage` so the walk resumes without the founder
+ * needing to manually click the stall-restart button.
+ *
+ * Observed 2026-04-23 on HAPS project eadae45d: chain completed 2 modules,
+ * stage 1 wrote state + scheduled stage 2 via after(), stage 2 never fired,
+ * chain rotted. Same failure pattern BOM had pre-fix.
+ *
+ * Idempotent: if the chain is healthy, null, or finished, this is a cheap
+ * no-op. If it's stale, the refire is itself idempotent because
+ * renderNextModuleStage reads state fresh before doing any work.
+ */
+const RENDER_CHAIN_STALE_MS = 90_000
+
+export async function tickImageRenderChain(projectId: string): Promise<void> {
+    return withAuth<void>(async ({ foundryId }) => {
+        if (!projectId || !UUID_RE.test(projectId)) return
+        const admin = createAdminClient()
+        const { data: project } = await admin
+            .from("cad_lab_projects")
+            .select("foundry_id, image_render_state, updated_at")
+            .eq("id", projectId)
+            .maybeSingle()
+
+        if (!project || project.foundry_id !== foundryId) return
+
+        const state = project.image_render_state as ImageRenderState | null
+        if (!state) return
+        if (state.finished_at !== null) return
+        if (state.current_id === null) return
+
+        const updatedMs = Date.parse(project.updated_at as unknown as string)
+        if (Number.isNaN(updatedMs)) return
+        const staleMs = Date.now() - updatedMs
+        if (staleMs < RENDER_CHAIN_STALE_MS) return
+
+        console.info(
+            `[render-tick] chain stale for ${projectId} (${(staleMs / 1000).toFixed(0)}s since last update, current_id=${state.current_id}) — re-firing renderNextModuleStage`,
+        )
+        after(async () => {
+            try {
+                await renderNextModuleStage(projectId)
+            } catch (err) {
+                console.error(
+                    "[render-tick] re-fire threw:",
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        })
+    })
+}
+
 // ─── Status loader ─────────────────────────────────────────────────────
 
 /**

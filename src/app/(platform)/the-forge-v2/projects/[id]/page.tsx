@@ -40,6 +40,7 @@ import { loadChaseRunStatus } from "@/actions/specialists/run-chase-research"
 import { loadFinnRunStatus } from "@/actions/specialists/run-finn-cost"
 import { loadBriefLockStatus } from "@/actions/brief-lock"
 import { tickAutopilotStage } from "@/actions/forge-v2-autopilot"
+import { tickImageRenderChain } from "@/actions/forge-v2-render-all-modules"
 import { createClient } from "@/lib/supabase/server"
 
 import { WorkspaceView, type TopMaterialRow, type TopProcessRow, type WorkspaceViewProps } from "./workspace-view"
@@ -85,6 +86,20 @@ export default async function ForgeV2ProjectPage({
     } catch (err) {
         console.warn(
             "[WORKSPACE-PAGE] tickAutopilotStage failed (non-fatal):",
+            err instanceof Error ? err.message : err,
+        )
+    }
+
+    // INTENT: same nudge pattern for the per-module render chain. Vercel's
+    // after() can drop scheduled stages on container teardown (observed
+    // 2026-04-23 on HAPS eadae45d — chain completed 2/7 and rotted). This
+    // re-fires renderNextModuleStage if the chain is stale. Cheap no-op when
+    // chain is idle, null, or making progress.
+    try {
+        await tickImageRenderChain(id)
+    } catch (err) {
+        console.warn(
+            "[WORKSPACE-PAGE] tickImageRenderChain failed (non-fatal):",
             err instanceof Error ? err.message : err,
         )
     }
