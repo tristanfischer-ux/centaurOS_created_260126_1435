@@ -34,8 +34,6 @@
  *   - Chained into: src/actions/specialists/run-max-decomposition.ts
  */
 
-import { after } from "next/server"
-
 import {
     completePipelineRun,
     failPipelineRun,
@@ -177,27 +175,6 @@ export async function runFangSizingBackground(
     trigger: "auto.max-complete" = "auto.max-complete",
 ): Promise<RunFangSizingReturn> {
     return runFangSizingInternal(projectId, foundryId, trigger)
-}
-
-/**
- * Schedule `runFangSizingBackground` via after() from a completed Max
- * decomposition. Kept here (rather than inline in run-max-decomposition.ts)
- * so the sizing stage can evolve without Max needing to know about it.
- */
-export function scheduleFangSizingAfterMax(
-    projectId: string,
-    foundryId: string,
-): void {
-    after(async () => {
-        try {
-            await runFangSizingBackground(projectId, foundryId, "auto.max-complete")
-        } catch (err) {
-            console.error(
-                "[run-fang-sizing] background runner threw:",
-                err instanceof Error ? err.message : err,
-            )
-        }
-    })
 }
 
 // ─── Internal runner ───────────────────────────────────────────────────
