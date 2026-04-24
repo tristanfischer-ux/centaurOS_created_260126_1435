@@ -2247,12 +2247,27 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
   await persistBomGenerationState(projectId, null)
 
   // ── Auto-fire Finn cost on BOM success, same as the legacy path. ──
+  //
+  // GOTCHA (P0.2): use the Background variant. This runs inside `after()`
+  // from `runBomMergeStage`, which itself fires from `after()` in the
+  // previous stage — cookies are gone and the withAuth-wrapped
+  // `runFinnCost` would return "Unauthorized", which sanitizeErrorMessage
+  // turns into "An unexpected error occurred" and every BOM→Finn hand-off
+  // fails silently. `loaded.foundryId` is already resolved via the admin
+  // client at the top of `runBomMergeStage`. No userId is available in
+  // this context (system-fired after chained stages); pass null.
+  const capturedFoundryId = loaded.foundryId
   after(async () => {
     try {
-      const { runFinnCost } = await import(
+      const { runFinnCostBackground } = await import(
         "@/actions/specialists/run-finn-cost"
       )
-      await runFinnCost(projectId, "auto.bom-complete")
+      await runFinnCostBackground(
+        projectId,
+        capturedFoundryId,
+        null,
+        "auto.bom-complete",
+      )
     } catch (err) {
       console.error(
         "[bom-distributed:merge] Finn auto-fire failed:",

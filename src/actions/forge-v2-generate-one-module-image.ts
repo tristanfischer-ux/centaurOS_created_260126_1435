@@ -104,6 +104,33 @@ export async function generateOneModuleImage(
     moduleId: string,
 ): Promise<GenerateOneModuleImageResult> {
     return withAuth<GenerateOneModuleImageResult>(async ({ foundryId }) => {
+        return generateOneModuleImageInternal(projectId, moduleId, foundryId)
+    })
+}
+
+/**
+ * Background entry — called from `after()` post-response contexts (e.g. the
+ * render-all-modules chain running inside /api/render-stage or after the
+ * autopilot stepGenerateIllustration) where cookies are gone and
+ * `withAuth` would fail. Caller MUST have already resolved foundryId from
+ * an authenticated request OR verified project ownership upstream.
+ *
+ * This is the #90 pattern applied to per-module image generation.
+ */
+export async function generateOneModuleImageBackground(
+    projectId: string,
+    moduleId: string,
+    foundryId: string,
+): Promise<GenerateOneModuleImageResult> {
+    return generateOneModuleImageInternal(projectId, moduleId, foundryId)
+}
+
+async function generateOneModuleImageInternal(
+    projectId: string,
+    moduleId: string,
+    foundryId: string,
+): Promise<GenerateOneModuleImageResult> {
+    {
         const admin = createAdminClient()
 
         // 1. Load project (auth + foundry check) and its current modules.
@@ -718,7 +745,7 @@ export async function generateOneModuleImage(
         }
 
         return { ok: true, imageUrl: result.imageUrl }
-    })
+    }
 }
 
 // ─── Minimum-viable VisualStyleSpec synthesis ─────────────────────────

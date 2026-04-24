@@ -930,6 +930,21 @@ async function stepWaitForFinn(projectId: string): Promise<void> {
  * illustration doesn't trap the founder at this stage.
  */
 async function stepGenerateIllustration(projectId: string): Promise<void> {
+    // GOTCHA (P0.2): this stage runs inside after() chained from earlier
+    // stages — cookies are gone. Resolve foundryId up front so the Background
+    // variants of the illustration/concept render/render-chain actions can
+    // be called instead of their withAuth counterparts (which would return
+    // "Unauthorized" → sanitised → silent failure).
+    const foundryIdForChain = await getProjectFoundryId(projectId)
+    if (!foundryIdForChain) {
+        await recordFailure(
+            projectId,
+            "generating_illustration",
+            "project disappeared during illustration stage",
+        )
+        return
+    }
+
     // v1.2: clear the hero + per-module imageUrls before the render chain
     // fires. On re-autopilot cycles — typical for a founder who adjusted the
     // brief and is running autopilot again — old renders would otherwise be
@@ -972,14 +987,20 @@ async function stepGenerateIllustration(projectId: string): Promise<void> {
     }
 
     try {
-        const [{ generateSystemIllustrationForProject }, { generateConceptRenderForProject }] =
-            await Promise.all([
-                import("@/actions/forge-v2-generate-system-illustration"),
-                import("@/actions/forge-v2-generate-concept-render"),
-            ])
+        // P0.2: Background variants bypass the withAuth cookie read. This
+        // stage runs from an after() chain so the user-facing variants
+        // would return "Unauthorized" and both hero panels would never
+        // land. foundryId was resolved above.
+        const [
+            { generateSystemIllustrationForProjectBackground },
+            { generateConceptRenderForProjectBackground },
+        ] = await Promise.all([
+            import("@/actions/forge-v2-generate-system-illustration"),
+            import("@/actions/forge-v2-generate-concept-render"),
+        ])
         const [systemRes, conceptRes] = await Promise.allSettled([
-            generateSystemIllustrationForProject(projectId),
-            generateConceptRenderForProject(projectId),
+            generateSystemIllustrationForProjectBackground(projectId, foundryIdForChain),
+            generateConceptRenderForProjectBackground(projectId, foundryIdForChain),
         ])
         if (systemRes.status === "rejected") {
             console.warn(
@@ -1026,12 +1047,19 @@ async function stepGenerateIllustration(projectId: string): Promise<void> {
     // for a typical project — firing here means founders land on the modules
     // page with renders already in progress, matching Tristan's "feels faster"
     // goal (2026-04-22 decision: swap to gpt-image-2 + auto-fire the chain).
+    // P0.2: use the Background variant — this after() runs post-response
+    // where cookies are gone; the withAuth-wrapped
+    // startRenderAllRemainingModuleImages would return "Unauthorized".
+    const capturedFoundryIdForRender = foundryIdForChain
     after(async () => {
         try {
-            const { startRenderAllRemainingModuleImages } = await import(
+            const { startRenderAllRemainingModuleImagesBackground } = await import(
                 "./forge-v2-render-all-modules"
             )
-            const res = await startRenderAllRemainingModuleImages(projectId)
+            const res = await startRenderAllRemainingModuleImagesBackground(
+                projectId,
+                capturedFoundryIdForRender,
+            )
             if (!res.ok && res.errorCode !== "ALREADY_RUNNING" && res.errorCode !== "NO_UNRENDERED_MODULES") {
                 console.warn(
                     "[autopilot] auto-fire module renders failed (non-fatal):",
@@ -1061,11 +1089,26 @@ async function stepGenerateIllustration(projectId: string): Promise<void> {
 
 /** Stage 7: kick the supplier matcher. */
 async function stepMatchSuppliers(projectId: string): Promise<void> {
+    // P0.2: resolve foundryId up front so we can call the Background variant.
+    // This stage runs inside an after() chain (cookies gone) — the
+    // withAuth-wrapped matchSuppliersForProject would return "Unauthorized"
+    // which sanitizeErrorMessage destroys into "An unexpected error
+    // occurred" (Red Team 2 §4 — the BESS matching_suppliers failure).
+    const foundryId = await getProjectFoundryId(projectId)
+    if (!foundryId) {
+        await recordFailure(
+            projectId,
+            "matching_suppliers",
+            "project disappeared during supplier-match stage",
+        )
+        return
+    }
+
     try {
-        const { matchSuppliersForProject } = await import(
+        const { matchSuppliersForProjectBackground } = await import(
             "@/actions/forge-v2-supplier-match"
         )
-        const res = await matchSuppliersForProject(projectId)
+        const res = await matchSuppliersForProjectBackground(projectId, foundryId)
         if (!res.ok) {
             await recordFailure(
                 projectId,

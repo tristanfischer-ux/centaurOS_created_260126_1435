@@ -66,6 +66,31 @@ export async function matchSuppliersForProject(
     projectId: string,
 ): Promise<MatchSuppliersForProjectResult> {
     return withAuth<MatchSuppliersForProjectResult>(async ({ foundryId }) => {
+        return matchSuppliersForProjectInternal(projectId, foundryId)
+    })
+}
+
+/**
+ * Background entry — called from `after()` post-response contexts (e.g. the
+ * autopilot `stepMatchSuppliers` chain) where cookies are gone and
+ * `withAuth` would return "Unauthorized". Caller MUST have already resolved
+ * foundryId from an authenticated request.
+ *
+ * This is the #90 pattern applied to supplier-match. Mirrors
+ * `runMaxDecompositionBackground`.
+ */
+export async function matchSuppliersForProjectBackground(
+    projectId: string,
+    foundryId: string,
+): Promise<MatchSuppliersForProjectResult> {
+    return matchSuppliersForProjectInternal(projectId, foundryId)
+}
+
+async function matchSuppliersForProjectInternal(
+    projectId: string,
+    foundryId: string,
+): Promise<MatchSuppliersForProjectResult> {
+    {
         const admin = createAdminClient()
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
@@ -273,5 +298,5 @@ export async function matchSuppliersForProject(
             modulesMatched,
             modulesEmpty,
         }
-    })
+    }
 }

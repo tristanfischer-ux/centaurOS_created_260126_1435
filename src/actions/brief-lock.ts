@@ -352,12 +352,25 @@ export async function lockCadLabBrief(projectId: string): Promise<BriefLockResul
         //
         //      Dynamic import avoids a circular "use server" init cycle
         //      between brief-lock and run-max-decomposition.
+        //
+        //      GOTCHA (P0.2): use the Background variant — this runs in an
+        //      after() post-response context where cookies are unavailable,
+        //      so the withAuth-wrapped runMaxDecomposition would return
+        //      "Unauthorized". foundryId + user.id come from the outer
+        //      withAuth closure so we plumb them explicitly.
+        const capturedFoundryId = foundryId
+        const capturedUserId = user.id
         after(async () => {
             try {
-                const { runMaxDecomposition } = await import(
+                const { runMaxDecompositionBackground } = await import(
                     "@/actions/specialists/run-max-decomposition"
                 )
-                await runMaxDecomposition(projectId, "auto.brief-lock")
+                await runMaxDecompositionBackground(
+                    projectId,
+                    capturedFoundryId,
+                    capturedUserId,
+                    "auto.brief-lock",
+                )
             } catch (err) {
                 console.error(
                     "[brief-lock] auto-trigger Max failed (non-fatal for lock):",

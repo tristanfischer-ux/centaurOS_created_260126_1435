@@ -155,6 +155,42 @@ export async function runChaseResearch(
     trigger: "manual" | "auto.project-create",
 ): Promise<RunChaseResearchReturn> {
     return withAuth<RunChaseResearchReturn>(async ({ user, foundryId }) => {
+        return runChaseResearchInternal(projectId, foundryId, user.id, trigger)
+    })
+}
+
+/**
+ * Background entry — called from `after()` post-response contexts (e.g. the
+ * project-create auto-fire in `cad-lab-projects.ts`) where cookies are gone
+ * and `withAuth` would fail. Caller MUST have already resolved foundryId
+ * from an authenticated request.
+ *
+ * This is the #90 pattern applied to Chase. Mirrors
+ * `runMaxDecompositionBackground` — every chained post-response handoff
+ * calls a *Background variant that plumbs foundryId + userId explicitly.
+ */
+export async function runChaseResearchBackground(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "manual" | "auto.project-create" = "auto.project-create",
+): Promise<RunChaseResearchReturn> {
+    return runChaseResearchInternal(projectId, foundryId, userId, trigger)
+}
+
+async function runChaseResearchInternal(
+    projectId: string,
+    foundryId: string,
+    userId: string | null,
+    trigger: "manual" | "auto.project-create",
+): Promise<RunChaseResearchReturn> {
+    // Shim: expose user.id under the original closure name so the body
+    // continues to work. GOTCHA: triggered_by has an FK to auth.users, so
+    // passing a zero UUID when the caller didn't supply a userId blows up
+    // with a FK violation — same pattern as run-max-decomposition.
+    const user: { id: string | null } = { id: userId }
+    void foundryId
+    {
         // 1. Load + verify project. Same rationale as Max's orchestrator —
         //    we use the admin client so RLS doesn't hide a project the
         //    caller DOES own from a different session angle, then we
@@ -261,7 +297,7 @@ export async function runChaseResearch(
                 specialist_id: SPECIALIST_ID,
                 stage: STAGE,
                 trigger,
-                triggered_by: user.id,
+                triggered_by: user.id ?? undefined,
                 model_provider: "anthropic",
                 input_ref: {
                     source: "project.subject",
@@ -488,7 +524,7 @@ export async function runChaseResearch(
                 errorCode: "INTERNAL",
             }
         }
-    })
+    }
 }
 
 // ─── loadChaseRunStatus ────────────────────────────────────────────────

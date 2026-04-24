@@ -417,15 +417,29 @@ export async function createCadLabProject(
     // FLOW: dynamic import is still required — `run-chase-research.ts`
     // imports `saveCadLabResearch` from this file, so a top-level import
     // here would create a circular "use server" module-init cycle.
+    //
+    // GOTCHA (P0.2): use the Background variant because this runs in an
+    // after() post-response context where cookies are unavailable — the
+    // withAuth-wrapped variant would return "Unauthorized" and every first
+    // Chase auto-fire would fail silently. foundryId + user.id are still
+    // in closure from the outer withAuth, so we plumb them explicitly.
+    const capturedFoundryId = foundryId
+    const capturedUserId = user.id
+    const capturedProjectId = data.id
     after(async () => {
       try {
-        const { runChaseResearch } = await import(
+        const { runChaseResearchBackground } = await import(
           "@/actions/specialists/run-chase-research"
         )
-        await runChaseResearch(data.id, "auto.project-create")
+        await runChaseResearchBackground(
+          capturedProjectId,
+          capturedFoundryId,
+          capturedUserId,
+          "auto.project-create",
+        )
       } catch (err) {
         console.error("[createCadLabProject] Chase auto-trigger failed:", {
-          projectId: data.id,
+          projectId: capturedProjectId,
           error: err instanceof Error ? err.message : String(err),
         })
       }

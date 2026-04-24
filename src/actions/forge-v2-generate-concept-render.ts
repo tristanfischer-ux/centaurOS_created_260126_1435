@@ -74,6 +74,30 @@ export async function generateConceptRenderForProject(
     projectId: string,
 ): Promise<GenerateConceptRenderResult> {
     return withAuth<GenerateConceptRenderResult>(async ({ foundryId }) => {
+        return generateConceptRenderForProjectInternal(projectId, foundryId)
+    })
+}
+
+/**
+ * Background entry — called from `after()` post-response contexts (e.g. the
+ * autopilot `stepGenerateIllustration` chain) where cookies are gone and
+ * `withAuth` would fail. Caller MUST have already resolved foundryId from
+ * an authenticated request.
+ *
+ * This is the #90 pattern applied to concept-render generation.
+ */
+export async function generateConceptRenderForProjectBackground(
+    projectId: string,
+    foundryId: string,
+): Promise<GenerateConceptRenderResult> {
+    return generateConceptRenderForProjectInternal(projectId, foundryId)
+}
+
+async function generateConceptRenderForProjectInternal(
+    projectId: string,
+    foundryId: string,
+): Promise<GenerateConceptRenderResult> {
+    {
         const admin = createAdminClient()
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
@@ -169,5 +193,5 @@ export async function generateConceptRenderForProject(
                 errorCode: "GENERATION_FAILED",
             }
         }
-    })
+    }
 }

@@ -56,7 +56,7 @@ import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getBaseUrl } from "@/lib/domains"
 import type { CadLabModule } from "@/lib/cad-lab-types"
-import { generateOneModuleImage } from "./forge-v2-generate-one-module-image"
+import { generateOneModuleImageBackground } from "./forge-v2-generate-one-module-image"
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -142,6 +142,30 @@ export async function startRenderAllRemainingModuleImages(
     projectId: string,
 ): Promise<StartRenderAllResult> {
     return withAuth<StartRenderAllResult>(async ({ foundryId }) => {
+        return startRenderAllRemainingModuleImagesInternal(projectId, foundryId)
+    })
+}
+
+/**
+ * Background entry — called from `after()` post-response contexts (e.g.
+ * the autopilot `stepGenerateIllustration` render auto-fire) where
+ * cookies are gone and `withAuth` would return "Unauthorized". Caller
+ * MUST have already resolved foundryId from an authenticated request.
+ *
+ * This is the #90 pattern applied to the render-chain kick-off.
+ */
+export async function startRenderAllRemainingModuleImagesBackground(
+    projectId: string,
+    foundryId: string,
+): Promise<StartRenderAllResult> {
+    return startRenderAllRemainingModuleImagesInternal(projectId, foundryId)
+}
+
+async function startRenderAllRemainingModuleImagesInternal(
+    projectId: string,
+    foundryId: string,
+): Promise<StartRenderAllResult> {
+    {
         const admin = createAdminClient()
 
         // ── 1. Ownership + precondition check ────────────────────────
@@ -292,7 +316,7 @@ export async function startRenderAllRemainingModuleImages(
         })
 
         return { ok: true, state: initial }
-    })
+    }
 }
 
 /**
@@ -310,10 +334,15 @@ export async function renderNextModuleStage(
 ): Promise<void> {
     const admin = createAdminClient()
 
-    // 1. Load project state
+    // 1. Load project state. foundry_id is pulled so the per-module render
+    //    call can use the Background variant below — this stage runs
+    //    without cookies (either /api/render-stage HTTP hop or an after()
+    //    chain from the autopilot), so the withAuth-wrapped
+    //    generateOneModuleImage would return "Unauthorized" and every
+    //    module would appear to "fail" for no legible reason.
     const { data: project, error: projectErr } = await admin
         .from("cad_lab_projects")
-        .select("id, modules, image_render_state")
+        .select("id, foundry_id, modules, image_render_state")
         .eq("id", projectId)
         .maybeSingle()
 
@@ -321,6 +350,16 @@ export async function renderNextModuleStage(
         console.error(
             "[render-all-modules:stage] project lookup failed:",
             projectErr?.message ?? "not found",
+        )
+        return
+    }
+
+    const foundryId =
+        typeof project.foundry_id === "string" ? project.foundry_id : null
+    if (!foundryId) {
+        console.error(
+            "[render-all-modules:stage] project missing foundry_id — bailing",
+            { projectId },
         )
         return
     }
@@ -389,8 +428,16 @@ export async function renderNextModuleStage(
 
     // 4. Fire the batch in parallel. Promise.allSettled so one failing
     //    doesn't drop the other's successful write.
+    //
+    //    P0.2: use the Background variant. This stage runs without cookies
+    //    (either the /api/render-stage HTTP hop or an after() chain) so the
+    //    withAuth-wrapped `generateOneModuleImage` would fail auth. Ownership
+    //    was already verified at the top of the chain by
+    //    `startRenderAllRemainingModuleImages` (or its Background sibling).
     const results = await Promise.allSettled(
-        batch.map((m) => generateOneModuleImage(projectId, m.id)),
+        batch.map((m) =>
+            generateOneModuleImageBackground(projectId, m.id, foundryId),
+        ),
     )
 
     // 5. Tally per-module outcomes. Captures BOTH the sanitised `error`

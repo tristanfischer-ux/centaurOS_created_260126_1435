@@ -61,6 +61,30 @@ export async function generateSystemIllustrationForProject(
     projectId: string,
 ): Promise<GenerateSystemIllustrationResult> {
     return withAuth<GenerateSystemIllustrationResult>(async ({ foundryId }) => {
+        return generateSystemIllustrationForProjectInternal(projectId, foundryId)
+    })
+}
+
+/**
+ * Background entry — called from `after()` post-response contexts (e.g. the
+ * autopilot `stepGenerateIllustration` chain) where cookies are gone and
+ * `withAuth` would fail. Caller MUST have already resolved foundryId from
+ * an authenticated request.
+ *
+ * This is the #90 pattern applied to system-illustration generation.
+ */
+export async function generateSystemIllustrationForProjectBackground(
+    projectId: string,
+    foundryId: string,
+): Promise<GenerateSystemIllustrationResult> {
+    return generateSystemIllustrationForProjectInternal(projectId, foundryId)
+}
+
+async function generateSystemIllustrationForProjectInternal(
+    projectId: string,
+    foundryId: string,
+): Promise<GenerateSystemIllustrationResult> {
+    {
         const admin = createAdminClient()
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
@@ -215,5 +239,5 @@ export async function generateSystemIllustrationForProject(
                 errorCode: "INTERNAL",
             }
         }
-    })
+    }
 }
