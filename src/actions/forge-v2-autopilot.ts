@@ -360,7 +360,7 @@ export async function startAutopilot(
         // own 300s budget for each stage, otherwise Chase+Max+BOM share
         // a single 300s budget and the chain wedges mid-BOM. See
         // `scheduleAutopilotStep` docs for the full rationale.
-        scheduleAutopilotStep(projectId, "waitForChase")
+        await scheduleAutopilotStep(projectId, "waitForChase")
 
         return { ok: true }
     })
@@ -398,7 +398,7 @@ async function stepWaitForChase(projectId: string): Promise<void> {
             // P0.1b: HTTP hop instead of after(). Fresh Vercel container
             // for lockBrief so the chain doesn't share a single 300s
             // budget with the next several stages.
-            scheduleAutopilotStep(projectId, "lockBrief")
+            await scheduleAutopilotStep(projectId, "lockBrief")
         },
     })
 }
@@ -440,7 +440,7 @@ async function stepLockBrief(projectId: string): Promise<void> {
         // Already locked. Move on.
         await advance(projectId, "locking_brief", "waiting_max")
         // P0.1b: HTTP hop instead of after() — fresh container for Max.
-        scheduleAutopilotStep(projectId, "waitForMax")
+        await scheduleAutopilotStep(projectId, "waitForMax")
         return
     }
 
@@ -531,7 +531,7 @@ async function stepLockBrief(projectId: string): Promise<void> {
     // missing. So all we have to do is schedule the hop; the fresh container
     // running stepWaitForMax will fire Max on a clean 300s budget. See
     // `scheduleAutopilotStep` docs for the full rationale.
-    scheduleAutopilotStep(projectId, "waitForMax")
+    await scheduleAutopilotStep(projectId, "waitForMax")
 }
 
 /**
@@ -610,7 +610,7 @@ async function stepWaitForMax(projectId: string): Promise<void> {
         onDone: async () => {
             await advance(projectId, "waiting_max", "waiting_sizing")
             // P0.1b: HTTP hop — fresh container for Fang sizing.
-            scheduleAutopilotStep(projectId, "waitForSizing")
+            await scheduleAutopilotStep(projectId, "waitForSizing")
         },
         // #88 Phase-2 fix: if the prior Max run was swept as TIMEOUT_STALL,
         // re-invoke Max via the Background variant so the autopilot chain
@@ -688,7 +688,7 @@ async function stepWaitForSizing(projectId: string): Promise<void> {
 
     await advance(projectId, "waiting_sizing", "waiting_layout")
     // P0.1b: HTTP hop — fresh container for Fang spatial layout.
-    scheduleAutopilotStep(projectId, "waitForLayout")
+    await scheduleAutopilotStep(projectId, "waitForLayout")
 }
 
 /**
@@ -750,7 +750,7 @@ async function stepWaitForLayout(projectId: string): Promise<void> {
 
     await advance(projectId, "waiting_layout", "waiting_bom")
     // P0.1b: HTTP hop — fresh container for BOM generation.
-    scheduleAutopilotStep(projectId, "waitForBom")
+    await scheduleAutopilotStep(projectId, "waitForBom")
 }
 
 /** Stage 4: wait for BOM generator (auto-fired from Max) to land.
@@ -802,7 +802,7 @@ async function stepWaitForBom(projectId: string): Promise<void> {
         onDone: async () => {
             await advance(projectId, "waiting_bom", "waiting_finn")
             // P0.1b: HTTP hop — fresh container for Finn cost estimate.
-            scheduleAutopilotStep(projectId, "waitForFinn")
+            await scheduleAutopilotStep(projectId, "waitForFinn")
         },
         // #88: re-fire BOM via Background variant if stall-swept.
         reTrigger: async () => {
@@ -831,7 +831,7 @@ async function stepWaitForFinn(projectId: string): Promise<void> {
             await advance(projectId, "waiting_finn", "generating_illustration")
             // P0.1b: HTTP hop — fresh container for illustration stage
             // (runs system + concept renders + fires the per-module chain).
-            scheduleAutopilotStep(projectId, "generateIllustration")
+            await scheduleAutopilotStep(projectId, "generateIllustration")
         },
         // P2.9: re-fire Finn via Background variant if stall-swept. Previously
         // Finn had no Background variant so a TIMEOUT_STALL ended the walk.
@@ -1016,7 +1016,7 @@ async function stepGenerateIllustration(projectId: string): Promise<void> {
     // after() above that kicks the per-module render chain STAYS as-is
     // (it calls a *Background variant, not an autopilot stage, and is
     // expected to run in the same stage budget as illustration).
-    scheduleAutopilotStep(projectId, "matchSuppliers")
+    await scheduleAutopilotStep(projectId, "matchSuppliers")
 }
 
 /** Stage 7: kick the supplier matcher. */
@@ -1057,7 +1057,7 @@ async function stepMatchSuppliers(projectId: string): Promise<void> {
     await advance(projectId, "matching_suppliers", "running_fang_reviews")
     // P0.1b: HTTP hop — fresh container for the Fang review fan-out
     // (3 sequential ~60s reviews = up to 180s of work).
-    scheduleAutopilotStep(projectId, "runFangReviews")
+    await scheduleAutopilotStep(projectId, "runFangReviews")
 }
 
 /**
@@ -1131,7 +1131,7 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
         // autopilot — skip Fang reviews and still generate the PDF.
         await advance(projectId, "running_fang_reviews", "generating_pdf")
         // P0.1b: HTTP hop — fresh container for PDF export.
-        scheduleAutopilotStep(projectId, "generatePdf")
+        await scheduleAutopilotStep(projectId, "generatePdf")
         return
     }
 
@@ -1173,7 +1173,7 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
     // of autopilot, not just a green chip.
     await advance(projectId, "running_fang_reviews", "generating_pdf")
     // P0.1b: HTTP hop — fresh container for PDF export.
-    scheduleAutopilotStep(projectId, "generatePdf")
+    await scheduleAutopilotStep(projectId, "generatePdf")
 }
 
 /**
@@ -1695,10 +1695,10 @@ function sleep(ms: number): Promise<void> {
  * every stepXxx reads state fresh and short-circuits if the stage has
  * already advanced.
  */
-function scheduleAutopilotStep(
+async function scheduleAutopilotStep(
     projectId: string,
     step: AutopilotStepName,
-): void {
+): Promise<void> {
     // Reuses FORGE_RENDER_STAGE_SECRET — one secret for both stage-chain
     // routes (/api/render-stage + /api/autopilot-step). Rotating one key
     // covers both surfaces; simpler for ops than parallel keys.
@@ -1718,40 +1718,55 @@ function scheduleAutopilotStep(
 
     const url = `${getBaseUrl()}/api/autopilot-step`
 
-    // GOTCHA (2026-04-24): plain `void fetch(...)` does NOT work in Vercel
-    // serverless. When the handler returns, Vercel terminates the container
-    // before the outbound fetch has landed — observed on run 3 of
-    // verify-autopilot.sh where `stepWaitForChase` ran, advance() moved state
-    // to locking_brief, scheduleAutopilotStep("lockBrief") was issued as
-    // void fetch(), the function returned, Vercel killed the container, the
-    // fetch never reached /api/autopilot-step, and the chain wedged forever.
+    // GOTCHA (2026-04-24, run 11): `after(fetch)` is unreliable on Vercel
+    // when the calling handler returns very quickly. Observed:
+    //   - waitForMax handler ran ~150s → after(fetch) for waitForSizing fired ✓
+    //   - waitForSizing handler ran ~0.2s → after(fetch) for waitForLayout
+    //     did NOT fire ✗ (no POST in logs, chain wedged at waiting_layout)
+    // Hypothesis: short-lived containers get torn down before Vercel
+    // processes the `after()` queue, even though the docs say `after()`
+    // extends container lifetime.
     //
-    // Fix: wrap the fetch in `after()`. `after()` tells Vercel "keep the
-    // container alive until this callback finishes". The callback is a
-    // <1s fetch to an internal route — trivially small budget. The actual
-    // stage work still runs in a FRESH container on the other end of the
-    // hop, so the per-stage 300s budget is preserved. The distinction from
-    // the earlier bug is: we're not using `after()` to run THE STAGE (that
-    // would share the budget), we're using it just to hold the container
-    // long enough for the HOP REQUEST to complete.
-    after(async () => {
-        try {
-            await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${secret}`,
-                },
-                body: JSON.stringify({ projectId, step }),
-                cache: "no-store",
-            })
-        } catch (err) {
+    // Fix: inline-await the fetch with a 2s client-side abort. The target
+    // route runs on a fresh container with full 300s budget; our client
+    // only needs to stay alive long enough for the TCP handshake + tiny
+    // JSON body to flush (<200ms in practice). Once Vercel's edge has the
+    // request, the target handler runs independently of our client socket.
+    // keepalive:true hints the runtime to finish the request even if the
+    // calling context is unwinding.
+    //
+    // Budget impact: +200ms (typically) to 2s (worst case) per stage. The
+    // autopilot stages each have 300s budget — this is negligible.
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 2000)
+    try {
+        await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${secret}`,
+            },
+            body: JSON.stringify({ projectId, step }),
+            cache: "no-store",
+            signal: controller.signal,
+            keepalive: true,
+        })
+        console.info(`[autopilot] hop dispatched: ${step}`)
+    } catch (err) {
+        // AbortError is the expected path — we aborted after 2s to let the
+        // caller return. The target server received the request well before
+        // that and is processing independently.
+        if (err instanceof Error && err.name === "AbortError") {
+            console.info(`[autopilot] hop sent (aborted after 2s): ${step}`)
+        } else {
             console.error(
                 `[autopilot] next stage fetch (${step}) failed:`,
                 err instanceof Error ? err.message : err,
             )
         }
-    })
+    } finally {
+        clearTimeout(timer)
+    }
 }
 
 /**

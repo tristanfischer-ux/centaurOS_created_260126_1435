@@ -580,7 +580,7 @@ export async function renderNextModuleStage(
     //    Fire-and-forget: don't await so the current stage's response can
     //    land without being blocked by the next stage's execution.
     if (remaining) {
-        scheduleNextStageViaHttp(projectId)
+        await scheduleNextStageViaHttp(projectId)
     }
 }
 
@@ -771,7 +771,7 @@ function errMessage(err: unknown): string {
  * self-heal that handled dropped `after()` callbacks pre-P0.1 — no
  * regression in recovery behaviour.
  */
-function scheduleNextStageViaHttp(projectId: string): void {
+async function scheduleNextStageViaHttp(projectId: string): Promise<void> {
     const secret = process.env.FORGE_RENDER_STAGE_SECRET
     if (!secret) {
         // SECURITY: refuse to fire the hop when the secret isn't
@@ -788,29 +788,37 @@ function scheduleNextStageViaHttp(projectId: string): void {
 
     const url = `${getBaseUrl()}/api/render-stage`
 
-    // GOTCHA (2026-04-24): plain `void fetch(...)` does NOT fire in Vercel
-    // serverless. When the handler returns, Vercel terminates the container
-    // before the outbound fetch lands. The hop never reaches the next route
-    // and the chain wedges. `after()` keeps the container alive just long
-    // enough for the <1s hop request itself to complete; the actual stage
-    // work still runs on a fresh container with its own 300s budget. Same
-    // fix applied to scheduleAutopilotStep in forge-v2-autopilot.ts.
-    after(async () => {
-        try {
-            await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${secret}`,
-                },
-                body: JSON.stringify({ projectId }),
-                cache: "no-store",
-            })
-        } catch (err) {
+    // GOTCHA (2026-04-24, run 11): `after(fetch)` was unreliable when the
+    // calling handler returned in <1s — Vercel tore down the container
+    // before the `after()` queue ran the callback. Same root cause as in
+    // scheduleAutopilotStep. Fix: inline-await the fetch with a 2s abort.
+    // The target route gets the request within ~200ms and runs on a fresh
+    // 300s container independently of our client socket.
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 2000)
+    try {
+        await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${secret}`,
+            },
+            body: JSON.stringify({ projectId }),
+            cache: "no-store",
+            signal: controller.signal,
+            keepalive: true,
+        })
+        console.info("[render-all-modules:stage] hop dispatched")
+    } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+            console.info("[render-all-modules:stage] hop sent (aborted after 2s)")
+        } else {
             console.error(
                 "[render-all-modules:stage] next stage fetch failed:",
                 err instanceof Error ? err.message : err,
             )
         }
-    })
+    } finally {
+        clearTimeout(timer)
+    }
 }
