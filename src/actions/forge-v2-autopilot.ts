@@ -686,6 +686,34 @@ async function stepWaitForSizing(projectId: string): Promise<void> {
         )
     }
 
+    // V1 FIX (2026-04-24): inline Fang layout here, in the SAME fresh
+    // container, rather than relying on the waiting_layout hop fire.
+    // Run 15 observation: stepWaitForLayout was dispatched by cron ~16
+    // times over 8 minutes but NEVER wrote a brief.layout pipeline_run
+    // row — the after()-wrapped dispatch was being dropped under cron
+    // load (multiple concurrent after() callbacks from other projects
+    // saturating the container). runFangLayoutBackground itself is fast
+    // (<200ms when tested manually) and depends on dimension_sheet which
+    // sizing just wrote, so running it here is cheap + reliable. The
+    // separate stepWaitForLayout stage stays for the hop path (belt +
+    // braces) — it's idempotent via the 23505 handler.
+    try {
+        const { runFangLayoutBackground } = await import(
+            "@/actions/specialists/run-fang-layout"
+        )
+        await runFangLayoutBackground(
+            projectId,
+            foundryId,
+            null,
+            "auto.sizing-complete",
+        )
+    } catch (err) {
+        console.warn(
+            "[autopilot] inline-layout after sizing threw — continuing:",
+            err instanceof Error ? err.message : err,
+        )
+    }
+
     await advance(projectId, "waiting_sizing", "waiting_layout")
     // P0.1b: HTTP hop — fresh container for Fang spatial layout.
     await scheduleAutopilotStep(projectId, "waitForLayout")

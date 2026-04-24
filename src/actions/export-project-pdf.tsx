@@ -437,6 +437,8 @@ interface SupplierPdf {
     scoreBreakdown: Record<string, unknown> | null
     matchReasons: string[]
     rampRole: string | null
+    websiteUrl: string | null
+    contactEmail: string | null
 }
 
 interface AuditRowPdf {
@@ -1251,9 +1253,41 @@ function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sourc
             {suppliers.map((s, i) => {
                 const sb = s.scoreBreakdown ?? {}
                 const keys = Object.keys(sb).filter((k) => typeof sb[k] === "number")
+                // V1 FIX (2026-04-24, per Tristan PDF review): marketplace_listings
+                // titles are scraped product descriptions ("LiFePo4 19\" Rack-Mount
+                // Lithium iron phosphate battery"), not company names. Derive the
+                // supplier's primary name from the domain portion of website_url
+                // when available — founders can actually reach out to cmxbattery.com
+                // but not to "rack mount lithium iron". Fall back to the raw title
+                // only when no website URL exists.
+                const companyName = (() => {
+                    const url = (s as unknown as { websiteUrl?: string | null }).websiteUrl
+                    if (typeof url === "string" && /^https?:\/\//i.test(url)) {
+                        try {
+                            const host = new URL(url).hostname.replace(/^www\./, "")
+                            return host
+                        } catch {
+                            // fallthrough
+                        }
+                    }
+                    return s.name
+                })()
+                const websiteUrl = (s as unknown as { websiteUrl?: string | null }).websiteUrl
+                const contactEmail = (s as unknown as { contactEmail?: string | null }).contactEmail
                 return (
                     <View key={i} style={{ marginBottom: 14 }} wrap={false}>
-                        <Text style={{ fontWeight: "bold", fontSize: 12 }}>{s.name}</Text>
+                        <Text style={{ fontWeight: "bold", fontSize: 12 }}>{companyName}</Text>
+                        <Text style={[styles.small, { fontStyle: "italic", color: MUTED }]}>
+                            {s.name}
+                        </Text>
+                        {websiteUrl && (
+                            <Text style={[styles.small, { color: "#2563eb" }]}>
+                                {websiteUrl}
+                            </Text>
+                        )}
+                        {contactEmail && !contactEmail.toLowerCase().includes("unknown") && (
+                            <Text style={styles.small}>Contact: {contactEmail}</Text>
+                        )}
                         <Text style={styles.small}>
                             {s.hq ?? "HQ not declared"}
                             {s.rampRole ? ` · ramp role ${s.rampRole}` : ""}
@@ -1361,13 +1395,22 @@ function SizingOptimisationSection({
         })
     }
 
+    // V1 FIX (2026-04-24, per Tristan PDF review): different sizing domains
+    // use different optimisation strategies. Vertical-farm does a trial
+    // sweep over (tiers × canopy_m2). Battery-energy-storage + aerospace
+    // do direct deterministic calculation (no sweep) because the sizing
+    // is a closed-form solve on capacity + voltage + rack count. Prior
+    // PDF showed "Forge ran a 0-trial sweep" for BESS which is misleading.
+    // Branch the caption by whether a sweep actually occurred.
+    const trialCount = (opt?.trials ?? []).length
+    const captionText = trialCount > 0
+        ? `Forge ran a ${trialCount}-trial sweep to find the best fit for this envelope. Coefficient library: ${sheet.rules_domain} v${sheet.rules_version}.`
+        : `Forge applied the ${sheet.rules_domain} v${sheet.rules_version} rules library — a closed-form deterministic solve (no trial sweep needed for this domain). Final target below was computed directly from the brief's capacity + envelope constraints.`
+
     return (
         <View>
             <Text style={styles.h2}>{sectionNumber}. Sizing optimisation</Text>
-            <Text style={styles.muted}>
-                Forge ran a {(opt?.trials ?? []).length}-trial sweep to find the best fit for this envelope.
-                Coefficient library: {sheet.rules_domain} v{sheet.rules_version}.
-            </Text>
+            <Text style={styles.muted}>{captionText}</Text>
             <View style={{ marginBottom: 10 }}>
                 <Text style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>Envelope</Text>
                 <Text style={{ fontSize: 10, marginBottom: 6 }}>{envelopeLine}</Text>
@@ -2469,6 +2512,8 @@ async function exportProjectPdfInternal(
             .filter((x): x is string => typeof x === "string" && x.length > 0)
 
         const hqById = new Map<string, string | null>()
+        const websiteById = new Map<string, string | null>()
+        const contactEmailById = new Map<string, string | null>()
         if (supplierIds.length > 0) {
             const { data: globals } = await admin
                 .from("suppliers")
@@ -2479,6 +2524,24 @@ async function exportProjectPdfInternal(
                     const info = g.company_info as { hq?: unknown } | null
                     const hq = info && typeof info.hq === "string" ? info.hq : null
                     hqById.set(g.id as string, hq)
+                }
+            }
+            // V1 FIX (2026-04-24): marketplace_listings.title is often a product
+            // description scraped from a listing page ("LiFePo4 19\" Rack-Mount
+            // battery"), not a company name. Pull website_url + contact_email
+            // from the listing row so the PDF can render a clickable domain
+            // + outreach email instead of the opaque product-title name.
+            const { data: listingsMeta } = await admin
+                .from("marketplace_listings")
+                .select("id, website_url, contact_email")
+                .in("id", supplierIds)
+            if (listingsMeta) {
+                for (const l of listingsMeta) {
+                    websiteById.set(l.id as string, (l.website_url as string | null) ?? null)
+                    contactEmailById.set(
+                        l.id as string,
+                        (l.contact_email as string | null) ?? null,
+                    )
                 }
             }
         }
@@ -2499,6 +2562,8 @@ async function exportProjectPdfInternal(
                 ? (r.all_match_reasons as string[])
                 : [],
             rampRole: typeof r.ramp_role === "string" ? r.ramp_role : null,
+            websiteUrl: websiteById.get(r.supplier_id as string) ?? null,
+            contactEmail: contactEmailById.get(r.supplier_id as string) ?? null,
         }))
 
         // Source-attribution counts — so the PDF can tell the reader
