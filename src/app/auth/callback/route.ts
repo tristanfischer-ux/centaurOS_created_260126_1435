@@ -157,13 +157,15 @@ export async function GET(request: Request) {
       // DECISION 2026-04-16: founder-first architecture. Everyone lands on /today.
       // Supplier / fractional-executive are now opt-in flags layered on the founder
       // account, not distinct routing paths. `account_type === 'supplier'` branch removed.
-      const hasExplicitNext = next !== '/today' && next.startsWith('/')
+      // 2026-04-24: post-pivot default landing is /agents (Brainstorming),
+      // not /today. /today route stays mounted for deep links.
+      const hasExplicitNext = next !== '/agents' && next !== '/today' && next.startsWith('/')
       let redirectPath: string
 
       if (hasExplicitNext) {
         redirectPath = next
       } else if (profile.role === 'Founder' || profile.role === 'Executive' || profile.role === 'Apprentice') {
-        redirectPath = '/today'
+        redirectPath = '/agents'
       } else {
         // Check if user has marketplace orders (buyer)
         const { count: orderCount } = await supabase
@@ -174,7 +176,7 @@ export async function GET(request: Request) {
         if (orderCount && orderCount > 0) {
           redirectPath = '/buyer'
         } else {
-          redirectPath = '/today'
+          redirectPath = '/agents'
         }
       }
 

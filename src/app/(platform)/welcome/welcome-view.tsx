@@ -58,7 +58,9 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
     const handleContinue = (): void => {
         startTransition(async () => {
             await markWelcomeComplete()
-            router.push("/today")
+            // DECISION 2026-04-24: post-pivot landing is /agents (Brainstorming).
+            // Full Welcome-page rebuild in Phase B will update labels + CTA copy.
+            router.push("/agents")
         })
     }
 

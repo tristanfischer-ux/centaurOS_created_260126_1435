@@ -142,12 +142,14 @@ export async function login(formData: FormData) {
             redirect('/workspace-picker')
         }
 
-        // Single foundry or active foundry set - go to Today page
+        // Single foundry or active foundry set — go to Brainstorming (/agents)
+        // as the post-pivot default landing (2026-04-24). Today route stays
+        // mounted for deep links but is no longer the primary entry point.
         if (foundryCount >= 1) {
-            redirect('/today')
+            redirect('/agents')
         }
     }
 
     // Default: users without foundry memberships
-    redirect('/today')
+    redirect('/agents')
 }

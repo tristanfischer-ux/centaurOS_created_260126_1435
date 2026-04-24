@@ -43,9 +43,10 @@ export default async function LoginPage({
             redirect(redirectTo)
         }
 
-        // DECISION 2026-04-16: founder-first architecture. Everyone lands on /today.
+        // DECISION 2026-04-24: post-pivot landing is Brainstorming (/agents).
+        // /today stays mounted for deep links but Today-as-default was dropped.
         // Supplier / fractional-executive are opt-in flags, not routing paths.
-        redirect('/today')
+        redirect('/agents')
     }
 
     return (

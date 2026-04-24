@@ -86,8 +86,9 @@ export async function setupNewUser({
     console.warn("[setupNewUser] Profile already exists for user, skipping:", userId);
     return {
       foundryId: existingProfile.foundry_id || "forge-guild",
-      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
-      redirectPath: "/today",
+      // DECISION 2026-04-24: post-pivot landing is /agents (Brainstorming),
+      // not /today. /today route stays mounted for deep links.
+      redirectPath: "/agents",
     };
   }
 
@@ -192,7 +193,7 @@ export async function setupNewUser({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries table type constraints require cast
         await (supabase as any).from("foundries").delete().eq("id", foundryId);
       }
-      return { foundryId: "forge-guild", redirectPath: "/today" };
+      return { foundryId: "forge-guild", redirectPath: "/agents" };
     }
 
     // Step 3: Set the foundry owner now that profile exists
@@ -284,8 +285,8 @@ export async function setupNewUser({
 
     if (profileError) {
       console.error("[setupNewUser] Profile creation failed:", profileError.message);
-      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
-      return { foundryId, redirectPath: "/today" };
+      // DECISION 2026-04-24: post-pivot landing is /agents (Brainstorming).
+      return { foundryId, redirectPath: "/agents" };
     }
 
     // Set owner on sandbox foundries (same circular FK pattern as founders)
@@ -437,10 +438,11 @@ export async function setupNewUser({
   }
 
   // DECISION 2026-04-17: every brand-new user lands on /welcome — a guided
-  // tour from Tristan covering each section and the 13 specialists. The
-  // Welcome page's primary CTA marks onboarding_data.has_completed_welcome
-  // and routes to /today. Existing-profile and error-fallback branches in
-  // this file keep returning "/today" so only first-time signups hit the tour.
+  // tour from Tristan covering each section and the specialists. The Welcome
+  // page's primary CTA marks onboarding_data.has_completed_welcome and routes
+  // to /agents (the Brainstorming page — post-pivot default landing as of
+  // 2026-04-24). Existing-profile and error-fallback branches in this file
+  // return "/agents" so only first-time signups hit the tour.
   // Supplier / fractional-executive are opt-in flags handled during
   // onboarding, not routing paths.
   return { foundryId, redirectPath: "/welcome" };
