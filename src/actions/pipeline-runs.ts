@@ -32,6 +32,32 @@ export async function startPipelineRun(
     .select("id")
     .single()
   if (error || !data) {
+    // 23505 = Postgres unique_violation. With the partial unique index
+    // pipeline_runs_no_duplicate_in_flight (migration 20260425020000), this
+    // means another caller just won the race to start the same
+    // (project_id, specialist_id, stage) triple while status IN
+    // ('queued','running'). Look up the existing in-flight row + return
+    // its id so the caller treats this attempt as an idempotent no-op
+    // success. See RED-TEAM-2-STATE-MACHINE.md §3 (BESS dc8c1def twin-BOM
+    // incident 2026-04-23 17:22:07) for the motivating failure mode.
+    if (error?.code === "23505") {
+      const { data: existing } = await db
+        .from("pipeline_runs")
+        .select("id")
+        .eq("project_id", input.project_id)
+        .eq("specialist_id", input.specialist_id)
+        .eq("stage", input.stage)
+        .in("status", ["queued", "running"])
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (existing) {
+        console.info(
+          `[startPipelineRun] duplicate-in-flight detected for ${input.specialist_id}:${input.stage} on project ${input.project_id}; reusing run ${existing.id}`
+        )
+        return { runId: existing.id }
+      }
+    }
     throw new Error(`startPipelineRun failed: ${error?.message}`)
   }
   return { runId: data.id }
