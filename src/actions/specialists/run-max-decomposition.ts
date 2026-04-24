@@ -54,7 +54,7 @@
  */
 
 import { skeletonDecompose, expandModuleDetail } from "@/actions/cad-lab"
-import { saveCadLabModules } from "@/actions/cad-lab-projects"
+import { saveCadLabModules, saveCadLabModulesBackground } from "@/actions/cad-lab-projects"
 import {
     completePipelineRun,
     failPipelineRun,
@@ -426,12 +426,15 @@ async function runMaxDecompositionInternal(
                 buildCadLabModule(sk, expansionById.get(sk.id)),
             )
 
-            // 8. Persist modules. saveCadLabModules takes a JSON string (see
-            //    its own docstring — avoids React Flight depth blowup).
-            const saveResult = await saveCadLabModules(
-                projectId,
-                JSON.stringify(modules),
-            )
+            // 8. Persist modules. Use the Background variant so cookies-less
+            //    autopilot hop contexts can write — saveCadLabModules (withAuth)
+            //    returns "Unauthorized" here and fails the whole run despite
+            //    skeleton+expansion having actually completed (observed run 8
+            //    2026-04-24). The interactive path (not routed here) keeps the
+            //    withAuth variant for UI callers.
+            const saveResult = userId != null || user.id != null
+                ? await saveCadLabModulesBackground(projectId, JSON.stringify(modules))
+                : await saveCadLabModules(projectId, JSON.stringify(modules))
             if ("error" in saveResult) {
                 await failPipelineRun(runId, "SAVE_FAILED", saveResult.error, {
                     input_tokens: tokensIn,

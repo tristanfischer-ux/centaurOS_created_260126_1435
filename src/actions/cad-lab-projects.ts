@@ -16,6 +16,7 @@
 import { after } from "next/server"
 
 import { withAuth } from "@/lib/server-action-utils"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
 import { isIllustrationStyle, type IllustrationStyle } from "@/lib/cad-lab/illustration-styles"
@@ -630,6 +631,46 @@ export async function saveCadLabModules(
 
     return { success: true as const }
   })
+}
+
+/**
+ * Background variant — skips `withAuth` so it can be called from autopilot
+ * hop contexts where cookies aren't available. Caller has already resolved
+ * foundry ownership; we use the admin client directly for the write.
+ *
+ * GOTCHA: observed 2026-04-24 run 8 — Max's `runMaxDecompositionInternal`
+ * called `saveCadLabModules` which used withAuth → cookies missing in the
+ * /api/autopilot-step container → returned "Unauthorized" → Max's
+ * pipeline_run marked failed despite skeleton + expansion having actually
+ * completed successfully (9 modules in 23s, expansions in ~85s, wasted).
+ */
+export async function saveCadLabModulesBackground(
+  projectId: string,
+  modulesJson: string,
+): Promise<{ success: true } | { error: string }> {
+  if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+
+  let modules: unknown
+  try {
+    modules = JSON.parse(modulesJson)
+  } catch {
+    return { error: "Invalid modules JSON" }
+  }
+  if (!Array.isArray(modules)) return { error: "Modules must be an array" }
+  if (modules.length === 0) return { error: "At least one module required" }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("cad_lab_projects")
+    .update({ modules: modules as Json })
+    .eq("id", projectId)
+
+  if (error) {
+    console.error("[THE-FORGE-PROJECTS] saveCadLabModulesBackground failed:", error.message)
+    return { error: `Failed to save modules: ${error.message}` }
+  }
+
+  return { success: true as const }
 }
 
 // ─── Save Product Overview ────────────────────────────────────────────
