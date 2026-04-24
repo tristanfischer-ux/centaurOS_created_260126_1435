@@ -602,10 +602,20 @@ export async function matchCadLabModuleSuppliers(
   // Nightshift (script 35) writes certifications, materials, industries, key_equipment
   // as top-level columns, NOT inside attributes. Without these columns the scoring
   // engine can't see enrichment data, causing weak process/material matches.
+  //
+  // SHIP-BLOCKER FIX (2026-04-24): `match_marketplace_listings` RPC returns
+  // results across ALL categories by embedding similarity alone. VC funds
+  // and PE firms (category='Finance') with prospectus text mentioning
+  // "invests in battery storage" routinely beat actual manufacturers on
+  // semantic score and populate the supplier shortlist with investors.
+  // Observed in 2026-04-23 BESS PDF where 11/11 "suppliers" were funds.
+  // Filter category to Products/Services at the candidate-fetch step so
+  // Finance/People/AI rows never enter the scoring loop.
   const { data: listings } = await supabase
     .from("marketplace_listings")
     .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, city, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, data_quality_score")
     .in("id", [...candidateIds])
+    .in("category", ["Products", "Services"])
 
   const matches: CadLabSupplierMatch[] = []
 
