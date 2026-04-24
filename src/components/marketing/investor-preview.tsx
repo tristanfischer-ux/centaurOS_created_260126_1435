@@ -1,95 +1,25 @@
 /**
  * @file investor-preview.tsx
  *
- * @description Interactive investor search preview for the marketing homepage.
- * Visitors can search/describe their startup and see anonymized results proving
- * matching investors exist, then sign up to reveal details.
+ * @description Investor intelligence preview section on the marketing homepage.
+ * Header + stats row + sign-up CTA. The interactive search box that used to
+ * live here was removed 2026-04-24 — the authenticated /investors search is
+ * the canonical surface, and a second broken search on the public page was a
+ * liability (marketing promised a capability the logged-out user could not
+ * actually validate).
  *
- * @security Only displays ANONYMIZED data — no firm names, no contact info,
- * no identifying information. Designed to drive signup conversion.
+ * @security Public — no auth required, fetches only the total investor count
+ * for the stats display via getPublicInvestorPreview().
  */
 
 'use client'
 
-import { useCallback, useRef, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {
-  Search,
-  Lock,
-  ArrowRight,
-  X,
-  CheckCircle2,
-} from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { AnimatedSection, StaggerContainer } from '@/components/marketing/animations'
-import { MatchPillarBars } from '@/app/(platform)/investors/components/MatchPillarBars'
-import { getPublicInvestorPreview, searchPublicInvestors } from '@/actions/public-investor-preview'
-import type {
-  PublicInvestorPreview,
-  AnonymizedInvestorResult,
-  InvestorSearchResult,
-} from '@/actions/public-investor-preview'
-import { useEffect } from 'react'
-
-// ─── Example search chips ────────────────────────────────────────────────────
-
-const EXAMPLE_SEARCHES = [
-  'Deep tech seed',
-  'Consumer hardware Series A',
-  'Medical devices pre-seed',
-  'UK manufacturing',
-]
-
-// ─── Signup URL builder ─────────────────────────────────────────────────────
-
-// INTENT: Extract stage/sector from the search query to pre-populate the /join form.
-// Duplicated from server action keywords because "use server" files can only export async functions.
-
-const STAGE_MAP: Record<string, string> = {
-  'pre-seed': 'Pre-Seed', 'preseed': 'Pre-Seed', 'seed': 'Seed',
-  'series-a': 'Series A', 'series a': 'Series A', 'series-b': 'Series B',
-  'series b': 'Series B', 'growth': 'Growth', 'early': 'Early Stage',
-}
-
-const SECTOR_LIST = [
-  'hardware', 'software', 'saas', 'fintech', 'healthtech', 'medtech',
-  'biotech', 'cleantech', 'climate', 'deeptech', 'deep tech', 'robotics',
-  'consumer', 'electronics', 'manufacturing', 'medical', 'devices', 'iot',
-  'aerospace', 'space', 'automotive', 'defence',
-]
-
-function buildSignupUrl(searchQuery?: string): string {
-  const params = new URLSearchParams()
-
-  if (searchQuery) {
-    const lower = searchQuery.toLowerCase()
-
-    // Extract stage
-    for (const [keyword, stage] of Object.entries(STAGE_MAP)) {
-      if (lower.includes(keyword)) {
-        params.set('stage', stage)
-        break
-      }
-    }
-
-    // Extract sectors as industry
-    const matched: string[] = []
-    for (const sector of SECTOR_LIST) {
-      if (lower.includes(sector)) {
-        matched.push(sector.charAt(0).toUpperCase() + sector.slice(1))
-      }
-    }
-    if (matched.length > 0) {
-      params.set('industry', matched.slice(0, 2).join(', '))
-    }
-  }
-
-  const qs = params.toString()
-  return qs ? `/join?${qs}` : '/join'
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+import { ArrowRight } from 'lucide-react'
+import { AnimatedSection } from '@/components/marketing/animations'
+import { getPublicInvestorPreview } from '@/actions/public-investor-preview'
+import type { PublicInvestorPreview } from '@/actions/public-investor-preview'
 
 function formatNumber(n: number): string {
   if (n >= 10000) return '10K+'
@@ -97,131 +27,10 @@ function formatNumber(n: number): string {
   return `${n}+`
 }
 
-// ─── Skeleton Card ───────────────────────────────────────────────────────────
-
-function SkeletonCard() {
-  return (
-    <Card className="animate-pulse">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="h-5 w-32 bg-muted rounded" />
-          <div className="h-4 w-16 bg-muted rounded" />
-        </div>
-        <div className="h-4 w-24 bg-muted rounded" />
-        <div className="flex gap-2">
-          <div className="h-5 w-16 bg-muted rounded-full" />
-          <div className="h-5 w-20 bg-muted rounded-full" />
-        </div>
-        <div className="flex gap-2">
-          <div className="h-5 w-14 bg-muted rounded-full" />
-          <div className="h-5 w-18 bg-muted rounded-full" />
-          <div className="h-5 w-12 bg-muted rounded-full" />
-        </div>
-        <div className="h-4 w-28 bg-muted rounded" />
-      </CardContent>
-    </Card>
-  )
-}
-
-// ─── Anonymized Result Card ──────────────────────────────────────────────────
-
-function AnonymizedCard({ result, signupUrl }: { result: AnonymizedInvestorResult; signupUrl: string }) {
-  return (
-    <Card className="transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99]">
-      <CardContent className="p-4 space-y-3">
-        {/* Header: placeholder name + composite % */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-foreground">{result.placeholder}</span>
-              {result.firm_type && result.firm_type !== result.subcategory && (
-                <Badge variant="outline" size="sm" className="text-[10px]">
-                  {result.firm_type}
-                </Badge>
-              )}
-              <Badge variant="secondary" size="sm" className="text-[10px]">
-                {result.subcategory}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {[
-                result.geo_summary,
-                result.cheque_range_label,
-                result.stage_focus.slice(0, 3).join(', '),
-              ].filter(Boolean).join(' · ')}
-            </p>
-          </div>
-
-          <div className="flex items-baseline gap-1 shrink-0">
-            <span className="text-xl font-bold text-international-orange tabular-nums">
-              {result.composite}%
-            </span>
-            <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
-              match
-            </span>
-          </div>
-        </div>
-
-        {/* 6 pillar bars — exact same component the authenticated For You tab uses */}
-        <MatchPillarBars pillars={result.pillars} hideZeroValues />
-
-        {/* Thesis excerpt — single anonymous-flavour sentence */}
-        {result.thesis_excerpt && (
-          <p className="text-sm text-foreground/80 leading-snug line-clamp-2">
-            {result.thesis_excerpt}
-          </p>
-        )}
-
-        {/* Sectors + active flag */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {result.sectors.map((sector) => (
-              <span
-                key={sector}
-                className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
-              >
-                {sector}
-              </span>
-            ))}
-          </div>
-          {result.is_active_deploying && (
-            <span className="flex items-center gap-0.5 text-success shrink-0">
-              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-              <span className="text-[9px] font-semibold uppercase tracking-wide">Active</span>
-            </span>
-          )}
-        </div>
-
-        {/* Lock CTA */}
-        <div className="pt-2 border-t border-border">
-          <Link
-            href={signupUrl}
-            className="flex items-center gap-1.5 text-xs text-international-orange font-medium hover:underline"
-          >
-            <Lock className="h-3 w-3" />
-            Sign up free to see this investor
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-
-// ─── Main Section ────────────────────────────────────────────────────────────
-
 export function InvestorPreviewSection() {
   const [preview, setPreview] = useState<PublicInvestorPreview | null>(null)
-  const [searchResult, setSearchResult] = useState<InvestorSearchResult | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeQuery, setActiveQuery] = useState('')
-  const signupUrl = buildSignupUrl(activeQuery || undefined)
   const [loading, setLoading] = useState(true)
-  const [isPending, startTransition] = useTransition()
-  const inputRef = useRef<HTMLInputElement>(null)
 
-  // Load default preview on mount
   useEffect(() => {
     getPublicInvestorPreview()
       .then(setPreview)
@@ -231,50 +40,13 @@ export function InvestorPreviewSection() {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleSearch = useCallback((query: string) => {
-    const trimmed = query.trim()
-    if (!trimmed || trimmed.length < 2) return
+  if (loading || !preview) return null
 
-    setActiveQuery(trimmed)
-    startTransition(async () => {
-      try {
-        const result = await searchPublicInvestors(trimmed)
-        setSearchResult(result)
-      } catch {
-        console.error('[InvestorPreview] Search failed')
-        setSearchResult({ results: [], totalMatches: 0 })
-      }
-    })
-  }, [])
-
-  const handleReset = useCallback(() => {
-    setSearchQuery('')
-    setActiveQuery('')
-    setSearchResult(null)
-    inputRef.current?.focus()
-  }, [])
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSearch(searchQuery)
-    }
-  }, [handleSearch, searchQuery])
-
-  const handleChipClick = useCallback((chip: string) => {
-    setSearchQuery(chip)
-    handleSearch(chip)
-  }, [handleSearch])
-
-  // Don't render if no data and not searching
-  if (loading || (!preview && !searchResult)) return null
-
-  const totalCount = preview?.totalCount ?? 0
-  const hasSearched = !!activeQuery && !!searchResult
+  const totalCount = preview.totalCount ?? 0
 
   return (
     <section id="investors" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Header */}
         <AnimatedSection className="text-center mb-8 sm:mb-10">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Investor Intelligence
@@ -288,7 +60,6 @@ export function InvestorPreviewSection() {
           </p>
         </AnimatedSection>
 
-        {/* Stats row */}
         <AnimatedSection className="grid grid-cols-3 gap-3 sm:gap-6 max-w-3xl mx-auto mb-10 sm:mb-12 md:mb-16">
           {[
             { value: formatNumber(totalCount), label: 'Investors' },
@@ -302,133 +73,9 @@ export function InvestorPreviewSection() {
           ))}
         </AnimatedSection>
 
-        {/* Search box */}
-        <AnimatedSection className="max-w-2xl mx-auto mb-8 sm:mb-10 overflow-hidden">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="e.g. pre-seed hardware startup"
-                className="w-full h-11 pl-9 pr-9 rounded-lg border border-input bg-background text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange transition-colors"
-                aria-label="Describe your startup to find matching investors"
-              />
-              {searchQuery && (
-                <button
-                  onClick={handleReset}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Clear search"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={() => handleSearch(searchQuery)}
-              disabled={isPending || searchQuery.trim().length < 2}
-              className="h-11 px-5 rounded-lg bg-international-orange hover:bg-international-orange-hover disabled:opacity-50 text-white font-semibold text-sm transition-colors w-full sm:w-auto sm:shrink-0"
-            >
-              Search
-            </button>
-          </div>
-
-          {/* Example chips (only shown before search) */}
-          {!hasSearched && (
-            <div className="flex flex-wrap gap-2 mt-4 justify-center max-w-full">
-              {EXAMPLE_SEARCHES.map((chip) => (
-                <button
-                  key={chip}
-                  onClick={() => handleChipClick(chip)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-international-orange/40 transition-colors"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-          )}
-        </AnimatedSection>
-
-        {/* Trust bar removed — "99+ actively deploying" looks small against 7,800 total,
-            and the keyword-matching label was unclear. Numbers above carry the weight. */}
-
-        {/* Loading state */}
-        {isPending && (
-          <div className="max-w-2xl mx-auto space-y-4 mb-10">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        )}
-
-        {/* Search results */}
-        {hasSearched && !isPending && (
-          <div className="max-w-2xl mx-auto mb-10">
-            {/* Active query badge */}
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="brand" size="sm">
-                &ldquo;{activeQuery}&rdquo;
-              </Badge>
-              <button
-                onClick={handleReset}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-
-            {searchResult.results.length > 0 ? (
-              <>
-                {/* Results header */}
-                <p className="text-lg font-bold text-foreground mb-4">
-                  Found {searchResult.totalMatches} matching investor{searchResult.totalMatches !== 1 ? 's' : ''}
-                </p>
-
-                {/* Result cards */}
-                <StaggerContainer className="space-y-4">
-                  {searchResult.results.map((result) => (
-                    <AnonymizedCard key={result.placeholder} result={result} signupUrl={signupUrl} />
-                  ))}
-                </StaggerContainer>
-
-                {/* Below cards CTA */}
-                {searchResult.totalMatches > searchResult.results.length && (
-                  <p className="text-sm text-muted-foreground mt-6 text-center">
-                    Showing {searchResult.results.length} of {searchResult.totalMatches} results.{' '}
-                    <Link
-                      href={signupUrl}
-                      className="text-international-orange font-medium hover:underline"
-                    >
-                      Sign up free to browse all {searchResult.totalMatches} investors and get matched.
-                    </Link>
-                  </p>
-                )}
-              </>
-            ) : (
-              /* Zero results */
-              <div className="text-center py-8">
-                <p className="text-muted-foreground text-sm">
-                  No exact matches — but with {formatNumber(totalCount)} investors, we likely have someone.
-                </p>
-                <Link
-                  href={signupUrl}
-                  className="inline-flex items-center gap-1 text-international-orange font-medium text-sm mt-2 hover:underline"
-                >
-                  Sign up to search the full directory
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* CTA */}
         <AnimatedSection className="text-center">
           <Link
-            href={signupUrl}
+            href="/join"
             className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white font-bold px-8 py-3.5 rounded-lg transition-colors text-sm sm:text-base"
           >
             Get Started Free — See All Investors
