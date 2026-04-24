@@ -296,10 +296,12 @@ export const searchPublicInvestors = unstable_cache(
       return { results: [], totalMatches: 0 }
     }
 
-    // 2. Paginated RPC fetch — same pattern as src/actions/investors.ts
-    //    (8 × 1000 covers the full 7,800-row Finance set).
+    // 2. Paginated RPC fetch — same pattern as src/actions/investors.ts.
+    //    GOTCHA: 8 × 1000-row pgvector scans triggered Postgres statement_timeout
+    //    (57014) on production 2026-04-24. Public preview only displays the top
+    //    ~12 anonymized cards; 2000 candidates is ample recall.
     const PAGE = 1000
-    const PAGES = 8
+    const PAGES = 2
     const embJson = JSON.stringify(queryEmbedding) as unknown as string
     const pageResults = await Promise.all(
       Array.from({ length: PAGES }, (_, i) =>

@@ -747,8 +747,13 @@ export async function searchInvestors(
       // the Forge Capital Dashboard's 5,961 matches we paginate the RPC:
       // 6 parallel calls of 1000 each, covers the ~5,565 embedded Finance
       // rows. Seq scan is ~50ms per call so parallel latency is acceptable.
+      // GOTCHA: 8 parallel pgvector cosine scans × 1000 rows × 1536 dims caused
+      // Postgres statement_timeout (57014) on production 2026-04-24. The dashboard
+      // displays 24 cards from the client-ranked composite — top 2000 candidates is
+      // plenty of recall and stays inside the timeout. Increase only if dashboard
+      // ranking demonstrably starves on the long tail.
       const PAGE = 1000
-      const PAGES = 8 // 8 × 1000 = 8000, safely covers current 7,792 embedded rows
+      const PAGES = 2
       const embJson = JSON.stringify(queryEmbedding) as unknown as string
       const pageResults = await Promise.all(
         Array.from({ length: PAGES }, (_, i) =>
