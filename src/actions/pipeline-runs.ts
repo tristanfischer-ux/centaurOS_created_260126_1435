@@ -41,10 +41,19 @@ export async function startPipelineRun(
     // success. See RED-TEAM-2-STATE-MACHINE.md §3 (BESS dc8c1def twin-BOM
     // incident 2026-04-23 17:22:07) for the motivating failure mode.
     if (error?.code === "23505") {
-      // First pass: look for the in-flight winner (queued/running).
+      // First pass: look for the in-flight winner (queued/running), BUT
+      // treat rows that have been running >5min as stale-abandoned. Vercel
+      // can kill containers mid-flight and leave the pipeline_runs row
+      // stuck at 'running' forever — if a new caller 23505s on such a
+      // zombie, reusing its runId means the chain wedges permanently.
+      // Mark the zombie failed and INSERT fresh. Observed 2026-04-24
+      // run 13: Finn cost.estimate for project 3e6c39b1 died with no
+      // logs at the 300s timeout, row stayed 'running', cron's repeated
+      // dispatches kept reusing the dead runId and never recovered.
+      const STALE_RUNNING_MS = 5 * 60 * 1000
       const { data: inFlight } = await db
         .from("pipeline_runs")
-        .select("id")
+        .select("id, started_at")
         .eq("project_id", input.project_id)
         .eq("specialist_id", input.specialist_id)
         .eq("stage", input.stage)
@@ -53,10 +62,56 @@ export async function startPipelineRun(
         .limit(1)
         .maybeSingle()
       if (inFlight) {
-        console.info(
-          `[startPipelineRun] duplicate-in-flight detected for ${input.specialist_id}:${input.stage} on project ${input.project_id}; reusing run ${inFlight.id}`
-        )
-        return { runId: inFlight.id }
+        const startedMs = inFlight.started_at
+          ? new Date(inFlight.started_at).getTime()
+          : Date.now()
+        const ageMs = Date.now() - startedMs
+        if (ageMs > STALE_RUNNING_MS) {
+          // Zombie: container died mid-flight. Fail it out so the partial
+          // unique index releases the (project, specialist, stage) triple,
+          // then retry the insert once. If the retry also hits 23505, fall
+          // through to the original behaviour (shouldn't happen since we
+          // just freed the slot).
+          console.warn(
+            `[startPipelineRun] stale-running row ${inFlight.id} (${Math.round(ageMs / 1000)}s old) ` +
+              `for ${input.specialist_id}:${input.stage} on project ${input.project_id} — marking failed and retrying insert`,
+          )
+          await db
+            .from("pipeline_runs")
+            .update({
+              status: "failed",
+              error_code: "STALE_ABANDONED",
+              error_message: `Run sat at 'running' for ${Math.round(ageMs / 1000)}s with no completion — container presumed killed. Auto-recovered by startPipelineRun.`,
+              finished_at: new Date().toISOString(),
+            })
+            .eq("id", inFlight.id)
+          const retry = await db
+            .from("pipeline_runs")
+            .insert({
+              ...input,
+              status: "running",
+              started_at: new Date().toISOString(),
+            })
+            .select("id")
+            .single()
+          if (retry.data) {
+            console.info(
+              `[startPipelineRun] stale-recovery insert succeeded, new runId=${retry.data.id}`,
+            )
+            return { runId: retry.data.id }
+          }
+          console.error(
+            `[startPipelineRun] stale-recovery insert failed:`,
+            retry.error?.message,
+          )
+          // Fall through to the normal in-flight handler below — safest
+          // if the retry hit a different error.
+        } else {
+          console.info(
+            `[startPipelineRun] duplicate-in-flight detected for ${input.specialist_id}:${input.stage} on project ${input.project_id}; reusing run ${inFlight.id}`,
+          )
+          return { runId: inFlight.id }
+        }
       }
       // Fast-stage race: on sub-100ms stages (sizing skip, layout skip)
       // the winner can already be `done` by the time we do this lookup.
