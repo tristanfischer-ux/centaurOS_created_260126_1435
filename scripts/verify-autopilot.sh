@@ -549,6 +549,34 @@ wait_for_stage() {
 
 log "=== Stage 3: polling pipeline stages ==="
 
+# Manual cron ticker — Vercel cron only fires on Production; on a preview
+# we drive /api/cron/autopilot-tick ourselves every 30s so the stage machine
+# advances even if the optimistic after(fetch) hops silently drop. The tick
+# endpoint wraps each dispatch in after() and returns in <1s, so we can
+# tick frequently without backpressure.
+CRON_SECRET_VAL="${CRON_SECRET:-}"
+if [ -z "$CRON_SECRET_VAL" ] && [ -f "$REPO_ROOT/.env.local" ]; then
+    CRON_SECRET_VAL=$(grep -E '^CRON_SECRET=' "$REPO_ROOT/.env.local" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "")
+fi
+if [ -n "$CRON_SECRET_VAL" ]; then
+    log "starting background cron ticker (every 30s while polling)"
+    (
+        while sleep 30; do
+            curl -s -o /dev/null -w "[cron-tick] HTTP %{http_code}\n" --max-time 10 \
+                -H "Authorization: Bearer $CRON_SECRET_VAL" \
+                "${PREVIEW_URL}/api/cron/autopilot-tick" >>"$LOG_FILE" 2>&1 || true
+        done
+    ) &
+    CRON_TICKER_PID=$!
+    trap "kill $CRON_TICKER_PID 2>/dev/null || true" EXIT
+    # Fire one tick immediately so we don't wait 30s for the first.
+    curl -s -o /dev/null -w "[cron-tick] HTTP %{http_code}\n" --max-time 10 \
+        -H "Authorization: Bearer $CRON_SECRET_VAL" \
+        "${PREVIEW_URL}/api/cron/autopilot-tick" >>"$LOG_FILE" 2>&1 &
+else
+    log "WARN: CRON_SECRET not found — cron ticker disabled (relying on hops only)"
+fi
+
 # 3.1 Chase: research.report >= 1500 chars.
 wait_for_stage \
     "research.report filled (>=1500 chars)" \

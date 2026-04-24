@@ -37,7 +37,7 @@
  * - Vercel cron config: vercel.json
  */
 
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyCronSecret } from "@/lib/security/cron-auth"
@@ -126,19 +126,31 @@ async function tickOnce(): Promise<{
             continue
         }
 
-        try {
-            await dispatchAutopilotStep(project.id, step)
-            dispatched++
-            details.push({ projectId: project.id, stage: state.stage, ok: true })
-        } catch (err) {
-            failed++
-            details.push({
-                projectId: project.id,
-                stage: state.stage,
-                ok: false,
-                err: err instanceof Error ? err.message : String(err),
-            })
-        }
+        // Fire-and-forget dispatch via after(): stepXxx runners internally
+        // call waitForStage which polls for up to 240s. If cron awaited
+        // each dispatch synchronously, one stuck project would blow the
+        // whole tick's 300s budget. after() keeps the Vercel container
+        // alive past the response so the stage runner's active polling
+        // work continues, while cron itself returns in <1s per project.
+        //
+        // Caveat: after() has been unreliable for FETCH hops (empty-body,
+        // tiny-flush-window case). But for long-running active work like
+        // waitForStage's 5s interval polling, the container stays busy
+        // and after() fires reliably. Not a fetch-hop situation.
+        const pid = project.id
+        const stageSlug = state.stage
+        after(async () => {
+            try {
+                await dispatchAutopilotStep(pid, step)
+            } catch (err) {
+                console.error(
+                    `[autopilot-tick] dispatch ${step} for ${pid} (stage=${stageSlug}) threw:`,
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        })
+        dispatched++
+        details.push({ projectId: project.id, stage: state.stage, ok: true })
     }
 
     return { dispatched, skipped, failed, details }
@@ -155,26 +167,11 @@ export async function GET(request: Request): Promise<NextResponse> {
     const authFailure = verifyCronSecret(request)
     if (authFailure) return authFailure
 
-    const pass1 = await tickOnce()
+    const pass = await tickOnce()
     console.info(
-        `[autopilot-tick] pass 1: dispatched=${pass1.dispatched} ` +
-            `skipped=${pass1.skipped} failed=${pass1.failed}`,
+        `[autopilot-tick] dispatched=${pass.dispatched} ` +
+            `skipped=${pass.skipped} failed=${pass.failed}`,
     )
 
-    // Sleep 30s so we effectively tick every 30s at 1-minute cron rate.
-    await new Promise((resolve) => setTimeout(resolve, 30_000))
-
-    const pass2 = await tickOnce()
-    console.info(
-        `[autopilot-tick] pass 2: dispatched=${pass2.dispatched} ` +
-            `skipped=${pass2.skipped} failed=${pass2.failed}`,
-    )
-
-    return NextResponse.json(
-        {
-            ok: true,
-            passes: [pass1, pass2],
-        },
-        { status: 200 },
-    )
+    return NextResponse.json({ ok: true, pass }, { status: 200 })
 }
