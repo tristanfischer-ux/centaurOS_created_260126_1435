@@ -1,9 +1,6 @@
 import {
-  AppWindow,
   CalendarDays,
-  Clock,
   Compass,
-  MessageCircle,
   UserCircle,
 } from 'lucide-react'
 import type { SidebarNavItem } from './types'
@@ -13,6 +10,8 @@ import type { SidebarNavItem } from './types'
  *
  * Knowledge moved to Plan section (organisational, not personal).
  * Supplier Portal is a separate section — see ./supplier-portal.
+ *
+ * Hidden during pivot focus (2026-04-24): Comms, Time, Google Apps.
  */
 
 export const welcomeNavItem: SidebarNavItem = {
@@ -31,7 +30,4 @@ export const todayNavItem: SidebarNavItem = {
 
 export const meNavigation: SidebarNavItem[] = [
   { name: 'My Profile', href: '/my-profile', icon: UserCircle, tooltip: 'Your profile, companies, and marketplace presence' },
-  { name: 'Comms', href: '/updates', icon: MessageCircle, tooltip: 'Activity feed, conversations, and direct messages' },
-  { name: 'Time', href: '/time', icon: Clock, tooltip: 'Track hours across your projects and tasks' },
-  { name: 'Google Apps', href: '/google-apps', icon: AppWindow, tooltip: 'Your Google Drive, Docs, Calendar, and Email' },
 ]
