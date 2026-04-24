@@ -270,6 +270,8 @@ export function composeListingEmbeddingText(listing: {
 
   if (listing.attributes) {
     const attrs = listing.attributes
+
+    // Supplier / People / Services / Products shape (existing — keep)
     const arrFields = ['skills', 'expertise', 'industries', 'previous_companies'] as const
     for (const field of arrFields) {
       const val = attrs[field]
@@ -279,6 +281,58 @@ export function composeListingEmbeddingText(listing: {
     }
     if (typeof attrs.role === 'string' && attrs.role) parts.push(attrs.role)
     if (typeof attrs.headline === 'string' && attrs.headline) parts.push(attrs.headline)
+
+    // Investor / Finance shape — added 2026-04-24 to fix /investors search noise.
+    // Pre-fix, every investor's signature was ~"firm name + VC Fund + Finance" — semantically meaningless.
+    // 8,264 of 8,264 Finance rows have stage_focus/sectors/firm_type populated; 8,068+ have
+    // investment_thesis/portfolio/cheque_range/value_add. Embedding these fields is the dominant
+    // quality lever for /investors per main-session handover 2026-04-24.
+    if (listing.category === 'Finance') {
+      const arrJoin = (val: unknown): string =>
+        Array.isArray(val)
+          ? val.filter((v): v is string => typeof v === 'string').join(' ')
+          : ''
+
+      // Headline thesis — most semantically dense field
+      if (typeof attrs.investment_thesis === 'string' && attrs.investment_thesis) {
+        parts.push(`Thesis: ${attrs.investment_thesis}`)
+      }
+      if (typeof attrs.firm_type === 'string' && attrs.firm_type) {
+        parts.push(`Firm type: ${attrs.firm_type}`)
+      }
+      const stages = arrJoin(attrs.stage_focus)
+      if (stages) parts.push(`Stages: ${stages}`)
+      const sectors = arrJoin(attrs.sectors)
+      if (sectors) parts.push(`Sectors: ${sectors}`)
+      const geos = arrJoin(attrs.geo_focus)
+      if (geos) parts.push(`Geographies: ${geos}`)
+      const portfolio = arrJoin(attrs.notable_portfolio) || arrJoin(attrs.portfolio_companies)
+      if (portfolio) parts.push(`Portfolio: ${portfolio}`)
+      if (typeof attrs.team_expertise === 'string' && attrs.team_expertise) {
+        parts.push(`Team expertise: ${attrs.team_expertise}`)
+      }
+      if (typeof attrs.value_add === 'string' && attrs.value_add) {
+        parts.push(`Value add: ${attrs.value_add}`)
+      }
+      if (typeof attrs.recent_deals_summary === 'string' && attrs.recent_deals_summary) {
+        parts.push(`Recent deals: ${attrs.recent_deals_summary}`)
+      }
+      if (typeof attrs.ideal_company_profile === 'string' && attrs.ideal_company_profile) {
+        parts.push(`Ideal company: ${attrs.ideal_company_profile}`)
+      }
+      // Cheque range — render as natural-language phrase
+      if (attrs.cheque_range_gbp && typeof attrs.cheque_range_gbp === 'object') {
+        const r = attrs.cheque_range_gbp as { min?: number; max?: number }
+        if (typeof r.min === 'number' || typeof r.max === 'number') {
+          const min = typeof r.min === 'number' ? `£${r.min.toLocaleString()}` : '?'
+          const max = typeof r.max === 'number' ? `£${r.max.toLocaleString()}` : '?'
+          parts.push(`Cheque range: ${min}–${max}`)
+        }
+      }
+      if (typeof attrs.fund_size_gbp === 'number') {
+        parts.push(`Fund size: £${attrs.fund_size_gbp.toLocaleString()}`)
+      }
+    }
   }
 
   return parts.filter(Boolean).join(' ')
