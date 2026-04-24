@@ -87,7 +87,7 @@ async function tickOnce(): Promise<{
     }> = []
     let dispatched = 0
     let skipped = 0
-    let failed = 0
+    const failed = 0
 
     // Fetch all projects whose autopilot_state is active (started + not
     // finished). Filter in JS because Supabase JSON ops for nested nulls are
