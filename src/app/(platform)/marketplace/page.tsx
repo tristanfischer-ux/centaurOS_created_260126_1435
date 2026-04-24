@@ -156,10 +156,10 @@ export default async function MarketplacePage({
             <div className="pb-4 border-b border-muted">
                 <div className={typography.pageHeader}>
                     <div className={typography.pageHeaderAccent} />
-                    <h1 className={typography.h1}>Marketplace</h1>
+                    <h1 className={typography.h1}>Suppliers</h1>
                 </div>
                 <p className={typography.pageSubtitle}>
-                    Find suppliers, services, and tools for your hardware venture
+                    Products, services, and manufacturing partners for your hardware venture
                 </p>
             </div>
 

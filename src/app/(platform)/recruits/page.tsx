@@ -153,10 +153,10 @@ Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
             <div className="pb-4 border-b border-muted">
                 <div className={typography.pageHeader}>
                     <div className={typography.pageHeaderAccent} />
-                    <h1 className={typography.h1}>Recruits</h1>
+                    <h1 className={typography.h1}>Fractional Executives</h1>
                 </div>
                 <p className={typography.pageSubtitle}>
-                    Find expert talent to grow your team
+                    Experienced executives available on a fractional or contract basis
                 </p>
             </div>
 
@@ -165,10 +165,10 @@ Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
                 specialistName="Harper"
                 specialistTitle="Hiring"
                 narrative={briefing.narrative}
-                fallbackMessage="The best candidates aren't applying to job boards — they need to be found. I match against skills, availability, and culture fit so you're not wading through 200 irrelevant CVs. Set your filters for the role you need filled this month and let's see who's out there."
+                fallbackMessage="The best fractional executives aren't applying to job boards — they need to be found. I match against skills, availability, and culture fit so you're not wading through 200 irrelevant CVs. Set your filters for the role you need filled this month and let's see who's out there."
                 isLoading={false}
                 severity={briefing.severity}
-                context={{ type: 'general', title: 'Recruits', description: 'Harper on recruits.', metadata: {} }}
+                context={{ type: 'general', title: 'Fractional Executives', description: 'Harper on fractional hiring.', metadata: {} }}
                 storageKey="recruits"
             />
 
@@ -193,8 +193,8 @@ Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
                             initialSavedListings={savedListings}
                             foundryContext={ctx || undefined}
                             allowedCategories={['People']}
-                            pageTitle="Recruits"
-                            pageSubtitle="Find expert talent to grow your team"
+                            pageTitle="Fractional Executives"
+                            pageSubtitle="Experienced executives available on a fractional or contract basis"
                             stats={recruitsStats ?? undefined}
                             statsLabels={RECRUITS_STATS_LABELS}
                             statsDefaultExpanded={false}
