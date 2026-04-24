@@ -41,7 +41,8 @@ export async function startPipelineRun(
     // success. See RED-TEAM-2-STATE-MACHINE.md §3 (BESS dc8c1def twin-BOM
     // incident 2026-04-23 17:22:07) for the motivating failure mode.
     if (error?.code === "23505") {
-      const { data: existing } = await db
+      // First pass: look for the in-flight winner (queued/running).
+      const { data: inFlight } = await db
         .from("pipeline_runs")
         .select("id")
         .eq("project_id", input.project_id)
@@ -51,11 +52,34 @@ export async function startPipelineRun(
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle()
-      if (existing) {
+      if (inFlight) {
         console.info(
-          `[startPipelineRun] duplicate-in-flight detected for ${input.specialist_id}:${input.stage} on project ${input.project_id}; reusing run ${existing.id}`
+          `[startPipelineRun] duplicate-in-flight detected for ${input.specialist_id}:${input.stage} on project ${input.project_id}; reusing run ${inFlight.id}`
         )
-        return { runId: existing.id }
+        return { runId: inFlight.id }
+      }
+      // Fast-stage race: on sub-100ms stages (sizing skip, layout skip)
+      // the winner can already be `done` by the time we do this lookup.
+      // Observed 2026-04-24 run 10: sizing completed in 78ms, a racing
+      // second attempt hit 23505 but the original row was already done,
+      // inFlight lookup returned null, function threw. Fall back to the
+      // most-recent `done` row within a short window — treat as idempotent
+      // success (the stage did complete, we just lost the race).
+      const { data: recentDone } = await db
+        .from("pipeline_runs")
+        .select("id, finished_at")
+        .eq("project_id", input.project_id)
+        .eq("specialist_id", input.specialist_id)
+        .eq("stage", input.stage)
+        .eq("status", "done")
+        .order("finished_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (recentDone) {
+        console.info(
+          `[startPipelineRun] duplicate race on ${input.specialist_id}:${input.stage} but winner already done — reusing runId ${recentDone.id}`
+        )
+        return { runId: recentDone.id }
       }
     }
     throw new Error(`startPipelineRun failed: ${error?.message}`)
