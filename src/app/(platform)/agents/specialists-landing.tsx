@@ -33,6 +33,7 @@ import { TeamMeetingDialog } from "./team-meeting-dialog"
 import { MeetingHistory } from "./meeting-history"
 import { HuddleCard } from "./huddle-card"
 import { HUDDLES } from "./huddle-config"
+import { IDEA_PROMPTS, type IdeaPrompt } from "./idea-prompts"
 import { getInsightFeed } from "@/actions/agent-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
@@ -189,62 +190,105 @@ export function SpecialistsLanding({
         setIsMeetingOpen(true)
     }, [brainstormTopic])
 
+    // INTENT: Idea prompts are curated brainstorming starters. Click → open a
+    // team meeting with the prompt's question as the topic and its suggested
+    // specialists pre-selected. Zero typing required.
+    const handleLaunchIdea = useCallback((prompt: IdeaPrompt) => {
+        setMeetingPreset({
+            participantIds: prompt.specialistIds,
+            topic: prompt.question,
+        })
+        setIsMeetingOpen(true)
+    }, [])
+
     return (
         <div className="space-y-10 pb-12">
-            {/* ── Brainstorming Box (mirrors Red Team topic input) ──────── */}
+            {/* ── Ideas to brainstorm — curated prompts to start a session ── */}
             <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
+                className="space-y-4"
+            >
+                <div className="space-y-1">
+                    <h2 className="text-xl sm:text-2xl font-display font-semibold text-foreground tracking-tight">
+                        Ideas to brainstorm
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                        Pick a question to start a conversation with the specialists best placed to help.
+                    </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {IDEA_PROMPTS.map((prompt) => {
+                        const participants = prompt.specialistIds
+                            .map((id) => getSpecialistById(id))
+                            .filter((s): s is NonNullable<ReturnType<typeof getSpecialistById>> => Boolean(s))
+                        return (
+                            <button
+                                key={prompt.id}
+                                type="button"
+                                onClick={() => handleLaunchIdea(prompt)}
+                                className="group flex flex-col gap-3 rounded-xl border bg-card hover:border-international-orange/40 hover:shadow-md transition-all text-left p-4"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                                        {prompt.category}
+                                    </span>
+                                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-international-orange transition-all" />
+                                </div>
+                                <p className="text-sm font-semibold text-foreground leading-snug group-hover:text-international-orange transition-colors">
+                                    {prompt.question}
+                                </p>
+                                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                                    {prompt.subtitle}
+                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap mt-auto pt-1">
+                                    {participants.map((specialist) => (
+                                        <span
+                                            key={specialist.id}
+                                            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                        >
+                                            {specialist.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </button>
+                        )
+                    })}
+                </div>
+            </motion.div>
+
+            {/* ── Or write your own — ad-hoc brainstorm ───────────────── */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
             >
                 <Card>
-                    <CardContent className="pt-6 space-y-4">
-                        <div className="space-y-2">
-                            <label
-                                htmlFor="brainstorm-topic"
-                                className="text-sm font-medium text-foreground"
-                            >
-                                What do you want to brainstorm?
-                            </label>
-                            <textarea
-                                id="brainstorm-topic"
-                                value={brainstormTopic}
-                                onChange={(e) => setBrainstormTopic(e.target.value)}
-                                placeholder="e.g., How should we price our first hardware product so we don't leave money on the table?"
-                                rows={4}
-                                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 resize-none"
-                            />
-                        </div>
+                    <CardContent className="pt-6 space-y-3">
+                        <label
+                            htmlFor="brainstorm-topic"
+                            className="text-sm font-medium text-foreground"
+                        >
+                            Or brainstorm something else
+                        </label>
+                        <textarea
+                            id="brainstorm-topic"
+                            value={brainstormTopic}
+                            onChange={(e) => setBrainstormTopic(e.target.value)}
+                            placeholder="Type any topic — we'll open it up with the four key specialists."
+                            rows={3}
+                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 resize-none"
+                        />
                         <Button
                             onClick={handleLaunchBrainstorm}
                             disabled={brainstormTopic.trim().length < 10}
-                            className="w-full bg-international-orange hover:bg-international-orange/90 text-white h-12 text-sm font-semibold"
+                            className="w-full bg-international-orange hover:bg-international-orange/90 text-white h-11 text-sm font-semibold"
                         >
                             <Sparkles className="h-4 w-4 mr-2" /> Start Brainstorming
                         </Button>
                     </CardContent>
                 </Card>
-            </motion.div>
-
-            {/* ── Human-First Philosophy Banner ─────────────────────────── */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="flex items-start gap-3 rounded-lg bg-status-info-light/50 border border-status-info/20 px-4 py-3"
-            >
-                <Shield className="h-4 w-4 text-status-info mt-0.5 shrink-0" />
-                <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-foreground">
-                        You&apos;re in charge
-                    </p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                        Your Specialists are fast, knowledgeable, and tireless&nbsp;&mdash;&nbsp;but
-                        like any team member, they can make mistakes or miss nuances. You&apos;re the
-                        decision-maker. Always verify critical information, especially legal and
-                        financial guidance.
-                    </p>
-                </div>
             </motion.div>
 
             {/* ── Catch-Up Card — shows when specialists have unread insights ── */}
@@ -455,6 +499,22 @@ export function SpecialistsLanding({
                     </CardContent>
                 </Card>
             </motion.div>
+
+            {/* ── "You're in charge" footer disclaimer ────────────────── */}
+            <div className="flex items-start gap-3 rounded-lg bg-status-info-light/50 border border-status-info/20 px-4 py-3">
+                <Shield className="h-4 w-4 text-status-info mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                    <p className="text-sm font-medium text-foreground">
+                        You&apos;re in charge
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        Your Specialists are fast, knowledgeable, and tireless&nbsp;&mdash;&nbsp;but
+                        like any team member, they can make mistakes or miss nuances. You&apos;re the
+                        decision-maker. Always verify critical information, especially legal and
+                        financial guidance.
+                    </p>
+                </div>
+            </div>
 
             {/* ── Brief Dialog (mobile only — desktop uses advisor panel) ── */}
             {selectedSpecialist && !isDesktop && (
