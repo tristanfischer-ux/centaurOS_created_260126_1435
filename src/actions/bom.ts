@@ -2246,33 +2246,18 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
   // ── Clear state (ephemeral — parts + bom_lines are the artefact). ──
   await persistBomGenerationState(projectId, null)
 
-  // ── Auto-fire Finn cost on BOM success, same as the legacy path. ──
+  // DISABLED 2026-04-24: previously this fired Finn via after() inside the
+  // BOM merge container. Problem: merge runs inside Max's after-chain
+  // descendant container. That container's 300s budget is already burned
+  // by earlier stages (Max skeleton + expansion + BOM skeleton + batches
+  // + merge). By the time Finn fires from here, there's often <30s left —
+  // but Finn needs ~30s minimum. Result: Finn creates pipeline_run row
+  // at 'running', container dies mid-LLM-call, row stays zombie for 5min
+  // until startPipelineRun's stale-abandoned recovery kicks in. Every
+  // autopilot run stalled at waiting_finn for 4+ minutes.
   //
-  // GOTCHA (P0.2): use the Background variant. This runs inside `after()`
-  // from `runBomMergeStage`, which itself fires from `after()` in the
-  // previous stage — cookies are gone and the withAuth-wrapped
-  // `runFinnCost` would return "Unauthorized", which sanitizeErrorMessage
-  // turns into "An unexpected error occurred" and every BOM→Finn hand-off
-  // fails silently. `loaded.foundryId` is already resolved via the admin
-  // client at the top of `runBomMergeStage`. No userId is available in
-  // this context (system-fired after chained stages); pass null.
-  const capturedFoundryId = loaded.foundryId
-  after(async () => {
-    try {
-      const { runFinnCostBackground } = await import(
-        "@/actions/specialists/run-finn-cost"
-      )
-      await runFinnCostBackground(
-        projectId,
-        capturedFoundryId,
-        null,
-        "auto.bom-complete",
-      )
-    } catch (err) {
-      console.error(
-        "[bom-distributed:merge] Finn auto-fire failed:",
-        err instanceof Error ? err.message : err,
-      )
-    }
-  })
+  // Instead, let autopilot's stepWaitForFinn hop fire Finn on a fresh
+  // 300s container. stepWaitForFinn has self-heal: if no cost.estimate
+  // pipeline_run exists, it calls runFinnCostBackground directly. The
+  // cron ticker guarantees stepWaitForFinn gets dispatched within 30s.
 }

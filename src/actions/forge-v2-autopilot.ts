@@ -851,6 +851,57 @@ async function stepWaitForBom(projectId: string): Promise<void> {
 
 /** Stage 5: wait for Finn's cost estimate (auto-fired from BOM). */
 async function stepWaitForFinn(projectId: string): Promise<void> {
+    // CHANGED 2026-04-24: BOM's merge stage used to auto-fire Finn via
+    // after() inside its own container (the descendant of Max's after-chain).
+    // That container's 300s budget was already mostly spent, so Finn's
+    // pipeline_run would start but the container would die mid-LLM-call,
+    // leaving a zombie row that stalled autopilot for 4+ minutes until
+    // startPipelineRun's stale-abandoned recovery kicked in. We removed
+    // that auto-fire and instead rely on stepWaitForFinn to self-fire
+    // Finn on its own fresh 300s container, mirroring the stepWaitForMax
+    // / stepWaitForBom self-heal pattern.
+    const admin = createAdminClient()
+    const { data: existing } = await admin
+        .from("pipeline_runs")
+        .select("id, status")
+        .eq("project_id", projectId)
+        .eq("specialist_id", "finance-lead")
+        .eq("stage", "cost.estimate")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    // If no Finn run exists, fire it ourselves synchronously on this
+    // fresh 300s container — same pattern as stepWaitForMax self-fire.
+    if (!existing) {
+        console.info(
+            "[autopilot] stepWaitForFinn: no Finn run found, firing it now",
+        )
+        const foundryId = await getProjectFoundryId(projectId)
+        if (foundryId) {
+            try {
+                const { runFinnCostBackground } = await import(
+                    "@/actions/specialists/run-finn-cost"
+                )
+                const result = await runFinnCostBackground(
+                    projectId,
+                    foundryId,
+                    null,
+                    "auto.bom-complete",
+                )
+                console.info(
+                    "[autopilot] stepWaitForFinn self-fire result:",
+                    result.ok ? `ok runId=${result.runId}` : `error=${"error" in result ? result.error : "unknown"}`,
+                )
+            } catch (err) {
+                console.error(
+                    "[autopilot] stepWaitForFinn self-fire threw:",
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        }
+    }
+
     await waitForStage(projectId, {
         specialistId: "finance-lead",
         stage: "cost.estimate",
