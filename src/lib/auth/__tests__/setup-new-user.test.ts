@@ -186,7 +186,9 @@ describe('setupNewUser', () => {
     })
 
     expect(result.foundryId).toBe('existing-foundry')
-    expect(result.redirectPath).toBe('/today')
+    // 2026-04-24: post-pivot landing switched from /today to /agents
+    // (Brainstorming page).
+    expect(result.redirectPath).toBe('/agents')
   })
 
   it('creates sandbox foundry for executives (not forge-guild)', async () => {
