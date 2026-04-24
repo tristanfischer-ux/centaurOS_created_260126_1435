@@ -2045,10 +2045,12 @@ export async function skeletonDecompose(
       : ""
     const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}${docSection}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
 
-    // DECISION: Direct call with Opus — small output (~500 tokens) but complex products with
-    // 12K-char research reports need 30-60s. 60s stays well within Vercel 300s cap.
+    // DECISION: Direct call with Opus — output is N modules × ~200 tokens
+    // each + schema overhead. Industrial BESS with 9 modules hit the 2048
+    // ceiling and Claude returned truncated JSON → parse failed → pipeline
+    // wedge. Observed run 9 2026-04-24. Doubled to 4096 for 2× headroom.
     const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 2048, 60_000, 1,
+      systemPrompt, userPrompt, modelId, 4096, 60_000, 1,
     )
 
     // Parse JSON response
