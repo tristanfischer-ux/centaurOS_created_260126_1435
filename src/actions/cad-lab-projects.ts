@@ -102,6 +102,17 @@ export interface CadLabProjectSummary {
   systemIllustrationUrl: string | null
   createdAt: string
   updatedAt: string
+  /** Autopilot run snapshot — shape mirrors AutopilotState in forge-v2-autopilot.ts.
+   *  Exposed as a loose Record so this file stays import-cycle-free from the
+   *  autopilot action module. Null when autopilot never ran. */
+  autopilotState: {
+    started_at: string
+    stage: string
+    completed_stages: string[]
+    failed_stages: string[]
+    error?: string
+    finished_at: string | null
+  } | null
 }
 
 /** Full project data for loading into the editor */
@@ -229,7 +240,7 @@ export async function listCadLabProjects(): Promise<
   return withAuth(async ({ supabase }) => {
     const { data: projects, error } = await supabase
       .from("cad_lab_projects")
-      .select("id, name, subject, status, stage, thumbnail_svg, system_illustration_url, created_at, updated_at")
+      .select("id, name, subject, status, stage, thumbnail_svg, system_illustration_url, autopilot_state, created_at, updated_at")
       .order("updated_at", { ascending: false })
 
     if (error) {
@@ -248,6 +259,7 @@ export async function listCadLabProjects(): Promise<
         systemIllustrationUrl: p.system_illustration_url,
         createdAt: p.created_at,
         updatedAt: p.updated_at,
+        autopilotState: ((p as { autopilot_state?: unknown }).autopilot_state as CadLabProjectSummary["autopilotState"]) ?? null,
       })),
     }
   })

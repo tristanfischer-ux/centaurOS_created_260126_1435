@@ -1,152 +1,185 @@
 /**
- * @file page.tsx — /the-forge-v2 Workspace landing.
+ * @file page.tsx — /the-forge-v2 simplified landing.
  *
- * @description Entry point for The Forge v2. Lists all CAD Lab projects for
- * the foundry and offers paths into existing projects or creation of new ones.
- * Empty state leads users to "Start from a description" — the current v1
- * pipeline flow. Projects link to /the-forge-v2/projects/[id] for the
- * 9-artefact detail view.
+ * @description One input, one button, one promise: type what you want to
+ * build, the Forge builds the plan. Past plans live underneath as a compact
+ * list so founders can revisit anything they already ran.
  *
- * Gated behind `new_forge_experience` feature flag via sidebar href rewrite
- * — /the-forge remains the canonical path until the flag flip (Phase 1 PR #12).
+ * Replaces the earlier project grid + "New project" wizard flow. The wizard
+ * still exists at /the-forge-v2/new for references-upload edge cases, but
+ * this landing skips straight to autopilot — text in, PDF out.
  *
  * @related
- * - Mockup: FORGE-MOCKUP-WORKSPACE.html (project-header + health-strip + artefact-grid)
- * - Action: listCadLabProjects from @/actions/cad-lab-projects
- * - Shell: ./_components/workspace-shell.tsx
+ * - Input box:    ./_components/start-forge-box.tsx
+ * - Action:       listCadLabProjects from @/actions/cad-lab-projects
+ * - Running/plan: ./projects/[id]/page.tsx
  */
 
 import Link from "next/link"
-import Image from "next/image"
 import type { Metadata } from "next"
-import { Plus, Sparkles, ArrowRight, Layers, Hammer } from "lucide-react"
+import { ArrowRight, CheckCircle2, Loader2, Hammer } from "lucide-react"
 
-import { listCadLabProjects } from "@/actions/cad-lab-projects"
+import { listCadLabProjects, type CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 import { WorkspaceShell } from "./_components/workspace-shell"
+import { StartForgeBox } from "./_components/start-forge-box"
 
 export const metadata: Metadata = {
-    title: "The Forge · Workspace",
-    description: "Your hardware projects — from concept through design, supplier selection, and launch.",
+    title: "The Forge",
+    description: "Describe what you want to build — the Forge drafts a full plan in about 20 minutes.",
 }
 
 export const dynamic = "force-dynamic"
 
-const STAGE_TONE: Record<string, { label: string; class: string }> = {
-    draft:            { label: "Draft",        class: "bg-muted text-muted-foreground border-border" },
-    researched:       { label: "Researched",   class: "bg-electric-blue/10 text-electric-blue border-electric-blue/30" },
-    interface_ready:  { label: "Building",     class: "bg-status-warning-light text-status-warning border-status-warning/30" },
-    generated:        { label: "Generated",    class: "bg-status-success-light text-status-success border-status-success/30" },
-    complete:         { label: "Complete",     class: "bg-status-success-light text-status-success border-status-success/30" },
-}
-
-export default async function ForgeV2WorkspacePage(): Promise<React.ReactNode> {
+export default async function ForgeV2LandingPage(): Promise<React.ReactNode> {
     const result = await listCadLabProjects()
     const projects = "projects" in result ? result.projects : []
     const loadError = "error" in result
 
+    // Sort past plans most-recent first, cap at 10 rows on the landing. The
+    // full archive lives at /the-forge-v2/archive (route already exists).
+    const recent = [...projects]
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 10)
+
     return (
         <WorkspaceShell
-            subtitle="Your hardware projects — from concept through design, supplier selection, and launch."
-            primaryCta={{ label: "New project", href: "/the-forge-v2/new", icon: <Plus className="h-3.5 w-3.5" /> }}
+            subtitle="Describe what you're building. The Forge drafts a full plan — brief, modules, bill of materials, cost, risks, suppliers — in about 20 minutes."
+            maxWidth="narrow"
         >
             {loadError && (
                 <Card className="rounded-xl border-destructive/30">
                     <CardContent className="py-4">
-                        <p className="text-sm text-destructive">Couldn&apos;t load your projects. Please refresh the page.</p>
+                        <p className="text-sm text-destructive">Couldn&apos;t load your past plans. You can still start a new one below.</p>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Empty state — no projects yet */}
-            {projects.length === 0 && !loadError && (
-                <Card className="rounded-xl border bg-gradient-to-br from-background to-international-orange/[0.03]">
-                    <CardContent className="py-14 flex flex-col items-center text-center gap-5">
-                        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-international-orange/10">
-                            <Hammer className="h-7 w-7 text-international-orange" />
-                        </div>
-                        <div className="max-w-md space-y-2">
-                            <h2 className="text-xl font-semibold text-foreground tracking-tight">Start your first Forge project</h2>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                Describe what you want to build and The Forge decomposes it into modules, researches materials, matches suppliers, and tracks cost &amp; risk from concept through launch.
-                            </p>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                <Link href="/the-forge-v2/new"><Sparkles className="h-3.5 w-3.5" /> Start from a description</Link>
-                            </Button>
-                            <Button asChild size="sm" variant="outline" className="gap-1.5">
-                                <Link href="/the-forge/cad-lab"><Layers className="h-3.5 w-3.5" /> Browse templates</Link>
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* ─── Input: type, press, wait ────────────────────────────── */}
+            <Card className="rounded-xl border bg-background shadow-sm">
+                <CardContent className="py-6 sm:py-8">
+                    <StartForgeBox />
+                </CardContent>
+            </Card>
+
+            {/* ─── Past plans (compact list) ───────────────────────────── */}
+            {recent.length > 0 && (
+                <section aria-labelledby="past-plans-heading" className="space-y-3">
+                    <h2
+                        id="past-plans-heading"
+                        className="text-xs font-mono uppercase tracking-widest text-muted-foreground"
+                    >
+                        Past plans
+                    </h2>
+                    <Card className="rounded-xl overflow-hidden">
+                        <ul className="divide-y divide-border">
+                            {recent.map((p) => {
+                                const { statusLabel, statusKind, href } = deriveProjectEntryState(p.id, p.status, p.autopilotState)
+                                return (
+                                    <li key={p.id}>
+                                        <Link
+                                            href={href}
+                                            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors group"
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-semibold text-foreground truncate group-hover:text-international-orange transition-colors">
+                                                        {p.name}
+                                                    </span>
+                                                    <StatusPill kind={statusKind} label={statusLabel} />
+                                                </div>
+                                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                    {p.subject || "Untitled concept"}
+                                                </p>
+                                            </div>
+                                            <time className="text-[11px] text-muted-foreground shrink-0 font-mono">
+                                                {new Date(p.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                            </time>
+                                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-international-orange group-hover:translate-x-0.5 transition-all" />
+                                        </Link>
+                                    </li>
+                                )
+                            })}
+                        </ul>
+                    </Card>
+                    {projects.length > recent.length && (
+                        <p className="text-xs text-muted-foreground">
+                            <Link href="/the-forge-v2/archive" className="hover:text-international-orange transition-colors">
+                                See all {projects.length} plans →
+                            </Link>
+                        </p>
+                    )}
+                </section>
             )}
 
-            {/* Project grid */}
-            {projects.length > 0 && (
-                <>
-                    <div className="flex items-baseline justify-between">
-                        <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                            {projects.length === 1 ? "1 project" : `${projects.length} projects`}
-                        </h2>
-                        <Link href="/the-forge/cad-lab" className="text-xs text-muted-foreground hover:text-international-orange transition-colors">
-                            Open legacy CAD lab →
-                        </Link>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {projects.map((p) => {
-                            const stage = STAGE_TONE[p.stage] ?? STAGE_TONE.draft
-                            return (
-                                <Link
-                                    key={p.id}
-                                    href={`/the-forge-v2/projects/${p.id}`}
-                                    className="group rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden"
-                                >
-                                    {/* Thumbnail */}
-                                    <div className="aspect-[16/7] bg-gradient-to-br from-international-orange/[0.04] to-muted flex items-center justify-center overflow-hidden">
-                                        {p.systemIllustrationUrl ? (
-                                            <Image
-                                                src={p.systemIllustrationUrl}
-                                                alt={`${p.name} system illustration`}
-                                                width={560}
-                                                height={245}
-                                                className="w-full h-full object-cover"
-                                                unoptimized
-                                            />
-                                        ) : (
-                                            <Hammer className="h-8 w-8 text-muted-foreground/30" aria-hidden="true" />
-                                        )}
-                                    </div>
-                                    <div className="p-5 space-y-2">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <h3 className="text-sm font-semibold text-foreground tracking-tight truncate group-hover:text-international-orange transition-colors">
-                                                {p.name}
-                                            </h3>
-                                            <Badge variant="outline" className={cn("text-[10px] font-semibold uppercase tracking-wide shrink-0", stage.class)}>
-                                                {stage.label}
-                                            </Badge>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                                            {p.subject || "Untitled concept"}
-                                        </p>
-                                        <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                                            <span className="text-[11px] text-muted-foreground">
-                                                Updated {new Date(p.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                                            </span>
-                                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange group-hover:translate-x-0.5 transition-all" />
-                                        </div>
-                                    </div>
-                                </Link>
-                            )
-                        })}
-                    </div>
-                </>
+            {recent.length === 0 && !loadError && (
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <Hammer className="h-4 w-4 text-muted-foreground/60" aria-hidden="true" />
+                    <span>No plans yet. Describe what you want to build above and the Forge takes it from there.</span>
+                </div>
             )}
         </WorkspaceShell>
     )
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────
+
+type StatusKind = "building" | "ready" | "draft"
+
+function StatusPill({ kind, label }: { kind: StatusKind; label: string }): React.ReactElement {
+    const classes: Record<StatusKind, string> = {
+        building: "bg-status-warning-light text-status-warning border-status-warning/30",
+        ready: "bg-status-success-light text-status-success border-status-success/30",
+        draft: "bg-muted text-muted-foreground border-border",
+    }
+    const Icon = kind === "building" ? Loader2 : kind === "ready" ? CheckCircle2 : null
+    return (
+        <Badge
+            variant="outline"
+            className={cn(
+                "text-[10px] font-semibold uppercase tracking-wide shrink-0 gap-1",
+                classes[kind],
+            )}
+        >
+            {Icon && (
+                <Icon className={cn("h-3 w-3", kind === "building" && "animate-spin")} aria-hidden="true" />
+            )}
+            {label}
+        </Badge>
+    )
+}
+
+function deriveProjectEntryState(
+    projectId: string,
+    projectStatus: string,
+    state: CadLabProjectSummary["autopilotState"],
+): { statusLabel: string; statusKind: StatusKind; href: string } {
+    // Ready = autopilot finished with no error. Link direct to the plan.
+    if (state && state.finished_at && !state.error) {
+        return {
+            statusLabel: "Ready",
+            statusKind: "ready",
+            href: `/the-forge-v2/projects/${projectId}/plan`,
+        }
+    }
+    // Building = autopilot started but not finished. Link to the workspace
+    // so the running state shows.
+    if (state && !state.finished_at) {
+        return {
+            statusLabel: "Building",
+            statusKind: "building",
+            href: `/the-forge-v2/projects/${projectId}`,
+        }
+    }
+    // Everything else — autopilot never started, or errored, or a pre-v2
+    // project created the old way. Treat as a draft; the workspace page
+    // handles the routing.
+    return {
+        statusLabel: projectStatus === "complete" ? "Ready" : "Draft",
+        statusKind: projectStatus === "complete" ? "ready" : "draft",
+        href: `/the-forge-v2/projects/${projectId}`,
+    }
 }

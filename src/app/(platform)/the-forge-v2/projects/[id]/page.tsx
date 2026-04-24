@@ -25,7 +25,7 @@
  */
 
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
 import {
@@ -39,11 +39,13 @@ import { loadBomRunStatus } from "@/actions/specialists/run-bom-generator"
 import { loadChaseRunStatus } from "@/actions/specialists/run-chase-research"
 import { loadFinnRunStatus } from "@/actions/specialists/run-finn-cost"
 import { loadBriefLockStatus } from "@/actions/brief-lock"
-import { tickAutopilotStage } from "@/actions/forge-v2-autopilot"
+import { tickAutopilotStage, loadAutopilotState } from "@/actions/forge-v2-autopilot"
 import { tickImageRenderChain } from "@/actions/forge-v2-render-all-modules"
 import { createClient } from "@/lib/supabase/server"
 
+import { WorkspaceShell } from "../../_components/workspace-shell"
 import { WorkspaceView, type TopMaterialRow, type TopProcessRow, type WorkspaceViewProps } from "./workspace-view"
+import { RunningState } from "./_components/running-state"
 
 export const dynamic = "force-dynamic"
 
@@ -68,6 +70,45 @@ export default async function ForgeV2ProjectPage({
         notFound()
     }
     const project = loadResult.project
+
+    // ── V1 autopilot routing ─────────────────────────────────────────
+    // If autopilot has finished cleanly, skip the workspace cockpit and
+    // drop founders straight into the inline plan. If it's running, show
+    // the plain-language progress checklist. The legacy cockpit only
+    // renders for pre-autopilot drafts (projects created via the older
+    // 3-step wizard flow) or autopilot-errored states where the founder
+    // wants to inspect the partial artefacts.
+    const autopilotState = await loadAutopilotState(id)
+    if (autopilotState?.finished_at && !autopilotState.error) {
+        redirect(`/the-forge-v2/projects/${id}/plan`)
+    }
+
+    if (autopilotState && !autopilotState.finished_at) {
+        try {
+            await tickAutopilotStage(id)
+        } catch (err) {
+            console.warn(
+                "[WORKSPACE-PAGE] tickAutopilotStage (running-state) failed (non-fatal):",
+                err instanceof Error ? err.message : err,
+            )
+        }
+        return (
+            <WorkspaceShell
+                crumbs={[
+                    { label: "Workspace", href: "/the-forge-v2" },
+                    { label: project.name },
+                ]}
+                subtitle="The Forge is building your plan. This page refreshes on its own — you can close the tab and come back."
+                maxWidth="narrow"
+            >
+                <RunningState
+                    projectId={id}
+                    projectName={project.name}
+                    state={autopilotState}
+                />
+            </WorkspaceShell>
+        )
+    }
 
     // INTENT: nudge autopilot on every workspace page load. Every stepWaitForX
     // runner has its own self-healing check that fires the expected
