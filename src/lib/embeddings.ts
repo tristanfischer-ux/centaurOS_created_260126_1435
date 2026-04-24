@@ -31,7 +31,18 @@ export async function embedQuery(text: string): Promise<number[]> {
   const openai = getOpenAI()
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-small',
+    // Explicitly request 1536 dims — without this, production was occasionally
+    // returning 768-dim vectors which caused pgvector "different vector dimensions
+    // 1536 and 768" errors in match_marketplace_listings_v2 calls. See Vercel
+    // logs 2026-04-24. text-embedding-3-small's NATIVE dim is 1536; the dimensions
+    // param locks it deterministically and matches investors_mirror.embedding +
+    // marketplace_listings.embedding columns (both vector(1536)).
+    dimensions: 1536,
     input: text,
   })
-  return response.data[0].embedding
+  const embedding = response.data[0].embedding
+  if (embedding.length !== 1536) {
+    throw new Error(`embedQuery: OpenAI returned ${embedding.length}-dim vector, expected 1536`)
+  }
+  return embedding
 }
