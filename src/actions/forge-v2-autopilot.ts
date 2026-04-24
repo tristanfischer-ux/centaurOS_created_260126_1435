@@ -150,11 +150,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  *  runMaxDecomposition. */
 const MIN_BRIEF_REPORT_CHARS = 200
 
-/** Max modules to fan Fang reviews across. Each review takes ~45-60s on
- *  top of any pipeline budget check, and we sequence them serially so the
- *  runner stays under Vercel's 300s cap. Three modules × 60s = 180s,
- *  safely inside the cap with room for the final state write. */
-const FANG_REVIEW_MODULE_LIMIT = 3
+/** Max modules to fan Fang reviews across. Historical comment said
+ *  "we sequence them serially so the runner stays under Vercel's 300s cap.
+ *  Three modules × 60s = 180s." That was accurate for the serial loop.
+ *  Commit f0be4d70 switched to parallel Promise.allSettled — 10 modules
+ *  in ~90s wall-clock, well inside the 300s cap. Plus: Tristan's review of
+ *  the run-15 PDF explicitly called 2/8 reviews "worse than 0/8" and asked
+ *  for all modules to be reviewed. Bumping the cap to 20 so it's
+ *  effectively unlimited for any real project while still preventing
+ *  runaway cost on an exotic 40-module brief. */
+const FANG_REVIEW_MODULE_LIMIT = 20
 
 /** How long a stage runner will poll its trigger condition before giving
  *  up and writing a timeout. Sized so each stage's runner fits under the
