@@ -1749,7 +1749,6 @@ async function scheduleAutopilotStep(
             body: JSON.stringify({ projectId, step }),
             cache: "no-store",
             signal: controller.signal,
-            keepalive: true,
         })
         console.info(`[autopilot] hop dispatched: ${step}`)
     } catch (err) {

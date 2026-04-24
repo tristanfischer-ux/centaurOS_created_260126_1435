@@ -806,7 +806,6 @@ async function scheduleNextStageViaHttp(projectId: string): Promise<void> {
             body: JSON.stringify({ projectId }),
             cache: "no-store",
             signal: controller.signal,
-            keepalive: true,
         })
         console.info("[render-all-modules:stage] hop dispatched")
     } catch (err) {
