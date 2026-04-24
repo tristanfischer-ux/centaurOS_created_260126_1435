@@ -788,23 +788,29 @@ function scheduleNextStageViaHttp(projectId: string): void {
 
     const url = `${getBaseUrl()}/api/render-stage`
 
-    // Fire-and-forget. `.catch` swallows network errors since stale-state
-    // recovery handles re-firing; we just need a visible log for ops.
-    // Using `fetch` without awaiting means the caller's response isn't
-    // blocked waiting for the new stage to complete.
-    void fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${secret}`,
-        },
-        body: JSON.stringify({ projectId }),
-        // Cache-free — this is a mutation-triggering POST.
-        cache: "no-store",
-    }).catch((err) => {
-        console.error(
-            "[render-all-modules:stage] next stage fetch failed:",
-            err instanceof Error ? err.message : err,
-        )
+    // GOTCHA (2026-04-24): plain `void fetch(...)` does NOT fire in Vercel
+    // serverless. When the handler returns, Vercel terminates the container
+    // before the outbound fetch lands. The hop never reaches the next route
+    // and the chain wedges. `after()` keeps the container alive just long
+    // enough for the <1s hop request itself to complete; the actual stage
+    // work still runs on a fresh container with its own 300s budget. Same
+    // fix applied to scheduleAutopilotStep in forge-v2-autopilot.ts.
+    after(async () => {
+        try {
+            await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${secret}`,
+                },
+                body: JSON.stringify({ projectId }),
+                cache: "no-store",
+            })
+        } catch (err) {
+            console.error(
+                "[render-all-modules:stage] next stage fetch failed:",
+                err instanceof Error ? err.message : err,
+            )
+        }
     })
 }

@@ -1718,24 +1718,39 @@ function scheduleAutopilotStep(
 
     const url = `${getBaseUrl()}/api/autopilot-step`
 
-    // Fire-and-forget. `.catch` swallows network errors since stale-state
-    // recovery handles re-firing; we just need a visible log for ops.
-    // Using `fetch` without awaiting means the caller's response isn't
-    // blocked waiting for the next stage to complete.
-    void fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${secret}`,
-        },
-        body: JSON.stringify({ projectId, step }),
-        // Cache-free — this is a mutation-triggering POST.
-        cache: "no-store",
-    }).catch((err) => {
-        console.error(
-            `[autopilot] next stage fetch (${step}) failed:`,
-            err instanceof Error ? err.message : err,
-        )
+    // GOTCHA (2026-04-24): plain `void fetch(...)` does NOT work in Vercel
+    // serverless. When the handler returns, Vercel terminates the container
+    // before the outbound fetch has landed — observed on run 3 of
+    // verify-autopilot.sh where `stepWaitForChase` ran, advance() moved state
+    // to locking_brief, scheduleAutopilotStep("lockBrief") was issued as
+    // void fetch(), the function returned, Vercel killed the container, the
+    // fetch never reached /api/autopilot-step, and the chain wedged forever.
+    //
+    // Fix: wrap the fetch in `after()`. `after()` tells Vercel "keep the
+    // container alive until this callback finishes". The callback is a
+    // <1s fetch to an internal route — trivially small budget. The actual
+    // stage work still runs in a FRESH container on the other end of the
+    // hop, so the per-stage 300s budget is preserved. The distinction from
+    // the earlier bug is: we're not using `after()` to run THE STAGE (that
+    // would share the budget), we're using it just to hold the container
+    // long enough for the HOP REQUEST to complete.
+    after(async () => {
+        try {
+            await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${secret}`,
+                },
+                body: JSON.stringify({ projectId, step }),
+                cache: "no-store",
+            })
+        } catch (err) {
+            console.error(
+                `[autopilot] next stage fetch (${step}) failed:`,
+                err instanceof Error ? err.message : err,
+            )
+        }
     })
 }
 
