@@ -89,15 +89,21 @@ async function tickOnce(): Promise<{
     let skipped = 0
     const failed = 0
 
-    // Fetch all projects whose autopilot_state is active (started + not
-    // finished). Filter in JS because Supabase JSON ops for nested nulls are
-    // fiddly — the working set is small (< a few dozen at any time).
+    // Fetch active autopilot projects. Push the finished_at / started_at
+    // filters INTO the SQL — filtering only in JS after a LIMIT was a
+    // latent bug: old abandoned projects at the tail of the oldest-first
+    // sort crowded out freshly-started projects, which then never got
+    // dispatched. Observed 2026-04-24 run 15: project 4cff19f8 with
+    // finished_at=null was dropped because 30 older projects (all with
+    // finished_at set from stale recordFailure calls) filled the limit.
     const { data: projects, error } = await admin
         .from("cad_lab_projects")
         .select("id, autopilot_state")
         .not("autopilot_state", "is", null)
-        .order("updated_at", { ascending: true })
-        .limit(MAX_PROJECTS_PER_PASS * 3)
+        .is("autopilot_state->>finished_at", null)
+        .not("autopilot_state->>started_at", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(MAX_PROJECTS_PER_PASS * 2)
 
     if (error) {
         console.error("[autopilot-tick] project lookup failed:", error.message)
