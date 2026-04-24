@@ -202,15 +202,15 @@ export function LearnPage({
       <div className="pb-4 border-b border-muted">
         {/* Cascade breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-          <a href="/workshop" className="hover:text-foreground transition-colors">Workshop</a>
+          <Link href="/marketplace" className="hover:text-foreground transition-colors">Marketplace</Link>
           <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground font-medium">Inspiration</span>
+          <span className="text-foreground font-medium">Manufacturing Techniques</span>
         </nav>
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>
             <BookOpen className="h-7 w-7 mr-3 inline-block text-electric-blue" />
-            Inspiration
+            Manufacturing Techniques
           </h1>
         </div>
         <p className={cn(typography.pageSubtitle, 'mt-1')}>
@@ -226,7 +226,7 @@ export function LearnPage({
         fallbackMessage="Most founders over-specify tolerances by 2x, which doubles their unit cost — and they don't know it until the first invoice hits. I've mapped the decisions that actually matter: when to injection mould vs CNC, when tolerances are overkill, when a cheaper material performs better. Find the topic closest to your current build and I'll save you the expensive lesson."
         isLoading={false}
         severity="success"
-        context={{ type: 'general', title: 'Learn', description: 'Sage on learning resources.', metadata: {} }}
+        context={{ type: 'general', title: 'Manufacturing Techniques', description: 'Sage on manufacturing know-how.', metadata: {} }}
         storageKey="learn"
       />
 

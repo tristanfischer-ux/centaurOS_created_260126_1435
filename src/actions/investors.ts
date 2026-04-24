@@ -23,7 +23,7 @@ import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
 import type { FoundryProfile } from '@/lib/investor-match'
-import { nomicEmbedQuery } from '@/lib/search/nomic-embed'
+import { embedQuery } from '@/lib/embeddings'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import {
   getFoundryTier,
@@ -726,11 +726,13 @@ export async function searchInvestors(
   // category filter, eliminating the 200-row re-fetch and client-side filtering.
   if (query && query.trim().length > 5) {
     try {
-      // DECISION: Use nomic-embed-text-v1.5 (768-dim), the same model the
-      // Forge Capital pipeline uses locally. Document embeddings in
-      // marketplace_listings.embedding are synced from Forge Capital DB,
-      // so queries MUST be embedded with the matching model.
-      const queryEmbedding = await nomicEmbedQuery(query.trim())
+      // DECISION: Use OpenAI text-embedding-3-small (1536-dim) to match the
+      // marketplace_listings.embedding column type. Forge Capital sync (commit
+      // 4e7d9bb 2026-04-24) writes investor docs with the same model + dim, so
+      // query and document vectors are comparable. Earlier nomic 768-dim path
+      // caused pgvector "different vector dimensions 1536 and 768" errors that
+      // silently dropped the search to keyword fallback.
+      const queryEmbedding = await embedQuery(query.trim())
       // DECISION: v2 RPC returns attributes + filters by category at DB level,
       // eliminating the re-fetch + client-side filter pattern.
       // DECISION: threshold=0.0 mirrors the Forge Capital Dashboard behaviour:
