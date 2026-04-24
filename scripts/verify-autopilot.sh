@@ -312,7 +312,26 @@ log "project created: $PROJECT_ID"
 log "workspace URL: $PREVIEW_URL/the-forge-v2/projects/$PROJECT_ID"
 
 # ---------------------------------------------------------------------------
-# Stage 3+: poll cad_lab_projects + pipeline_runs for stage advancement
+# Clean-slate audit assertion (2026-04-24):
+#
+# The harness's contract is "the PDF is produced entirely by the pipeline,
+# not by any seeding". To make that provable rather than claimed, we
+# immediately after project creation assert the following about the new
+# project UUID:
+#   - zero pipeline_runs rows
+#   - research is null (or empty of .report)
+#   - modules is empty
+#   - brief_locked_at is null
+#   - dimension_sheet is null
+#   - spatial_plan is null
+#   - image_render_state is null
+#   - ai_cost_estimates is null
+#
+# If ANY of these are already populated at T0, the harness fails fast with a
+# CONTAMINATION exit code. Pipeline_runs cleanup DELETE runs first in case
+# a prior run's rows (pre-autopilot auto-fire) somehow landed — it's a
+# paranoid guard; the new UUID should never have any. After the DELETE we
+# re-query and assert count == 0.
 # ---------------------------------------------------------------------------
 
 REST="$SUPABASE_URL/rest/v1"
@@ -326,9 +345,74 @@ pg_query() {
         "$REST/$query" --max-time 10
 }
 
+pg_delete() {
+    local query="$1"
+    curl -s -X DELETE \
+        -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+        -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+        -H "Prefer: return=representation" \
+        "$REST/$query" --max-time 10
+}
+
 fetch_project_row() {
     pg_query "cad_lab_projects?id=eq.${PROJECT_ID}&select=id,autopilot_state,image_render_state,system_illustration_url,modules,research,brief_locked_at,reviews,spatial_plan,dimension_sheet,ai_cost_estimates,bom_generation_state,pipeline_stage,shipped_at,updated_at"
 }
+
+# ---------------------------------------------------------------------------
+# CLEAN-SLATE AUDIT (2026-04-24)
+# ---------------------------------------------------------------------------
+log "=== Clean-slate audit ==="
+
+# 1. DELETE any pipeline_runs rows attached to this brand-new UUID. For a
+#    UUID that's seconds old this should remove 0 rows, but we do it anyway
+#    as a paranoid guard — if the sidecar auto-fire already fired Chase
+#    between /the-forge-v2/start POST and this DELETE, we want a visible
+#    count so the audit log is honest.
+DELETED_RUNS="$(pg_delete "pipeline_runs?project_id=eq.${PROJECT_ID}")"
+DELETED_COUNT="$(echo "$DELETED_RUNS" | jq 'length' 2>/dev/null || echo "0")"
+log "  pre-run pipeline_runs deleted: $DELETED_COUNT"
+
+# 2. Verify ZERO pipeline_runs rows exist for this project now.
+POST_DELETE_RUNS="$(pg_query "pipeline_runs?project_id=eq.${PROJECT_ID}&select=id")"
+POST_DELETE_COUNT="$(echo "$POST_DELETE_RUNS" | jq 'length' 2>/dev/null || echo "UNKNOWN")"
+if [ "$POST_DELETE_COUNT" != "0" ]; then
+    fail 25 "clean-slate audit failed: pipeline_runs count != 0 after delete (got $POST_DELETE_COUNT)"
+fi
+log "  post-delete pipeline_runs count: 0 ✓"
+
+# 3. Assert the project's derived state fields are empty at T0. We only
+#    check the fields that would be SEEDED by any cheating path — fields
+#    that naturally populate AFTER Chase/Max/etc. run. If any of these is
+#    non-null here, something pre-populated them outside the pipeline.
+AUDIT_ROW="$(fetch_project_row)"
+AUDIT_MODULES="$(echo "$AUDIT_ROW" | jq -r '.[0].modules | length' 2>/dev/null || echo "UNKNOWN")"
+AUDIT_BRIEF_LOCKED="$(echo "$AUDIT_ROW" | jq -r '.[0].brief_locked_at // "null"' 2>/dev/null || echo "UNKNOWN")"
+AUDIT_DIM_SHEET="$(echo "$AUDIT_ROW" | jq -r '.[0].dimension_sheet // "null"' 2>/dev/null || echo "UNKNOWN")"
+AUDIT_SPATIAL="$(echo "$AUDIT_ROW" | jq -r '.[0].spatial_plan // "null"' 2>/dev/null || echo "UNKNOWN")"
+AUDIT_IMG_STATE="$(echo "$AUDIT_ROW" | jq -r '.[0].image_render_state // "null"' 2>/dev/null || echo "UNKNOWN")"
+AUDIT_COST="$(echo "$AUDIT_ROW" | jq -r '.[0].ai_cost_estimates // "null"' 2>/dev/null || echo "UNKNOWN")"
+
+log "  modules: $AUDIT_MODULES, brief_locked_at: $AUDIT_BRIEF_LOCKED"
+log "  dimension_sheet: $AUDIT_DIM_SHEET, spatial_plan: $AUDIT_SPATIAL"
+log "  image_render_state: $AUDIT_IMG_STATE, ai_cost_estimates: $AUDIT_COST"
+
+if [ "$AUDIT_MODULES" != "0" ]; then
+    fail 25 "clean-slate audit failed: modules array non-empty at T0 ($AUDIT_MODULES)"
+fi
+if [ "$AUDIT_BRIEF_LOCKED" != "null" ]; then
+    fail 25 "clean-slate audit failed: brief_locked_at already set at T0"
+fi
+if [ "$AUDIT_DIM_SHEET" != "null" ]; then
+    fail 25 "clean-slate audit failed: dimension_sheet already populated at T0"
+fi
+if [ "$AUDIT_SPATIAL" != "null" ]; then
+    fail 25 "clean-slate audit failed: spatial_plan already populated at T0"
+fi
+if [ "$AUDIT_COST" != "null" ]; then
+    fail 25 "clean-slate audit failed: ai_cost_estimates already populated at T0"
+fi
+
+log "=== Clean-slate audit PASSED — pipeline output will be entirely pipeline-produced ==="
 
 fetch_supplier_count() {
     # forge_supplier_shortlist is the canonical store; cad_lab_projects has
