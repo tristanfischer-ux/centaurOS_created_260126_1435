@@ -43,6 +43,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getAnthropicKey } from "@/lib/ai/api-keys"
 import { withAuth } from "@/lib/server-action-utils"
+import type { TrustedContext } from "@/lib/server-action-utils"
 import { matchSuppliersForProject } from "@/actions/forge-v2-supplier-match"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
@@ -179,6 +180,7 @@ If you cannot find any real matches, return { "candidates": [] }.`
 export async function discoverSuppliersForGap(
     projectId: string,
     moduleId: string,
+    trusted?: TrustedContext,
 ): Promise<SupplierDiscoveryResult> {
     return withAuth<SupplierDiscoveryResult>(async ({ foundryId }) => {
         const admin = createAdminClient()
@@ -536,5 +538,5 @@ export async function discoverSuppliersForGap(
                 status: "done",
             },
         }
-    })
+    }, trusted)
 }

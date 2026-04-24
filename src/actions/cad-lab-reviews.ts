@@ -19,6 +19,7 @@
  */
 
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import type { TrustedContext } from '@/lib/server-action-utils'
 import type { Json } from "@/types/database.types"
 import type {
     CadLabModule,
@@ -127,6 +128,7 @@ export type ReviewResult =
  */
 export async function requestSpecialistReview(
     req: ReviewRequest,
+    trusted?: TrustedContext,
 ): Promise<ReviewResult> {
     return withAIGate('cad_lab_review', async ({ supabase, foundryId, user }) => {
         const userId = user.id
@@ -397,7 +399,7 @@ ${reviewContext}${assemblyNotesInstructions}`
         }
 
         return { review }
-    })
+    }, trusted)
 }
 
 // ─── Quick Verdict (Phase 1 of two-phase review) ────────────────────

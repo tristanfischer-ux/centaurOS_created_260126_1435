@@ -22,6 +22,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import { classifyPart } from "@/lib/part-classification"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import type { TrustedContext } from '@/lib/server-action-utils'
 
 // ─── Batching constants ───────────────────────────────────────────────
 //
@@ -116,6 +117,7 @@ export async function estimateModuleCostsAi(
   researchExcerpt: string,
   productOverview?: string,
   techniqueInsights?: Record<string, ProcessInsights>,
+  trusted?: TrustedContext,
 ): Promise<EstimateResult | EstimateError> {
   return withAIGate('cad_lab_cost', async () => {
   const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
@@ -441,5 +443,5 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
     console.error("[CAD-LAB-COST] AI estimation failed:", msg)
     return { success: false, error: msg }
   }
-  })
+  }, trusted)
 }

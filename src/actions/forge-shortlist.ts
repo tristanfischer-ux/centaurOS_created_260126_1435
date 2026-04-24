@@ -21,7 +21,9 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import type { ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
+import type { TrustedContext } from "@/lib/server-action-utils"
 
 // ─── Types (serialisable over React Flight) ─────────────────────────
 
@@ -124,10 +126,24 @@ export async function getProjectShortlist(projectId: string): Promise<ShortlistR
 
 // ─── Create / Upsert ────────────────────────────────────────────────
 
-export async function addToShortlist(input: ShortlistUpsertInput): Promise<{ ok: boolean; error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { ok: false, error: "unauthenticated" }
+export async function addToShortlist(
+  input: ShortlistUpsertInput,
+  trusted?: TrustedContext,
+): Promise<{ ok: boolean; error?: string }> {
+  // TRUSTED BYPASS: Background specialists pass a verified userId + foundryId
+  // resolved upstream (e.g. foundry-owner fallback). In that case we skip the
+  // cookie read and use an admin client — the context proves identity.
+  let userId: string
+  let supabase: Awaited<ReturnType<typeof createClient>>
+  if (trusted) {
+    userId = trusted.userId
+    supabase = createAdminClient() as unknown as Awaited<ReturnType<typeof createClient>>
+  } else {
+    supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { ok: false, error: "unauthenticated" }
+    userId = user.id
+  }
 
   const { error } = await supabase
     .from("forge_supplier_shortlist")
@@ -142,7 +158,7 @@ export async function addToShortlist(input: ShortlistUpsertInput): Promise<{ ok:
       best_score_breakdown: input.bestScoreBreakdown as unknown as never,
       all_match_reasons: input.allMatchReasons,
       ramp_role: input.rampRole ?? "unassigned",
-      added_by: user.id,
+      added_by: userId,
     }, { onConflict: "project_id,supplier_id" })
 
   if (error) {

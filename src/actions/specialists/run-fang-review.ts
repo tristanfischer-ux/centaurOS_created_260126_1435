@@ -156,6 +156,22 @@ async function runFangReviewInternal(
         //    proven the caller is in foundryId, now we prove the project
         //    belongs to that foundry so we never leak cross-tenant state.
         const admin = createAdminClient()
+
+        // When autopilot fires Fang reviews via background (userId null), the
+        // downstream `requestSpecialistReview` (withAIGate-wrapped) still
+        // needs a trusted identity to skip cookie reads that fail inside
+        // after() contexts. Fall back to the foundry owner. RT4 Option A.
+        if (!user.id) {
+            const { data: foundry } = await admin
+                .from("foundries")
+                .select("owner_id")
+                .eq("id", foundryId)
+                .maybeSingle()
+            if (foundry?.owner_id) user.id = foundry.owner_id
+        }
+        const trusted = user.id
+            ? { userId: user.id, foundryId }
+            : undefined
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select("id, foundry_id, subject, name, modules, research, diagnostic_answers")
@@ -275,7 +291,7 @@ async function runFangReviewInternal(
                 designBrief: designBrief ?? undefined,
                 diagnosticAnswers: diagnosticAnswers ?? undefined,
                 projectSubject,
-            })
+            }, trusted)
 
             if ("error" in reviewResult) {
                 await failPipelineRun(runId, "REVIEW_FAILED", reviewResult.error)

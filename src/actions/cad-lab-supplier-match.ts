@@ -40,7 +40,9 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { embedText } from "@/lib/search/semantic-search"
+import type { TrustedContext } from "@/lib/server-action-utils"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -493,15 +495,25 @@ function scoreCapabilityMatch(
  */
 export async function matchCadLabModuleSuppliers(
   input: CadLabModuleInput,
+  trusted?: TrustedContext,
 ): Promise<CadLabSupplierMatch[]> {
   // AUTH: reject unauthenticated callers. Returning [] rather than throwing
   // because the caller (source/page.tsx) treats error as "no matches" and
   // this endpoint would otherwise be a public embedding-cost vector.
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    console.warn("[CadLabMatch] Rejected unauthenticated request")
-    return []
+  // TRUSTED BYPASS: Background specialists (Supplier Match autopilot stage)
+  // pass `trusted` with a verified userId + foundryId resolved upstream.
+  // In that case we skip the cookie read and use an admin client — the
+  // trusted context proves the caller has already verified identity.
+  let supabase: Awaited<ReturnType<typeof createClient>>
+  if (trusted) {
+    supabase = createAdminClient() as unknown as Awaited<ReturnType<typeof createClient>>
+  } else {
+    supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.warn("[CadLabMatch] Rejected unauthenticated request")
+      return []
+    }
   }
 
   const hasProcess = !!input.process && input.process.toLowerCase() !== "other"

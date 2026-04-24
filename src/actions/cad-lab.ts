@@ -79,6 +79,7 @@ import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import type { TrustedContext } from '@/lib/server-action-utils'
 import {
   lookupUserSector,
   extractJsonArray,
@@ -125,7 +126,17 @@ import { retrieveProductDimensionsForPrompt } from "@/lib/cad-lab/product-dimens
  * @param feature - Which CAD Lab feature is being used
  * @returns Gate result with optional trackUsage callback
  */
-async function enforceCadLabLimit(userId: string, feature: AIFeature): Promise<{
+async function enforceCadLabLimit(
+  userId: string,
+  feature: AIFeature,
+  /**
+   * Pre-resolved foundryId for server-to-server callers (Background
+   * specialists / autopilot chains) that run in `after()` / post-response
+   * contexts where `getFoundryIdCached()` cannot read cookies. When
+   * provided, the cookie-based lookup is skipped.
+   */
+  trustedFoundryId?: string,
+): Promise<{
   allowed: boolean
   foundryId: string | null
   error?: string
@@ -138,7 +149,7 @@ async function enforceCadLabLimit(userId: string, feature: AIFeature): Promise<{
   const noopTrack = async () => {}
 
   try {
-    const foundryId = await getFoundryIdCached()
+    const foundryId = trustedFoundryId ?? (await getFoundryIdCached())
     if (!foundryId) {
       // SECURITY: Fail closed — no foundry means no way to enforce limits or track usage.
       // This can happen with partially-onboarded accounts or malformed sessions.
@@ -246,18 +257,29 @@ export async function runCadLabResearch(
     assumptionNotes?: string
     documentContext?: string
   },
+  trusted?: TrustedContext,
 ): Promise<CadLabResearchResult> {
   // AUTH: Verify user is authenticated
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: "Unauthorized" } as unknown as CadLabResearchResult
+  // TRUSTED BYPASS: Background specialists (Chase auto-fire) pass `trusted`
+  // so we skip cookie reads that fail inside after() contexts.
+  let userId: string
+  let foundryIdForGate: string | undefined
+  if (trusted) {
+    userId = trusted.userId
+    foundryIdForGate = trusted.foundryId
+  } else {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: "Unauthorized" } as unknown as CadLabResearchResult
+    userId = user.id
+  }
 
   // SECURITY: Rate limit AI calls to prevent cost abuse
-  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${userId}`)
   if (rateLimitError) return { error: rateLimitError } as unknown as CadLabResearchResult
 
   // SECURITY: Enforce monthly AI usage limits
-  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
+  const gate = await enforceCadLabLimit(userId, 'cad_lab_generate', foundryIdForGate)
   if (!gate.allowed) return { error: gate.error } as unknown as CadLabResearchResult
 
   // SECURITY: Cap input lengths to prevent token/cost abuse

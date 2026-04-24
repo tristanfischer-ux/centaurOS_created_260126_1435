@@ -86,6 +86,19 @@ async function generateSystemIllustrationForProjectInternal(
 ): Promise<GenerateSystemIllustrationResult> {
     {
         const admin = createAdminClient()
+
+        // Resolve foundry owner for TrustedContext so the inner
+        // `generateCadLabSystemIllustrationAction` (withAIGate-wrapped) can
+        // skip cookie reads that fail inside after() contexts. RT4 Option A.
+        const { data: foundry } = await admin
+            .from("foundries")
+            .select("owner_id")
+            .eq("id", foundryId)
+            .maybeSingle()
+        const trusted = foundry?.owner_id
+            ? { userId: foundry.owner_id, foundryId }
+            : undefined
+
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select("id, foundry_id, subject, modules, illustration_style, visual_style, dimension_sheet, spatial_plan")
@@ -197,6 +210,7 @@ async function generateSystemIllustrationForProjectInternal(
                 undefined,
                 undefined,
                 illustrationStyle,
+                trusted,
             )
             if ("error" in res) {
                 return {

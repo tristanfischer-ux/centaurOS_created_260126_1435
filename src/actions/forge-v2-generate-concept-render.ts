@@ -99,6 +99,18 @@ async function generateConceptRenderForProjectInternal(
 ): Promise<GenerateConceptRenderResult> {
     {
         const admin = createAdminClient()
+
+        // Foundry-owner fallback for TrustedContext — see RT4 Option A
+        // rationale in src/actions/forge-v2-generate-system-illustration.ts.
+        const { data: foundry } = await admin
+            .from("foundries")
+            .select("owner_id")
+            .eq("id", foundryId)
+            .maybeSingle()
+        const trusted = foundry?.owner_id
+            ? { userId: foundry.owner_id, foundryId }
+            : undefined
+
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select("id, foundry_id, subject, modules")
@@ -155,6 +167,7 @@ async function generateConceptRenderForProjectInternal(
                 undefined,
                 undefined,
                 CONCEPT_STYLE,
+                trusted,
             )
             if ("error" in res) {
                 return {

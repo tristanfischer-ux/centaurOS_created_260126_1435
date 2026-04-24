@@ -16,6 +16,7 @@
 import { after } from "next/server"
 
 import { withAuth } from "@/lib/server-action-utils"
+import type { TrustedContext } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { ensureCadLabProjectOwnership } from "@/lib/cad-lab/project-ownership"
@@ -462,6 +463,7 @@ export async function createCadLabProject(
 export async function saveCadLabResearch(
   projectId: string,
   research: CadLabResearchResult,
+  trusted?: TrustedContext,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
@@ -491,7 +493,7 @@ export async function saveCadLabResearch(
     }
 
     return { success: true as const }
-  })
+  }, trusted)
 }
 
 // ─── Save Interface Definition (Step 2) ──────────────────────────────
@@ -1481,6 +1483,7 @@ export async function rateModuleQuality(
 export async function saveCadLabAiCostEstimates(
   projectId: string,
   estimates: Record<string, AiCostEstimate>,
+  trusted?: TrustedContext,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
@@ -1496,7 +1499,7 @@ export async function saveCadLabAiCostEstimates(
     }
 
     return { success: true as const }
-  })
+  }, trusted)
 }
 
 // ─── Save Part Category Overrides ────────────────────────────────────

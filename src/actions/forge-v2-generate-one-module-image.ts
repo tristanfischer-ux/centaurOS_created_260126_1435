@@ -133,6 +133,19 @@ async function generateOneModuleImageInternal(
     {
         const admin = createAdminClient()
 
+        // Foundry-owner fallback for TrustedContext — the inner
+        // generateCadLabSingleImageAction + flipCadLabImageForMirrorAction are
+        // both withAIGate-wrapped and would otherwise fail on cookie reads
+        // inside after() / render-stage contexts. RT4 Option A.
+        const { data: foundryOwner } = await admin
+            .from("foundries")
+            .select("owner_id")
+            .eq("id", foundryId)
+            .maybeSingle()
+        const trusted = foundryOwner?.owner_id
+            ? { userId: foundryOwner.owner_id, foundryId }
+            : undefined
+
         // 1. Load project (auth + foundry check) and its current modules.
         // system_illustration_url is included so every per-module render
         // can be anchored to the already-rendered cover — Gemini 3.1
@@ -236,6 +249,7 @@ async function generateOneModuleImageInternal(
                     primaryImageUrl,
                     axis,
                     target.name,
+                    trusted,
                 )
                 if ("imageUrl" in flipRes) {
                     // Persist the flipped URL to just this module's slot,
@@ -610,6 +624,7 @@ async function generateOneModuleImageInternal(
                 moduleCropBase64,
                 illustrationStyle,
                 systemIllustrationRefMimeType,
+                trusted,
             )
         } catch (err) {
             const rawError = extractRawErrorMessage(err)

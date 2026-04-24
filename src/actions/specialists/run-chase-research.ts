@@ -196,6 +196,30 @@ async function runChaseResearchInternal(
         //    caller DOES own from a different session angle, then we
         //    check foundry_id ourselves to block cross-tenant spoofs.
         const admin = createAdminClient()
+
+        // When autopilot fires Chase via background (userId null), the
+        // downstream runCadLabResearch + saveCadLabResearch still need a
+        // trusted identity to skip cookie-backed auth that fails inside
+        // after() contexts. Fall back to the foundry owner — the legitimate
+        // "system user" for this tenant. Mirrors the pattern in
+        // run-max-decomposition.ts:180-189 (RT4 Option A).
+        if (!user.id) {
+            const { data: foundry } = await admin
+                .from("foundries")
+                .select("owner_id")
+                .eq("id", foundryId)
+                .maybeSingle()
+            if (foundry?.owner_id) user.id = foundry.owner_id
+        }
+
+        // TrustedContext for the deep call chain (runCadLabResearch,
+        // saveCadLabResearch). Only construct when we have a resolved
+        // userId — otherwise fall back to untrusted (cookie) path which
+        // will fail the same way it did before this patch, but at least
+        // loudly.
+        const trusted = user.id
+            ? { userId: user.id, foundryId }
+            : undefined
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select("id, foundry_id, subject, research")
@@ -346,6 +370,7 @@ async function runChaseResearchInternal(
                         retried = true
                         firstErrorMessage = firstErr
                     },
+                    trusted,
                 })
 
             const report =
@@ -458,7 +483,7 @@ async function runChaseResearchInternal(
                 ...researchResult,
                 designBrief: mergedDesignBrief,
             }
-            const saveResult = await saveCadLabResearch(projectId, researchToSave)
+            const saveResult = await saveCadLabResearch(projectId, researchToSave, trusted)
             if ("error" in saveResult) {
                 await failPipelineRun(runId, "SAVE_FAILED", saveResult.error, {
                     input_tokens: extraction.tokensIn,
@@ -602,6 +627,11 @@ async function runResearchWithOneRetry(
         priorDesignBrief: CadLabDesignBrief | undefined
         priorAssumptionNotes: string | undefined
         onRetry: (firstErrorMessage: string) => void
+        /**
+         * TrustedContext for the after()-context calls — skips the cookie
+         * read inside `runCadLabResearch` that would otherwise fail.
+         */
+        trusted?: { userId: string; foundryId: string }
     },
 ): Promise<CadLabResearchResult> {
     const researchArg = opts.priorDesignBrief
@@ -611,7 +641,7 @@ async function runResearchWithOneRetry(
           }
         : undefined
 
-    const first = await runCadLabResearch(description, researchArg)
+    const first = await runCadLabResearch(description, researchArg, opts.trusted)
     if (first.success) return first
 
     const errMsg = typeof first.error === "string" ? first.error : ""
@@ -627,7 +657,7 @@ async function runResearchWithOneRetry(
     )
     opts.onRetry(errMsg)
     await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
-    return runCadLabResearch(description, researchArg)
+    return runCadLabResearch(description, researchArg, opts.trusted)
 }
 
 interface ExtractionResult {

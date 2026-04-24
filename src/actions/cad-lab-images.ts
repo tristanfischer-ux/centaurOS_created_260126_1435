@@ -25,6 +25,7 @@ import { getDesignSynthesisPrompt, getProductIdentityPrompt, getDesignReconcilia
 import type { ModuleConnection } from "@/lib/cad-lab-types"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { withAuth } from '@/lib/server-action-utils'
+import type { TrustedContext } from '@/lib/server-action-utils'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -187,6 +188,7 @@ export async function generateCadLabSingleImageAction(
   moduleCropBase64?: string,
   illustrationStyle?: IllustrationStyle,
   referenceMimeType?: string,
+  trusted?: TrustedContext,
 ): Promise<ImageGenResult | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     // SECURITY: Block cross-foundry projectId — generateModuleImage writes to
@@ -272,7 +274,7 @@ export async function generateCadLabSingleImageAction(
         imageError: rawMsg,
       }
     }
-  })
+  }, trusted)
 }
 
 /**
@@ -377,6 +379,7 @@ export async function generateCadLabSystemIllustrationAction(
   heroPrompt?: string,
   referenceImageUrls?: string[],
   illustrationStyle: IllustrationStyle = DEFAULT_ILLUSTRATION_STYLE,
+  trusted?: TrustedContext,
 ): Promise<{ url: string; confidence?: "high" | "low" | "unavailable"; score?: number | null; issues?: string[] } | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     // SECURITY: hero illustration also writes to xray-images/<projectId>/.
@@ -494,7 +497,7 @@ export async function generateCadLabSystemIllustrationAction(
       console.error("[CAD-LAB-IMAGES] Failed to generate system illustration:", errorMsg)
       return { error: errorMsg }
     }
-  })
+  }, trusted)
 }
 
 /** Build the hero quality rubric used by the vision scorer. Generic by default;
@@ -1187,6 +1190,7 @@ export async function flipCadLabImageForMirrorAction(
   primaryImageUrl: string,
   axis: MirrorAxis = 'horizontal',
   mirrorModuleName?: string,
+  trusted?: TrustedContext,
 ): Promise<{ imageUrl: string } | { error: string }> {
   return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
     const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
@@ -1274,5 +1278,5 @@ export async function flipCadLabImageForMirrorAction(
       console.error("[CAD-LAB-IMAGES] Flip failed:", errorMsg)
       return { error: errorMsg }
     }
-  })
+  }, trusted)
 }

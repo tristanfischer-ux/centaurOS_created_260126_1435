@@ -16,7 +16,7 @@
  */
 
 import { withAuth } from '@/lib/server-action-utils'
-import type { AuthContext } from '@/lib/server-action-utils'
+import type { AuthContext, TrustedContext } from '@/lib/server-action-utils'
 import { checkAILimit } from '@/lib/ai/limit-check'
 import { trackAIUsage } from '@/lib/ai/usage-tracking'
 import type { AIFeature } from '@/lib/ai/usage-tracking'
@@ -74,8 +74,12 @@ export interface AIGateContext extends AuthContext {
  */
 export async function withAIGate<T>(
   feature: AIFeature,
-  action: (ctx: AIGateContext) => Promise<T>
+  action: (ctx: AIGateContext) => Promise<T>,
+  trusted?: TrustedContext
 ): Promise<T> {
+  // TRUSTED BYPASS: when `trusted` is passed, `withAuth` uses an admin
+  // client and skips cookie reads. See `withAuth` / `TrustedContext`
+  // JSDoc in server-action-utils.ts for the full contract.
   return withAuth(async (authCtx) => {
     // SECURITY: Check AI usage limit before executing the action
     const limitCheck = await checkAILimit(authCtx.foundryId)
@@ -153,5 +157,5 @@ export async function withAIGate<T>(
     }
 
     return result
-  })
+  }, trusted)
 }

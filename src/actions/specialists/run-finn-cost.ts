@@ -173,6 +173,24 @@ async function runFinnCostInternal(
         //    never want to silently cost another tenant's project on behalf
         //    of this caller.
         const admin = createAdminClient()
+
+        // When autopilot fires this via background (userId null), downstream
+        // estimateModuleCostsAi + saveCadLabAiCostEstimates still need a
+        // trusted identity to skip cookie reads that fail inside after()
+        // contexts. Fall back to the foundry owner — the legitimate "system
+        // user" for this tenant. Mirrors the pattern in
+        // run-max-decomposition.ts:180-189 (RT4 Option A).
+        if (!user.id) {
+            const { data: foundry } = await admin
+                .from("foundries")
+                .select("owner_id")
+                .eq("id", foundryId)
+                .maybeSingle()
+            if (foundry?.owner_id) user.id = foundry.owner_id
+        }
+        const trusted = user.id
+            ? { userId: user.id, foundryId }
+            : undefined
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
@@ -340,6 +358,8 @@ async function runFinnCostInternal(
                 diagnosticAnswers,
                 researchExcerpt,
                 productOverview,
+                undefined,
+                trusted,
             )
 
             if (!estimateResult.success) {
@@ -362,7 +382,7 @@ async function runFinnCostInternal(
             // 6. Persist onto cad_lab_projects.ai_cost_estimates JSONB.
             //    saveCadLabAiCostEstimates is itself withAuth-wrapped and
             //    returns `{ success: true }` or `{ error }`.
-            const saveResult = await saveCadLabAiCostEstimates(projectId, estimates)
+            const saveResult = await saveCadLabAiCostEstimates(projectId, estimates, trusted)
             if ("error" in saveResult) {
                 await failPipelineRun(
                     runId,

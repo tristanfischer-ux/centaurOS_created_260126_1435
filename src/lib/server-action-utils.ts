@@ -30,6 +30,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import {
   sanitizeErrorMessage,
@@ -47,6 +48,38 @@ export interface AuthContext {
   /** Authenticated user (guaranteed non-null) */
   user: User
   /** User's active foundry ID (guaranteed non-null) */
+  foundryId: string
+}
+
+/**
+ * TrustedContext — a verified identity passed by server-to-server callers
+ * (Background specialists, autopilot dispatchers) that have ALREADY verified
+ * auth upstream in the request chain but run in a post-response context
+ * (`after()`, `/api/autopilot-step`, `/api/render-stage`) where cookies are
+ * not available.
+ *
+ * When present, `withAuth` / `withUser` / `withAIGate` SKIP the cookie read
+ * and `supabase.auth.getUser()` call, and inject this identity directly into
+ * the wrapped callback. The inner `supabase` client becomes an admin client
+ * (RLS-bypassed) — the trusted context proves ownership, so the caller is
+ * responsible for filtering by `foundryId` in multi-tenant queries.
+ *
+ * **SECURITY CONTRACT (CRITICAL):**
+ * - `TrustedContext` MUST ONLY be constructed server-side by code that has
+ *   already verified the caller's identity (either via an upstream `withAuth`
+ *   or a shared-secret gate like `/api/autopilot-step` / `/api/render-stage`).
+ * - `TrustedContext` MUST NEVER be deserialised from an HTTP request body,
+ *   query parameter, or header — doing so would allow clients to forge
+ *   identity and bypass RLS entirely.
+ * - Both fields are required. Do not accept null/undefined members.
+ *
+ * @see `src/actions/specialists/run-*.ts` — Background specialists that
+ *      construct TrustedContext from the foundry-owner-fallback pattern.
+ */
+export interface TrustedContext {
+  /** Verified user id (forged `User.id` in the downstream callback) */
+  userId: string
+  /** Verified foundry id (set as `foundryId` in the downstream callback) */
   foundryId: string
 }
 
@@ -147,9 +180,26 @@ export function buildServerActionError(error: unknown): ServerActionError {
  * ```
  */
 export async function withAuth<T>(
-  action: (ctx: AuthContext) => Promise<T>
+  action: (ctx: AuthContext) => Promise<T>,
+  trusted?: TrustedContext
 ): Promise<T> {
   try {
+    // TRUSTED BYPASS: When a server-to-server caller has already verified
+    // auth upstream (e.g. Background specialist fired from /api/autopilot-step
+    // or /api/render-stage, both of which are protected by a shared-secret
+    // gate), they pass `trusted` to skip the cookie read entirely. The
+    // downstream callback receives an admin client — the caller MUST filter
+    // by foundryId explicitly for multi-tenant isolation.
+    if (trusted) {
+      const admin = createAdminClient()
+      const user = { id: trusted.userId } as unknown as User
+      return await action({
+        supabase: admin as unknown as Awaited<ReturnType<typeof createClient>>,
+        user,
+        foundryId: trusted.foundryId,
+      })
+    }
+
     // AUTH: Create authenticated Supabase client
     const supabase = await createClient()
 
@@ -222,9 +272,21 @@ export async function withAuth<T>(
  * ```
  */
 export async function withUser<T>(
-  action: (ctx: Omit<AuthContext, 'foundryId'>) => Promise<T>
+  action: (ctx: Omit<AuthContext, 'foundryId'>) => Promise<T>,
+  trusted?: TrustedContext
 ): Promise<T> {
   try {
+    // TRUSTED BYPASS: See `withAuth` for the contract. withUser does not
+    // require a foundry, so only `trusted.userId` is used here.
+    if (trusted) {
+      const admin = createAdminClient()
+      const user = { id: trusted.userId } as unknown as User
+      return await action({
+        supabase: admin as unknown as Awaited<ReturnType<typeof createClient>>,
+        user,
+      })
+    }
+
     const supabase = await createClient()
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()

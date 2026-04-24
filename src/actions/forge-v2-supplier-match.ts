@@ -92,6 +92,20 @@ async function matchSuppliersForProjectInternal(
 ): Promise<MatchSuppliersForProjectResult> {
     {
         const admin = createAdminClient()
+
+        // Foundry-owner fallback for TrustedContext so the downstream
+        // matchCadLabModuleSuppliers, addToShortlist, and the auto-fired
+        // discoverSuppliersForGap can skip cookie reads inside after()
+        // contexts. RT4 Option A.
+        const { data: foundryOwner } = await admin
+            .from("foundries")
+            .select("owner_id")
+            .eq("id", foundryId)
+            .maybeSingle()
+        const trusted = foundryOwner?.owner_id
+            ? { userId: foundryOwner.owner_id, foundryId }
+            : undefined
+
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select("id, foundry_id, modules, diagnostic_answers")
@@ -175,7 +189,7 @@ async function matchSuppliersForProjectInternal(
             }
             let matches: CadLabSupplierMatch[] = []
             try {
-                matches = await matchCadLabModuleSuppliers(input)
+                matches = await matchCadLabModuleSuppliers(input, trusted)
             } catch (err) {
                 console.error(
                     `[forge-v2-supplier-match] scorer threw for module ${mod.id}:`,
@@ -220,7 +234,7 @@ async function matchSuppliersForProjectInternal(
                 bestMatchScore: match.matchScore,
                 bestScoreBreakdown: match.scoreBreakdown,
                 allMatchReasons: match.matchReasons,
-            })
+            }, trusted)
             if (res.ok) {
                 suppliersAdded += 1
             } else {
@@ -271,6 +285,7 @@ async function matchSuppliersForProjectInternal(
                     const res = await discoverSuppliersForGap(
                         projectId,
                         moduleWithoutMatch.id,
+                        trusted,
                     )
                     if (!res.ok) {
                         console.warn(
