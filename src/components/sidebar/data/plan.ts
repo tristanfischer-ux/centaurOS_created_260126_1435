@@ -4,6 +4,7 @@ import {
   History,
   Star,
   Target,
+  UsersRound,
   Waypoints,
 } from 'lucide-react'
 import type { SidebarNavItem } from './types'
@@ -30,7 +31,9 @@ import type { SidebarNavItem } from './types'
  */
 
 // Hidden during pivot focus (2026-04-24): Review, Reports, Red Team, Knowledge.
+// Specialists moved here from Workshop 2026-04-24 — sidebar section renamed "Brainstorming".
 export const planNavigation: SidebarNavItem[] = [
+  { name: 'Specialists', href: '/agents', icon: UsersRound, tooltip: '13 specialists — strategy, engineering, finance, legal, hiring, and more' },
   { name: 'Strategy', href: '/strategy', icon: Waypoints, tooltip: 'Your strategic direction — pillars, progress, and health at a glance' },
   { name: 'Objectives', href: '/new-objectives', icon: Target, tooltip: 'Milestones that move the strategy forward' },
   { name: 'Tasks', href: '/new-tasks', icon: CheckSquare, tooltip: 'Day-to-day work that delivers on objectives' },

@@ -412,10 +412,10 @@ export function Sidebar({
                     </>
                 )}
 
-                {/* PLAN */}
+                {/* PLAN (renamed "Brainstorming" 2026-04-24 during pivot) */}
                 <div className="mt-1.5 mb-0.5 border-t border-border" />
                 <SectionHeader
-                    label="Plan"
+                    label="Brainstorming"
                     introRoute="/plan"
                     hasNew={badges.plan}
                     isOpen={openSections.plan}
