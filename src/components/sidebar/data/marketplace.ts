@@ -20,7 +20,7 @@ import type { SidebarNavItem } from './types'
  */
 
 export const marketplacePeopleNavigation: SidebarNavItem[] = [
-  { name: 'Hire People', href: '/recruits', icon: UserSearch, tooltip: 'Find expert talent — fractional executives, specialists, and consultants' },
+  { name: 'Fractional Executives', href: '/recruits', icon: UserSearch, tooltip: 'Find expert talent — fractional executives, specialists, and consultants' },
 ]
 
 export const marketplaceSuppliesNavigation: SidebarNavItem[] = [

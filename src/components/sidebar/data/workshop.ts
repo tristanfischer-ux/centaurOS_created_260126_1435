@@ -1,6 +1,5 @@
 import {
   Hammer,
-  Users,
 } from 'lucide-react'
 import type { SidebarNavItem } from './types'
 
@@ -18,13 +17,12 @@ import type { SidebarNavItem } from './types'
  * opt-in via new_forge_experience flag is the safer path.
  */
 
-// Hidden during pivot focus (2026-04-24): Products, Browse.
-// Moved to Brainstorming 2026-04-24: Specialists, Outputs.
+// Hidden during pivot focus (2026-04-24): Products, Browse, Team.
+// Moved to Brainstorming 2026-04-24: Specialists (renamed "Brainstorm"), Outputs.
 // Moved to Marketplace + renamed "Manufacturing Techniques" 2026-04-24: Inspiration.
 export function getWorkshopNavigation(newForgeExperience: boolean = false): SidebarNavItem[] {
   const forgeHref = newForgeExperience ? '/the-forge-v2' : '/the-forge'
   return [
     { name: 'The Forge', href: forgeHref, icon: Hammer, tooltip: 'Explore materials, manufacturing approaches, and find suppliers' },
-    { name: 'Team', href: '/team', icon: Users, tooltip: 'Team members, roles, and capacity' },
   ]
 }

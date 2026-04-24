@@ -34,7 +34,7 @@ import type { SidebarNavItem } from './types'
 // Moved here from Workshop 2026-04-24: Specialists (top), Outputs (bottom).
 // Sidebar section renamed "Brainstorming".
 export const planNavigation: SidebarNavItem[] = [
-  { name: 'Specialists', href: '/agents', icon: UsersRound, tooltip: '13 specialists — strategy, engineering, finance, legal, hiring, and more' },
+  { name: 'Brainstorm', href: '/agents', icon: UsersRound, tooltip: 'Open the brainstorming page — idea prompts, huddles, and team meetings' },
   { name: 'Strategy', href: '/strategy', icon: Waypoints, tooltip: 'Your strategic direction — pillars, progress, and health at a glance' },
   { name: 'Objectives', href: '/new-objectives', icon: Target, tooltip: 'Milestones that move the strategy forward' },
   { name: 'Tasks', href: '/new-tasks', icon: CheckSquare, tooltip: 'Day-to-day work that delivers on objectives' },
