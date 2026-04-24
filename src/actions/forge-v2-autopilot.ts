@@ -978,39 +978,18 @@ async function stepGenerateIllustration(projectId: string): Promise<void> {
 
     await advance(projectId, "generating_illustration", "matching_suppliers")
 
-    // Kick off per-module render chain in parallel with supplier matching.
-    // The render chain uses its own `after()` + `image_render_state` idempotency
-    // gate (ALREADY_RUNNING is a no-op), so a concurrent page-load auto-fire
-    // from modules/page.tsx won't double-render. Module renders take ~3 min
-    // for a typical project — firing here means founders land on the modules
-    // page with renders already in progress, matching Tristan's "feels faster"
-    // goal (2026-04-22 decision: swap to gpt-image-2 + auto-fire the chain).
-    // P0.2: use the Background variant — this after() runs post-response
-    // where cookies are gone; the withAuth-wrapped
-    // startRenderAllRemainingModuleImages would return "Unauthorized".
-    const capturedFoundryIdForRender = foundryIdForChain
-    after(async () => {
-        try {
-            const { startRenderAllRemainingModuleImagesBackground } = await import(
-                "./forge-v2-render-all-modules"
-            )
-            const res = await startRenderAllRemainingModuleImagesBackground(
-                projectId,
-                capturedFoundryIdForRender,
-            )
-            if (!res.ok && res.errorCode !== "ALREADY_RUNNING" && res.errorCode !== "NO_UNRENDERED_MODULES") {
-                console.warn(
-                    "[autopilot] auto-fire module renders failed (non-fatal):",
-                    res.error,
-                )
-            }
-        } catch (err) {
-            console.warn(
-                "[autopilot] auto-fire module renders threw (non-fatal):",
-                err instanceof Error ? err.message : err,
-            )
-        }
-    })
+    // V1 CUT (2026-04-24, per Tristan PDF review): drop per-module renders.
+    // Rationale: 2/8 modules rendered on the last autopilot run — inconsistent
+    // "half-built" look. Cover + hero illustration above already ship. Module
+    // renders add ~12 min of the 20 min runtime, are the flakiest pipeline
+    // (gpt-image-2 timeouts, consistency retries), and the PDF already
+    // degrades gracefully to "no render generated" rows. Bringing them back
+    // in V1.1 after we can guarantee 8/8 reliability. To re-enable, restore
+    // the startRenderAllRemainingModuleImagesBackground block that was here.
+    //
+    // Page-load auto-fire on /modules still works (tickImageRenderChain +
+    // the user clicking "Render all"), so founders who want per-module
+    // imagery can trigger it manually. Autopilot just won't wait for it.
 
     // P0.1b: HTTP hop — fresh container for supplier matching. The
     // after() above that kicks the per-module render chain STAYS as-is

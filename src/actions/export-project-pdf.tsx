@@ -1541,6 +1541,9 @@ function featureStyle(
  *
  * Never fabricates coordinates — everything comes off the persisted plan.
  */
+// V1 flag: flip to true once the @react-pdf SVG black-rect issue is fixed.
+const SHOW_SPATIAL_DRAWING = false
+
 function SpatialPlanSection({
     plan,
     sectionNumber,
@@ -2047,17 +2050,26 @@ function SpatialPlanSection({
                     </Text>
                 </View>
             )}
-            {is2D ? (
-                <>
-                    {axisCaption}
-                    <View wrap={false} style={{ marginBottom: 8 }}>
-                        {drawing2D}
-                    </View>
-                    {legend}
-                </>
-            ) : (
-                drawingStack
-            )}
+            {/* V1 CUT (2026-04-24): drop the SVG/stack drawing. Even with
+                the explicit white background Rect, @react-pdf/renderer
+                still output a solid black rectangle for the spatial
+                diagram (observed BESS PDF page 7 2026-04-23). The
+                placement table + constraints list + notes below convey
+                the same information readably. Bring the drawing back in
+                V1.1 — likely needs a server-side PNG raster fallback.
+                Kept as a feature flag so we can flip back when fixed. */}
+            {SHOW_SPATIAL_DRAWING &&
+                (is2D ? (
+                    <>
+                        {axisCaption}
+                        <View wrap={false} style={{ marginBottom: 8 }}>
+                            {drawing2D}
+                        </View>
+                        {legend}
+                    </>
+                ) : (
+                    drawingStack
+                ))}
             <View
                 style={{
                     flexDirection: "row",
@@ -2198,8 +2210,11 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             {/* 7. Suppliers */}
             <SuppliersPage suppliers={data.suppliers} sources={data.sources} />
 
-            {/* 8. Audit log */}
-            <AuditLogPage rows={data.auditLog} />
+            {/* 8. Audit log — V1 CUT (2026-04-24): autopilot isn't writing
+                audit_log rows, section always renders "No audit events
+                recorded". Remove from PDF until audit writes are wired.
+                <AuditLogPage rows={data.auditLog} />
+            */}
         </Document>
     )
 }
