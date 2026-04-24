@@ -321,6 +321,9 @@ async function runMaxDecompositionInternal(
                 description,
                 report,
                 modelId,
+                undefined, // domainHint
+                undefined, // documentContext
+                userId ?? undefined, // trustedUserId — skips cookies-backed auth inside when running from autopilot hop
             )
 
             if (!skeletonResult.success || skeletonResult.modules.length === 0) {
@@ -364,6 +367,10 @@ async function runMaxDecompositionInternal(
                         description,
                         report,
                         modelId,
+                        undefined, // domainHint
+                        undefined, // consistencyBrief
+                        undefined, // documentContext
+                        userId ?? undefined, // trustedUserId — same bypass as skeletonDecompose
                     ),
             )
 

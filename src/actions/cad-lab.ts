@@ -1978,19 +1978,34 @@ export async function skeletonDecompose(
   modelId: ClaudeModelId = "claude-opus-4-7",
   domainHint?: CadLabDomain,
   documentContext?: string,
+  // GOTCHA (2026-04-24): when called from the autopilot HTTP-hop context
+  // (/api/autopilot-step → runMaxDecompositionBackground → here), cookies
+  // are gone so supabase.auth.getUser() returns null and this function
+  // returned { error: "Unauthorized" } with a 36ms failure. Observed on
+  // verify-autopilot run 4. Callers that already have a verified userId +
+  // budget check (the Background path) pass `trustedUserId` to skip the
+  // cookie-based auth layer. The inner budget check (enforceCadLabLimit)
+  // is also bypassed because runMaxDecompositionInternal already ran
+  // checkAILimit before firing this call — defence-in-depth double-charge
+  // isn't needed.
+  trustedUserId?: string,
 ): Promise<SkeletonDecompositionResult> {
-  // AUTH: Verify user is authenticated
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: "Unauthorized", modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 }
+  let userId: string
+  if (trustedUserId) {
+    userId = trustedUserId
+  } else {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "Unauthorized", modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 }
+    userId = user.id
 
-  // SECURITY: Rate limit
-  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
-  if (rateLimitError) return { success: false, error: rateLimitError, modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 }
+    const rateLimitError = await checkRateLimit("aiCadLab", `ai:${userId}`)
+    if (rateLimitError) return { success: false, error: rateLimitError, modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 }
 
-  // SECURITY: Enforce monthly AI usage limits
-  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
-  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached", modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 } as SkeletonDecompositionResult
+    const gate = await enforceCadLabLimit(userId, 'cad_lab_generate')
+    if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached", modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 } as SkeletonDecompositionResult
+  }
+  void userId // reserved for future logging; currently unused in non-trusted path after inlining above
 
   const start = Date.now()
 
@@ -2151,15 +2166,20 @@ export async function expandModuleDetail(
   domainHint?: CadLabDomain,
   consistencyBrief?: string,
   documentContext?: string,
+  // See skeletonDecompose: same cookies-in-after() bypass. When called
+  // from the autopilot background path, the caller has already verified
+  // auth + budget, so we skip the user.getUser() + enforceCadLabLimit
+  // calls that would otherwise fail with "Unauthorized" in that context.
+  trustedUserId?: string,
 ): Promise<ModuleExpansionResult> {
-  // AUTH: Verify user is authenticated (no separate rate limit — skeleton already rate-limited)
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: "Unauthorized", moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 }
+  if (!trustedUserId) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "Unauthorized", moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 }
 
-  // SECURITY: Enforce monthly AI usage limits
-  const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate_module')
-  if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached", moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 } as ModuleExpansionResult
+    const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate_module')
+    if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached", moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 } as ModuleExpansionResult
+  }
 
   const target = skeletonModules.find(m => m.id === targetModuleId)
   if (!target) return { success: false, error: `Module ${targetModuleId} not found in skeleton`, moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 }
