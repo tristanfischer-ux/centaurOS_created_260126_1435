@@ -473,20 +473,7 @@ export function Sidebar({
                 />
                 <Collapsible open={openSections.marketplace}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        <div className="px-3 pt-1 pb-0.5">
-                            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                                People
-                            </p>
-                        </div>
-                        {marketplacePeopleNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                        <div className="px-3 pt-2 pb-0.5">
-                            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                                Supplies
-                            </p>
-                        </div>
-                        {marketplaceSuppliesNavigation.map((item) => (
+                        {[...marketplacePeopleNavigation, ...marketplaceSuppliesNavigation].map((item) => (
                             <NavLink key={item.name} item={item} pathname={pathname} />
                         ))}
                     </CollapsibleContent>
