@@ -1236,17 +1236,44 @@ async function stepGeneratePdf(projectId: string): Promise<void> {
                     uploadErr.message,
                 )
             } else {
-                // Record a report_downloads row so the UI can surface it.
-                await admin
-                    .from("report_downloads")
-                    .insert({
-                        foundry_id: foundryId,
-                        report_name: result.filename,
-                        report_source: "forge-autopilot",
-                        file_format: "pdf",
-                        file_size_bytes: result.sizeBytes,
-                        storage_path: storagePath,
-                    })
+                // V1 FIX (2026-04-24): report_downloads.profile_id is NOT NULL
+                // with no default. Prior insert omitted it — Postgres rejected
+                // the row silently (no error propagation), so the PDF landed
+                // in storage but never surfaced in the UI. Resolve the
+                // foundry owner's profile_id explicitly.
+                const { data: ownerRow } = await admin
+                    .from("foundries")
+                    .select("owner_id")
+                    .eq("id", foundryId)
+                    .maybeSingle()
+                const profileId = ownerRow?.owner_id ?? null
+                if (!profileId) {
+                    console.warn(
+                        `[autopilot] PDF uploaded but no foundry owner_id for ${foundryId} — skipping report_downloads insert`,
+                    )
+                } else {
+                    const { error: insertErr } = await admin
+                        .from("report_downloads")
+                        .insert({
+                            foundry_id: foundryId,
+                            profile_id: profileId,
+                            report_name: result.filename,
+                            report_source: "forge-autopilot",
+                            file_format: "pdf",
+                            file_size_bytes: result.sizeBytes,
+                            storage_path: storagePath,
+                        })
+                    if (insertErr) {
+                        console.warn(
+                            "[autopilot] report_downloads insert failed (non-fatal, PDF in storage):",
+                            insertErr.message,
+                        )
+                    } else {
+                        console.info(
+                            `[autopilot] PDF landed in storage + report_downloads for project ${projectId}`,
+                        )
+                    }
+                }
             }
         } catch (uploadThrow) {
             console.warn(
