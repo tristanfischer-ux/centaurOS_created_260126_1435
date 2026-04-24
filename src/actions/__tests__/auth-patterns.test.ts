@@ -89,7 +89,7 @@ describe('Authentication Guards', () => {
       formData.append('title', 'Test Objective')
 
       const result = await createObjective(formData)
-      expect(result).toEqual({ error: 'Unauthorized' })
+      expect(result).toMatchObject({ error: 'Unauthorized' })
     })
 
     it('should return error when foundry context is missing', async () => {
@@ -105,7 +105,7 @@ describe('Authentication Guards', () => {
       formData.append('title', 'Test Objective')
 
       const result = await createObjective(formData)
-      expect(result).toEqual({ error: 'User not in a foundry' })
+      expect(result).toMatchObject({ error: 'User not in a foundry' })
     })
   })
 

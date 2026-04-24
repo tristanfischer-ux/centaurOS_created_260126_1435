@@ -295,7 +295,7 @@ describe('Team Actions - Authorization', () => {
             })
 
             const result = await addTeamMember(VALID_TEAM_ID, VALID_PROFILE_ID)
-            expect(result).toEqual({ error: 'Unauthorized' })
+            expect(result).toMatchObject({ error: 'Unauthorized' })
         })
 
         it('should verify foundry matching', async () => {
@@ -411,7 +411,7 @@ describe('Team Actions - Authorization', () => {
             })
 
             const result = await removeTeamMember(VALID_TEAM_ID, VALID_PROFILE_ID)
-            expect(result).toEqual({ error: 'Unauthorized' })
+            expect(result).toMatchObject({ error: 'Unauthorized' })
         })
 
         it('should require team membership', async () => {

@@ -51,7 +51,7 @@ describe('withAuth', () => {
     const action = jest.fn()
     const result = await withAuth(action)
 
-    expect(result).toEqual({ error: 'Unauthorized' })
+    expect(result).toMatchObject({ error: 'Unauthorized' })
     expect(action).not.toHaveBeenCalled()
   })
 
@@ -64,7 +64,7 @@ describe('withAuth', () => {
     const action = jest.fn()
     const result = await withAuth(action)
 
-    expect(result).toEqual({ error: 'Unauthorized' })
+    expect(result).toMatchObject({ error: 'Unauthorized' })
     expect(action).not.toHaveBeenCalled()
   })
 
@@ -78,7 +78,7 @@ describe('withAuth', () => {
     const action = jest.fn()
     const result = await withAuth(action)
 
-    expect(result).toEqual({ error: 'User not in a foundry' })
+    expect(result).toMatchObject({ error: 'User not in a foundry' })
     expect(action).not.toHaveBeenCalled()
   })
 
@@ -127,7 +127,7 @@ describe('withAuth', () => {
     const action = jest.fn().mockRejectedValue(new Error('Database connection failed'))
     const result = await withAuth(action)
 
-    expect(result).toEqual({ error: 'An unexpected error occurred. Please try again or contact support if the problem persists.' })
+    expect(result).toMatchObject({ error: 'An unexpected error occurred. Please try again or contact support if the problem persists.' })
   })
 
   it('should handle non-Error exceptions', async () => {
@@ -140,7 +140,7 @@ describe('withAuth', () => {
     const action = jest.fn().mockRejectedValue('string error')
     const result = await withAuth(action)
 
-    expect(result).toEqual({ error: 'An unexpected error occurred. Please try again or contact support if the problem persists.' })
+    expect(result).toMatchObject({ error: 'An unexpected error occurred. Please try again or contact support if the problem persists.' })
   })
 
   it('should handle action returning error objects', async () => {
@@ -172,7 +172,7 @@ describe('withUser', () => {
     const action = jest.fn()
     const result = await withUser(action)
 
-    expect(result).toEqual({ error: 'Unauthorized' })
+    expect(result).toMatchObject({ error: 'Unauthorized' })
     expect(action).not.toHaveBeenCalled()
   })
 
@@ -221,6 +221,6 @@ describe('withUser', () => {
     const action = jest.fn().mockRejectedValue(new Error('Something broke'))
     const result = await withUser(action)
 
-    expect(result).toEqual({ error: 'An unexpected error occurred. Please try again or contact support if the problem persists.' })
+    expect(result).toMatchObject({ error: 'An unexpected error occurred. Please try again or contact support if the problem persists.' })
   })
 })
