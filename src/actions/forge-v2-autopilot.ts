@@ -506,8 +506,21 @@ async function stepLockBrief(projectId: string): Promise<void> {
                 locked_by: null,
             })
         if (insertErr) {
-            await recordFailure(projectId, "locking_brief", insertErr.message)
-            return
+            // 23505 = unique violation on (project_id, revision_number) =
+            // a concurrent caller (another cron tick or a racing after())
+            // already locked. Treat as idempotent success — the row exists,
+            // just not written by us. Fall through to the stamp step.
+            // Observed 2026-04-24 run 18: cron ticked stepLockBrief twice
+            // during waiting_chase→locking_brief handoff, both raced the
+            // insert, one 23505'd and autopilot crashed.
+            if (insertErr.code === "23505") {
+                console.info(
+                    "[autopilot] stepLockBrief: brief_revisions row already exists (concurrent lock) — treating as idempotent success",
+                )
+            } else {
+                await recordFailure(projectId, "locking_brief", insertErr.message)
+                return
+            }
         }
     }
 
