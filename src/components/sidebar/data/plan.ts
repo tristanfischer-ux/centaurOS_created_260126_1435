@@ -1,11 +1,8 @@
 import {
-  Brain,
   CheckSquare,
-  ClipboardCheck,
   FileOutput,
   History,
   Star,
-  Swords,
   Target,
   Waypoints,
 } from 'lucide-react'
@@ -32,14 +29,11 @@ import type { SidebarNavItem } from './types'
  * in ./workshop.ts so both section-level flag switches read the same.
  */
 
+// Hidden during pivot focus (2026-04-24): Review, Reports, Red Team, Knowledge.
 export const planNavigation: SidebarNavItem[] = [
   { name: 'Strategy', href: '/strategy', icon: Waypoints, tooltip: 'Your strategic direction — pillars, progress, and health at a glance' },
   { name: 'Objectives', href: '/new-objectives', icon: Target, tooltip: 'Milestones that move the strategy forward' },
   { name: 'Tasks', href: '/new-tasks', icon: CheckSquare, tooltip: 'Day-to-day work that delivers on objectives' },
-  { name: 'Review', href: '/review', icon: ClipboardCheck, tooltip: 'Content, tasks, and actions awaiting your approval' },
-  { name: 'Reports', href: '/reports', icon: FileOutput, tooltip: 'Generate polished weekly updates and board packs from your live data' },
-  { name: 'Red Team', href: '/red-team', icon: Swords, tooltip: 'Stress-test decisions with multi-LLM adversarial debate' },
-  { name: 'Knowledge', href: '/knowledge', icon: Brain, tooltip: "Your team's accumulated knowledge — every document and decision sharpens the next answer" },
 ]
 
 export const planNavigationV2: SidebarNavItem[] = [

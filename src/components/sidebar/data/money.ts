@@ -1,13 +1,8 @@
 import {
-  BarChart3,
   Building2,
   CircleDot,
-  Flame,
   Gauge,
   Grid2X2,
-  Sprout,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react'
 import type { SidebarNavItem } from './types'
 
@@ -35,13 +30,10 @@ import type { SidebarNavItem } from './types'
  * sidebar code, tests, tooling) working during the rollout window.
  */
 
+// Hidden during pivot focus (2026-04-24): Cash Burn, Cash Out, Cash In, P&L, Fundraise.
+// Investors stays — primary product surface post-pivot.
 export const moneyLegacyNavigation: SidebarNavItem[] = [
-  { name: 'Cash Burn', href: '/cash-burn', icon: Flame, tooltip: '52-week runway analysis with scenario modelling' },
-  { name: 'Cash Out', href: '/cash-burn/cash-out', icon: TrendingDown, tooltip: 'Fixed and variable cost management' },
-  { name: 'Cash In', href: '/cash-burn/cash-in', icon: TrendingUp, tooltip: 'Revenue, loans, equity, and grants' },
-  { name: 'P&L', href: '/cash-burn/pnl', icon: BarChart3, tooltip: 'Projected Income Statement and Balance Sheet' },
   { name: 'Investors', href: '/investors', icon: Building2, tooltip: 'Browse 600 UK VC and PE firms — search, filter, and track outreach' },
-  { name: 'Fundraise', href: '/fundraise', icon: Sprout, tooltip: 'Track your fundraise pipeline — shortlisted investors, outreach, and coverage' },
 ]
 
 export const moneyV2Navigation: SidebarNavItem[] = [
