@@ -296,7 +296,14 @@ function layoutFn(input: LayoutInput): LayoutOutput {
         `Aisle: ${AISLE_WIDTH_MM}mm centred along container depth (${envD}mm interior).`,
     )
     if (Object.keys(targets).length > 0) {
-        notes.push(`Target: ${JSON.stringify(targets)}.`)
+        // Human-readable — each target as "kWh: 500", "kW: 100" rather
+        // than a raw JSON blob that leaked verbatim into the PDF's notes
+        // section (observed 2026-04-24 on BESS PDF).
+        const parts = Object.entries(targets).map(([k, v]) => {
+            const label = k.toUpperCase()
+            return `${label}: ${v}`
+        })
+        notes.push(`Target — ${parts.join(" · ")}.`)
     }
 
     return { placements, features, constraints, notes }

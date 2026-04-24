@@ -172,13 +172,27 @@ async function runMaxDecompositionInternal(
     const user: { id: string | null } = { id: userId }
     // Foundry is already known — skip the withAuth wrapper.
     void foundryId
+        const admin = createAdminClient()
+        // When autopilot fires this via background (userId null), skeleton
+        // + expand still need a trusted identity to skip their internal
+        // cookies-backed auth. Fall back to the foundry owner — that's the
+        // legitimate "system user" for this tenant. Observed 2026-04-24 on
+        // BESS run 6 where Max still failed "Unauthorized" because
+        // trustedUserId was null and skeletonDecompose took the cookie path.
+        if (!user.id) {
+            const { data: foundry } = await admin
+                .from("foundries")
+                .select("owner_id")
+                .eq("id", foundryId)
+                .maybeSingle()
+            if (foundry?.owner_id) user.id = foundry.owner_id
+        }
         // 1. Load + verify project (foundry scope check via admin client —
         //    we can't use the user-scoped client because RLS on cad_lab_projects
         //    is keyed on foundry membership. The withAuth wrapper has already
         //    confirmed the caller is in foundryId; now confirm THIS project
         //    is in the same foundry, so we never accidentally decompose
         //    another tenant's project on behalf of this caller.)
-        const admin = createAdminClient()
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select("id, foundry_id, subject, model_id, research")

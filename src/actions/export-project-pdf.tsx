@@ -1620,13 +1620,26 @@ function SpatialPlanSection({
     // ── 2D drawing body ────────────────────────────────────────────────
     const drawing2D = (
         <Svg width={drawingW + axisInsetPt * 2} height={svgH}>
+            {/* White canvas under everything so the drawing renders against
+                a clean background. Without this, @react-pdf/renderer was
+                filling the SVG area with black (observed 2026-04-24 on BESS
+                PDF — user reported "can't see where the modules fit into it"
+                because every fill="none" rect rendered as black). */}
+            <Rect
+                x={0}
+                y={0}
+                width={drawingW + axisInsetPt * 2}
+                height={svgH}
+                fill="#ffffff"
+                stroke="none"
+            />
             {/* Envelope outline */}
             <Rect
                 x={axisInsetPt}
                 y={axisInsetPt}
                 width={drawingW}
                 height={drawingH}
-                fill="none"
+                fill="#ffffff"
                 stroke="#111827"
                 strokeWidth={1.2}
             />
@@ -1925,14 +1938,14 @@ function SpatialPlanSection({
                         </Text>
                         <Text
                             style={{
-                                width: 26,
+                                width: 40,
                                 fontSize: 7.5,
                                 fontWeight: "bold",
                                 color: MUTED,
                                 textAlign: "right",
                             }}
                         >
-                            Rot°
+                            Rotation °
                         </Text>
                     </View>
                     {plan.placements.map((p, i) => (
