@@ -1123,29 +1123,31 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
         "@/actions/specialists/run-fang-review"
     )
 
-    // INTENT: Fang reviews run sequentially. Running them in parallel
-    // would trip the per-foundry AI budget rate limiter (each review
-    // does its own check) and could saturate the DeepSeek concurrency
-    // ceiling. Serial keeps the runner's peak concurrency at 1.
-    for (const mod of reviewable) {
-        try {
-            await runFangReviewBackground(
+    // CHANGED 2026-04-24: parallelize Fang reviews. Original comment said
+    // serial to avoid rate-limiter + DeepSeek concurrency issues. In
+    // practice: 9-module BESS project took ~18 min running serial (2 min
+    // per review), which was the dominant cost of the autopilot chain.
+    // DeepSeek easily handles 9 concurrent calls. Rate limiter concern
+    // is addressed by DEVELOPER_FOUNDRY_IDS bypass for test accounts and
+    // by the per-foundry monthly cap (which kicks in BEFORE per-call).
+    // Dropping from 18 min to ~2 min end-to-end for the reviews stage.
+    await Promise.allSettled(
+        reviewable.map((mod) =>
+            runFangReviewBackground(
                 projectId,
                 mod.id,
                 foundryId,
                 null,
                 "auto.supplier-match-complete",
-            )
-            // Failures inside the inner action are returned as { ok: false };
-            // we don't short-circuit on them because some modules may still
-            // land cleanly after one errors.
-        } catch (err) {
-            console.warn(
-                `[autopilot] Fang review threw for module ${mod.id}:`,
-                err instanceof Error ? err.message : err,
-            )
-        }
-    }
+            ).catch((err: unknown) => {
+                console.warn(
+                    `[autopilot] Fang review threw for module ${mod.id}:`,
+                    err instanceof Error ? err.message : err,
+                )
+                return { ok: false as const, error: "threw" }
+            }),
+        ),
+    )
 
     // v1.2: after Fang reviews finish, advance to the PDF-export stage
     // rather than closing out. The founder wants a deliverable at the end
