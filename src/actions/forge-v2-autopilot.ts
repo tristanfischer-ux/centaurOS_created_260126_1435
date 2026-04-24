@@ -1252,13 +1252,18 @@ async function stepGeneratePdf(projectId: string): Promise<void> {
                         `[autopilot] PDF uploaded but no foundry owner_id for ${foundryId} — skipping report_downloads insert`,
                     )
                 } else {
+                    // GOTCHA (2026-04-24): report_downloads has CHECK
+                    // constraint chk_report_source that only allows
+                    // ['cad-lab','reports','investors','finance','agents'].
+                    // 'cad-lab' is semantically correct — autopilot is a
+                    // CAD-lab product. Using anything else silently fails.
                     const { error: insertErr } = await admin
                         .from("report_downloads")
                         .insert({
                             foundry_id: foundryId,
                             profile_id: profileId,
                             report_name: result.filename,
-                            report_source: "forge-autopilot",
+                            report_source: "cad-lab",
                             file_format: "pdf",
                             file_size_bytes: result.sizeBytes,
                             storage_path: storagePath,
