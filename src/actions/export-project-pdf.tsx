@@ -508,6 +508,13 @@ interface PdfInput {
      *  projects from before v1.2 layout engine won't have this, and
      *  rule libraries that don't yet implement layout return null. */
     spatialPlan: SpatialPlan | null
+    /** Pre-rasterised PNG of the spatial plan as a base64 data URI.
+     *  Added 2026-04-24: @react-pdf/renderer's native `<Svg>` renders
+     *  the SpatialPlanSection drawing as a solid black rectangle. We
+     *  build the SVG server-side, pipe through sharp() to a PNG, and
+     *  embed as `<Image>` instead. Null for 3D views (which fall back
+     *  to the stack diagram) or when no plan exists. */
+    spatialPlanImageDataUri: string | null
     totals: {
         moduleCount: number
         keyPartCount: number
@@ -1593,10 +1600,12 @@ function SpatialPlanSection({
     plan,
     sectionNumber,
     moduleNameById,
+    imageDataUri,
 }: {
     plan: SpatialPlan | null
     sectionNumber: number
     moduleNameById: Map<string, string>
+    imageDataUri: string | null
 }): React.ReactElement | null {
     if (!plan) return null
 
@@ -2095,26 +2104,27 @@ function SpatialPlanSection({
                     </Text>
                 </View>
             )}
-            {/* V1 CUT (2026-04-24): drop the SVG/stack drawing. Even with
-                the explicit white background Rect, @react-pdf/renderer
-                still output a solid black rectangle for the spatial
-                diagram (observed BESS PDF page 7 2026-04-23). The
-                placement table + constraints list + notes below convey
-                the same information readably. Bring the drawing back in
-                V1.1 — likely needs a server-side PNG raster fallback.
-                Kept as a feature flag so we can flip back when fixed. */}
-            {SHOW_SPATIAL_DRAWING &&
-                (is2D ? (
-                    <>
-                        {axisCaption}
-                        <View wrap={false} style={{ marginBottom: 8 }}>
-                            {drawing2D}
-                        </View>
-                        {legend}
-                    </>
-                ) : (
-                    drawingStack
-                ))}
+            {/* V1.1 (2026-04-24): sharp-rasterised PNG of the 2D floor plan.
+                @react-pdf/renderer's native <Svg> renders this as black even
+                with explicit white backgrounds; we build the SVG string
+                server-side in rasterise-spatial-plan.ts and convert to PNG
+                via sharp before the Image embed. Falls back to stack-list
+                diagram for 3D views (isometric_exploded / cutaway) which
+                don't raster well at this size. */}
+            {is2D && imageDataUri ? (
+                <>
+                    {axisCaption}
+                    <View wrap={false} style={{ marginBottom: 8 }}>
+                        <Image
+                            src={imageDataUri}
+                            style={{ width: "100%", height: "auto" }}
+                        />
+                    </View>
+                    {legend}
+                </>
+            ) : (
+                drawingStack
+            )}
             <View
                 style={{
                     flexDirection: "row",
@@ -2231,6 +2241,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                         plan={data.spatialPlan}
                         sectionNumber={planSectionNumber}
                         moduleNameById={moduleNameById}
+                        imageDataUri={data.spatialPlanImageDataUri}
                     />
                     <Text style={styles.footer} fixed>
                         <Text>Spatial plan</Text>
@@ -2731,6 +2742,22 @@ async function exportProjectPdfInternal(
             auditLog,
             dimensionSheet: (project.dimension_sheet ?? null) as PdfInput["dimensionSheet"],
             spatialPlan: (project.spatial_plan ?? null) as PdfInput["spatialPlan"],
+            spatialPlanImageDataUri: await (async () => {
+                const plan = (project.spatial_plan ?? null) as SpatialPlan | null
+                if (!plan) return null
+                try {
+                    const { rasteriseSpatialPlanToDataUri } = await import(
+                        "@/lib/pdf/rasterise-spatial-plan"
+                    )
+                    return await rasteriseSpatialPlanToDataUri(plan, moduleNameById)
+                } catch (err) {
+                    console.warn(
+                        "[export-pdf] spatial plan rasterise failed — falling back to table only:",
+                        err instanceof Error ? err.message : err,
+                    )
+                    return null
+                }
+            })(),
             totals: {
                 moduleCount: modules.length,
                 keyPartCount,
