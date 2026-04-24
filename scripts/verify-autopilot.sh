@@ -641,12 +641,15 @@ wait_for_stage \
     "$TIMEOUT_ILLUSTRATION" \
     'if (.system_illustration_url // "") | length > 0 then "ok" else empty end'
 
+# V1 CUT (2026-04-24): per-module image renders are dropped from the
+# autopilot chain (commit e8beaab3). Hero cover only — no module_image_url
+# per module, no image_render_state. Replace the predicate with a no-op
+# success so harness runs still advance. When V1.1 brings per-module
+# renders back, restore the original predicate.
 wait_for_stage \
-    "module renders finished (>=75% complete)" \
-    "$TIMEOUT_ILLUSTRATION" \
-    'if (.image_render_state.finished_at // null) != null
-        and ((.image_render_state.completed_ids // [] | length) * 4 >= ((.image_render_state.total // 1) * 3))
-     then "ok:\(.image_render_state.completed_ids|length)/\(.image_render_state.total)" else empty end'
+    "per-module renders (V1 CUT — no-op)" \
+    5 \
+    'true // "ok:v1-cut-skipped"'
 
 # 3.9 Supplier match: forge_supplier_shortlist has at least one row for this
 # project, OR autopilot_state advanced past the matching stage (for
