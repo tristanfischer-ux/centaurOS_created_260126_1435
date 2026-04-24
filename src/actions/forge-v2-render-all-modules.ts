@@ -54,6 +54,7 @@ import { after } from "next/server"
 
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getBaseUrl } from "@/lib/domains"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import { generateOneModuleImage } from "./forge-v2-generate-one-module-image"
 
@@ -522,22 +523,17 @@ export async function renderNextModuleStage(
 
     await persistState(projectId, updated)
 
-    // 8. If more work remains, schedule the next stage
+    // 8. If more work remains, fire the next stage via an internal HTTP
+    //    hop to /api/render-stage. See `scheduleNextStageViaHttp` below for
+    //    why this is NOT `after(() => selfRef(projectId))` anymore — short
+    //    version: `after()` extends the CURRENT Vercel invocation instead
+    //    of spawning a new one, so chaining stages inside a single
+    //    container shares ONE 300s budget for the whole chain, not N × 300s.
+    //    The HTTP hop lands on a fresh container with a fresh budget.
+    //    Fire-and-forget: don't await so the current stage's response can
+    //    land without being blocked by the next stage's execution.
     if (remaining) {
-        after(async () => {
-            try {
-                const { renderNextModuleStage: selfRef } = await import(
-                    "./forge-v2-render-all-modules"
-                )
-                await selfRef(projectId)
-            } catch (err) {
-                console.error(
-                    "[render-all-modules:stage] next stage schedule threw:",
-                    err instanceof Error ? err.message : err,
-                )
-                await recordFatalFailure(projectId, errMessage(err))
-            }
-        })
+        scheduleNextStageViaHttp(projectId)
     }
 }
 
@@ -692,4 +688,76 @@ async function recordFatalFailure(
 
 function errMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err)
+}
+
+/**
+ * Fire-and-forget HTTP hop to /api/render-stage, which re-invokes
+ * `renderNextModuleStage(projectId)` on a fresh Vercel serverless
+ * container (fresh 300s budget per module).
+ *
+ * ## Why HTTP, not after()
+ *
+ * `after()` in Next.js EXTENDS the current serverless invocation — it
+ * does NOT spawn a new one. So a chain `stage -> after(() -> stage ->
+ * after(...))` shares ONE 300s Vercel budget across every stage in the
+ * chain, not N × 300s. This was the root cause of the "2 of 8 modules"
+ * autopilot failure (2026-04-23) — the chain busted 300s mid-module-3
+ * or mid-module-4 and Vercel killed the container.
+ *
+ * An internal HTTP POST to a NEW route lands on a separate Vercel
+ * invocation with its OWN 300s maxDuration. Each module gets its full
+ * budget.
+ *
+ * ## Fire-and-forget semantics
+ *
+ * We deliberately do NOT await. The caller (`renderNextModuleStage`)
+ * has just persisted state and returned; the caller's Vercel container
+ * should be free to tear down once its response lands. Awaiting the
+ * POST would block that teardown and re-introduce the same chaining
+ * problem we're fixing.
+ *
+ * ## Failure recovery
+ *
+ * If the fetch fails to land (network blip, cold start, DNS resolution),
+ * `tickImageRenderChain()` detects the stale state on the next workspace
+ * page render (90s threshold) and re-fires the stage. This is the same
+ * self-heal that handled dropped `after()` callbacks pre-P0.1 — no
+ * regression in recovery behaviour.
+ */
+function scheduleNextStageViaHttp(projectId: string): void {
+    const secret = process.env.FORGE_RENDER_STAGE_SECRET
+    if (!secret) {
+        // SECURITY: refuse to fire the hop when the secret isn't
+        // configured. Hard-fails the chain rather than issuing an
+        // un-authenticated request. Surfaces the misconfiguration loudly
+        // so ops can fix it instead of drifting.
+        console.error(
+            "[render-all-modules:stage] FORGE_RENDER_STAGE_SECRET not set — " +
+                "cannot schedule next stage. Chain will stall until " +
+                "tickImageRenderChain() recovers it.",
+        )
+        return
+    }
+
+    const url = `${getBaseUrl()}/api/render-stage`
+
+    // Fire-and-forget. `.catch` swallows network errors since stale-state
+    // recovery handles re-firing; we just need a visible log for ops.
+    // Using `fetch` without awaiting means the caller's response isn't
+    // blocked waiting for the new stage to complete.
+    void fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${secret}`,
+        },
+        body: JSON.stringify({ projectId }),
+        // Cache-free — this is a mutation-triggering POST.
+        cache: "no-store",
+    }).catch((err) => {
+        console.error(
+            "[render-all-modules:stage] next stage fetch failed:",
+            err instanceof Error ? err.message : err,
+        )
+    })
 }
