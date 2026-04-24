@@ -38,7 +38,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 
-import { welcomeNavItem, todayNavItem, meNavigation } from "@/components/sidebar/data/me"
+import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
 import { getPlanNavigation } from "@/components/sidebar/data/plan"
 import {
@@ -376,7 +376,6 @@ export function Sidebar({
                 <Collapsible open={openSections.me}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
                         <NavLink item={welcomeNavItem} pathname={pathname} />
-                        <NavLink item={todayNavItem} pathname={pathname} />
                         {meNavigation.map((item) => (
                             <NavLink
                                 key={item.name}

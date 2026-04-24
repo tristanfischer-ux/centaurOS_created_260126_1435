@@ -56,7 +56,10 @@ export function getMoneyNavigation(newMoneyExperience: boolean): SidebarNavItem[
  * the surface has changed vs the legacy experience.
  */
 export function getMoneySectionLabel(newMoneyExperience: boolean): string {
-  return newMoneyExperience ? 'MONEY [V2]' : 'Cash Burn'
+  // 2026-04-24 post-pivot rename: legacy label flipped from "Cash Burn" to
+  // "Fundraising" — only Investors remains under it, so the section reads as
+  // a fundraising hub.
+  return newMoneyExperience ? 'MONEY [V2]' : 'Fundraising'
 }
 
 /**

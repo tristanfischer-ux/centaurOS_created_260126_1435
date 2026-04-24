@@ -41,13 +41,15 @@ import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
 import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 // INTENT: Key leaders — four specialists used as the default participant set
-// for the Brainstorming box launch. Previously surfaced as clickable avatars at
-// the top of the page; the UI is gone but the default-team concept lives on.
+// for the Brainstorming box launch. Post-pivot (2026-04-24) lineup reflects the
+// two product poles Tristan is focused on: Fang (manufacturing) + Chase (supply
+// chain) cover The Forge side, Fiona (fundraising) covers the Investors side,
+// and Sage (strategy) is the glue specialist who frames every brainstorm.
 const KEY_LEADER_IDS: SpecialistId[] = [
+    "vp-manufacturing",
+    "vp-supply-chain",
+    "fundraising-advisor",
     "strategist",
-    "cto",
-    "chief-of-staff",
-    "legal-counsel",
 ]
 
 /**
