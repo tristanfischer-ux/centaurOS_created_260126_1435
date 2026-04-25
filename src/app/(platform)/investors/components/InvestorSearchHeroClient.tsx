@@ -18,6 +18,7 @@
 'use client'
 
 import { useState, useCallback, useTransition, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { InvestorSearchHero } from './InvestorSearchHero'
 import { DashboardMatchCards } from './DashboardMatchCards'
@@ -76,6 +77,9 @@ export function InvestorSearchHeroClient({
   const [hasSearched, setHasSearched] = useState<boolean>(false)
   const [isPending, startTransition] = useTransition()
   const [searchedAcrossTotal, setSearchedAcrossTotal] = useState<number>(8264)
+  const [brainstormHandoff, setBrainstormHandoff] =
+    useState<{ topic: string; summary: string; createdAt: string } | null>(null)
+  const searchParams = useSearchParams()
 
   // FLOW: Keep state in sync if the parent re-renders with new server data.
   useEffect(() => {
@@ -118,6 +122,54 @@ export function InvestorSearchHeroClient({
     setFirms(initialFirms)
     setMatchOutputs(initialMatchOutputs ?? {})
   }, [initialFirms, initialMatchOutputs])
+
+  // INTENT: receive a brainstorming hand-off from the team-meeting dialog.
+  // Sender lives in src/app/(platform)/agents/team-meeting-dialog.tsx —
+  // when a founder clicks "See which investors would back this" at the
+  // end of a brainstorming meeting, it stashes { topic, summary, createdAt }
+  // in localStorage and routes here with `?fromBrainstorm=1`. We auto-fire
+  // a search using the topic as the query, render a banner above results,
+  // and clear localStorage so a stale payload doesn't leak into a future
+  // session.
+  useEffect(() => {
+    if (searchParams.get('fromBrainstorm') !== '1') return
+    if (typeof window === 'undefined') return
+
+    const raw = window.localStorage.getItem('investor-from-brainstorm-context')
+    if (!raw) return
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        topic?: unknown
+        summary?: unknown
+        createdAt?: unknown
+      }
+      const topic = typeof parsed.topic === 'string' ? parsed.topic.trim() : ''
+      const summary =
+        typeof parsed.summary === 'string' ? parsed.summary.trim() : ''
+      const createdAt =
+        typeof parsed.createdAt === 'string' ? parsed.createdAt : ''
+
+      if (!topic && !summary) return
+
+      setBrainstormHandoff({ topic, summary, createdAt })
+
+      // Auto-fire a search using the topic + first sentence of summary as
+      // the query. Topic alone is often too short for runSearch's 6-char
+      // minimum, and the summary adds the real signal.
+      const query = summary
+        ? `${topic}. ${summary.split('.')[0]}.`.trim()
+        : topic
+      if (query.length >= 6) {
+        runSearch(query)
+      }
+    } catch {
+      // Corrupt payload — silently ignore, founder can still type a query.
+    } finally {
+      window.localStorage.removeItem('investor-from-brainstorm-context')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const handlePromptPick = useCallback((query: string) => {
     runSearch(query)
@@ -179,6 +231,21 @@ export function InvestorSearchHeroClient({
         isSearching={isPending}
         companyContext={companyContext}
       />
+
+      {brainstormHandoff && (
+        <div
+          role="status"
+          className="rounded-lg border border-international-orange/30 bg-international-orange/[0.06] px-4 py-3 text-sm leading-relaxed text-foreground"
+        >
+          <span className="font-semibold">Continued from brainstorming.</span>{' '}
+          {brainstormHandoff.topic
+            ? `Searching investors for "${brainstormHandoff.topic}".`
+            : 'Searching investors for the topic from your meeting.'}{' '}
+          <span className="text-muted-foreground">
+            Edit the search above to refine — the meeting summary seeded the query.
+          </span>
+        </div>
+      )}
 
       {/* Phase G: search-prompt grid */}
       {!hasSearched && <SearchPromptGrid onPick={handlePromptPick} />}
