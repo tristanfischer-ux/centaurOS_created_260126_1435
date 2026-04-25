@@ -7,21 +7,19 @@
  * search panel. Mirrors the supplier-card pattern from SUPPLIES-MOCKUP-SUPPLIERS.html:
  * three-column layout (logo | body with name/headline/tags/trust | actions with location/badge/button).
  *
- * INTENT: Render what we know honestly. Why-fit text requires a server-side
- * LLM enrichment action that does not yet exist. We render an honest placeholder
- * instead of fabricating copy.
- *
- * TODO: Wire why-fit rationale once `generateSupplierWhyFit(listingId, query)` is
- * created in src/actions/marketplace.ts. The action should embed the query, compare
- * it against the supplier's embedding + process_capabilities, and return 1–2 sentences.
+ * Why-fit: on expand, calls generateSupplierWhyFit(listingId, query) and shows
+ * 1-2 LLM-generated sentences explaining the match. Renders a spinner while loading
+ * and an honest fallback message on error.
  */
 
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ShieldCheck, MapPin, Star, Package, Clock } from 'lucide-react'
+import { ShieldCheck, MapPin, Star, Package, Clock, ChevronDown, Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { MarketplaceListing } from '@/actions/marketplace'
+import { generateSupplierWhyFit } from '@/actions/suppliers'
 
 // ---------------------------------------------------------------------------
 // Logo initials helper
@@ -113,6 +111,97 @@ function TrustSignals({ listing }: { listing: MarketplaceListing }) {
           <strong className="text-foreground font-semibold">{leadDays} days</strong>
         </span>
       ) : null}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Why-fit expand sub-component
+// ---------------------------------------------------------------------------
+
+function WhyFitExpander({
+  listingId,
+  searchQuery,
+}: {
+  listingId: string
+  searchQuery: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [whyFit, setWhyFit] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  const handleExpand = (e: React.MouseEvent) => {
+    // Prevent the Link navigation from firing when the expand button is clicked.
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (expanded) {
+      setExpanded(false)
+      return
+    }
+
+    // Already fetched — just show it.
+    if (whyFit || fetchError) {
+      setExpanded(true)
+      return
+    }
+
+    // First expand — call the server action.
+    setExpanded(true)
+    startTransition(async () => {
+      try {
+        const result = await generateSupplierWhyFit(listingId, searchQuery)
+        if (result.ok) {
+          setWhyFit(result.whyFit)
+        } else {
+          setFetchError(true)
+        }
+      } catch {
+        setFetchError(true)
+      }
+    })
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={handleExpand}
+        className={cn(
+          'flex items-center gap-1.5 text-[11px] font-medium transition-colors',
+          expanded
+            ? 'text-international-orange'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+        aria-expanded={expanded}
+      >
+        <Sparkles className="h-3 w-3 shrink-0" />
+        Why this supplier
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 shrink-0 transition-transform duration-200',
+            expanded && 'rotate-180'
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="mt-2 rounded-md bg-muted/40 border border-border/60 px-3 py-2 text-xs text-foreground leading-relaxed">
+          {isPending ? (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Analysing match…
+            </span>
+          ) : fetchError ? (
+            <span className="text-muted-foreground italic">
+              Could not generate insight — try refining your description.
+            </span>
+          ) : whyFit ? (
+            whyFit
+          ) : null}
+        </div>
+      )}
     </div>
   )
 }
@@ -212,16 +301,9 @@ export function SupplierMatchCard({ listing, searchQuery }: SupplierMatchCardPro
           </div>
         )}
 
-        {/* Why-fit */}
+        {/* Why-fit — expand on demand */}
         {searchQuery && (
-          <div className="rounded-md bg-muted/40 border border-border/60 px-3 py-2 text-xs text-muted-foreground italic">
-            {/*
-              TODO: Replace this placeholder with output from generateSupplierWhyFit(listing.id, searchQuery).
-              That action needs creating in src/actions/marketplace.ts — embed the query,
-              compare with the supplier embedding + process_capabilities, return 1–2 sentences.
-            */}
-            Tap to see why this supplier matches &ldquo;{searchQuery}&rdquo;
-          </div>
+          <WhyFitExpander listingId={listing.id} searchQuery={searchQuery} />
         )}
 
         {/* Trust signals */}
