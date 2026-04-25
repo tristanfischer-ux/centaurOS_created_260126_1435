@@ -42,10 +42,10 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "ForgeOS — The Operating System for Hardware Startups",
+    default: "ForgeOS — Ship the smart version of every hardware product",
     template: "%s | ForgeOS",
   },
-  description: "Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform. Free to start.",
+  description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
   metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
@@ -65,14 +65,14 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_GB",
     siteName: "ForgeOS by Fractional Forge",
-    title: "ForgeOS — The Operating System for Hardware Startups",
-    description: "Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform. Free to start.",
+    title: "ForgeOS — Ship the smart version of every hardware product",
+    description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
     url: "https://fractionalforge.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ForgeOS — The Operating System for Hardware Startups",
-    description: "Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform. Free to start.",
+    title: "ForgeOS — Ship the smart version of every hardware product",
+    description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
   },
   robots: {
     index: true,

@@ -85,11 +85,16 @@ const ARTICLES = [
   },
 ] as const
 
+// 2026-04-25 pricing restructure: Free / Starter \u00a320 / Add-on / Pro.
+// Killed the \u00a32 Explorer entry tier (loss-making). Hid Seed \u00a319 and the
+// Startup Team \u00a349 from the public catalogue (legacy \u2014 existing subscribers
+// stay until they upgrade or churn). Added the \u00a310 / 100-leads Investor
+// Search Add-On as the cash-cow upsell.
 const PRICING_TIERS = [
-  { name: "Explorer", price: "Free", detail: "50 AI assists, all 13 specialist AI agents" },
-  { name: "Seed", price: "\u00a319/mo", detail: "250 assists, verified emails" },
-  { name: "Startup Team", price: "\u00a349/mo", detail: "750 assists, supplier matching" },
-  { name: "Professional", price: "\u00a3149/mo", detail: "2,500 assists, priority support" },
+  { name: "Free", price: "Free", detail: "1 brainstorm/mo, 5 saved searches lifetime" },
+  { name: "Starter", price: "\u00a320/mo", detail: "100 investor leads with full why-fit + drafted email, 10 brainstorms" },
+  { name: "Add-on", price: "\u00a310 / 100", detail: "Extra investor leads, one click from inside Investors" },
+  { name: "Pro", price: "\u00a3149/mo", detail: "Unlimited leads, Deep Council, dual-side data" },
 ] as const
 
 const FAQS = [
@@ -115,7 +120,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "ForgeOS is free to start \u2014 50 AI assists per month with all 13 specialist AI agents. Paid plans start at \u00a319/month for more capacity. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "ForgeOS is free to try \u2014 1 brainstorming session a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is \u00a320/month and gives you 100 investor leads with full why-fit, how-to-pitch, and drafted email. Need more leads? \u00a310 per 100 extra, one click from inside Investors. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
   },
 ] as const
 
@@ -199,7 +204,7 @@ export default function MarketingPage() {
     url: "https://fractionalforge.app",
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
-      "The Operating System for Hardware Startups. Expert knowledge, smart tools, investor intelligence, and manufacturing connections — everything a hardware startup needs, in one platform.",
+      "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps hardware founders ship the smart version — find the spec, the suppliers, and the investors who fund it.",
     sameAs: [
       "https://www.linkedin.com/company/fractional-forge",
     ],
@@ -213,25 +218,25 @@ export default function MarketingPage() {
     operatingSystem: "Web",
     url: "https://fractionalforge.app",
     description:
-      "The operating system for hardware startups. Expert knowledge, smart tools, investor intelligence, and manufacturing connections.",
+      "ForgeOS helps hardware founders ship the smart version of commodity products — find the spec, the suppliers, and the investors who fund it.",
     offers: [
       {
         "@type": "Offer",
         price: "0",
         priceCurrency: "GBP",
-        name: "Explorer (Free)",
+        name: "Free",
       },
       {
         "@type": "Offer",
-        price: "49",
+        price: "20",
         priceCurrency: "GBP",
-        name: "Startup Team",
+        name: "Starter",
       },
       {
         "@type": "Offer",
         price: "149",
         priceCurrency: "GBP",
-        name: "Professional",
+        name: "Pro",
       },
     ],
     provider: {
@@ -456,19 +461,19 @@ function HeroSection() {
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            For Hardware Startup Founders
+            Built for the intelligence-embedded hardware wave
           </span>
         </motion.div>
 
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="font-playfair text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
-          Everything a hardware startup needs,{" "}
+          Make every product{" "}
           <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
-            in one platform.
+            smart.
           </motion.span>
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Design your product. Find your investors. Connect with your manufacturers. Supported by 13 specialist AI agents and a marketplace of experienced fractional executives — ForgeOS is the operating system for building hardware businesses.
+          Cheap intelligence is making every commodity hardware product re-imaginable &mdash; air-quality monitors, kettles, drills, dialysis devices. ForgeOS helps hardware founders ship the smart version: find the spec, the suppliers, and the investors who fund it. From a paragraph to a bill of materials to a manufacturer shortlist in twenty minutes.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -478,8 +483,8 @@ function HeroSection() {
                 Start Free <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
-            <a href="#how-it-works" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
-              See How It Works <ChevronDown className="h-4 w-4" />
+            <a href="#why-i-built" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
+              Read the Story <ChevronDown className="h-4 w-4" />
             </a>
           </div>
 
@@ -533,6 +538,18 @@ function TristanIntroSection() {
 
 const HOW_IT_WORKS_PILLARS = [
   {
+    label: "The Smart-Product Wave",
+    title: "Designed for what hardware is becoming.",
+    image: "/images/marketing/ecosystem-os.png",
+    imageAlt: "Connected sensors and intelligent product concepts",
+    body: "Most hardware categories are about to be re-imagined for intelligence \u2014 air-quality monitors, kettles, drills, dialysis devices. ForgeOS coordinates the design, supply, and capital cycle for the smart version of whatever you are building, so you skip the eighteen months of reinventing wheels.",
+    highlights: [
+      "Tools tuned for sensor, edge-compute, and connected-product builds",
+      "From a paragraph of intent to a bill of materials, fast",
+      "Move from idea to manufacturer conversation in a single afternoon",
+    ],
+  },
+  {
     label: "Fractional Expertise",
     title: "Experienced Professionals, On Your Terms",
     image: "/images/marketing/role-executive.png",
@@ -545,11 +562,11 @@ const HOW_IT_WORKS_PILLARS = [
     ],
   },
   {
-    label: "Specialist AI Agents",
-    title: "13 Specialist AI Agents. Your Judgement.",
+    label: "Specialists",
+    title: "13 Specialists. Your Judgement.",
     image: "/images/marketing/role-apprentice.png",
     imageAlt: "Young engineers collaborating on product design",
-    body: "13 specialist AI agents support every decision \u2014 strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, product, HR, fundraising, and operations. They provide structured analysis, draw on real data, and challenge assumptions. The decisions remain yours.",
+    body: "13 specialists support every decision \u2014 strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, product, HR, fundraising, and operations. They provide structured analysis, draw on real data, and challenge assumptions. The decisions remain yours.",
     highlights: [
       "Strategy, engineering, finance, legal, and 9 more disciplines",
       "Grounded in real supplier, investor, and industry data",
@@ -561,10 +578,10 @@ const HOW_IT_WORKS_PILLARS = [
     title: "A Connected Manufacturing Network",
     image: "/images/marketing/factory-partner.png",
     imageAlt: "Factory floor with manufacturing equipment",
-    body: "13,700+ manufacturers across the UK and Europe indexed with capability data. From early prototype design through to production, understand what materials and equipment you need, and find the right partners to make it real.",
+    body: "13,700+ manufacturers across the UK and Europe indexed with capability data. From early prototype design through to production, understand what materials and equipment you need, and find the right partners to make it real — including suppliers experienced in sensor and edge-compute integration for smart products.",
     highlights: [
       "13,700+ UK and European manufacturers and suppliers indexed",
-      "Prototype-ready: identify the materials, equipment, and suppliers for your design",
+      "Find suppliers experienced in sensor, electronics, and edge-compute integration",
       "Search by capability, location, and specialism to find the right match",
     ],
   },
@@ -576,7 +593,7 @@ const HOW_IT_WORKS_PILLARS = [
     body: "Hardware startups end up with people in different places — a fractional engineer in Manchester, a manufacturer in Poland, a finance person working evenings, investors in Cambridge. Fractional Forge has strategy, objectives, and tasks built in, so the whole team knows what they are doing and why.",
     highlights: [
       "Strategic objectives broken down into weekly tasks",
-      "Assign work to teammates or directly to the 13 specialist AI agents",
+      "Assign work to teammates or directly to the 13 specialists",
       "Track progress across a distributed team from one dashboard",
     ],
   },
@@ -597,7 +614,7 @@ function HowItWorksSection() {
             How It <span className="text-international-orange">Works</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Hardware founders end up reinventing the same wheels — finding engineers, finding manufacturers, finding investors, sorting out IP. Fractional Forge brings it all together.
+            Cheap intelligence is making every commodity hardware product re-imaginable. Fractional Forge pulls the design, supply, and capital cycle for the smart version into one place — so you stop reinventing wheels.
           </p>
         </AnimatedSection>
 
