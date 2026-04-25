@@ -110,15 +110,15 @@ const FAQS = [
   },
   {
     question: "How does the fractional model actually work?",
-    answer: "ForgeOS combines two things. First, specialist support across strategy, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, hiring, fundraising, chief technology, and chief of staff, providing structured analysis across every part of a hardware company. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The specialists provide the breadth; the professionals bring the depth.",
+    answer: "Fractional Forge combines two things. First, specialist support across strategy, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, hiring, fundraising, chief technology, and chief of staff, providing structured analysis across every part of a hardware company. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The specialists provide the breadth; the professionals bring the depth.",
   },
   {
     question: "How quickly can I go from idea to prototype?",
-    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. Specialists work through the technical, commercial, and operational questions in parallel. 13,700+ UK and European manufacturers are indexed and searchable, so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
+    answer: "The aim of Fractional Forge is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. Specialists work through the technical, commercial, and operational questions in parallel. 13,700+ UK and European manufacturers are indexed and searchable, so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
   },
   {
     question: "How much does it cost?",
-    answer: "ForgeOS is free to try \u2014 5 brainstorming sessions a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is \u00a320/month and gives you 100 investor leads with full why-fit, how-to-pitch, and drafted email. Need more leads? \u00a310 per 100 extra, one click from inside Investors. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "Fractional Forge is free to try \u2014 5 brainstorming sessions a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is \u00a320/month and gives you 100 investor leads with full why-fit, how-to-pitch, and drafted email. Need more leads? \u00a310 per 100 extra, one click from inside Investors. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
   },
 ] as const
 
@@ -202,7 +202,7 @@ export default function MarketingPage() {
     url: "https://fractionalforge.app",
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
-      "Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. ForgeOS helps hardware founders ship the smart version, find the spec, the suppliers, and the investors who fund it.",
+      "Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Fractional Forge helps hardware founders ship the smart version, find the spec, the suppliers, and the investors who fund it.",
     sameAs: [
       "https://www.linkedin.com/company/fractional-forge",
     ],
@@ -211,12 +211,12 @@ export default function MarketingPage() {
   const softwareApplicationStructuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "ForgeOS",
+    name: "Fractional Forge",
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     url: "https://fractionalforge.app",
     description:
-      "ForgeOS helps hardware founders ship the smart version of everyday products, kettles, drills, air-quality monitors, find the spec, the suppliers, and the investors who fund it.",
+      "Fractional Forge helps hardware founders ship the smart version of everyday products, kettles, drills, air-quality monitors, find the spec, the suppliers, and the investors who fund it.",
     offers: [
       {
         "@type": "Offer",
@@ -558,7 +558,7 @@ const HOW_IT_WORKS_PILLARS = [
     title: "Designed for what hardware is becoming.",
     image: "/images/marketing/ecosystem-os.png",
     imageAlt: "Connected sensors and intelligent product concepts",
-    body: "Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under \u00a35 a unit, and that is what makes the smart version commercially viable. ForgeOS coordinates the design, supply, and capital cycle for the smart version of whatever you are building, so you skip the eighteen months of reinventing wheels.",
+    body: "Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under \u00a35 a unit, and that is what makes the smart version commercially viable. Fractional Forge coordinates the design, supply, and capital cycle for the smart version of whatever you are building, so you skip the eighteen months of reinventing wheels.",
     highlights: [
       "Tools tuned for sensor, edge-compute, and connected-product builds",
       "From a paragraph of intent to a bill of materials, fast",
