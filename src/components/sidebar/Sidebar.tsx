@@ -534,6 +534,19 @@ export function Sidebar({
                     <TimeWeekBarLoader />
                     <AICreditsBarLoader />
                 </div>
+
+                {/* TODO Tier 5 step 22 (RED-TEAM-PIVOT-PLAN): usage counter +
+                 * invite-friend CTA in sidebar footer. Render a running
+                 * counter "X/Y searches this month, invite a friend, +100
+                 * free" against the user's current month's usage from
+                 * llm_usage / user_subscriptions. CTA URL pattern is
+                 * `${APP_DOMAIN}/signup?ref=<user.id>` (centralised in
+                 * src/lib/domains.ts). Conversion-engine wiring lands in
+                 * the same step — credits the inviter +100 leads when the
+                 * referee subscribes to Starter. Free-tier accounts cap at
+                 * +500 inviter searches per month. The investors empty-out
+                 * upsell (LimitReachedUpsell) and the post-meeting upsell
+                 * (PostMeetingUpsell) already produce the same URL shape. */}
             </div>
 
             <FeedbackDialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />

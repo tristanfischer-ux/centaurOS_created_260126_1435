@@ -53,6 +53,9 @@ import {
     Hammer,
     Building2,
     ArrowRight,
+    Copy,
+    Mail,
+    Check,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
@@ -69,6 +72,11 @@ import { parseProposedActions, stripProposedActionsBlock } from "@/lib/agents/me
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "@/lib/agents/specialists-config"
 import type { ProposedAction } from "@/lib/agents/message-parsers"
+import type { SubscriptionTier } from "@/lib/billing/plans"
+import { SUBSCRIPTION_PLANS } from "@/lib/billing/plans"
+import { APP_DOMAIN } from "@/lib/domains"
+import { toast } from "sonner"
+import Link from "next/link"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,6 +142,21 @@ interface TeamMeetingDialogProps {
     onOpenChange: (open: boolean) => void
     /** When provided, auto-selects participants and pre-fills topic */
     preset?: MeetingPreset
+    /**
+     * Authenticated user id, used by the post-meeting upsell to build the
+     * referral URL `${APP_DOMAIN}/signup?ref=<user_id>`. Optional so the
+     * dialog still renders cleanly when the parent has not loaded it yet.
+     */
+    userId?: string
+    /**
+     * Subscription tier of the current user, used to decide which post-
+     * meeting upsell variant to show. Free hits the hard upsell after 1
+     * brainstorm; Starter+ users get the softer top-up nudge once they
+     * pass 80% of the bundled allowance.
+     */
+    userTier?: SubscriptionTier
+    /** Brainstorm sessions the user has consumed this calendar month. */
+    brainstormsUsedThisMonth?: number
 }
 
 // ─── Meeting Topic Suggestions ────────────────────────────────────────────────
@@ -781,6 +804,9 @@ export function TeamMeetingDialog({
     open,
     onOpenChange,
     preset,
+    userId,
+    userTier,
+    brainstormsUsedThisMonth,
 }: TeamMeetingDialogProps) {
     const router = useRouter()
     // ─── State ────────────────────────────────────────────────────────────
@@ -2249,6 +2275,24 @@ export function TeamMeetingDialog({
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Tier-aware upsell — renders below the What-next CTAs only
+                                 * when the user has used >= 80% of their bundled brainstorm
+                                 * allowance for the month. Free hits this on session 1 of 1;
+                                 * Starter+ surfaces the £10 top-up / Pro upgrade language. */}
+                                <PostMeetingUpsell
+                                    userId={userId}
+                                    tier={userTier ?? 'free'}
+                                    used={
+                                        typeof brainstormsUsedThisMonth === 'number'
+                                            ? brainstormsUsedThisMonth + 1
+                                            : 1
+                                    }
+                                    cap={
+                                        SUBSCRIPTION_PLANS[userTier ?? 'free']?.limits
+                                            .brainstormSessionsPerMonth ?? null
+                                    }
+                                />
                             </>
                         ) : error ? (
                             <div className="space-y-4 py-8">
@@ -2380,5 +2424,144 @@ export function TeamMeetingDialog({
             />
         )}
         </>
+    )
+}
+
+// ─── Post-meeting upsell ──────────────────────────────────────────────────
+
+interface PostMeetingUpsellProps {
+    /** Authenticated user id, used to build the referral URL. Optional. */
+    userId?: string
+    /** Subscription tier of the current user. */
+    tier: SubscriptionTier
+    /** Brainstorm sessions consumed this calendar month (including this one). */
+    used: number
+    /** Bundled allowance for this tier. `null` = unlimited (no upsell). */
+    cap: number | null
+}
+
+/**
+ * Tier-aware upsell rendered below the existing "What next?" CTA bar at
+ * the end of every brainstorm. Shown only when the user is at >= 80% of
+ * their bundled brainstorm allowance — earlier than that and the upsell
+ * is noise.
+ *
+ * Voice rules: lead with the option, never the failure. "Cancel anytime,
+ * no contract" reassurance line. Referral URL pattern is
+ * `${APP_DOMAIN}/signup?ref=<user_id>` so the conversion engine in
+ * Tier 5 step 22 can credit the inviter without any URL-shape migration.
+ */
+function PostMeetingUpsell({ userId, tier, used, cap }: PostMeetingUpsellProps) {
+    const [copied, setCopied] = useState(false)
+
+    if (cap === null) return null
+    if (cap <= 0) return null
+    if (used / cap < 0.8) return null
+
+    const referralUrl = userId ? `${APP_DOMAIN}/signup?ref=${userId}` : null
+    const isFree = tier === 'free'
+    const remaining = Math.max(0, cap - used)
+
+    // Resolve Starter v2 / Pro copy from the live plan data so a price
+    // change in plans.ts ripples through here without manual edits.
+    const starter = SUBSCRIPTION_PLANS['starter_v2']
+    const pro = SUBSCRIPTION_PLANS['professional']
+    const starterPrice = starter ? `£${(starter.priceMonthlyGBP / 100).toFixed(0)}` : '£20'
+    const starterBrainstorms = starter?.limits.brainstormSessionsPerMonth ?? 10
+    const starterLeads = starter?.limits.investorLeadsPerMonth ?? 100
+    const proPrice = pro ? `£${(pro.priceMonthlyGBP / 100).toFixed(0)}` : '£149'
+
+    const usageLine = isFree
+        ? `You've used ${used} of ${cap} brainstorms this month.`
+        : `${used} of ${cap} brainstorms used this month, ${remaining} remaining.`
+
+    const offerLine = isFree
+        ? `Upgrade to Starter, ${starterPrice}/month for ${starterBrainstorms} brainstorms, ${starterLeads} investor leads, and a drafted email for each match.`
+        : `Top up with the £10 add-on for 100 extra investor leads, or upgrade to Pro (${proPrice}/month) for unlimited brainstorming.`
+
+    const handleCopy = async () => {
+        if (!referralUrl) return
+        try {
+            await navigator.clipboard.writeText(referralUrl)
+            setCopied(true)
+            toast.success('Invite link copied. Paste it anywhere.')
+            setTimeout(() => setCopied(false), 2400)
+        } catch {
+            toast.error('Could not copy link. Long-press the link to copy manually.')
+        }
+    }
+
+    const handleEmailShare = () => {
+        if (!referralUrl) return
+        const subject = encodeURIComponent('ForgeOS, the brainstorming room I\'ve been using')
+        const body = encodeURIComponent(
+            [
+                'Hey,',
+                '',
+                'I\'ve been running brainstorms with the ForgeOS specialist team. Sharing my invite link below in case it\'s useful.',
+                '',
+                referralUrl,
+                '',
+                'Tristan',
+            ].join('\n'),
+        )
+        window.location.href = `mailto:?subject=${subject}&body=${body}`
+    }
+
+    return (
+        <div className="px-6 pb-4">
+            <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <div>
+                    <p className="text-sm font-semibold text-foreground">{usageLine}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                        {offerLine}
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm" className="gap-2">
+                        <Link href={isFree ? '/pricing?plan=starter_v2' : '/pricing'}>
+                            {isFree ? `Start Starter, ${starterPrice}/month` : 'See plans'}
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
+                    </Button>
+                    {referralUrl && (
+                        <>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleCopy}
+                                className="gap-2"
+                            >
+                                {copied ? (
+                                    <>
+                                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Copied
+                                    </>
+                                ) : (
+                                    <>
+                                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Copy invite link
+                                    </>
+                                )}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleEmailShare}
+                                className="gap-2"
+                            >
+                                <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                                Send via email
+                            </Button>
+                        </>
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    {isFree
+                        ? 'Or invite a friend who pays for Starter, you get +100 investor searches free this month. Cancel anytime, no contract.'
+                        : 'Invite a friend who pays for Starter, you get +100 investor searches free this month.'}
+                </p>
+            </div>
+        </div>
     )
 }

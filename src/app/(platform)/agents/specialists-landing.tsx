@@ -88,10 +88,19 @@ function getOrgChartHierarchy() {
 
 interface SpecialistsLandingProps {
     onOpenProjectBuilder: () => void
+    /** Authenticated user id, forwarded to TeamMeetingDialog. */
+    userId?: string
+    /** Subscription tier, forwarded to TeamMeetingDialog. */
+    userTier?: import("@/lib/billing/plans").SubscriptionTier
+    /** Brainstorms used this month, forwarded to TeamMeetingDialog. */
+    brainstormsUsedThisMonth?: number
 }
 
 export function SpecialistsLanding({
     onOpenProjectBuilder,
+    userId,
+    userTier,
+    brainstormsUsedThisMonth,
 }: SpecialistsLandingProps) {
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -570,6 +579,9 @@ export function SpecialistsLanding({
                     if (!open) setMeetingPreset(null)
                 }}
                 preset={meetingPreset ?? undefined}
+                userId={userId}
+                userTier={userTier}
+                brainstormsUsedThisMonth={brainstormsUsedThisMonth}
             />
         </div>
     )

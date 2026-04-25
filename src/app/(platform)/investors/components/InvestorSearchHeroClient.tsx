@@ -24,6 +24,7 @@ import { InvestorSearchHero } from './InvestorSearchHero'
 import { DashboardMatchCards } from './DashboardMatchCards'
 import { SearchPromptGrid } from './SearchPromptGrid'
 import { InvestorMatchInsightCard } from './InvestorMatchInsightCard'
+import { LimitReachedUpsell, ApproachingLimitBanner } from './LimitReachedUpsell'
 import {
   searchInvestors,
   addToShortlist,
@@ -49,6 +50,22 @@ interface InvestorSearchHeroClientProps {
   initialMatchOutputs?: Record<string, InvestorMatchOutputView>
   /** Resolved tier from the initial search — drives the blur/teaser logic. */
   resolvedTier?: ResolvedTier
+  /**
+   * Authenticated user id, used by the limit-reached upsell to build the
+   * `${APP_DOMAIN}/signup?ref=<user_id>` referral URL. Optional so the
+   * component is safe in anonymous render paths.
+   */
+  userId?: string
+  /**
+   * Snapshot of the user's investor monthly view cap, used to render the
+   * limit-reached upsell when free-tier users have exhausted their allowance
+   * and the soft-state >=80% banner before that.
+   */
+  viewCapSnapshot?: {
+    cap: number | null
+    viewsUsedThisMonth: number
+    viewsRemaining: number | null
+  }
 }
 
 const PAID_TIERS = new Set(['seed', 'starter', 'professional', 'enterprise'])
@@ -63,6 +80,8 @@ export function InvestorSearchHeroClient({
   initialMatchOutputs,
   resolvedTier = 'free',
   companyContext,
+  userId,
+  viewCapSnapshot,
 }: InvestorSearchHeroClientProps) {
   const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
   const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores ?? {})
@@ -210,6 +229,24 @@ export function InvestorSearchHeroClient({
   const showInsightCards = firms.length > 0 && (hasSearched || initialFirms.length > 0)
   const isPaid = PAID_TIERS.has(tier)
   const isAnonymous = tier === 'anonymous'
+  const isFreeSignedIn = tier === 'free'
+
+  // FLOW: Limit-reached and approaching-limit derivations.
+  // Only the new freemium "Free" tier gets the upsell + soft banner — paid
+  // and anonymous tiers route through the existing surfaces. We drive both
+  // states off the monthly investor-view cap (the canonical limit-check in
+  // src/lib/ai/limit-check.ts). When the parallel "free freemium gate"
+  // commit lands (1 brainstorm + 5 lifetime saved searches), the same
+  // component can be re-fed off `savedSearchesLifetime` by switching the
+  // `limit` prop to `saved_searches`.
+  const cap = viewCapSnapshot?.cap ?? null
+  const usedThisMonth = viewCapSnapshot?.viewsUsedThisMonth ?? 0
+  const isFreeAtLimit =
+    isFreeSignedIn && cap !== null && cap > 0 && usedThisMonth >= cap
+  const freeUsagePct =
+    isFreeSignedIn && cap !== null && cap > 0 ? usedThisMonth / cap : 0
+  const isFreeApproaching =
+    isFreeSignedIn && cap !== null && cap > 0 && freeUsagePct >= 0.8 && !isFreeAtLimit
 
   // Anonymous teaser: render first card fully (server provides the teaser
   // output), the rest blurred. Free signed-in: all blurred.
@@ -225,6 +262,18 @@ export function InvestorSearchHeroClient({
 
   return (
     <div className="space-y-8">
+      {/* Soft >=80% banner: above the search box so the founder sees it
+       * BEFORE typing their next query, not as a wall after the fact.
+       * Only renders for signed-in free users; paid users have separate
+       * surfaces (existing /investors top-of-page banner). */}
+      {isFreeApproaching && (
+        <ApproachingLimitBanner
+          limit="monthly_searches"
+          currentCount={usedThisMonth}
+          limitMax={cap as number}
+        />
+      )}
+
       <InvestorSearchHero
         onSearch={runSearch}
         onCancel={handleCancel}
@@ -293,8 +342,20 @@ export function InvestorSearchHeroClient({
         />
       )}
 
-      {!showInsightCards && hasSearched && <EmptyMatchState />}
-      {!showInsightCards && !hasSearched && firms.length === 0 && <EmptyMatchState />}
+      {/* Limit-reached state: free user has exhausted their monthly views.
+       * Show the upsell instead of (or alongside) the empty-match state so
+       * the next action is upgrade/invite, not a dead end. */}
+      {isFreeAtLimit && !showInsightCards && (
+        <LimitReachedUpsell
+          userId={userId}
+          limit="monthly_searches"
+          currentCount={usedThisMonth}
+          limitMax={cap as number}
+        />
+      )}
+
+      {!showInsightCards && hasSearched && !isFreeAtLimit && <EmptyMatchState />}
+      {!showInsightCards && !hasSearched && firms.length === 0 && !isFreeAtLimit && <EmptyMatchState />}
     </div>
   )
 }

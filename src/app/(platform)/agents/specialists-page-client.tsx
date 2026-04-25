@@ -11,6 +11,7 @@ import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { ArrowLeft, Monitor } from "lucide-react"
 import { SpecialistsLanding } from "./specialists-landing"
 import type { AgentWorkflowRow, AgentCustomPromptRow } from "@/actions/agent-workflows"
+import type { SubscriptionTier } from "@/lib/billing/plans"
 
 /**
  * Dynamically load the heavy workflow builder (ReactFlow + Dagre) only when needed.
@@ -38,6 +39,13 @@ type PageView = "specialists" | "project-builder"
 interface SpecialistsPageClientProps {
     initialWorkflows: AgentWorkflowRow[]
     initialCustomPrompts: AgentCustomPromptRow[]
+    /** Authenticated user id, threaded into TeamMeetingDialog for the
+     * referral URL on the post-meeting upsell. */
+    userId?: string
+    /** Subscription tier of the current user, drives the upsell variant. */
+    userTier?: SubscriptionTier
+    /** Brainstorm sessions consumed this calendar month. */
+    brainstormsUsedThisMonth?: number
 }
 
 /**
@@ -47,6 +55,9 @@ interface SpecialistsPageClientProps {
 export function SpecialistsPageClient({
     initialWorkflows,
     initialCustomPrompts,
+    userId,
+    userTier,
+    brainstormsUsedThisMonth,
 }: SpecialistsPageClientProps) {
     const [view, setView] = useState<PageView>("specialists")
     const [isMobile, setIsMobile] = useState<boolean | null>(null)
@@ -125,6 +136,9 @@ export function SpecialistsPageClient({
                         <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
                             <SpecialistsLanding
                                 onOpenProjectBuilder={() => setView("project-builder")}
+                                userId={userId}
+                                userTier={userTier}
+                                brainstormsUsedThisMonth={brainstormsUsedThisMonth}
                             />
                         </Suspense>
                     </div>
