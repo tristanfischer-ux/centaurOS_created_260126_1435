@@ -580,6 +580,24 @@ interface PdfInput {
             confidence: "high" | "medium" | "low"
         }>
     } | null
+    /**
+     * Deterministic feasibility verdict (Loop 3 P1, council-unanimous
+     * 2026-04-25 NIGHT). Drives the brief-page status banner and, when
+     * status is "red", the Feasibility Exception page that renders right
+     * after the brief. Computed in the proofreader stage from sizing,
+     * cost, mass and brief constraints — no LLM involvement.
+     */
+    feasibilityVerdict: {
+        status: "green" | "amber" | "red"
+        ranAtIso: string
+        fails: Array<{
+            axis: "envelope" | "mass" | "cost" | "transport" | "suppliers"
+            severity: "blocker" | "warning"
+            summary: string
+            evidence: string
+        }>
+        tradeoffs: string[]
+    } | null
 }
 
 // ─── PDF Component ─────────────────────────────────────────────────────
@@ -742,11 +760,193 @@ function TocPage({ sections }: { sections: string[] }): React.ReactElement {
     )
 }
 
+// ─── Feasibility verdict (Loop 3 P1, council-unanimous 2026-04-25) ───
+//
+// Council finding: "Engineers don't design things they know violate
+// physics. Neither should the engine." When sizing / cost / mass / UK
+// transport gates fail, the brief page now opens with a Red banner
+// summarising the gap, and a dedicated Feasibility Exception page
+// renders right after the brief — listing every failed axis with
+// numerical evidence and a small set of trade-off pivots the founder
+// can consider. The downstream pages (sizing, BOM, cost waterfall,
+// suppliers) still render so the engineering work is visible, but the
+// reader meets the verdict before the polish, not after it.
+
+const VERDICT_COLORS = {
+    red: { bg: "#fee2e2", border: "#b91c1c", text: "#7f1d1d", label: "RED" },
+    amber: { bg: "#fef3c7", border: "#b45309", text: "#7c2d12", label: "AMBER" },
+    green: { bg: "#dcfce7", border: "#15803d", text: "#14532d", label: "GREEN" },
+} as const
+
+function FeasibilityVerdictBanner({
+    verdict,
+}: {
+    verdict: NonNullable<PdfInput["feasibilityVerdict"]>
+}): React.ReactElement {
+    const c = VERDICT_COLORS[verdict.status]
+    const blockerCount = verdict.fails.filter((f) => f.severity === "blocker").length
+    const warnCount = verdict.fails.filter((f) => f.severity === "warning").length
+    return (
+        <View
+            style={{
+                backgroundColor: c.bg,
+                borderLeftWidth: 3,
+                borderLeftColor: c.border,
+                paddingTop: 8,
+                paddingBottom: 8,
+                paddingLeft: 10,
+                paddingRight: 10,
+                marginBottom: 14,
+            }}
+        >
+            <Text style={{ fontSize: 11, fontWeight: "bold", color: c.text }}>
+                Feasibility verdict: {c.label}
+            </Text>
+            <Text style={{ fontSize: 9, color: c.text, marginTop: 2 }}>
+                {blockerCount > 0
+                    ? `${blockerCount} blocker${blockerCount === 1 ? "" : "s"}`
+                    : ""}
+                {blockerCount > 0 && warnCount > 0 ? " · " : ""}
+                {warnCount > 0
+                    ? `${warnCount} warning${warnCount === 1 ? "" : "s"}`
+                    : ""}
+                {verdict.fails.length === 0
+                    ? "No constraint conflicts detected."
+                    : " — see Feasibility Exception page below."}
+            </Text>
+        </View>
+    )
+}
+
+function FeasibilityExceptionPage({
+    verdict,
+}: {
+    verdict: NonNullable<PdfInput["feasibilityVerdict"]>
+}): React.ReactElement {
+    const c = VERDICT_COLORS[verdict.status]
+    const blockers = verdict.fails.filter((f) => f.severity === "blocker")
+    const warnings = verdict.fails.filter((f) => f.severity === "warning")
+    return (
+        <Page size="A4" style={styles.page} wrap>
+            <Text style={styles.h2}>Feasibility exception</Text>
+            <Text style={[styles.muted, { marginBottom: 10, fontSize: 9 }]}>
+                Before this report was assembled, the engine compared the
+                derived design against the brief constraints and against UK
+                transport law. The fails below are not opinions — each one
+                is grounded in numbers from the engine&apos;s own outputs
+                (sizing solver, cost waterfall, parts mass roll-up). Treat
+                the downstream sections as tentative until these are
+                resolved.
+            </Text>
+            <View
+                style={{
+                    backgroundColor: c.bg,
+                    borderLeftWidth: 3,
+                    borderLeftColor: c.border,
+                    paddingTop: 6,
+                    paddingBottom: 6,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    marginBottom: 12,
+                }}
+            >
+                <Text style={{ fontSize: 10, fontWeight: "bold", color: c.text }}>
+                    Status: {c.label}
+                </Text>
+            </View>
+            {blockers.length > 0 && (
+                <View style={{ marginBottom: 12 }}>
+                    <Text
+                        style={{
+                            fontSize: 11,
+                            fontWeight: "bold",
+                            color: VERDICT_COLORS.red.border,
+                            marginBottom: 4,
+                        }}
+                    >
+                        BLOCKERS ({blockers.length})
+                    </Text>
+                    {blockers.map((f, idx) => (
+                        <View key={`bk-${idx}`} style={{ marginBottom: 6 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+                                {axisLabel(f.axis)} — {f.summary}
+                            </Text>
+                            <Text style={{ fontSize: 9, color: MUTED, marginTop: 1 }}>
+                                {f.evidence}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {warnings.length > 0 && (
+                <View style={{ marginBottom: 12 }}>
+                    <Text
+                        style={{
+                            fontSize: 11,
+                            fontWeight: "bold",
+                            color: VERDICT_COLORS.amber.border,
+                            marginBottom: 4,
+                        }}
+                    >
+                        WARNINGS ({warnings.length})
+                    </Text>
+                    {warnings.map((f, idx) => (
+                        <View key={`wn-${idx}`} style={{ marginBottom: 6 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+                                {axisLabel(f.axis)} — {f.summary}
+                            </Text>
+                            <Text style={{ fontSize: 9, color: MUTED, marginTop: 1 }}>
+                                {f.evidence}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {verdict.tradeoffs.length > 0 && (
+                <View style={{ marginBottom: 6 }}>
+                    <Text style={[styles.h5, { marginBottom: 4 }]}>
+                        Suggested trade-offs
+                    </Text>
+                    {verdict.tradeoffs.map((t, idx) => (
+                        <Text
+                            key={`to-${idx}`}
+                            style={{ fontSize: 10, marginBottom: 3 }}
+                        >
+                            • {t}
+                        </Text>
+                    ))}
+                </View>
+            )}
+            <Text style={styles.footer} fixed>
+                <Text>Feasibility exception</Text>
+            </Text>
+        </Page>
+    )
+}
+
+function axisLabel(axis: NonNullable<PdfInput["feasibilityVerdict"]>["fails"][number]["axis"]): string {
+    switch (axis) {
+        case "envelope":
+            return "Envelope"
+        case "mass":
+            return "Mass"
+        case "cost":
+            return "Cost"
+        case "transport":
+            return "Transport (UK)"
+        case "suppliers":
+            return "Supplier coverage"
+    }
+}
+
 function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
     const b = data.brief
     return (
         <View>
             <Text style={styles.h2}>1. Brief</Text>
+            {data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
+                <FeasibilityVerdictBanner verdict={data.feasibilityVerdict} />
+            )}
             {b.subject && (
                 <View style={styles.para}>
                     <Text style={styles.h5}>What we are building</Text>
@@ -2327,6 +2527,14 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 </Text>
             </Page>
 
+            {/* Feasibility exception page (Loop 3 P1, council-unanimous
+             *  2026-04-25 NIGHT). Renders only when the verdict is non-green.
+             *  Sits BEFORE sizing/BOM/cost so the founder sees the gap
+             *  before the polish. */}
+            {data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
+                <FeasibilityExceptionPage verdict={data.feasibilityVerdict} />
+            )}
+
             {/* 3. Sizing optimisation (P1 — only when dimension_sheet present) */}
             {hasSheet && sizingSectionNumber != null && (
                 <Page size="A4" style={styles.page} wrap>
@@ -2583,7 +2791,7 @@ async function exportProjectPdfInternal(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet, spatial_plan, proofread_findings",
+                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet, spatial_plan, proofread_findings, feasibility_verdict",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -3110,6 +3318,48 @@ async function exportProjectPdfInternal(
                     costPence:
                         typeof raw.cost_pence === "number" ? raw.cost_pence : 0,
                     findings: cleaned,
+                }
+            })(),
+            feasibilityVerdict: (() => {
+                const raw = project.feasibility_verdict as
+                    | {
+                          status?: unknown
+                          ran_at?: unknown
+                          fails?: unknown
+                          tradeoffs?: unknown
+                      }
+                    | null
+                if (!raw) return null
+                const status =
+                    raw.status === "red" || raw.status === "amber" || raw.status === "green"
+                        ? raw.status
+                        : "green"
+                type Fail = NonNullable<PdfInput["feasibilityVerdict"]>["fails"][number]
+                const fails: Fail[] = []
+                if (Array.isArray(raw.fails)) {
+                    for (const f of raw.fails) {
+                        if (
+                            f &&
+                            typeof f === "object" &&
+                            "axis" in f &&
+                            "severity" in f &&
+                            "summary" in f
+                        ) {
+                            fails.push(f as Fail)
+                        }
+                    }
+                }
+                const tradeoffs = Array.isArray(raw.tradeoffs)
+                    ? raw.tradeoffs.filter((s): s is string => typeof s === "string")
+                    : []
+                return {
+                    status,
+                    ranAtIso:
+                        typeof raw.ran_at === "string"
+                            ? raw.ran_at
+                            : new Date().toISOString(),
+                    fails,
+                    tradeoffs,
                 }
             })(),
         }

@@ -30,6 +30,10 @@ import {
     MID_STRUCTURED_MODEL,
     CHEAP_PROSE_MODEL,
 } from "@/lib/ai/openrouter"
+import {
+    computeFeasibilityVerdict,
+    type FeasibilityVerdict,
+} from "@/lib/feasibility/compute-verdict"
 
 /**
  * V4-Pro is the preferred proofreader (frontier reasoning at half-Haiku
@@ -78,11 +82,7 @@ export async function runProofreaderBackground(
 
     const { data: project, error: projectErr } = await admin
         .from("cad_lab_projects")
-        .select(
-            "id, foundry_id, name, subject, design_revision, brief_locked_at, " +
-                "research, modules, dimension_sheet, spatial_plan, reviews, " +
-                "result, system_illustration_url",
-        )
+        .select("id, foundry_id, name, subject, design_revision, brief_locked_at, research, modules, dimension_sheet, spatial_plan, reviews, result, ai_cost_estimates, system_illustration_url")
         .eq("id", projectId)
         .maybeSingle()
     if (projectErr || !project) {
@@ -235,9 +235,39 @@ export async function runProofreaderBackground(
         findings,
     }
 
+    // Loop 3 P1 (council-unanimous, 2026-04-25 NIGHT): compute the
+    // deterministic feasibility verdict from sizing + cost + mass + brief
+    // constraints. Runs alongside the LLM proofreader so the founder sees
+    // a hard pass/fail on the front page even when the LLM misses
+    // something. Independent of LLM availability — no second API call.
+    const briefConstraints =
+        ((research as Record<string, unknown> | null)?.designBrief as
+            | Record<string, unknown>
+            | undefined)?.constraints as Record<string, unknown> | undefined
+    const verdict: FeasibilityVerdict = computeFeasibilityVerdict({
+        dimensionSheet,
+        briefConstraints: briefConstraints ?? null,
+        parts: parts.map((p) => ({
+            mass_kg:
+                typeof p.mass_kg === "number" ? p.mass_kg : null,
+            estimated_unit_cost_gbp:
+                typeof p.estimated_unit_cost_gbp === "number"
+                    ? p.estimated_unit_cost_gbp
+                    : null,
+        })),
+        aiCostEstimates: project.ai_cost_estimates as
+            | Record<string, unknown>
+            | null,
+        shortlistCount: shortlist.length,
+        bomRowCount: parts.length,
+    })
+
     const { error: updateErr } = await admin
         .from("cad_lab_projects")
-        .update({ proofread_findings: payload as unknown as never })
+        .update({
+            proofread_findings: payload as unknown as never,
+            feasibility_verdict: verdict as unknown as never,
+        })
         .eq("id", projectId)
     if (updateErr) {
         return {

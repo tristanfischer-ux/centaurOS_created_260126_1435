@@ -98,28 +98,86 @@ async function synthesizeSupplierForProject(
         : ""
     const prompt =
         `You are writing a 1-2 sentence synthesis explaining why a specific supplier is a candidate for a specific project's bill of materials. The synthesis replaces the supplier's own marketing blurb in an engineering report — so it must be SPECIFIC to this project, not generic.\n\nSUPPLIER: ${match.name}\n\nSUPPLIER DESCRIPTION (their own copy):\n${supplierDesc || "(no description on file)"}\n\nMATCHED BOM PARTS (this is what the matcher thinks they could supply):\n${partsLines.join("\n")}${briefBlock}\n\nWrite ONE sentence (≤50 words) that names what the supplier brings, what they would supply for this specific project, and any caveat the founder should weigh. No marketing language. No hyperbole. Plain engineering prose. Output ONLY the sentence — no preamble, no markdown, no quote marks.`
-    const result = await callOpenRouter({
+    // Loop 3 P2: prompt-leak guard. V4-Flash occasionally echoes the prompt
+    // structure verbatim instead of producing an answer ("We need to write a
+    // single sentence d50 words. Supplier: ..."). This shipped twice in the
+    // BESS PDF, flagged by 4-frontier council 2026-04-25 as "0/10 — meta-text
+    // shipped verbatim, complete authorial abdication". Three layers:
+    //   1. Schema-tighten the prompt (already done above — "Output ONLY...").
+    //   2. Regex-detect prompt leak markers + reject; retry once with stricter
+    //      system message + temperature 0.
+    //   3. On second fail, return deterministic safe template — never ship a
+    //      raw model output that failed validation.
+    const validate = (raw: string | null | undefined): string | null => {
+        if (!raw) return null
+        const t = raw.trim().replace(/^["']|["']$/g, "")
+        if (t.length < 10) return null
+        // Prompt-leak markers — phrases the model only emits when it's echoing
+        // the instructions back instead of answering them.
+        const LEAK_PATTERNS = [
+            /\bwe need to write\b/i,
+            /\bsentence must\b/i,
+            /\bthe (supplier|founder) (description|brief) is\b/i,
+            /\boutput only\b/i,
+            /\bd50 words\b/i,
+            /^supplier:\s/im,
+            /^matched bom parts:/im,
+            /^(prompt|instructions?|system):/im,
+        ]
+        if (LEAK_PATTERNS.some((re) => re.test(t))) return null
+        if (t.length > 350) {
+            const cut = t.slice(0, 350)
+            const lastSpace = cut.lastIndexOf(" ")
+            return (lastSpace > 200 ? cut.slice(0, lastSpace) : cut).replace(/[,;:]$/, "") + "…"
+        }
+        return t
+    }
+
+    const first = await callOpenRouter({
         model: CHEAP_STRUCTURED_MODEL,
         prompt,
         maxTokens: 256,
         temperature: 0.2,
         timeoutMs: 25_000,
     })
-    if (!result.ok) {
+    const firstClean = first.ok ? validate(first.text) : null
+    if (firstClean) return firstClean
+
+    if (!first.ok) {
         console.warn(
-            `[forge-v2-supplier-match] synthesis failed for ${match.id}: ${result.error}`,
+            `[forge-v2-supplier-match] synthesis call failed for ${match.id}: ${first.error}`,
         )
-        return null
+    } else {
+        console.warn(
+            `[forge-v2-supplier-match] synthesis leak/empty for ${match.id} on first pass`,
+        )
     }
-    const text = result.text.trim().replace(/^["']|["']$/g, "")
-    if (text.length < 10) return null
-    // Cap to 350 chars defensively (~50 words). Truncate on word boundary.
-    if (text.length > 350) {
-        const cut = text.slice(0, 350)
-        const lastSpace = cut.lastIndexOf(" ")
-        return (lastSpace > 200 ? cut.slice(0, lastSpace) : cut).replace(/[,;:]$/, "") + "…"
-    }
-    return text
+
+    // Stricter retry — temperature 0 + system message that forces an answer.
+    const retry = await callOpenRouter({
+        model: CHEAP_STRUCTURED_MODEL,
+        system:
+            "You are an engineering writer. Output exactly one sentence answering the user. Never echo the user's instructions. Never say 'we need to write' or quote the brief format back. Plain prose only.",
+        prompt,
+        maxTokens: 256,
+        temperature: 0,
+        timeoutMs: 25_000,
+    })
+    const retryClean = retry.ok ? validate(retry.text) : null
+    if (retryClean) return retryClean
+
+    // Deterministic safe fallback — never ship raw failed model output to PDF.
+    const partsList = matchedParts
+        .slice(0, 3)
+        .map((p) => p.partNumber)
+        .filter(Boolean)
+        .join(", ")
+    const partsPhrase = partsList
+        ? ` for ${partsList}`
+        : matchedParts.length > 0
+          ? " for matched components"
+          : ""
+    return `${match.name} is a candidate${partsPhrase}; capability and lead time to be verified during procurement.`
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────
