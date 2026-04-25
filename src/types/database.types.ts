@@ -3019,7 +3019,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "assumptions_linked_experiment_fk"
+            foreignKeyName: "assumptions_linked_experiment_id_fkey"
             columns: ["linked_experiment_id"]
             isOneToOne: false
             referencedRelation: "experiments"
@@ -3881,6 +3881,57 @@ export type Database = {
           },
         ]
       }
+      brief_revisions: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          project_id: string
+          revision_label: string
+          revision_number: number
+          summary: string
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          project_id: string
+          revision_label: string
+          revision_number: number
+          summary?: string
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          project_id?: string
+          revision_label?: string
+          revision_number?: number
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brief_revisions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_revisions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       burn_scenarios: {
         Row: {
           cost_delay_weeks: number
@@ -4539,32 +4590,122 @@ export type Database = {
           },
         ]
       }
+      cad_lab_project_files: {
+        Row: {
+          bbox_max_mm: Json | null
+          bbox_min_mm: Json | null
+          created_at: string
+          filename: string
+          format: string
+          foundry_id: string
+          id: string
+          material_hint: string | null
+          mime_type: string
+          parse_error: string | null
+          parse_status: string
+          part_count: number | null
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          surface_area_mm2: number | null
+          updated_at: string
+          uploaded_by: string
+          volume_mm3: number | null
+        }
+        Insert: {
+          bbox_max_mm?: Json | null
+          bbox_min_mm?: Json | null
+          created_at?: string
+          filename: string
+          format: string
+          foundry_id: string
+          id?: string
+          material_hint?: string | null
+          mime_type: string
+          parse_error?: string | null
+          parse_status?: string
+          part_count?: number | null
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          surface_area_mm2?: number | null
+          updated_at?: string
+          uploaded_by: string
+          volume_mm3?: number | null
+        }
+        Update: {
+          bbox_max_mm?: Json | null
+          bbox_min_mm?: Json | null
+          created_at?: string
+          filename?: string
+          format?: string
+          foundry_id?: string
+          id?: string
+          material_hint?: string | null
+          mime_type?: string
+          parse_error?: string | null
+          parse_status?: string
+          part_count?: number | null
+          project_id?: string
+          size_bytes?: number
+          storage_path?: string
+          surface_area_mm2?: number | null
+          updated_at?: string
+          uploaded_by?: string
+          volume_mm3?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cad_lab_project_files_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cad_lab_project_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_lab_projects: {
         Row: {
           accepted_risks: Json | null
           ai_cost_estimates: Json | null
           archived_at: string | null
+          autopilot_state: Json | null
           batch_started_at: string | null
           batch_status: string
+          bom_generation_state: Json | null
           brief_locked_at: string | null
+          brief_locked_by: string | null
           checkpoints: Json | null
+          concept_render_url: string | null
           created_at: string
           created_by: string
           decomposition_connections: Json | null
+          design_change_log: Json
           design_revision: number
           diagnostic_answers: Json | null
           diagnostic_enrichment: Json | null
+          dimension_sheet: Json | null
           forked_from_id: string | null
           foundry_id: string
           generated_code: string | null
+          hero_bounding_boxes: Json | null
           id: string
           illustration_style: string
+          image_render_state: Json | null
           images_generated_at_revision: number
           integrated_assembly_code: string | null
           integrated_assembly_step_url: string | null
           integrated_assembly_stl_url: string | null
           interface_contracts: Json | null
           interface_definition: string | null
+          interior_overview_url: string | null
           model_id: string
           modules: Json | null
           name: string
@@ -4580,6 +4721,9 @@ export type Database = {
           review_skipped: boolean | null
           reviews: Json | null
           seeded_brief_content: Json | null
+          shipped_at: string | null
+          shipped_by: string | null
+          spatial_plan: Json | null
           stage: string
           status: string
           subject: string
@@ -4595,27 +4739,36 @@ export type Database = {
           accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
           archived_at?: string | null
+          autopilot_state?: Json | null
           batch_started_at?: string | null
           batch_status?: string
+          bom_generation_state?: Json | null
           brief_locked_at?: string | null
+          brief_locked_by?: string | null
           checkpoints?: Json | null
+          concept_render_url?: string | null
           created_at?: string
           created_by: string
           decomposition_connections?: Json | null
+          design_change_log?: Json
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
+          dimension_sheet?: Json | null
           forked_from_id?: string | null
           foundry_id: string
           generated_code?: string | null
+          hero_bounding_boxes?: Json | null
           id?: string
           illustration_style?: string
+          image_render_state?: Json | null
           images_generated_at_revision?: number
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
           interface_contracts?: Json | null
           interface_definition?: string | null
+          interior_overview_url?: string | null
           model_id?: string
           modules?: Json | null
           name?: string
@@ -4631,6 +4784,9 @@ export type Database = {
           review_skipped?: boolean | null
           reviews?: Json | null
           seeded_brief_content?: Json | null
+          shipped_at?: string | null
+          shipped_by?: string | null
+          spatial_plan?: Json | null
           stage?: string
           status?: string
           subject: string
@@ -4646,27 +4802,36 @@ export type Database = {
           accepted_risks?: Json | null
           ai_cost_estimates?: Json | null
           archived_at?: string | null
+          autopilot_state?: Json | null
           batch_started_at?: string | null
           batch_status?: string
+          bom_generation_state?: Json | null
           brief_locked_at?: string | null
+          brief_locked_by?: string | null
           checkpoints?: Json | null
+          concept_render_url?: string | null
           created_at?: string
           created_by?: string
           decomposition_connections?: Json | null
+          design_change_log?: Json
           design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
+          dimension_sheet?: Json | null
           forked_from_id?: string | null
           foundry_id?: string
           generated_code?: string | null
+          hero_bounding_boxes?: Json | null
           id?: string
           illustration_style?: string
+          image_render_state?: Json | null
           images_generated_at_revision?: number
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
           interface_contracts?: Json | null
           interface_definition?: string | null
+          interior_overview_url?: string | null
           model_id?: string
           modules?: Json | null
           name?: string
@@ -4682,6 +4847,9 @@ export type Database = {
           review_skipped?: boolean | null
           reviews?: Json | null
           seeded_brief_content?: Json | null
+          shipped_at?: string | null
+          shipped_by?: string | null
+          spatial_plan?: Json | null
           stage?: string
           status?: string
           subject?: string
@@ -7013,60 +7181,58 @@ export type Database = {
       }
       experiments: {
         Row: {
-          completed_at: string | null
-          cost_pence: number | null
+          assumption_id: string | null
           created_at: string
           decision: string | null
-          duration_days: number | null
+          ended_at: string | null
           foundry_id: string
           hypothesis_id: string
-          hypothesis_under_test: string | null
           id: string
-          method: string | null
           name: string
           result_summary: string | null
           started_at: string | null
-          status: string
-          success_criteria: string | null
+          success_criterion: string
+          test_method: string | null
           updated_at: string
         }
         Insert: {
-          completed_at?: string | null
-          cost_pence?: number | null
+          assumption_id?: string | null
           created_at?: string
           decision?: string | null
-          duration_days?: number | null
+          ended_at?: string | null
           foundry_id: string
           hypothesis_id: string
-          hypothesis_under_test?: string | null
           id?: string
-          method?: string | null
           name: string
           result_summary?: string | null
           started_at?: string | null
-          status?: string
-          success_criteria?: string | null
+          success_criterion: string
+          test_method?: string | null
           updated_at?: string
         }
         Update: {
-          completed_at?: string | null
-          cost_pence?: number | null
+          assumption_id?: string | null
           created_at?: string
           decision?: string | null
-          duration_days?: number | null
+          ended_at?: string | null
           foundry_id?: string
           hypothesis_id?: string
-          hypothesis_under_test?: string | null
           id?: string
-          method?: string | null
           name?: string
           result_summary?: string | null
           started_at?: string | null
-          status?: string
-          success_criteria?: string | null
+          success_criterion?: string
+          test_method?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "experiments_assumption_id_fkey"
+            columns: ["assumption_id"]
+            isOneToOne: false
+            referencedRelation: "assumptions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "experiments_foundry_id_fkey"
             columns: ["foundry_id"]
@@ -9524,6 +9690,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "hypotheses_archived_reason_id_fkey"
+            columns: ["archived_reason_id"]
+            isOneToOne: false
+            referencedRelation: "hypothesis_archive_reasons"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hypotheses_foundry_id_fkey"
             columns: ["foundry_id"]
             isOneToOne: false
@@ -9541,30 +9714,48 @@ export type Database = {
       }
       hypothesis_archive_reasons: {
         Row: {
-          active: boolean
-          description: string | null
+          created_at: string
+          created_by: string | null
+          foundry_id: string
           id: string
           label: string
-          slot_key: string
-          sort_order: number
+          notes: string | null
+          pivoted_into_hypothesis_id: string | null
         }
         Insert: {
-          active?: boolean
-          description?: string | null
+          created_at?: string
+          created_by?: string | null
+          foundry_id: string
           id?: string
           label: string
-          slot_key: string
-          sort_order?: number
+          notes?: string | null
+          pivoted_into_hypothesis_id?: string | null
         }
         Update: {
-          active?: boolean
-          description?: string | null
+          created_at?: string
+          created_by?: string | null
+          foundry_id?: string
           id?: string
           label?: string
-          slot_key?: string
-          sort_order?: number
+          notes?: string | null
+          pivoted_into_hypothesis_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hypothesis_archive_reasons_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hypothesis_archive_reasons_pivoted_into_hypothesis_id_fkey"
+            columns: ["pivoted_into_hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "hypotheses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hypothesis_migration_archive: {
         Row: {
@@ -11218,6 +11409,65 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      llm_usage: {
+        Row: {
+          action: string
+          anon_id: string | null
+          cost_usd: number
+          created_at: string
+          error_message: string | null
+          foundry_id: string | null
+          id: string
+          ip_address: unknown
+          model_used: string
+          specialist_id: string | null
+          status: string
+          tokens_in: number
+          tokens_out: number
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          anon_id?: string | null
+          cost_usd: number
+          created_at?: string
+          error_message?: string | null
+          foundry_id?: string | null
+          id?: string
+          ip_address?: unknown
+          model_used: string
+          specialist_id?: string | null
+          status?: string
+          tokens_in: number
+          tokens_out: number
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          anon_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          error_message?: string | null
+          foundry_id?: string | null
+          id?: string
+          ip_address?: unknown
+          model_used?: string
+          specialist_id?: string | null
+          status?: string
+          tokens_in?: number
+          tokens_out?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_usage_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -14975,6 +15225,110 @@ export type Database = {
           },
         ]
       }
+      pipeline_runs: {
+        Row: {
+          cost_gbp_pence: number | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          finished_at: string | null
+          foundry_id: string
+          id: string
+          input_ref: Json | null
+          input_ref_module_id: string
+          input_tokens: number | null
+          model_id: string | null
+          model_provider: string | null
+          output_ref: Json | null
+          output_tokens: number | null
+          project_id: string | null
+          specialist_id: string
+          stage: string
+          started_at: string | null
+          status: string
+          trigger: string
+          triggered_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          cost_gbp_pence?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id: string
+          id?: string
+          input_ref?: Json | null
+          input_ref_module_id?: string
+          input_tokens?: number | null
+          model_id?: string | null
+          model_provider?: string | null
+          output_ref?: Json | null
+          output_tokens?: number | null
+          project_id?: string | null
+          specialist_id: string
+          stage: string
+          started_at?: string | null
+          status?: string
+          trigger: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cost_gbp_pence?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id?: string
+          id?: string
+          input_ref?: Json | null
+          input_ref_module_id?: string
+          input_tokens?: number | null
+          model_id?: string | null
+          model_provider?: string | null
+          output_ref?: Json | null
+          output_tokens?: number | null
+          project_id?: string | null
+          specialist_id?: string
+          stage?: string
+          started_at?: string | null
+          status?: string
+          trigger?: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_runs_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pitch_prep_requests: {
         Row: {
           additional_files: string[] | null
@@ -17303,6 +17657,91 @@ export type Database = {
           },
         ]
       }
+      quotes: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          foundry_id: string
+          id: string
+          lead_weeks: number | null
+          module_id: string | null
+          notes: string | null
+          project_id: string | null
+          quantity: number
+          replied_at: string | null
+          requested_by: string | null
+          sent_at: string | null
+          status: string
+          supplier_id: string | null
+          supplier_notes: string | null
+          terms: Json | null
+          unit_price_gbp_pence: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          foundry_id: string
+          id?: string
+          lead_weeks?: number | null
+          module_id?: string | null
+          notes?: string | null
+          project_id?: string | null
+          quantity?: number
+          replied_at?: string | null
+          requested_by?: string | null
+          sent_at?: string | null
+          status?: string
+          supplier_id?: string | null
+          supplier_notes?: string | null
+          terms?: Json | null
+          unit_price_gbp_pence?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          foundry_id?: string
+          id?: string
+          lead_weeks?: number | null
+          module_id?: string | null
+          notes?: string | null
+          project_id?: string | null
+          quantity?: number
+          replied_at?: string | null
+          requested_by?: string | null
+          sent_at?: string | null
+          status?: string
+          supplier_id?: string | null
+          supplier_notes?: string | null
+          terms?: Json | null
+          unit_price_gbp_pence?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limits: {
         Row: {
           count: number | null
@@ -17338,13 +17777,13 @@ export type Database = {
           closed_at: string | null
           closed_by: string | null
           created_at: string
-          description: string | null
           evidence_ref: Json
           foundry_id: string
           hypothesis_id: string
           id: string
-          label: string
-          slot_key: string
+          investor_question: string
+          item_text: string
+          seeded_from_template: boolean
           status: string
           updated_at: string
         }
@@ -17352,13 +17791,13 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           created_at?: string
-          description?: string | null
           evidence_ref?: Json
           foundry_id: string
           hypothesis_id: string
           id?: string
-          label: string
-          slot_key: string
+          investor_question: string
+          item_text: string
+          seeded_from_template?: boolean
           status?: string
           updated_at?: string
         }
@@ -17366,13 +17805,13 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           created_at?: string
-          description?: string | null
           evidence_ref?: Json
           foundry_id?: string
           hypothesis_id?: string
           id?: string
-          label?: string
-          slot_key?: string
+          investor_question?: string
+          item_text?: string
+          seeded_from_template?: boolean
           status?: string
           updated_at?: string
         }
@@ -20353,6 +20792,84 @@ export type Database = {
           },
         ]
       }
+      supplier_discovery_jobs: {
+        Row: {
+          candidates_persisted: number | null
+          candidates_returned: number | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          finished_at: string | null
+          foundry_id: string
+          gap_industry: string | null
+          gap_key_hash: string
+          gap_material: string | null
+          gap_process: string | null
+          gap_product_category: string | null
+          id: string
+          status: string
+          total_cost_gbp_pence: number | null
+          triggering_module_id: string | null
+          triggering_project_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          candidates_persisted?: number | null
+          candidates_returned?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id: string
+          gap_industry?: string | null
+          gap_key_hash: string
+          gap_material?: string | null
+          gap_process?: string | null
+          gap_product_category?: string | null
+          id?: string
+          status?: string
+          total_cost_gbp_pence?: number | null
+          triggering_module_id?: string | null
+          triggering_project_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          candidates_persisted?: number | null
+          candidates_returned?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          foundry_id?: string
+          gap_industry?: string | null
+          gap_key_hash?: string
+          gap_material?: string | null
+          gap_process?: string | null
+          gap_product_category?: string | null
+          id?: string
+          status?: string
+          total_cost_gbp_pence?: number | null
+          triggering_module_id?: string | null
+          triggering_project_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_discovery_jobs_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_discovery_jobs_triggering_project_id_fkey"
+            columns: ["triggering_project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_interview_responses: {
         Row: {
           created_at: string
@@ -22525,7 +23042,11 @@ export type Database = {
           created_at: string | null
           deep_bio: string | null
           email: string | null
+          email_tier: string | null
+          email_tier_at: string | null
           email_verified: boolean | null
+          email_verified_at: string | null
+          email_verifier_raw: Json | null
           embedding: string | null
           full_name: string
           id: string
@@ -22544,7 +23065,11 @@ export type Database = {
           created_at?: string | null
           deep_bio?: string | null
           email?: string | null
+          email_tier?: string | null
+          email_tier_at?: string | null
           email_verified?: boolean | null
+          email_verified_at?: string | null
+          email_verifier_raw?: Json | null
           embedding?: string | null
           full_name: string
           id?: string
@@ -22563,7 +23088,11 @@ export type Database = {
           created_at?: string | null
           deep_bio?: string | null
           email?: string | null
+          email_tier?: string | null
+          email_tier_at?: string | null
           email_verified?: boolean | null
+          email_verified_at?: string | null
+          email_verifier_raw?: Json | null
           embedding?: string | null
           full_name?: string
           id?: string
@@ -24730,6 +25259,10 @@ export type Database = {
           count: number
           op: string
         }[]
+      }
+      migrate_products_to_hypotheses: {
+        Args: { p_foundry_id: string }
+        Returns: undefined
       }
       plan_can: {
         Args: { p_action: string; p_foundry_id: string; p_user_id: string }
