@@ -178,10 +178,6 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Apprenticeship",
     summary: "The user is on the apprenticeship dashboard — training progress and OTJT.",
   },
-  "/recruits": {
-    title: "People Marketplace",
-    summary: "The user is browsing the people marketplace — finding talent and recommendations.",
-  },
   "/marketplace-orders": {
     title: "Orders",
     summary: "The user is viewing orders — tracking active and completed bookings.",
