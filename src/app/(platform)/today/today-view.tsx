@@ -84,7 +84,8 @@ import { useWeeklyTime } from "@/hooks/use-weekly-time"
 import { useCalBriefing } from "./use-cal-briefing"
 import { ReleaseNoticeBanner } from "./release-notice-banner"
 import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
-import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
+import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { CHECKLIST_ITEMS } from "@/components/onboarding/GettingStartedChecklist"
 import type { TodayInsightInput } from "@/actions/specialist-page-insights"
 import { useTodayForgeFeed } from "@/hooks/useTodayForgeFeed"
@@ -535,10 +536,15 @@ export function TodayView({
 
     const { calNarrative, calInsights, isCalLoading, dismissInsight, refreshBriefing } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
 
-    const { openPanel } = useAdvisorPanel()
-    const handleDiscussInsight = (specialistId: string, context: string) => {
-        openPanel(specialistId, { handoffContext: context, contextLabel: 'Today' })
-    }
+    // BriefSpecialistDialog modal state — replaces the deleted AdvisorPanel sidebar.
+    // Mirrors the pattern in src/app/(platform)/the-forge/components/forge-advisor-insights.tsx.
+    const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
+    const [briefHandoffContext, setBriefHandoffContext] = useState<string | null>(null)
+    const briefSpecialist = briefSpecialistId ? getSpecialistById(briefSpecialistId) : null
+    const handleDiscussInsight = useCallback((specialistId: string, context: string) => {
+        setBriefHandoffContext(context)
+        setBriefSpecialistId(specialistId)
+    }, [])
 
     // ─── Forge + Money feeds (Supabase Realtime) ─────────────────
 
@@ -1043,6 +1049,20 @@ export function TodayView({
                 ].filter(Boolean).length
                 return (dismissed || completed >= 3) ? <PageTour page="today" /> : null
             })()}
+            {briefSpecialist && (
+                <BriefSpecialistDialog
+                    specialist={briefSpecialist}
+                    open={briefSpecialistId !== null}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setBriefSpecialistId(null)
+                            setBriefHandoffContext(null)
+                        }
+                    }}
+                    handoffContext={briefHandoffContext}
+                    contextLabel="Today"
+                />
+            )}
         </div>
     )
 }
