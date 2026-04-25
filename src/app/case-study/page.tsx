@@ -1,9 +1,13 @@
 /**
  * @file Case Study Page
  *
- * @description Full case study: Agricultural IoT Irrigation System.
- * Shows how a founder went from product idea to engineering package
- * in 3 hours using the CAD Lab. Server component with SEO metadata.
+ * @description Full case study: a solar-powered, internet-connected
+ * irrigation system for smallholder farms. A real example of the
+ * smart-product wave — sensors and software embedded in everyday
+ * agricultural hardware. Shows how a founder went from product idea
+ * to engineering package in 3 hours using the Forge.
+ *
+ * Server component with SEO metadata.
  */
 
 import type { Metadata } from "next"
@@ -15,12 +19,12 @@ import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
 export const metadata: Metadata = {
-  title: "Case Study: Agricultural IoT Irrigation System",
+  title: "Case Study: Smart Agricultural Irrigation System",
   description:
-    "How a solar-powered IoT irrigation system went from concept to full engineering package in 3 hours using ForgeOS CAD Lab. Traditional approach: 4-8 weeks and $5K-$15K.",
+    "A solar-powered, internet-connected irrigation system, exactly the kind of smart product the wave is making commercially viable. From product concept to full engineering package in 3 hours using the Forge. Traditional approach: 4-8 weeks and $5K-$15K.",
   openGraph: {
-    title: "Case Study: Agricultural IoT Irrigation System | ForgeOS",
-    description: "From concept to full engineering package in 3 hours. See what ForgeOS CAD Lab produces.",
+    title: "Case Study: Smart Agricultural Irrigation System | ForgeOS",
+    description: "From concept to full engineering package in 3 hours. See what the Forge produces.",
     type: "website",
     url: "https://fractionalforge.app/case-study",
     siteName: "ForgeOS by Fractional Forge",
@@ -43,16 +47,16 @@ const DELIVERABLES = [
   },
   {
     number: "2",
-    title: "Bill of Materials with Cost Modelling",
+    title: "Bill of materials with cost modelling",
     items: [
-      "Full BOM with costs at three volumes: 1,000 / 10,000 / 100,000 units",
+      "Full bill of materials with costs at three volumes: 1,000 / 10,000 / 100,000 units",
       "Identified that standard automotive-grade connectors reduce costs by 30% vs custom",
-      "Flagged 2G/GSM phase-out risk — recommended dual 2G/NB-IoT capability",
+      "Flagged the 2G mobile phase-out risk — recommended dual 2G and narrowband cellular capability",
     ],
   },
   {
     number: "3",
-    title: "DFM Analysis",
+    title: "Design-for-manufacturing analysis",
     items: [
       "Recommended design-for-assembly in Kenya or Uganda to reduce import duties",
       "Identified 3 components requiring custom injection moulding and suggested standard alternatives",
@@ -61,38 +65,38 @@ const DELIVERABLES = [
   },
   {
     number: "4",
-    title: "Competitive Benchmarking",
+    title: "Competitive benchmarking",
     items: [
       "Compared against SunCulture RainMaker2 ($450), iSense ($250), and basic drip kits ($80)",
-      "Positioned the product at $95-100, undercutting smart competitors by 60% with IoT connectivity",
+      "Positioned the product at $95-100, undercutting smart competitors by 60% with sensor and connectivity capability built in",
     ],
   },
   {
     number: "5",
-    title: "Certification Roadmap",
+    title: "Certification roadmap",
     items: [
-      "CE marking requirements for electronic components",
-      "IP65 ingress protection testing plan",
-      "FCC/local telecom approval pathway for 2G modules",
+      "Conformité Européenne (CE) marking requirements for electronic components",
+      "Ingress Protection rating 65 (IP65) testing plan for water and dust resistance",
+      "Federal Communications Commission and local telecom approval pathway for 2G mobile modules",
       "Solar panel efficiency certification requirements",
     ],
   },
   {
     number: "6",
-    title: "Matched UK Suppliers",
+    title: "Matched UK suppliers",
     items: [
       "47 UK-based manufacturers matched from the marketplace",
-      "Filtered by: injection moulding capability, electronics assembly, IP-rated enclosures",
-      "Direct RFQ capability to request quotes from multiple suppliers simultaneously",
+      "Filtered by: injection moulding capability, electronics assembly, weatherproof enclosures",
+      "Direct request-for-quote capability to multiple suppliers simultaneously",
     ],
   },
 ] as const
 
 const REQUIREMENTS = [
   "Solar-powered with 7-day battery backup",
-  "SMS/2G connectivity for remote monitoring",
+  "Short-message and 2G mobile connectivity for remote monitoring",
   "Soil moisture sensors with 50m wireless range",
-  "IP65 weather-resistant housing",
+  "Weather-resistant housing rated to Ingress Protection 65",
   "Target cost: under $100 at 10,000 units",
 ] as const
 
@@ -109,13 +113,14 @@ export default function CaseStudyPage() {
               Case Study
             </Badge>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
-              From Product Idea to Engineering Package{" "}
-              <span className="text-international-orange">in 3 Hours</span>
+              From product idea to engineering package{" "}
+              <span className="text-international-orange">in 3 hours</span>
             </h1>
             <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              How a solar-powered IoT irrigation system for smallholder farms in
-              East Africa went from concept to manufacturing-ready specs using
-              the CAD Lab.
+              A solar-powered, internet-connected irrigation system for
+              smallholder farms in East Africa — exactly the kind of smart
+              product the wave is making commercially viable. From concept to
+              manufacturing-ready specs using the Forge.
             </p>
           </div>
         </section>
@@ -135,7 +140,7 @@ export default function CaseStudyPage() {
                   icon: Banknote,
                   label: "Cost",
                   traditional: "$5,000-$15,000",
-                  forgeos: "$49/month",
+                  forgeos: "£20/month",
                 },
                 {
                   icon: Users,
@@ -171,18 +176,20 @@ export default function CaseStudyPage() {
                 The Challenge
               </h2>
               <p className="text-base sm:text-lg text-foreground leading-relaxed">
-                A hardware founder was designing a solar-powered IoT irrigation
-                system for smallholder farms in East Africa. The product needed
-                to be affordable (under $100 per unit at scale), durable enough
-                for outdoor use in equatorial conditions, and simple enough to
-                install without electrical expertise.
+                A hardware founder was designing a solar-powered, internet-connected
+                irrigation system for smallholder farms in East Africa. Compute and
+                connectivity have dropped under £5 a unit, which makes a smart version
+                of an irrigation controller commercially viable for the first time.
+                The product needed to be affordable (under $100 per unit at scale),
+                durable enough for outdoor use in equatorial conditions, and simple
+                enough to install without electrical expertise.
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Traditionally, getting from a product concept to a full
-                engineering package — CAD models, bill of materials,
-                manufacturing cost estimates, DFM analysis, and matched
-                suppliers — takes 4-8 weeks and costs $5,000-$15,000 in
-                freelance engineering fees.
+                engineering package — computer-aided design models, a bill of
+                materials, manufacturing cost estimates, design-for-manufacturing
+                analysis, and matched suppliers — takes 4-8 weeks and costs
+                $5,000-$15,000 in freelance engineering fees.
               </p>
             </div>
 
@@ -202,9 +209,12 @@ export default function CaseStudyPage() {
                 </CardContent>
               </Card>
               <p className="text-sm text-muted-foreground">
-                The founder described these requirements in plain English in the
-                CAD Lab. No CAD files, no engineering drawings — just a clear
-                description of what the product needed to do.
+                The founder described these requirements in a paragraph of plain
+                English. No computer-aided design files, no engineering drawings —
+                just a clear description of what the product needed to do. The
+                Forge breaks that paragraph into modules, suggests a bill of
+                materials, and matches every part to UK and European
+                manufacturers. Twenty-minute first pass, hours of detail after.
               </p>
             </div>
           </div>
@@ -215,10 +225,10 @@ export default function CaseStudyPage() {
           <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-8">
             <div className="text-center space-y-3">
               <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest">
-                What ForgeOS Produced in 3 Hours
+                What the Forge produced in 3 hours
               </h2>
               <p className="text-2xl sm:text-3xl font-black">
-                A Complete Engineering Package
+                A complete engineering package
               </p>
             </div>
 
@@ -269,8 +279,8 @@ export default function CaseStudyPage() {
             <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
               The founder used the engineering package to secure a $150,000 grant
               from Innovate UK&apos;s Smart Grant programme, citing the detailed
-              DFM analysis and cost modelling as key factors in the
-              application&apos;s success.
+              design-for-manufacturing analysis and cost modelling as key factors
+              in the application&apos;s success.
             </p>
 
             <Card className="max-w-md mx-auto">
