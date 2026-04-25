@@ -59,6 +59,7 @@ import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
 import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "@/lib/agents/specialists-config"
 import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix"
+import { getPrimaryTargetForTier } from "@/lib/agents/failover"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { MeetingOutputs } from "./meeting-outputs"
@@ -923,6 +924,12 @@ export function TeamMeetingDialog({
             const controller = new AbortController()
             const fetchTimeout = setTimeout(() => controller.abort(), 60_000)
 
+            // FLOW: read primary target per specialist's modelTier (NOT hardcoded
+            // claude-opus-4-7). Fixes the 02:55:12 P0 where every specialist was
+            // routed to Anthropic Opus and an Anthropic 529 OVERLOADED took out
+            // brainstorming entirely. Server still receives modelTier and builds
+            // the full FALLBACK_CHAINS[tier] cascade.
+            const target = getPrimaryTargetForTier(specialist.modelTier)
             let res: Response
             try {
                 res = await fetch("/api/agents/execute", {
@@ -932,9 +939,9 @@ export function TeamMeetingDialog({
                     body: JSON.stringify({
                         prompt,
                         input,
-                        providerId: "anthropic",
-                        modelId: "claude-opus-4-7",
-                        modelTier: "claude",
+                        providerId: target.providerId,
+                        modelId: target.modelId,
+                        modelTier: target.modelTier,
                         modality: "text",
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
@@ -1090,13 +1097,15 @@ export function TeamMeetingDialog({
             } catch (err) {
                 const message = err instanceof Error ? err.message : "Unknown error"
                 console.error(`[TeamMeeting] ${specialist.name} failed:`, message)
-                setError(`${specialist.name} encountered an error: ${message}`)
+                // In-character empty state — keeps the meeting feeling like a meeting,
+                // not a stack trace. Retry CTA stays visible elsewhere in the UI.
+                setError(`${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.`)
 
                 const errorEntry: MeetingEntry = {
                     specialistId: specialist.id,
                     specialistName: getSpecialistDisplayName(specialist),
                     round,
-                    content: `*[Error: Could not generate response]*`,
+                    content: `*${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.*`,
                 }
                 setEntries((prev) => [...prev, errorEntry])
             }
@@ -1244,7 +1253,7 @@ export function TeamMeetingDialog({
                         specialistId: specialist.id,
                         specialistName: getSpecialistDisplayName(specialist),
                         round: roundCounter,
-                        content: `*[Error: Could not generate response]*`,
+                        content: `*${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.*`,
                     }
                     debateAccumulator.push(errorEntry)
                     setEntries((prev) => [...prev, errorEntry])
@@ -1289,15 +1298,20 @@ export function TeamMeetingDialog({
         const fullTranscript = `Meeting Topic: "${topic}"\nAttendees: ${attendees}\nRounds: ${currentRound}\n\n${transcript}`
 
         try {
+            // Wrap-up stays on the claude tier deliberately — synthesis benefits
+            // from Opus and the wrap-up cost is one call per meeting, not per
+            // turn. Piping through getPrimaryTargetForTier keeps client/server
+            // routing consistent with the per-specialist call site above.
+            const wrapUpTarget = getPrimaryTargetForTier("claude")
             const res = await fetch("/api/agents/execute", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     prompt: WRAP_UP_PROMPT,
                     input: fullTranscript,
-                    providerId: "anthropic",
-                    modelId: "claude-opus-4-7",
-                    modelTier: "claude",
+                    providerId: wrapUpTarget.providerId,
+                    modelId: wrapUpTarget.modelId,
+                    modelTier: wrapUpTarget.modelTier,
                     modality: "text",
                 }),
             })

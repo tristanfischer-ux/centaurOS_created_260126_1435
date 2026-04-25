@@ -101,76 +101,18 @@ Create 6-12 slides. Make content concise, professional, and actionable. Every bu
 
 // ─── Provider Failover Configuration ─────────────────────────────────
 
-/**
- * Model tier type matching specialists-data.ts modelTier field.
- * Used to look up the fallback chain when a primary provider fails.
- */
-type ModelTier = "claude" | "sonnet" | "qwen" | "qwen-local" | "minimax" | "deepseek" | "google" | "openai"
-
-interface ProviderTarget {
-    providerId: AIProviderId
-    modelId: string
-}
-
-/**
- * Ordered fallback chains per model tier. When the primary provider returns
- * a retryable error (503, rate limit, network), the system tries the next
- * provider in the chain. The first entry is the primary (same as MODEL_TIERS
- * on the client). "qwen-local" has no fallbacks — local-only by design.
- *
- * @security Failover never crosses the qwen-local boundary. If you chose
- * local inference for privacy, a cloud fallback would violate that contract.
- */
-const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
-    claude: [
-        { providerId: "anthropic", modelId: "claude-opus-4-7" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-        { providerId: "minimax", modelId: "MiniMax-M2.7" },
-    ],
-    sonnet: [
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-        { providerId: "minimax", modelId: "MiniMax-M2.7" },
-    ],
-    qwen: [
-        { providerId: "qwen", modelId: "qwen3.5-plus" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
-        { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "openai", modelId: "gpt-5.4" },
-    ],
-    minimax: [
-        { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
-        { providerId: "qwen", modelId: "qwen3.5-plus" },
-        { providerId: "openai", modelId: "gpt-5.4" },
-    ],
-    "qwen-local": [
-        { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
-        // No fallbacks — local-only for privacy
-    ],
-    deepseek: [
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" }, // Fallback: 4 specialists switched to deepseek 2026-04-07
-        { providerId: "google", modelId: "gemini-2.5-flash" },
-        { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "openai", modelId: "gpt-5.4" },
-    ],
-    google: [
-        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-    ],
-    openai: [
-        { providerId: "openai", modelId: "gpt-5.4" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-    ],
-}
+// AUDIT: ModelTier, ProviderTarget, and FALLBACK_CHAINS extracted to
+// src/lib/agents/failover.ts (2026-04-24) so the client (team-meeting-dialog.tsx)
+// can read the primary target per tier instead of hardcoding claude-opus-4-7.
+// withFailover() centralises the retry-with-jitter + cascade loop so both
+// handleTextStreaming and handleToolAwareStreaming iterate the chain.
+import {
+    type ModelTier,
+    type ProviderTarget,
+    FALLBACK_CHAINS,
+    AllProvidersExhaustedError,
+    withFailover,
+} from "@/lib/agents/failover"
 
 // AUDIT: isRetryableError extracted to src/lib/agents/error-classification.ts (2026-02-19, refactor step 3 of 8)
 import { isRetryableError } from "@/lib/agents/error-classification"
@@ -1346,10 +1288,10 @@ Rules:
             }))
         }
         if (modality === "text") {
-            return withHealedThreadHeader(await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming, activeLayers))
+            return withHealedThreadHeader(await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming, activeLayers, specialistId))
         }
         if (modality === "slides") {
-            return withHealedThreadHeader(await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId))
+            return withHealedThreadHeader(await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId, undefined, undefined, specialistId))
         }
         if (modality === "image") {
             const result = await handleImageGeneration(apiKey, providerId, modelId, finalPrompt)
@@ -1419,6 +1361,7 @@ async function handleTextStreaming(
     rolloutId?: string | null,
     enableWebSearch?: boolean,
     groundingLayers?: string[],
+    specialistId?: string,
 ): Promise<Response> {
     const conversationHistory = history?.map((msg) => ({
         role: msg.role as "system" | "user" | "assistant",
@@ -1447,41 +1390,37 @@ async function handleTextStreaming(
                 }
             }, 15_000)
 
-            let lastError = "No providers available"
+            // FLOW: refactored 2026-04-24 onto shared withFailover helper for
+            // parity with handleToolAwareStreaming. Mid-stream errors stay
+            // non-retryable — once we've emitted to the client, cascading
+            // would produce incoherent output.
+            let hasStartedStreaming = false
+            let lastTargetForLog: ProviderTarget = chain[0] ?? { providerId: "anthropic" as const, modelId: "unknown" }
 
-            for (let i = 0; i < chain.length; i++) {
-                const target = chain[i]
-                const streamFn = getTextProvider(target.providerId)
-                if (!streamFn) {
-                    console.warn("[agents/execute] Provider does not support text:", target.providerId)
-                    continue
-                }
+            try {
+                await withFailover(chain, async (target) => {
+                    lastTargetForLog = target
+                    const streamFn = getTextProvider(target.providerId)
+                    if (!streamFn) {
+                        // Treat as a retryable env error so withFailover skips to next.
+                        throw new Error(`Provider ${target.providerId} does not support text (capacity)`)
+                    }
 
-                const targetApiKey = resolveApiKeyForProvider(target.providerId)
-                if (!targetApiKey) {
-                    console.warn("[agents/execute] No API key for fallback provider:", target.providerId)
-                    continue
-                }
+                    const targetApiKey = resolveApiKeyForProvider(target.providerId)
+                    if (!targetApiKey) {
+                        throw new Error(`No API key for provider ${target.providerId} (overloaded)`)
+                    }
 
-                const maxTokens = enableThinking ? 32768 : 16384
-                const useThinking = enableThinking && target.providerId === "anthropic"
+                    const maxTokens = enableThinking ? 32768 : 16384
+                    const useThinking = enableThinking && target.providerId === "anthropic"
+                    const useWebSearch = enableWebSearch && target.providerId === "anthropic"
 
-                if (i > 0) {
-                    console.info("[agents/execute] Failover attempt:", {
-                        attempt: i + 1,
-                        from: `${chain[i - 1].providerId}/${chain[i - 1].modelId}`,
-                        to: `${target.providerId}/${target.modelId}`,
-                        reason: lastError,
-                    })
-                }
+                    // Reset accumulator per attempt so a cascade doesn't include text from
+                    // the failed target (relevant only if the previous attempt threw before
+                    // emitting any chunks to the client).
+                    fullOutput = ""
 
-                try {
                     await new Promise<void>((resolve, reject) => {
-                        let hasStartedStreaming = false
-
-                        // Only enable web search for Anthropic providers
-                        const useWebSearch = enableWebSearch && target.providerId === "anthropic"
-
                         streamFn({
                             apiKey: targetApiKey,
                             modelId: target.modelId,
@@ -1504,108 +1443,74 @@ async function handleTextStreaming(
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
                             },
                             onDone() {
-                                clearInterval(heartbeatInterval)
-                                controller.enqueue(encoder.encode("data: [DONE]\n\n"))
-                                controller.close()
-                                if (onComplete && fullOutput) {
-                                    onComplete(fullOutput).catch(() => {})
-                                }
                                 resolve()
                             },
                             onError(error) {
-                                if (hasStartedStreaming) {
-                                    if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
-                                    clearInterval(heartbeatInterval)
-                                    console.error("[agents/execute] Mid-stream error (no failover):", {
-                                        provider: target.providerId,
-                                        model: target.modelId,
-                                        error,
-                                    })
-                                    const classified = classifyStreamError(error)
-                                    controller.enqueue(
-                                        encoder.encode(`data: ${JSON.stringify({
-                                            error: classified.message,
-                                            errorCategory: classified.category,
-                                            rawHint: classified.rawHint,
-                                        })}\n\n`)
-                                    )
-                                    controller.close()
-                                    resolve()
+                                if (hasStartedStreaming && isRetryableError(error)) {
+                                    // Don't cascade after partial emit — wrap as non-retryable.
+                                    reject(new Error(`mid-stream provider failure (no fallback): ${error}`))
                                 } else {
                                     reject(new Error(error))
                                 }
                             },
                         }).catch(reject)
                     })
+                }, { specialistId })
 
-                    // If we reach here, streaming completed successfully
-                    if (i > 0) {
-                        console.info("[agents/execute] Failover succeeded:", {
-                            provider: target.providerId,
-                            model: target.modelId,
-                            attempt: i + 1,
-                        })
-                    }
-                    return // Exit the ReadableStream start — response is streaming
-                } catch (err) {
-                    const errorStr = err instanceof Error ? err.message : String(err)
-                    lastError = errorStr
+                // Streamed successfully (on some target in the chain)
+                clearInterval(heartbeatInterval)
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+                controller.close()
+                if (onComplete && fullOutput) {
+                    onComplete(fullOutput).catch(() => {})
+                }
+            } catch (err) {
+                if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
+                clearInterval(heartbeatInterval)
 
-                    if (isRetryableError(errorStr) && i < chain.length - 1) {
-                        // Retryable error with more providers available — continue to next
-                        console.warn("[agents/execute] Retryable error, trying next provider:", {
-                            failedProvider: target.providerId,
-                            failedModel: target.modelId,
-                            error: errorStr,
-                            remainingProviders: chain.length - i - 1,
-                        })
-                        continue
-                    }
+                const isExhausted = err instanceof AllProvidersExhaustedError
+                const inner = isExhausted ? err.lastError : err
+                const errorStr = inner instanceof Error ? inner.message : String(inner)
 
-                    // Non-retryable error OR last provider in chain — surface to client
-                    if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
-                    clearInterval(heartbeatInterval)
-                    if (!isRetryableError(errorStr)) {
-                        console.error("[agents/execute] Non-retryable error:", {
-                            provider: target.providerId,
-                            model: target.modelId,
-                            error: errorStr,
-                        })
-                    } else {
-                        console.error("[agents/execute] All providers exhausted:", {
-                            chainLength: chain.length,
-                            lastProvider: target.providerId,
-                            lastError: errorStr,
-                        })
-                    }
+                if (isExhausted) {
+                    console.error("[agents/execute] All providers exhausted:", {
+                        chainLength: chain.length,
+                        lastProvider: lastTargetForLog.providerId,
+                        lastError: errorStr,
+                    })
+                } else if (hasStartedStreaming) {
+                    console.error("[agents/execute] Mid-stream error (no failover):", {
+                        provider: lastTargetForLog.providerId,
+                        model: lastTargetForLog.modelId,
+                        error: errorStr,
+                    })
+                } else {
+                    console.error("[agents/execute] Non-retryable error:", {
+                        provider: lastTargetForLog.providerId,
+                        model: lastTargetForLog.modelId,
+                        error: errorStr,
+                    })
+                }
 
-                    const classified = classifyStreamError(errorStr)
+                const specialistRecord = specialistId ? getSpecialistById(specialistId) : null
+                const specialistName = specialistRecord?.name
+
+                const classified = classifyStreamError(errorStr)
+                try {
                     controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify({
                             error: classified.message,
                             errorCategory: classified.category,
                             rawHint: classified.rawHint,
+                            specialistName,
+                            allProvidersDown: isExhausted,
                         })}\n\n`)
                     )
                     controller.close()
-                    return
+                } catch {
+                    // Stream may already be closed
                 }
             }
-
-            // All providers exhausted — no viable provider left in the fallback chain
-            clearInterval(heartbeatInterval)
-            console.error("[agents/execute] No viable provider in fallback chain:", {
-                chain: chain.map(t => t.providerId),
-                lastError,
-            })
-            controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({
-                    error: "All AI providers are temporarily unavailable. Please try again in a few minutes.",
-                    errorCategory: "overloaded",
-                    rawHint: lastError?.substring(0, 120) ?? "",
-                })}\n\n`)
-            )
-            controller.close()
         },
     })
 
@@ -1671,18 +1576,14 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
     let fullOutput = ""
     const MAX_TOOL_LOOPS = 8
 
-    // Resolve the primary provider from the chain
-    const primaryTarget = chain[0]
-    if (!primaryTarget) {
+    // FLOW: chain comes from FALLBACK_CHAINS[modelTier] — see route.ts:1257.
+    // Prior to 2026-04-24 this handler only ever read chain[0] and never iterated
+    // on errors. Anthropic 529 OVERLOADED on Opus would surface to the user
+    // instead of cascading to Sonnet → DeepSeek → Gemini → MiniMax. Fix: wrap
+    // the per-target body in withFailover so retry-with-jitter + cascade run.
+    if (!chain || chain.length === 0) {
         return NextResponse.json({ error: "No providers available" }, { status: 503 })
     }
-
-    const targetApiKey = resolveApiKeyForProvider(primaryTarget.providerId)
-    if (!targetApiKey) {
-        return NextResponse.json({ error: "No API key for provider" }, { status: 503 })
-    }
-
-    const isAnthropic = primaryTarget.providerId === "anthropic"
 
     const readable = new ReadableStream({
         async start(controller) {
@@ -1703,273 +1604,314 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                 }
             }, 15_000)
 
+            // GOTCHA: Once we've emitted ANY text/tool-marker chunk to the client,
+            // we cannot safely cascade — the user has already seen partial output
+            // from provider A and switching to provider B would produce incoherent
+            // output. Track `hasEmittedToClient` and treat post-emit errors as
+            // non-retryable inside the attempt closure so withFailover surfaces
+            // them instead of cascading.
+            let hasEmittedToClient = false
+            let lastTargetForLog: ProviderTarget = chain[0]
+
             try {
-                if (isAnthropic) {
-                    // ── Anthropic Tool Loop (non-streaming beta API) ──────
-                    const Anthropic = (await import("@anthropic-ai/sdk")).default
-                    const client = new Anthropic({ apiKey: targetApiKey })
-
-                    // Build conversation messages
-                    const conversationMessages: Array<{
-                        role: "user" | "assistant"
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        content: string | any[]
-                    }> = []
-                    if (history && history.length > 0) {
-                        for (const msg of history) {
-                            if (msg.role === "user" || msg.role === "assistant") {
-                                conversationMessages.push({ role: msg.role, content: msg.content })
-                            }
-                        }
-                    }
-                    conversationMessages.push({ role: "user", content: finalPrompt })
-
-                    // Build tool definitions for Anthropic format
-                    const anthropicTools: Array<{
-                        name: string
-                        description: string
-                        input_schema: Record<string, unknown>
-                    }> = tools.map((t) => ({
-                        name: t.name,
-                        description: t.description,
-                        input_schema: t.parameters,
-                    }))
-
-                    // Add web search tool if enabled
-                    const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
-                    const allTools: Array<Record<string, unknown>> = [...anthropicTools]
-                    const betas: string[] = []
-                    if (enableWebSearch) {
-                        allTools.push({
-                            type: "web_search_20260209",
-                            name: "web_search",
-                            max_uses: 3,
-                        })
-                        betas.push(WEB_SEARCH_BETA)
+                await withFailover(chain, async (target) => {
+                    lastTargetForLog = target
+                    const targetApiKey = resolveApiKeyForProvider(target.providerId)
+                    if (!targetApiKey) {
+                        // Make this look like a retryable env error so withFailover skips
+                        // to the next target. (withFailover already filters via its own
+                        // hasApiKeyForProvider check, but be defensive in case env vars
+                        // diverge between the two helpers.)
+                        throw new Error(`No API key configured for provider ${target.providerId} (overloaded)`)
                     }
 
-                    const maxTokens = enableThinking ? 32768 : 16384
-                    const useThinking = enableThinking && primaryTarget.providerId === "anthropic"
+                    const isAnthropic = target.providerId === "anthropic"
 
-                    const createParams = {
-                        model: primaryTarget.modelId,
-                        max_tokens: maxTokens,
-                        system: systemPrompt,
-                        messages: conversationMessages,
-                        tools: allTools,
-                        tool_choice: { type: "auto" as const },
-                        ...(betas.length > 0 && { betas }),
-                        ...(useThinking && {
-                            thinking: {
-                                type: "enabled" as const,
-                                budget_tokens: 10_000,
-                            },
-                        }),
-                    }
+                    if (isAnthropic) {
+                        // ── Anthropic Tool Loop (non-streaming beta API) ──────
+                        const Anthropic = (await import("@anthropic-ai/sdk")).default
+                        const client = new Anthropic({ apiKey: targetApiKey })
 
-                    let loopCount = 0
-
-                    while (loopCount <= MAX_TOOL_LOOPS) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete
-                        const response = await client.beta.messages.create(createParams as any) as any
-
-                        // Handle pause_turn (web search continuation)
-                        let finalResponse = response
-                        let continueCount = 0
-                        while (finalResponse.stop_reason === "pause_turn" && continueCount < 3) {
-                            continueCount++
-                            const continueMessages = [
-                                ...conversationMessages,
-                                { role: "assistant" as const, content: finalResponse.content },
-                                { role: "user" as const, content: "Continue." },
-                            ]
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete for pause_turn
-                            finalResponse = await client.beta.messages.create({
-                                ...createParams,
-                                messages: continueMessages,
-                            } as any) as any
-                        }
-
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta response content blocks have variable shape
-                        const content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>; citations?: Array<{ url?: string; title?: string; cited_text?: string }> }> = finalResponse.content ?? []
-
-                        // Check if the model wants to use tools
-                        const toolUseBlocks = content.filter(b => b.type === "tool_use")
-                        const textBlocks = content.filter(b => b.type === "text")
-
-                        // Stream any intermediate text the model produced before tool calls
-                        for (const block of textBlocks) {
-                            if (block.text) {
-                                const chunkSize = 100
-                                for (let i = 0; i < block.text.length; i += chunkSize) {
-                                    const text = block.text.slice(i, i + chunkSize)
-                                    fullOutput += text
-                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+                        // Build conversation messages — fresh per attempt so a cascade
+                        // doesn't reuse partial tool-loop state from the failed target.
+                        const conversationMessages: Array<{
+                            role: "user" | "assistant"
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            content: string | any[]
+                        }> = []
+                        if (history && history.length > 0) {
+                            for (const msg of history) {
+                                if (msg.role === "user" || msg.role === "assistant") {
+                                    conversationMessages.push({ role: msg.role, content: msg.content })
                                 }
                             }
                         }
+                        conversationMessages.push({ role: "user", content: finalPrompt })
 
-                        // Extract and emit web search citations
-                        const citations: Array<{ title: string; url: string; snippet: string }> = []
-                        const seenUrls = new Set<string>()
-                        for (const block of content) {
-                            if (block.type === "text" && block.citations) {
-                                for (const c of block.citations) {
-                                    const url = c.url ?? ""
-                                    if (url && !seenUrls.has(url)) {
-                                        seenUrls.add(url)
-                                        citations.push({
-                                            title: (c.title ?? "Source").toString(),
-                                            url,
-                                            snippet: (c.cited_text ?? "").slice(0, 200),
-                                        })
+                        // Build tool definitions for Anthropic format
+                        const anthropicTools: Array<{
+                            name: string
+                            description: string
+                            input_schema: Record<string, unknown>
+                        }> = tools.map((t) => ({
+                            name: t.name,
+                            description: t.description,
+                            input_schema: t.parameters,
+                        }))
+
+                        // Add web search tool if enabled
+                        const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
+                        const allTools: Array<Record<string, unknown>> = [...anthropicTools]
+                        const betas: string[] = []
+                        if (enableWebSearch) {
+                            allTools.push({
+                                type: "web_search_20260209",
+                                name: "web_search",
+                                max_uses: 3,
+                            })
+                            betas.push(WEB_SEARCH_BETA)
+                        }
+
+                        const maxTokens = enableThinking ? 32768 : 16384
+                        const useThinking = enableThinking && target.providerId === "anthropic"
+
+                        const createParams = {
+                            model: target.modelId,
+                            max_tokens: maxTokens,
+                            system: systemPrompt,
+                            messages: conversationMessages,
+                            tools: allTools,
+                            tool_choice: { type: "auto" as const },
+                            ...(betas.length > 0 && { betas }),
+                            ...(useThinking && {
+                                thinking: {
+                                    type: "enabled" as const,
+                                    budget_tokens: 10_000,
+                                },
+                            }),
+                        }
+
+                        // Reset accumulators per attempt so a cascade doesn't include
+                        // text from the previous failed provider.
+                        fullOutput = ""
+
+                        let loopCount = 0
+
+                        while (loopCount <= MAX_TOOL_LOOPS) {
+                            let response
+                            try {
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete
+                                response = await client.beta.messages.create(createParams as any) as any
+                            } catch (err) {
+                                const msg = err instanceof Error ? err.message : String(err)
+                                if (hasEmittedToClient && isRetryableError(msg)) {
+                                    // Wrap as non-retryable so withFailover doesn't cascade after we've
+                                    // already shipped tokens to the client.
+                                    throw new Error(`mid-stream provider failure (no fallback): ${msg}`)
+                                }
+                                throw err
+                            }
+
+                            // Handle pause_turn (web search continuation)
+                            let finalResponse = response
+                            let continueCount = 0
+                            while (finalResponse.stop_reason === "pause_turn" && continueCount < 3) {
+                                continueCount++
+                                const continueMessages = [
+                                    ...conversationMessages,
+                                    { role: "assistant" as const, content: finalResponse.content },
+                                    { role: "user" as const, content: "Continue." },
+                                ]
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete for pause_turn
+                                finalResponse = await client.beta.messages.create({
+                                    ...createParams,
+                                    messages: continueMessages,
+                                } as any) as any
+                            }
+
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta response content blocks have variable shape
+                            const content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>; citations?: Array<{ url?: string; title?: string; cited_text?: string }> }> = finalResponse.content ?? []
+
+                            // Check if the model wants to use tools
+                            const toolUseBlocks = content.filter(b => b.type === "tool_use")
+                            const textBlocks = content.filter(b => b.type === "text")
+
+                            // Stream any intermediate text the model produced before tool calls
+                            for (const block of textBlocks) {
+                                if (block.text) {
+                                    const chunkSize = 100
+                                    for (let i = 0; i < block.text.length; i += chunkSize) {
+                                        const text = block.text.slice(i, i + chunkSize)
+                                        fullOutput += text
+                                        hasEmittedToClient = true
+                                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
                                     }
                                 }
                             }
-                        }
-                        if (citations.length > 0) {
-                            try {
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ webSources: citations })}\n\n`))
-                            } catch {
-                                // Stream may be closed
-                            }
-                        }
 
-                        // If no tool calls or we've hit the limit, we're done
-                        if (toolUseBlocks.length === 0 || loopCount >= MAX_TOOL_LOOPS) {
-                            break
-                        }
-
-                        // Stream tool-use markers to the client for UX feedback
-                        for (const toolBlock of toolUseBlocks) {
-                            try {
-                                controller.enqueue(encoder.encode(
-                                    `data: ${JSON.stringify({ toolUse: { name: toolBlock.name, id: toolBlock.id } })}\n\n`,
-                                ))
-                            } catch {
-                                // Stream may be closed
+                            // Extract and emit web search citations
+                            const citations: Array<{ title: string; url: string; snippet: string }> = []
+                            const seenUrls = new Set<string>()
+                            for (const block of content) {
+                                if (block.type === "text" && block.citations) {
+                                    for (const c of block.citations) {
+                                        const url = c.url ?? ""
+                                        if (url && !seenUrls.has(url)) {
+                                            seenUrls.add(url)
+                                            citations.push({
+                                                title: (c.title ?? "Source").toString(),
+                                                url,
+                                                snippet: (c.cited_text ?? "").slice(0, 200),
+                                            })
+                                        }
+                                    }
+                                }
                             }
-                            console.info("[agents/execute] Tool call:", {
-                                tool: toolBlock.name,
-                                specialistId,
-                                loopIteration: loopCount,
+                            if (citations.length > 0) {
+                                try {
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ webSources: citations })}\n\n`))
+                                } catch {
+                                    // Stream may be closed
+                                }
+                            }
+
+                            // If no tool calls or we've hit the limit, we're done
+                            if (toolUseBlocks.length === 0 || loopCount >= MAX_TOOL_LOOPS) {
+                                break
+                            }
+
+                            // Stream tool-use markers to the client for UX feedback
+                            for (const toolBlock of toolUseBlocks) {
+                                try {
+                                    hasEmittedToClient = true
+                                    controller.enqueue(encoder.encode(
+                                        `data: ${JSON.stringify({ toolUse: { name: toolBlock.name, id: toolBlock.id } })}\n\n`,
+                                    ))
+                                } catch {
+                                    // Stream may be closed
+                                }
+                                console.info("[agents/execute] Tool call:", {
+                                    tool: toolBlock.name,
+                                    specialistId,
+                                    loopIteration: loopCount,
+                                })
+                            }
+
+                            // Execute all tool calls in parallel for lower latency
+                            const toolResults = await Promise.all(
+                                toolUseBlocks.map(async (toolBlock) => {
+                                    const result = await executeToolCall(
+                                        toolBlock.name!,
+                                        (toolBlock.input ?? {}) as Record<string, unknown>,
+                                        { foundryId, specialistId, userId, threadId },
+                                    )
+                                    return {
+                                        type: "tool_result" as const,
+                                        tool_use_id: toolBlock.id!,
+                                        content: result,
+                                    }
+                                })
+                            )
+
+                            // Append the assistant's response (with tool_use) and tool results to messages
+                            conversationMessages.push({
+                                role: "assistant",
+                                content: finalResponse.content,
                             })
-                        }
 
-                        // Execute all tool calls in parallel for lower latency
-                        const toolResults = await Promise.all(
-                            toolUseBlocks.map(async (toolBlock) => {
-                                const result = await executeToolCall(
-                                    toolBlock.name!,
-                                    (toolBlock.input ?? {}) as Record<string, unknown>,
-                                    { foundryId, specialistId, userId, threadId },
-                                )
-                                return {
-                                    type: "tool_result" as const,
-                                    tool_use_id: toolBlock.id!,
-                                    content: result,
+                            loopCount++
+                            const remaining = MAX_TOOL_LOOPS - loopCount
+
+                            // Inject tools_remaining counter so the model can plan its tool usage
+                            conversationMessages.push({
+                                role: "user",
+                                content: [
+                                    ...toolResults,
+                                    { type: "text", text: `[System: ${remaining} tool call${remaining === 1 ? "" : "s"} remaining]` },
+                                ],
+                            })
+
+                            // Update createParams with new messages for next iteration
+                            createParams.messages = conversationMessages
+                        }
+                    } else {
+                        // ── Non-Anthropic: inject tool context into system prompt ──
+                        // For non-Claude providers, we execute all common tools upfront
+                        // and inject results as system prompt context. This is simpler
+                        // than full tool-calling integration for Qwen/MiniMax/OpenAI.
+                        // GOTCHA: When we cascade FROM Anthropic TO a non-Anthropic
+                        // target (e.g. Opus 529 → DeepSeek), the model sees fewer
+                        // tools — acceptable trade-off (working response > perfect
+                        // tools), called out in FALLBACK-CHAIN-PLAN.md §6.
+                        let toolContext = ""
+                        const toolCtx = { foundryId }
+
+                        // Execute data-access tools proactively for non-Claude providers
+                        // DECISION: Run in parallel since each queries a different Supabase table (~200-400ms saved)
+                        const dataTools = ["query_objectives", "query_tasks", "query_activity_metrics"]
+                        const dataResults = await Promise.all(
+                            dataTools.map(async (toolName) => {
+                                try {
+                                    return await executeToolCall(toolName, {}, toolCtx)
+                                } catch {
+                                    return null
                                 }
                             })
                         )
-
-                        // Append the assistant's response (with tool_use) and tool results to messages
-                        conversationMessages.push({
-                            role: "assistant",
-                            content: finalResponse.content,
-                        })
-
-                        loopCount++
-                        const remaining = MAX_TOOL_LOOPS - loopCount
-
-                        // Inject tools_remaining counter so the model can plan its tool usage
-                        conversationMessages.push({
-                            role: "user",
-                            content: [
-                                ...toolResults,
-                                { type: "text", text: `[System: ${remaining} tool call${remaining === 1 ? "" : "s"} remaining]` },
-                            ],
-                        })
-
-                        // Update createParams with new messages for next iteration
-                        createParams.messages = conversationMessages
-                    }
-                } else {
-                    // ── Non-Anthropic: inject tool context into system prompt ──
-                    // For non-Claude providers, we execute all common tools upfront
-                    // and inject results as system prompt context. This is simpler
-                    // than full tool-calling integration for Qwen/MiniMax/OpenAI.
-                    let toolContext = ""
-                    const toolCtx = { foundryId }
-
-                    // Execute data-access tools proactively for non-Claude providers
-                    // DECISION: Run in parallel since each queries a different Supabase table (~200-400ms saved)
-                    const dataTools = ["query_objectives", "query_tasks", "query_activity_metrics"]
-                    const dataResults = await Promise.all(
-                        dataTools.map(async (toolName) => {
-                            try {
-                                return await executeToolCall(toolName, {}, toolCtx)
-                            } catch {
-                                return null
+                        for (const result of dataResults) {
+                            if (result && !result.startsWith("Error") && !result.startsWith("No ")) {
+                                toolContext += `\n\n${result}`
                             }
-                        })
-                    )
-                    for (const result of dataResults) {
-                        if (result && !result.startsWith("Error") && !result.startsWith("No ")) {
-                            toolContext += `\n\n${result}`
                         }
+
+                        const enrichedSystemPrompt = toolContext
+                            ? `${systemPrompt}\n\n## Live Company Data\n${toolContext}`
+                            : systemPrompt
+
+                        // Fall back to standard streaming with enriched context
+                        const streamFn = getTextProvider(target.providerId)
+                        if (!streamFn) {
+                            throw new Error(`Provider ${target.providerId} does not support text`)
+                        }
+
+                        const conversationHistory = history?.map((msg) => ({
+                            role: msg.role as "system" | "user" | "assistant",
+                            content: msg.content,
+                        }))
+
+                        // Reset accumulator for this attempt.
+                        fullOutput = ""
+
+                        await new Promise<void>((resolve, reject) => {
+                            streamFn({
+                                apiKey: targetApiKey,
+                                modelId: target.modelId,
+                                systemPrompt: enrichedSystemPrompt,
+                                userPrompt: finalPrompt,
+                                conversationHistory,
+                                maxTokens: enableThinking ? 32768 : 16384,
+                                onChunk(text) {
+                                    fullOutput += text
+                                    hasEmittedToClient = true
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+                                },
+                                onDone() {
+                                    resolve()
+                                },
+                                onError(error) {
+                                    if (hasEmittedToClient && isRetryableError(error)) {
+                                        // Don't cascade after partial emit — wrap as non-retryable.
+                                        reject(new Error(`mid-stream provider failure (no fallback): ${error}`))
+                                    } else {
+                                        reject(new Error(error))
+                                    }
+                                },
+                            }).catch(reject)
+                        })
                     }
+                }, { specialistId })
 
-                    const enrichedSystemPrompt = toolContext
-                        ? `${systemPrompt}\n\n## Live Company Data\n${toolContext}`
-                        : systemPrompt
-
-                    // Fall back to standard streaming with enriched context
-                    const streamFn = getTextProvider(primaryTarget.providerId)
-                    if (!streamFn) {
-                        throw new Error(`Provider ${primaryTarget.providerId} does not support text`)
-                    }
-
-                    const conversationHistory = history?.map((msg) => ({
-                        role: msg.role as "system" | "user" | "assistant",
-                        content: msg.content,
-                    }))
-
-                    // GOTCHA: DeepSeek's chat completions API hard-caps max_tokens at 8192.
-                    // Anthropic / OpenAI / Gemini / MiniMax / Qwen all accept 16384–32768.
-                    // Clamp per-provider at dispatch so the first call is already compliant —
-                    // otherwise the registry-level safety net in streamDeepSeek (see
-                    // DEEPSEEK_MAX_TOKENS_CAP in registry.ts, commit c7ae580b) fires a warn
-                    // on every DeepSeek call for Max/Jian/Fang/Priya. This path is the
-                    // primary call site for specialists with modelTier === "deepseek".
-                    const requestedMaxTokens = enableThinking ? 32768 : 16384
-                    const providerMaxTokens =
-                        primaryTarget.providerId === "deepseek"
-                            ? Math.min(requestedMaxTokens, 8192)
-                            : requestedMaxTokens
-
-                    await new Promise<void>((resolve, reject) => {
-                        streamFn({
-                            apiKey: targetApiKey,
-                            modelId: primaryTarget.modelId,
-                            systemPrompt: enrichedSystemPrompt,
-                            userPrompt: finalPrompt,
-                            conversationHistory,
-                            maxTokens: providerMaxTokens,
-                            onChunk(text) {
-                                fullOutput += text
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
-                            },
-                            onDone() {
-                                resolve()
-                            },
-                            onError(error) {
-                                reject(new Error(error))
-                            },
-                        }).catch(reject)
-                    })
-                }
-
-                // Stream complete
+                // Stream complete (succeeded on some target in the chain)
                 clearInterval(heartbeatInterval)
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"))
                 controller.close()
@@ -1982,13 +1924,21 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                 clearInterval(heartbeatInterval)
                 if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
 
-                const errorStr = err instanceof Error ? err.message : String(err)
+                const isExhausted = err instanceof AllProvidersExhaustedError
+                const inner = isExhausted ? err.lastError : err
+                const errorStr = inner instanceof Error ? inner.message : String(inner)
                 console.error("[agents/execute] Tool-aware streaming failed:", {
-                    provider: primaryTarget.providerId,
-                    model: primaryTarget.modelId,
+                    provider: lastTargetForLog.providerId,
+                    model: lastTargetForLog.modelId,
                     specialistId,
+                    chainLength: chain.length,
+                    exhausted: isExhausted,
                     error: errorStr,
                 })
+
+                // Look up specialist name so the client can render in-character empty state.
+                const specialistRecord = specialistId ? getSpecialistById(specialistId) : null
+                const specialistName = specialistRecord?.name
 
                 const classified = classifyStreamError(errorStr)
                 try {
@@ -1997,6 +1947,8 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                             error: classified.message,
                             errorCategory: classified.category,
                             rawHint: classified.rawHint,
+                            specialistName,
+                            allProvidersDown: isExhausted,
                         })}\n\n`),
                     )
                     controller.close()
