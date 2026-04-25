@@ -134,13 +134,19 @@ export const STAGE_CONFIG: Record<
         kind: "fire",
         fireStep: "runFangReviews",
         nextStage: "generating_pdf",
-        maxAttempts: 2,
+        // Per-module fan-out: each module review takes ~60s × N modules.
+        // First 2 retries give the partial-success path room to backfill
+        // failed modules; further retries cover transient Anthropic 429s.
+        maxAttempts: 5,
     },
     generating_pdf: {
         kind: "fire",
         fireStep: "generatePdf",
         nextStage: "done",
-        maxAttempts: 2,
+        // PDF gen has @react-pdf/renderer + brief render-readiness wait;
+        // 5 retries absorbs transient Vercel cold-starts and image queue
+        // settle time.
+        maxAttempts: 5,
     },
 }
 
