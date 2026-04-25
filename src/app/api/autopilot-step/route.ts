@@ -223,6 +223,7 @@ async function runStep(
             const result = await runChaseResearchBackground(
                 projectId,
                 foundryId,
+                null,
             )
             if (!result.ok) {
                 return { ok: false, error: result.error ?? "Chase failed" }
@@ -245,6 +246,7 @@ async function runStep(
             const result = await runMaxDecompositionBackground(
                 projectId,
                 foundryId,
+                null,
             )
             return result.ok
                 ? { ok: true }
@@ -296,6 +298,7 @@ async function runStep(
             const result = await runBomGeneratorBackground(
                 projectId,
                 foundryId,
+                null,
             )
             if (!result.ok) {
                 return { ok: false, error: result.error ?? "BOM failed" }
@@ -327,7 +330,11 @@ async function runStep(
             const { runFinnCostBackground } = await import(
                 "@/actions/specialists/run-finn-cost"
             )
-            const result = await runFinnCostBackground(projectId, foundryId)
+            const result = await runFinnCostBackground(
+                projectId,
+                foundryId,
+                null,
+            )
             return result.ok
                 ? { ok: true }
                 : { ok: false, error: result.error ?? "Finn failed" }
@@ -477,6 +484,10 @@ async function runFangReviewsForAllModules(
     // matches existing stepRunFangReviews behaviour and keeps Anthropic
     // rate-limit headroom. Promise.allSettled — one module's failure
     // shouldn't sink the whole stage.
+    // Signature: runFangReviewBackground(projectId, moduleId, foundryId,
+    //            userId, trigger?). userId is null for system-fired runs
+    //            (autopilot has no user session at this point — column is
+    //            nullable).
     const CONCURRENCY = 4
     const results: Array<PromiseSettledResult<{ ok: boolean; error?: string }>> =
         []
@@ -484,7 +495,13 @@ async function runFangReviewsForAllModules(
         const batch = modules.slice(i, i + CONCURRENCY)
         const settled = await Promise.allSettled(
             batch.map((m) =>
-                runFangReviewBackground(projectId, foundryId, m.id),
+                runFangReviewBackground(
+                    projectId,
+                    m.id,
+                    foundryId,
+                    null,
+                    "auto.supplier-match-complete",
+                ),
             ),
         )
         results.push(...settled)
