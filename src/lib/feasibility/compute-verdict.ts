@@ -260,11 +260,16 @@ function computeTotalCost(
     aiCostEstimates: Record<string, unknown> | null,
 ): number | null {
     if (aiCostEstimates && typeof aiCostEstimates === "object") {
+        // Each value is { moduleId, totalPerUnit, labourCost, parts: [...] }.
+        // Field name is `totalPerUnit` (NOT `totalGbp`); the PDF cost
+        // waterfall reads the same field. Match it so the verdict and
+        // the cost waterfall always agree.
         let total = 0
         let any = false
         for (const v of Object.values(aiCostEstimates)) {
-            if (v && typeof v === "object" && "totalGbp" in v) {
-                const t = numberOrNull((v as { totalGbp?: unknown }).totalGbp)
+            if (v && typeof v === "object") {
+                const obj = v as { totalPerUnit?: unknown; totalGbp?: unknown }
+                const t = numberOrNull(obj.totalPerUnit ?? obj.totalGbp)
                 if (t !== null && t > 0) {
                     total += t
                     any = true
