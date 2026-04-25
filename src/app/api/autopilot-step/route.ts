@@ -279,9 +279,30 @@ async function runStep(
                 projectId,
                 foundryId,
             )
-            return result.ok
-                ? { ok: true }
-                : { ok: false, error: result.error ?? "BOM failed" }
+            if (!result.ok) {
+                return { ok: false, error: result.error ?? "BOM failed" }
+            }
+            // BOM is a 3-stage distributed pipeline: skeleton → batches →
+            // merge. runBomGeneratorBackground only kicks off the generator;
+            // the skeleton stage was previously fired via after() inside
+            // run-bom-generator.ts. The new architecture owns the chain
+            // here so dual-trigger races can't happen. Skeleton stage uses
+            // its own internal after()-cascade to fire batch + merge; we
+            // await skeleton synchronously, batch + merge propagate via
+            // skeleton's own state machine and the cron picks up failures.
+            const { runBomSkeletonStage } = await import("@/actions/bom")
+            try {
+                await runBomSkeletonStage(projectId)
+            } catch (err) {
+                return {
+                    ok: false,
+                    error:
+                        err instanceof Error
+                            ? `BOM skeleton stage failed: ${err.message}`
+                            : "BOM skeleton stage failed",
+                }
+            }
+            return { ok: true }
         }
 
         case "waitForFinn": {
