@@ -27,7 +27,7 @@ A new UX pattern for `/agents`. **Don't lose this in the rebuild — Tristan sig
 3. Council size fixed-4 or dynamic 3–5?
 4. Layout: 2×2 grid (chosen for 1200px readability) or horizontal row?
 5. How do timeouts fall back? Currently the mockup shows "Sage done, Max thinking, Finn timed out" as a partial state.
-6. Cost per brainstorm ≈ £0.90 (Opus open + close ≈ £0.50, four cheap voices ≈ £0.40). Pro-tier paywall? Free for Enterprise?
+6. Cost per brainstorm: blended **~£1.00–£1.20/session** (cheap-council ~£0.80, premium-council with Sage + Cal in middle ~£1.35 — both are on Opus 4.7). Pro-tier paywall? Free for Enterprise? Earlier £0.90 estimate was wrong because the audit revealed Sage and Cal already run on Opus.
 
 **Where it slots in the rebuild:** under `/agents` (the new "brainstorming-first landing" already in main per commit `b93bde36`). It's an alternative interaction mode — the existing single-specialist chat stays.
 
@@ -47,17 +47,20 @@ Each swap was benchmarked through `experiments/autoagent-strategy-specialist/ben
 | Fiona | fundraising-advisor | Sonnet 4 | **Claude Opus 4.7** | **+0.21 composite, +0.35 voice** — cleanest win in the suite. Also doubles as Brainstorming Council host. |
 | Finn | finance-lead | Opus 4 | **DeepSeek V4-Pro (Together AI)** | composite +0.19, voice +0.05, **~8× cheaper than Opus** |
 
-**Untouched (and why — don't accidentally touch in rebuild):**
-| Specialist | Lives at | Why kept |
+**Untouched / corrected after live config audit (don't accidentally touch in rebuild):**
+
+The fresh audit of `specialists-config.ts` + `failover.ts` revealed the CLAUDE.md "April 5" baseline table was wrong on multiple specialists. Live state below — trust this:
+
+| Specialist | Lives at (live) | Why kept |
 |---|---|---|
-| Max (CTO) | Gemini 3.1 Pro | V4-Pro spike: -0.03 quality, 2.2× more expensive, 2.5× slower. V4 also rejected. Gemini wins. |
-| Jian (VP Eng) | DeepSeek V4 | Already optimal — composite 4.45, voice 4.85. |
-| Chase (VP Supply) | Sonnet 4 | Llama 3.3/4 70B catastrophic: -1.19 composite, voice 2.40. Llama can't hold persona depth. |
-| Priya (Product) | DeepSeek V4 | Already optimal — composite 4.51 (highest in fleet). |
-| Cal (Chief of Staff) | Sonnet 4 (or gpt-5.4 — verify in `specialists-config.ts`) | Synthesis-heavy, Sonnet wins. |
-| Harper (HR) | Sonnet 4 | Empathy needs Claude lineage. |
-| Sage (Strategy) | Sonnet 4 | **Pending** — proposed Mistral Large 2 swap blocked: no `MISTRAL_API_KEY` or `OPENROUTER_API_KEY` in env. Sage stays on Sonnet until a key arrives. |
-| Leo (Legal) | Sonnet 4 → Opus 4.7 (validation in flight tonight) | **Pending benchmark** — Tristan made a strategic risk call that legal is high-stakes enough to justify Opus regardless. Validation run in flight; if it passes the rubric the swap lands separately. |
+| Max (CTO) | **Gemini 3.1 Pro** (`google` tier) | V4-Pro spike: -0.03 quality, 2.2× more expensive, 2.5× slower. V4 also rejected. Gemini wins. |
+| Jian (VP Eng) | DeepSeek V4 (`deepseek`) | Already optimal — composite 4.45, voice 4.85. |
+| Chase (VP Supply) | **Gemini 3.1 Pro** (`google`) | Llama 3.3/4 70B catastrophic: -1.19 composite, voice 2.40. Llama can't hold persona depth. |
+| Priya (Product) | DeepSeek V4 (`deepseek`) | Already optimal — composite 4.51 (highest in fleet). |
+| Cal (Chief of Staff) | **Claude Opus 4.7** (`claude`) | Synthesis-heavy. The `claude` tier resolves to Opus 4.7 (not Sonnet) — has been for some time. |
+| Harper (HR) | **DeepSeek V4** (`deepseek`) | Re-benchmark candidate (empathy might need Claude) but currently on V4. |
+| Sage (Strategy) | **Claude Opus 4.7** (`claude`) | Proposed Mistral Large 2 swap blocked: no `MISTRAL_API_KEY` or `OPENROUTER_API_KEY` in env. Sage stays on Opus until key arrives — note: Mistral would be a quality downgrade for raw scores; the swap rationale is council diversity not better synthesis. |
+| Leo (Legal) | **Claude Opus 4.7** (`claude`) | Was already on Opus. The "Sonnet→Opus benchmark" agent discovered this — `claude` tier had been Opus all along. Tristan's risk-call retroactively confirmed by what was already deployed. |
 
 **Cost sketch:** the 5 applied swaps net out to a real reduction (Mia/Sal/Fang/Finn cheaper, Fiona more expensive but lower call volume). Specifics in the commit message of the apply commit (`feat(specialists): apply 5 benchmark-validated model swaps`).
 
@@ -136,11 +139,11 @@ In `~/.claude/projects/-Users-tristanfischer/memory/`:
 
 ---
 
-## 8. What's still in flight at handover time
+## 8. What's still pending / blocked
 
-- **Leo Sonnet→Opus benchmark** — sub-agent running, ~30 min, $0.20. Will land as a separate commit if it passes.
-- **Sage Mistral validation** — blocked on `MISTRAL_API_KEY` or `OPENROUTER_API_KEY` in env. Tristan to provide.
+- **Sage Mistral validation** — blocked on `MISTRAL_API_KEY` or `OPENROUTER_API_KEY` in env. Tristan to provide. **Important:** Sage is currently on Opus 4.7, so a Mistral swap would be a quality downgrade for raw rubric scores — the rationale is *council diversity* (different national/RLHF lineage), not better synthesis. Frame it that way before applying.
 - **NIM API key** — Tristan to sign up at build.nvidia.com for the "free Blackwell" V4-Pro route. The Finn swap currently routes through Together AI's DeepSeek-V4-Pro (paid) until the NIM key arrives.
+- **Telegram specialist routing** — `src/lib/telegram/specialist-chat.ts` has hardcoded claude/minimax routing pair. The new tiers (qwen-235b, gpt-mini, haiku, deepseek-v4-pro) all route to MiniMax in Telegram chats. Out of scope for the swap commits but worth fixing if Telegram chat is part of the rebuild.
 
 ---
 

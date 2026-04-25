@@ -491,28 +491,34 @@ Every specialist workflow output MUST follow the Voice Sandwich pattern:
 ### Config Interface Integrity Rule
 Any time a field is added to a config interface (not just personality — any interface), grep for where it's consumed, not just where it's defined. An interface field without a consumer is a bug, not a feature.
 
-### Baseline Scores (April 5, 2026 — Post-Optimization, All 13 Specialists)
-Live API benchmarks (claude-sonnet-4-20250514, LLM-as-judge). 5 AutoAgent mutation cycles per specialist. Any personality change must not drop composite below these baselines minus 0.2.
+### Live Specialist→Model Mapping (refreshed 2026-04-25)
 
-| Specialist | ID | Composite | Action. | Spec. | Depth | Voice | Scenarios |
-|---|---|---|---|---|---|---|---|
-| Sage (Strategy) | strategist | **4.40** | 4.30 | 4.20 | 4.40 | 4.67 | 20 |
-| Max (CTO) | cto | **4.46** | 4.30 | 4.20 | 4.50 | 4.85 | 10 |
-| Jian (VP Eng) | vp-engineering | **4.38** | 4.20 | 4.20 | 4.25 | 4.85 | 10 |
-| Fang (VP Mfg) | vp-manufacturing | **4.33** | 4.40 | 4.15 | 4.25 | 4.50 | 10 |
-| Chase (VP Supply) | vp-supply-chain | **4.39** | 4.40 | 4.35 | 4.20 | 4.60 | 10 |
-| Priya (Product) | product-lead | **4.37** | 4.55 | 4.15 | 4.35 | 4.40 | 10 |
-| Mia (Marketing) | growth-marketer | **4.35** | 4.50 | 4.05 | 4.40 | 4.45 | 10 |
-| Sal (Sales) | sales-lead | **4.42** | 4.55 | 4.30 | 4.25 | 4.65 | 10 |
-| Cal (Chief of Staff) | chief-of-staff | **4.35** | 4.50 | 4.05 | 4.25 | 4.55 | 10 |
-| Finn (Finance) | finance-lead | **4.39** | 4.45 | 4.40 | 4.20 | 4.50 | 10 |
-| Fiona (Fundraising) | fundraising-advisor | **4.39** | 4.25 | 4.25 | 4.35 | 4.70 | 10 |
-| Harper (HR) | hiring-team | **4.29** | 4.40 | 4.15 | 4.25 | 4.35 | 10 |
-| Leo (Legal) | legal-counsel | **4.38** | 4.55 | 4.10 | 4.25 | 4.65 | 10 |
+**Source of truth:** `src/lib/agents/specialists-config.ts` + `src/lib/agents/failover.ts`. The historical "April 5" baseline table previously here was stale on at least eight rows after the 2026-04-25 swap sweep — refreshed below to match what's actually deployed.
 
-**Fleet average: 4.38 composite (+0.04 from pre-optimization).** Top: Max (4.46), Sal (4.42), Sage (4.40). Most improved: Priya (+0.12), Chase (+0.10), Sal (+0.08), Leo (+0.08).
+| Specialist | ID | `modelTier` | Resolves to | Last benchmark (composite / voice) | Notes |
+|---|---|---|---|---|---|
+| Sage (Strategy) | strategist | `claude` | claude-opus-4-7 | 4.40 / 4.67 (Apr 5) | Mistral Large 2 swap proposed but blocked on key |
+| Max (CTO) | cto | `deepseek` | deepseek-v4 | 4.54 / 4.90 (Apr 7) | V4-Pro rejected 2026-04-25: -0.35 composite |
+| Jian (VP Eng) | vp-engineering | `deepseek` | deepseek-v4 | 4.45 / 4.85 (Apr 7) | At ceiling — don't swap without strong evidence |
+| Fang (VP Mfg) | vp-manufacturing | `qwen-235b` | qwen3-235b | **4.64 / 5.00** (2026-04-25) | Best Fang ever measured; swapped from V4 |
+| Chase (VP Supply) | vp-supply-chain | `google` | gemini-3.1-pro | 4.39 / 4.60 (Apr 5) | Llama 70B catastrophic (-1.19/-2.00) |
+| Priya (Product) | product-lead | `deepseek` | deepseek-v4 | 4.51 / 4.40 (Apr 7) | Already optimal |
+| Mia (Marketing) | growth-marketer | `haiku` | claude-haiku-4-5-20251001 | +0.06 / +0.10 vs Sonnet (2026-04-25) | ~5× cheaper |
+| Sal (Sales) | sales-lead | `gpt-mini` | gpt-4.1-mini | +0.07 / -0.05 vs Sonnet (2026-04-25) | ~10× cheaper |
+| Cal (Chief of Staff) | chief-of-staff | `claude` | claude-opus-4-7 | 4.35 / 4.55 (Apr 5) | Synthesis-heavy — Opus stays |
+| Finn (Finance) | finance-lead | `deepseek-v4-pro` | deepseek-v4-pro | +0.19 / +0.05 vs Opus (2026-04-25) | ~8× cheaper than Opus |
+| Fiona (Fundraising) | fundraising-advisor | `claude` | claude-opus-4-7 | **+0.21 / +0.35** vs Sonnet (2026-04-25) | Cleanest win in suite. Hosts Brainstorming Council. |
+| Harper (HR) | hiring-team | `deepseek` | deepseek-v4 | 4.29 / 4.35 (Apr 5) | Empathy needs Claude lineage — re-benchmark candidate |
+| Leo (Legal) | legal-counsel | `claude` | claude-opus-4-7 | 4.62 / 4.70 (live, 2026-04-25) | Already Opus — Tristan's risk-call retroactively confirmed |
 
-**DeepSeek V4 re-benchmark (April 7, 2026):** 4 specialists switched from Sonnet to DeepSeek V4 after cross-model benchmarking showed consistent improvement. Max (CTO): 4.46 -> 4.54 (+0.08), Jian (VP Eng): 4.38 -> 4.45 (+0.07), Fang (VP Mfg): 4.33 -> 4.47 (+0.14), Priya (Product): 4.37 -> 4.51 (+0.14). Fallback chain: deepseek -> sonnet -> gemini-flash -> minimax -> gpt-5.4.
+**Keep/discard rule for any future swap:** composite ≥ live - 0.2 AND voice ≥ 4.0. Run via `experiments/autoagent-strategy-specialist/benchmark/runner_multi.py` (multi-provider sidecar — Anthropic, OpenAI, DeepSeek, Together AI, OpenRouter routable).
+
+**Don't repeat these losing experiments** (per `~/.claude/projects/.../memory/forgeos_specialist_model_swap_findings_20260425.md`):
+- Llama 3.3/4 70B on any persona-heavy specialist (depth ceiling too low)
+- gpt-oss-120b on any persona-heavy specialist (voice floor breach)
+- DeepSeek V4-Pro on any specialist already at composite ≥4.50 (no headroom; reasoning_content blowup makes it expensive)
+
+**Read this section AND `specialists-config.ts` before proposing any new swap.** The mapping above is the live truth as of 2026-04-25 — newer commits supersede.
 
 ---
 
