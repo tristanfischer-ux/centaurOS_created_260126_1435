@@ -231,6 +231,7 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                                 <SupplierMatchInsightCard
                                     key={s.shortlistId}
                                     baseHref={base}
+                                    projectId={project.id}
                                     supplier={{
                                         supplierId: s.supplierId,
                                         shortlistId: s.shortlistId,

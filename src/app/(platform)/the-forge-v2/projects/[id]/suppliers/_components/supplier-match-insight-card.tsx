@@ -41,6 +41,7 @@ import type {
   SupplierMatchOutput,
   SupplierMatchCitation,
 } from '@/actions/supplier-match-generation'
+import { SaveToShortlistButton } from './save-to-shortlist-button'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,6 +70,10 @@ interface Props {
   matchOutput?: SupplierMatchOutput
   /** Render mode — see SupplierMatchInsightMode for details. */
   mode: SupplierMatchInsightMode
+  /** Project id — passed to SaveToShortlistButton. */
+  projectId: string
+  /** Whether this supplier is already on the project shortlist. */
+  isShortlisted?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +120,8 @@ export function SupplierMatchInsightCard({
   supplier,
   matchOutput,
   mode,
+  projectId,
+  isShortlisted = false,
 }: Props) {
   const isBlurred = mode === 'blurred'
   const showInsights = !!matchOutput && !isBlurred
@@ -155,7 +162,15 @@ export function SupplierMatchInsightCard({
               </div>
             )}
           </div>
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
+            {!isBlurred && (
+              <SaveToShortlistButton
+                projectId={projectId}
+                supplierId={supplier.supplierId}
+                supplierName={supplier.name}
+                initialSaved={isShortlisted}
+              />
+            )}
             <Button asChild size="sm" variant="outline" className="h-8 px-2">
               <Link href={detailHref}>
                 Open supplier
