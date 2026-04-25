@@ -526,7 +526,11 @@ export function MeetingThreadView({
     }, [thread.id])
 
     const tierLabel = TIER_LABELS[thread.councilTier] ?? thread.councilTier
-    const citations = (thread.citations ?? []) as unknown[]
+    // GOTCHA: rows written before commit fc381a3a stored the JSON string '[]'
+    // in citations (jsonb), which PostgREST returns as a string here. Coerce
+    // to an array — anything that's not already an array becomes [].
+    const rawCitations = thread.citations ?? []
+    const citations: unknown[] = Array.isArray(rawCitations) ? rawCitations : []
 
     return (
         <div className="max-w-7xl mx-auto space-y-6">

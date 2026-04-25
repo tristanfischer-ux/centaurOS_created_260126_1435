@@ -167,7 +167,12 @@ export async function createMeetingThread(
       council_tier: input.councilTier,
       specialist_ids: input.specialistIds,
       outputs: (input.outputs ?? null) as unknown as Json,
-      citations: '[]' as unknown as Json,
+      // INTENT: jsonb column needs an empty JSON array, not the string "[]".
+      // Passing the string round-trips through PostgREST as a JSON-encoded
+      // string and then `(row.citations ?? []) as unknown[]` returns a
+      // string in the page render, where typed.map crashes the meeting
+      // thread view with "typed.map is not a function".
+      citations: [] as unknown as Json,
       artifact_id: input.artifactId ?? null,
     })
     .select('id')
