@@ -406,7 +406,7 @@ function JoinPageInner() {
               Join ForgeOS
             </h1>
             <p className="text-muted-foreground text-base sm:text-lg max-w-lg mx-auto">
-              The operating system for building physical products — expert teams, guided manufacturing, and full IP protection.
+              The operating system for the smart-product wave — specialist support across thirteen disciplines, a UK and European manufacturing network, and full intellectual-property protection.
             </p>
           </div>
 
