@@ -47,7 +47,14 @@ const BESS_RULES = {
         h_mm: 500,
     },
     fire: {
-        agent_kg_per_kwh: 0.04,
+        // Clean-agent (Novec 1230 / FK-5-1-12) design mass per NFPA 2001
+        // §A.5.4.2 — ~6% v/v at 20°C ≈ 0.10 kg/m³ of protected enclosure.
+        // Previous coefficient `agent_kg_per_kwh: 0.04` cited "per NFPA 855"
+        // was a fabrication caught by Loop-1 critique (Gemini 3.1 Pro):
+        // NFPA 855 governs install + venting; agent mass comes from NFPA
+        // 2001 (clean agent) or NFPA 12 (CO2), keyed to enclosure volume,
+        // never battery capacity.
+        agent_kg_per_m3_enclosure: 0.10,
         h_mm: 300,
     },
     scada: {
@@ -76,7 +83,11 @@ function solve(input: DomainSolveInput): DomainSolveResult {
     const utilization_pct = (used_floor_m2 / floor_budget_m2) * 100
 
     const thermal_kw_needed = targetKwh * BESS_RULES.hvac.thermal_kw_per_battery_kwh_at_1C
-    const fire_agent_kg = targetKwh * BESS_RULES.fire.agent_kg_per_kwh
+    // Fire agent mass keyed to enclosure volume per NFPA 2001 (clean agent),
+    // not to battery capacity. Internal volume = floor area × interior height.
+    const enclosure_volume_m3 =
+        envelope.interior_floor_m2 * (envelope.interior_h_mm / 1_000)
+    const fire_agent_kg = enclosure_volume_m3 * BESS_RULES.fire.agent_kg_per_m3_enclosure
 
     const rack_count = Math.ceil(targetKwh / BESS_RULES.battery.typical_rack_kwh)
     const rack_w_total = rack_count * BESS_RULES.battery.typical_rack_w_mm
@@ -156,9 +167,9 @@ function solve(input: DomainSolveInput): DomainSolveResult {
             h_mm: BESS_RULES.fire.h_mm,
             floor_m2: 0,
             mount: "ceiling",
-            scaled_by: "target_kWh (NFPA 855)",
+            scaled_by: "enclosure volume (NFPA 2001 clean-agent design concentration)",
             requirement: {
-                label: "Agent mass",
+                label: "Agent mass (Novec 1230 @ 6% v/v)",
                 value: +fire_agent_kg.toFixed(1),
                 unit: "kg",
             },
@@ -239,8 +250,9 @@ function solve(input: DomainSolveInput): DomainSolveResult {
         conflicts,
         recommendations,
         notes: [
-            `Battery density coefficient: ${BESS_RULES.battery.kwh_per_m2_floor} kWh/m² — conservative LFP rack density with cable trays + 600mm service aisle.`,
-            `Fire agent mass per NFPA 855: ${BESS_RULES.fire.agent_kg_per_kwh} kg/kWh.`,
+            `Battery density coefficient: ${BESS_RULES.battery.kwh_per_m2_floor} kWh/m² floor — conservative LFP rack density with cable trays + 600mm service aisle (15-20% margin against vendor demonstrated maxima of 117 kWh/m²).`,
+            `Fire suppression sizing: ${BESS_RULES.fire.agent_kg_per_m3_enclosure} kg/m³ enclosure for Novec 1230 (FK-5-1-12) at 6% v/v design concentration per NFPA 2001 §A.5.4.2 — keyed to enclosure volume, not battery capacity. NFPA 855 governs venting, separation, and detection; the agent quantity is set by NFPA 2001.`,
+            `Feasibility label: "FEASIBLE" here means "fits the container envelope with stated targets". It does NOT confirm cost ceiling, regulatory acceptance, or supplier availability — those gates run downstream (Finn, Chase, Suppliers).`,
         ],
     }
 }

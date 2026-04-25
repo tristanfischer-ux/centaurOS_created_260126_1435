@@ -342,7 +342,9 @@ RULES:
 - If the research report mentions sub-components, those are good module candidates
 - Output ONLY the JSON object — no markdown, no explanation
 - SYMMETRY (CRITICAL): If a module is the mirrored counterpart of another (e.g. "Right Leg" mirrors "Left Leg", "Right Drive Module" mirrors "Left Drive Module"), you MUST set mirrorOf to the ID of the primary module. Only ONE module in a symmetric pair sets mirrorOf — the other is the primary (mirrorOf: null). Modules that happen to be similar but aren't geometric mirrors should NOT use mirrorOf. Downstream image generation depends on mirrorOf to produce visually consistent illustrations — if you omit it, mirror pairs will look completely different.
-- NO ACRONYMS — spell out every acronym IN FULL on first AND every subsequent mention. Write "battery management system" not "BMS", "energy management system" not "EMS", "contract manufacturer" not "CM", "design for manufacturing" not "DFM", "bill of materials" not "BOM", "thermal runaway" not "TR". Narrow exceptions: proper nouns (ForgeOS), standards codes (AS9100D, ISO 13485, NFPA 855), file extensions (.step), and "United Kingdom" / "European Union" / "United States" written out in full only.`
+- NO ACRONYMS — spell out every acronym IN FULL on first AND every subsequent mention. Write "battery management system" not "BMS", "energy management system" not "EMS", "contract manufacturer" not "CM", "design for manufacturing" not "DFM", "bill of materials" not "BOM", "thermal runaway" not "TR".
+- STANDARDS BODIES ARE PROPER NOUNS — keep their canonical acronyms intact. Write "UL 9540" not "United Laboratories 9540" (UL = Underwriters Laboratories, do NOT guess); "IEC 62619" not "International Electrotechnical Commission 62619"; "ISO 1496-1" not "International Organization for Standardization 1496-1"; "NFPA 855" not "National Fire Protection Association 855"; "RED 2014/53/EU" not spelled out; "UKCA" not spelled out; "DNV-RP-0043" not spelled out. If you do not know the registered full name of a standards body or code with certainty, USE THE ACRONYM ONLY — never invent a plausible-sounding expansion. Reference: the only acronyms that get expanded are technical/system acronyms (BMS, EMS, BOM, etc.); registered organisation codes and standard numbers stay verbatim.
+- Other narrow exceptions: proper nouns (ForgeOS), file extensions (.step), and "United Kingdom" / "European Union" / "United States" written out in full only.`
 
 const MODULE_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
   electronics:
@@ -399,7 +401,8 @@ RULES:
   - Write "internet of things" not "IoT"
   - Write "controlled environment agriculture" not "CEA"
   - Write "thermal runaway" not "TR"
-  Narrow exceptions: proper nouns (ForgeOS, NFPA 855), file extensions (.step, .pdf), code identifiers, and "United Kingdom" / "European Union" / "United States" can be written out in full but never abbreviated. Standards codes (AS9100D, ISO 13485, NFPA 855) stay as-is — they're proper nouns.`
+- STANDARDS BODIES ARE PROPER NOUNS — keep their canonical acronyms intact. Write "UL 9540" not "United Laboratories 9540" (UL = Underwriters Laboratories — do NOT guess); "IEC 62619" not spelled out; "ISO 1496-1" not spelled out; "NFPA 855" not spelled out; "RED 2014/53/EU" not spelled out; "UKCA" not spelled out. If unsure of the canonical full name of any standards body, USE THE ACRONYM ONLY — never invent an expansion. Only technical/system acronyms (BMS, EMS, BOM, etc.) get expanded; registered organisation codes stay verbatim.
+- Other narrow exceptions: proper nouns (ForgeOS), file extensions (.step, .pdf), code identifiers, and "United Kingdom" / "European Union" / "United States" written out in full only.`
 
 const SKELETON_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
   electronics:
@@ -442,7 +445,9 @@ RULES:
 - failureModes: 2-4 realistic engineering failure modes
 - unknowns: 1-3 open questions that need resolution
 - Use dimensions from the research report — do not invent new ones
-- NO ACRONYMS — every acronym MUST be written in full on first AND every subsequent mention, in keyParts, description, whyItMatters, failureModes, unknowns. Write "battery management system" not "BMS", "energy management system" not "EMS", "contract manufacturer" not "CM", "design for manufacturing" not "DFM", "bill of materials" not "BOM", "thermal runaway" not "TR", "controlled environment agriculture" not "CEA". Narrow exceptions: proper nouns, standards codes (AS9100D, ISO 13485, NFPA 855), file extensions (.step), and "United Kingdom" / "European Union" / "United States" written out in full only.
+- NO ACRONYMS — every technical/system acronym MUST be written in full on first AND every subsequent mention, in keyParts, description, whyItMatters, failureModes, unknowns. Write "battery management system" not "BMS", "energy management system" not "EMS", "contract manufacturer" not "CM", "design for manufacturing" not "DFM", "bill of materials" not "BOM", "thermal runaway" not "TR", "controlled environment agriculture" not "CEA".
+- STANDARDS BODIES ARE PROPER NOUNS — keep their canonical acronyms intact. Write "UL 9540" not "United Laboratories 9540" (UL = Underwriters Laboratories — do NOT guess at expansions); "IEC 62619" not spelled out; "ISO 1496-1" not spelled out; "NFPA 855" not spelled out; "RED 2014/53/EU" not spelled out; "UKCA" not spelled out; "EN 60529" not spelled out. If unsure of the canonical full name of any standards body or registered scheme, USE THE ACRONYM ONLY — fabricated expansions like "United Laboratories" are factual errors that destroy report credibility. Only technical/system acronyms (BMS, EMS, BOM, etc.) get expanded.
+- Other narrow exceptions: proper nouns (ForgeOS), file extensions (.step), and "United Kingdom" / "European Union" / "United States" written out in full only.
 - Output ONLY the JSON object — no markdown, no explanation`
 
 const MODULE_EXPANSION_ROLE: Record<CadLabDomain, string> = {

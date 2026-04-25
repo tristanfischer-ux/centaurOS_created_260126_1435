@@ -277,23 +277,35 @@ async function runFangSizingInternal(
         const fromBriefStructured = inferTargetsFromBrief(industryDomain, research?.designBrief)
         const fromBriefText = inferTargetsFromBriefText(industryDomain, briefTextHaystack)
         const fromSubject = inferTargetsFromSubject(subject, industryDomain)
-        // Priority: brief-structured > brief-text > subject > library-default.
-        // Free-text extraction beats subject because briefs are richer than
-        // the project name. Library defaults are last resort and recorded as
-        // such so downstream conflict-flagging can warn the founder.
+
+        // Sizing-target priority (revised 2026-04-25 NIGHT after multi-model
+        // critique caught BESS demo sized at 100 kW / 500 kWh when brief said
+        // 1500 kW / 3500 kWh — `fromBriefStructured` had Max's default values
+        // overriding the founder's real numbers in `fromBriefText`).
+        //
+        // New rule: take the MAX of all numeric sources. Founders state
+        // capacity as a ceiling ("up to 3.5 MWh", "behind-the-meter
+        // 1.5 MW"); under-sizing produces a different product. Library
+        // defaults still apply only when no other source provides a value.
+        // Provenance records the SOURCE OF THE WINNING VALUE for the audit
+        // log so the founder can see where the number came from.
         targets = {}
-        for (const [k, v] of Object.entries(fromSubject)) {
-            targets[k] = v
-            targetProvenance[k] = "subject"
+        const merge = (
+            src: Record<string, number>,
+            label: typeof targetProvenance[string],
+        ) => {
+            for (const [k, v] of Object.entries(src)) {
+                const existing = targets[k]
+                if (existing === undefined || v > existing) {
+                    targets[k] = v
+                    targetProvenance[k] = label
+                }
+            }
         }
-        for (const [k, v] of Object.entries(fromBriefText)) {
-            targets[k] = v
-            targetProvenance[k] = "brief-text"
-        }
-        for (const [k, v] of Object.entries(fromBriefStructured)) {
-            targets[k] = v
-            targetProvenance[k] = "brief-structured"
-        }
+        merge(fromSubject, "subject")
+        merge(fromBriefText, "brief-text")
+        merge(fromBriefStructured, "brief-structured")
+
         if (industryDomain) {
             const rules = getRulesByDomain(industryDomain)
             if (rules) {
