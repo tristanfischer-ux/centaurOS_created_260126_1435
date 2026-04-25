@@ -18,9 +18,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
+
 import {
   createProduct,
   createIteration,
@@ -133,28 +131,6 @@ export function ProductListView({ products }: ProductListViewProps) {
   const [forgePickerOpen, setForgePickerOpen] = React.useState(false)
   const [showPlanUpload, setShowPlanUpload] = React.useState(false)
 
-  // ── AI Briefing ─────────────────────────────────────────────────
-  const briefingContext = React.useMemo(() => {
-    const counts = countByLifecycle(products)
-    const parts = Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')
-    return `Products: ${products.length}${parts ? ` (${parts})` : ''}`
-  }, [products])
-
-  // INTENT: Empty is a starting point, not a problem. Only escalate severity
-  // when there's an actual regression to flag (e.g. a regressing iteration).
-  // "warning" triggers failure-framing language in the AI briefing.
-  const briefingSeverity = React.useMemo(() => {
-    const hasRegressing = products.some((p) => p.latest_convergence_status === 'regressing')
-    return hasRegressing ? 'warning' as const : 'success' as const
-  }, [products])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('product-lead', briefingContext, briefingSeverity),
-    briefingSeverity,
-    true,
-    'briefing-products',
-  )
-
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -170,19 +146,6 @@ export function ProductListView({ products }: ProductListViewProps) {
           Where your designs, market research, and unit economics come together.
         </p>
       </div>
-
-      {/* Priya briefing */}
-      <SpecialistBriefingHero
-        specialistId="product-lead"
-        specialistName="Priya"
-        specialistTitle="Product Development"
-        narrative={briefing.narrative}
-        fallbackMessage="I'm Priya. Each product on this page moves through five steps: concept, validate, build, launch, grow. Market assessment and competitor tracking run alongside, so the story stays honest at every stage. Start with a name and the problem you want to solve — that's enough for me to take it from there."
-        isLoading={briefing.isLoading}
-        loadingMessage="Reviewing your product portfolio..."
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Products', description: briefingContext }}
-      />
 
       {/* Empty state or product grid */}
       {products.length === 0 ? (

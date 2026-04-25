@@ -72,9 +72,6 @@ import {
   batchVerifyNotes,
   batchArchiveNotes,
 } from '@/actions/knowledge'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { KnowledgeNoteCard } from './knowledge-note-card'
 import { KnowledgeNoteDetailDialog } from './knowledge-note-detail-dialog'
 import { CreateKnowledgeNoteDialog } from './create-knowledge-note-dialog'
@@ -88,7 +85,6 @@ import type {
   VaultStats,
 } from '@/lib/knowledge-vault/types'
 
-// DECISION: SpecialistBriefingHero replaces SpecialistInsightCard on this page
 
 // ─── Note Type Icons ─────────────────────────────────────────────────
 
@@ -167,24 +163,6 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
   // Dialogs
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-
-  // ─── Briefing ──────────────────────────────────────────────────
-  const briefingSeverity = useMemo(() => {
-    if (!stats) return 'success' as const
-    return stats.unverifiedCount > stats.verifiedCount ? 'warning' as const : 'success' as const
-  }, [stats])
-
-  const briefingContext = useMemo(() => {
-    if (!stats) return ''
-    return `Notes: ${stats.totalNotes}, Connections: ${stats.totalLinks}, Verified: ${stats.verifiedCount}, Needs review: ${stats.unverifiedCount}, Documents: ${stats.documentsProcessed}`
-  }, [stats])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('chief-of-staff', briefingContext, briefingSeverity),
-    briefingSeverity,
-    !isLoading && stats != null && stats.totalNotes > 0,
-    'briefing-knowledge',
-  )
 
   // ─── Data Fetching ───────────────────────────────────────────────
 
@@ -347,7 +325,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
 
   const hasActiveFilters = searchQuery || selectedDomain || selectedTypes.length > 0 || activeTab !== 'all' || hideStale
 
-  // DECISION: Sage's guidance now handled by SpecialistBriefingHero in the render
+
 
   // ─── Render ──────────────────────────────────────────────────────
 
@@ -399,19 +377,6 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
           </Button>
         </div>
       </div>
-
-      {/* ── Cal's Guidance ─────────────────────────────── */}
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={briefing.narrative}
-        fallbackMessage="Every time you explain something twice, that's a knowledge gap. Documents, specialist insights, research notes — put them here and every specialist on the platform gets smarter about your business. Upload the document you find yourself re-sending most often. That's your starting point."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Knowledge', description: 'Cal on building institutional memory.', metadata: {} }}
-        storageKey="knowledge"
-      />
 
       {/* ── Empty State ──────────────────────────────────────────── */}
       {isVaultEmpty ? (

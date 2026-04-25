@@ -40,7 +40,6 @@ import { MergeReviewDialog } from '@/components/strategy/merge-review-dialog'
 import type { MergeReviewState } from '@/lib/business-plan-types'
 import { AutoGenerateMilestonesDialog } from '@/components/strategy/auto-generate-milestones-dialog'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
-import { StrategyHealthReview } from '@/components/specialists/strategy-health-review'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
 import type { SpecialistContext } from '@/components/specialists/types'
@@ -462,20 +461,6 @@ export function StrategyDashboard({
           </div>
         </div>
       </div>
-
-      {/* Sage's Strategy Overview — always visible, right after header */}
-      <StrategyHealthReview
-        pillars={pillars.map(p => ({
-          title: p.title,
-          health: p.health,
-          progress: p.progress,
-          overdueTasks: p.overdueTasks,
-          objectiveCount: p.objectiveCount,
-        }))}
-        purposeSummary={purposeData?.purpose}
-        totalObjectives={totalObjectives}
-        unlinkedObjectiveCount={unlinkedObjectiveCount}
-      />
 
       <DocumentUploadPrompt
         domain="strategy"

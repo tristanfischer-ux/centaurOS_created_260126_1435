@@ -21,7 +21,6 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getReviewQueue } from '@/actions/content-publishing'
 import { typography } from '@/lib/design-system'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { ReviewQueueTabs } from './review-queue-tabs'
 
 export const metadata: Metadata = {
@@ -144,18 +143,6 @@ export default async function ReviewQueuePage() {
                 </div>
                 <p className="text-muted-foreground mt-1">Items awaiting your approval</p>
             </div>
-
-            <SpecialistBriefingHero
-                specialistId="chief-of-staff"
-                specialistName="Cal"
-                specialistTitle="Chief of Staff"
-                narrative={null}
-                fallbackMessage="Things waiting for your approval — draft tasks, content, decisions that can't move without you. I show pending items by urgency so the team isn't blocked longer than necessary. Clear the red items first — someone's waiting on each one."
-                isLoading={false}
-                severity="success"
-                context={{ type: 'general', title: 'Review Queue', description: 'Cal on the review queue.', metadata: {} }}
-                storageKey="review-queue"
-            />
 
             <ReviewQueueTabs
                 contentItems={contentItems}

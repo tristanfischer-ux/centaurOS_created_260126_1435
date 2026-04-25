@@ -51,8 +51,6 @@ import type {
   DebateRole,
 } from "@/lib/red-team/types"
 import type { DebateHistoryItem } from "@/actions/red-team-debate"
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-
 // ─── Constants ──────────────────────────────────────────────────
 
 const ROLE_COLORS: Record<DebateRole, string> = {
@@ -901,18 +899,6 @@ export function RedTeamView(): React.ReactElement {
             </Button>
           )}
         </div>
-
-        <SpecialistBriefingHero
-          specialistId="strategist"
-          specialistName="Sage"
-          specialistTitle="Strategy"
-          narrative={null}
-          fallbackMessage="Before you commit to a decision, let me attack it from five angles. I'll argue the competitor's perspective, the skeptical investor's, the angry customer's, the regulator's, and the 'what if we're just wrong' scenario. Paste your decision and hit 'Challenge' — better to break it here than in market."
-          isLoading={false}
-          severity="success"
-          context={{ type: 'general', title: 'Red Team', description: 'Sage on red team.', metadata: {} }}
-          storageKey="red-team"
-        />
 
         {/* Health Warning Banner */}
         {healthChecked && unhealthyProviders.length > 0 && (

@@ -58,9 +58,7 @@ import { WorkloadBoard } from './workload-board'
 import { TeamDetailCard } from './team-detail-card'
 import { SmartInsights } from './smart-insights'
 import { HarperAnalysisPanel } from './components/harper-analysis-panel'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
+
 import { generateTeamInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
 import { QuickAssignDialog } from './quick-assign-dialog'
@@ -367,36 +365,6 @@ export function TeamPageView({
             return sum + (100 - score)
         }, 0) / humanMembers.length)
         : 100
-
-    // ── Harper live AI briefing ──────────────────────────────
-    const harperBriefingContext = useMemo(() => {
-        const parts: string[] = []
-        parts.push(`${totalPeople} team members: ${founders.length + executives.length} leadership, ${apprentices.length} team members`)
-        parts.push(`${totalTeams} teams formed`)
-        parts.push(`Average capacity: ${avgCapacity}%`)
-        if (insights?.overloadedMembers?.length) {
-            parts.push(`${insights.overloadedMembers.length} overloaded: ${insights.overloadedMembers.map((m) => m.name || 'Unknown').join(', ')}`)
-        }
-        if (insights?.overdueTaskCount) {
-            parts.push(`${insights.overdueTaskCount} overdue tasks`)
-        }
-        if (insights?.idleMembers?.length) {
-            parts.push(`${insights.idleMembers.length} idle members`)
-        }
-        return parts.join('. ')
-    }, [totalPeople, founders.length, executives.length, apprentices.length, totalTeams, avgCapacity, insights])
-
-    const harperSeverity = useMemo(() => {
-        if (insights?.overloadedMembers?.length) return 'warning' as const
-        return 'success' as const
-    }, [insights])
-
-    const harperBriefing = usePageBriefing(
-        () => generatePageBriefing('hiring-team', harperBriefingContext, harperSeverity),
-        harperSeverity,
-        totalPeople > 0,
-        'briefing-team',
-    )
 
     // Orbit hero mode — when active, use compact layout with orbit as hero
     const isOrbitActive = activeTab === 'members' && viewMode === 'orbit'
@@ -1205,19 +1173,6 @@ export function TeamPageView({
                         </Link>
                     </div>
                 </div>
-
-                {/* Harper specialist briefing — above tabs so it persists across all tabs */}
-                <SpecialistBriefingHero
-                    specialistId="hiring-team"
-                    specialistName="Harper"
-                    specialistTitle="Hiring"
-                    narrative={harperBriefing.narrative}
-                    fallbackMessage="I'm Harper. Good people are off the market in a week, so let's make sure yours aren't drowning. I track who's overloaded, who's underused, and where you've got gaps that'll hurt in 60 days. Check the workload view — if anyone's consistently red, we need to talk about hiring before they quit."
-                    isLoading={harperBriefing.isLoading}
-                    severity={harperBriefing.severity}
-                    context={{ type: 'general', title: 'Team', description: harperBriefingContext, metadata: {} }}
-                    storageKey="team"
-                />
 
                 {/* Row 2: Tabs + mobile view toggle */}
                 <div className="flex items-center gap-2">

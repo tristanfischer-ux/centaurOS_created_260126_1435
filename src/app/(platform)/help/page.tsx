@@ -24,7 +24,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
 import { typography } from "@/lib/design-system/typography"
-import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 import { VIDEOS, VIDEO_LIBRARY_ORDER } from "@/lib/video-urls"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 
@@ -209,18 +208,6 @@ export default function HelpCenterPage() {
           </p>
         </div>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={null}
-        fallbackMessage="Most people land here looking for three things: how to connect accounts (90 seconds), how to invite team members (60 seconds), or how to export a report (30 seconds). If that's you, the video walkthroughs below will get you there fastest. For everything else, the search box finds answers quicker than scrolling."
-        isLoading={false}
-        severity="success"
-        context={{ type: 'general', title: 'Help', description: 'Cal on getting help.', metadata: {} }}
-        storageKey="help"
-      />
 
       {/* Quick Start Guide */}
       <section>

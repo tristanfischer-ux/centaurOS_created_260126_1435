@@ -9,8 +9,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingDown, AlertTriangle, Zap, Upload, Package, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -24,7 +22,6 @@ import { ImportDialog } from '../components/ImportDialog'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { generateCashOutGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
@@ -107,23 +104,6 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
     variable: row.variableCosts,
     total: row.totalOut,
   })), [cashOutGrid])
-
-  // ── AI Briefing ──────────────────────────────────────────────────────────
-  const briefingContext = useMemo(() => {
-    const topCosts = items
-      .sort((a, b) => b.weeklyAmount - a.weeklyAmount)
-      .slice(0, 3)
-      .map(i => i.name)
-      .join(', ')
-    return `Weekly fixed: £${weeklyFixedTotal / 100}, Weekly variable: £${weeklyVariableTotal / 100}, Total items: ${items.length}, Top costs: ${topCosts || 'none'}`
-  }, [weeklyFixedTotal, weeklyVariableTotal, items])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('finance-lead', briefingContext, 'success'),
-    'success',
-    items.length > 0,
-    'briefing-cash-out',
-  )
 
   const handleAdd = useCallback((costType?: string) => {
     setEditingItem(null)
@@ -274,18 +254,6 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
           <Badge variant="secondary" size="sm">{formatCurrency(annualTotal)}/yr</Badge>
         </div>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="finance-lead"
-        specialistName="Finn"
-        specialistTitle="Finance"
-        narrative={briefing.narrative}
-        fallbackMessage="Every pound out is either fixed (rent, salaries — hard to cut) or variable (tools, contractors — cuttable tomorrow). I separate them so you know your real floor. The subscriptions tab is the first place I'd check — unused SaaS tends to hide there."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Cash Out', description: 'Finn on cash out.', metadata: {} }}
-        storageKey="cash-out"
-      />
 
       {error && (
         <Alert variant="destructive">

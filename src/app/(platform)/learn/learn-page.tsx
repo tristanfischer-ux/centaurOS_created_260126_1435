@@ -27,7 +27,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { typography } from '@/lib/design-system'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { TechniquesExplorer } from '@/components/techniques'
@@ -227,18 +226,6 @@ export function LearnPage({
           Techniques, tutorials, and expert guidance to level up your craft.
         </p>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="strategist"
-        specialistName="Sage"
-        specialistTitle="Strategy"
-        narrative={null}
-        fallbackMessage="Most founders over-specify tolerances by 2x, which doubles their unit cost — and they don't know it until the first invoice hits. I've mapped the decisions that actually matter: when to injection mould vs CNC, when tolerances are overkill, when a cheaper material performs better. Find the topic closest to your current build and I'll save you the expensive lesson."
-        isLoading={false}
-        severity="success"
-        context={{ type: 'general', title: 'Learn', description: 'Sage on learning resources.', metadata: {} }}
-        storageKey="learn"
-      />
 
       {/* Tab bar */}
       <div className="flex flex-wrap gap-2" role="tablist">

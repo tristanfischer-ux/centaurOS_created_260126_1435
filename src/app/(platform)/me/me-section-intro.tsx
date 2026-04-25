@@ -19,7 +19,7 @@ import { SectionIntroPage } from "@/components/sidebar/SectionIntroPage"
 import { getSectionById } from "@/lib/features/section-registry"
 import { Card, CardContent } from "@/components/ui/card"
 import { MeDashboardBody } from "./me-dashboard-view"
-import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
+
 
 import type { MeDashboardData } from "@/actions/me-dashboard"
 
@@ -131,21 +131,6 @@ export function MeSectionIntro({ data }: MeSectionIntroProps): React.ReactElemen
                         )
                     })}
                 </div>
-            </div>
-
-            {/* Cal's coaching tip */}
-            <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <SpecialistBriefingHero
-                    specialistId="chief-of-staff"
-                    specialistName="Cal"
-                    specialistTitle="Chief of Staff"
-                    narrative={null}
-                    fallbackMessage="Morning. I've triaged your day: items that'll hurt if ignored, things worth 30 minutes, and quick wins to build momentum. Your specialists can handle many of these — head to Tasks and hit 'Delegate to Specialists' to get them working while you focus on the decisions only you can make."
-                    isLoading={false}
-                    severity="success"
-                    context={{ type: 'general', title: 'Me', description: 'Cal on your daily command centre.', metadata: {} }}
-                    storageKey="me-intro"
-                />
             </div>
 
             {/* Dashboard widgets */}

@@ -11,8 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { typography } from "@/lib/design-system"
-import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
-import { 
+import {
     Sparkles, 
     Calendar,
     Globe,
@@ -172,18 +171,6 @@ export default function WhatsNewPage() {
                 </div>
             </div>
 
-            <SpecialistBriefingHero
-                specialistId="chief-of-staff"
-                specialistName="Cal"
-                specialistTitle="Chief of Staff"
-                narrative={null}
-                fallbackMessage="New features ship weekly. I've flagged the ones that affect how you work — skip the rest. If something below looks useful, try it now while you're thinking about it. Features you ignore here tend to stay ignored."
-                isLoading={false}
-                severity="success"
-                context={{ type: 'general', title: "What's New", description: 'Cal on recent updates.', metadata: {} }}
-                storageKey="whats-new"
-            />
-            
             {/* New Features Highlight */}
             {newFeatures.length > 0 && (
                 <Card className="border overflow-hidden">

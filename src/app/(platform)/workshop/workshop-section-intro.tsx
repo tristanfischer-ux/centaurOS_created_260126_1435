@@ -26,8 +26,6 @@ import { getSectionById } from "@/lib/features/section-registry"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
-
 const section = getSectionById("workshop")!
 
 /** Static showcase items representing what The Forge produces */
@@ -90,21 +88,6 @@ export function WorkshopSectionIntro(): React.ReactElement {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
-
-            {/* Max's Workshop briefing */}
-            <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <SpecialistBriefingHero
-                    specialistId="cto"
-                    specialistName="Max"
-                    specialistTitle="CTO"
-                    narrative={null}
-                    fallbackMessage="This is your operational cockpit — Forge projects, team status, and specialists in one view. If you're wondering 'what should I work on right now,' start here. The answer is usually whatever's closest to shipping."
-                    isLoading={false}
-                    severity="success"
-                    context={{ type: 'general', title: 'Workshop', description: 'Max introduces The Forge workshop.', metadata: {} }}
-                    storageKey="workshop-intro"
-                />
             </div>
 
             {/* The Forge Showcase — examples of what it produces */}

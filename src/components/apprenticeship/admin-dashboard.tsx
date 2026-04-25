@@ -2,9 +2,6 @@
 
 import { useState, useMemo } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -121,23 +118,6 @@ export function AdminDashboard({
     }
   }, [enrollments])
 
-  const briefingSeverity = useMemo(() =>
-    atRiskCount > 0 ? 'warning' as const : 'success' as const,
-    [atRiskCount]
-  )
-
-  const briefingContext = useMemo(() =>
-    `Enrolments: ${totalEnrollments}, Avg progress: ${avgProgress.toFixed(0)}%, On track: ${totalEnrollments - atRiskCount}, At risk: ${atRiskCount}`,
-    [totalEnrollments, avgProgress, atRiskCount]
-  )
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('hiring-team', briefingContext, briefingSeverity),
-    briefingSeverity,
-    true,
-    'briefing-apprentice-admin',
-  )
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -158,18 +138,6 @@ export function AdminDashboard({
           Enroll New Apprentice
         </Button>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="hiring-team"
-        specialistName="Harper"
-        specialistTitle="Hiring"
-        narrative={briefing.narrative}
-        fallbackMessage="Your apprenticeship programme overview. Monitor enrolments, track OTJT progress, and approve hours to keep the programme on track."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Apprenticeship Admin', description: 'Harper on programme management.', metadata: {} }}
-        storageKey="apprentice-admin"
-      />
 
       {/* Tabs */}
       <Tabs defaultValue="overview">

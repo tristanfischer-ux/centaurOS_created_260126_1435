@@ -2,8 +2,6 @@
 
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -20,7 +18,6 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { ProgressRing } from '@/components/ui/progress-ring'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { PitchPrepRequest, PitchPrepStatus } from '@/types/pitch-prep'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -66,18 +63,6 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
   const activeCount = useMemo(() => requests.filter(r => r.status !== 'completed' && r.status !== 'cancelled').length, [requests])
   const completedCount = useMemo(() => requests.filter(r => r.status === 'completed').length, [requests])
 
-  const briefingContext = useMemo(() =>
-    `Pitch requests: ${requests.length} (${activeCount} active, ${completedCount} completed)`,
-    [requests.length, activeCount, completedCount]
-  )
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('fundraising-advisor', briefingContext, 'success'),
-    'success',
-    true,
-    'briefing-pitch-prep',
-  )
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -98,19 +83,6 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
           </Link>
         </Button>
       </div>
-
-      {/* Fiona's briefing */}
-      <SpecialistBriefingHero
-        specialistId="fundraising-advisor"
-        specialistName="Fiona"
-        specialistTitle="Fundraising Advisor"
-        narrative={briefing.narrative}
-        fallbackMessage="Investors ask the same 12 questions — but the ones who win practise until the answers feel effortless. I'll run you through guided exercises: your story arc, your numbers narrative, objection handling. Start a practice round — it's the highest-ROI hour you'll spend before any meeting."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Pitch Preparation', description: 'Investor pitch prep and coaching', metadata: {} }}
-        storageKey="pitch-prep"
-      />
 
       {/* Legal Disclaimer */}
       <Alert className="bg-status-info-light border-status-info">

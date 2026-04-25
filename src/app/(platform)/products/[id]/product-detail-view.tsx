@@ -17,9 +17,6 @@ import * as React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import {
   updateProduct,
   deleteProduct,
@@ -232,50 +229,6 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id, product.cad_lab_project_id])
-
-  // ── AI Briefing ──────────────────────────────────────────────────
-  const briefingContext = React.useMemo(() => {
-    const parts: string[] = [`Product: ${product.name}`, `Stage: ${product.lifecycle}`]
-    if (product.unit_economics?.cogs_per_unit_pence) {
-      parts.push(`COGS: ${formatPence(product.unit_economics.cogs_per_unit_pence)}`)
-    }
-    if (product.unit_economics?.gross_margin_pct != null) {
-      parts.push(`Margin: ${product.unit_economics.gross_margin_pct.toFixed(1)}%`)
-    }
-    if (product.cad_lab_project_id) parts.push('Linked to CAD Lab')
-    // FLOW: Include iteration progress for Priya to reference
-    if (iterations.length > 0) {
-      const latest = iterations[iterations.length - 1]
-      parts.push(`Iteration ${latest.iteration_number} (${latest.convergence_status})`)
-      if (iterations.length >= 2) {
-        const first = iterations[0]
-        const fp = first.pareto_scores as IterationPareto
-        const lp = latest.pareto_scores as IterationPareto
-        const totalImprovement = (lp.market + lp.financial + lp.fundability + lp.manufacturing)
-          - (fp.market + fp.financial + fp.fundability + fp.manufacturing)
-        if (totalImprovement !== 0) {
-          parts.push(`Total improvement since v1: ${totalImprovement > 0 ? '+' : ''}${totalImprovement} points`)
-        }
-      }
-    }
-    if (synthesis) {
-      const p = synthesis.pareto
-      parts.push(`Pareto: market=${p.market}, financial=${p.financial}, fundability=${p.fundability}, manufacturing=${p.manufacturing}`)
-    }
-    return parts.join(', ')
-  }, [product, iterations, synthesis])
-
-  const briefingSeverity = React.useMemo(() => {
-    if (product.lifecycle === 'deprecated') return 'warning' as const
-    return 'success' as const
-  }, [product.lifecycle])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('product-lead', briefingContext, briefingSeverity),
-    briefingSeverity,
-    true,
-    `briefing-product-${product.id}`,
-  )
 
   // INTENT: Fetch iterations when History tab is first opened
   React.useEffect(() => {
@@ -755,19 +708,6 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
           </div>
         </div>
       </div>
-
-      {/* Priya briefing */}
-      <SpecialistBriefingHero
-        specialistId="product-lead"
-        specialistName="Priya"
-        specialistTitle="Product Development"
-        narrative={briefing.narrative}
-        fallbackMessage={`Reviewing ${product.name} — currently in ${LIFECYCLE_LABELS[product.lifecycle]} stage.`}
-        isLoading={briefing.isLoading}
-        loadingMessage={`Analysing ${product.name}...`}
-        severity={briefing.severity}
-        context={{ type: 'general', title: product.name, description: briefingContext }}
-      />
 
       {/* Tab bar — WAI-ARIA tablist with arrow-key navigation */}
       <div className="border-b border-border" role="tablist" aria-label="Product sections">

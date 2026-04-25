@@ -27,9 +27,6 @@ import dynamic from 'next/dynamic'
 import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { generateTasksBriefing, type SpecialistBriefingResult } from '@/actions/specialist-page-insights'
-import type { SpecialistContext } from '@/components/specialists/types'
 import { PageTour } from '@/components/guidance/page-tour'
 import { DelegationProgressModal } from '@/components/tasks/delegation-progress-modal'
 
@@ -168,75 +165,6 @@ export function TasksCommandCenter({
       needsReview: needsReview.length,
     }
   }, [tasks, currentUserId])
-
-  // ── Cal's tasks briefing ──────────────────────────────────────
-  const [calBriefing, setCalBriefing] = useState<SpecialistBriefingResult>({ narrative: null, severity: 'success' })
-  const [isCalLoading, setIsCalLoading] = useState(false)
-  const calFetched = useRef(false)
-
-  const completedCount = useMemo(
-    () => tasks.filter(t => t.status === 'Completed').length,
-    [tasks],
-  )
-  const blockerCount = useMemo(
-    () => tasks.filter(t => t.risk_level === 'blocker').length,
-    [tasks],
-  )
-
-  const calFallback = "Cal here. You've got work scattered across objectives — I've pulled it all into one place. Focus view shows what matters today, Board shows the full battlefield, Timeline catches scheduling collisions. See that 'Delegate to Specialists' button? Click it and your team of specialists will work through your pending tasks — each one produces a deliverable you review and approve. I'd rather get 8 tasks done in 5 minutes than have them sitting overdue."
-
-  const calSeverity = useMemo((): 'success' | 'warning' | 'error' => {
-    if (stats.overdue > 5 || blockerCount > 2) return 'error'
-    if (stats.overdue > 0 || blockerCount > 0) return 'warning'
-    return 'success'
-  }, [stats, blockerCount])
-
-  useEffect(() => {
-    if (calFetched.current || tasks.length === 0) return
-    calFetched.current = true
-    setIsCalLoading(true)
-
-    generateTasksBriefing({
-      totalTasks: stats.totalTasks,
-      overdueCount: stats.overdue,
-      dueTodayCount: stats.dueToday,
-      completedCount,
-      needsReviewCount: stats.needsReview,
-      myActiveCount: stats.myActiveTasks,
-      blockerCount,
-    }).then((result) => {
-      if (result) setCalBriefing(result)
-    }).catch(() => { /* Non-critical — local fallback remains */ })
-      .finally(() => setIsCalLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Build rich context for "Discuss with Cal" — top overdue + blockers
-  const calContext: SpecialistContext = useMemo(() => {
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-
-    const overdueTasks = tasks
-      .filter(t => t.end_date && t.status !== 'Completed' && t.status !== 'Rejected' && new Date(t.end_date) < today)
-      .sort((a, b) => new Date(a.end_date!).getTime() - new Date(b.end_date!).getTime())
-      .slice(0, 5)
-      .map(t => ({ title: t.title, status: t.status ?? 'Unknown' }))
-
-    const blockers = tasks
-      .filter(t => t.risk_level === 'blocker' && t.status !== 'Completed' && t.status !== 'Rejected')
-      .slice(0, 5)
-      .map(t => ({ title: t.title, status: t.status ?? 'Unknown' }))
-
-    return {
-      type: 'task' as const,
-      title: 'Tasks Overview',
-      description: `Cal is reviewing task execution: ${stats.overdue} overdue, ${stats.dueToday} due today, ${blockerCount} blockers.`,
-      metadata: {
-        tasks: [...overdueTasks, ...blockers],
-        notes: calBriefing.narrative ?? calFallback,
-      },
-    }
-  }, [tasks, stats, blockerCount, calBriefing, calFallback])
 
   // Strategic context — how tasks connect to the bigger picture
   const strategicContext = useMemo(() => {
@@ -399,20 +327,6 @@ export function TasksCommandCenter({
           </div>
         </div>
       </div>
-
-      {/* Cal's Tasks Briefing */}
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={calBriefing.narrative}
-        fallbackMessage={calFallback}
-        isLoading={isCalLoading}
-        loadingMessage="Scanning your tasks..."
-        severity={calSeverity}
-        context={calContext}
-        storageKey="tasks"
-      />
 
       {/* Smart Summary Pills */}
       <div data-tour="tasks-summary">
