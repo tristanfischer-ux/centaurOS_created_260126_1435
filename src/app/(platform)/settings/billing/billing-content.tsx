@@ -152,7 +152,10 @@ export function BillingContent({
     }
   }
 
-  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => p.tier !== 'enterprise')
+  // Hide enterprise (contact-sales tier) and legacy plans (existing subscribers
+  // continue to resolve against legacy entries but new upgrades route through
+  // the public catalogue only — see plans.ts `legacy` flag).
+  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => p.tier !== 'enterprise' && !p.legacy)
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -459,12 +462,16 @@ export function BillingContent({
  * Get numeric order of a tier for comparison.
  */
 function getPlanOrder(tier: SubscriptionTier): number {
+  // Legacy tiers (`seed`, `starter`) are slotted in below `starter_v2` so
+  // a £49/mo Startup Team subscriber is correctly recognised as "above"
+  // the new £20 Starter when the upgrade UI compares orders.
   const order: Record<SubscriptionTier, number> = {
     free: 0,
     seed: 1,
-    starter: 2,
-    professional: 3,
-    enterprise: 4,
+    starter_v2: 2,
+    starter: 3,
+    professional: 4,
+    enterprise: 5,
   }
   return order[tier]
 }

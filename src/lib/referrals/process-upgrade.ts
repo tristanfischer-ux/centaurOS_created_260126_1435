@@ -23,6 +23,11 @@ const UPGRADE_REWARDS: Record<
 > = {
   seed: { tasks: 15, investorViews: 3 },
   starter: { tasks: 25, investorViews: 5 },
+  // Starter (£20) sits between Seed and the legacy Startup Team in reward
+  // size — it bundles fewer AI tasks than Startup Team but lands the new
+  // entry-tier cohort. Pegged to seed rewards as a conservative starting
+  // point; revisit when v2 cohort data is in.
+  starter_v2: { tasks: 15, investorViews: 3 },
   professional: { tasks: 40, investorViews: 10 },
   enterprise: { tasks: 75, investorViews: 30 },
 }

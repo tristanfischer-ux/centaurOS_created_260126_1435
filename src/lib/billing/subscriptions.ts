@@ -43,7 +43,7 @@ const PRICE_ID_TO_TIER: Record<string, SubscriptionTier> = Object.fromEntries(
   })
 )
 
-const VALID_TIERS: Set<string> = new Set(['free', 'seed', 'starter', 'professional', 'enterprise'])
+const VALID_TIERS: Set<string> = new Set(['free', 'seed', 'starter', 'starter_v2', 'professional', 'enterprise'])
 
 // ==========================================
 // SUBSCRIPTION MANAGEMENT
@@ -440,17 +440,20 @@ export async function checkSubscriptionLimit(
   const tier = subscription?.tier || 'free'
   const plan = SUBSCRIPTION_PLANS[tier]
   const limit = plan.limits[feature]
-  
+
   // Boolean features
   if (typeof limit === 'boolean') {
     return { allowed: limit, currentTier: tier }
   }
-  
-  // Numeric limits (undefined = unlimited)
-  if (limit === undefined) {
+
+  // Numeric limits — undefined OR null both mean "unlimited" / "no cap".
+  // null is used by the new pricing-restructure fields
+  // (investorLeadsPerMonth, brainstormSessionsPerMonth, savedSearchesLifetime)
+  // to signal an unlimited allowance on Pro / Enterprise.
+  if (limit === undefined || limit === null) {
     return { allowed: true, currentTier: tier }
   }
-  
+
   // Return the limit for the caller to check
   return { allowed: true, currentTier: tier, limit }
 }
