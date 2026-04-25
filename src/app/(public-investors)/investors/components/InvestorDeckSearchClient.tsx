@@ -317,9 +317,10 @@ export function InvestorDeckSearchClient({
       )}
 
       {/* ── Match cards (visible) ─────────────────────────────────────────── */}
-      {hasSearched && visibleFirms.map(firm => (
+      {hasSearched && visibleFirms.map((firm, i) => (
         <MatchCard
           key={firm.id}
+          rank={i + 1}
           firm={firm}
           matchScore={matchScores[firm.id]?.score}
           pillars={matchScores[firm.id]?.pillars}
@@ -338,9 +339,10 @@ export function InvestorDeckSearchClient({
       )}
 
       {/* ── Locked blurred cards (preview of what's behind paywall) ──────── */}
-      {hasSearched && lockedFirms.map(firm => (
+      {hasSearched && lockedFirms.map((firm, i) => (
         <MatchCard
           key={firm.id}
+          rank={FREE_VISIBLE + i + 1}
           firm={firm}
           matchScore={matchScores[firm.id]?.score}
           pillars={matchScores[firm.id]?.pillars}
@@ -604,11 +606,26 @@ function FilterChip({ children, active }: { children: React.ReactNode; active?: 
 }
 
 // ── Match card ──────────────────────────────────────────────────────────────
+// DECISION: Ported from Forge Capital 07b-export-python.py lines 2347-2360.
+// Structure: header row (rank + name + type chip | composite %) · meta line ·
+// 6-column scorecard grid · 260-char thesis · sector tags row.
+// Behaviour (why-fit / pitch-guidance / shortlist / lock-state / view-cap) is
+// unchanged — only the visual shell is replaced.
+
+const SCORECARD_PILLARS: Array<{ key: keyof FirmMatchResult['pillars']; label: string }> = [
+  { key: 'thesis',     label: 'Thesis' },
+  { key: 'stage',      label: 'Stage' },
+  { key: 'geo',        label: 'Geo' },
+  { key: 'cheque',     label: 'Cheque' },
+  { key: 'activity',   label: 'Activity' },
+  { key: 'confidence', label: 'Confidence' },
+]
 
 interface MatchCardProps {
+  rank: number
   firm: InvestorFirm
   matchScore?: number
-  /** 6-pillar breakdown from calculateMatchScore — drives MatchPillarBars. */
+  /** 6-pillar breakdown from calculateMatchScore — drives scorecard grid. */
   pillars?: FirmMatchResult['pillars']
   matchOutput?: InvestorMatchOutputView
   isSaved: boolean
@@ -619,6 +636,7 @@ interface MatchCardProps {
 }
 
 function MatchCard({
+  rank,
   firm,
   matchScore,
   pillars,
@@ -634,10 +652,20 @@ function MatchCard({
     ? normaliseFirmType(attrs.firm_type)
     : firm.subcategory ?? 'VC'
   const city = attrs.hq_city ?? attrs.location ?? null
-  const thesis = attrs.investment_thesis ?? firm.description ?? null
-  const stages = attrs.stage_focus ?? []
+
+  // Meta line: {geo} · {cheque-range} · {stage}
+  const chequeMin  = attrs.cheque_range_gbp?.min
+  const chequeMax  = attrs.cheque_range_gbp?.max
+  const chequeStr  = chequeMin || chequeMax
+    ? [chequeMin ? `£${fmtCheque(chequeMin)}` : null, chequeMax ? `£${fmtCheque(chequeMax)}` : null]
+        .filter(Boolean).join('–')
+    : null
+  const stageFocusArr = attrs.stage_focus ?? []
+  const stageStr = stageFocusArr.slice(0, 2).join(' / ') || null
+
+  const thesis  = attrs.investment_thesis ?? firm.description ?? null
   const sectors = attrs.sectors ?? []
-  const contactEmail = attrs.contact_email ?? null
+
   const router = useRouter()
 
   // Why-fit / how-to-pitch — expand state
@@ -646,7 +674,6 @@ function MatchCard({
   const [enrichFailed, setEnrichFailed] = useState(false)
 
   const handleExpand = (e: React.MouseEvent) => {
-    // Stop propagation so the card-level click-to-navigate doesn't fire
     e.stopPropagation()
     if (!isPaid) return
     if (!expanded && !matchOutput && onRevealWhyFit) {
@@ -670,174 +697,200 @@ function MatchCard({
   }
 
   const handleSaveClick = (e: React.MouseEvent) => {
-    // Stop propagation so the card-level click-to-navigate doesn't fire
     e.stopPropagation()
     onSave?.()
   }
 
-  const handleContactEmailClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-  }
-
   return (
+    // STRUCTURE: Forge Capital search-result-card
+    // 1px border · white bg · 12px radius · 14px padding (p-3.5)
     <div
-      className={`bg-card border border-border rounded-xl px-5 py-4.5 mb-2.5 grid gap-5 transition-all hover:border-international-orange/30 hover:shadow-sm ${
-        isLocked ? 'opacity-80' : 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md'
+      className={`bg-card border border-border rounded-xl p-3.5 mb-2.5 transition-all ${
+        isLocked
+          ? 'opacity-80'
+          : 'cursor-pointer hover:border-border hover:shadow-sm hover:-translate-y-px'
       }`}
-      style={{ gridTemplateColumns: '1fr 88px' }}
       onClick={handleCardClick}
       role={isLocked ? undefined : 'link'}
       tabIndex={isLocked ? undefined : 0}
       onKeyDown={isLocked ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick() }}
     >
-      {/* Left col */}
-      <div>
-        {/* Header */}
-        <div className="flex items-center gap-2.5 mb-2 flex-wrap">
-          <span className={`font-bold text-[15px] text-foreground ${isLocked ? 'blur-[5px] select-none' : ''}`}>
-            {isLocked ? '████████ Capital' : firm.title}
-          </span>
-          <span className="text-[9px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold tracking-wider uppercase">
-            {firmType}
-          </span>
-          {city && (
-            <span className={`text-xs text-muted-foreground ${isLocked ? 'blur-[5px]' : ''}`}>
-              · {isLocked ? '████████' : city}
+      {/* ── Header row: rank + name + type chip | composite % ── */}
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        <div className="min-w-0 flex-1">
+          {/* Result name */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`font-bold text-sm text-foreground leading-snug ${isLocked ? 'blur-[5px] select-none' : ''}`}>
+              {rank}. {isLocked ? '████████ Capital' : firm.title}
             </span>
-          )}
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-bold tracking-wider uppercase flex-shrink-0">
+              {firmType}
+            </span>
+          </div>
+          {/* Meta line: geo · cheque · stage */}
+          <div className={`text-xs text-muted-foreground mt-0.5 ${isLocked ? 'blur-[5px]' : ''}`}>
+            {[city, chequeStr, stageStr].filter(Boolean).join(' · ') || ' '}
+          </div>
         </div>
 
-        {/* Thesis */}
-        {thesis && (
-          <p className={`text-sm text-muted-foreground mb-2.5 leading-relaxed ${isLocked ? 'blur-[5px]' : ''}`}>
-            {isLocked
-              ? '██████ seed-stage ██████ & hardware. £███k–£███m cheques. Portfolio includes ██████████ — active deployer.'
-              : thesis.length > 220 ? thesis.slice(0, 220) + '…' : thesis}
-          </p>
-        )}
-
-        {/* Pillar chips */}
-        <div className="flex gap-2.5 mb-2.5 flex-wrap">
-          {/* Overall score pillar */}
-          {matchScore !== undefined && (
-            <PillarChip label="Fit" value={Math.round(matchScore)} />
+        {/* Composite score — top right */}
+        <div className="text-right flex-shrink-0">
+          {matchScore !== undefined ? (
+            <>
+              <div className="text-xl font-black text-foreground leading-none tabular-nums">
+                {Math.round(matchScore)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground leading-none mt-0.5">match</div>
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground">—</div>
           )}
-          {stages.slice(0, 2).map(s => (
-            <PillarChip key={s} label="Stage" value={s} isText />
-          ))}
-          {sectors.slice(0, 2).map(s => (
-            <PillarChip key={s} label="" value={s} isText />
-          ))}
-          {/* 6-pillar breakdown bars — wired from calculateMatchScore */}
-          {pillars && !isLocked && (
-            <MatchPillarBars pillars={pillars} compact className="w-full mt-1" />
-          )}
-        </div>
-
-        {/* Why-fit / how-to-pitch expand panel (paid only) */}
-        {isPaid && !isLocked && (
-          <div className="mb-2.5">
+          {/* Save button — below score, paid only */}
+          {onSave && !isLocked && (
             <button
-              onClick={handleExpand}
-              className="text-xs text-international-orange font-semibold hover:underline cursor-pointer"
+              onClick={handleSaveClick}
+              className={`mt-1.5 text-[10px] px-2 py-0.5 rounded border transition-all ${
+                isSaved
+                  ? 'border-international-orange text-international-orange bg-international-orange/10'
+                  : 'border-border text-muted-foreground hover:border-international-orange hover:text-international-orange'
+              }`}
             >
-              {expanded ? '▲ Hide insight' : '▼ Why this investor · How to pitch'}
+              {isSaved ? '★ Saved' : '☆ Save'}
             </button>
-            {expanded && (
-              <div className="mt-3 space-y-3 rounded-lg bg-muted/40 border border-border p-4">
-                {isEnriching && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating insight…
-                  </div>
-                )}
-                {!isEnriching && enrichFailed && (
-                  <p className="text-sm text-muted-foreground">
-                    Could not generate insight — try refining your description.
-                  </p>
-                )}
-                {!isEnriching && !enrichFailed && matchOutput && (
-                  <>
-                    <div>
-                      <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">Why they would back you</p>
-                      <p className="text-sm text-foreground leading-relaxed">{matchOutput.whyFit}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">How to pitch</p>
-                      <p className="text-sm text-foreground leading-relaxed">{matchOutput.howToPitch}</p>
-                    </div>
-                  </>
-                )}
-                {!isEnriching && !enrichFailed && !matchOutput && (
-                  <p className="text-sm text-muted-foreground">Generating insight…</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
+      {/* Score-na state: shown when pillars are missing (scores still loading or no match yet) */}
+      <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+        {SCORECARD_PILLARS.map(({ key, label }) => {
+          const raw   = pillars?.[key]
+          const hasScore = raw !== undefined
+          const value = hasScore ? raw : 0
+          const isNA  = !hasScore
+
+          // Colour tiers from Forge Capital CSS (lines 937-950 of 07b)
+          let fillColor = '#d1d5db' // score-na grey
+          if (!isNA) {
+            if (value >= 70) fillColor = '#16a34a'      // green  (score-high)
+            else if (value >= 40) fillColor = '#f59e0b' // amber  (score-mid)
+            else fillColor = '#dc2626'                   // red    (score-low)
+          }
+
+          return (
+            <div key={key} className="text-center">
+              {/* 9px uppercase label */}
+              <div
+                className="font-medium uppercase mb-1 truncate"
+                style={{ fontSize: '9px', color: 'hsl(var(--muted-foreground))', letterSpacing: '0.3px' }}
+              >
+                {label}
+              </div>
+              {/* 5px-tall bar */}
+              <div
+                className="w-full overflow-hidden"
+                style={{ height: '5px', borderRadius: '3px', background: '#e5e7eb' }}
+              >
+                {!isNA && (
+                  <div
+                    style={{
+                      height: '100%',
+                      borderRadius: '3px',
+                      width: `${Math.min(100, Math.max(0, value))}%`,
+                      background: fillColor,
+                    }}
+                  />
                 )}
               </div>
-            )}
-          </div>
-        )}
+              {/* Small bold value below */}
+              <div
+                className="font-semibold mt-0.5 tabular-nums"
+                style={{ fontSize: '10px', color: isNA ? '#9ca3af' : 'hsl(var(--foreground))' }}
+              >
+                {isNA ? 'N/A' : value}
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
-        {/* Contact row */}
-        <div className={`flex items-center gap-2.5 text-xs text-foreground pt-2.5 border-t border-border/60 ${isLocked ? 'pointer-events-none' : ''}`}>
-          <span>{isLocked ? '🔒' : '👤'}</span>
-          <span className={`font-bold ${isLocked ? 'blur-[5px]' : ''}`}>
-            {isLocked ? '████████' : (firm.attributes.firm_type ? 'Lead partner' : 'Contact')}
-          </span>
-          {contactEmail && !isLocked && (
-            <a
-              href={`mailto:${contactEmail}`}
-              onClick={handleContactEmailClick}
-              className="ml-auto text-international-orange font-semibold no-underline hover:underline"
+      {/* ── Thesis paragraph — 260 chars max ── */}
+      {thesis && !isLocked && (
+        <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
+          {thesis.length > 260 ? thesis.slice(0, 260) + '…' : thesis}
+        </p>
+      )}
+      {thesis && isLocked && (
+        <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed blur-[5px] select-none">
+          {'██████ seed-stage ██████ & hardware. £███k–£███m cheques. Portfolio includes ██████████ — active deployer.'}
+        </p>
+      )}
+
+      {/* ── Sector tags — max 4 visible ── */}
+      {sectors.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {sectors.slice(0, 4).map(s => (
+            <span
+              key={s}
+              className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground truncate max-w-[120px]"
             >
-              {contactEmail} →
-            </a>
-          )}
-          {!contactEmail && !isLocked && (
-            <span className="ml-auto text-muted-foreground">
-              {isPaid ? 'View full profile →' : 'Upgrade to unlock contact details'}
+              {s.length > 16 ? s.slice(0, 15) + '…' : s}
             </span>
-          )}
-          {isLocked && (
-            <a href="#" className="ml-auto text-international-orange/50 blur-[5px]">████@████.com →</a>
+          ))}
+        </div>
+      )}
+
+      {/* ── Why-fit / how-to-pitch expand panel (paid only) ── */}
+      {isPaid && !isLocked && (
+        <div className="mt-1">
+          <button
+            onClick={handleExpand}
+            className="text-xs text-international-orange font-semibold hover:underline cursor-pointer"
+          >
+            {expanded ? '▲ Hide insight' : '▼ Why this investor · How to pitch'}
+          </button>
+          {expanded && (
+            <div className="mt-3 space-y-3 rounded-lg bg-muted/40 border border-border p-4">
+              {isEnriching && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating insight…
+                </div>
+              )}
+              {!isEnriching && enrichFailed && (
+                <p className="text-sm text-muted-foreground">
+                  Could not generate insight — try refining your description.
+                </p>
+              )}
+              {!isEnriching && !enrichFailed && matchOutput && (
+                <>
+                  <div>
+                    <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">Why they would back you</p>
+                    <p className="text-sm text-foreground leading-relaxed">{matchOutput.whyFit}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">How to pitch</p>
+                    <p className="text-sm text-foreground leading-relaxed">{matchOutput.howToPitch}</p>
+                  </div>
+                </>
+              )}
+              {!isEnriching && !enrichFailed && !matchOutput && (
+                <p className="text-sm text-muted-foreground">Generating insight…</p>
+              )}
+            </div>
           )}
         </div>
-      </div>
-
-      {/* Right col — score */}
-      <div className="text-right self-start pt-1 flex flex-col items-end gap-2">
-        {matchScore !== undefined ? (
-          <>
-            <div className="text-[28px] font-black text-international-orange leading-none">
-              {Math.round(matchScore)}
-            </div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Fit</div>
-          </>
-        ) : (
-          <div className="text-sm text-muted-foreground">—</div>
-        )}
-        {onSave && !isLocked && (
-          <button
-            onClick={handleSaveClick}
-            className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
-              isSaved
-                ? 'border-international-orange text-international-orange bg-international-orange/10'
-                : 'border-border text-muted-foreground hover:border-international-orange hover:text-international-orange'
-            }`}
-          >
-            {isSaved ? '★ Saved' : '☆ Save'}
-          </button>
-        )}
-      </div>
+      )}
     </div>
   )
 }
 
-function PillarChip({ label, value, isText }: { label: string; value: number | string; isText?: boolean }) {
-  return (
-    <span className="text-[10px] px-2 py-1 rounded-full bg-muted text-foreground">
-      {label && <span className="mr-1">{label}</span>}
-      <strong className="text-international-orange">{isText ? value : value}</strong>
-    </span>
-  )
+/** Format cheque size as human-readable string (e.g. 500000 → "500k", 2000000 → "2m") */
+function fmtCheque(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}m`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`
+  return String(n)
 }
 
 // ── Paywall card ─────────────────────────────────────────────────────────────

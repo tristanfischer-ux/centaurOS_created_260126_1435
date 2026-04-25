@@ -3065,6 +3065,12 @@ export interface InvestorDirectoryStats { // used by pre-search chart panel
   stageFocus: { name: string; value: number }[]
   /** Top cities/locations by investor count — donut chart */
   geoDistribution: { name: string; value: number }[]
+  /**
+   * Government grant bodies grouped by country — donut chart.
+   * Only rendered when array is non-empty (matches Forge Capital
+   * `if (grant_country_count > 0)` conditional).
+   */
+  grantsByCountry: { name: string; value: number }[]
 }
 
 export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStats> {
@@ -3073,7 +3079,7 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
   const admin = createAdminClient()
 
   // Run all aggregation queries in parallel
-  const [typeRes, sectorsRes, stageRes, geoRes] = await Promise.allSettled([
+  const [typeRes, sectorsRes, stageRes, geoRes, grantsCountryRes] = await Promise.allSettled([
     // Type breakdown
     admin
       .from('marketplace_listings')
@@ -3105,6 +3111,17 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
       .eq('category', 'Finance')
       .filter('attributes->>data_source', 'eq', 'forge_capital')
       .filter('attributes->>hq_city', 'not.is', null),
+
+    // Grants by country — government grant bodies grouped by hq_country / country
+    // DECISION: Try attributes->>'country' first (Forge Capital push field), then
+    // attributes->>'hq_city' as a fallback city label. The chart is only rendered
+    // when the resulting array is non-empty so empty results are harmless.
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->>firm_type', 'eq', 'GOVT_GRANT'),
   ])
 
   // ── Summary stats ──────────────────────────────────────────────────────────
@@ -3206,11 +3223,32 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
     .sort((a, b) => b.value - a.value)
     .slice(0, 10)
 
+  // ── Grants by country ──────────────────────────────────────────────────────
+  // INTENT: Mirror Forge Capital's `if (grant_country_count > 0)` conditional.
+  // We try attributes->>'country' (the primary Forge Capital field) and fall
+  // back to attributes->>'hq_city' as a visible label so the chart is
+  // informative even when the country field is absent.
+  const grantsCountryMap = new Map<string, number>()
+  if (grantsCountryRes.status === 'fulfilled' && grantsCountryRes.value.data) {
+    for (const row of grantsCountryRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const country = (attrs.country as string | null)?.trim()
+        ?? (attrs.hq_country as string | null)?.trim()
+        ?? (attrs.hq_city as string | null)?.trim()
+      if (country) grantsCountryMap.set(country, (grantsCountryMap.get(country) ?? 0) + 1)
+    }
+  }
+  const grantsByCountry = Array.from(grantsCountryMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
   return {
     ...HARDCODED_STATS,
     typeBreakdown,
     topSectors,
     stageFocus,
     geoDistribution,
+    grantsByCountry,
   }
 }
