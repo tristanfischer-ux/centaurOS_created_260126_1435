@@ -103,13 +103,20 @@ export const STAGE_CONFIG: Record<
         kind: "fire",
         fireStep: "waitForBom",
         nextStage: "waiting_finn",
-        maxAttempts: 3,
+        // BOM is a 3-stage internal chain (generator → skeleton → batches
+        // → merge). Skeleton fires the rest via after() with inherent
+        // flakiness. Budget 6 retries (~6 min) for the chain to settle.
+        maxAttempts: 6,
     },
     waiting_finn: {
         kind: "fire",
         fireStep: "waitForFinn",
         nextStage: "generating_illustration",
-        maxAttempts: 3,
+        // Finn precondition is `parts` table populated by BOM merge stage.
+        // Merge runs via after() chain after BOM autopilot row is already
+        // marked done — Finn will see "Generate a BOM first" until merge
+        // lands. Budget 5 retries (~5 min) to absorb that lag.
+        maxAttempts: 5,
     },
     generating_illustration: {
         kind: "fire",
