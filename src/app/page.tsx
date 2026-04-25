@@ -110,11 +110,11 @@ const FAQS = [
   },
   {
     question: "How does the fractional model actually work?",
-    answer: "ForgeOS combines two things. First, specialist support across thirteen disciplines, strategy, chief technology, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, hiring, fundraising, and chief of staff, providing structured analysis across every part of a hardware company. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The specialists provide the breadth; the professionals bring the depth.",
+    answer: "ForgeOS combines two things. First, specialist support across strategy, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, hiring, fundraising, chief technology, and chief of staff, providing structured analysis across every part of a hardware company. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The specialists provide the breadth; the professionals bring the depth.",
   },
   {
     question: "How quickly can I go from idea to prototype?",
-    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. Specialists work through the technical, commercial, and operational questions in parallel, thirteen disciplines covered. 13,700+ UK and European manufacturers are indexed and searchable, so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
+    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. Specialists work through the technical, commercial, and operational questions in parallel. 13,700+ UK and European manufacturers are indexed and searchable, so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
   },
   {
     question: "How much does it cost?",
@@ -400,11 +400,13 @@ export default function MarketingPage() {
         {/* ═══ Section 1b: Personal intro from Tristan ═══ */}
         <TristanIntroSection />
 
-        {/* ═══ Section 2: How It Works (4 Pillars) ═══ */}
-        <HowItWorksSection />
-
-        {/* ═══ Section 3: Investor example match card (killer feature) ═══ */}
+        {/* ═══ Section 2: Investor example match card (killer feature, lifted
+            ahead of the How-It-Works pillars per buy-or-bounce v3 report).
+            Demonstration first, explanation second. ═══ */}
         <ExampleInvestorMatch />
+
+        {/* ═══ Section 3: How It Works (5 Pillars) ═══ */}
+        <HowItWorksSection />
 
         {/* ═══ Section 4: Manufacturer / Product Showcase ═══ */}
         <ProductShowcaseSection />
@@ -712,7 +714,7 @@ function FounderArticlesSection() {
               The factory itself is the biggest time sink. Finding a location takes months. Then come the lease negotiations, and as a startup you can easily be asked to pay one, two, or three years of rent up front, which raises the obvious question of where that money is meant to come from. After that comes procuring the equipment, installing it, and hiring the people to run it. You can easily be twelve or eighteen months in before you have built anything at all.
             </p>
             <p>
-              Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels, finding engineers, finding investors, sorting out intellectual property, building a finance team, all pre-revenue, all without the budget for any of it. Fractional Forge is my attempt at that equivalent: 13,700 UK and European manufacturers who already have the building and the machinery, an investor database of 7,800 firms, specialists across thirteen disciplines, and a marketplace of experienced fractional executives, all in one place.
+              Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels, finding engineers, finding investors, sorting out intellectual property, building a finance team, all pre-revenue, all without the budget for any of it. Fractional Forge is my attempt at that equivalent: 13,700 UK and European manufacturers who already have the building and the machinery, an investor database of 7,800 firms, specialist support across strategy, finance, legal, manufacturing and the rest, and a marketplace of experienced fractional executives, all in one place.
             </p>
             <p>
               Have a look and let me know how you get on.
@@ -779,7 +781,7 @@ function PricingTeaserSection() {
             Start free. Scale <span className="text-international-orange">when ready.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-            Start free with 50 AI assists and specialist support across thirteen disciplines. Upgrade when you need more.
+            Start free with 50 AI assists and specialist support across strategy, finance, legal, manufacturing and the rest. Upgrade when you need more.
           </p>
         </AnimatedSection>
 

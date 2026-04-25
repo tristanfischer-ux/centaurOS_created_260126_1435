@@ -70,10 +70,10 @@ const ROWS: ComparisonRow[] = [
   },
   {
     feature: 'Specialist access',
-    free: 'All thirteen disciplines',
-    starter: 'All thirteen disciplines',
+    free: 'All disciplines',
+    starter: 'All disciplines',
     addOn: 'dash',
-    pro: 'All thirteen disciplines',
+    pro: 'All disciplines',
   },
   {
     feature: 'Deep Council (multi-specialist deep dive)',

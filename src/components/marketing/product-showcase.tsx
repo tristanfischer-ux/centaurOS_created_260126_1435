@@ -124,7 +124,7 @@ const TABS: ShowcaseTab[] = [
     url: 'fractionalforge.app/team',
     image: '/images/screenshots/team.png',
     headline: 'Your team, visualised',
-    description: 'See every role covered and every gap at a glance. Specialists across thirteen disciplines plus your human team, organised by function with live workload and capacity tracking.',
+    description: 'See every role covered and every gap at a glance. Specialists plus your human team, organised by function with live workload and capacity tracking.',
     callouts: [
       { text: 'Coverage + gaps', position: 'top-[15%] left-[5%]' },
       { text: 'Live capacity tracking', position: 'bottom-[15%] right-[5%]' },
