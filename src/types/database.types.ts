@@ -10066,6 +10066,79 @@ export type Database = {
         }
         Relationships: []
       }
+      investor_match_cache: {
+        Row: {
+          cost_usd: number
+          created_at: string
+          drafted_email_body: string
+          drafted_email_subject: string
+          foundry_context_hash: string
+          foundry_id: string
+          how_to_pitch: string
+          id: string
+          investor_listing_id: string
+          model_used: string
+          source_citations: Json | null
+          tokens_in: number
+          tokens_out: number
+          why_fit: string
+        }
+        Insert: {
+          cost_usd?: number
+          created_at?: string
+          drafted_email_body: string
+          drafted_email_subject: string
+          foundry_context_hash: string
+          foundry_id: string
+          how_to_pitch: string
+          id?: string
+          investor_listing_id: string
+          model_used: string
+          source_citations?: Json | null
+          tokens_in?: number
+          tokens_out?: number
+          why_fit: string
+        }
+        Update: {
+          cost_usd?: number
+          created_at?: string
+          drafted_email_body?: string
+          drafted_email_subject?: string
+          foundry_context_hash?: string
+          foundry_id?: string
+          how_to_pitch?: string
+          id?: string
+          investor_listing_id?: string
+          model_used?: string
+          source_citations?: Json | null
+          tokens_in?: number
+          tokens_out?: number
+          why_fit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_match_cache_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_match_cache_investor_listing_id_fkey"
+            columns: ["investor_listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_match_cache_investor_listing_id_fkey"
+            columns: ["investor_listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       investor_news_intel: {
         Row: {
           current_focus: string | null
@@ -11411,6 +11484,57 @@ export type Database = {
             referencedColumns: ["listing_id"]
           },
         ]
+      }
+      llm_concurrency_permits: {
+        Row: {
+          expires_at: string
+          id: number
+          model: string
+          provider: string
+          released_at: string | null
+          taken_at: string
+        }
+        Insert: {
+          expires_at: string
+          id?: number
+          model: string
+          provider: string
+          released_at?: string | null
+          taken_at?: string
+        }
+        Update: {
+          expires_at?: string
+          id?: number
+          model?: string
+          provider?: string
+          released_at?: string | null
+          taken_at?: string
+        }
+        Relationships: []
+      }
+      llm_permit_caps: {
+        Row: {
+          max_concurrent: number
+          model: string
+          notes: string | null
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          max_concurrent: number
+          model: string
+          notes?: string | null
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          max_concurrent?: number
+          model?: string
+          notes?: string | null
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       llm_usage: {
         Row: {
@@ -23863,6 +23987,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      acquire_llm_permit: {
+        Args: { p_model: string; p_provider: string; p_ttl_seconds?: number }
+        Returns: number
+      }
       acquire_memory_processing_lock: {
         Args: { p_thread_id: string }
         Returns: boolean
@@ -25346,6 +25474,7 @@ export type Database = {
       refresh_platform_stats: { Args: never; Returns: undefined }
       refresh_provider_stats: { Args: never; Returns: undefined }
       refresh_search_ranking: { Args: never; Returns: undefined }
+      release_llm_permit: { Args: { p_permit_id: number }; Returns: undefined }
       remove_listing_executive: {
         Args: { p_exec_id: string }
         Returns: boolean
