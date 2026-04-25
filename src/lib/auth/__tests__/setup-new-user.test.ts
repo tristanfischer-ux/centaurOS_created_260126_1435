@@ -31,13 +31,31 @@ afterAll(() => {
 })
 
 // ─── Mock the admin client used by persistSetupError ────────────────────────
-// persistSetupError imports createAdminClient — mock it so tests don't hit Supabase
+// persistSetupError imports createAdminClient — mock it so tests don't hit Supabase.
+// The shared-foundry existence check (`from('foundries').select('id').eq('id', X).single()`)
+// also reuses this client, so the mock must expose a fully-chainable PostgREST-shaped builder.
 jest.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: () => ({
-    from: () => ({
-      insert: jest.fn().mockResolvedValue({ error: null }),
-    }),
-  }),
+  createAdminClient: () => {
+    // PostgREST builders are both chainable AND thenable — `.insert(x)` can be
+    // awaited directly OR continued via `.select('id').single()`. Use a thenable
+    // chain so both call shapes resolve to {data, error}.
+    const makeChain = () => {
+      const chain: Record<string, unknown> = {}
+      Object.assign(chain, {
+        select: jest.fn(() => chain),
+        insert: jest.fn(() => chain),
+        update: jest.fn(() => chain),
+        upsert: jest.fn(() => chain),
+        delete: jest.fn(() => chain),
+        eq: jest.fn(() => chain),
+        single: jest.fn().mockResolvedValue({ data: { id: 'shared' }, error: null }),
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: (v: unknown) => unknown) => resolve({ data: null, error: null }),
+      })
+      return chain
+    }
+    return { from: jest.fn(() => makeChain()) }
+  },
 }))
 
 // ─── Mock Supabase ──────────────────────────────────────────────
