@@ -10,6 +10,8 @@
  */
 
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import { searchInvestors, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser, getInvestorDirectoryStats, type FirmMatchResult } from '@/actions/investors'
 import type { InvestorDirectoryStats } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
@@ -127,6 +129,12 @@ export default async function InvestorDirectoryPage() {
 
   return (
     <div className="space-y-0">
+      {/* Breadcrumb — mirrors Forge Capital pattern (Home › Investors) */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
+        <Link href="/today" className="hover:text-foreground transition-colors">Home</Link>
+        <ChevronRight className="h-3 w-3" />
+        <span className="text-foreground font-medium">Investors</span>
+      </nav>
       {/* Page header */}
       <div className="pb-6 mb-0">
         <div className="flex items-center gap-3 mb-1">

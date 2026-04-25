@@ -19,6 +19,7 @@
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { getSupplierDirectoryStats } from '@/actions/suppliers'
@@ -88,6 +89,12 @@ export default async function MarketplacePage() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb — mirrors Forge Capital pattern (Home › Suppliers) */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground -mb-2">
+        <Link href="/today" className="hover:text-foreground transition-colors">Home</Link>
+        <ChevronRight className="h-3 w-3" />
+        <span className="text-foreground font-medium">Suppliers</span>
+      </nav>
       {/* ── Page header ── */}
       <div className="pb-4 border-b border-border">
         <div className={typography.pageHeader}>

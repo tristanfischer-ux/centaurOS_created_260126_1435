@@ -3112,16 +3112,15 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
       .filter('attributes->>data_source', 'eq', 'forge_capital')
       .filter('attributes->>hq_city', 'not.is', null),
 
-    // Grants by country — government grant bodies grouped by hq_country / country
-    // DECISION: Try attributes->>'country' first (Forge Capital push field), then
-    // attributes->>'hq_city' as a fallback city label. The chart is only rendered
-    // when the resulting array is non-empty so empty results are harmless.
+    // Grants by country — query the `investor_grants` table directly. The
+    // marketplace_listings push only mirrors a small slice (~14 of 3,042 rows)
+    // because GOVT_GRANT entries are pushed selectively. The investor_grants
+    // table is the canonical source for the full grant corpus. Range bumped
+    // past PostgREST's default 1000-row cap so all 3K+ rows are sampled.
     admin
-      .from('marketplace_listings')
-      .select('attributes')
-      .eq('category', 'Finance')
-      .filter('attributes->>data_source', 'eq', 'forge_capital')
-      .filter('attributes->>firm_type', 'eq', 'GOVT_GRANT'),
+      .from('investor_grants')
+      .select('country')
+      .range(0, 9999),
   ])
 
   // ── Summary stats ──────────────────────────────────────────────────────────
@@ -3133,7 +3132,9 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
     total: 8212,
     withWebsites: 8011,
     withPortfolio: 4253,
-    grantsCount: 143,
+    // Live count from investor_grants on 2026-04-25 (3,042 rows). The legacy
+    // 143 referred only to GOVT_GRANT marketplace_listings rows.
+    grantsCount: 3042,
   }
 
   // ── Type breakdown ─────────────────────────────────────────────────────────
@@ -3225,17 +3226,41 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
 
   // ── Grants by country ──────────────────────────────────────────────────────
   // INTENT: Mirror Forge Capital's `if (grant_country_count > 0)` conditional.
-  // We try attributes->>'country' (the primary Forge Capital field) and fall
-  // back to attributes->>'hq_city' as a visible label so the chart is
-  // informative even when the country field is absent.
+  // Source: investor_grants.country (ISO-2 codes — UK / DE / CH / EU / etc.).
+  // We map common ISO codes to human-readable display names so the legend
+  // reads "United Kingdom" not "UK".
+  const ISO_GRANT_COUNTRY_MAP: Record<string, string> = {
+    UK: 'United Kingdom',
+    GB: 'United Kingdom',
+    DE: 'Germany',
+    CH: 'Switzerland',
+    EU: 'European Union',
+    IE: 'Ireland',
+    US: 'United States',
+    FR: 'France',
+    NL: 'Netherlands',
+    ES: 'Spain',
+    IT: 'Italy',
+    SE: 'Sweden',
+    DK: 'Denmark',
+    NO: 'Norway',
+    FI: 'Finland',
+    BE: 'Belgium',
+    AT: 'Austria',
+    PL: 'Poland',
+    BG: 'Bulgaria',
+    AU: 'Australia',
+    CA: 'Canada',
+    JP: 'Japan',
+    UN: 'International',
+  }
   const grantsCountryMap = new Map<string, number>()
   if (grantsCountryRes.status === 'fulfilled' && grantsCountryRes.value.data) {
-    for (const row of grantsCountryRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
-      const attrs = row.attributes ?? {}
-      const country = (attrs.country as string | null)?.trim()
-        ?? (attrs.hq_country as string | null)?.trim()
-        ?? (attrs.hq_city as string | null)?.trim()
-      if (country) grantsCountryMap.set(country, (grantsCountryMap.get(country) ?? 0) + 1)
+    for (const row of grantsCountryRes.value.data as Array<{ country: string | null }>) {
+      const raw = row.country?.trim()
+      if (!raw) continue
+      const display = ISO_GRANT_COUNTRY_MAP[raw.toUpperCase()] ?? raw
+      grantsCountryMap.set(display, (grantsCountryMap.get(display) ?? 0) + 1)
     }
   }
   const grantsByCountry = Array.from(grantsCountryMap.entries())
