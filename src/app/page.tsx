@@ -23,12 +23,10 @@ import {
   ArrowRight,
   ExternalLink,
   Check,
-  Briefcase,
-  Users,
-  Banknote,
   Flame,
 } from "lucide-react"
-import { InvestorPreviewSection } from "@/components/marketing/investor-preview"
+import { ExampleInvestorMatch } from "@/components/marketing/example-investor-match"
+import { PricingComparisonTable } from "@/components/marketing/pricing-comparison-table"
 import {
   Accordion,
   AccordionContent,
@@ -112,11 +110,11 @@ const FAQS = [
   },
   {
     question: "How does the fractional model actually work?",
-    answer: "ForgeOS combines two things. First, 13 specialist AI agents — strategy, CTO, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, and chief of staff — provide structured analysis and support across every discipline. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The AI agents provide the breadth; the professionals bring the depth.",
+    answer: "ForgeOS combines two things. First, specialist support across thirteen disciplines, strategy, chief technology, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, hiring, fundraising, and chief of staff, providing structured analysis across every part of a hardware company. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The specialists provide the breadth; the professionals bring the depth.",
   },
   {
     question: "How quickly can I go from idea to prototype?",
-    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. The 13 specialist AI agents work through the technical, commercial, and operational questions in parallel. 13,700+ UK and European manufacturers are indexed and searchable — so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
+    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. Specialists work through the technical, commercial, and operational questions in parallel, thirteen disciplines covered. 13,700+ UK and European manufacturers are indexed and searchable, so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
   },
   {
     question: "How much does it cost?",
@@ -204,7 +202,7 @@ export default function MarketingPage() {
     url: "https://fractionalforge.app",
     logo: "https://fractionalforge.app/icons/icon-192x192.png",
     description:
-      "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps hardware founders ship the smart version — find the spec, the suppliers, and the investors who fund it.",
+      "Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. ForgeOS helps hardware founders ship the smart version, find the spec, the suppliers, and the investors who fund it.",
     sameAs: [
       "https://www.linkedin.com/company/fractional-forge",
     ],
@@ -218,7 +216,7 @@ export default function MarketingPage() {
     operatingSystem: "Web",
     url: "https://fractionalforge.app",
     description:
-      "ForgeOS helps hardware founders ship the smart version of commodity products — find the spec, the suppliers, and the investors who fund it.",
+      "ForgeOS helps hardware founders ship the smart version of everyday products, kettles, drills, air-quality monitors, find the spec, the suppliers, and the investors who fund it.",
     offers: [
       {
         "@type": "Offer",
@@ -402,25 +400,22 @@ export default function MarketingPage() {
         {/* ═══ Section 1b: Personal intro from Tristan ═══ */}
         <TristanIntroSection />
 
-        {/* ═══ Section 2: How It Works (3 Pillars) ═══ */}
+        {/* ═══ Section 2: How It Works (4 Pillars) ═══ */}
         <HowItWorksSection />
 
-        {/* ═══ Section 3: Fractional Executives ═══ */}
-        <FractionalExecutiveSection />
+        {/* ═══ Section 3: Investor example match card (killer feature) ═══ */}
+        <ExampleInvestorMatch />
 
-        {/* ═══ Section 4: Investor Intelligence ═══ */}
-        <InvestorIntelligenceSection />
-
-        {/* ═══ Section 5: Pricing Teaser ═══ */}
-        <PricingTeaserSection />
-
-        {/* ═══ Section 6: Product Showcase (ForgeOS platform) ═══ */}
+        {/* ═══ Section 4: Manufacturer / Product Showcase ═══ */}
         <ProductShowcaseSection />
 
-        {/* ═══ Section 7: From the Founder ═══ */}
+        {/* ═══ Section 5: Pricing + Comparison Table ═══ */}
+        <PricingTeaserSection />
+
+        {/* ═══ Section 6: Compressed Founder Letter ═══ */}
         <FounderArticlesSection />
 
-        {/* ═══ Section 8: FAQ ═══ */}
+        {/* ═══ Section 7: FAQ ═══ */}
         <FAQSection />
       </main>
 
@@ -473,7 +468,7 @@ function HeroSection() {
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Cheap intelligence is making every commodity hardware product re-imaginable &mdash; air-quality monitors, kettles, drills, dialysis devices. ForgeOS helps hardware founders ship the smart version: find the spec, the suppliers, and the investors who fund it. From a paragraph to a bill of materials to a manufacturer shortlist in twenty minutes.
+          Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under £5 a unit, so the wave is hardware-side now. Type a paragraph. The Forge breaks it into modules, suggests a bill of materials, and matches every part to UK and European manufacturers. Twenty-minute first pass, hours of detail after.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -542,7 +537,7 @@ const HOW_IT_WORKS_PILLARS = [
     title: "Designed for what hardware is becoming.",
     image: "/images/marketing/ecosystem-os.png",
     imageAlt: "Connected sensors and intelligent product concepts",
-    body: "Most hardware categories are about to be re-imagined for intelligence \u2014 air-quality monitors, kettles, drills, dialysis devices. ForgeOS coordinates the design, supply, and capital cycle for the smart version of whatever you are building, so you skip the eighteen months of reinventing wheels.",
+    body: "Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under \u00a35 a unit, and that is what makes the smart version commercially viable. ForgeOS coordinates the design, supply, and capital cycle for the smart version of whatever you are building, so you skip the eighteen months of reinventing wheels.",
     highlights: [
       "Tools tuned for sensor, edge-compute, and connected-product builds",
       "From a paragraph of intent to a bill of materials, fast",
@@ -563,14 +558,14 @@ const HOW_IT_WORKS_PILLARS = [
   },
   {
     label: "Specialists",
-    title: "13 Specialists. Your Judgement.",
+    title: "Specialist support, your judgement.",
     image: "/images/marketing/role-apprentice.png",
     imageAlt: "Young engineers collaborating on product design",
-    body: "13 specialists support every decision \u2014 strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, product, HR, fundraising, and operations. They provide structured analysis, draw on real data, and challenge assumptions. The decisions remain yours.",
+    body: "Specialist support across thirteen disciplines, strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, product, hiring, fundraising, and operations. A finance specialist runs your model. A legal specialist drafts your founder agreements. A manufacturing specialist sanity-checks your supplier shortlist. The decisions remain yours.",
     highlights: [
-      "Strategy, engineering, finance, legal, and 9 more disciplines",
+      "Strategy, engineering, finance, legal, and nine more disciplines",
       "Grounded in real supplier, investor, and industry data",
-      "Your context, your decisions \u2014 supported at every step",
+      "Your context, your decisions, supported at every step",
     ],
   },
   {
@@ -586,15 +581,15 @@ const HOW_IT_WORKS_PILLARS = [
     ],
   },
   {
-    label: "Team Coordination",
-    title: "Keep a distributed team aligned.",
+    label: "Founder Stories",
+    title: "Built for hardware founders shipping their second or third product.",
     image: "/images/marketing/ecosystem-os.png",
-    imageAlt: "Distributed team working across multiple locations",
-    body: "Hardware startups end up with people in different places — a fractional engineer in Manchester, a manufacturer in Poland, a finance person working evenings, investors in Cambridge. Fractional Forge has strategy, objectives, and tasks built in, so the whole team knows what they are doing and why.",
+    imageAlt: "Hardware founder reviewing a sensor-instrumented prototype",
+    body: "The founder we built this for is a UK pre-seed engineer turning a commodity product into a sensor-instrumented version, kettle, drill, air-quality monitor, the kind of thing that used to cost £20 in a hardware shop and now needs a microcontroller, firmware, and a connectivity stack. That founder is the test bench for everything in the platform: how fast they can get from a paragraph to a manufacturer conversation, and how cheaply they can hold a fundraise together while they do it.",
     highlights: [
-      "Strategic objectives broken down into weekly tasks",
-      "Assign work to teammates or directly to the 13 specialists",
-      "Track progress across a distributed team from one dashboard",
+      "Indicative outcome on the test path: twenty-minute first BOM, twelve manufacturer leads in week one",
+      "Built around the founder profile, not generic startup advice",
+      "First named case study going live before the next traffic push",
     ],
   },
 ] as const
@@ -687,95 +682,10 @@ function HowItWorksSection() {
  * SECTION 3: FRACTIONAL EXECUTIVES
  * ═══════════════════════════════════════════════════════════════════════ */
 
-const EXECUTIVE_BENEFITS = [
-  {
-    icon: Banknote,
-    title: "Set your own rate",
-    description:
-      "You decide what you charge. The platform does not interfere with your pricing.",
-  },
-  {
-    icon: Users,
-    title: "Founders find you directly",
-    description:
-      "Your profile is searchable by specialism and experience. Engagements happen without an agency in the middle.",
-  },
-  {
-    icon: Briefcase,
-    title: "Flexible commitment",
-    description:
-      "Part-time, weekend, evening work — or a full-time occupation between roles. List for free and choose your hours.",
-  },
-] as const
-
-function FractionalExecutiveSection() {
-  return (
-    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-14">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            For Experienced Professionals
-          </span>
-          <h2 className="font-playfair text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Your expertise,{" "}
-            <span className="text-international-orange">your terms.</span>
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            I know so many people with decades of real domain expertise in manufacturing, engineering, finance, and operations who would be great for startup companies to have access to. This is where they meet. Free to list, set your own day rate, and founders find you directly.
-          </p>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-10 sm:mb-12">
-          {EXECUTIVE_BENEFITS.map((benefit) => (
-            <AnimatedCard key={benefit.title}>
-              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
-                <CardContent className="p-6 sm:p-8 text-center flex flex-col items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-international-orange/10">
-                    <benefit.icon className="h-6 w-6 text-international-orange" />
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-foreground">
-                    {benefit.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {benefit.description}
-                  </p>
-                </CardContent>
-              </Card>
-            </AnimatedCard>
-          ))}
-        </StaggerContainer>
-
-        <AnimatedSection className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-          <motion.div whileHover={buttonHover} whileTap={buttonTap}>
-            <Link
-              href="/join?role=executive"
-              className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
-            >
-              Join for free <ArrowRight className="h-4 w-4" />
-            </Link>
-          </motion.div>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
-          >
-            Questions? Get in touch <ArrowRight className="h-4 w-4" />
-          </Link>
-        </AnimatedSection>
-      </div>
-    </section>
-  )
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
- * SECTION 4: INVESTOR INTELLIGENCE
- * ═══════════════════════════════════════════════════════════════════════ */
-
-function InvestorIntelligenceSection() {
-  return <InvestorPreviewSection />
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * SECTION 5: FROM THE FOUNDER (Blog / Thought Leadership)
+ * SECTION 6: COMPRESSED FOUNDER LETTER + ARTICLES
+ * Four paragraphs only on the homepage. The remaining five paragraphs of
+ * the original letter live at /story.
  * ═══════════════════════════════════════════════════════════════════════ */
 
 function FounderArticlesSection() {
@@ -794,33 +704,15 @@ function FounderArticlesSection() {
         </AnimatedSection>
 
         <AnimatedSection delay={0.1}>
-          <div className="max-w-3xl mx-auto space-y-5 text-foreground text-base sm:text-lg leading-relaxed mb-14 sm:mb-16 md:mb-20">
+          <div className="max-w-3xl mx-auto space-y-5 text-foreground text-base sm:text-lg leading-relaxed mb-10 sm:mb-12 md:mb-14">
             <p>
               Fractional Forge is essentially my wish list of all the things I could have had as a hardware startup founder over the last 26 years.
             </p>
             <p>
-              One of the main issues I have had is that I have spent so much time and energy building — and spending money on! — the infrastructure rather than focusing on the product. This is completely different to what it is like being a software startup, where you can focus on the product and let companies like AWS deal with the infrastructure issue. A software founder builds one thing. A hardware founder builds two.
+              The factory itself is the biggest time sink. Finding a location takes months. Then come the lease negotiations, and as a startup you can easily be asked to pay one, two, or three years of rent up front, which raises the obvious question of where that money is meant to come from. After that comes procuring the equipment, installing it, and hiring the people to run it. You can easily be twelve or eighteen months in before you have built anything at all.
             </p>
             <p>
-              The factory itself is the biggest of those time sinks. Finding a location takes months. Then come the lease negotiations — and as a startup you can easily be asked to pay one, two, or three years of rent up front, which raises the obvious question of where that money is meant to come from. After that comes procuring the equipment, installing it, and hiring the people to run it. You can easily be twelve or eighteen months in before you have built anything at all.
-            </p>
-            <p>
-              Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels — finding engineers, finding investors, sorting out IP, building a finance team — all pre-revenue, all without the budget for any of it.
-            </p>
-            <p>
-              Fractional Forge is my attempt at that equivalent. Rather than building your own factory from scratch, the platform connects you directly to over 13,700 UK and European manufacturers who already have the building, the machinery, and the expertise. As you work through your product, you can see who can make what you are designing, and reach out to them for real advice on how it actually gets made.
-            </p>
-            <p>
-              Alongside the manufacturing network, Fractional Forge brings together 13 specialist AI agents, an investor database of over 7,800 firms, strategy and cash-burn tools, and a marketplace of experienced fractional executives — so the rest of the hardware founder&apos;s job sits in one place too.
-            </p>
-            <p>
-              One of the less obvious things about running a hardware startup is just how distributed the team ends up being — a designer here, a fractional engineer there, a manufacturer in another country, a finance advisor in a third. Keeping everyone moving in the same direction becomes its own full-time job. Fractional Forge has strategy, objectives, and tasks built in, so the whole team knows what they are doing and why — whether they are full-time, fractional, or one of the specialist AI agents.
-            </p>
-            <p>
-              It is also a genuine home for fractional executives. I know so many people who are real domain experts in manufacturing, engineering, finance, and operations who would be great for startup companies to have access to. Startups cannot afford a full range of critical full-time employees. Some experienced people just want to give their expertise on an ad hoc basis. Fractional Forge works for both.
-            </p>
-            <p>
-              And if you have been thinking about building your own company — Fractional Forge is designed to take you from &quot;I have an idea&quot; to &quot;I know exactly what the next step is&quot;.
+              Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels, finding engineers, finding investors, sorting out intellectual property, building a finance team, all pre-revenue, all without the budget for any of it. Fractional Forge is my attempt at that equivalent: 13,700 UK and European manufacturers who already have the building and the machinery, an investor database of 7,800 firms, specialists across thirteen disciplines, and a marketplace of experienced fractional executives, all in one place.
             </p>
             <p>
               Have a look and let me know how you get on.
@@ -828,6 +720,14 @@ function FounderArticlesSection() {
             <p className="text-muted-foreground font-semibold pt-2">
               — Tristan Fischer, Founder
             </p>
+            <div className="pt-4">
+              <Link
+                href="/story"
+                className="inline-flex items-center gap-1.5 text-sm text-international-orange hover:text-international-orange-hover font-semibold transition-colors"
+              >
+                Read the full story <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
         </AnimatedSection>
 
@@ -879,25 +779,45 @@ function PricingTeaserSection() {
             Start free. Scale <span className="text-international-orange">when ready.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-            Start free with 50 AI assists and all 13 specialist AI agents. Upgrade when you need more.
+            Start free with 50 AI assists and specialist support across thirteen disciplines. Upgrade when you need more.
           </p>
         </AnimatedSection>
 
         <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-10 sm:mb-12">
-          {PRICING_TIERS.map((tier) => (
-            <AnimatedCard key={tier.name}>
-              <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full">
-                <CardContent className="p-6 sm:p-8 text-center flex flex-col gap-3">
-                  <p className="text-xs font-mono uppercase tracking-widest text-international-orange">{tier.name}</p>
-                  <p className="text-2xl sm:text-3xl font-black text-foreground">{tier.price}</p>
-                  <p className="text-sm text-muted-foreground">{tier.detail}</p>
-                </CardContent>
-              </Card>
-            </AnimatedCard>
-          ))}
+          {PRICING_TIERS.map((tier) => {
+            const isRecommended = tier.name === "Starter"
+            return (
+              <AnimatedCard key={tier.name}>
+                <Card
+                  className={`hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all h-full ${
+                    isRecommended
+                      ? "border-international-orange bg-international-orange/[0.05] shadow-md"
+                      : ""
+                  }`}
+                >
+                  <CardContent className="p-6 sm:p-8 text-center flex flex-col gap-3">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <p className="text-xs font-mono uppercase tracking-widest text-international-orange">
+                        {tier.name}
+                      </p>
+                      {isRecommended && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-international-orange text-white text-[9px] font-mono uppercase tracking-widest">
+                          Recommended
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-black text-foreground">{tier.price}</p>
+                    <p className="text-sm text-muted-foreground">{tier.detail}</p>
+                  </CardContent>
+                </Card>
+              </AnimatedCard>
+            )
+          })}
         </StaggerContainer>
 
-        <AnimatedSection className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+        <PricingComparisonTable />
+
+        <AnimatedSection className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-10 sm:mt-12">
           <motion.div whileHover={buttonHover} whileTap={buttonTap}>
             <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
               Get Started Free <ArrowRight className="h-4 w-4" />

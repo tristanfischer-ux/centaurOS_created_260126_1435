@@ -74,15 +74,15 @@ const TABS: ShowcaseTab[] = [
       { text: 'Partner contacts included', position: 'bottom-[15%] right-[5%]' },
     ],
   },
-  // 4. Specialists — the 13 AI agents
+  // 4. Specialists — thirteen disciplines covered
   {
     id: 'specialists',
     label: 'Specialists',
     icon: <Briefcase className="h-4 w-4" />,
     url: 'fractionalforge.app/specialists',
     image: '/images/screenshots/specialists-huddles.png',
-    headline: '13 specialist AI agents',
-    description: 'Strategy, CTO, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, and chief of staff. They fill expertise gaps across every discipline.',
+    headline: 'Specialist support across every discipline',
+    description: 'Strategy, chief technology, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, hiring, fundraising, and chief of staff. A finance specialist runs your model. A legal specialist drafts your founder agreements. A manufacturing specialist sanity-checks your supplier shortlist.',
     callouts: [
       { text: 'Live data analysis', position: 'top-[15%] left-[5%]' },
       { text: 'You make the decisions', position: 'bottom-[20%] right-[5%]' },
@@ -110,7 +110,7 @@ const TABS: ShowcaseTab[] = [
     url: 'fractionalforge.app/strategy',
     image: '/images/screenshots/strategy-river.png',
     headline: 'Keep a distributed team aligned',
-    description: 'Break your strategy into objectives and those into weekly tasks. Assign work to teammates or directly to the 13 specialist AI agents — everyone knows what they are doing and why.',
+    description: 'Break your strategy into objectives and those into weekly tasks. Assign work to teammates or directly to the specialists, everyone knows what they are doing and why.',
     callouts: [
       { text: 'Objectives into weekly tasks', position: 'top-[15%] left-[5%]' },
       { text: 'Live progress across the team', position: 'top-[45%] right-[5%]' },
@@ -124,7 +124,7 @@ const TABS: ShowcaseTab[] = [
     url: 'fractionalforge.app/team',
     image: '/images/screenshots/team.png',
     headline: 'Your team, visualised',
-    description: 'See every role covered and every gap at a glance. 13 specialist AI agents plus your human team — organised by function with live workload and capacity tracking.',
+    description: 'See every role covered and every gap at a glance. Specialists across thirteen disciplines plus your human team, organised by function with live workload and capacity tracking.',
     callouts: [
       { text: 'Coverage + gaps', position: 'top-[15%] left-[5%]' },
       { text: 'Live capacity tracking', position: 'bottom-[15%] right-[5%]' },

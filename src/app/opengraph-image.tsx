@@ -190,7 +190,7 @@ export default async function Image() {
               color: "#888888",
             }}
           >
-            13 AI Specialists
+            Specialist support
           </div>
         </div>
 
