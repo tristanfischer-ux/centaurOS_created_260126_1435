@@ -36,6 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { normaliseFirmTypeLabel } from "@/lib/investors/firm-type-labels"
 import {
     Dialog,
     DialogContent,
@@ -182,7 +183,7 @@ export function AnonymousInvestorsClient({
                                                 variant="outline"
                                                 className="text-[10px] uppercase tracking-wider"
                                             >
-                                                {teaserFirm.attributes.firm_type}
+                                                {normaliseFirmTypeLabel(teaserFirm.attributes.firm_type)}
                                             </Badge>
                                         )}
                                     </div>
@@ -377,7 +378,7 @@ export function AnonymousInvestorsClient({
                                                         variant="outline"
                                                         className="text-[10px] uppercase tracking-wider"
                                                     >
-                                                        {firm.attributes.firm_type}
+                                                        {normaliseFirmTypeLabel(firm.attributes.firm_type)}
                                                     </Badge>
                                                 )}
                                             </div>
