@@ -25,12 +25,12 @@ import { Badge } from '@/components/ui/badge'
 import { AnimatedSection } from '@/components/marketing/animations'
 
 const EXAMPLE_DRAFTED_EMAIL_SUBJECT =
-  'Planet A: Vertical farming with quantifiable impact, £400K pre-orders, PCT-pending'
+  'Planet A: Vertical farming with quantifiable impact, [your traction headline], PCT-pending'
 
 const EXAMPLE_DRAFTED_EMAIL_BODY = [
   'Hi Tina,',
   'We are building a vertical-farming hardware platform with a PCT-pending growth-tray geometry and a trade-secret lighting recipe. Both target the resource-efficiency questions Planet A funds against, and our in-house data is built to feed straight into a life cycle assessment.',
-  'I think there is a real fit with how you backed Project Eaden and Arsenale Bioyards. Could I send a 20-minute walkthrough of our energy-per-kilogram numbers and the £400K of pre-orders we have already signed?',
+  'I think there is a real fit with how you backed Project Eaden and Arsenale Bioyards. Could I send a 20-minute walkthrough of our energy-per-kilogram numbers and [your most recent commercial milestone, for example signed pre-orders or a letter of intent]?',
 ] as const
 
 export function ExampleInvestorMatch() {
@@ -67,8 +67,8 @@ export function ExampleInvestorMatch() {
                     <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
                       Venture Capital
                     </Badge>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-international-orange/10 text-international-orange text-[10px] font-mono uppercase tracking-widest">
-                      Example
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-international-orange text-white text-[11px] font-mono font-bold uppercase tracking-widest">
+                      Example, not a customer
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -103,7 +103,7 @@ export function ExampleInvestorMatch() {
                   trade-secret lighting recipe target the resource-efficiency
                   questions they fund against. Portfolio peers like Project
                   Eaden and Arsenale Bioyards show they back hardware-led
-                  agtech at early stages. Your pre-seed stage and £400K of
+                  agtech at early stages. Your pre-seed stage and signed
                   pre-orders sit inside their typical €0.5M to €5M initial
                   ticket band, and BRC certification underway signals a
                   scalable impact story they can underwrite.
@@ -117,9 +117,8 @@ export function ExampleInvestorMatch() {
                 <p className="text-sm leading-relaxed text-foreground">
                   Lead with the energy-per-kilogram number their science team
                   would validate, draw a parallel to Project Eaden&apos;s
-                  food-systems angle, then land on £400K of signed pre-orders
-                  and the UK supermarket letters of intent as proof of
-                  scalable demand.
+                  food-systems angle, then land on signed pre-orders and the
+                  UK supermarket letters of intent as proof of scalable demand.
                 </p>
               </section>
 
@@ -135,9 +134,14 @@ export function ExampleInvestorMatch() {
               </div>
 
               <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  <Mail className="h-3.5 w-3.5" />
-                  Drafted email preview
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5" />
+                    Drafted email preview
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-international-orange text-white text-[10px] font-mono font-bold uppercase tracking-widest">
+                    Sample founder, not a customer
+                  </span>
                 </div>
                 <div className="space-y-1">
                   <div className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">

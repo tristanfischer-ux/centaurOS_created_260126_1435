@@ -581,15 +581,15 @@ const HOW_IT_WORKS_PILLARS = [
     ],
   },
   {
-    label: "Founder Stories",
-    title: "Built for hardware founders shipping their second or third product.",
+    label: "What is already in the box",
+    title: "The data you can use on day one.",
     image: "/images/marketing/ecosystem-os.png",
-    imageAlt: "Hardware founder reviewing a sensor-instrumented prototype",
-    body: "The founder we built this for is a UK pre-seed engineer turning a commodity product into a sensor-instrumented version, kettle, drill, air-quality monitor, the kind of thing that used to cost £20 in a hardware shop and now needs a microcontroller, firmware, and a connectivity stack. That founder is the test bench for everything in the platform: how fast they can get from a paragraph to a manufacturer conversation, and how cheaply they can hold a fundraise together while they do it.",
+    imageAlt: "Map view of UK and European manufacturers",
+    body: "We are pre-launch on customers, so we are not going to put words in a founder's mouth. Instead, here is what is in the platform the moment you sign up. 13,700 UK and European manufacturers indexed with capability data, weighted toward the UK, Germany, Italy, France, and the Netherlands. 7,800 investors built from Companies House, FCA disclosures, public fund websites, and the British Business Bank co-investment list. 49,000 partner contacts attached to those investors. Every record carries the source it was pulled from, so you can audit the citation before you send the email.",
     highlights: [
-      "Indicative outcome on the test path: twenty-minute first BOM, twelve manufacturer leads in week one",
-      "Built around the founder profile, not generic startup advice",
-      "First named case study going live before the next traffic push",
+      "13,700 manufacturers across the UK, Germany, Italy, France and the Netherlands",
+      "7,800 investors, sources disclosed: Companies House, FCA, fund websites, British Business Bank",
+      "Pre-launch on customers — building the proof in public, not borrowing other people's quotes",
     ],
   },
 ] as const

@@ -112,6 +112,9 @@ export function PricingComparisonTable() {
         <p className="text-muted-foreground text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
           One row per feature. One number or one tick per cell.
         </p>
+        <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl mx-auto leading-relaxed mt-3">
+          The marketplace is where you engage fractional executives at their own day rates. ForgeOS takes a small platform fee on each engagement, waived on your first three orders.
+        </p>
       </div>
 
       {/* Desktop / tablet table */}
