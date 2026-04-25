@@ -1,26 +1,11 @@
 /**
  * Summary Generator
- * 
- * Generates natural language summaries from report data using OpenAI.
+ *
+ * Generates natural language summaries from report data using Claude Haiku 4.5.
  * Note: While this uses AI internally, user-facing copy avoids the term "AI".
  */
 
-import OpenAI from 'openai'
 import { DailyPulseData, UserRole, Insight } from './types'
-
-// Initialize OpenAI client (lazy)
-let openaiClient: OpenAI | null = null
-
-function getOpenAIClient(): OpenAI {
-    if (!openaiClient) {
-        const apiKey = process.env.OPENAI_API_KEY?.trim()
-        if (!apiKey) {
-            throw new Error('OPENAI_API_KEY environment variable is not set')
-        }
-        openaiClient = new OpenAI({ apiKey })
-    }
-    return openaiClient
-}
 
 interface SummaryContext {
     data: DailyPulseData
@@ -30,21 +15,20 @@ interface SummaryContext {
 }
 
 /**
- * Generate a natural language summary for the daily pulse
+ * Generate a natural language summary for the daily pulse.
+ * Uses Claude Haiku 4.5 (cheap + great at short prose) via direct Anthropic fetch.
  */
 export async function generateDailySummary(context: SummaryContext): Promise<string> {
     const { data, userName, userRole, insights } = context
-    
-    // Check if we should use AI or fallback to template
-    if (!process.env.OPENAI_API_KEY?.trim()) {
+
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    if (!apiKey) {
         return generateTemplateSummary(context)
     }
-    
+
     try {
-        const openai = getOpenAIClient()
-        
         const isLeader = userRole === 'Executive' || userRole === 'Founder' || userRole === 'Team Lead'
-        
+
         const systemPrompt = isLeader
             ? `You are a concise executive assistant summarizing team activity for a business leader. Focus on:
 - Team productivity highlights and any concerns
@@ -56,7 +40,7 @@ Keep it to 2-3 sentences. Be direct and actionable. Don't use the word "AI" anyw
 - Upcoming priorities or deadlines
 - Encouraging and constructive tone
 Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anywhere.`
-        
+
         const dataContext = {
             personalCompleted: data.personal.tasks_completed_count,
             personalCompletedTitles: data.personal.tasks_completed.slice(0, 3).map(t => t.title),
@@ -70,23 +54,38 @@ Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anyw
             pendingApprovals: data.pending_approvals.length,
             topInsights: insights.slice(0, 2).map(i => ({ type: i.type, title: i.title }))
         }
-        
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-5.4',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                {
-                    role: 'user',
-                    content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`
-                }
-            ],
-            max_completion_tokens: 200,
-            temperature: 0.7
+
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 200,
+                temperature: 0.7,
+                system: systemPrompt,
+                messages: [
+                    {
+                        role: 'user',
+                        content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`,
+                    },
+                ],
+            }),
         })
-        
-        return completion.choices[0]?.message?.content || generateTemplateSummary(context)
+
+        if (!response.ok) {
+            console.error('[summary-generator] Anthropic API error:', response.status, await response.text())
+            return generateTemplateSummary(context)
+        }
+
+        const json = await response.json()
+        const text = (json.content?.[0]?.text ?? '').trim()
+        return text || generateTemplateSummary(context)
     } catch (error) {
-        console.error('Failed to generate summary with OpenAI:', error)
+        console.error('Failed to generate summary with Claude Haiku:', error)
         return generateTemplateSummary(context)
     }
 }

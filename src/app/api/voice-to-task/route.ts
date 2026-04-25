@@ -153,23 +153,23 @@ export async function POST(req: NextRequest) {
                 foundryId: profileForRollout.foundry_id,
                 userId: user.id,
                 agentId: 'voice_to_task',
-                metadata: { model: 'gpt-5.4' },
+                metadata: { model: 'gpt-4.1-mini' },
             });
         }
 
         const completion = await openai.chat.completions.parse({
-            model: "gpt-5.4",
+            model: "gpt-4.1-mini",
             messages: [
                 {
                     role: "system",
-                    content: `You are an executive assistant for a fractional foundry OS. 
+                    content: `You are an executive assistant for a fractional foundry OS.
           Extract task details from the voice transcript.
-          
+
           If the user mentions "Legal AI", map to assignee_type="Legal_AI".
           If "General Assistant" or "AI", map to "General_AI".
           If "My task" or "Me", map to "Self".
           Otherwise "Unassigned".
-          
+
           Current Date: ${new Date().toISOString()}`
                 },
                 { role: "user", content: transcriptText },
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
         });
 
         await guard.trackUsage({
-            model: 'gpt-5.4',
+            model: 'gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens || 500,
             completionTokens: completion.usage?.completion_tokens || 200,
         })
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
                 responseSnapshot,
                 promptTokens: completion.usage?.prompt_tokens ?? null,
                 completionTokens: completion.usage?.completion_tokens ?? null,
-                metadata: { model: 'gpt-5.4' },
+                metadata: { model: 'gpt-4.1-mini' },
             });
             await finishRollout(rolloutId, 'finished');
         }
