@@ -49,7 +49,12 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
     const handleGoToToday = (): void => {
         startTransition(async () => {
             await markWelcomeComplete()
-            router.push("/today")
+            // RED-TEAM-PIVOT-PLAN Tier 2 step 17: post-welcome destination
+            // is /investors. Founders who skip the new-project tour still
+            // land on the killer-feature surface. The handler name kept as
+            // `handleGoToToday` for git-blame continuity, scheduled rename
+            // when the welcome tour gets its next refresh.
+            router.push("/investors")
         })
     }
 
@@ -167,7 +172,7 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                                     variant="ghost"
                                     size="lg"
                                 >
-                                    Take me to Today instead
+                                    See investors who would back you instead
                                 </Button>
                             </div>
                         </CardContent>

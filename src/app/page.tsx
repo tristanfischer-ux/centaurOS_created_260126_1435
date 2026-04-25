@@ -310,8 +310,12 @@ export default function MarketingPage() {
               Login
             </a>
             <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+              {/* RED-TEAM-PIVOT-PLAN Tier 2 step 13: top-nav Start Free
+                * routes to /investors so first-time visitors land on the
+                * killer-feature teaser within 60 seconds. Label kept short
+                * because the nav button is small. */}
               <Link
-                href="/signup"
+                href="/investors"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
                 Start Free
@@ -358,8 +362,11 @@ export default function MarketingPage() {
                 className="md:hidden border-t border-muted bg-background overflow-hidden shadow-lg"
               >
                 <div className="px-4 sm:px-6 py-4 pb-safe flex flex-col gap-1">
+                  {/* RED-TEAM-PIVOT-PLAN Tier 2 step 13: mobile-menu Start
+                    * Free routes to /investors for the same anonymous-first
+                    * journey as the desktop nav. */}
                   <Link
-                    href="/signup"
+                    href="/investors"
                     className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -438,8 +445,11 @@ export default function MarketingPage() {
             transition={{ duration: 0.3, ease: "easeOut" }}
             className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
           >
+            {/* RED-TEAM-PIVOT-PLAN Tier 2 step 13: floating mobile CTA
+              * routes to /investors. Label stays "Start Free" — the
+              * floating bar is too narrow for a longer label. */}
             <Link
-              href="/signup"
+              href="/investors"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
               Start Free
@@ -483,8 +493,14 @@ function HeroSection() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
             <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
-              <Link href="/signup" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
-                Start Free <ArrowRight className="h-4 w-4" />
+              {/* RED-TEAM-PIVOT-PLAN Tier 2 step 13: the hero CTA is the
+                * single most important homepage decision — it now routes
+                * to /investors so a first-time visitor sees the killer
+                * feature (matched leads + why-fit + how-to-pitch + drafted
+                * email) within 60 seconds. Label upgraded from "Start
+                * Free" to a concrete promise so the click is informed. */}
+              <Link href="/investors" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
+                See investors who would back you <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
             <a href="#why-i-built" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
@@ -828,8 +844,14 @@ function PricingTeaserSection() {
 
         <AnimatedSection className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-10 sm:mt-12">
           <motion.div whileHover={buttonHover} whileTap={buttonTap}>
-            <Link href="/signup" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-              Get Started Free <ArrowRight className="h-4 w-4" />
+            {/* RED-TEAM-PIVOT-PLAN Tier 2 step 13: pricing-section CTA mirrors
+              * the Free-tier path — visitors land on /investors first to see
+              * the killer feature, then sign up from inside the page once
+              * they have read the example match. Starter and Pro tier CTAs
+              * still route through /signup?plan= because card capture is
+              * needed for paid tiers. */}
+            <Link href="/investors" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+              See investors who would back you <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
           <Link

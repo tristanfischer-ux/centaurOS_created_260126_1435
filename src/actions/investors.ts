@@ -1226,6 +1226,142 @@ export async function searchInvestors(
   return { ...baseResult, matchOutputs, resolvedTier: access.tier }
 }
 
+// ---------------------------------------------------------------------------
+// RED-TEAM-PIVOT-PLAN Tier 2 step 14 — Anonymous /investors teaser
+// ---------------------------------------------------------------------------
+
+/**
+ * Anonymous teaser bundle: one fully-rendered match (real investor data + a
+ * curated why-fit/how-to-pitch/drafted email) plus the next four firms for
+ * the blurred locked rest. Used by the unauthenticated /investors landing.
+ *
+ * @description The teaser firm is Planet A Ventures, the same investor used
+ * on the marketing example match (src/components/marketing/example-investor-match.tsx)
+ * so the hero promise on the homepage matches what an anonymous visitor
+ * actually sees inside /investors. The match output text is hand-curated for
+ * a sentinel "UK pre-seed climate-hardware founder" foundry context — no LLM
+ * call is made on the anonymous path so there is zero per-visit cost.
+ *
+ * Falls back to the first firm in marketplace_listings if Planet A is not
+ * present (e.g. fresh dev DB) so the page still renders something real.
+ */
+export interface AnonymousInvestorsTeaser {
+  teaserFirm: InvestorFirm | null
+  teaserMatchOutput: InvestorMatchOutputView | null
+  blurredFirms: InvestorFirm[]
+  /** Sentinel foundry context summarised for the banner copy. */
+  sentinelContext: {
+    sector: string
+    stage: string
+    traction: string
+  }
+  /** Total number of investor firms in the directory — used by the "1 of N" copy. */
+  totalFirms: number
+}
+
+const ANONYMOUS_TEASER_FIRM_NAME = 'Planet A'
+
+const ANONYMOUS_TEASER_SENTINEL = {
+  sector: 'climate hardware',
+  stage: 'pre-seed',
+  traction: 'first commercial pilot signed',
+} as const
+
+const ANONYMOUS_TEASER_MATCH_OUTPUT: InvestorMatchOutputView = {
+  whyFit:
+    "Planet A's in-house science team calculates life cycle assessments to quantify impact on every deal, and a UK pre-seed climate-hardware founder with a first commercial pilot signed is exactly the file they fund against. Portfolio peers like Project Eaden and Arsenale Bioyards show they back hardware-led climate plays at this stage, with cheques sitting inside their typical €0.5M to €5M initial band. A signed pilot puts you ahead of the average pre-seed they back on traction, which is the bar Tina cited as a deal-breaker on the Hardware in Climate podcast.",
+  howToPitch:
+    "Lead with the resource-per-output number Planet A's science team can validate, draw a parallel to one named portfolio company that solved an adjacent piece of the climate stack, then land on the signed pilot as proof that your hardware works in a real customer's operation. Skip the total addressable market slide entirely — Planet A reads them as a cue to slow-walk a deal.",
+  draftedEmailSubject:
+    'Planet A: Climate hardware with a signed pilot, [your traction headline], EU pre-seed',
+  draftedEmailBody:
+    [
+      'Hi Tina,',
+      'We are building a climate-hardware platform with our first commercial pilot signed and live data flowing back into a life cycle assessment your science team could validate directly.',
+      'I see a real fit with how you backed Project Eaden and Arsenale Bioyards. Could I send a 20-minute walkthrough of our resource-per-output numbers and the contract structure of the pilot?',
+    ].join('\n\n'),
+  sourceCitations: [
+    {
+      type: 'fund_decision',
+      text: 'Planet A typical pre-seed cheque sits between €0.5M and €5M, with a science-led diligence step.',
+      source: 'Planet A public fund disclosure, 2026',
+    },
+    {
+      type: 'portfolio_precedent',
+      text: 'Project Eaden and Arsenale Bioyards are existing portfolio companies in the hardware-led climate stack.',
+      source: 'Planet A portfolio page',
+    },
+  ],
+  fromCache: true,
+  modelUsed: 'curated-anonymous-teaser',
+}
+
+/**
+ * Loads the anonymous-mode teaser bundle. Safe to call without an authenticated
+ * user — uses the admin client to read public-by-design fields from
+ * marketplace_listings (no contacts, no deep tier-gated data).
+ */
+export async function getAnonymousInvestorsTeaser(): Promise<AnonymousInvestorsTeaser> {
+  const admin = createAdminClient()
+
+  // Look up the curated teaser firm by exact title match. ilike with the
+  // sanitised value protects against directory drift where the title has been
+  // re-cased or had a suffix appended (e.g. "Planet A Ventures").
+  const { data: teaserRow } = await admin
+    .from('marketplace_listings')
+    .select('*')
+    .eq('category', 'Finance')
+    .ilike('title', `${ANONYMOUS_TEASER_FIRM_NAME}%`)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  // Fall back to the highest-quality firm if the curated firm isn't seeded.
+  // The signup-wall promise is the same either way, but we never want a blank
+  // teaser on a fresh database.
+  let teaserFirm: InvestorFirm | null = teaserRow ? rowToFirm(teaserRow as Record<string, unknown>) : null
+  if (!teaserFirm) {
+    const { data: fallbackRow } = await admin
+      .from('marketplace_listings')
+      .select('*')
+      .eq('category', 'Finance')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    teaserFirm = fallbackRow ? rowToFirm(fallbackRow as Record<string, unknown>) : null
+  }
+
+  // Pull the next four firms for the blurred rest. Excludes the teaser by id
+  // (when known) so the founder doesn't see the same firm rendered twice.
+  let blurredQuery = admin
+    .from('marketplace_listings')
+    .select('*')
+    .eq('category', 'Finance')
+    .order('created_at', { ascending: true })
+    .limit(5)
+  if (teaserFirm?.id) {
+    blurredQuery = blurredQuery.neq('id', teaserFirm.id)
+  }
+  const { data: blurredRows } = await blurredQuery
+  const blurredFirms: InvestorFirm[] = (blurredRows ?? [])
+    .map((row) => rowToFirm(row as Record<string, unknown>))
+    .slice(0, 4)
+
+  // Total count drives the "1 fully-rendered, N more blurred" copy.
+  const { count: totalFirms } = await admin
+    .from('marketplace_listings')
+    .select('id', { count: 'exact', head: true })
+    .eq('category', 'Finance')
+
+  return {
+    teaserFirm,
+    teaserMatchOutput: teaserFirm ? ANONYMOUS_TEASER_MATCH_OUTPUT : null,
+    blurredFirms,
+    sentinelContext: { ...ANONYMOUS_TEASER_SENTINEL },
+    totalFirms: totalFirms ?? 0,
+  }
+}
+
 /**
  * Fetches a single investor firm by ID with tier-gating.
  *

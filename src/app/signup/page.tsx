@@ -123,6 +123,12 @@ function JoinPageInner() {
   const redirectParam = searchParams.get("redirect");
   const isClaimFlow = redirectParam != null && /^\/claim\/[a-f0-9]{16,128}$/.test(redirectParam);
   const refCode = searchParams.get("ref");
+  // RED-TEAM-PIVOT-PLAN Tier 2 step 17: the anonymous /investors landing
+  // routes the signup wall here with `?from=investors-anonymous` so the
+  // post-signup redirect can skip /welcome and continue inside /investors.
+  // Allowlist the known values so a crafted ?from= can't influence routing.
+  const fromParamRaw = searchParams.get("from");
+  const fromParam = fromParamRaw === "investors-anonymous" ? fromParamRaw : null;
 
   // Deep-link support: ?role=founder shows founder fields for backward compat
   const roleParam = searchParams.get("role");
@@ -224,6 +230,7 @@ function JoinPageInner() {
             <form action={formAction} className="space-y-5">
               <input type="hidden" name="role" value="supplier" />
               {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
+              {fromParam && <input type="hidden" name="from" value={fromParam} />}
 
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium text-foreground">
@@ -444,6 +451,7 @@ function JoinPageInner() {
           <form action={formAction} className="space-y-5">
             <input type="hidden" name="role" value={effectiveRole} />
             {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
+            {fromParam && <input type="hidden" name="from" value={fromParam} />}
 
             {/* Common Fields */}
             <div className="space-y-2">

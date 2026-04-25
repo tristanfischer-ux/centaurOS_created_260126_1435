@@ -186,7 +186,9 @@ describe('setupNewUser', () => {
     })
 
     expect(result.foundryId).toBe('existing-foundry')
-    expect(result.redirectPath).toBe('/today')
+    // RED-TEAM-PIVOT-PLAN Tier 2 step 17: post-signup default landing
+    // is /investors. Idempotency / fallback returns updated to match.
+    expect(result.redirectPath).toBe('/investors')
   })
 
   it('creates sandbox foundry for executives (not forge-guild)', async () => {

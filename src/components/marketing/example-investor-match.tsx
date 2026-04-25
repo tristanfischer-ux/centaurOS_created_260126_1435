@@ -180,11 +180,15 @@ export function ExampleInvestorMatch() {
             Every investor in your shortlist looks like this. Starter gives you
             100 of them a month for £20.
           </p>
+          {/* RED-TEAM-PIVOT-PLAN Tier 2 step 13: marketing CTA routes to
+            * /investors so the visitor keeps seeing real matches without a
+            * signup interruption. Wall fires from inside /investors when
+            * they try to interact. */}
           <Link
-            href="/signup"
+            href="/investors"
             className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white font-bold px-8 py-3.5 rounded-lg transition-colors text-sm sm:text-base"
           >
-            Start Free, See Your Matches
+            See Your Matches
             <ArrowRight className="h-4 w-4" />
           </Link>
         </AnimatedSection>

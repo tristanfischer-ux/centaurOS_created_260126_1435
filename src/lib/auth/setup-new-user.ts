@@ -86,8 +86,12 @@ export async function setupNewUser({
     console.warn("[setupNewUser] Profile already exists for user, skipping:", userId);
     return {
       foundryId: existingProfile.foundry_id || "forge-guild",
-      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
-      redirectPath: "/today",
+      // DECISION 2026-04-25 (RED-TEAM-PIVOT-PLAN Tier 2 step 17):
+      // post-signup default landing is now /investors. Investor matching
+      // is the primary acquisition surface (15 hours saved per fundraise),
+      // so a returning duplicate-profile signup should keep continuity
+      // with the anonymous-mode landing they came from.
+      redirectPath: "/investors",
     };
   }
 
@@ -284,8 +288,12 @@ export async function setupNewUser({
 
     if (profileError) {
       console.error("[setupNewUser] Profile creation failed:", profileError.message);
-      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
-      return { foundryId, redirectPath: "/today" };
+      // DECISION 2026-04-25 (RED-TEAM-PIVOT-PLAN Tier 2 step 17):
+      // post-signup default landing is /investors. Even on the
+      // profile-creation-failure fallback we route there because the
+      // founder still needs a useful next surface, and /investors works
+      // for unauthenticated visitors as well.
+      return { foundryId, redirectPath: "/investors" };
     }
 
     // Set owner on sandbox foundries (same circular FK pattern as founders)

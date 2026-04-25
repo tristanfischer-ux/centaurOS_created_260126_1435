@@ -20,15 +20,19 @@ import { getProducts } from '@/actions/products'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { InvestorStats, ShortlistStage, InvestorTierAccess, InvestorViewCapResult } from '@/actions/investors'
-import { InvestorBrowser } from './components/InvestorBrowser'
-import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
-import { InvestorPageTabs } from './components/InvestorPageTabs'
-import { InvestorSpecialistBanner } from './components/InvestorSpecialistBanner'
-import { InvestorSearchHeroClient } from './components/InvestorSearchHeroClient'
-import { ContactsDirectoryTab } from './components/ContactsDirectoryTab'
-import { GrantsDirectoryTab } from './components/GrantsDirectoryTab'
-import { PortfolioDirectoryTab } from './components/PortfolioDirectoryTab'
-import { AnonymousInvestorsView } from './components/AnonymousInvestorsView'
+// FLOW: components live under (platform)/investors/components/ because the
+// deep-dive route /investors/[id] still uses them and stays auth-gated.
+// Importing across route groups is fine — Next.js route groups affect URL
+// composition and layout chaining, not module resolution.
+import { InvestorBrowser } from '../../(platform)/investors/components/InvestorBrowser'
+import { InvestorInsightsPanel } from '../../(platform)/investors/components/InvestorInsightsPanel'
+import { InvestorPageTabs } from '../../(platform)/investors/components/InvestorPageTabs'
+import { InvestorSpecialistBanner } from '../../(platform)/investors/components/InvestorSpecialistBanner'
+import { InvestorSearchHeroClient } from '../../(platform)/investors/components/InvestorSearchHeroClient'
+import { ContactsDirectoryTab } from '../../(platform)/investors/components/ContactsDirectoryTab'
+import { GrantsDirectoryTab } from '../../(platform)/investors/components/GrantsDirectoryTab'
+import { PortfolioDirectoryTab } from '../../(platform)/investors/components/PortfolioDirectoryTab'
+import { AnonymousInvestorsView } from '../../(platform)/investors/components/AnonymousInvestorsView'
 
 export const metadata: Metadata = {
   title: 'Investor Intelligence',

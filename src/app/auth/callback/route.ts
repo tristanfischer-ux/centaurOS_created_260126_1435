@@ -10,7 +10,11 @@ import { setupNewUser } from '@/lib/auth/setup-new-user'
  * @security Prevents open redirect via crafted next= parameter
  */
 function sanitizeRedirectPath(path: string | null): string {
-  const defaultPath = '/today'
+  // RED-TEAM-PIVOT-PLAN Tier 2 step 17: default post-signup / post-login
+  // landing is /investors. Investor matching is the primary acquisition
+  // surface, so the new-account journey continues there. Existing users
+  // with an explicit `next` param still honour it.
+  const defaultPath = '/investors'
   if (!path) return defaultPath
   // SECURITY: Must be a relative path, not an absolute URL or protocol-relative URL
   if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
@@ -144,7 +148,10 @@ export async function GET(request: Request) {
         })
 
         // Honor `next` param for claim flow — user needs to land on /claim/<token>
-        const finalRedirect = (next !== '/today' && next.startsWith('/')) ? next : redirectPath
+        // RED-TEAM-PIVOT-PLAN Tier 2 step 17: default landing is /investors,
+        // so the "is the next path actually different from the default?" check
+        // compares against /investors not /today.
+        const finalRedirect = (next !== '/investors' && next.startsWith('/')) ? next : redirectPath
 
         // Clear signup cookies
         const response = NextResponse.redirect(new URL(finalRedirect, requestUrl.origin))
@@ -153,17 +160,17 @@ export async function GET(request: Request) {
         return response
       }
 
-      // EXISTING USER — honor `next` param for claim flow, otherwise route to /today
-      // DECISION 2026-04-16: founder-first architecture. Everyone lands on /today.
-      // Supplier / fractional-executive are now opt-in flags layered on the founder
-      // account, not distinct routing paths. `account_type === 'supplier'` branch removed.
-      const hasExplicitNext = next !== '/today' && next.startsWith('/')
+      // EXISTING USER — honor `next` param for claim flow, otherwise route to default.
+      // RED-TEAM-PIVOT-PLAN Tier 2 step 17: default post-login landing is
+      // /investors so the journey started on the anonymous landing
+      // continues uninterrupted. Buyer-history fallback to /buyer kept.
+      const hasExplicitNext = next !== '/investors' && next.startsWith('/')
       let redirectPath: string
 
       if (hasExplicitNext) {
         redirectPath = next
       } else if (profile.role === 'Founder' || profile.role === 'Executive' || profile.role === 'Apprentice') {
-        redirectPath = '/today'
+        redirectPath = '/investors'
       } else {
         // Check if user has marketplace orders (buyer)
         const { count: orderCount } = await supabase
@@ -174,7 +181,7 @@ export async function GET(request: Request) {
         if (orderCount && orderCount > 0) {
           redirectPath = '/buyer'
         } else {
-          redirectPath = '/today'
+          redirectPath = '/investors'
         }
       }
 

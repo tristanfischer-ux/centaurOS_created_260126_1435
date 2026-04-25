@@ -342,10 +342,20 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     redirect(redirectTo);
   }
 
+  // RED-TEAM-PIVOT-PLAN Tier 2 step 17: visitors who arrived from the
+  // anonymous /investors landing skip the welcome tour and continue
+  // directly inside /investors so the journey they started is unbroken.
+  // The `from` field is set by the signup form when a `from` query param
+  // (currently `investors-anonymous`) was on the URL.
+  const from = (formData.get("from") as string)?.trim() || null;
+  if (from === "investors-anonymous") {
+    redirect("/investors");
+  }
+
   // DECISION 2026-04-17: new email/password signups land on /welcome — the
   // guided tour from Tristan. The Welcome page's CTA marks onboarding_data
-  // and routes to /today. Supplier flag is handled during onboarding, not
-  // routing. Mirrors the OAuth path (setup-new-user.ts returns /welcome).
+  // and routes to the post-welcome destination (now /investors per Tier 2
+  // step 17). Supplier flag is handled during onboarding, not routing.
   redirect("/welcome");
 }
 
