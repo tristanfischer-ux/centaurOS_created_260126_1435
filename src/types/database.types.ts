@@ -21089,6 +21089,59 @@ export type Database = {
           },
         ]
       }
+      supplier_match_cache: {
+        Row: {
+          cost_pence: number
+          created_at: string
+          id: string
+          input_tokens: number
+          model_used: string
+          output_tokens: number
+          project_context_hash: string
+          project_id: string
+          questions_to_ask: Json
+          source_citations: Json
+          supplier_id: string
+          why_relevant: string
+        }
+        Insert: {
+          cost_pence?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model_used: string
+          output_tokens?: number
+          project_context_hash: string
+          project_id: string
+          questions_to_ask: Json
+          source_citations: Json
+          supplier_id: string
+          why_relevant: string
+        }
+        Update: {
+          cost_pence?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model_used?: string
+          output_tokens?: number
+          project_context_hash?: string
+          project_id?: string
+          questions_to_ask?: Json
+          source_citations?: Json
+          supplier_id?: string
+          why_relevant?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_match_cache_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_ratings: {
         Row: {
           commercial_fairness: number | null
