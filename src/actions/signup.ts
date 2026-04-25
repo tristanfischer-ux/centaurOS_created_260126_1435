@@ -132,6 +132,15 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const supabase = await createClient();
 
   const password = formData.get("password") as string;
+  // SECURITY 2026-04-25: server-side password-confirm validation. The client-side
+  // disabled gate was previously the only check; password-manager autofill could
+  // desync the controlled-component state from DOM, leaving the gate disabled
+  // even when the user typed matching strings. Validating here defends against
+  // that failure mode without trusting the client.
+  const passwordConfirm = formData.get("password_confirm") as string | null;
+  if (passwordConfirm !== null && passwordConfirm !== password) {
+    return errorWithValues("Passwords do not match");
+  }
   const intent = formData.get("intent") as string | null;
   const listingId = formData.get("listing_id") as string | null;
 

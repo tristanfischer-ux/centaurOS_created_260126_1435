@@ -275,8 +275,9 @@ function JoinPageInner() {
                   name="password"
                   type="password"
                   placeholder="Create a strong password"
-                  defaultValue=""
+                  value={passwordValue}
                   onChange={(e) => setPasswordValue(e.target.value)}
+                  onBlur={(e) => setPasswordValue(e.currentTarget.value)}
                   autoComplete="new-password"
                   enterKeyHint="next"
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
@@ -298,10 +299,12 @@ function JoinPageInner() {
                 </Label>
                 <Input
                   id="supplier-confirm-password"
+                  name="password_confirm"
                   type="password"
                   placeholder="Re-enter your password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  onBlur={(e) => setConfirmPassword(e.currentTarget.value)}
                   autoComplete="new-password"
                   enterKeyHint="go"
                   className={cn(
@@ -324,7 +327,7 @@ function JoinPageInner() {
               >
                 <Button
                   type="submit"
-                  disabled={isPending || passwordMismatch}
+                  disabled={isPending}
                   className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
                 >
                   {isPending ? (
@@ -536,8 +539,9 @@ function JoinPageInner() {
                 name="password"
                 type="password"
                 placeholder="Create a strong password"
-                defaultValue=""
+                value={passwordValue}
                 onChange={(e) => setPasswordValue(e.target.value)}
+                onBlur={(e) => setPasswordValue(e.currentTarget.value)}
                 autoComplete="new-password"
                 enterKeyHint="go"
                 className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
@@ -562,10 +566,12 @@ function JoinPageInner() {
               </Label>
               <Input
                 id="confirm-password"
+                name="password_confirm"
                 type="password"
                 placeholder="Re-enter your password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                onBlur={(e) => setConfirmPassword(e.currentTarget.value)}
                 autoComplete="new-password"
                 enterKeyHint="go"
                 className={cn(
@@ -668,7 +674,7 @@ function JoinPageInner() {
             >
               <Button
                 type="submit"
-                disabled={isPending || passwordMismatch}
+                disabled={isPending}
                 className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
               >
                 {isPending ? (
