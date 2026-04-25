@@ -400,12 +400,35 @@ export async function renderNextModuleStage(
     // with 40+ identical errors. Excluding failed_ids means the chain
     // skips permanently-failed modules and moves to the next candidate.
     const RENDER_BATCH_SIZE = 1
+    /**
+     * Per-module retry budget. Tristan flagged 2026-04-25 NIGHT on HAPS
+     * that "Starboard Propulsion Pod has no image — they should ALL
+     * have images." Previously a single render failure would land the
+     * module in failed_ids forever. Now we retry up to MAX_RENDER_ATTEMPTS
+     * before giving up, and only blacklist after that. The previous code
+     * comment (lines 395-401) optimised for log-cleanliness over render-
+     * completeness — the new approach logs only on first failure per
+     * attempt batch, not every tick (so log floods don't recur).
+     */
+    const MAX_RENDER_ATTEMPTS = 3
     const modules = (project.modules as CadLabModule[] | null) ?? []
     const ordered = orderForRender(modules)
     const priorFailed = new Set(state.failed_ids ?? [])
-    const unrenderedQueue = ordered.filter(
-        (m) => !hasImage(m) && !priorFailed.has(m.id),
-    )
+    const failedReasonsAttemptByModuleId: Record<string, number> = {}
+    for (const [id, reason] of Object.entries(state.failed_reasons ?? {})) {
+        if (typeof reason?.attempt === "number") {
+            failedReasonsAttemptByModuleId[id] = reason.attempt
+        }
+    }
+    const unrenderedQueue = ordered.filter((m) => {
+        if (hasImage(m)) return false
+        if (priorFailed.has(m.id)) return false
+        // Allow retry up to MAX_RENDER_ATTEMPTS — the module is queued
+        // even if a previous attempt landed in failed_reasons, as long
+        // as we haven't exhausted the budget.
+        const attempts = failedReasonsAttemptByModuleId[m.id] ?? 0
+        return attempts < MAX_RENDER_ATTEMPTS
+    })
     const batch = unrenderedQueue.slice(0, RENDER_BATCH_SIZE)
 
     if (batch.length === 0) {
@@ -522,32 +545,43 @@ export async function renderNextModuleStage(
     const completed = Array.from(
         new Set([...current.completed_ids, ...newlyCompleted]),
     )
-    const failed = Array.from(
-        new Set([...current.failed_ids, ...newlyFailed]),
-    )
 
-    // P1.5 — build the failed_reasons map. Start from whatever the
-    // previous stage persisted (a module that failed two stages ago stays
-    // in the map), then overwrite/add entries for anything that failed
-    // THIS stage. Skip completed outcomes — only failures need a reason.
-    // Timestamp uses wall clock so log-pull tooling can correlate with
-    // Vercel's 1-hour log retention.
+    // P1.5 — build the failed_reasons map. Increment attempt counter
+    // each time a module fails. Only promote to failed_ids (permanent
+    // blacklist) after MAX_RENDER_ATTEMPTS. Modules below the threshold
+    // stay in failed_reasons but get re-queued by the queue filter.
     const nowIso = new Date().toISOString()
     const failedReasons: Record<string, ImageRenderFailureReason> = {
         ...(current.failed_reasons ?? {}),
     }
+    const newlyExhausted: string[] = []
     for (const o of batchOutcomes) {
-        if (o.ok) continue
-        // attempt = 1 today (no per-module retry loop yet); incrementing
-        // when retry lands is a one-line change. Kept as a first-class
-        // field so the DB shape doesn't have to change again.
+        if (o.ok) {
+            // Clear any prior failure entry — the module finally rendered.
+            delete failedReasons[o.id]
+            continue
+        }
+        const priorAttempt = failedReasons[o.id]?.attempt ?? 0
+        const newAttempt = priorAttempt + 1
         failedReasons[o.id] = {
             provider: o.provider,
             rawError: o.rawError ?? o.error ?? "Unknown error",
-            attempt: 1,
+            attempt: newAttempt,
             timestamp: nowIso,
         }
+        if (newAttempt >= MAX_RENDER_ATTEMPTS) {
+            newlyExhausted.push(o.id)
+            console.warn(
+                `[render-all-modules:stage] module ${o.id} EXHAUSTED retries ` +
+                    `(${newAttempt}/${MAX_RENDER_ATTEMPTS}) — promoting to failed_ids`,
+            )
+        }
     }
+    // Only the exhausted modules become permanently blacklisted — others
+    // stay queued for the next tick so the chain keeps trying.
+    const failed = Array.from(
+        new Set([...current.failed_ids, ...newlyExhausted]),
+    )
 
     // 7. Figure out if more work remains. Re-read modules so a
     //    concurrent Max re-run that added modules is picked up, and
