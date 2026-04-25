@@ -1727,51 +1727,44 @@ export async function tickAutopilotStage(
 
         // Re-enter the current stage. Each stepXxx has its own self-healing
         // check + idempotency so a duplicate re-entry is safe.
+        //
+        // 2026-04-25 fix: previously this used `after(async () => stepXxx(...))`,
+        // but the cron-tick endpoint returns in <100ms. Vercel drops the
+        // after() queue on short-lived handlers (memory:
+        // forgeos_vercel_after_silent_drop.md). Result: cron fired 6+ times
+        // over 30 minutes, every after() dropped, no stages ran, all 6 demo
+        // projects wedged at waiting_chase. Switch to scheduleAutopilotStep
+        // (inline-await fetch + 5s abort) which lands the work on a fresh
+        // /api/autopilot-step Vercel container with its own 300s budget.
         const stage = state.stage
-        after(async () => {
+        const stepName = ((): AutopilotStepName | null => {
+            switch (stage) {
+                case "waiting_chase": return "waitForChase"
+                case "locking_brief": return "lockBrief"
+                case "waiting_max": return "waitForMax"
+                case "waiting_sizing": return "waitForSizing"
+                case "waiting_layout": return "waitForLayout"
+                case "waiting_bom": return "waitForBom"
+                case "waiting_finn": return "waitForFinn"
+                case "generating_illustration": return "generateIllustration"
+                case "matching_suppliers": return "matchSuppliers"
+                case "running_fang_reviews": return "runFangReviews"
+                case "generating_pdf": return "generatePdf"
+                default: return null
+            }
+        })()
+        if (stepName) {
             try {
-                switch (stage) {
-                    case "waiting_chase":
-                        await stepWaitForChase(projectId)
-                        break
-                    case "locking_brief":
-                        await stepLockBrief(projectId)
-                        break
-                    case "waiting_max":
-                        await stepWaitForMax(projectId)
-                        break
-                    case "waiting_sizing":
-                        await stepWaitForSizing(projectId)
-                        break
-                    case "waiting_layout":
-                        await stepWaitForLayout(projectId)
-                        break
-                    case "waiting_bom":
-                        await stepWaitForBom(projectId)
-                        break
-                    case "waiting_finn":
-                        await stepWaitForFinn(projectId)
-                        break
-                    case "generating_illustration":
-                        await stepGenerateIllustration(projectId)
-                        break
-                    case "matching_suppliers":
-                        await stepMatchSuppliers(projectId)
-                        break
-                    case "running_fang_reviews":
-                        await stepRunFangReviews(projectId)
-                        break
-                    case "generating_pdf":
-                        await stepGeneratePdf(projectId)
-                        break
-                }
+                await scheduleAutopilotStep(projectId, stepName)
             } catch (err) {
                 console.error(
-                    `[autopilot:tick] re-enter ${stage} threw:`,
+                    `[autopilot:tick] schedule ${stage} threw:`,
                     err instanceof Error ? err.message : err,
                 )
             }
-        })
+        } else {
+            console.warn(`[autopilot:tick] no step mapping for stage "${stage}"`)
+        }
 
         return { ok: true, ticked: true, stage }
     })

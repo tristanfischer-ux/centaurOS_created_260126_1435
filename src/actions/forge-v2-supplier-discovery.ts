@@ -87,7 +87,12 @@ interface CandidateShape {
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
-const MODEL = "claude-opus-4-7"
+// COST TRIAL (2026-04-25): swap from claude-opus-4-7 → claude-sonnet-4-6.
+// Supplier discovery is web-search-grounded structured extraction — find
+// real companies that match the part shape, output JSON. Not a frontier-
+// reasoning task. ~5× cheaper. Web search itself does the heavy lifting;
+// the model just summarises + structures the result.
+const MODEL = "claude-sonnet-4-6"
 const DAILY_CAP_PER_FOUNDRY = 20
 const IDEMPOTENCY_WINDOW_HOURS = 24
 const MAX_CANDIDATES = 10
