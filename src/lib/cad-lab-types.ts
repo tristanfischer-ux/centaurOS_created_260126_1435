@@ -62,9 +62,17 @@ export interface CadLabDesignBriefConstraints {
   productionRegion?: string
 }
 
-/** Per-project regulatory posture row. */
+/** Per-project regulatory posture row.
+ *
+ * Loop 3 P4 (council 2026-04-25): the standards bibliography shape was a
+ * regression vs an expert team. Compliance matrices have applicability,
+ * design impact, evidence required, status, owner, and gap action — the
+ * fields below extend the row in that direction. The four extension
+ * fields are optional so older rows keep rendering.
+ */
 export interface CadLabDesignBriefRegulatoryItem {
-  /** Short code (e.g. "AS9100D"). */
+  /** Short code (e.g. "BS EN IEC 62933-5-2"). Standards-body codes pass
+   *  through verbatim — never expanded — per the acronym rule reform. */
   code: string
   /** Human-readable name. */
   name: string
@@ -72,6 +80,24 @@ export interface CadLabDesignBriefRegulatoryItem {
   summary: string
   /** Status against this standard. */
   status: "met" | "in-progress" | "not-started"
+  /** Loop 3 P4: scope of applicability for this specific project — e.g.
+   *  "AC interface and battery system safety scope", "modified container
+   *  invalidates structural certification", or "informational only". */
+  applicability?: string
+  /** Loop 3 P4: design constraint or feature this standard drives —
+   *  e.g. "protection coordination + isolation strategy", "deflagration
+   *  vent area + burst-pressure calculation". */
+  designImpact?: string
+  /** Loop 3 P4: artefact the founder must produce or obtain to evidence
+   *  compliance — type-test cert, supplier declaration, calculation pack,
+   *  insurer sign-off, AHJ acceptance letter. */
+  evidenceRequired?: string
+  /** Loop 3 P4: role accountable for closing this — electrical lead,
+   *  safety lead, battery lead, mechanical lead, founder, etc. */
+  ownerRole?: string
+  /** Loop 3 P4: the next concrete action for this standard — what the
+   *  founder does next to advance status from "not-started". */
+  gapAction?: string
 }
 
 /** DFM (Design for Manufacturability) analysis result */

@@ -390,6 +390,14 @@ interface Regulatory {
     name: string
     status: string | null
     summary: string
+    /** Loop 3 P4: compliance-matrix extension fields. Optional — older
+     *  Chase outputs don't have these and the renderer falls back to the
+     *  pre-Loop-3 single-line shape. */
+    applicability?: string
+    designImpact?: string
+    evidenceRequired?: string
+    ownerRole?: string
+    gapAction?: string
 }
 
 interface ModulePdf {
@@ -1035,20 +1043,71 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
 }
 
 function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactElement {
+    // Loop 3 P4: when at least one item carries the new compliance-matrix
+    // fields (applicability / designImpact / evidenceRequired / ownerRole
+    // / gapAction), render the rich layout. When none do, fall back to
+    // the original 1-line summary shape so older projects still look the
+    // same.
+    const hasMatrix = items.some(
+        (r) =>
+            r.applicability ||
+            r.designImpact ||
+            r.evidenceRequired ||
+            r.ownerRole ||
+            r.gapAction,
+    )
     return (
         <View break>
             <Text style={styles.h2}>2. Regulatory posture</Text>
             {items.length === 0 && (
                 <Text style={styles.muted}>No regulatory items declared on the Brief.</Text>
             )}
+            {hasMatrix && items.length > 0 && (
+                <Text style={[styles.muted, { marginBottom: 8, fontSize: 9 }]}>
+                    Per-standard compliance matrix — applicability, design
+                    impact, evidence required, status, owner, and the next
+                    concrete gap action. Status &quot;not-started&quot; means
+                    the founder hasn&apos;t closed the gap yet, not that the
+                    standard is unimportant.
+                </Text>
+            )}
             {items.map((r, i) => (
                 <View key={i} style={{ marginBottom: 10 }} wrap={false}>
                     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
                         <Text style={{ fontWeight: "bold", marginRight: 8 }}>{r.code}</Text>
                         {r.status && <Text style={styles.pillMuted}>{r.status}</Text>}
+                        {r.ownerRole && (
+                            <Text style={[styles.pillMuted, { marginLeft: 6 }]}>
+                                {r.ownerRole}
+                            </Text>
+                        )}
                     </View>
                     <Text style={{ fontStyle: "italic", marginBottom: 2 }}>{r.name}</Text>
-                    {r.summary && <Text>{r.summary}</Text>}
+                    {r.summary && <Text style={{ marginBottom: 3 }}>{r.summary}</Text>}
+                    {r.applicability && (
+                        <Text style={{ fontSize: 9, marginBottom: 2 }}>
+                            <Text style={{ fontWeight: "bold" }}>Applicability: </Text>
+                            {r.applicability}
+                        </Text>
+                    )}
+                    {r.designImpact && (
+                        <Text style={{ fontSize: 9, marginBottom: 2 }}>
+                            <Text style={{ fontWeight: "bold" }}>Design impact: </Text>
+                            {r.designImpact}
+                        </Text>
+                    )}
+                    {r.evidenceRequired && (
+                        <Text style={{ fontSize: 9, marginBottom: 2 }}>
+                            <Text style={{ fontWeight: "bold" }}>Evidence required: </Text>
+                            {r.evidenceRequired}
+                        </Text>
+                    )}
+                    {r.gapAction && (
+                        <Text style={{ fontSize: 9, marginBottom: 2 }}>
+                            <Text style={{ fontWeight: "bold" }}>Next action: </Text>
+                            {r.gapAction}
+                        </Text>
+                    )}
                 </View>
             ))}
         </View>
@@ -2847,6 +2906,11 @@ async function exportProjectPdfInternal(
                     name?: string
                     summary?: string
                     status?: string
+                    applicability?: string
+                    designImpact?: string
+                    evidenceRequired?: string
+                    ownerRole?: string
+                    gapAction?: string
                 }>
             }
         } | null)?.designBrief ?? null
@@ -2859,6 +2923,26 @@ async function exportProjectPdfInternal(
                       name: String(r.name ?? ""),
                       status: typeof r.status === "string" ? r.status : null,
                       summary: String(r.summary ?? ""),
+                      applicability:
+                          typeof r.applicability === "string" && r.applicability.length > 0
+                              ? r.applicability
+                              : undefined,
+                      designImpact:
+                          typeof r.designImpact === "string" && r.designImpact.length > 0
+                              ? r.designImpact
+                              : undefined,
+                      evidenceRequired:
+                          typeof r.evidenceRequired === "string" && r.evidenceRequired.length > 0
+                              ? r.evidenceRequired
+                              : undefined,
+                      ownerRole:
+                          typeof r.ownerRole === "string" && r.ownerRole.length > 0
+                              ? r.ownerRole
+                              : undefined,
+                      gapAction:
+                          typeof r.gapAction === "string" && r.gapAction.length > 0
+                              ? r.gapAction
+                              : undefined,
                   }))
             : []
 

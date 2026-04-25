@@ -701,13 +701,31 @@ JSON shape:
     "productionRegion": string or null
   },
   "regulatory": [
-    { "code": "AS9100D", "name": "Quality management", "summary": "One line", "status": "not-started" }
+    {
+      "code": "BS EN IEC 62933-5-2",
+      "name": "Safety requirements for grid-integrated electrical energy storage systems",
+      "summary": "One-line scope statement.",
+      "applicability": "Where this standard bites for THIS project — be specific, e.g. 'AC interface, battery system safety scope', 'informational only', 'invalidated once container is modified'.",
+      "designImpact": "What this standard forces the design to do — e.g. 'protection coordination + isolation strategy', 'deflagration vent area + burst pressure calculation', 'cell-level abuse-test pack'.",
+      "evidenceRequired": "Concrete artefact the founder must obtain — type-test certificate, supplier declaration, calculation pack, insurer sign-off, Authority Having Jurisdiction acceptance letter.",
+      "status": "not-started",
+      "ownerRole": "Electrical lead | Safety lead | Battery lead | Mechanical lead | Founder",
+      "gapAction": "Next concrete action to move status forward."
+    }
   ]
 }
 
 Rules:
 - Ground every field in the report. If the report doesn't mention a constraint, use null — do NOT invent numbers or dates.
-- "regulatory" must reference standards the report or subject implies. Empty array is fine if no regulatory posture is obvious.
+- "regulatory" must be a project-specific compliance matrix, NOT a list of well-known standards. Each row needs applicability + designImpact + evidenceRequired + ownerRole + gapAction filled out. Generic standard descriptions without project-mapped obligations are a regression — every row must connect a clause to a design decision.
+- For UK projects, distinguish what is statutory from what is reference:
+  - STATUTORY in the United Kingdom: BS 7671 (IET wiring regulations) for AC side; UKCA marking; Low Voltage, Electromagnetic Compatibility, and Machinery directives where applicable; Electricity Safety Quality and Continuity Regulations interfaces; CDM Regulations for installation phase.
+  - REFERENCE / INSURANCE / NFCC: NFPA 855, UL 9540, UL 9540A — these are NOT UK statutory law. They are referenced by insurers, the National Fire Chiefs Council, and Authorities Having Jurisdiction. Mark these clearly in "applicability" so the founder doesn't treat them as legal requirements.
+  - UK / EU EQUIVALENTS: BS EN IEC 62933-5-2 is the UK/EU peer of NFPA 855 for electrical energy storage system safety. BS EN 15004-1 is the UK fixed-gaseous-suppression standard (peer of NFPA 2001). BS EN IEC 62619 / 63056 cover lithium cell + system safety.
+  - TRANSPORT: UN 38.3 + ADR/Carriage of Dangerous Goods Regulations apply to lithium battery shipment with batteries installed.
+  - ISO 1496-1 / ISO 1161 (freight container structural standards) apply ONLY if the container is unmodified. Once vents, doors, or rack reinforcements are added, the container loses CSC certification — call this out explicitly when relevant.
+- Do NOT cite a US-only standard as if it were UK statutory law. Do NOT cite a freight-container structural standard for a heavily modified container without flagging the certification consequence.
+- Standards-body codes pass through verbatim — UL, IEC, ISO, NFPA, BS, EN. Do NOT invent expansions ("United Laboratories" is a hallucination, the correct full name is "Underwriters Laboratories" — but the code "UL" stays as-is in copy).
 - British English ("programme" not "program"). First-person voice not required here — this is extraction, not narrative.
 - Do NOT use the words "AI", "smart", or "intelligent" in the values. This lands in-product.
 - Output must parse as JSON.`
@@ -845,7 +863,33 @@ function normaliseBriefShape(
                         : statusRaw === "in-progress"
                             ? "in-progress"
                             : "not-started"
-                return { code, name, summary, status }
+                // Loop 3 P4: extended compliance-matrix fields. Optional —
+                // older Chase outputs that pre-date this change still
+                // round-trip cleanly; the PDF renderer falls back to the
+                // 1-line summary shape when these are absent.
+                const extras: {
+                    applicability?: string
+                    designImpact?: string
+                    evidenceRequired?: string
+                    ownerRole?: string
+                    gapAction?: string
+                } = {}
+                if (typeof r.applicability === "string" && r.applicability.trim().length > 0) {
+                    extras.applicability = r.applicability.trim()
+                }
+                if (typeof r.designImpact === "string" && r.designImpact.trim().length > 0) {
+                    extras.designImpact = r.designImpact.trim()
+                }
+                if (typeof r.evidenceRequired === "string" && r.evidenceRequired.trim().length > 0) {
+                    extras.evidenceRequired = r.evidenceRequired.trim()
+                }
+                if (typeof r.ownerRole === "string" && r.ownerRole.trim().length > 0) {
+                    extras.ownerRole = r.ownerRole.trim()
+                }
+                if (typeof r.gapAction === "string" && r.gapAction.trim().length > 0) {
+                    extras.gapAction = r.gapAction.trim()
+                }
+                return { code, name, summary, status, ...extras }
             })
             .filter((r) => r.code.length > 0 && r.name.length > 0)
         if (regulatory.length > 0) {
