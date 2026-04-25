@@ -42,7 +42,7 @@ const FAQ_ITEMS = [
   {
     question: 'Do I need a credit card to start?',
     answer:
-      "No. The Free tier is free forever — one brainstorming session a month, plus 5 saved investor searches over the life of the account, plus specialist support across thirteen disciplines. No credit card required. Upgrade when you need more.",
+      "No. The Free tier is free forever — five brainstorming sessions a month, five saved investor searches over the life of the account, and unlimited supplier search across 13,700 UK and European manufacturers. No credit card required. Upgrade when you need more.",
   },
   {
     question: 'How does the £10 investor lead add-on work?',
@@ -85,7 +85,7 @@ const PRICING_TIERS = [
     price: 'Free',
     cadence: '',
     detail:
-      '5 brainstorming sessions a month. 5 saved investor searches over the life of the account. Specialist support across thirteen disciplines. Manufacturer search across 13,700 UK and European suppliers.',
+      '5 brainstorming sessions a month. 5 saved investor searches over the life of the account. Unlimited supplier search across 13,700 UK and European manufacturers.',
     cta: 'Get Started Free',
     ctaSubtext: 'Free forever · No credit card required',
     emphasised: false,
@@ -115,7 +115,7 @@ const PRICING_TIERS = [
     price: '£149',
     cadence: '/month',
     detail:
-      'Unlimited investor leads. Unlimited brainstorming. Deep Council — multi-specialist deep dives across the thirteen disciplines on a single question. Dual-side data: investor and manufacturer signals together.',
+      'Unlimited investor leads. Unlimited brainstorming. Deep Council — multi-specialist deep dives on a single question. Dual-side data: investor and manufacturer signals together.',
     cta: 'Upgrade to Pro',
     ctaSubtext: 'Cancel anytime · Best for active fundraisers',
     emphasised: false,
@@ -160,13 +160,13 @@ export function PricingContent() {
           {/* Header */}
           <div className="text-center space-y-4 mb-8">
             <p className="text-xs font-mono uppercase tracking-widest text-international-orange">
-              The Operating System for the Smart-Product Wave
+              Built for Hardware Founders
             </p>
             <h1 className="text-4xl sm:text-5xl font-display font-bold text-foreground tracking-tight">
               Start free. Scale when ready.
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Everyday objects are becoming sensors and software. Start free with specialist support across thirteen disciplines. Upgrade when you need more.
+              Five free brainstorming sessions a month, five free saved investor searches, and unlimited supplier search across 13,700 UK and European manufacturers. Upgrade when you want more leads or deeper Council sessions.
             </p>
           </div>
 
