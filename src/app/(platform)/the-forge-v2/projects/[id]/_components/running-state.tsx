@@ -88,6 +88,12 @@ interface StageDefinition {
     /** Set on stages where the server does not yet drive a `running` state.
      *  Renders an honest caption under the explanatory paragraph. */
     serverWiringPending?: boolean
+    /**
+     * First-person specialist quote shown in the live commentary panel while
+     * this stage is active. Deterministic, fixed — never LLM-generated.
+     * Voice: specific, no consultant-speak, British spelling.
+     */
+    specialistQuote: string
 }
 
 const STAGES: StageDefinition[] = [
@@ -102,6 +108,7 @@ const STAGES: StageDefinition[] = [
         liveCounterTemplate: "Reading roughly 40 to 60 sources, scoring each for relevance.",
         costPoints: 1450,
         specialists: ["Chase"],
+        specialistQuote: "Chase: I'm pulling the regulatory landscape for this category. Stricter rules in Europe than the United States on this one — I'll flag exactly what affects the design so Max doesn't spec against the wrong standard.",
     },
     {
         id: "locking_brief",
@@ -115,6 +122,7 @@ const STAGES: StageDefinition[] = [
         costPoints: 320,
         specialists: ["Chase"],
         celebration: "Chase: \"Locked. Everything from here cites this revision.\"",
+        specialistQuote: "Chase: I'm folding the research back into your brief and locking it. From here, every specialist reads the same document. This is the one thing that keeps a 12-stage run from drifting.",
     },
     {
         // Client-only stage. Server-side wiring queued for the next round per
@@ -131,6 +139,7 @@ const STAGES: StageDefinition[] = [
         costPoints: 480,
         specialists: ["Max"],
         serverWiringPending: true,
+        specialistQuote: "Max: I'm looking at where a sensor or a small data loop turns this from a product into a platform. The cost delta between a dumb unit and a connected one is often less than £8 at volume. Worth knowing before the architecture locks.",
     },
     {
         id: "waiting_max",
@@ -144,6 +153,7 @@ const STAGES: StageDefinition[] = [
         costPoints: 2100,
         specialists: ["Max"],
         celebration: "Max: \"Architecture locked. Now we know what gets built and what gets bought.\"",
+        specialistQuote: "Max: I'm scoring candidate architectures against your cost ceiling and supply-chain reality, not just what's technically elegant. The split that looks cleanest on paper isn't always the one that sources in 12 weeks.",
     },
     {
         id: "waiting_sizing",
@@ -156,6 +166,7 @@ const STAGES: StageDefinition[] = [
         liveCounterTemplate: "Solving sizing constraints across each module.",
         costPoints: 1680,
         specialists: ["Fang"],
+        specialistQuote: "Fang: I'm working out what each module actually has to be dimensionally. Two modules sharing a wall need to fit. A battery specced for eight hours is a fundamentally different component from one specced for two. Sizing first, then layout.",
     },
     {
         id: "waiting_layout",
@@ -168,6 +179,7 @@ const STAGES: StageDefinition[] = [
         liveCounterTemplate: "Placing modules against clearance, thermal, and flow rules.",
         costPoints: 1240,
         specialists: ["Fang"],
+        specialistQuote: "Fang: I'm placing modules against thermal zones and service-access clearance. The topology is the hard decision here. You can change the dimensions of a module later without much pain, but moving what sits next to what costs you a complete redesign.",
     },
     {
         id: "waiting_bom",
@@ -181,6 +193,7 @@ const STAGES: StageDefinition[] = [
         costPoints: 3400,
         specialists: ["Max", "Fang"],
         celebration: "Fang: \"Bill of materials skeleton complete. The cost picture becomes real next.\"",
+        specialistQuote: "Fang: I'm walking each module and calling out every part -- structural, electrical, fasteners, bought-in sub-assemblies. A contract manufacturer's first question when you ask for a quote is always: where's the bill of materials? This is that document.",
     },
     {
         id: "waiting_finn",
@@ -193,6 +206,7 @@ const STAGES: StageDefinition[] = [
         liveCounterTemplate: "Pricing every bill-of-materials line and ranking the cost drivers.",
         costPoints: 1820,
         specialists: ["Finn"],
+        specialistQuote: "Finn: I'm pricing every line in the bill of materials and then running the 80/20 sensitivity. On most hardware products, 3 to 5 parts drive 70 percent of the unit cost. Those are the only ones worth optimising hard. Everything else is noise.",
     },
     {
         id: "generating_illustration",
@@ -206,6 +220,7 @@ const STAGES: StageDefinition[] = [
         costPoints: 540,
         specialists: ["Max"],
         celebration: "Max: \"Hero illustration in. The plan now opens with a picture, not a wall of text.\"",
+        specialistQuote: "Max: I'm composing the system view from the spatial plan and module list. Not a photorealistic render -- a clear, labelled illustration. The kind of picture you can drop into an investor email and they immediately understand what you're building.",
     },
     {
         id: "matching_suppliers",
@@ -218,6 +233,7 @@ const STAGES: StageDefinition[] = [
         liveCounterTemplate: "Scoring roughly 19,900 indexed suppliers against your bill-of-materials specs.",
         costPoints: 4600,
         specialists: ["Chase"],
+        specialistQuote: "Chase: I'm filtering to suppliers who have made parts like yours in the last 24 months, not just ones who claim the capability. The shortlist will tell you exactly what to ask each one on the qualifying call so you don't waste 90 minutes finding out they can't hold your tolerance.",
     },
     {
         id: "running_fang_reviews",
@@ -230,6 +246,7 @@ const STAGES: StageDefinition[] = [
         liveCounterTemplate: "Reviewing each module for manufacturability and assembly risk.",
         costPoints: 2900,
         specialists: ["Fang"],
+        specialistQuote: "Fang: I'm reading each module for the things a contract manufacturer flags in their first review. Tolerances that are tighter than the geometry actually needs. Assembly steps that slow a line down. Parts that could be one part instead of three. Every issue gets a specific fix, not just a note.",
     },
     {
         id: "generating_pdf",
@@ -242,6 +259,7 @@ const STAGES: StageDefinition[] = [
         liveCounterTemplate: "Compiling the plan and rendering the downloadable file.",
         costPoints: 880,
         specialists: ["Cal"],
+        specialistQuote: "Cal: I'm pulling everything into a single document -- brief, modules, bill of materials, cost view, suppliers, red-team findings. The downloadable file is byte-for-byte the same data you see on screen. No version drift, no hidden changes for the person you send it to.",
     },
 ]
 
@@ -338,6 +356,39 @@ export function RunningState({ projectId, projectName, state }: RunningStateProp
             router.refresh()
         })
     }
+
+    // ─── Live commentary panel state ───────────────────────────────────
+    // Fades in over ~400ms when the active stage changes, persists for the
+    // duration of the stage, then transitions to the next stage's quote.
+    // Deterministic, fixed text — never LLM-generated.
+    const [commentaryVisible, setCommentaryVisible] = useState(false)
+    const [commentaryStageId, setCommentaryStageId] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (!state || state.finished_at) return
+        const activeStage = STAGES[currentIndex]
+        if (!activeStage) return
+        if (activeStage.id !== commentaryStageId) {
+            // Stage changed — fade out then back in with new quote
+            setCommentaryVisible(false)
+            const t = setTimeout(() => {
+                setCommentaryStageId(activeStage.id)
+                setCommentaryVisible(true)
+            }, 200)
+            return () => clearTimeout(t)
+        }
+    }, [state, currentIndex, commentaryStageId])
+
+    // Initialise on first render
+    useEffect(() => {
+        if (!state || state.finished_at) return
+        const activeStage = STAGES[currentIndex]
+        if (!activeStage) return
+        setCommentaryStageId(activeStage.id)
+        const t = setTimeout(() => setCommentaryVisible(true), 400)
+        return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // ─── "Not yet started" empty state ─────────────────────────────────
     if (!state) {
@@ -503,6 +554,27 @@ export function RunningState({ projectId, projectName, state }: RunningStateProp
                     )}
                 </CardContent>
             </Card>
+
+            {/* Live specialist commentary — fades in with the active stage's quote */}
+            {!hasError && commentaryStageId && (() => {
+                const commentaryStage = STAGES.find((s) => s.id === commentaryStageId)
+                if (!commentaryStage) return null
+                return (
+                    <Card
+                        className="rounded-xl border border-border transition-opacity duration-500"
+                        style={{ opacity: commentaryVisible ? 1 : 0 }}
+                    >
+                        <CardContent className="py-4 px-5">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">
+                                Live commentary
+                            </p>
+                            <p className="text-sm text-foreground leading-relaxed italic">
+                                {commentaryStage.specialistQuote}
+                            </p>
+                        </CardContent>
+                    </Card>
+                )
+            })()}
 
             {/* Step checklist with full per-stage explanatory copy on the active stage */}
             <Card className="rounded-xl overflow-hidden">

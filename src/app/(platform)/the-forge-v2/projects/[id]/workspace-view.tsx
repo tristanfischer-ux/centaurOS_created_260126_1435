@@ -981,7 +981,7 @@ function EmptyWorkspaceView({
                         </div>
                     )}
                     <p>
-                        Finish the 6 Key Requirements to unlock Modules, BOM, Suppliers, Risks, Cost, Specialists, Geometry, and Launch. <strong>{briefFieldsDone} of {briefFieldsTotal}</strong> done — <strong>{remaining} remaining</strong>: intended use, target cost, performance envelope, regulatory surface, materials constraint, launch window.
+                        Start the Forge to generate Modules, bill of materials, Suppliers, Risks, Cost, Specialists, Geometry, and your full plan. Or finish the 6 Key Requirements to run it manually. <strong>{briefFieldsDone} of {briefFieldsTotal}</strong> done — <strong>{remaining} remaining</strong>: intended use, target cost, performance envelope, regulatory surface, materials constraint, launch window.
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -1114,7 +1114,7 @@ function EmptyWorkspaceView({
                 <div className="w2-es-side-panel">
                     <h3>Known Challenges</h3>
                     <div className="empty-msg">
-                        Will populate from <strong>module Failure Modes</strong> and <strong>open Unknowns</strong> once the Brief is locked and modules are scaffolded. These are the things that could kill the build — surfaced early, tracked till closed.
+                        Will populate from <strong>module Failure Modes</strong> and <strong>open Unknowns</strong> once the Forge has run. These are the things that could kill the build — surfaced early, tracked till closed.
                     </div>
                 </div>
             </div>
@@ -1125,10 +1125,10 @@ function EmptyWorkspaceView({
 function LockedArtCard({ title, copy, children }: { title: string; copy: string; children: React.ReactNode }) {
     return (
         <div className="w2-es-art-card locked" aria-disabled="true">
-            <div className="lock-tag">Brief-lock required</div>
             <div className="ic">{children}</div>
             <h4>{title}</h4>
             <p>{copy}</p>
+            <span className="action pending-tag">Populates after Forge runs</span>
         </div>
     )
 }
