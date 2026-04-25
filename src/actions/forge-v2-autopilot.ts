@@ -1263,31 +1263,40 @@ async function stepRunFangReviews(projectId: string): Promise<void> {
         "@/actions/specialists/run-fang-review"
     )
 
-    // CHANGED 2026-04-24: parallelize Fang reviews. Original comment said
-    // serial to avoid rate-limiter + DeepSeek concurrency issues. In
-    // practice: 9-module BESS project took ~18 min running serial (2 min
-    // per review), which was the dominant cost of the autopilot chain.
-    // DeepSeek easily handles 9 concurrent calls. Rate limiter concern
-    // is addressed by DEVELOPER_FOUNDRY_IDS bypass for test accounts and
-    // by the per-foundry monthly cap (which kicks in BEFORE per-call).
-    // Dropping from 18 min to ~2 min end-to-end for the reviews stage.
-    await Promise.allSettled(
-        reviewable.map((mod) =>
-            runFangReviewBackground(
-                projectId,
-                mod.id,
-                foundryId,
-                null,
-                "auto.supplier-match-complete",
-            ).catch((err: unknown) => {
-                console.warn(
-                    `[autopilot] Fang review threw for module ${mod.id}:`,
-                    err instanceof Error ? err.message : err,
-                )
-                return { ok: false as const, error: "threw" }
-            }),
-        ),
-    )
+    // 2026-04-25: chunked rollout (3 modules at a time) instead of a single
+    // Promise.allSettled blast. The 2026-04-24 parallelisation was correct
+    // for a single project, but breaks down when 4 autopilot chains run in
+    // parallel: 4 × 9 modules = 36 simultaneous claude-opus-4-7 calls hits
+    // Anthropic org-level rate limits and every review fails with 429.
+    // Confirmed on the 4-project demo run on 2026-04-25 — every Fang review
+    // returned REVIEW_FAILED with "Too many requests".
+    //
+    // Cap of 3 in flight per project means worst-case 4 × 3 = 12 concurrent,
+    // well inside Anthropic's per-org tier quotas. Wall-clock impact for a
+    // 9-module project: ~6 min (3 batches × 2 min) instead of ~2 min, but
+    // shipping vs failing is the right trade. Per-call retries (maxRetries
+    // raised to 2 in cad-lab-reviews.ts) absorb the residual transient 429s.
+    const FANG_REVIEW_CONCURRENCY = 3
+    for (let i = 0; i < reviewable.length; i += FANG_REVIEW_CONCURRENCY) {
+        const batch = reviewable.slice(i, i + FANG_REVIEW_CONCURRENCY)
+        await Promise.allSettled(
+            batch.map((mod) =>
+                runFangReviewBackground(
+                    projectId,
+                    mod.id,
+                    foundryId,
+                    null,
+                    "auto.supplier-match-complete",
+                ).catch((err: unknown) => {
+                    console.warn(
+                        `[autopilot] Fang review threw for module ${mod.id}:`,
+                        err instanceof Error ? err.message : err,
+                    )
+                    return { ok: false as const, error: "threw" }
+                }),
+            ),
+        )
+    }
 
     // v1.2: after Fang reviews finish, advance to the PDF-export stage
     // rather than closing out. The founder wants a deliverable at the end
@@ -1369,26 +1378,47 @@ async function stepGeneratePdf(projectId: string): Promise<void> {
                     // ['cad-lab','reports','investors','finance','agents'].
                     // 'cad-lab' is semantically correct — autopilot is a
                     // CAD-lab product. Using anything else silently fails.
-                    const { error: insertErr } = await admin
+                    //
+                    // 2026-04-25: dedupe via check-then-insert. Cron-tick
+                    // and after-hop can both fire stepGeneratePdf concurrently
+                    // (storage upload is idempotent via upsert:true above,
+                    // but plain INSERT was creating duplicate rows — observed
+                    // 2× rows for BESS on the 2026-04-25 demo run). Skipping
+                    // when a row already points at this storage_path is
+                    // safe: the file is byte-identical (same projectId,
+                    // same revision, same renderer).
+                    const { data: existing } = await admin
                         .from("report_downloads")
-                        .insert({
-                            foundry_id: foundryId,
-                            profile_id: profileId,
-                            report_name: result.filename,
-                            report_source: "cad-lab",
-                            file_format: "pdf",
-                            file_size_bytes: result.sizeBytes,
-                            storage_path: storagePath,
-                        })
-                    if (insertErr) {
-                        console.warn(
-                            "[autopilot] report_downloads insert failed (non-fatal, PDF in storage):",
-                            insertErr.message,
+                        .select("id")
+                        .eq("storage_path", storagePath)
+                        .limit(1)
+                        .maybeSingle()
+                    if (existing) {
+                        console.info(
+                            `[autopilot] report_downloads row already exists for ${storagePath} — skipping insert (idempotent)`,
                         )
                     } else {
-                        console.info(
-                            `[autopilot] PDF landed in storage + report_downloads for project ${projectId}`,
-                        )
+                        const { error: insertErr } = await admin
+                            .from("report_downloads")
+                            .insert({
+                                foundry_id: foundryId,
+                                profile_id: profileId,
+                                report_name: result.filename,
+                                report_source: "cad-lab",
+                                file_format: "pdf",
+                                file_size_bytes: result.sizeBytes,
+                                storage_path: storagePath,
+                            })
+                        if (insertErr) {
+                            console.warn(
+                                "[autopilot] report_downloads insert failed (non-fatal, PDF in storage):",
+                                insertErr.message,
+                            )
+                        } else {
+                            console.info(
+                                `[autopilot] PDF landed in storage + report_downloads for project ${projectId}`,
+                            )
+                        }
                     }
                 }
             }

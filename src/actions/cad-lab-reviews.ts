@@ -249,7 +249,16 @@ ${reviewContext}${assemblyNotesInstructions}`
         // tool loop can silently blow past the ceiling and return 504 with
         // no actionable error. 240s + no retries lets us fail fast and
         // surface the real cause. See forgeos-rules.md R4/R5.
-        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
+// and uses exponential backoff between attempts. With 4 autopilot chains
+// running in parallel and ~9 modules each, the blast hits org-level
+// rate limits; without retries the call fails immediately and the review
+// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
+// transient rate-limit spikes while keeping per-call wall-clock under
+// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
+// where every Fang review failed with "Too many requests" before maxRetries
+// was raised. Total worst-case retry latency: ~30s, still inside timeout.
+const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
         const toolCtx = { foundryId, specialistId: req.specialistId, userId }
         const calculationsPerformed: ReviewCalculation[] = []
@@ -483,7 +492,16 @@ SUMMARY: <one sentence explaining the verdict>`
         // tool loop can silently blow past the ceiling and return 504 with
         // no actionable error. 240s + no retries lets us fail fast and
         // surface the real cause. See forgeos-rules.md R4/R5.
-        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
+// and uses exponential backoff between attempts. With 4 autopilot chains
+// running in parallel and ~9 modules each, the blast hits org-level
+// rate limits; without retries the call fails immediately and the review
+// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
+// transient rate-limit spikes while keeping per-call wall-clock under
+// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
+// where every Fang review failed with "Too many requests" before maxRetries
+// was raised. Total worst-case retry latency: ~30s, still inside timeout.
+const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
         const response = await client.messages.create({
             model: QUICK_VERDICT_MODEL,
@@ -687,7 +705,16 @@ export async function requestDecompositionCheckpoints(
         // tool loop can silently blow past the ceiling and return 504 with
         // no actionable error. 240s + no retries lets us fail fast and
         // surface the real cause. See forgeos-rules.md R4/R5.
-        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
+// and uses exponential backoff between attempts. With 4 autopilot chains
+// running in parallel and ~9 modules each, the blast hits org-level
+// rate limits; without retries the call fails immediately and the review
+// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
+// transient rate-limit spikes while keeping per-call wall-clock under
+// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
+// where every Fang review failed with "Too many requests" before maxRetries
+// was raised. Total worst-case retry latency: ~30s, still inside timeout.
+const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
         // Build module summary for the prompt
         const moduleSummary = req.modules.map((m, i) =>
@@ -1031,7 +1058,16 @@ export async function reviseModulesFromCheckpoints(
         // tool loop can silently blow past the ceiling and return 504 with
         // no actionable error. 240s + no retries lets us fail fast and
         // surface the real cause. See forgeos-rules.md R4/R5.
-        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
+// and uses exponential backoff between attempts. With 4 autopilot chains
+// running in parallel and ~9 modules each, the blast hits org-level
+// rate limits; without retries the call fails immediately and the review
+// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
+// transient rate-limit spikes while keeping per-call wall-clock under
+// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
+// where every Fang review failed with "Too many requests" before maxRetries
+// was raised. Total worst-case retry latency: ~30s, still inside timeout.
+const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
         // INTENT: Stronger JSON contract. Previous prompt said "Return a JSON
         // object with keys: ..." which Claude often violated by wrapping in
@@ -1213,7 +1249,16 @@ export async function reviseModulesFromReviews(
         // tool loop can silently blow past the ceiling and return 504 with
         // no actionable error. 240s + no retries lets us fail fast and
         // surface the real cause. See forgeos-rules.md R4/R5.
-        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
+// and uses exponential backoff between attempts. With 4 autopilot chains
+// running in parallel and ~9 modules each, the blast hits org-level
+// rate limits; without retries the call fails immediately and the review
+// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
+// transient rate-limit spikes while keeping per-call wall-clock under
+// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
+// where every Fang review failed with "Too many requests" before maxRetries
+// was raised. Total worst-case retry latency: ~30s, still inside timeout.
+const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
         const results = await Promise.allSettled(
             affectedModules.map(async (mod) => {
