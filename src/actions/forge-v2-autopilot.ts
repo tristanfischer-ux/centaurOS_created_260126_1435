@@ -138,6 +138,7 @@ export type StartAutopilotResult =
               | "PROJECT_FORBIDDEN"
               | "ALREADY_RUNNING"
               | "ALREADY_SHIPPED"
+              | "FOUNDRY_LIMIT"
               | "INTERNAL"
       }
 
@@ -160,6 +161,14 @@ const MIN_BRIEF_REPORT_CHARS = 200
  *  effectively unlimited for any real project while still preventing
  *  runaway cost on an exotic 40-module brief. */
 const FANG_REVIEW_MODULE_LIMIT = 20
+
+/** Max concurrent autopilot chains per foundry. Today (April 2026) the
+ *  Anthropic key is shared across the whole platform. A single foundry
+ *  starting 5+ projects at once would exhaust org-level rate limits and
+ *  starve every other foundry's chain. Cap of 3 lines up with how many
+ *  concurrent chains a real founder is likely to want, while bounding
+ *  any one tenant's blast radius into the shared LLM quota. */
+const MAX_AUTOPILOTS_PER_FOUNDRY = 3
 
 /** How long a stage runner will poll its trigger condition before giving
  *  up and writing a timeout. Sized so each stage's runner fits under the
@@ -235,6 +244,33 @@ export async function startAutopilot(
                 ok: false,
                 error: "This project has already shipped.",
                 errorCode: "ALREADY_SHIPPED",
+            }
+        }
+
+        // ── 1b. Per-foundry concurrent autopilot cap ────────────────────
+        // Today the Anthropic key is shared across the whole platform — a
+        // single foundry starting many chains at once exhausts org-level
+        // rate limits and starves every other foundry's chains. Cap any
+        // one foundry to MAX_AUTOPILOTS_PER_FOUNDRY (= 3) in flight. The
+        // count excludes the current project so re-starting a stalled
+        // chain on this very project is always allowed.
+        const { data: activeRows, error: activeErr } = await admin
+            .from("cad_lab_projects")
+            .select("id, autopilot_state")
+            .eq("foundry_id", foundryId)
+            .neq("id", projectId)
+            .not("autopilot_state", "is", null)
+            .is("autopilot_state->>finished_at", null)
+        if (activeErr) {
+            console.error(
+                "[autopilot:start] active-count lookup failed (non-fatal, allowing start):",
+                activeErr.message,
+            )
+        } else if ((activeRows?.length ?? 0) >= MAX_AUTOPILOTS_PER_FOUNDRY) {
+            return {
+                ok: false,
+                error: `You already have ${MAX_AUTOPILOTS_PER_FOUNDRY} chains running. Wait for one to finish before starting another.`,
+                errorCode: "FOUNDRY_LIMIT",
             }
         }
 
