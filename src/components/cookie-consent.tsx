@@ -34,7 +34,18 @@ function setCookie(name: string, value: string, maxAgeSeconds: number): void {
  *  - Mobile: bottom-stretched (left + right insets) so the message stays
  *    legible on a narrow screen.
  *  - z-index 40 keeps the toast above page content but below modal overlays
- *    (which sit at z-50 per the design system).
+ *    (which sit at z-50 per the design system). Do NOT increase z-index above
+ *    40 — the design system reserves z-50 for dialogs and sheets and a higher
+ *    banner would cover form fields inside those overlays.
+ *
+ * GOTCHA: The outer wrapper MUST keep `pointer-events-none`. Without it the
+ * invisible wrapper div (which spans the full right edge) intercepts clicks
+ * on page content that sits near the bottom-right corner. The toast itself
+ * must counteract with `pointer-events-auto`. Do not remove either class.
+ *
+ * GOTCHA: Do NOT add `inset-0` or `flex items-center justify-center` to the
+ * wrapper — that was the original overlay regression fixed in commit 83297676.
+ * The current `inset-x-4 bottom-4 flex justify-end` pattern is intentional.
  */
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
