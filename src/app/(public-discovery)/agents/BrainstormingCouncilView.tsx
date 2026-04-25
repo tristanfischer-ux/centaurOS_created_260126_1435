@@ -157,26 +157,6 @@ function getSigCloseLabel(specialistId: string): string {
     return map[specialistId] ?? "Next step"
 }
 
-// ─── Flag emoji per model lineage ────────────────────────────────────────────
-
-function getLineageFlag(modelTier: string): string {
-    const map: Record<string, string> = {
-        claude:          "US",
-        sonnet:          "US",
-        haiku:           "US",
-        deepseek:        "CN",
-        "deepseek-v4-pro": "CN",
-        google:          "US",
-        openai:          "US",
-        "gpt-mini":      "US",
-        "qwen-235b":     "CN",
-        qwen:            "CN",
-        "qwen-local":    "CN",
-        minimax:         "CN",
-    }
-    return map[modelTier] ?? "—"
-}
-
 // ─── BrainstormingCouncilView ────────────────────────────────────────────────
 
 interface BrainstormingCouncilViewProps {
@@ -565,7 +545,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 .bc-lineage-chip.bc-qwen     { color: #4c1d95; background: #f5f3ff; border-color: #ddd6fe; }
                 .bc-lineage-chip.bc-claude   { color: #92400e; background: #fffbeb; border-color: #fde68a; }
                 .bc-lineage-chip.bc-opus     { color: var(--bc-opus); background: var(--bc-opus-soft); border-color: var(--bc-opus-dim); }
-                .bc-lineage-chip .bc-flag { font-size: 11px; line-height: 1; }
                 /* ─── Specialist card body ─── */
                 .bc-sp-body {
                     font-size: 13.5px;
@@ -827,7 +806,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     {councilMembers.map((specialist, idx) => {
                         const lineage = MODEL_TIER_LINEAGE[specialist.modelTier] ?? "deepseek"
                         const modelLabel = MODEL_TIER_LABELS[specialist.modelTier] ?? "model TBD"
-                        const flag = getLineageFlag(specialist.modelTier)
                         const avatarClass = getAvatarClass(specialist.id)
                         const sigLabel = getSigCloseLabel(specialist.id)
                         const initials = specialist.name.slice(0, 2).toUpperCase()
@@ -852,7 +830,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                         <div className="bc-lineage">
                                             <span className={`bc-lineage-chip bc-${lineage}`}>
                                                 <span className="bc-swatch" />
-                                                <span className="bc-flag">{flag}</span>
                                                 {modelLabel}
                                             </span>
                                         </div>
