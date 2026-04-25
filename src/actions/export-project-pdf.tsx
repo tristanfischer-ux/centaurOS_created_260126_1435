@@ -560,6 +560,26 @@ interface PdfInput {
         bomModel: string
         bomProvider: string
     }
+    /**
+     * Engine self-review findings from the proofreader specialist (Phase 1).
+     * Null when the proofreader hasn't run yet (older projects) OR when it
+     * found nothing (returned `findings: []`). Non-blocking — the PDF
+     * always emits; findings are surfaced in the appendix for the founder
+     * to review.
+     */
+    proofreadFindings: {
+        ranAtIso: string
+        model: string
+        costPence: number
+        findings: Array<{
+            section: string
+            severity: "cosmetic" | "content" | "blocker"
+            location: string
+            issue: string
+            suggested_fix: string
+            confidence: "high" | "medium" | "low"
+        }>
+    } | null
 }
 
 // ─── PDF Component ─────────────────────────────────────────────────────
@@ -2331,12 +2351,121 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             {/* 7. Suppliers */}
             <SuppliersPage suppliers={data.suppliers} sources={data.sources} />
 
+            {/* 8. Engine self-review (Phase 1 proofreader, 2026-04-25 NIGHT)
+                — only renders when the proofreader specialist found
+                something. Non-blocking: the PDF always emits; this
+                appendix surfaces caught issues to the founder. */}
+            {data.proofreadFindings && (
+                <EngineReviewPage findings={data.proofreadFindings} />
+            )}
+
             {/* 8. Audit log — V1 CUT (2026-04-24): autopilot isn't writing
                 audit_log rows, section always renders "No audit events
                 recorded". Remove from PDF until audit writes are wired.
                 <AuditLogPage rows={data.auditLog} />
             */}
         </Document>
+    )
+}
+
+// ─── Engine self-review appendix ──────────────────────────────────────
+
+function EngineReviewPage({
+    findings,
+}: {
+    findings: NonNullable<PdfInput["proofreadFindings"]>
+}): React.ReactElement {
+    const blockers = findings.findings.filter((f) => f.severity === "blocker")
+    const content = findings.findings.filter((f) => f.severity === "content")
+    const cosmetic = findings.findings.filter((f) => f.severity === "cosmetic")
+    const totalCount = findings.findings.length
+    return (
+        <Page size="A4" style={styles.page} wrap>
+            <Text style={styles.h2}>Engine self-review</Text>
+            <Text style={[styles.muted, { marginBottom: 8, fontSize: 9 }]}>
+                Before this PDF was emitted, the engine ran a fact-check
+                pass against the assembled state — comparing brief targets
+                to derived values, checking standard citations, looking for
+                math errors and internal contradictions. Findings below are
+                surfaced here for founder review. Phase 1 is non-correcting
+                — what the engine caught is documented; what it missed is
+                not.
+            </Text>
+            <Text style={[styles.small, { marginBottom: 10, color: MUTED }]}>
+                Run at {findings.ranAtIso.replace("T", " ").slice(0, 19)} ·
+                model {findings.model} · cost {findings.costPence}p ·
+                {totalCount === 0
+                    ? " no findings"
+                    : ` ${totalCount} finding${totalCount === 1 ? "" : "s"} (` +
+                      `${blockers.length} blocker, ${content.length} content, ${cosmetic.length} cosmetic)`}
+            </Text>
+            {blockers.length > 0 && (
+                <FindingGroup
+                    title="BLOCKERS"
+                    description="The engine considers these severe enough to warrant founder review before the report is shared."
+                    color="#b91c1c"
+                    findings={blockers}
+                />
+            )}
+            {content.length > 0 && (
+                <FindingGroup
+                    title="CONTENT FIXES"
+                    description="Wrong but not blocking — citation or value the founder may want to correct."
+                    color="#b45309"
+                    findings={content}
+                />
+            )}
+            {cosmetic.length > 0 && (
+                <FindingGroup
+                    title="COSMETIC"
+                    description="Formatting / typo level."
+                    color="#525252"
+                    findings={cosmetic}
+                />
+            )}
+            <Text style={styles.footer} fixed>
+                <Text>Engine self-review</Text>
+            </Text>
+        </Page>
+    )
+}
+
+function FindingGroup({
+    title,
+    description,
+    color,
+    findings,
+}: {
+    title: string
+    description: string
+    color: string
+    findings: NonNullable<PdfInput["proofreadFindings"]>["findings"]
+}): React.ReactElement {
+    return (
+        <View style={{ marginBottom: 14 }}>
+            <Text style={{ fontSize: 11, fontWeight: "bold", color, marginBottom: 2 }}>
+                {title} ({findings.length})
+            </Text>
+            <Text style={[styles.small, { marginBottom: 6, color: MUTED }]}>
+                {description}
+            </Text>
+            {findings.map((f, i) => (
+                <View key={i} style={{ marginBottom: 8 }} wrap={false}>
+                    <Text style={[styles.small, { fontWeight: "bold" }]}>
+                        {f.section.toUpperCase()} · {f.location}{" "}
+                        <Text style={{ fontWeight: "normal", color: MUTED }}>
+                            (confidence {f.confidence})
+                        </Text>
+                    </Text>
+                    <Text style={[styles.small, { marginTop: 1 }]}>
+                        Issue: {f.issue}
+                    </Text>
+                    <Text style={[styles.small, { marginTop: 1, color: MUTED }]}>
+                        Suggested fix: {f.suggested_fix}
+                    </Text>
+                </View>
+            ))}
+        </View>
     )
 }
 
@@ -2402,7 +2531,7 @@ async function exportProjectPdfInternal(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet, spatial_plan",
+                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet, spatial_plan, proofread_findings",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -2895,6 +3024,42 @@ async function exportProjectPdfInternal(
                 reviewCount,
             },
             sources,
+            proofreadFindings: (() => {
+                const raw = project.proofread_findings as
+                    | {
+                          ran_at?: unknown
+                          model?: unknown
+                          cost_pence?: unknown
+                          findings?: unknown
+                      }
+                    | null
+                if (!raw) return null
+                const findingsArr = Array.isArray(raw.findings) ? raw.findings : []
+                if (findingsArr.length === 0) return null
+                type Finding = NonNullable<PdfInput["proofreadFindings"]>["findings"][number]
+                const cleaned: Finding[] = []
+                for (const f of findingsArr) {
+                    if (
+                        f &&
+                        typeof f === "object" &&
+                        "section" in f &&
+                        "issue" in f &&
+                        "severity" in f
+                    ) {
+                        cleaned.push(f as Finding)
+                    }
+                }
+                return {
+                    ranAtIso:
+                        typeof raw.ran_at === "string"
+                            ? raw.ran_at
+                            : new Date().toISOString(),
+                    model: typeof raw.model === "string" ? raw.model : "unknown",
+                    costPence:
+                        typeof raw.cost_pence === "number" ? raw.cost_pence : 0,
+                    findings: cleaned,
+                }
+            })(),
         }
 
         try {

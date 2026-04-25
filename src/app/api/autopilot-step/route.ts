@@ -428,6 +428,27 @@ async function runStep(
             return await runFangReviewsForAllModules(projectId, foundryId)
         }
 
+        case "runProofreader": {
+            const { runProofreaderBackground } = await import(
+                "@/actions/specialists/run-proofreader"
+            )
+            const result = await runProofreaderBackground(
+                projectId,
+                foundryId,
+                null,
+            )
+            // Proofreader is non-blocking by design (Phase 1) — it appends
+            // findings to a JSONB column the PDF appendix renders. A
+            // failure here should NOT block PDF emission. Log + advance.
+            if (!result.ok) {
+                console.warn(
+                    "[autopilot-step] proofreader failed (non-blocking):",
+                    result.error,
+                )
+            }
+            return { ok: true }
+        }
+
         case "generatePdf": {
             // Brief render-readiness wait — gives per-module renders that
             // were kicked off in `generateIllustration` time to land before

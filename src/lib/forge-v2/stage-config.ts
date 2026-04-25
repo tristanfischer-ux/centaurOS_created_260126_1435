@@ -133,11 +133,19 @@ export const STAGE_CONFIG: Record<
     running_fang_reviews: {
         kind: "fire",
         fireStep: "runFangReviews",
-        nextStage: "generating_pdf",
+        nextStage: "proofreading",
         // Per-module fan-out: each module review takes ~60s × N modules.
         // First 2 retries give the partial-success path room to backfill
         // failed modules; further retries cover transient Anthropic 429s.
         maxAttempts: 5,
+    },
+    proofreading: {
+        kind: "fire",
+        fireStep: "runProofreader",
+        nextStage: "generating_pdf",
+        // Single V4-Pro fact-check call; transient OpenRouter 429/5xx
+        // covered by 3 retries.
+        maxAttempts: 3,
     },
     generating_pdf: {
         kind: "fire",
@@ -162,6 +170,7 @@ export const STEP_TO_STAGE: Record<AutopilotStepName, AutopilotStage> = {
     generateIllustration: "generating_illustration",
     matchSuppliers: "matching_suppliers",
     runFangReviews: "running_fang_reviews",
+    runProofreader: "proofreading",
     generatePdf: "generating_pdf",
 }
 

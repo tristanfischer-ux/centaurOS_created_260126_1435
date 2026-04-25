@@ -68,6 +68,7 @@ export type AutopilotStage =
     | "generating_illustration"
     | "matching_suppliers"
     | "running_fang_reviews"
+    | "proofreading"    // v1.4 (2026-04-25 NIGHT): Engine self-review before PDF
     | "generating_pdf"  // v1.2: final PDF export so founder gets a deliverable
     | "done"
 
@@ -97,6 +98,7 @@ export type AutopilotStepName =
     | "generateIllustration"
     | "matchSuppliers"
     | "runFangReviews"
+    | "runProofreader"
     | "generatePdf"
 
 export type StartAutopilotResult =
