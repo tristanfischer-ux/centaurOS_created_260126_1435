@@ -1,15 +1,24 @@
 /**
  * WelcomeView — Client component for /welcome.
  *
- * @description First-login tour page. Opens with a hero + personal letter
- * from Tristan Fischer (Founder), a "Try these three in your first hour"
- * card with the primary CTA, a guided tour of every platform section with
- * its killer drop-in/output move, the 13-specialist roster, and a closing
- * CTA. Copy follows Tristan's first-person British voice and avoids the
- * "No AI Emphasis" phrases (no "AI-powered", "Smart", "Intelligent", etc.).
+ * @description First-login tour page rebuilt 2026-04-25 for the post-pivot
+ * product: Brainstorming-led, Fundraising-focused, with a trimmed sidebar
+ * (Brainstorming · Fundraising · Workshop · Marketplace).
  *
- * The primary CTA (`Take me to Today`) marks the welcome as seen via the
- * `markWelcomeComplete` server action, then routes to `/today`.
+ * Structure: hero + personal letter from Tristan → "Try these three in
+ * your first hour" card pointing at brainstorm/investors/forge → guided
+ * tour of the four current sidebar sections with their canonical
+ * drop-in/output → trimmed roster of the four key leaders (Fang, Chase,
+ * Fiona, Sage) with a link to all 13 → closing CTA.
+ *
+ * Copy follows Tristan's first-person British voice and the in-product
+ * "No AI Emphasis" rule — no "AI-powered", "Smart", "Intelligent",
+ * AI-agent counts, robot/brain icons. Specialists are referred to as
+ * "specialists", never "AI agents".
+ *
+ * The primary CTA marks the welcome as seen via the `markWelcomeComplete`
+ * server action, then routes to `/agents` (the Brainstorming page —
+ * post-pivot default landing).
  */
 
 "use client"
@@ -19,31 +28,23 @@ import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
     ArrowRight,
-    Waypoints,
-    Flame,
+    Sparkles,
+    Building2,
     Hammer,
     Store,
-    UserSearch,
-    CalendarDays,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { markWelcomeComplete } from "@/actions/welcome"
 
-const SPECIALISTS: ReadonlyArray<{ name: string; role: string }> = [
-    { name: "Sage", role: "Strategy" },
-    { name: "Max", role: "CTO" },
-    { name: "Jian", role: "VP Engineering" },
-    { name: "Priya", role: "Product" },
-    { name: "Fang", role: "VP Manufacturing" },
-    { name: "Chase", role: "VP Supply Chain" },
-    { name: "Mia", role: "Growth" },
-    { name: "Sal", role: "Sales" },
-    { name: "Cal", role: "Chief of Staff" },
-    { name: "Finn", role: "Finance" },
-    { name: "Fiona", role: "Fundraising" },
-    { name: "Harper", role: "People" },
-    { name: "Leo", role: "Legal" },
+// INTENT: Trimmed roster — the four key leaders the founder will speak to most
+// in the post-pivot product. Forge pole (Fang + Chase) + Investors pole (Fiona)
+// + Strategy glue (Sage). All 13 still live at /agents.
+const KEY_LEADERS: ReadonlyArray<{ name: string; role: string; reason: string }> = [
+    { name: "Sage", role: "Strategy", reason: "Frames every brainstorm and stress-tests big calls." },
+    { name: "Fang", role: "VP Manufacturing", reason: "Picks the manufacturing route and the cost ceiling." },
+    { name: "Chase", role: "VP Supply Chain", reason: "Finds the suppliers and ranks them on price + lead time." },
+    { name: "Fiona", role: "Fundraising", reason: "Matches you to investors and writes the outreach." },
 ]
 
 interface WelcomeViewProps {
@@ -58,8 +59,7 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
     const handleContinue = (): void => {
         startTransition(async () => {
             await markWelcomeComplete()
-            // DECISION 2026-04-24: post-pivot landing is /agents (Brainstorming).
-            // Full Welcome-page rebuild in Phase B will update labels + CTA copy.
+            // 2026-04-24: post-pivot landing is /agents (Brainstorming).
             router.push("/agents")
         })
     }
@@ -93,28 +93,18 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
                 <div className="max-w-2xl space-y-5 text-base sm:text-[17px] leading-relaxed text-foreground">
-                    <p className="font-medium">Welcome. I&apos;m Tristan Fischer.</p>
+                    <p className="font-medium">{"Welcome. I’m Tristan Fischer."}</p>
                     <p>
-                        I&apos;ve spent 26 years running startups — software and hardware —
-                        most recently Fischer Farms, one of the UK&apos;s larger vertical farms.
-                        ForgeOS is the wish list of everything I could have had along the way.
+                        {"I’ve spent 26 years running startups — software and hardware — most recently Fischer Farms, one of the UK’s larger vertical farms. ForgeOS is the wish list of everything I could have had along the way."}
                     </p>
                     <p>
-                        A software founder builds one thing: the product. A hardware founder
-                        builds two — the product, and all the infrastructure to make it.
-                        Finding a factory. Negotiating leases. Procuring equipment. Hiring the
-                        people to run it. Eighteen months can disappear before you&apos;ve shipped
-                        anything, and by then your design team has iterated past whatever
-                        equipment you bought.
+                        {"A software founder builds one thing: the product. A hardware founder builds two — the product, and all the infrastructure to make it. Finding a factory. Negotiating leases. Procuring equipment. Hiring the people to run it. Eighteen months can disappear before you’ve shipped anything."}
                     </p>
                     <p>
-                        Hardware has never had an AWS. Every founder reinvents the same wheels
-                        — engineers, investors, IP, finance — all pre-revenue, all without the
-                        budget. ForgeOS is my attempt to change that. What follows is a tour of
-                        each area, and the exact moment you&apos;ll start saving time in it.
+                        {"ForgeOS gives you a team of 13 specialists, an investor database of 600 UK funds, and a workspace that turns a paragraph about your product into a system architecture. Use it to think out loud, find capital, and actually build the thing."}
                     </p>
                     <div className="pt-2">
-                        <p className="font-semibold text-foreground">— Tristan</p>
+                        <p className="font-semibold text-foreground">{"— Tristan"}</p>
                         <p className="text-sm text-muted-foreground">Founder, Fractional Forge</p>
                     </div>
                 </div>
@@ -132,18 +122,18 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                         <CardContent className="pt-6 pb-6 space-y-5">
                             <FirstHourStep
                                 number={1}
-                                title="Paste your business plan into Strategy."
-                                body="Ten minutes later you have a full strategic tree — pillars, objectives, measurable KPIs, and atomic tasks — every objective linked to a line on your cashflow."
+                                title={"Brainstorm something you’re stuck on."}
+                                body={"Pick one of the eight idea prompts on the Brainstorming page, or type your own. Sage and three other specialists run the conversation, ask good questions, and leave you with the next step instead of more reading."}
                             />
                             <FirstHourStep
                                 number={2}
-                                title="Drop your finance spreadsheet into Cash Burn."
-                                body="It auto-categorises spend, flags anomalies, and returns three cashflow scenarios — Base, Optimistic, Pessimistic — with runway projections."
+                                title="Search the investor database."
+                                body="Six hundred UK VC and PE firms, matched against your stage, sector, and cheque size. Fiona surfaces the dozen you should actually approach this week and writes the opening line."
                             />
                             <FirstHourStep
                                 number={3}
-                                title="Write one paragraph about your product in The Forge."
-                                body="You'll get a system architecture, a module decomposition, a skeleton Bill of Materials, reference images of each module, and a design report — before lunch."
+                                title="Drop your product idea into The Forge."
+                                body={"One paragraph in. A system architecture, a module decomposition, a skeleton Bill of Materials, and a shortlist of UK manufacturers — out — before lunch."}
                             />
                         </CardContent>
                     </Card>
@@ -154,7 +144,7 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                             size="lg"
                             className="gap-2"
                         >
-                            Take me to Today
+                            Take me to Brainstorming
                             <ArrowRight className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="lg" asChild>
@@ -167,104 +157,65 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
             <div id="tour" className="scroll-mt-8" />
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Section deep-dives                                      */}
+            {/* Section deep-dives — match the four current sidebar
+                sections (Brainstorming · Fundraising · Workshop ·
+                Marketplace) in the order they appear in the sidebar. */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 space-y-6 lg:space-y-8 max-w-4xl">
                 <SectionBlock
-                    icon={Waypoints}
-                    label="Plan"
-                    subtitle="Strategy, objectives, tasks, intelligence"
-                    startHref="/strategy"
-                    startLabel="Start in Strategy"
-                    intro="Paste your business plan. Sage, your Strategy specialist, builds you a strategic tree — pillars, objectives, milestones, atomic tasks. Every objective links to a measurable outcome and a line on your cashflow, so you can see which objective is eating which £ of runway."
+                    icon={Sparkles}
+                    label="Brainstorming"
+                    subtitle="Ideas in, decisions out"
+                    startHref="/agents"
+                    startLabel="Open Brainstorming"
+                    intro={"The Brainstorming page is the front door. Eight curated questions are waiting — pricing, hiring, fundraising, build-vs-partner — each one already paired with the specialists best placed to answer it. Or type your own topic and four key leaders pick it up. The output isn’t a chat log; it’s a decision and the next step."}
                     rows={[
                         [
+                            "Strategy",
+                            "Sage frames the bigger picture. Drop a business plan or paste your one-liner — back comes a strategic tree of pillars, objectives, and atomic tasks, each linked to a measurable outcome.",
+                        ],
+                        [
                             "Objectives",
-                            "Write one sentence; Sage returns success criteria, KPIs, dependencies, and the right specialist to own it.",
+                            "Each objective auto-decomposes into 1–3-day tasks scheduled against your team’s velocity. The system tells you “this objective needs one more engineer to ship on time” before you spend six weeks finding out.",
                         ],
                         [
                             "Tasks",
-                            "Objectives auto-decompose into 1–3 day atomic work, scheduled against your team's historical velocity. It tells you “this objective needs one more engineer to ship on time” before you burn six weeks finding that out.",
+                            "Day-to-day work tied to the objectives that justify the burn. Drag, assign, mark done, see it ladder up to the strategic pillar.",
                         ],
                         [
-                            "Review",
-                            "One-click weekly review — progress, blockers, wins, all-hands talking points, auto-drafted.",
-                        ],
-                        [
-                            "Reports",
-                            "Quarterly retrospectives, trend analysis, and pattern discovery across everything you've shipped.",
-                        ],
-                        [
-                            "Red Team",
-                            "Describe a decision — pricing, pivot, market entry. Five distinct perspectives (Bull, Bear, Realist, Disruptor, Wildcard) debate it across four rounds. The output isn't an argument, it's the single assumption your decision hinges on that you haven't tested yet.",
-                        ],
-                        [
-                            "Knowledge",
-                            "Drop in your past decks, emails, and docs. Every specialist afterwards references them automatically. You stop explaining your company from scratch.",
+                            "Outputs",
+                            "Every deliverable your specialists have produced — pitch decks, financial models, strategy briefs, CAD exports — searchable by specialist or document type.",
                         ],
                     ]}
                 />
                 <SectionBlock
-                    icon={Flame}
-                    label="Cash Burn"
-                    subtitle="Your runway, and what changes it"
-                    startHref="/cash-burn"
-                    startLabel="Start in Cash Burn"
-                    intro="Drop in your finance spreadsheet or QuickBooks export. Cash Burn auto-categorises spend, flags anomalies, and generates three cashflow scenarios with burn-down projections. When your runway drops below 60 days, it automatically creates a “Fundraising Required” task with the exact numbers you'll need."
-                    rows={[
-                        [
-                            "Cash Out",
-                            "Watches your spend and flags where you're paying well above market rate.",
-                        ],
-                        [
-                            "Cash In",
-                            "Extracts deal terms from your revenue log and shows when actual income drifts from forecast.",
-                        ],
-                        [
-                            "P&L",
-                            "Gross margin, operating margin, CAC payback, LTV:CAC, and your live path to breakeven, in one view.",
-                        ],
-                        [
-                            "Investors",
-                            "Your sector, stage, and target matched against 600 UK VC and PE firms. Filter “early-stage, food tech, UK” in plain English. Fiona, your Fundraising specialist, pulls each investor's portfolio and recent activity into every outreach brief.",
-                        ],
-                        [
-                            "Fundraise",
-                            "Fiona generates your fundraising playbook — outreach sequence, templates, diligence tracker, valuation model. Edit once, deploy across the whole list.",
-                        ],
-                    ]}
+                    icon={Building2}
+                    label="Fundraising"
+                    subtitle={"Find the investors who’d back you"}
+                    startHref="/investors"
+                    startLabel="Open the investor database"
+                    intro={"Six hundred UK VC and PE firms profiled and matched to your sector, stage, and cheque size. Filter in plain English — “early-stage food tech”, “hardware climate fund”, “family office angels writing £250K”. Fiona pulls each investor’s portfolio and recent activity into every outreach brief, so the email lands in their inbox already personalised."}
+                    rows={[]}
                 />
                 <SectionBlock
                     icon={Hammer}
                     label="Workshop"
                     subtitle="From idea to manufactured product"
                     startHref="/the-forge-v2"
-                    startLabel="Start in The Forge"
-                    intro="Type your product idea in one paragraph. Max, your CTO specialist, returns a system architecture diagram, a module decomposition (your product broken into 5–8 functional modules, each with its interface contract), a skeleton Bill of Materials, reference images of each module, and a design report with research, risks, and next steps."
+                    startLabel="Open The Forge"
+                    intro="Type your product idea in one paragraph. Max, your CTO specialist, returns a system architecture diagram, a module decomposition, a skeleton Bill of Materials, reference images of each module, and a design report with research, risks, and next steps. Jian (engineering), Fang (manufacturing), and Chase (supply chain) take it from there."
                     rows={[
                         [
                             "Build",
-                            "Jian, your VP Engineering specialist, generates detailed CAD specs, tolerance stack-ups, manufacturing process recommendations, and cost-per-unit estimates from live supplier quotes.",
+                            "Jian generates detailed CAD specs, tolerance stack-ups, manufacturing process recommendations, and cost-per-unit estimates from live supplier quotes.",
                         ],
                         [
                             "Assemble",
-                            "Fang, your VP Manufacturing specialist, returns assembly method sheets, tooling lists, and labour-hour estimates.",
+                            "Fang returns assembly method sheets, tooling lists, and labour-hour estimates.",
                         ],
                         [
                             "Procurement",
-                            "Chase, your VP Supply Chain specialist, searches hundreds of thousands of parts, auto-fills supplier quotes, flags long lead times, and ranks suppliers on reliability and price. If a supplier's lead time misses your launch window, it tells you — with alternatives already queued.",
-                        ],
-                        [
-                            "Parts & BOM",
-                            "Auto-generated, filterable by cost, lead time, supplier, risk. Export to CSV.",
-                        ],
-                        [
-                            "Products",
-                            "Create variants — Standard, Pro, SKU-by-SKU — and it re-runs the BOM and cost model for each.",
-                        ],
-                        [
-                            "Browse & Inspiration",
-                            "Manufacturing playbooks (injection moulding, PCB assembly, 3D printing) and curated learning paths tied to whatever stage you're at.",
+                            "Chase searches hundreds of thousands of parts, auto-fills supplier quotes, flags long lead times, and ranks suppliers on reliability and price.",
                         ],
                     ]}
                     footnote="IP-sensitive? Mark the project, and designs never touch shared storage."
@@ -272,83 +223,68 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                 <SectionBlock
                     icon={Store}
                     label="Marketplace"
-                    subtitle="Factories, suppliers, quotes"
+                    subtitle="Fractional Executives · Suppliers · Manufacturing Techniques"
                     startHref="/marketplace"
-                    startLabel="Start in the Marketplace"
-                    intro="Your BOM and specs go in. Matched suppliers come out. The Marketplace connects you to UK factories and vendors that already have the premises, the equipment, and the people — many with capacity they'd like to fill. Ranked shortlists for PCB assembly, injection moulding, 3D printing, testing labs, and fulfilment."
+                    startLabel="Open the Marketplace"
+                    intro="Three doors into the same physical world: experienced fractional executives ready to fill a gap on your team, UK suppliers and contract manufacturers ranked on capability and lead time, and a library of manufacturing techniques (injection moulding, PCB assembly, 3D printing, CNC) so you stop over-specifying tolerances by 2x."
                     rows={[
                         [
-                            "Quotes",
-                            "Paste or generate. The system flags “Quote A is 30% cheaper but 6-week lead vs Quote B's 2-week” and recommends against your launch date.",
+                            "Fractional Executives",
+                            "Describe the hole in your team. Harper returns matched candidates with portfolios, interview questions, and a culture-fit checklist. Fractional, contract, or full-time — your choice.",
                         ],
                         [
-                            "Orders",
-                            "Every order in one place, auto-synced with supplier status, with delay alerts.",
-                        ],
-                    ]}
-                />
-                <SectionBlock
-                    icon={UserSearch}
-                    label="Recruits"
-                    subtitle="Fractional executives and specialist hires"
-                    startHref="/recruits"
-                    startLabel="Start in Recruits"
-                    intro="Describe the hole in your team. Harper, your People specialist, returns a matched list from a pool of fractional executives and full-time candidates, with job descriptions, interview questions, and a culture-fit checklist. If you need PCB engineering experience, Harper surfaces candidates with exactly that background and their portfolio."
-                    rows={[]}
-                />
-                <SectionBlock
-                    icon={CalendarDays}
-                    label="Me"
-                    subtitle="Your calendar, focus, daily brief"
-                    startHref="/today"
-                    startLabel="Start in Today"
-                    intro="Your personal command deck — everything tied to what you need to do next."
-                    rows={[
-                        [
-                            "Today",
-                            "Your Morning Brief. Calendar, objectives, yesterday's wins, at-risk items. Ninety seconds, no manual status reporting.",
+                            "Suppliers",
+                            "Your Bill of Materials goes in. Ranked supplier shortlists come out — PCB assembly, injection moulding, 3D printing, testing labs, fulfilment.",
                         ],
                         [
-                            "My Profile",
-                            "Integrations, calendar sync, focus time blocked back to your calendar.",
-                        ],
-                        [
-                            "Comms",
-                            "A single feed of every meaningful change across your company — people, funding, product, orders.",
+                            "Manufacturing Techniques",
+                            "Curated tutorials and Q&A on the decisions that quietly cost the most: when to mould vs CNC, when tolerances are overkill, when a cheaper material outperforms.",
                         ],
                     ]}
                 />
             </section>
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Specialists roster                                      */}
+            {/* Trimmed key-leaders roster                              */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 max-w-4xl">
                 <div className="flex items-center gap-3 mb-5">
                     <div className="h-8 w-1.5 bg-international-orange rounded-full" />
                     <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-                        Your team of 13 specialists
+                        Your four key leaders
                     </h2>
                 </div>
                 <p className="text-base text-muted-foreground mb-6 max-w-2xl leading-relaxed">
-                    Each one is available from every section. Call them individually, or run a
-                    30-minute huddle with any combination to workshop a problem. Post-meeting,
-                    tasks auto-assign.
+                    Most brainstorming sessions land with one of these four. The other nine
+                    specialists are a click away whenever a conversation needs them — Max,
+                    Jian, Priya, Mia, Sal, Cal, Finn, Harper, Leo.
                 </p>
                 <Card className="border-border">
                     <CardContent className="pt-6 pb-6">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
-                            {SPECIALISTS.map((s) => (
-                                <div key={s.name} className="flex items-baseline gap-2">
-                                    <span className="text-sm font-semibold text-foreground">
-                                        {s.name}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        — {s.role}
-                                    </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                            {KEY_LEADERS.map((leader) => (
+                                <div key={leader.name} className="flex flex-col">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-base font-semibold text-foreground">
+                                            {leader.name}
+                                        </span>
+                                        <span className="text-sm text-muted-foreground">
+                                            — {leader.role}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed mt-1">
+                                        {leader.reason}
+                                    </p>
                                 </div>
                             ))}
                         </div>
+                        <Link
+                            href="/agents"
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-international-orange hover:underline mt-5"
+                        >
+                            See all 13 specialists
+                            <ArrowRight className="h-4 w-4" />
+                        </Link>
                     </CardContent>
                 </Card>
             </section>
@@ -368,7 +304,7 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                     size="lg"
                     className="gap-2"
                 >
-                    Take me to Today
+                    Take me to Brainstorming
                     <ArrowRight className="h-4 w-4" />
                 </Button>
             </section>
@@ -443,9 +379,7 @@ function SectionBlock({
                         {rows.map(([name, body]) => (
                             <div key={name} className="text-sm text-foreground">
                                 <span className="font-semibold">{name}.</span>{" "}
-                                <span className="text-muted-foreground leading-relaxed">
-                                    {body}
-                                </span>
+                                <span className="text-muted-foreground leading-relaxed">{body}</span>
                             </div>
                         ))}
                     </div>

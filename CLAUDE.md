@@ -172,6 +172,77 @@ For every page-level red-team pass, the code audit + fix is only half the work. 
 2. If "still doesn't work": STOP. Switch to Plan Mode. Re-analyze assumptions. Create debugging plan. Write reproducing test. Prove fix works.
 - Only ONE attempt before escalating to plan mode
 
+### Logs Are Your Debugger — USE THEM, DON'T POKE BLINDLY
+
+**You have full Vercel access via the `vercel` CLI AND full Supabase log access via the MCP server. Production runtime logs are one command away on both layers. Use them BEFORE guessing at fixes.** Codified 2026-04-25 after a session spent diagnosing a silent signup-failure bug by visual inspection alone, when `vercel logs` + `mcp__claude_ai_Supabase__get_logs` together would have surfaced the actual root cause in 60 seconds.
+
+The mistake to avoid: a user reports "X doesn't work in production" → you start reading code, forming hypotheses, reproducing in agent-browser → you hit a silent failure (no client-side error, no toast, no console) → you guess at root causes (rate limiter? CSRF? validation?) and propose three speculative fixes. None of that is necessary. The server-side log line tells you the answer. Two log queries can rule out 80% of the hypothesis space.
+
+#### Vercel logs (frontend / API routes / edge / middleware / runtime errors)
+
+**Commands you should reach for FIRST when debugging anything that touches the Next.js layer:**
+
+```bash
+# Recent production logs, expanded so message bodies are visible
+npx vercel logs --no-follow --environment production --since 30m -x -n 200
+
+# Filter to errors only
+npx vercel logs --no-follow --environment production --since 2h --level error -x
+
+# Search by query string (function logs, message text, etc)
+npx vercel logs --no-follow --environment production --since 1h -q "signup" -x
+
+# Inspect a specific deployment with logs
+npx vercel inspect <deployment-url> --logs
+
+# List recent deployments to find the one a user was hitting
+npx vercel ls
+```
+
+Source markers in output: `λ` = serverless function, `ε` = edge/middleware, `◇` = static. Errors of interest cluster under `λ` (server actions) and `ε` (middleware).
+
+#### Supabase logs (auth / Postgres / RLS / Storage / Edge Functions / Realtime)
+
+**Use the MCP tool for the linked Supabase project — equally important when debugging auth, RLS, or DB errors:**
+
+```
+mcp__claude_ai_Supabase__get_logs(project_id, service)
+```
+
+Service values to know:
+- `auth` — sign-up, sign-in, token refresh, password resets. The first place to look for any "user can't log in" / "signup didn't work" report.
+- `postgres` — slow queries, RLS policy denials, connection-pool issues, statement timeouts.
+- `api` — PostgREST request log; surfaces 4xx/5xx from anywhere using the auto-generated REST API.
+- `edge-function` — Deno edge function invocations + their stdout.
+- `storage` — file upload/download errors, signed-URL issues.
+- `realtime` — channel subscription / broadcast issues.
+- `branch-action` — Supabase branch operations.
+
+ForgeOS production project ID: `jyarhvinengfyrwgtskq`. (See `forgeos_supabase_project_ids.md` in memory for the full list — there's also `kgkajatjyqfetdtbzmwg` for the apex-outreach CRM. Do not confuse them.)
+
+#### Workflow for any "X is broken in production" report
+
+1. **Reproduce once** (agent-browser or curl) — note the timestamp.
+2. **Pull Vercel logs** for that window (`vercel logs --since` + `--level error`). Note any matching error.
+3. **If signup / auth / RLS related**: also pull Supabase auth logs via the MCP tool. Cross-reference timing.
+4. **Read the log line carefully.** Most production bugs surface as a single distinctive error message in one of the two log streams.
+5. **If both logs show nothing** for the request: the request didn't reach the server. Block is client-side (JS error, validation, BotID, network). That alone narrows the hypothesis space by 80%.
+6. ONLY THEN form a hypothesis and edit code. Logs over guesses every time.
+
+#### Cross-layer signal patterns
+
+- **Vercel `λ POST /investors` error + Supabase postgres slow-query log** → likely the function timed out on a query you can identify in postgres logs.
+- **Vercel function log absent + Supabase auth log absent for a user-attempted signup** → fully client-side block (BotID, JS error, controlled-component issue).
+- **Vercel function log shows `signup` was called + Supabase auth log shows `auth.signUp` errored** → the cause is in the Supabase auth log message.
+- **Both logs show success but user reports failure** → race / hydration / client-state issue. Different debugging route.
+
+#### Do not skip this step because:
+- "I think I know what's wrong" — you don't, until logs say so.
+- "It's faster to just edit the code" — it's not. Wrong fixes cost an hour each. Reading a log line costs 30 seconds.
+- "Logs are noisy" — `--since`, `--level`, `-q`, and service filters narrow fast.
+
+This rule applies equally to BOTH platforms — Vercel for the Next.js runtime, Supabase for the data layer. Together they cover the full request lifecycle. Reach for both before reaching for code.
+
 ### Supabase Is Your Job — ZERO EXCEPTIONS
 
 **You have FULL ACCESS to Supabase. You can and MUST do ALL database operations yourself. NEVER ask the user to run Supabase commands. NEVER say "you'll need to apply this migration" or "run npx supabase db push when you're back." YOU run it. NOW.**
