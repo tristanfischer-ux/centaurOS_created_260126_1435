@@ -17,6 +17,7 @@ import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser } from '@/actions/investors'
 import { getProducts } from '@/actions/products'
+import { getEarlyAccessProfile } from '@/actions/referrals'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { InvestorStats, ShortlistStage, InvestorTierAccess, InvestorViewCapResult } from '@/actions/investors'
@@ -110,12 +111,13 @@ export default async function InvestorDirectoryPage() {
     intelligenceAccess: false,
   }
 
-  const [searchResult, statsResult, shortlistResult, accessResult, viewCapResult] = await Promise.allSettled([
+  const [searchResult, statsResult, shortlistResult, accessResult, viewCapResult, earlyAccessResult] = await Promise.allSettled([
     searchInvestors({ page: 1, pageSize: 24 }),
     getInvestorStats(),
     getShortlistIds(),
     getInvestorTierAccess(),
     getInvestorViewCapStatus(),
+    getEarlyAccessProfile(),
   ])
 
   if (searchResult.status === 'fulfilled') {
@@ -147,6 +149,18 @@ export default async function InvestorDirectoryPage() {
   let viewCapStatus: InvestorViewCapResult | null = null
   if (viewCapResult.status === 'fulfilled') {
     viewCapStatus = viewCapResult.value
+  }
+
+  // INTENT: Resolve early-access status once at the page level and pass it
+  // down to InvestorSearchHeroClient so the LimitReachedUpsell and
+  // ApproachingLimitBanner show the invite-a-friend framing for early-access
+  // users instead of the paid-conversion upsell.
+  let isEarlyAccess = false
+  if (earlyAccessResult.status === 'fulfilled') {
+    const earlyAccessData = earlyAccessResult.value
+    if (!('error' in earlyAccessData)) {
+      isEarlyAccess = earlyAccessData.isEarlyAccess
+    }
   }
 
   // Compute match scores for initial firms
@@ -327,6 +341,7 @@ export default async function InvestorDirectoryPage() {
                   viewsUsedThisMonth: viewCapStatus.viewsUsedThisMonth,
                   viewsRemaining: viewCapStatus.viewsRemaining,
                 } : undefined}
+                isEarlyAccess={isEarlyAccess}
               />
             </Suspense>
           </div>
