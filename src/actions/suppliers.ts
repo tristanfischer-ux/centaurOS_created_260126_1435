@@ -439,6 +439,12 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
     .sort((a, b) => b.value - a.value)
     .slice(0, 10)
 
+  // Helper: case-insensitive Title Case dedupe key. Listings use mixed casing
+  // ("Stainless Steel" vs "stainless steel" vs "STAINLESS STEEL") which would
+  // otherwise produce duplicate chart entries with the same label.
+  const titleCase = (s: string) =>
+    s.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+
   // ── Top process capabilities ───────────────────────────────────────────────────
   // GOTCHA: process_capabilities is JSONB array of *objects* with a `process_name`
   // field (not plain strings). Extract the process_name from each element.
@@ -450,8 +456,10 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
       const caps = row.process_capabilities
       if (!Array.isArray(caps)) continue
       for (const cap of caps as Array<Record<string, unknown>>) {
-        const name = (cap?.process_name as string | undefined)?.trim()
-        if (name) capMap.set(name, (capMap.get(name) ?? 0) + 1)
+        const raw = (cap?.process_name as string | undefined)?.trim()
+        if (!raw) continue
+        const name = titleCase(raw)
+        capMap.set(name, (capMap.get(name) ?? 0) + 1)
       }
     }
   }
@@ -469,7 +477,7 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
       if (!Array.isArray(mats)) continue
       for (const m of mats as unknown[]) {
         if (typeof m === 'string' && m.trim()) {
-          const name = m.trim()
+          const name = titleCase(m)
           matMap.set(name, (matMap.get(name) ?? 0) + 1)
         }
       }

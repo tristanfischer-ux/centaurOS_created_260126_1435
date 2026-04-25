@@ -221,7 +221,9 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
           {stats.topCapabilities.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            // Height grows with item count so all 10 y-axis labels render
+            // (default Recharts hides labels when bar height < ~22px).
+            <ResponsiveContainer width="100%" height={Math.max(260, stats.topCapabilities.length * 26)}>
               <BarChart
                 data={stats.topCapabilities}
                 layout="vertical"
@@ -236,9 +238,10 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
                 <YAxis
                   type="category"
                   dataKey="name"
-                  width={100}
+                  width={120}
+                  interval={0}
                   tick={tickStyle}
-                  tickFormatter={(v: string) => v.length > 16 ? v.slice(0, 15) + '…' : v}
+                  tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 17) + '…' : v}
                 />
                 <Tooltip
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -425,12 +428,7 @@ export function SupplierSearchPanel({
   return (
     <div className="space-y-4">
 
-      {/* ── Pre-search stats charts — visible when no active search ── */}
-      {!isFiltered && (
-        <SupplierStatsCharts stats={stats} />
-      )}
-
-      {/* ── Search form ── */}
+      {/* ── Search form (Tristan's brief: search bar BEFORE charts; charts UNDER) ── */}
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Textarea */}
         <div className="relative">
@@ -503,6 +501,11 @@ export function SupplierSearchPanel({
           </Button>
         </div>
       </form>
+
+      {/* ── Pre-search stats charts — visible when no active search (placed UNDER the search bar per Tristan's brief, mirroring Forge Capital) ── */}
+      {!isFiltered && (
+        <SupplierStatsCharts stats={stats} />
+      )}
 
       {/* ── Results count bar ── */}
       <div className="flex items-center gap-3 text-xs text-muted-foreground">

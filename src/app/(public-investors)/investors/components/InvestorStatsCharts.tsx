@@ -154,7 +154,8 @@ export function InvestorStatsCharts({ stats }: Props) {
         {/* Top Sectors — horizontal bar, single colour, borderRadius 4, no legend */}
         <div className="bg-card border border-border rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Top Sectors</h4>
-          <ResponsiveContainer width="100%" height={220}>
+          {/* Height grows with item count so all 10 y-axis labels render. */}
+          <ResponsiveContainer width="100%" height={Math.max(260, stats.topSectors.length * 26)}>
             <BarChart
               data={stats.topSectors}
               layout="vertical"
@@ -169,9 +170,10 @@ export function InvestorStatsCharts({ stats }: Props) {
               <YAxis
                 type="category"
                 dataKey="name"
-                width={96}
+                width={120}
+                interval={0}
                 tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(v: string) => v.length > 16 ? v.slice(0, 15) + '…' : v}
+                tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 17) + '…' : v}
               />
               <Tooltip
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
