@@ -26,6 +26,7 @@ import {
   Flame,
 } from "lucide-react"
 import { ExampleInvestorMatch } from "@/components/marketing/example-investor-match"
+import { ForgeDemoGrid } from "@/components/marketing/forge-demo-grid"
 import { PricingComparisonTable } from "@/components/marketing/pricing-comparison-table"
 import {
   Accordion,
@@ -404,6 +405,12 @@ export default function MarketingPage() {
             ahead of the How-It-Works pillars per buy-or-bounce v3 report).
             Demonstration first, explanation second. ═══ */}
         <ExampleInvestorMatch />
+
+        {/* ═══ Section 2b: Forge demo grid — five real project packs, full
+            PDFs, generated 25 April 2026 against the live pipeline. The
+            "no proof of Forge output" answer that pairs the investor card
+            above. ═══ */}
+        <ForgeDemoGrid />
 
         {/* ═══ Section 3: How It Works (5 Pillars) ═══ */}
         <HowItWorksSection />
