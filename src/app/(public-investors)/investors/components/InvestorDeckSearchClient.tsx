@@ -31,6 +31,8 @@ import {
   type InvestorViewCapResult,
 } from '@/actions/investors'
 import { Loader2 } from 'lucide-react'
+import { InvestorStatsCharts } from './InvestorStatsCharts'
+import type { InvestorDirectoryStats } from '@/actions/investors'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +61,8 @@ interface Props {
     seekingFunding?: boolean
   }
   viewCapStatus: InvestorViewCapResult | null
+  /** Directory overview stats for the pre-search chart panel. Null = loading/unavailable. */
+  investorStats: InvestorDirectoryStats | null
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -140,6 +144,7 @@ export function InvestorDeckSearchClient({
   access,
   companyContext,
   viewCapStatus,
+  investorStats,
 }: Props) {
   const [query, setQuery] = useState('')
   const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
@@ -335,8 +340,13 @@ export function InvestorDeckSearchClient({
         />
       ))}
 
-      {/* ── Empty state (before search) ───────────────────────────────────── */}
-      {!hasSearched && <EmptyState />}
+      {/* ── Pre-search charts (visible before search, hidden after results) ── */}
+      {!hasSearched && investorStats && (
+        <InvestorStatsCharts stats={investorStats} />
+      )}
+
+      {/* ── Empty state (before search, no stats available) ──────────────── */}
+      {!hasSearched && !investorStats && <EmptyState />}
 
       {/* ── Empty results (search with 0 results) ────────────────────────── */}
       {hasSearched && !isPending && firms.length === 0 && (

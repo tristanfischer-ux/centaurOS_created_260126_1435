@@ -18,6 +18,7 @@
  */
 
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { SupplierSearchPanel } from './_components/SupplierSearchPanel'
@@ -90,12 +91,12 @@ export default async function MarketplacePage() {
             {verifiedCount.toLocaleString()} verified
           </span>
         )}
-        <a
+        <Link
           href="/marketplace/quotes"
           className="inline-flex items-center text-xs font-semibold text-international-orange px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted transition-colors no-underline"
         >
           + Send request for quotation
-        </a>
+        </Link>
       </div>
 
       {/* ── Search panel + results ── */}

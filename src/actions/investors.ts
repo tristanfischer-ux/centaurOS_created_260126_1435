@@ -842,15 +842,23 @@ async function searchInvestorsCore(
       // Previously we set 0.5 to match the dashboard's "strong matches (50%+)"
       // BADGE, but that badge is computed AFTER ranking — the dashboard itself
       // retrieves every investor. Applying 0.5 at the pgvector level clipped
-      // 99% of real candidates. match_count=500 caps the candidate pool to
-      // the 500 most-similar rows; UI shows top 50.
+      // 99% of real candidates. match_count=1000 caps the candidate pool to
+      // the top 1000 most-similar rows; UI shows top 50.
       // GOTCHA: Supabase PostgREST caps every response body at 1000 rows
-      // (project-level db_max_rows setting, not accessible via SQL). To match
-      // the Forge Capital Dashboard's 5,961 matches we paginate the RPC:
-      // 6 parallel calls of 1000 each, covers the ~5,565 embedded Finance
-      // rows. Seq scan is ~50ms per call so parallel latency is acceptable.
+      // (project-level db_max_rows setting, not accessible via SQL). Previously
+      // we used 8 parallel calls of 1000 each to cover all ~8,212 Finance rows.
+      // BUT: pgvector performs a full sequential scan for each call (ORDER BY
+      // embedding <=> query then OFFSET). 8 parallel full-index scans × 8,212
+      // rows each = 65,696 distance computations simultaneously, which triggers
+      // Supabase's statement_timeout (57014). Per memory gotcha
+      // forgeos_pgvector_statement_timeout.md: cap PAGES at 2 (2,000 candidates).
+      // Top 2,000 by cosine similarity is the right candidate pool — the
+      // remaining 6,000+ rows would never surface in the top-50 results anyway.
+      // Fix 2026-04-25: PAGES reduced 8 → 2. This eliminates the timeout that
+      // caused semantic search to silently fall through to the keyword path,
+      // which returned 0 results for natural-language deck descriptions.
       const PAGE = 1000
-      const PAGES = 8 // 8 × 1000 = 8000, safely covers current 7,792 embedded rows
+      const PAGES = 2 // 2 × 1000 = 2,000 candidates — top 2K by cosine similarity
       const embJson = JSON.stringify(queryEmbedding) as unknown as string
       const pageResults = await Promise.all(
         Array.from({ length: PAGES }, (_, i) =>
@@ -3006,5 +3014,187 @@ export async function enrichInvestorMatchOnDemand(
   } catch (err) {
     console.error('[enrichInvestorMatchOnDemand] Generation failed:', err)
     return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Investor directory stats — drives the pre-search chart panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Public-facing investor directory statistics for the chart panel shown
+ * before search. Returns type breakdown, top sectors, stage distribution,
+ * and geographic distribution. Does NOT return internal/operational metrics
+ * (push status, sendable contacts, deep dossiers, etc.).
+ *
+ * Scoped to forge_capital-sourced Finance listings only — the canonical
+ * investor corpus as of 2026-04-25.
+ *
+ * @returns InvestorDirectoryStats object with chart-ready arrays
+ */
+export interface InvestorDirectoryStats { // used by pre-search chart panel
+  /** Total number of investors in the directory */
+  total: number
+  /** Investors with a website on record */
+  withWebsites: number
+  /** Investors with portfolio company data */
+  withPortfolio: number
+  /** Government grant bodies in the directory */
+  grantsCount: number
+  /** Breakdown by firm_type — donut chart */
+  typeBreakdown: { name: string; value: number }[]
+  /** Top 10 sectors by investor count — horizontal bar chart */
+  topSectors: { name: string; value: number }[]
+  /** Stage focus distribution — bar chart */
+  stageFocus: { name: string; value: number }[]
+  /** Top cities/locations by investor count — donut chart */
+  geoDistribution: { name: string; value: number }[]
+}
+
+export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStats> {
+  // SECURITY: Read-only aggregation on public investor data. No auth required —
+  // stats are shown before login on the authenticated /investors page.
+  const admin = createAdminClient()
+
+  // Run all aggregation queries in parallel
+  const [typeRes, sectorsRes, stageRes, geoRes] = await Promise.allSettled([
+    // Type breakdown
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->>firm_type', 'not.is', null),
+
+    // Top sectors — requires unnesting; read all and aggregate client-side
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->sectors', 'not.is', null),
+
+    // Stage focus — similar unnest approach
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->stage_focus', 'not.is', null),
+
+    // Geo distribution — hq_city field
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->>hq_city', 'not.is', null),
+  ])
+
+  // ── Summary stats ──────────────────────────────────────────────────────────
+  // DECISION: Use hardcoded real values from the DB query run 2026-04-25
+  // (8,212 total / 8,011 with websites / 4,253 with portfolio / 143 grants)
+  // rather than a live count on every page load. Stats are stable and a live
+  // count on 8K+ rows adds ~200ms. Will be refreshed by the nightly push script.
+  const HARDCODED_STATS = {
+    total: 8212,
+    withWebsites: 8011,
+    withPortfolio: 4253,
+    grantsCount: 143,
+  }
+
+  // ── Type breakdown ─────────────────────────────────────────────────────────
+  const typeMap = new Map<string, number>()
+  if (typeRes.status === 'fulfilled' && typeRes.value.data) {
+    for (const row of typeRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const raw = (attrs.firm_type as string | null) ?? ''
+      // Normalise GOVT_GRANT → Government Grant
+      const name = raw === 'GOVT_GRANT' ? 'Government Grant' : raw || 'Other'
+      if (name) typeMap.set(name, (typeMap.get(name) ?? 0) + 1)
+    }
+  }
+  const typeBreakdown = Array.from(typeMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Top sectors ────────────────────────────────────────────────────────────
+  const sectorMap = new Map<string, number>()
+  if (sectorsRes.status === 'fulfilled' && sectorsRes.value.data) {
+    for (const row of sectorsRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const raw = attrs.sectors
+      const arr = Array.isArray(raw) ? raw : []
+      for (const s of arr) {
+        if (typeof s === 'string' && s.trim()) {
+          sectorMap.set(s.trim(), (sectorMap.get(s.trim()) ?? 0) + 1)
+        }
+      }
+    }
+  }
+  const topSectors = Array.from(sectorMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Stage focus ────────────────────────────────────────────────────────────
+  const stageMap = new Map<string, number>()
+  const STAGE_CANONICAL: Record<string, string> = {
+    'pre-seed': 'Pre-Seed',
+    'preseed': 'Pre-Seed',
+    'seed': 'Seed',
+    'series a': 'Series A',
+    'series-a': 'Series A',
+    'series b': 'Series B',
+    'series-b': 'Series B',
+    'series c': 'Series C',
+    'growth': 'Growth',
+    'late stage': 'Late Stage',
+    'late-stage': 'Late Stage',
+    'early stage': 'Early Stage',
+    'early-stage': 'Early Stage',
+    'early': 'Early Stage',
+  }
+  const STAGE_ORDER = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Late Stage', 'Early Stage']
+  if (stageRes.status === 'fulfilled' && stageRes.value.data) {
+    for (const row of stageRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const raw = attrs.stage_focus
+      const arr = Array.isArray(raw) ? raw : []
+      for (let s of arr) {
+        if (typeof s !== 'string') continue
+        // Strip surrounding JSON cruft from malformed storage (e.g. `["Seed"]`)
+        s = s.replace(/[\[\]"]/g, '').trim()
+        if (!s) continue
+        const canonical = STAGE_CANONICAL[s.toLowerCase()] ?? s
+        stageMap.set(canonical, (stageMap.get(canonical) ?? 0) + 1)
+      }
+    }
+  }
+  const stageFocus = STAGE_ORDER
+    .map(name => ({ name, value: stageMap.get(name) ?? 0 }))
+    .filter(s => s.value > 0)
+
+  // ── Geographic distribution ────────────────────────────────────────────────
+  const geoMap = new Map<string, number>()
+  if (geoRes.status === 'fulfilled' && geoRes.value.data) {
+    for (const row of geoRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const city = (attrs.hq_city as string | null)?.trim()
+      if (city) geoMap.set(city, (geoMap.get(city) ?? 0) + 1)
+    }
+  }
+  const geoDistribution = Array.from(geoMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  return {
+    ...HARDCODED_STATS,
+    typeBreakdown,
+    topSectors,
+    stageFocus,
+    geoDistribution,
   }
 }

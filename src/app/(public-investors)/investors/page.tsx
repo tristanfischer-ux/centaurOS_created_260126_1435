@@ -10,7 +10,8 @@
  */
 
 import type { Metadata } from 'next'
-import { searchInvestors, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser } from '@/actions/investors'
+import { searchInvestors, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser, getInvestorDirectoryStats } from '@/actions/investors'
+import type { InvestorDirectoryStats } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
 import { InvestorDeckSearchClient } from './components/InvestorDeckSearchClient'
 import { AnonymousInvestorsView } from '../../(platform)/investors/components/AnonymousInvestorsView'
@@ -51,11 +52,11 @@ export default async function InvestorDirectoryPage() {
   type SearchOutputs = Awaited<ReturnType<typeof searchInvestors>>['matchOutputs']
   type SearchTier = Awaited<ReturnType<typeof searchInvestors>>['resolvedTier']
 
-  let initialFirms: SearchFirms = []
-  let initialTotal = 0
-  let initialMatchOutputs: SearchOutputs = {}
+  const initialFirms: SearchFirms = []
+  const initialTotal = 0
+  const initialMatchOutputs: SearchOutputs = {}
   let resolvedTier: SearchTier = 'free'
-  let matchScores: Record<string, number> = {}
+  const matchScores: Record<string, number> = {}
   let shortlistIds: Record<string, import('@/actions/investors').ShortlistStage> = {}
   let access: import('@/actions/investors').InvestorTierAccess = {
     tier: 'free',
@@ -72,10 +73,11 @@ export default async function InvestorDirectoryPage() {
     seekingFunding?: boolean
   } = {}
 
-  const [shortlistResult, accessResult, viewCapResult] = await Promise.allSettled([
+  const [shortlistResult, accessResult, viewCapResult, statsResult] = await Promise.allSettled([
     getShortlistIds(),
     getInvestorTierAccess(),
     getInvestorViewCapStatus(),
+    getInvestorDirectoryStats(),
   ])
 
   if (shortlistResult.status === 'fulfilled') {
@@ -87,6 +89,10 @@ export default async function InvestorDirectoryPage() {
   }
   if (viewCapResult.status === 'fulfilled') {
     viewCapStatus = viewCapResult.value
+  }
+  let investorStats: InvestorDirectoryStats | null = null
+  if (statsResult.status === 'fulfilled') {
+    investorStats = statsResult.value
   }
 
   // Fetch company context for pre-seeding the textarea
@@ -143,6 +149,7 @@ export default async function InvestorDirectoryPage() {
         access={access}
         companyContext={companyContext}
         viewCapStatus={viewCapStatus}
+        investorStats={investorStats}
       />
     </div>
   )
