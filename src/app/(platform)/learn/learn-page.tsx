@@ -33,6 +33,8 @@ import Link from 'next/link'
 import { TechniquesExplorer } from '@/components/techniques'
 import { InsightsExplorer } from '@/components/techniques/insights-explorer'
 import { ALL_TECHNIQUES } from '@/lib/manufacturing-techniques'
+import { LearningTracksSection } from '@/components/techniques/learning-tracks-section'
+import { LEARNING_TRACKS } from '@/lib/manufacturing/learning-tracks'
 import type { TechniqueEnrichment } from '@/types/manufacturing-techniques'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -56,7 +58,7 @@ import {
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type LearnTabId = 'techniques' | 'insights' | 'tutorials' | 'qa'
+type LearnTabId = 'techniques' | 'tracks' | 'insights' | 'tutorials' | 'qa'
 
 interface Tab {
   id: LearnTabId
@@ -167,6 +169,14 @@ export function LearnPage({
       activeClasses: 'bg-international-orange/10 text-international-orange border-international-orange',
     },
     {
+      id: 'tracks',
+      label: 'Learning Tracks',
+      icon: ListChecks,
+      count: LEARNING_TRACKS.length,
+      iconColor: 'text-electric-blue',
+      activeClasses: 'bg-electric-blue/10 text-electric-blue border-electric-blue',
+    },
+    {
       id: 'insights',
       label: 'Real-World Insights',
       icon: Factory,
@@ -271,6 +281,11 @@ export function LearnPage({
       {/* TECHNIQUES tab                                                     */}
       {/* ================================================================== */}
       {activeTab === 'techniques' && <TechniquesExplorer />}
+
+      {/* ================================================================== */}
+      {/* LEARNING TRACKS tab                                                */}
+      {/* ================================================================== */}
+      {activeTab === 'tracks' && <LearningTracksSection />}
 
       {/* ================================================================== */}
       {/* INSIGHTS tab                                                       */}
