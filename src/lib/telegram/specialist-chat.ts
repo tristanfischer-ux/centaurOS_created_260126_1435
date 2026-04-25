@@ -196,6 +196,11 @@ export async function sendToSpecialist(
         qwen: { providerId: 'qwen', modelId: 'qwen3.5-plus' },
         'qwen-local': { providerId: 'qwen-local', modelId: 'qwen3:30b-a3b' },
         minimax: { providerId: 'minimax', modelId: 'MiniMax-M2.7' },
+        // Benchmark-validated swaps 2026-04-25 — must mirror primaries in failover.ts.
+        haiku: { providerId: 'anthropic', modelId: 'claude-haiku-4-5-20251001' },
+        'gpt-mini': { providerId: 'openai', modelId: 'gpt-4.1-mini' },
+        'qwen-235b': { providerId: 'qwen', modelId: 'qwen3-235b-a22b' },
+        'deepseek-v4-pro': { providerId: 'together', modelId: 'deepseek-ai/DeepSeek-V4-Pro' },
     }
     const primary = PRIMARY_TARGETS[specialist.modelTier]
     const providerId: AIProviderId = primary.providerId
