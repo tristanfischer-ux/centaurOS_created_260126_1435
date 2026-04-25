@@ -28,6 +28,8 @@
 "use client"
 
 import { useState, useRef } from "react"
+import Link from "next/link"
+import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
 
@@ -665,6 +667,12 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 }
             `}</style>
 
+            {/* Breadcrumb — Forge Capital pattern (Home › Brainstorming) */}
+            <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "hsl(var(--muted-foreground))", marginBottom: "12px" }}>
+                <Link href="/today" style={{ color: "inherit", textDecoration: "none" }}>Home</Link>
+                <ChevronRight style={{ width: "12px", height: "12px" }} />
+                <span style={{ color: "hsl(var(--foreground))", fontWeight: 500 }}>Brainstorming</span>
+            </nav>
             {/* ── Page header ── */}
             <div className="bc-page-head">
                 <h1>Brainstorming Council</h1>
