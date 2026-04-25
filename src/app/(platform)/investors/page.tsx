@@ -15,7 +15,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus } from '@/actions/investors'
+import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser } from '@/actions/investors'
 import { getProducts } from '@/actions/products'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -28,6 +28,7 @@ import { InvestorSearchHeroClient } from './components/InvestorSearchHeroClient'
 import { ContactsDirectoryTab } from './components/ContactsDirectoryTab'
 import { GrantsDirectoryTab } from './components/GrantsDirectoryTab'
 import { PortfolioDirectoryTab } from './components/PortfolioDirectoryTab'
+import { AnonymousInvestorsView } from './components/AnonymousInvestorsView'
 
 export const metadata: Metadata = {
   title: 'Investor Intelligence',
@@ -69,6 +70,23 @@ function InvestorDirectoryLoading() {
 // ---------------------------------------------------------------------------
 
 export default async function InvestorDirectoryPage() {
+  // RED-TEAM-PIVOT-PLAN Tier 2 step 14: anonymous landing branch. The
+  // platform layout already renders a stripped-down shell when there is no
+  // user on /investors, so we just need to detect that state here and render
+  // the curated teaser variant instead of the full directory.
+  //
+  // Calling supabase.auth.getUser() once at the top means the variant
+  // decision happens before any tier-aware data fetches that would fail or
+  // return useless empty values for an unauthenticated visitor.
+  const supabaseAuth = await createClient()
+  const {
+    data: { user: authedUser },
+  } = await supabaseAuth.auth.getUser()
+  if (!authedUser) {
+    const teaser = await getAnonymousInvestorsTeaser()
+    return <AnonymousInvestorsView teaser={teaser} />
+  }
+
   let initialFirms: Awaited<ReturnType<typeof searchInvestors>>['firms'] = []
   let initialTotal = 0
   let initialHasMore = false
@@ -138,11 +156,15 @@ export default async function InvestorDirectoryPage() {
 
   // INTENT: Fetch company profile data so Fiona's briefing gives actionable advice
   // (e.g., "You're pre-seed in manufacturing, here are 23 active VCs in your sector")
+  // Also captures the user id so the limit-reached upsell can build the
+  // referral URL `${APP_DOMAIN}/signup?ref=<user_id>`.
   let companyContext: { sector?: string | null; stage?: string | null; fundingStatus?: string | null; seekingFunding?: boolean } = {}
+  let currentUserId: string | undefined
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      currentUserId = user.id
       const { data: profile } = await supabase.from('profiles').select('foundry_id').eq('id', user.id).single()
       if (profile?.foundry_id) {
         const { data: foundry } = await supabase
@@ -295,6 +317,12 @@ export default async function InvestorDirectoryPage() {
                 access={access}
                 productSectors={productSectors}
                 companyContext={companyContext}
+                userId={currentUserId}
+                viewCapSnapshot={viewCapStatus ? {
+                  cap: viewCapStatus.cap,
+                  viewsUsedThisMonth: viewCapStatus.viewsUsedThisMonth,
+                  viewsRemaining: viewCapStatus.viewsRemaining,
+                } : undefined}
               />
             </Suspense>
           </div>
