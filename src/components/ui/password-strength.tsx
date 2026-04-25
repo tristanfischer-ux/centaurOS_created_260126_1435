@@ -7,38 +7,42 @@ interface PasswordStrengthProps {
   password: string
 }
 
-const CHECKS = [
-  { label: '8+ characters', test: (p: string) => p.length >= 8 },
-  { label: 'Uppercase', test: (p: string) => /[A-Z]/.test(p) },
-  { label: 'Lowercase', test: (p: string) => /[a-z]/.test(p) },
-  { label: 'Number', test: (p: string) => /\d/.test(p) },
-] as const
-
-const STRENGTH_LABELS = ['Weak', 'Fair', 'Good', 'Strong'] as const
-const STRENGTH_COLORS = [
-  'bg-destructive',
-  'bg-status-warning',
-  'bg-status-info',
-  'bg-success',
-] as const
+/**
+ * Length-based strength tiers.
+ *
+ * @description Mirrors the modern password guidance the signup action enforces
+ * (length is the only requirement, no character-class rules). The bar fills
+ * up as the password gets longer, so users see the gain from picking a
+ * passphrase rather than a short complex string. 8 chars is the floor —
+ * accepted, but flagged "Weak" so people know longer is better.
+ */
+const STRENGTH_TIERS: Array<{ minLength: number; label: string; color: string }> = [
+  { minLength: 8, label: 'Weak', color: 'bg-destructive' },
+  { minLength: 12, label: 'Fair', color: 'bg-status-warning' },
+  { minLength: 16, label: 'Good', color: 'bg-status-info' },
+  { minLength: 20, label: 'Strong', color: 'bg-success' },
+]
 
 /**
- * PasswordStrength — Visual 4-segment strength bar.
+ * PasswordStrength — Visual 4-segment strength bar driven by length only.
  *
- * @description Shows how many of the 4 password criteria are met:
- * length >= 8, uppercase, lowercase, and a number. Renders a labeled
- * progress bar with semantic color tokens.
+ * @description Shows a 4-segment progress bar that fills as the password
+ * grows past 8, 12, 16, and 20 characters. No character-class checks — that
+ * matches the modern length-only validation in the signup action.
  */
 export function PasswordStrength({ password }: PasswordStrengthProps) {
-  const passedCount = useMemo(
-    () => CHECKS.filter((c) => c.test(password)).length,
-    [password],
-  )
+  const filledSegments = useMemo(() => {
+    return STRENGTH_TIERS.reduce(
+      (count, tier) => (password.length >= tier.minLength ? count + 1 : count),
+      0,
+    )
+  }, [password])
 
   if (!password) return null
 
-  const label = STRENGTH_LABELS[passedCount - 1] ?? 'Weak'
-  const colorClass = STRENGTH_COLORS[passedCount - 1] ?? STRENGTH_COLORS[0]
+  const tierIndex = Math.max(0, filledSegments - 1)
+  const label = STRENGTH_TIERS[tierIndex]?.label ?? 'Weak'
+  const colorClass = STRENGTH_TIERS[tierIndex]?.color ?? 'bg-destructive'
 
   return (
     <div className="space-y-1.5 pt-1">
@@ -48,7 +52,7 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
             key={i}
             className={cn(
               'h-1 flex-1 rounded-full transition-colors duration-300',
-              i < passedCount ? colorClass : 'bg-muted',
+              i < filledSegments ? colorClass : 'bg-muted',
             )}
           />
         ))}

@@ -33,8 +33,13 @@ export type SignupState = {
 };
 
 /**
- * Security: Validate password strength
- * Requires: min 8 chars, at least one uppercase, one lowercase, one number
+ * Security: Validate password length only.
+ *
+ * @description Stripe, Linear, Notion and Figma all dropped character-class
+ * complexity rules years ago — they make passwords harder to remember without
+ * meaningfully reducing brute-force risk. Length plus a common-password
+ * blocklist is the modern baseline. Min 8 chars, max 128, reject obvious
+ * dictionary entries.
  */
 function validatePassword(password: string): { valid: boolean; error?: string } {
   if (!password || password.length < 8) {
@@ -44,16 +49,9 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
   if (password.length > 128) {
     return { valid: false, error: "Password must be 128 characters or fewer" };
   }
-  if (!/[A-Z]/.test(password)) {
-    return { valid: false, error: "Password must contain at least one uppercase letter" };
-  }
-  if (!/[a-z]/.test(password)) {
-    return { valid: false, error: "Password must contain at least one lowercase letter" };
-  }
-  if (!/[0-9]/.test(password)) {
-    return { valid: false, error: "Password must contain at least one number" };
-  }
-  // Check for common weak passwords
+  // Reject obvious dictionary passwords. Length + this blocklist is the
+  // modern baseline; character-class rules (uppercase/number/symbol) were
+  // removed 2026-04-25 because they hurt usability without raising entropy.
   const commonPasswords = ["password", "12345678", "qwerty123", "letmein123"];
   if (commonPasswords.some(common => password.toLowerCase().includes(common))) {
     return { valid: false, error: "Password is too common. Please choose a stronger password." };
@@ -132,13 +130,13 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const supabase = await createClient();
 
   const password = formData.get("password") as string;
-  // SECURITY 2026-04-25: server-side password-confirm validation. The client-side
-  // disabled gate was previously the only check; password-manager autofill could
-  // desync the controlled-component state from DOM, leaving the gate disabled
-  // even when the user typed matching strings. Validating here defends against
-  // that failure mode without trusting the client.
+  // DECISION 2026-04-25: dropped Confirm Password. Industry leaders (Stripe,
+  // Linear, Notion, Figma) all removed it — it adds friction without cutting
+  // typo errors. If a user mistypes, the next sign-in attempt fails fast and
+  // the password reset flow recovers without losing any data. We still accept
+  // the field if the legacy supplier form submits it, for a graceful rollover.
   const passwordConfirm = formData.get("password_confirm") as string | null;
-  if (passwordConfirm !== null && passwordConfirm !== password) {
+  if (passwordConfirm !== null && passwordConfirm.length > 0 && passwordConfirm !== password) {
     return errorWithValues("Passwords do not match");
   }
   const intent = formData.get("intent") as string | null;
@@ -157,7 +155,13 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   // SECURITY: Strip HTML tags and control characters — React auto-escapes on render,
   // and Supabase parameterized queries prevent SQL injection. escapeHtml() was removed
   // because it double-encodes (O'Brien → O&#x27;Brien in DB → literal entity in React).
-  const fullName = rawFullName ? rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : "";
+  // DECISION 2026-04-25: full name is optional. When omitted, fall back to the
+  // email local-part so downstream code (welcome emails, profile cards, foundry
+  // titles) always has something to render. Users can update their display name
+  // later in the profile-completion modal.
+  const sanitizedRawName = rawFullName ? rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : "";
+  const emailLocalPart = (rawEmail || "").split("@")[0]?.trim().slice(0, 100) ?? "";
+  const fullName = sanitizedRawName || emailLocalPart;
   const companyName = rawCompanyName ? rawCompanyName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : null;
   const businessName = rawBusinessName ? rawBusinessName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : null;
 
@@ -166,8 +170,12 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const industry = rawIndustry ? rawIndustry.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null;
   const stage = rawStage ? rawStage.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null;
 
-  if (!fullName || !role) {
-    return errorWithValues("All fields are required");
+  // DECISION 2026-04-25: full name is optional on signup. Email + password
+  // are the only required fields. Founders and suppliers still need a
+  // company/business name (checked further down). Empty full name flows
+  // through to setupNewUser which falls back to the email local-part.
+  if (!role) {
+    return errorWithValues("Signup role is required");
   }
 
   // SECURITY: Validate role against allowlist to prevent arbitrary role injection

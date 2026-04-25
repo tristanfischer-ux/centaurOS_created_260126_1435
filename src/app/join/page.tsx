@@ -4,7 +4,6 @@ import { useState, useEffect, useActionState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -137,8 +136,6 @@ function JoinPageInner() {
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);
   const [passwordValue, setPasswordValue] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const passwordMismatch = confirmPassword.length > 0 && passwordValue !== confirmPassword;
 
   // INTENT: Default role is executive. Founder deep-link still works for backward compat.
   const effectiveRole = isFounderDeepLink ? "founder" : "executive";
@@ -274,12 +271,12 @@ function JoinPageInner() {
                   id="password"
                   name="password"
                   type="password"
-                  placeholder="Create a strong password"
+                  placeholder="Create a password"
                   value={passwordValue}
                   onChange={(e) => setPasswordValue(e.target.value)}
                   onBlur={(e) => setPasswordValue(e.currentTarget.value)}
                   autoComplete="new-password"
-                  enterKeyHint="next"
+                  enterKeyHint="go"
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                   required
                   aria-required="true"
@@ -287,37 +284,9 @@ function JoinPageInner() {
                   aria-describedby="supplier-password-hint"
                 />
                 <p id="supplier-password-hint" className="text-xs text-muted-foreground">
-                  Min 8 characters, with uppercase, lowercase, and a number
+                  Eight characters or more.
                 </p>
                 <PasswordStrength password={passwordValue} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="supplier-confirm-password" className="text-sm font-medium text-foreground">
-                  Confirm Password
-                  <span className="text-destructive ml-1" aria-label="required">*</span>
-                </Label>
-                <Input
-                  id="supplier-confirm-password"
-                  name="password_confirm"
-                  type="password"
-                  placeholder="Re-enter your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onBlur={(e) => setConfirmPassword(e.currentTarget.value)}
-                  autoComplete="new-password"
-                  enterKeyHint="go"
-                  className={cn(
-                    "bg-background border-input focus:border-international-orange focus:ring-international-orange/20",
-                    passwordMismatch && "border-destructive",
-                  )}
-                  required
-                  aria-required="true"
-                  aria-invalid={passwordMismatch}
-                />
-                {passwordMismatch && (
-                  <p className="text-xs text-destructive" role="alert">Passwords do not match</p>
-                )}
               </div>
 
               <motion.div
@@ -483,8 +452,8 @@ function JoinPageInner() {
                 className="text-sm font-medium text-foreground"
               >
                 Full Name
-                <span className="text-destructive ml-1" aria-label="required">
-                  *
+                <span className="text-muted-foreground ml-1 font-normal text-xs">
+                  (optional)
                 </span>
               </Label>
               <Input
@@ -495,8 +464,6 @@ function JoinPageInner() {
                 defaultValue={state.values?.name || demoData?.fullName || ""}
                 autoComplete="name"
                 className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
-                required
-                aria-required="true"
               />
             </div>
 
@@ -538,7 +505,7 @@ function JoinPageInner() {
                 id="password"
                 name="password"
                 type="password"
-                placeholder="Create a strong password"
+                placeholder="Create a password"
                 value={passwordValue}
                 onChange={(e) => setPasswordValue(e.target.value)}
                 onBlur={(e) => setPasswordValue(e.currentTarget.value)}
@@ -554,37 +521,9 @@ function JoinPageInner() {
                 id="password-hint"
                 className="text-xs text-muted-foreground"
               >
-                Min 8 characters, with uppercase, lowercase, and a number
+                Eight characters or more.
               </p>
               <PasswordStrength password={passwordValue} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password" className="text-sm font-medium text-foreground">
-                Confirm Password
-                <span className="text-destructive ml-1" aria-label="required">*</span>
-              </Label>
-              <Input
-                id="confirm-password"
-                name="password_confirm"
-                type="password"
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                onBlur={(e) => setConfirmPassword(e.currentTarget.value)}
-                autoComplete="new-password"
-                enterKeyHint="go"
-                className={cn(
-                  "bg-background border-input focus:border-international-orange focus:ring-international-orange/20",
-                  passwordMismatch && "border-destructive",
-                )}
-                required
-                aria-required="true"
-                aria-invalid={passwordMismatch}
-              />
-              {passwordMismatch && (
-                <p className="text-xs text-destructive" role="alert">Passwords do not match</p>
-              )}
             </div>
 
             {/* Founder-specific fields — only shown via ?role=founder deep-link */}
