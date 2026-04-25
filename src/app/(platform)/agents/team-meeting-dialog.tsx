@@ -77,6 +77,17 @@ import { SUBSCRIPTION_PLANS } from "@/lib/billing/plans"
 import { APP_DOMAIN } from "@/lib/domains"
 import { toast } from "sonner"
 import Link from "next/link"
+import {
+    type CouncilTier,
+    COUNCIL_TIER_META,
+    getCouncilSpecialists,
+    getCouncilPosition,
+    COUNCIL_POSITION_LABELS,
+    MODEL_TIER_LATENCY_WEIGHT,
+    classifyTopic,
+    canAccessCouncilTier,
+    getCouncilUpgradeCopy,
+} from "@/lib/agents/council"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +99,16 @@ interface MeetingEntry {
     content: string
     /** Parsed PROPOSED_ACTIONS from specialist response; rendered as interactive approval cards. */
     proposals?: ProposedAction[]
+    /**
+     * Council position label for this entry — shown as a pill above the
+     * response card in the streaming UI.
+     */
+    councilPosition?: import("@/lib/agents/council").CouncilPosition
+    /**
+     * Wall-clock time in milliseconds from meeting start when this
+     * response completed (used for the arrival timer pill).
+     */
+    arrivalMs?: number
 }
 
 /** The phases of a conversation-led meeting */
@@ -830,9 +851,15 @@ export function TeamMeetingDialog({
     const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
     const [wantsToSpeak, setWantsToSpeak] = useState<Set<string>>(new Set())
     const [debateCancelRequested, setDebateCancelRequested] = useState(false)
+    /** Which Council tier the user has selected in the setup phase */
+    const [councilTier, setCouncilTier] = useState<CouncilTier>("quick")
+    /** When set, the upgrade modal is shown for this Council tier */
+    const [showCouncilUpgradeFor, setShowCouncilUpgradeFor] = useState<CouncilTier | null>(null)
 
     const scrollRef = useRef<HTMLDivElement>(null)
     const debateCancelRef = useRef(false)
+    /** Epoch ms when the meeting was started — used for arrival timers */
+    const meetingStartMsRef = useRef<number>(0)
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
     const topicSpeechRecognition = useSpeechRecognition({
@@ -881,6 +908,8 @@ export function TeamMeetingDialog({
                 setWantsToSpeak(new Set())
                 setDebateCancelRequested(false)
                 debateCancelRef.current = false
+                setCouncilTier("quick")
+                setShowCouncilUpgradeFor(null)
             }, 300)
             return () => clearTimeout(timer)
         }
@@ -895,6 +924,23 @@ export function TeamMeetingDialog({
             setTopic(preset.topic)
         }
     }, [open, preset, phase])
+
+    // INTENT: When the Council tier changes and a topic has been entered,
+    // auto-select the matching specialist set. The user can still override
+    // by clicking the specialist grid directly ("customise").
+    useEffect(() => {
+        if (phase !== "setup") return
+        if (councilTier === "strategy") return
+        if (!topic.trim()) return
+        const topicClass = classifyTopic(topic)
+        const specialists = getCouncilSpecialists(councilTier, topicClass)
+        if (specialists.length > 0) {
+            setSelectedIds(new Set(specialists.map((s) => s.id)))
+        }
+    // Intentionally limited deps: only re-run when councilTier changes mid-setup.
+    // Topic changes do NOT re-fire so manual customisation isn't clobbered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [councilTier, phase])
 
     // Auto-scroll during streaming
     useEffect(() => {
@@ -1152,10 +1198,116 @@ export function TeamMeetingDialog({
         [selectedSpecialists, topic, executeSpecialist]
     )
 
+    // ─── Run Council: staggered dispatch in latency order ────────────────
+
+    /**
+     * Run a full Council session in latency-ascending stagger order.
+     *
+     * Fires each specialist 500ms apart so the slowest models don't all
+     * start simultaneously and saturate token rate limits. Each specialist
+     * streams in independently — the UI updates as each one finishes.
+     *
+     * Attaches a `councilPosition` and `arrivalMs` to every entry so the
+     * streaming UI can show the position pill and arrival timer.
+     *
+     * @param orderedSpecialists - Specialists in latency-ascending order
+     * @param threads            - Thread ID map (pre-initialised)
+     */
+    const runCouncilMeeting = useCallback(
+        async (orderedSpecialists: Specialist[], threads: Record<string, string>) => {
+            meetingStartMsRef.current = Date.now()
+            const total = orderedSpecialists.length
+
+            for (let dispatchIdx = 0; dispatchIdx < total; dispatchIdx++) {
+                const specialist = orderedSpecialists[dispatchIdx]
+                const position = getCouncilPosition(dispatchIdx, total)
+
+                // 500ms stagger between dispatches (except the first)
+                if (dispatchIdx > 0) {
+                    await new Promise((r) => setTimeout(r, 500))
+                }
+
+                setPhase("in-progress")
+                setError(null)
+                setIsStreaming(true)
+                setCurrentSpecialistIdx(dispatchIdx)
+                setStreamingContent("")
+
+                try {
+                    // Build the prompt using the standard round-based logic:
+                    // dispatcher index 0 → round 0 entries present → "Quick take"
+                    // dispatcher index 1 → round 1 → "On reflection"
+                    // dispatcher index 2+ → round 2+ → "Thinking about this further"
+                    const currentEntries = entriesRef.current
+                    const prompt = buildMeetingPrompt(
+                        specialist,
+                        topic,
+                        currentEntries,
+                        currentEntries.length === 0 ? 1 : currentEntries.length + 1,
+                    )
+
+                    const dynamicsBlock = compileInterSpecialistDynamics(
+                        specialist.id,
+                        orderedSpecialists.map((s) => s.id),
+                        topic,
+                    )
+
+                    const response = await executeSpecialist(
+                        specialist,
+                        threads[specialist.id],
+                        prompt,
+                        topic,
+                        `\n\n## Council Context\nThis is a ${total}-specialist Council on: "${topic}". Your position in the staircase: ${COUNCIL_POSITION_LABELS[position]}.${dynamicsBlock ? `\n\n${dynamicsBlock}` : ""}`
+                    )
+
+                    const arrivalMs = Date.now() - meetingStartMsRef.current
+                    const proposals = parseProposedActions(response)
+                    const entry: MeetingEntry = {
+                        specialistId: specialist.id,
+                        specialistName: getSpecialistDisplayName(specialist),
+                        round: dispatchIdx + 1,
+                        content: stripProposedActionsBlock(response),
+                        proposals: proposals.length > 0 ? proposals : undefined,
+                        councilPosition: position,
+                        arrivalMs,
+                    }
+
+                    setEntries((prev) => [...prev, entry])
+
+                    // Compute "wants to speak" after each response
+                    const remainingIds = orderedSpecialists.map((s) => s.id)
+                    const wants = getWantsToSpeak(response, remainingIds, specialist.id)
+                    setWantsToSpeak(wants)
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : "Unknown error"
+                    console.error(`[Council] ${specialist.name} failed:`, message)
+                    setError(`${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.`)
+
+                    const errorEntry: MeetingEntry = {
+                        specialistId: specialist.id,
+                        specialistName: getSpecialistDisplayName(specialist),
+                        round: dispatchIdx + 1,
+                        content: `*${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.*`,
+                        councilPosition: position,
+                    }
+                    setEntries((prev) => [...prev, errorEntry])
+                }
+
+                setIsStreaming(false)
+                setStreamingContent("")
+            }
+
+            setCurrentRound(total)
+            setPhase("awaiting-input")
+        },
+        [topic, executeSpecialist]
+    )
+
     // ─── Start Meeting ────────────────────────────────────────────────────
 
     /**
      * Initialize threads and run only the FIRST specialist.
+     * When a Council tier is selected, auto-select and stagger all specialists.
      */
     const handleStartMeeting = useCallback(async () => {
         if (selectedIds.size < 2) {
@@ -1181,6 +1333,19 @@ export function TeamMeetingDialog({
                 return
             }
 
+            // Council mode: run all specialists in latency-ascending order with 500ms stagger
+            if (councilTier !== "quick" || selectedSpecialists.length > 2) {
+                // Sort the already-selected specialists by latency weight for dispatch order
+                const sortedForDispatch = [...selectedSpecialists].sort(
+                    (a, b) =>
+                        (MODEL_TIER_LATENCY_WEIGHT[a.modelTier] ?? 3) -
+                        (MODEL_TIER_LATENCY_WEIGHT[b.modelTier] ?? 3)
+                )
+                setIsStarting(false)
+                await runCouncilMeeting(sortedForDispatch, threads)
+                return
+            }
+
             await runSingleSpecialist(0, 1, threads)
         } catch (err) {
             const message = err instanceof Error ? err.message : "Unknown error"
@@ -1189,7 +1354,7 @@ export function TeamMeetingDialog({
         } finally {
             setIsStarting(false)
         }
-    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, selectedSpecialists])
+    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, selectedSpecialists, councilTier, runCouncilMeeting])
 
     // ─── Ask a Specific Specialist ────────────────────────────────────────
 
@@ -1556,11 +1721,102 @@ export function TeamMeetingDialog({
                 {/* ── Phase 1: Setup ───────────────────────────────────────── */}
                 {phase === "setup" && (
                     <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
-                        {/* Specialist Picker */}
+
+                        {/* Council Tier Picker */}
                         <div className="space-y-3">
                             <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                                Who should attend? (pick 2 or more)
+                                Pick the Council depth
                             </Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {COUNCIL_TIER_META.map((meta) => {
+                                    const hasAccess = canAccessCouncilTier(userTier, meta.tier)
+                                    const isSelected = councilTier === meta.tier
+
+                                    return (
+                                        <button
+                                            key={meta.tier}
+                                            type="button"
+                                            onClick={() => {
+                                                if (!hasAccess) {
+                                                    if (!meta.isComingSoon) {
+                                                        setShowCouncilUpgradeFor(meta.tier)
+                                                    }
+                                                    return
+                                                }
+                                                setCouncilTier(meta.tier)
+                                                // Auto-select the specialists for this tier when topic is available
+                                                if (topic.trim() && meta.tier !== "strategy") {
+                                                    const topicClass = classifyTopic(topic)
+                                                    const specialists = getCouncilSpecialists(meta.tier, topicClass)
+                                                    setSelectedIds(new Set(specialists.map((s) => s.id)))
+                                                }
+                                            }}
+                                            className={cn(
+                                                "flex flex-col items-start p-3 rounded-lg border text-left transition-all relative",
+                                                isSelected && hasAccess
+                                                    ? "border-international-orange bg-international-orange/5 ring-1 ring-international-orange/20"
+                                                    : !hasAccess
+                                                    ? "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
+                                                    : "border-muted hover:border-muted-foreground/30 bg-background",
+                                            )}
+                                        >
+                                            <div className="flex items-center justify-between w-full mb-1">
+                                                <span className={cn(
+                                                    "text-sm font-semibold",
+                                                    isSelected && hasAccess ? "text-international-orange" : "text-foreground"
+                                                )}>
+                                                    {meta.label}
+                                                </span>
+                                                {!hasAccess && !meta.isComingSoon && (
+                                                    <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground bg-muted rounded px-1 py-0.5">
+                                                        upgrade
+                                                    </span>
+                                                )}
+                                                {meta.isComingSoon && (
+                                                    <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground bg-muted rounded px-1 py-0.5">
+                                                        soon
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                {meta.description}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                                                {meta.latencyDescription}
+                                            </span>
+                                            {!hasAccess && !meta.isComingSoon && (
+                                                <span className="text-[10px] text-international-orange/70 mt-1">
+                                                    {meta.pricingHint}
+                                                </span>
+                                            )}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Specialist Picker — shown as a "customise" section */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                                    {councilTier !== "strategy" && selectedIds.size > 0
+                                        ? "Customise the lineup"
+                                        : "Who should attend? (pick 2 or more)"}
+                                </Label>
+                                {councilTier !== "strategy" && topic.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const topicClass = classifyTopic(topic)
+                                            const specialists = getCouncilSpecialists(councilTier, topicClass)
+                                            setSelectedIds(new Set(specialists.map((s) => s.id)))
+                                        }}
+                                        className="text-[10px] text-international-orange hover:underline"
+                                    >
+                                        Reset to {COUNCIL_TIER_META.find((m) => m.tier === councilTier)?.label} defaults
+                                    </button>
+                                )}
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 {SPECIALISTS.map((s) => {
                                     const isSelected = selectedIds.has(s.id)
@@ -1846,7 +2102,22 @@ export function TeamMeetingDialog({
 
                         {/* Currently streaming specialist */}
                         {currentSpecialist && (
-                            <div className="space-y-2">
+                            <div
+                                className="space-y-2 animate-in fade-in duration-400"
+                                style={{ animationTimingFunction: "ease-out" }}
+                            >
+                                {/* Council position pill */}
+                                {(() => {
+                                    const position = getCouncilPosition(currentSpecialistIdx, selectedSpecialists.length)
+                                    const label = COUNCIL_POSITION_LABELS[position]
+                                    return (
+                                        <div className="ml-9 mb-1">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-international-orange/80 bg-international-orange/8 px-2 py-0.5 rounded-full border border-international-orange/15">
+                                                {label}
+                                            </span>
+                                        </div>
+                                    )
+                                })()}
                                 <div className="flex items-center gap-2">
                                     <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
                                         {currentSpecialist.avatarImage ? (
@@ -1906,7 +2177,7 @@ export function TeamMeetingDialog({
                                             onClick={() => toggleEntry(i)}
                                             className={cn(
                                                 "flex items-start gap-2 w-full text-left py-2 px-3 rounded-lg transition-colors",
-"hover:bg-muted/30"
+                                                "hover:bg-muted/30"
                                             )}
                                         >
                                             <div className="relative h-6 w-6 rounded-full overflow-hidden bg-muted flex-shrink-0 mt-0.5">
@@ -1929,7 +2200,18 @@ export function TeamMeetingDialog({
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-semibold text-foreground">
                                                         {entry.specialistName}
-                                                    </span>                                                    {isExpanded ? (
+                                                    </span>
+                                                    {entry.councilPosition && (
+                                                        <span className="text-[9px] font-mono uppercase tracking-wider text-international-orange/70 bg-international-orange/8 px-1.5 py-0.5 rounded-full border border-international-orange/10">
+                                                            {COUNCIL_POSITION_LABELS[entry.councilPosition]}
+                                                        </span>
+                                                    )}
+                                                    {entry.arrivalMs !== undefined && (
+                                                        <span className="text-[9px] text-muted-foreground">
+                                                            {(entry.arrivalMs / 1000).toFixed(1)}s
+                                                        </span>
+                                                    )}
+                                                    {isExpanded ? (
                                                         <ChevronUp className="h-3 w-3 text-muted-foreground ml-auto" />
                                                     ) : (
                                                         <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto" />
@@ -1968,7 +2250,23 @@ export function TeamMeetingDialog({
                                 const lastEntry = entries[entries.length - 1]
                                 const specialist = getSpecialistById(lastEntry.specialistId)
                                 return (
-                                    <div className="space-y-2">
+                                    <div
+                                        className="space-y-2 animate-in fade-in duration-400"
+                                        style={{ animationTimingFunction: "ease-out" }}
+                                    >
+                                        {/* Council position pill + arrival timer */}
+                                        {lastEntry.councilPosition && (
+                                            <div className="ml-9 mb-1 flex items-center gap-2">
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-international-orange/80 bg-international-orange/8 px-2 py-0.5 rounded-full border border-international-orange/15">
+                                                    {COUNCIL_POSITION_LABELS[lastEntry.councilPosition]}
+                                                </span>
+                                                {lastEntry.arrivalMs !== undefined && (
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {(lastEntry.arrivalMs / 1000).toFixed(1)}s
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         <div className="flex items-center gap-2">
                                             <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
                                                 {specialist?.avatarImage ? (
@@ -1991,10 +2289,11 @@ export function TeamMeetingDialog({
                                             </span>
                                             <Badge variant="secondary" className="text-[10px]">
                                                 Round {lastEntry.round}
-                                            </Badge>                                        </div>
+                                            </Badge>
+                                        </div>
                                         <div className={cn(
                                             "ml-9 rounded-lg border p-4",
-"border-muted bg-muted/30"
+                                            "border-muted bg-muted/30"
                                         )}>
                                             <Markdown content={lastEntry.content} className="text-sm" />
                                         </div>
@@ -2423,7 +2722,66 @@ export function TeamMeetingDialog({
                 attendees={selectedSpecialists.map((s) => s.name)}
             />
         )}
+
+        {/* Council tier upgrade modal */}
+        {showCouncilUpgradeFor && (
+            <CouncilUpgradeModal
+                tier={showCouncilUpgradeFor}
+                onClose={() => setShowCouncilUpgradeFor(null)}
+            />
+        )}
         </>
+    )
+}
+
+// ─── Council Upgrade Modal ────────────────────────────────────────────────
+
+interface CouncilUpgradeModalProps {
+    tier: CouncilTier
+    onClose: () => void
+}
+
+/**
+ * Upgrade modal shown when a user clicks a Council tier they cannot access.
+ * Voice rules: lead with the option, not the failure. British spelling.
+ * No em dashes. No model names in copy.
+ */
+function CouncilUpgradeModal({ tier, onClose }: CouncilUpgradeModalProps) {
+    const copy = getCouncilUpgradeCopy(tier)
+
+    return (
+        <Dialog open onOpenChange={onClose}>
+            <DialogContent size="sm">
+                <DialogHeader>
+                    <DialogTitle className="font-display flex items-center gap-2">
+                        <Users className="h-5 w-5 text-international-orange" />
+                        {copy.headline}
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="py-2 space-y-4">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        {copy.body}
+                    </p>
+                    <div className="rounded-lg border border-international-orange/20 bg-international-orange/[0.04] px-4 py-3">
+                        <p className="text-xs text-muted-foreground">{copy.pricingHint}</p>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="secondary" onClick={onClose}>
+                        Stay on Quick Council
+                    </Button>
+                    <Button
+                        asChild
+                        className="bg-international-orange hover:bg-international-orange-hover text-white"
+                    >
+                        <Link href="/settings/billing">
+                            Upgrade to {copy.planName}
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                        </Link>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     )
 }
 
