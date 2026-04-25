@@ -222,7 +222,7 @@ export function BillingContent({
                   {subscription?.cancel_at_period_end
                     ? 'Cancels at end of period'
                     : currentTier === 'free'
-                      ? 'Free tier — upgrade for more smart assists and features'
+                      ? 'Free tier — upgrade for more specialist tasks and features'
                       : `Renews ${subscription?.current_period_end
                           ? new Date(subscription.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
                           : 'monthly'
@@ -282,18 +282,18 @@ export function BillingContent({
             </div>
             <div>
               <CardTitle className="text-base sm:text-lg flex items-center gap-1.5">
-                Smart Assists This Month
+                Specialist Tasks This Month
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help shrink-0" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[280px]">
-                    <p className="text-sm">Each specialist chat message, CAD Lab generation, voice-to-task, comparison, or investor match counts as one smart assist.</p>
+                    <p className="text-sm">Each specialist chat message, CAD Lab generation, voice-to-task, comparison, or investor match counts as one specialist task.</p>
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                {aiUsage.totalAiTasks} of {aiLimit} smart assists used
+                {aiUsage.totalAiTasks} of {aiLimit} specialist tasks used
               </p>
             </div>
           </div>
@@ -322,7 +322,7 @@ export function BillingContent({
               <p className="text-sm text-status-warning flex items-center gap-1.5">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {aiUsagePercent >= 100
-                  ? 'Limit reached — upgrade for more smart assists'
+                  ? 'Limit reached — upgrade for more specialist tasks'
                   : 'Approaching limit — consider upgrading'
                 }
               </p>
@@ -461,7 +461,7 @@ export function BillingContent({
                 <div>
                   <p className="font-semibold text-foreground">Enterprise</p>
                   <p className="text-sm text-muted-foreground">
-                    Unlimited smart assists, SSO, dedicated support, custom integrations
+                    Unlimited specialist tasks, SSO, dedicated support, custom integrations
                   </p>
                 </div>
               </div>

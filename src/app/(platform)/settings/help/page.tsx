@@ -82,8 +82,8 @@ export default function HelpPage() {
                             description="Add your website and competitors in Company settings to get more personalised advice."
                         />
                         <TipCard
-                            title="Smart Assists"
-                            description="Smart assist features use your plan's allowance. Track usage in Billing & Usage."
+                            title="Specialist Tasks"
+                            description="Specialist tasks use your plan's monthly allowance. Track usage in Billing & Usage."
                         />
                     </div>
                 </CardContent>
@@ -103,8 +103,8 @@ export default function HelpPage() {
                         answer="Go to Settings > Company > Team Management, then click 'Manage Team'. From there you can send invitations via email."
                     />
                     <FaqItem
-                        question="What are smart assists?"
-                        answer="Smart assists are actions like generating task breakdowns, getting specialist advice, or creating reports. Each plan includes a monthly allowance."
+                        question="What are specialist tasks?"
+                        answer="A specialist task is one specialist doing one thing for you — generating a task breakdown, drafting an investor email, scoring a supplier shortlist, reviewing a brief. Each plan includes a monthly allowance."
                     />
                     <FaqItem
                         question="How do I export my data?"
