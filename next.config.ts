@@ -44,6 +44,9 @@ const nextConfig: NextConfig = {
       { source: '/recruits/:path*', destination: '/agents', permanent: false },
       // /today removed 2026-04-25 — redirect to /investors (killer-feature default)
       { source: '/today', destination: '/investors', permanent: false },
+      // /plan removed 2026-04-25 — Brainstorming (/agents) is the closest analogue
+      { source: '/plan', destination: '/agents', permanent: false },
+      { source: '/plan/:path*', destination: '/agents', permanent: false },
     ]
   },
 

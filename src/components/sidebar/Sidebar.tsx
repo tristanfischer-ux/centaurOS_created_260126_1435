@@ -40,7 +40,6 @@ import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 
 import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
-import { planNavigation } from "@/components/sidebar/data/plan"
 import { moneyLegacyNavigation } from "@/components/sidebar/data/money"
 import { getWorkshopNavigation } from "@/components/sidebar/data/workshop"
 import { marketplacePeopleNavigation, marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
@@ -399,22 +398,7 @@ export function Sidebar({
                     </>
                 )}
 
-                {/* PLAN */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Plan"
-                    introRoute="/plan"
-                    hasNew={badges.plan}
-                    isOpen={openSections.plan}
-                    onToggle={() => toggleSection("plan")}
-                />
-                <Collapsible open={openSections.plan}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {planNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
+                {/* PLAN removed 2026-04-25 — not on the keep list for Wave 6 cutover */}
 
                 {/* CASH BURN (Money legacy — Phase 4 will re-scope per SHARED-SIDEBAR) */}
                 <div className="mt-1.5 mb-0.5 border-t border-border" />
