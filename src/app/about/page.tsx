@@ -22,7 +22,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer"
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Fractional Forge is building ForgeOS — the operating system for hardware companies. Learn about our mission to make manufacturing as accessible as deploying software.",
+    "Fractional Forge is building ForgeOS — the operating system for the smart-product wave. Everyday objects are becoming sensors and software; we help hardware founders ship the smart version, find the suppliers, and reach the investors who fund it.",
 }
 
 export default function AboutPage() {
@@ -49,10 +49,10 @@ export default function AboutPage() {
             </h2>
             <div className="space-y-4 text-lg text-muted-foreground leading-relaxed max-w-3xl">
               <p className="text-xl sm:text-2xl font-medium text-foreground">
-                Fractional Forge is building ForgeOS — the operating system for hardware startups.
+                Fractional Forge is building ForgeOS — the operating system for the smart-product wave.
               </p>
               <p>
-                A software startup gets to focus on the product because companies like AWS take care of the infrastructure. Hardware doesn&apos;t have an AWS. ForgeOS is our attempt to build one — the investors, the manufacturers, the specialist expertise, the team tools, and the cash burn tracking a hardware startup needs, all in one place, from day one.
+                Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under £5 a unit, and that is what makes the smart version commercially viable. ForgeOS pulls together the manufacturers, the investors, specialist support across thirteen disciplines, the team tools, and the cash burn tracking that a hardware founder needs to ship the smart version, all in one place, from day one.
               </p>
             </div>
           </section>
