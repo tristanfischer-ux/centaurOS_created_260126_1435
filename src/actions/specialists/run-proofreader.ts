@@ -25,9 +25,23 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { callOpenRouter, MID_STRUCTURED_MODEL } from "@/lib/ai/openrouter"
+import {
+    callOpenRouter,
+    MID_STRUCTURED_MODEL,
+    CHEAP_PROSE_MODEL,
+} from "@/lib/ai/openrouter"
 
-const PROOFREADER_MODEL = MID_STRUCTURED_MODEL // deepseek/deepseek-v4-pro
+/**
+ * V4-Pro is the preferred proofreader (frontier reasoning at half-Haiku
+ * cost). Loop 2 regen revealed it 429s frequently from upstream. We
+ * fall back to Gemini 2.5 Flash on failure — same JSON discipline,
+ * different lineage, ~10× cheaper but still well-suited to fact-check.
+ * Both run via OpenRouter so the OPENROUTER_API_KEY covers both.
+ */
+const PROOFREADER_MODELS: ReadonlyArray<string> = [
+    MID_STRUCTURED_MODEL, // deepseek/deepseek-v4-pro
+    CHEAP_PROSE_MODEL,    // google/gemini-2.5-flash
+] as const
 
 export interface ProofreaderResult {
     ok: boolean
@@ -147,17 +161,41 @@ export async function runProofreaderBackground(
 
     const userPrompt = sections
 
-    const result = await callOpenRouter({
-        model: PROOFREADER_MODEL,
-        system: systemPrompt,
-        prompt: userPrompt,
-        maxTokens: 16384,
-        temperature: 0.1,
-        timeoutMs: 90_000,
-    })
-
-    if (!result.ok) {
-        return { ok: false, error: `Proofreader call failed: ${result.error}` }
+    // Try each model in priority order. If V4-Pro rate-limits or
+    // 5xx-fails, fall through to Gemini 2.5 Flash. The proofreader is
+    // non-blocking (the fire-endpoint always advances the stage), but
+    // we still want findings when possible. Returning silently with
+    // `result=null` collapses to an empty findings array in the column.
+    let result: Awaited<ReturnType<typeof callOpenRouter>> | null = null
+    let lastError: string | null = null
+    for (const model of PROOFREADER_MODELS) {
+        const attempt = await callOpenRouter({
+            model,
+            system: systemPrompt,
+            prompt: userPrompt,
+            maxTokens: 16384,
+            temperature: 0.1,
+            timeoutMs: 90_000,
+        })
+        if (attempt.ok) {
+            result = attempt
+            break
+        }
+        lastError = attempt.error
+        if (!attempt.retriable) {
+            // Hard failure (auth, bad request, etc.) — try next model.
+            continue
+        }
+        // Retriable (429 / 5xx) — fall through to next model.
+        console.warn(
+            `[run-proofreader] ${model} retriable error: ${attempt.error} — falling back`,
+        )
+    }
+    if (!result || !result.ok) {
+        return {
+            ok: false,
+            error: `All proofreader models failed: ${lastError ?? "unknown"}`,
+        }
     }
 
     let findings: ProofreadFinding[] = []
