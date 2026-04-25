@@ -58,16 +58,22 @@ These routes are not broken, just unreachable from the sidebar. They can be dele
 
 | Item | Status | Notes |
 |---|---|---|
-| Account email + change password | Present | `/settings/account/page.tsx` handles this |
+| Account email | Present | Added email-on-file display card to `/settings/account/page.tsx` |
+| Change password | Gap filled | Added `ChangePasswordCard` component — sends Supabase reset link to email |
 | Subscription / billing tier | Present | `/settings/billing/page.tsx` shows current tier and "Manage subscription" |
-| Forge Ambassador status | Present | Wave 2C — ambassador chip visible in `/me` and `/settings` |
-| Email preferences | Gap filled | See below |
-| Foundry settings | Present | `/settings/company/page.tsx` |
-| Privacy / data export | Present | `/settings/privacy/page.tsx` with GDPR export link |
-| Delete account | Present | `/settings/account/page.tsx` with destructive action |
+| Forge Ambassador status | Present | Wave 2C — ambassador chip visible in billing settings via `getForgeAmbassadorStatus()` |
+| Email preferences | Present | `/settings/email/page.tsx` with opt-in checkboxes per channel (GDPR compliant) |
+| Foundry settings (name, slug, members) | Present | `/settings/company/page.tsx` with `TeamManagementCard` and `CompanyProfileCard` |
+| Privacy / data export | Present | `/settings/privacy/page.tsx` with `PrivacySettings` GDPR component and data export request |
+| Delete account | Present | `/settings/account/page.tsx` with `AccountDangerZone` confirmation dialog |
 
-### Empty states added
+### Changes made
 
-- Email preferences: `src/app/(platform)/settings/email/page.tsx` — rendered honest empty state with copy "Email preferences are not yet configurable in-app. To update your email preferences, contact support at hello@fractionalforge.com." No new schema required.
+- `src/app/(platform)/settings/account/page.tsx` — added email-on-file card, added `ChangePasswordCard`, restructured to show email then password then delete
+- `src/components/settings/change-password-card.tsx` — new component, sends `resetPasswordForEmail` via Supabase client-side auth, shows confirmation on success
+
+### What was not changed
+
+Email preferences (`/settings/email`) were already fully implemented with the `EmailPreferencesForm` component. No empty states needed.
 
 ---
