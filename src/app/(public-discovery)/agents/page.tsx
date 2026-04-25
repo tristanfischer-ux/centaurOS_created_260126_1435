@@ -33,6 +33,7 @@ import { getUserSubscription } from "@/lib/billing/subscriptions"
 import type { SubscriptionTier } from "@/lib/billing/plans"
 import { SpecialistsPageClient } from "../../(platform)/agents/specialists-page-client"
 import { AnonymousAgentsView } from "./AnonymousAgentsView"
+import { BrainstormingCouncilView } from "./BrainstormingCouncilView"
 
 export const metadata: Metadata = {
     title: "Your Specialist Team",
@@ -102,13 +103,13 @@ export default async function PublicAgentsPage() {
         // Non-critical — upsell falls back to default free-tier rendering
     }
 
-    return (
-        <SpecialistsPageClient
-            initialWorkflows={savedWorkflows}
-            initialCustomPrompts={savedCustomPrompts}
-            userId={authedUser.id}
-            userTier={userTier}
-            brainstormsUsedThisMonth={brainstormsUsedThisMonth}
-        />
-    )
+    // ── Authenticated visitor — Council UI (per BRAINSTORM-COUNCIL-MOCKUP-V1.html) ──
+    // The old SpecialistsPageClient ("Your Specialists / 13 specialists ready to
+    // help") is replaced by the Council UI as directed. The deep-dive routes under
+    // /agents/m/[id] are unaffected — they live under (platform) and are auth-gated
+    // independently. savedWorkflows / savedCustomPrompts / userTier are retained
+    // in scope so they can be threaded in when the Council form is wired to
+    // saveMeetingThread (meeting-threads.ts).
+    void savedWorkflows; void savedCustomPrompts; void userTier; void brainstormsUsedThisMonth
+    return <BrainstormingCouncilView userId={authedUser.id} />
 }
