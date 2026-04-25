@@ -2,16 +2,14 @@
  * WelcomeView — Client component for /welcome.
  *
  * @description First-login landing page. Opens with a hero + short personal
- * letter from Tristan Fischer (Founder), four tiles pointing at the V2
- * sidebar sections (Today / Forge / Cash Burn / Marketplace), a primary CTA
- * to start a new project, and a closing line. Copy follows Tristan's
- * first-person British voice and the in-product "No AI Emphasis" rule
- * (no "AI-powered", "Smart", "Intelligent", etc.).
+ * letter from Tristan Fischer (Founder), four tiles pointing at the four
+ * primary surfaces (Brainstorming / The Forge / Investors / Suppliers), a
+ * primary CTA to go straight to Investors, and a closing line. Copy follows
+ * Tristan's first-person British voice and the in-product "No AI Emphasis"
+ * rule (no "AI-powered", "Smart", "Intelligent", etc.).
  *
- * The primary CTA (`Start a new project`) marks the welcome as seen via the
- * `markWelcomeComplete` server action, then routes to `/the-forge-v2/new`.
- * A secondary CTA marks it seen and routes to `/today` for users who'd
- * rather start from their morning brief.
+ * The "Mark complete" button fires `markWelcomeComplete` then routes to
+ * /investors — the platform's primary landing surface.
  */
 
 "use client"
@@ -21,10 +19,10 @@ import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
     ArrowRight,
-    CalendarDays,
+    MessageSquare,
     Hammer,
-    Flame,
-    Store,
+    Users,
+    Package,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -39,21 +37,9 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
 
-    const handleStartProject = (): void => {
+    const handleMarkComplete = (): void => {
         startTransition(async () => {
             await markWelcomeComplete()
-            router.push("/the-forge-v2/new")
-        })
-    }
-
-    const handleGoToToday = (): void => {
-        startTransition(async () => {
-            await markWelcomeComplete()
-            // RED-TEAM-PIVOT-PLAN Tier 2 step 17: post-welcome destination
-            // is /investors. Founders who skip the new-project tour still
-            // land on the killer-feature surface. The handler name kept as
-            // `handleGoToToday` for git-blame continuity, scheduled rename
-            // when the welcome tour gets its next refresh.
             router.push("/investors")
         })
     }
@@ -73,10 +59,13 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                             </p>
                         </div>
                         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-4">
-                            Welcome to <span className="text-international-orange">ForgeOS</span>.
+                            Welcome to{" "}
+                            <span className="text-international-orange">Fractional Forge</span>.
                         </h1>
                         <p className="text-lg sm:text-xl text-muted-foreground font-light">
-                            A single workspace for planning, building, cash, and selling your hardware products.
+                            Four tools for hardware founders: sharpen your thinking, design
+                            your product, find the right investors, and source the right
+                            suppliers.
                         </p>
                     </div>
                 </div>
@@ -87,59 +76,86 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
                 <div className="max-w-2xl space-y-5 text-base sm:text-[17px] leading-relaxed text-foreground">
-                    <p className="font-medium">Welcome. I&apos;m Tristan Fischer.</p>
+                    <p className="font-medium">I&apos;m Tristan Fischer.</p>
                     <p>
-                        I&apos;ve spent 26 years running startups — software and hardware — most
-                        recently Fischer Farms, one of the UK&apos;s larger vertical farms.
-                        ForgeOS is the wish list of everything I could have had along the way:
-                        one place to plan the company, design the product, track the cash, and
-                        meet the suppliers who&apos;ll build it with you.
+                        I&apos;ve spent 26 years running startups — software and hardware —
+                        most recently Fischer Farms, one of the United Kingdom&apos;s larger
+                        vertical farms. Fractional Forge is the set of tools I wish I&apos;d
+                        had: a way to think through hard decisions with context-aware
+                        specialists, design a product to manufacturable spec, find the
+                        investors most likely to back you, and shortlist the suppliers
+                        who&apos;ll actually build it.
                     </p>
                     <p>
-                        Here are the four doors into the workspace. Open the one that matches
-                        what&apos;s in front of you today.
+                        There are four surfaces. Here&apos;s what each one does and where to
+                        start.
                     </p>
                 </div>
             </section>
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Four V2 section tiles                                   */}
+            {/* Four primary surface tiles                              */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-12">
                 <div className="max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <SectionTile
-                        icon={CalendarDays}
-                        label="Today"
-                        description="What's on your plate — tasks, risks, wins, and the calendar for the day — in one morning brief."
-                        href="/investors"
-                        ctaLabel="Open Today"
+                        icon={MessageSquare}
+                        label="Brainstorming"
+                        description="Ask a hard question — pricing, positioning, build vs. buy, a specific supplier risk. Four specialists answer in parallel from different angles: strategy, engineering, manufacturing, finance. Fiona closes with a consensus and the one action to take."
+                        href="/agents"
+                        ctaLabel="Open Brainstorming"
                     />
                     <SectionTile
                         icon={Hammer}
-                        label="Forge"
-                        description="Plan, build, and ship your hardware products. Architecture, Bill of Materials, suppliers, revisions — all in one project."
+                        label="The Forge"
+                        description="Describe what you&rsquo;re building in a paragraph. A twenty-minute autopilot returns a system architecture, module decomposition, bill of materials, cost estimate, supplier shortlist, and risk register — ready to share with a contract manufacturer."
                         href="/the-forge-v2"
-                        ctaLabel="Open the Forge"
+                        ctaLabel="Open The Forge"
                     />
                     <SectionTile
-                        icon={Flame}
-                        label="Cash Burn"
-                        description="Your runway on a single screen. Drop in your finance spreadsheet to see scenarios, the line items eating your cash, and when you&rsquo;ll need to raise."
-                        href="/cash-burn"
-                        ctaLabel="Open Cash Burn"
+                        icon={Users}
+                        label="Investors"
+                        description="Paste your deck or describe your company. Fractional Forge ranks the investors most likely to back you — with a fit score, a plain-English explanation of why each firm would be interested, and a drafted intro email for each match."
+                        href="/investors"
+                        ctaLabel="Open Investors"
                     />
                     <SectionTile
-                        icon={Store}
-                        label="Marketplace"
-                        description="Sell through Fractional Forge. List your products and services, take quote requests, and manage orders with UK founders and suppliers."
+                        icon={Package}
+                        label="Suppliers"
+                        description="Describe what you need — a specific material, process capability, or component. Fractional Forge searches 18,459 suppliers and returns a shortlist with a plain-English reason why each one matches your specification."
                         href="/marketplace"
-                        ctaLabel="Open the Marketplace"
+                        ctaLabel="Open Suppliers"
                     />
                 </div>
             </section>
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Primary CTA                                             */}
+            {/* How founders use it — 3 short scenarios                */}
+            {/* ─────────────────────────────────────────────────────── */}
+            <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
+                <div className="max-w-3xl">
+                    <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-6">
+                        How founders use it
+                    </p>
+                    <div className="space-y-5">
+                        <ScenarioRow
+                            number="01"
+                            text="A founder at the idea stage uses Brainstorming to pressure-test whether their product is manufacturable at the price point investors expect, then runs The Forge to get a real bill of materials before their first investor meeting."
+                        />
+                        <ScenarioRow
+                            number="02"
+                            text="A founder raising a seed round pastes their deck into Investors, gets a ranked list of 50 firms with fit scores and drafted intro emails, and works through them in order — starting with the highest-fit deep-tech funds."
+                        />
+                        <ScenarioRow
+                            number="03"
+                            text="A founder who has a design locked but no supply chain uses Suppliers to find contract manufacturers in their target region, then asks Brainstorming to help them evaluate which one to approach first."
+                        />
+                    </div>
+                </div>
+            </section>
+
+            {/* ─────────────────────────────────────────────────────── */}
+            {/* Primary CTA — mark complete, go to Investors            */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
                 <div className="max-w-3xl">
@@ -149,30 +165,30 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                                 Start here
                             </p>
                             <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight mb-2">
-                                Start a new project in the Forge.
+                                Find the investors who would back you.
                             </h2>
                             <p className="text-base text-muted-foreground leading-relaxed mb-5 max-w-2xl">
-                                Describe your product in a paragraph. The Forge returns a
-                                system architecture, a module decomposition, a skeleton Bill of
-                                Materials, and a design report — before lunch.
+                                Investors is the fastest way to see immediate value. Describe
+                                your company in two sentences and get a ranked list of matched
+                                investors with fit scores — in under a minute.
                             </p>
                             <div className="flex flex-wrap gap-3">
                                 <Button
-                                    onClick={handleStartProject}
+                                    onClick={handleMarkComplete}
                                     disabled={isPending}
                                     size="lg"
                                     className="gap-2"
                                 >
-                                    Start a new project
+                                    Go to Investors
                                     <ArrowRight className="h-4 w-4" />
                                 </Button>
                                 <Button
-                                    onClick={handleGoToToday}
+                                    onClick={handleMarkComplete}
                                     disabled={isPending}
                                     variant="ghost"
                                     size="lg"
                                 >
-                                    See investors who would back you instead
+                                    Mark complete and explore
                                 </Button>
                             </div>
                         </CardContent>
@@ -236,5 +252,21 @@ function SectionTile({
                 </Link>
             </CardContent>
         </Card>
+    )
+}
+
+interface ScenarioRowProps {
+    number: string
+    text: string
+}
+
+function ScenarioRow({ number, text }: ScenarioRowProps): React.ReactElement {
+    return (
+        <div className="flex gap-4">
+            <span className="text-xs font-mono text-muted-foreground pt-1 shrink-0 w-6">
+                {number}
+            </span>
+            <p className="text-base text-foreground leading-relaxed">{text}</p>
+        </div>
     )
 }
