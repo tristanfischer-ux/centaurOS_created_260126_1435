@@ -52,6 +52,7 @@ import type { ConvergenceEvaluation, ProposedChange } from "@/app/(platform)/the
 import type { EngineeringReviewResult } from "@/app/(platform)/the-forge/services/xray-to-objectives"
 import type { Json } from "@/types/database.types"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -2509,7 +2510,7 @@ RULES:
 export async function runConceptResearchAction(
   idea: string,
 ): Promise<ConceptResearchResult | { error: string }> {
-  return withAIGate('xray', async () => {
+  return withAIGate('xray', async ({ user, foundryId }) => {
     const start = Date.now()
 
     // VALIDATION: Ensure idea is non-empty
@@ -2625,32 +2626,72 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
       const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
       if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
+      const xrayModel = "claude-opus-4-7"
       const claudeData = await withRetry(async () => {
-        const resp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": anthropicKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: "claude-opus-4-7",
-            max_tokens: 16384,
-            system: CONCEPT_RESEARCH_PROMPT,
-            messages: [{
-              role: "user",
-              content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}${internalDbContext}`,
-            }],
-          }),
-          signal: AbortSignal.timeout(180_000), // 3 min — Opus with 16K output + internal DB context
-        })
+        let resp: Response
+        try {
+          resp = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": anthropicKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: xrayModel,
+              max_tokens: 16384,
+              system: CONCEPT_RESEARCH_PROMPT,
+              messages: [{
+                role: "user",
+                content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}${internalDbContext}`,
+              }],
+            }),
+            signal: AbortSignal.timeout(180_000), // 3 min — Opus with 16K output + internal DB context
+          })
+        } catch (err) {
+          void logLlmUsage({
+            action: 'xray',
+            modelUsed: xrayModel,
+            tokensIn: 0,
+            tokensOut: 0,
+            status: 'error',
+            errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+            foundryId,
+            userId: user.id,
+          })
+          throw err
+        }
 
         if (!resp.ok) {
           const errText = await resp.text()
+          const status: 'rate_limited' | 'timeout' | 'error' =
+            resp.status === 429 || resp.status === 529 ? 'rate_limited' :
+            resp.status === 408 || resp.status === 504 ? 'timeout' :
+            'error'
+          void logLlmUsage({
+            action: 'xray',
+            modelUsed: xrayModel,
+            tokensIn: 0,
+            tokensOut: 0,
+            status,
+            errorMessage: `${resp.status}: ${errText.slice(0, 200)}`,
+            foundryId,
+            userId: user.id,
+          })
           throw new Error(`Claude API error (${resp.status}): ${errText.slice(0, 300)}`)
         }
 
-        return resp.json()
+        const json = await resp.json()
+        void logLlmUsage({
+          action: 'xray',
+          modelUsed: xrayModel,
+          tokensIn: json.usage?.input_tokens ?? 0,
+          tokensOut: json.usage?.output_tokens ?? 0,
+          status: 'success',
+          foundryId,
+          userId: user.id,
+        })
+        return json
       }, {
         maxRetries: 2,
         baseDelay: 3000,

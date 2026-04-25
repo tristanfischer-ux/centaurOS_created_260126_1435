@@ -16,6 +16,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { STAGE_SPECIALISTS, getNextStageSpecialist, type CadLabStage } from "@/lib/cad-lab/stage-specialist-map"
+import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 
 // SECURITY: Valid stage and variant values — reject anything else
 const VALID_STAGES = new Set<string>(["design", "specify", "source", "assemble"])
@@ -92,33 +93,74 @@ ${stateContext}. Summarise what was accomplished. ${handoff} Be specific, not ge
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10_000)
+    const stageBriefingsModel = "deepseek-chat"
 
     try {
-        const response = await fetch("https://api.deepseek.com/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: "deepseek-chat",
-                max_tokens: 256,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt },
-                ],
-            }),
-            signal: controller.signal,
-        })
+        let response: Response
+        try {
+            response = await fetch("https://api.deepseek.com/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: stageBriefingsModel,
+                    max_tokens: 256,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt },
+                    ],
+                }),
+                signal: controller.signal,
+            })
+        } catch (err) {
+            clearTimeout(timeout)
+            void logLlmUsage({
+                action: 'stage_briefings',
+                modelUsed: stageBriefingsModel,
+                tokensIn: 0,
+                tokensOut: 0,
+                status: 'error',
+                errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+                userId: user.id,
+                specialistId: mapping.specialistId,
+            })
+            return { briefing: getFallbackBriefing(input) }
+        }
 
         clearTimeout(timeout)
 
         if (!response.ok) {
+            const errText = await response.text().catch(() => '')
+            const status: 'rate_limited' | 'timeout' | 'error' =
+                response.status === 429 || response.status === 529 ? 'rate_limited' :
+                response.status === 408 || response.status === 504 ? 'timeout' :
+                'error'
+            void logLlmUsage({
+                action: 'stage_briefings',
+                modelUsed: stageBriefingsModel,
+                tokensIn: 0,
+                tokensOut: 0,
+                status,
+                errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+                userId: user.id,
+                specialistId: mapping.specialistId,
+            })
             console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "stage_briefing", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
             return { briefing: getFallbackBriefing(input) }
         }
 
         const data = await response.json()
+        void logLlmUsage({
+            action: 'stage_briefings',
+            modelUsed: stageBriefingsModel,
+            tokensIn: data.usage?.prompt_tokens ?? 0,
+            tokensOut: data.usage?.completion_tokens ?? 0,
+            status: 'success',
+            userId: user.id,
+            specialistId: mapping.specialistId,
+        })
         const text = (data.choices?.[0]?.message?.content ?? "").trim()
 
         if (!text) {

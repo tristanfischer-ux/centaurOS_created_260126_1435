@@ -16,37 +16,84 @@ import { createClient } from "@/lib/supabase/server"
 import { aiGuard } from "@/lib/ai/guard"
 import { calculateRecruitMatchScore } from "@/lib/recruit-match"
 import type { CompanyNeedsProfile, ExecutiveProfile } from "@/lib/recruit-match"
+import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 // --- DeepSeek Call ------------------------------------------------------------
 
-async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
+async function callHaiku(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens = 2000,
+  context: { foundryId?: string; userId?: string } = {},
+): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (!apiKey) throw new Error("DEEPSEEK_API_KEY not configured")
+  const { foundryId, userId } = context
+  const recruitModel = "deepseek-chat"
 
-  const response = await fetch("https://api.deepseek.com/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "deepseek-chat",
-      max_tokens: maxTokens,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
-  })
+  let response: Response
+  try {
+    response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: recruitModel,
+        max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    })
+  } catch (err) {
+    void logLlmUsage({
+      action: 'recruit_match',
+      modelUsed: recruitModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status: 'error',
+      errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      foundryId,
+      userId,
+    })
+    throw err
+  }
 
   if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    const status: 'rate_limited' | 'timeout' | 'error' =
+      response.status === 429 || response.status === 529 ? 'rate_limited' :
+      response.status === 408 || response.status === 504 ? 'timeout' :
+      'error'
+    void logLlmUsage({
+      action: 'recruit_match',
+      modelUsed: recruitModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status,
+      errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+      foundryId,
+      userId,
+    })
     throw new Error(`DeepSeek API error: ${response.status}`)
   }
 
   const data = await response.json()
+  void logLlmUsage({
+    action: 'recruit_match',
+    modelUsed: recruitModel,
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
+    status: 'success',
+    foundryId,
+    userId,
+  })
   return data.choices?.[0]?.message?.content ?? ""
 }
 
@@ -390,7 +437,9 @@ Only return the JSON array.`
           try {
             const result = await callHaiku(
               "Be concise, specific, and reference real company data. matchSignals should be 1-3 short phrases about why this exec fits. highlightedSkills should be 1-3 of their most relevant skills.",
-              rationalePrompt
+              rationalePrompt,
+              2000,
+              { foundryId, userId: user.id },
             )
             rationales = safeParseJSON(result)
           } catch (err) {

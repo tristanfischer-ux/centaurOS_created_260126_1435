@@ -31,6 +31,7 @@ import type {
 } from '@/types/outreach'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -531,33 +532,74 @@ export async function deleteContacts(
 async function callClaude(
     systemPrompt: string,
     userPrompt: string,
+    context: { foundryId?: string; userId?: string } = {},
 ): Promise<{ text: string }> {
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
+    const { foundryId, userId } = context
+    const outreachComposeModel = "claude-sonnet-4-6"
 
     return withRetry(async () => {
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-api-key": apiKey,
-                "anthropic-version": "2023-06-01",
-            },
-            body: JSON.stringify({
-                model: "claude-sonnet-4-6",
-                max_tokens: 4096,
-                system: systemPrompt,
-                messages: [{ role: "user", content: userPrompt }],
-            }),
-            signal: AbortSignal.timeout(120_000),
-        })
+        let response: Response
+        try {
+            response = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": apiKey,
+                    "anthropic-version": "2023-06-01",
+                },
+                body: JSON.stringify({
+                    model: outreachComposeModel,
+                    max_tokens: 4096,
+                    system: systemPrompt,
+                    messages: [{ role: "user", content: userPrompt }],
+                }),
+                signal: AbortSignal.timeout(120_000),
+            })
+        } catch (err) {
+            void logLlmUsage({
+                action: 'outreach_compose',
+                modelUsed: outreachComposeModel,
+                tokensIn: 0,
+                tokensOut: 0,
+                status: 'error',
+                errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+                foundryId,
+                userId,
+            })
+            throw err
+        }
 
         if (!response.ok) {
             const errText = await response.text()
+            const status: 'rate_limited' | 'timeout' | 'error' =
+                response.status === 429 || response.status === 529 ? 'rate_limited' :
+                response.status === 408 || response.status === 504 ? 'timeout' :
+                'error'
+            void logLlmUsage({
+                action: 'outreach_compose',
+                modelUsed: outreachComposeModel,
+                tokensIn: 0,
+                tokensOut: 0,
+                status,
+                errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+                foundryId,
+                userId,
+            })
             throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
         }
 
         const data = await response.json()
+        void logLlmUsage({
+            action: 'outreach_compose',
+            modelUsed: outreachComposeModel,
+            tokensIn: data.usage?.input_tokens ?? 0,
+            tokensOut: data.usage?.output_tokens ?? 0,
+            status: 'success',
+            foundryId,
+            userId,
+        })
         return { text: data.content?.[0]?.text ?? "" }
     }, {
         maxRetries: 2,
@@ -611,7 +653,7 @@ export async function researchContact(
 
     let aiText: string
     try {
-        const result = await callClaude(systemPrompt, userPrompt)
+        const result = await callClaude(systemPrompt, userPrompt, { foundryId: foundry_id, userId: user.id })
         aiText = result.text
     } catch (err) {
         console.error('[Outreach] Research failed:', err)
@@ -701,7 +743,7 @@ export async function generateSequenceForContact(
 
     let aiText: string
     try {
-        const result = await callClaude(systemPrompt, userPrompt)
+        const result = await callClaude(systemPrompt, userPrompt, { foundryId: foundry_id, userId: user.id })
         aiText = result.text
     } catch (err) {
         console.error('[Outreach] AI generation failed:', err)

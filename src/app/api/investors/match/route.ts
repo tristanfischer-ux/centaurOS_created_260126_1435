@@ -18,32 +18,74 @@ import { aiGuard } from "@/lib/ai/guard"
 import { calculateMatchScore } from "@/lib/investor-match"
 import type { FoundryProfile } from "@/lib/investor-match"
 import type { InvestorFirm } from "@/actions/investors"
+import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 // ─── AI Call (DeepSeek first, Anthropic Haiku fallback) ─────────
 
-async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
+async function callHaiku(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens = 2000,
+  context: { foundryId?: string; userId?: string } = {},
+): Promise<string> {
+  const { foundryId, userId } = context
   // Try DeepSeek first (cheaper)
   const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (deepseekKey) {
+    const deepseekModel = "deepseek-chat"
     try {
       const response = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: deepseekModel,
           max_tokens: maxTokens,
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
         }),
       })
       if (response.ok) {
         const data = await response.json()
+        void logLlmUsage({
+          action: 'investor_match',
+          modelUsed: deepseekModel,
+          tokensIn: data.usage?.prompt_tokens ?? 0,
+          tokensOut: data.usage?.completion_tokens ?? 0,
+          status: 'success',
+          foundryId,
+          userId,
+        })
         return data.choices?.[0]?.message?.content ?? ""
       }
+      const errText = await response.text().catch(() => '')
+      const ds_status: 'rate_limited' | 'timeout' | 'error' =
+        response.status === 429 || response.status === 529 ? 'rate_limited' :
+        response.status === 408 || response.status === 504 ? 'timeout' :
+        'error'
+      void logLlmUsage({
+        action: 'investor_match',
+        modelUsed: deepseekModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: ds_status,
+        errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+        foundryId,
+        userId,
+      })
       console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
     } catch (err) {
+      void logLlmUsage({
+        action: 'investor_match',
+        modelUsed: deepseekModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+        foundryId,
+        userId,
+      })
       console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: err instanceof Error ? err.message : "unknown", timestamp: new Date().toISOString() }))
     }
   }
@@ -52,54 +94,142 @@ async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!anthropicKey) throw new Error("No AI API key configured (DEEPSEEK_API_KEY or ANTHROPIC_API_KEY)")
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  })
+  const anthropicModel = "claude-haiku-4-5-20251001"
+  let response: Response
+  try {
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: anthropicModel,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    })
+  } catch (err) {
+    void logLlmUsage({
+      action: 'investor_match',
+      modelUsed: anthropicModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status: 'error',
+      errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      foundryId,
+      userId,
+    })
+    throw err
+  }
 
-  if (!response.ok) throw new Error(`Anthropic API error: ${response.status}`)
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    const status: 'rate_limited' | 'timeout' | 'error' =
+      response.status === 429 || response.status === 529 ? 'rate_limited' :
+      response.status === 408 || response.status === 504 ? 'timeout' :
+      'error'
+    void logLlmUsage({
+      action: 'investor_match',
+      modelUsed: anthropicModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status,
+      errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+      foundryId,
+      userId,
+    })
+    throw new Error(`Anthropic API error: ${response.status}`)
+  }
   const data = await response.json()
+  void logLlmUsage({
+    action: 'investor_match',
+    modelUsed: anthropicModel,
+    tokensIn: data.usage?.input_tokens ?? 0,
+    tokensOut: data.usage?.output_tokens ?? 0,
+    status: 'success',
+    foundryId,
+    userId,
+  })
   return (data.content?.[0]?.text ?? "").trim()
 }
 
 // INTENT: Opus for high-quality draft emails — the most important user-facing content.
 // Rationales stay on Haiku (shorter, less critical). Opus produces substantially
 // better cold emails with more natural tone and specific portfolio references.
-async function callOpus(systemPrompt: string, userPrompt: string, maxTokens = 4000): Promise<string> {
+async function callOpus(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens = 4000,
+  context: { foundryId?: string; userId?: string } = {},
+): Promise<string> {
+  const { foundryId, userId } = context
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-20250514",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  })
+  const opusModel = "claude-opus-4-20250514"
+  let response: Response
+  try {
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: opusModel,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    })
+  } catch (err) {
+    void logLlmUsage({
+      action: 'investor_match',
+      modelUsed: opusModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status: 'error',
+      errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      foundryId,
+      userId,
+    })
+    throw err
+  }
 
   if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    const status: 'rate_limited' | 'timeout' | 'error' =
+      response.status === 429 || response.status === 529 ? 'rate_limited' :
+      response.status === 408 || response.status === 504 ? 'timeout' :
+      'error'
+    void logLlmUsage({
+      action: 'investor_match',
+      modelUsed: opusModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status,
+      errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+      foundryId,
+      userId,
+    })
     // Fallback to Haiku if Opus fails
     console.warn("[InvestorMatch] Opus failed, falling back to Haiku")
-    return callHaiku(systemPrompt, userPrompt, maxTokens)
+    return callHaiku(systemPrompt, userPrompt, maxTokens, context)
   }
   const data = await response.json()
+  void logLlmUsage({
+    action: 'investor_match',
+    modelUsed: opusModel,
+    tokensIn: data.usage?.input_tokens ?? 0,
+    tokensOut: data.usage?.output_tokens ?? 0,
+    status: 'success',
+    foundryId,
+    userId,
+  })
   return (data.content?.[0]?.text ?? "").trim()
 }
 
@@ -439,7 +569,12 @@ Only return the JSON array.`
 
           let rationales: { rationale: string }[] = []
           try {
-            const result = await callHaiku("Be concise, specific, and reference real data.", rationalePrompt)
+            const result = await callHaiku(
+              "Be concise, specific, and reference real data.",
+              rationalePrompt,
+              2000,
+              { foundryId: foundryId ?? undefined, userId: user.id },
+            )
             rationales = safeParseJSON<{ rationale: string }>(result)
           } catch (err) {
             console.warn("[InvestorMatch] Rationale generation failed:", err)
@@ -533,7 +668,7 @@ Return a JSON array of ${batchItems.length} objects: [{"partnerRationale": "1-2 
 Only return the JSON array, no markdown.`
 
             try {
-              const result = await callOpus(emailSystemPrompt, partnerPrompt, 4000)
+              const result = await callOpus(emailSystemPrompt, partnerPrompt, 4000, { foundryId: foundryId ?? undefined, userId: user.id })
               partnerRationales = safeParseJSON(result)
             } catch (err) {
               console.warn("[InvestorMatch] Partner/email generation failed:", err)
