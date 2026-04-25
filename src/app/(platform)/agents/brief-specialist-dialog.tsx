@@ -73,8 +73,7 @@ import type { StructuredStarter } from "@/lib/utils/starter-parser"
 import { DecisionTimeline } from "@/components/specialists/decision-timeline"
 import { HandoffCard } from "@/components/specialists/handoff-card"
 import { HandoffBreadcrumb } from "@/components/specialists/handoff-breadcrumb"
-import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
-import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
+import type { HandoffTrailEntry } from "@/lib/agents/specialist-handoff-types"
 import { getProactiveOpener, markInsightRead, getSpecialistGreetingContext } from "@/actions/agent-insights"
 import { createArtifact, exportArtifactToGoogleDocs, updateArtifactContent } from "@/actions/agent-artifacts"
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
@@ -279,9 +278,6 @@ export function BriefSpecialistDialog({
     handoffSourceSpecialistId,
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
-
-    // ─── AdvisorPanel State (always call hook, use result conditionally) ─────
-    const advisorPanel = useAdvisorPanel()
 
     // ─── State ────────────────────────────────────────────────────────────
     const [briefText, setBriefText] = useState("")
@@ -2059,16 +2055,16 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     </div>
                 </PopoverContent>
             </Popover>
-                {/* Fullscreen toggle button (panel mode only) */}
+                {/* Fullscreen toggle button (panel mode only — no longer reachable; kept for prop-type compatibility) */}
                 {isPanel && (
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={advisorPanel.toggleFullscreen}
+                        onClick={() => setIsFullscreen((v) => !v)}
                         className="h-8 w-8 p-0 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                        aria-label={advisorPanel.isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                     >
-                        {advisorPanel.isFullscreen ? (
+                        {isFullscreen ? (
                             <Minimize2 className="h-4 w-4" />
                         ) : (
                             <Maximize2 className="h-4 w-4" />

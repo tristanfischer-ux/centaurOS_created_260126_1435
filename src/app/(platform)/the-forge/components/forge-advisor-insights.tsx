@@ -12,10 +12,11 @@
 
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { BriefSpecialistDialog } from '@/app/(platform)/agents/brief-specialist-dialog'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { generateForgeInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
 import type { CadLabProjectSummary } from '@/actions/cad-lab-projects'
@@ -44,10 +45,14 @@ interface ForgeAdvisorInsightsProps {
 }
 
 export function ForgeAdvisorInsights({ projects }: ForgeAdvisorInsightsProps) {
-  const { openPanel } = useAdvisorPanel()
+  const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
+  const [briefHandoffContext, setBriefHandoffContext] = useState<string | null>(null)
+  const briefSpecialist = briefSpecialistId ? getSpecialistById(briefSpecialistId) : null
+
   const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'The Forge' })
-  }, [openPanel])
+    setBriefHandoffContext(context)
+    setBriefSpecialistId(specialistId)
+  }, [])
 
   const projectStats = useMemo(() => {
     let draftCount = 0
@@ -67,7 +72,7 @@ export function ForgeAdvisorInsights({ projects }: ForgeAdvisorInsightsProps) {
     { cacheKey: 'max-forge', emptyInsight: EMPTY_STATE_INSIGHT },
   )
 
-  if (insights.length === 0) return null
+  if (insights.length === 0 && !briefSpecialist) return null
 
   return (
     <div className="space-y-3">
@@ -80,6 +85,20 @@ export function ForgeAdvisorInsights({ projects }: ForgeAdvisorInsightsProps) {
           compact
         />
       ))}
+      {briefSpecialist && (
+        <BriefSpecialistDialog
+          specialist={briefSpecialist}
+          open={briefSpecialistId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setBriefSpecialistId(null)
+              setBriefHandoffContext(null)
+            }
+          }}
+          handoffContext={briefHandoffContext}
+          contextLabel="The Forge"
+        />
+      )}
     </div>
   )
 }
