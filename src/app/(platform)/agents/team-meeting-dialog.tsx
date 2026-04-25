@@ -63,6 +63,7 @@ import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
 import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "@/lib/agents/specialists-config"
 import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix"
 import { getPrimaryTargetForTier } from "@/lib/agents/failover"
+import { getEffectiveModelTier } from "@/lib/agents/tier-aware-models"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { MeetingOutputs } from "./meeting-outputs"
@@ -1009,7 +1010,17 @@ export function TeamMeetingDialog({
             // routed to Anthropic Opus and an Anthropic 529 OVERLOADED took out
             // brainstorming entirely. Server still receives modelTier and builds
             // the full FALLBACK_CHAINS[tier] cascade.
-            const target = getPrimaryTargetForTier(specialist.modelTier)
+            //
+            // Tier-aware override (2026-04-25): free / anonymous users always get
+            // the cheap-class model (Haiku) regardless of the specialist's natural
+            // modelTier. Paid tiers (starter_v2 and above) keep the benchmark-
+            // validated per-specialist mapping unchanged.
+            const effectiveTier = getEffectiveModelTier(
+                specialist.modelTier,
+                userTier ?? "free",
+                councilTier,
+            )
+            const target = getPrimaryTargetForTier(effectiveTier)
             let res: Response
             try {
                 res = await fetch("/api/agents/execute", {
@@ -1096,7 +1107,10 @@ export function TeamMeetingDialog({
 
             return fullResponse || "No response received."
         },
-        [readWithTimeout]
+        // userTier + councilTier are included so that if the user's tier
+        // changes mid-session (edge case) the next dispatch picks up the
+        // correct model class immediately.
+        [readWithTimeout, userTier, councilTier]
     )
 
     // Use a ref to track entries for TTS playback
