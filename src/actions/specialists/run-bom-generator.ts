@@ -68,7 +68,6 @@
  *   - UI consumers:      src/app/(platform)/the-forge-v2/projects/[id]/bom/
  */
 
-import { after } from "next/server"
 
 import {
     failPipelineRun,
@@ -392,34 +391,6 @@ async function runBomGeneratorInternal(
                 runId,
             }
         }
-
-        // 8. Schedule the skeleton stage. Dynamic import inside after()
-        //    avoids module-init cycles (see forge-v2-render-all-modules.ts).
-        after(async () => {
-            try {
-                const { runBomSkeletonStage } = await import("@/actions/bom")
-                await runBomSkeletonStage(projectId)
-            } catch (err) {
-                console.error(
-                    "[run-bom-generator] skeleton stage schedule threw:",
-                    err instanceof Error ? err.message : err,
-                )
-                try {
-                    await failPipelineRun(
-                        runId,
-                        "INTERNAL",
-                        err instanceof Error
-                            ? err.message
-                            : "Skeleton stage schedule threw.",
-                    )
-                } catch (failErr) {
-                    console.error(
-                        "[run-bom-generator] failPipelineRun threw:",
-                        failErr instanceof Error ? failErr.message : failErr,
-                    )
-                }
-            }
-        })
 
         return {
             ok: true,

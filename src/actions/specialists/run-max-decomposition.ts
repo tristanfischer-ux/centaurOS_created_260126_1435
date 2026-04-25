@@ -62,7 +62,6 @@ import {
     startPipelineRun,
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
-import { after } from "next/server"
 
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
@@ -539,76 +538,6 @@ async function runMaxDecompositionInternal(
                     expansionsOk: successfulExpansions,
                     expansionsTotal: skeletonModules.length,
                 },
-            })
-
-            // Wave 1c: auto-fire Fang sizing + BOM generator on Max success.
-            //
-            // Order: sizing → BOM. Sizing produces dimension_sheet which Fang
-            // review + the image prompt builders consume; BOM's part
-            // envelopes will eventually cross-check against it too. Both
-            // stages are independent of each other so we fire both in the
-            // same after() but sequence sizing FIRST because it writes a
-            // read-before-write row that BOM's dimension-aware part check
-            // (future) will read.
-            //
-            // Must use after() (not plain `void`) so Vercel keeps the container
-            // alive past this server action's Promise resolution — otherwise
-            // downstream pipeline_runs rows write 'running' and the container
-            // is torn down mid-generation, leaving rows stuck until the 6-min
-            // watchdog sweeps them. Same pattern as brief-lock → Max.
-            //
-            // GOTCHA (#90): the `after()` callback runs AFTER the HTTP response
-            // has been sent to the client, which means cookies are gone. Any
-            // action invoked from inside after() that calls `withAuth` will
-            // fail. We plumb foundryId explicitly into `*Background` variants
-            // that re-resolve the tenant via the admin client instead. Every
-            // chained stage MUST use this pattern.
-            //
-            // Dynamic import avoids a "use server" module-init cycle between
-            // run-max-decomposition and its successors (which also import
-            // from this file indirectly via shared types).
-            const capturedFoundryId = foundryId
-            const capturedProjectId = projectId
-            const capturedUserId = user.id
-            after(async () => {
-                // (1) Sizing first — deterministic solver, single DB write,
-                //     finishes in ~100ms. Safe to await before BOM.
-                try {
-                    const { runFangSizingBackground } = await import(
-                        "@/actions/specialists/run-fang-sizing"
-                    )
-                    await runFangSizingBackground(
-                        capturedProjectId,
-                        capturedFoundryId,
-                        "auto.max-complete",
-                    )
-                } catch (err) {
-                    console.error(
-                        "[run-max-decomposition] Fang sizing auto-fire failed:",
-                        err instanceof Error ? err.message : err,
-                    )
-                }
-
-                // (2) BOM generator — distributed, writes its own pipeline_run
-                //     + schedules subsequent stages via internal after() calls.
-                //     Use the Background variant which takes foundryId + userId
-                //     explicitly instead of reading cookies (#90 fix).
-                try {
-                    const { runBomGeneratorBackground } = await import(
-                        "@/actions/specialists/run-bom-generator"
-                    )
-                    await runBomGeneratorBackground(
-                        capturedProjectId,
-                        capturedFoundryId,
-                        capturedUserId,
-                        "auto.max-complete",
-                    )
-                } catch (err) {
-                    console.error(
-                        "[run-max-decomposition] BOM auto-fire failed:",
-                        err instanceof Error ? err.message : err,
-                    )
-                }
             })
 
             return {

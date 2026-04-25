@@ -1,62 +1,33 @@
 /**
- * @file route.ts — internal /api/autopilot-step endpoint.
+ * @file route.ts — /api/autopilot-step
  *
- * @description P0.1b (2026-04-23): breaks the `after()` self-chain in the
- * autopilot stage walker. Same root cause as P0.1 (/api/render-stage) but for
- * the autopilot chain instead of the per-module render chain.
+ * @description Fire-only specialist invocation endpoint for the zero-wait
+ * autopilot orchestrator (2026-04-25 rewrite).
  *
- * The autopilot chain looked like:
- *   startAutopilot → after(stepWaitForChase)
- *   stepWaitForChase.onDone → after(stepLockBrief)
- *   stepLockBrief → after(runMaxBackground + stepWaitForMax)
- *   stepWaitForMax.onDone → after(stepWaitForSizing)
- *   ... and so on through 11 stages.
+ * Triggered by the cron tick (`/api/cron/autopilot-tick`). For each
+ * `{ projectId, step }` request:
  *
- * `after()` in Next.js EXTENDS the CURRENT serverless invocation — it does
- * NOT spawn a new one. So the entire cascade shared ONE Vercel 300s budget.
- * Observed 2026-04-24 on BESS project abcb2581: Chase 118s + Max 110s +
- * BOM-start ~70s hit `Vercel Runtime Timeout Error: Task timed out after
- * 300 seconds` mid-BOM, leaving BOM `running` forever, cost never firing,
- * autopilot wedged.
+ *   1. INSERT a `pipeline_runs` autopilot tracking row
+ *      `(project_id, specialist_id='autopilot', stage=<derived>, status='running')`
+ *   2. Resolve `step` → specialist Background fn (per-step switch)
+ *   3. Call the Background fn synchronously (foreground; uses this Lambda's
+ *      full 300 s budget)
+ *   4. UPDATE the tracking row to `'done'` (success) or `'failed'` (with
+ *      error message)
+ *   5. Return 200
  *
- * The fix is a single HTTP hop between stages: each stage persists its
- * progress, then fire-and-forget fetches this route with
- * `{ projectId, step }` + a shared secret. The fetch lands on a NEW Vercel
- * invocation (fresh 300s budget) and immediately calls the matching stage
- * runner directly.
+ * The cron tick reads only the autopilot tracking row to decide
+ * advance / retry / terminal-fail. Specialists may also write their own
+ * `pipeline_runs` rows (under their own specialist_id) — those remain for
+ * cost / latency tracking but are not consulted by the orchestrator.
  *
- * Recovery: `tickAutopilotStage()` still runs on workspace-page render, so
- * if a fetch fails to land (cold-start flake, transient network issue),
- * the stale-state detector re-fires the current stage on page refresh.
- *
- * ## Environment
- *
- * Reuses `FORGE_RENDER_STAGE_SECRET` — one shared secret for both
- * /api/render-stage and /api/autopilot-step. Simplifies rotation and env
- * management: one secret in Vercel Production + Preview + .env.local rather
- * than maintaining two parallel keys.
- *
- * Missing env var → 503 (fail-closed). Matches `src/lib/security/cron-auth.ts`
- * and /api/render-stage.
- *
- * ## Security model
- *
- * - Shared-secret gate: only callers with the env-stored secret can invoke
- *   a stage runner. Prevents random internet drive-by POSTs from triggering
- *   expensive Max/BOM/Finn calls on arbitrary project ids.
- * - Project-scoped work only: the route loads the project row, refuses to
- *   run if `autopilot_state` is null or already finished.
- * - Step allowlist: `step` must match one of the known stage names. Unknown
- *   step → 400. Prevents injection into a future-added stage runner.
- * - No cookies / no foundry check: stage runners use the admin client
- *   internally and trust that ownership was verified at the TOP of the
- *   chain by `startAutopilot` (withAuth wrapper).
+ * No polling. No state mutation (cron owns `autopilot_state` writes). No
+ * HTTP-hop chaining (cron is the only orchestrator).
  *
  * @related
- * - Caller (emitter):  src/actions/forge-v2-autopilot.ts (scheduleAutopilotStep helper)
- * - Parallel route:    src/app/api/render-stage/route.ts (same pattern, per-module chain)
- * - Auth pattern:      src/lib/security/cron-auth.ts
- * - Base URL helper:   src/lib/domains.ts (getBaseUrl)
+ *   - Cron (orchestrator):  src/app/api/cron/autopilot-tick/route.ts
+ *   - Stage map:            src/lib/forge-v2/stage-config.ts
+ *   - Specialist helpers:   src/actions/specialists/*.ts
  */
 
 import { NextResponse } from "next/server"
@@ -64,55 +35,34 @@ import { timingSafeEqual } from "crypto"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
-    dispatchAutopilotStep,
-    type AutopilotStepName,
+    getProjectFoundryId,
     type AutopilotState,
 } from "@/actions/forge-v2-autopilot"
-
-// Allowlist for incoming step names. Mirrors the switch inside
-// `dispatchAutopilotStep` — defined inline here (not exported from the
-// "use server" file) because `"use server"` modules can ONLY export async
-// functions. Exporting the array from forge-v2-autopilot.ts would pass
-// tsc but crash next build at page-data collect.
-const AUTOPILOT_STEP_NAMES = [
-    "waitForChase",
-    "lockBrief",
-    "waitForMax",
-    "waitForSizing",
-    "waitForLayout",
-    "waitForBom",
-    "waitForFinn",
-    "generateIllustration",
-    "matchSuppliers",
-    "runFangReviews",
-    "generatePdf",
-] as const satisfies readonly AutopilotStepName[]
-
-function isAutopilotStepName(value: string): value is AutopilotStepName {
-    return (AUTOPILOT_STEP_NAMES as readonly string[]).includes(value)
-}
+import {
+    AUTOPILOT_TRACKING_SPECIALIST,
+    STEP_TO_STAGE,
+    isAutopilotStepName,
+    type AutopilotStepName,
+} from "@/lib/forge-v2/stage-config"
 
 export const dynamic = "force-dynamic"
-// Autopilot stages poll pipeline_runs for up to 240s and may additionally
-// block on a Background runner (Max ~120s, BOM ~90s, Fang review 45-60s
-// × N). 300s is the Vercel Pro cap and the budget each stage gets.
+// Each fire gets a fresh Vercel Lambda with its own 300 s budget. Most
+// specialists complete in 30-180 s; Fang reviews fan-out can take ~120 s.
 export const maxDuration = 300
 
 const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/**
- * Verifies the FORGE_RENDER_STAGE_SECRET Bearer token. Returns a
- * NextResponse on auth failure (caller should return immediately), or null
- * on success. Mirrors `verifyCronSecret` in cron-auth.ts and the matching
- * helper in /api/render-stage/route.ts.
- */
+/** Minimum chars on `research.report` for Chase to count as substantive. */
+const MIN_BRIEF_REPORT_CHARS = 200
+
+interface AutopilotStepRequestBody {
+    projectId?: unknown
+    step?: unknown
+}
+
 function verifyStageSecret(req: Request): NextResponse | null {
     const secret = process.env.FORGE_RENDER_STAGE_SECRET
-
-    // SECURITY: Fail closed when secret is not configured. Missing env var
-    // is a deployment misconfiguration — better to surface it loudly than
-    // silently accept unauthenticated POSTs.
     if (!secret) {
         console.error(
             "[autopilot-step] FORGE_RENDER_STAGE_SECRET not configured",
@@ -122,42 +72,17 @@ function verifyStageSecret(req: Request): NextResponse | null {
             { status: 503 },
         )
     }
-
     const authHeader = req.headers.get("authorization") || ""
     const expected = `Bearer ${secret}`
-    // SECURITY: Timing-safe compare to avoid a length-leak oracle. Buffers
-    // must be the same length before timingSafeEqual or it throws — the
-    // length check doubles as a pre-filter and an error-prevention guard.
     if (
         authHeader.length !== expected.length ||
         !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
     ) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-
     return null
 }
 
-interface AutopilotStepRequestBody {
-    projectId?: unknown
-    step?: unknown
-}
-
-/**
- * POST /api/autopilot-step
- *
- * Body: `{ projectId: string, step: AutopilotStepName }`
- *   - `projectId` — UUID of the project whose autopilot chain should run
- *     the named stage.
- *   - `step`       — the stage to run (see `AutopilotStepName` in
- *     forge-v2-autopilot.ts for the allowlist).
- *
- * Headers: `Authorization: Bearer $FORGE_RENDER_STAGE_SECRET`
- *
- * Response: `{ ok: true, ran: boolean }` on success, `{ error }` on failure.
- *           `ran: false` means the state was already finished or null
- *           (cheap no-op — not treated as an error).
- */
 export async function POST(request: Request): Promise<NextResponse> {
     const authFailure = verifyStageSecret(request)
     if (authFailure) return authFailure
@@ -188,13 +113,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         )
     }
     const step: AutopilotStepName = rawStep
+    const stage = STEP_TO_STAGE[step]
 
-    // Pre-flight: confirm the project exists and has a running autopilot
-    // state. Running without this check would be correct (stage runners
-    // themselves read state and short-circuit), but we want to return a
-    // meaningful HTTP response so upstream tooling (tests, log analysis)
-    // can distinguish "project gone" from "stage ran".
     const admin = createAdminClient()
+
+    // Pre-flight: project must exist and have an active autopilot state.
     const { data: project, error: projectErr } = await admin
         .from("cad_lab_projects")
         .select("id, autopilot_state")
@@ -202,10 +125,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         .maybeSingle()
 
     if (projectErr) {
-        console.error(
-            "[autopilot-step] project lookup failed:",
-            projectErr.message,
-        )
         return NextResponse.json(
             { error: "Project lookup failed" },
             { status: 500 },
@@ -217,36 +136,359 @@ export async function POST(request: Request): Promise<NextResponse> {
             { status: 404 },
         )
     }
-
     const state = project.autopilot_state as AutopilotState | null
-    if (!state) {
+    if (!state || state.finished_at != null || state.stage === "done") {
         return NextResponse.json(
-            { ok: true, ran: false, reason: "no_autopilot_state" },
-            { status: 200 },
-        )
-    }
-    if (state.finished_at != null) {
-        return NextResponse.json(
-            { ok: true, ran: false, reason: "already_finished" },
+            { ok: true, ran: false, reason: "not_active" },
             { status: 200 },
         )
     }
 
-    // Dispatch the stage runner. dispatchAutopilotStep wraps each branch in
-    // try/catch so a stage throwing doesn't crash the route; it will have
-    // already called recordFailure internally if there was a hard error.
-    try {
-        await dispatchAutopilotStep(projectId, step)
-    } catch (err) {
+    // ── 1. Insert tracking row (status=running) ─────────────────────
+    const startedAt = new Date().toISOString()
+    const { data: trackingInsert, error: insertErr } = await admin
+        .from("pipeline_runs")
+        .insert({
+            project_id: projectId,
+            specialist_id: AUTOPILOT_TRACKING_SPECIALIST,
+            stage,
+            status: "running",
+            trigger: "auto.autopilot",
+            started_at: startedAt,
+        } as never)
+        .select("id")
+        .maybeSingle()
+
+    if (insertErr || !trackingInsert) {
+        // Best-effort: log and continue. Better to attempt the work than
+        // silently abandon. The cron's stale-running detector will clean up.
         console.error(
-            `[autopilot-step] dispatch ${step} threw:`,
-            err instanceof Error ? err.stack ?? err.message : err,
-        )
-        return NextResponse.json(
-            { error: "Stage dispatch failed" },
-            { status: 500 },
+            "[autopilot-step] tracking row insert failed:",
+            insertErr?.message,
         )
     }
+    const trackingId = trackingInsert?.id ?? null
 
-    return NextResponse.json({ ok: true, ran: true, step }, { status: 200 })
+    // ── 2. Run the specialist ───────────────────────────────────────
+    let outcome: { ok: true } | { ok: false; error: string }
+    try {
+        outcome = await runStep(projectId, step)
+    } catch (err) {
+        outcome = {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+        }
+    }
+
+    // ── 3. Stamp tracking row to terminal status ────────────────────
+    if (trackingId) {
+        await admin
+            .from("pipeline_runs")
+            .update({
+                status: outcome.ok ? "done" : "failed",
+                error_message: outcome.ok ? null : outcome.error,
+                error_code: outcome.ok ? null : "STEP_FAILED",
+                finished_at: new Date().toISOString(),
+            } as never)
+            .eq("id", trackingId)
+    }
+
+    if (outcome.ok) {
+        return NextResponse.json({ ok: true, ran: true, step }, { status: 200 })
+    }
+    return NextResponse.json(
+        { ok: false, error: outcome.error, step },
+        { status: 200 },
+    )
+}
+
+// ─── Per-step specialist invocation ─────────────────────────────────────
+
+async function runStep(
+    projectId: string,
+    step: AutopilotStepName,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const foundryId = await getProjectFoundryId(projectId)
+    if (!foundryId) {
+        return { ok: false, error: "Project not found or has no foundry" }
+    }
+
+    switch (step) {
+        case "waitForChase": {
+            const { runChaseResearchBackground } = await import(
+                "@/actions/specialists/run-chase-research"
+            )
+            const result = await runChaseResearchBackground(
+                projectId,
+                foundryId,
+            )
+            if (!result.ok) {
+                return { ok: false, error: result.error ?? "Chase failed" }
+            }
+            // Post-check: research report must have substantive content.
+            const reportLen = await readResearchReportChars(projectId)
+            if (reportLen < MIN_BRIEF_REPORT_CHARS) {
+                return {
+                    ok: false,
+                    error: `Chase finished but research report has only ${reportLen} chars (need ${MIN_BRIEF_REPORT_CHARS}+).`,
+                }
+            }
+            return { ok: true }
+        }
+
+        case "waitForMax": {
+            const { runMaxDecompositionBackground } = await import(
+                "@/actions/specialists/run-max-decomposition"
+            )
+            const result = await runMaxDecompositionBackground(
+                projectId,
+                foundryId,
+            )
+            return result.ok
+                ? { ok: true }
+                : { ok: false, error: result.error ?? "Max failed" }
+        }
+
+        case "waitForSizing": {
+            const { runFangSizingBackground } = await import(
+                "@/actions/specialists/run-fang-sizing"
+            )
+            const result = await runFangSizingBackground(projectId, foundryId)
+            return result.ok
+                ? { ok: true }
+                : { ok: false, error: result.error ?? "Sizing failed" }
+        }
+
+        case "waitForLayout": {
+            const { runFangLayoutBackground } = await import(
+                "@/actions/specialists/run-fang-layout"
+            )
+            const result = await runFangLayoutBackground(projectId, foundryId)
+            return result.ok
+                ? { ok: true }
+                : { ok: false, error: result.error ?? "Layout failed" }
+        }
+
+        case "waitForBom": {
+            const { runBomGeneratorBackground } = await import(
+                "@/actions/specialists/run-bom-generator"
+            )
+            const result = await runBomGeneratorBackground(
+                projectId,
+                foundryId,
+            )
+            return result.ok
+                ? { ok: true }
+                : { ok: false, error: result.error ?? "BOM failed" }
+        }
+
+        case "waitForFinn": {
+            const { runFinnCostBackground } = await import(
+                "@/actions/specialists/run-finn-cost"
+            )
+            const result = await runFinnCostBackground(projectId, foundryId)
+            return result.ok
+                ? { ok: true }
+                : { ok: false, error: result.error ?? "Finn failed" }
+        }
+
+        case "generateIllustration": {
+            const [
+                { generateSystemIllustrationForProjectBackground },
+                { generateConceptRenderForProjectBackground },
+            ] = await Promise.all([
+                import("@/actions/forge-v2-generate-system-illustration"),
+                import("@/actions/forge-v2-generate-concept-render"),
+            ])
+            const [systemRes, conceptRes] = await Promise.allSettled([
+                generateSystemIllustrationForProjectBackground(
+                    projectId,
+                    foundryId,
+                ),
+                generateConceptRenderForProjectBackground(projectId, foundryId),
+            ])
+            // System illustration is the load-bearing one; concept render
+            // failure is non-fatal (matches existing stepGenerateIllustration
+            // behaviour). Fail only if system render hard-failed.
+            if (systemRes.status === "rejected") {
+                return {
+                    ok: false,
+                    error: `System illustration threw: ${
+                        systemRes.reason instanceof Error
+                            ? systemRes.reason.message
+                            : String(systemRes.reason)
+                    }`,
+                }
+            }
+            if (!systemRes.value.ok) {
+                return {
+                    ok: false,
+                    error:
+                        systemRes.value.error ?? "System illustration failed",
+                }
+            }
+            if (conceptRes.status === "rejected") {
+                console.warn(
+                    "[autopilot-step] concept render threw (non-fatal):",
+                    conceptRes.reason instanceof Error
+                        ? conceptRes.reason.message
+                        : conceptRes.reason,
+                )
+            } else if (!conceptRes.value.ok) {
+                console.warn(
+                    "[autopilot-step] concept render error (non-fatal):",
+                    conceptRes.value.error,
+                )
+            }
+
+            // Kick off per-module renders parallel-fire-and-forget. They run
+            // during supplier-match + Fang-review stages and are awaited
+            // by the PDF stage at the end. Failures here are non-fatal.
+            try {
+                const { startRenderAllRemainingModuleImagesBackground } =
+                    await import("@/actions/forge-v2-render-all-modules")
+                await startRenderAllRemainingModuleImagesBackground(
+                    projectId,
+                    foundryId,
+                )
+            } catch (err) {
+                console.warn(
+                    "[autopilot-step] per-module render queue failed (non-fatal):",
+                    err instanceof Error ? err.message : err,
+                )
+            }
+            return { ok: true }
+        }
+
+        case "matchSuppliers": {
+            const { matchSuppliersForProjectBackground } = await import(
+                "@/actions/forge-v2-supplier-match"
+            )
+            const result = await matchSuppliersForProjectBackground(
+                projectId,
+                foundryId,
+            )
+            return result.ok
+                ? { ok: true }
+                : {
+                      ok: false,
+                      error: result.error ?? "Supplier match failed",
+                  }
+        }
+
+        case "runFangReviews": {
+            return await runFangReviewsForAllModules(projectId, foundryId)
+        }
+
+        case "generatePdf": {
+            // Brief render-readiness wait — gives per-module renders that
+            // were kicked off in `generateIllustration` time to land before
+            // PDF gen. Cap 90s; PDF degrades gracefully on missing renders.
+            await waitForRenders(projectId, 90_000)
+            const { exportProjectPdfBackground } = await import(
+                "@/actions/export-project-pdf"
+            )
+            const result = await exportProjectPdfBackground(
+                projectId,
+                foundryId,
+            )
+            return result.ok
+                ? { ok: true }
+                : { ok: false, error: result.error ?? "PDF export failed" }
+        }
+    }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+async function readResearchReportChars(projectId: string): Promise<number> {
+    const admin = createAdminClient()
+    const { data } = await admin
+        .from("cad_lab_projects")
+        .select("research")
+        .eq("id", projectId)
+        .maybeSingle()
+    const research = data?.research as { report?: string } | null
+    const report = research?.report
+    return typeof report === "string" ? report.length : 0
+}
+
+async function runFangReviewsForAllModules(
+    projectId: string,
+    foundryId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const admin = createAdminClient()
+    const { data: project } = await admin
+        .from("cad_lab_projects")
+        .select("modules")
+        .eq("id", projectId)
+        .maybeSingle()
+    const modules = (project?.modules ?? []) as Array<{ id: string }>
+    if (modules.length === 0) {
+        return { ok: false, error: "No modules to review (modules is empty)" }
+    }
+
+    const { runFangReviewBackground } = await import(
+        "@/actions/specialists/run-fang-review"
+    )
+
+    // Parallel fan-out with a bounded concurrency. 4 in flight at a time
+    // matches existing stepRunFangReviews behaviour and keeps Anthropic
+    // rate-limit headroom. Promise.allSettled — one module's failure
+    // shouldn't sink the whole stage.
+    const CONCURRENCY = 4
+    const results: Array<PromiseSettledResult<{ ok: boolean; error?: string }>> =
+        []
+    for (let i = 0; i < modules.length; i += CONCURRENCY) {
+        const batch = modules.slice(i, i + CONCURRENCY)
+        const settled = await Promise.allSettled(
+            batch.map((m) =>
+                runFangReviewBackground(projectId, foundryId, m.id),
+            ),
+        )
+        results.push(...settled)
+    }
+
+    const failed = results.filter(
+        (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
+    )
+    if (failed.length === modules.length) {
+        // Every module failed — terminal. Otherwise, accept partial success
+        // (better some Risks/Specialists data than none).
+        return {
+            ok: false,
+            error: `All ${modules.length} Fang reviews failed`,
+        }
+    }
+    return { ok: true }
+}
+
+async function waitForRenders(
+    projectId: string,
+    maxMs: number,
+): Promise<void> {
+    const admin = createAdminClient()
+    const POLL_MS = 5_000
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < maxMs) {
+        const { data } = await admin
+            .from("cad_lab_projects")
+            .select("modules")
+            .eq("id", projectId)
+            .maybeSingle()
+        const mods = (data?.modules ?? []) as Array<{
+            imageUrl?: string | null
+            imageStatus?: string | null
+        }>
+        if (mods.length === 0) return
+        const ready = mods.filter(
+            (m) => typeof m.imageUrl === "string" && m.imageUrl.length > 0,
+        ).length
+        const inFlight = mods.filter(
+            (m) =>
+                m.imageStatus === "generating" || m.imageStatus === "pending",
+        ).length
+        if (ready === mods.length || inFlight === 0) return
+        await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+    }
 }

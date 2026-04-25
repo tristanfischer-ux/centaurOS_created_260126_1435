@@ -1,101 +1,130 @@
 /**
  * @file route.ts — /api/cron/autopilot-tick
  *
- * @description Deterministic re-drive for the autopilot stage machine.
- * Vercel cron hits this every minute; it finds every project with
- * `autopilot_state.finished_at = null` and dispatches the current
- * stage runner. Every stepXxx is idempotent — if the stage is already
- * running (pipeline_run exists + not stale) it short-circuits; if it
- * was dropped by a failed `after(fetch)` hop, it re-fires.
+ * @description Zero-wait cron orchestrator for the ForgeOS autopilot.
+ * Vercel cron hits this every minute. The handler is the SINGLE
+ * orchestrator: it advances `cad_lab_projects.autopilot_state.stage`,
+ * fires specialists fire-and-forget, never waits.
  *
- * ## Why this exists
+ * ## Per-project decision tree
  *
- * The autopilot chain previously relied on `after(fetch)` → /api/autopilot-step
- * hops to advance between stages. Runs 1–12 of verify-autopilot.sh each
- * landed a new fix for a different after()/keepalive/undici quirk. Cron
- * replaces the optimistic hop with a guaranteed tick: even if every hop
- * fails, cron picks up within 60s and drives the chain to completion.
+ * For each active project (autopilot_state.stage NOT IN ('done','failed')
+ * AND autopilot_state.finished_at IS NULL):
  *
- * Hops stay (they're the fast path when they work). Cron is the backstop.
- * stepXxx idempotency means double-dispatch is harmless.
+ *  1. If `STAGE_CONFIG[stage].kind === "synchronous"` (only `locking_brief`
+ *     today): run the work inline (small DB ops), then `advance()` or
+ *     `recordFailure()`. Same tick.
  *
- * ## Loop-within-invocation
+ *  2. Else (fire stage): query `pipeline_runs` for the autopilot tracking
+ *     row matching (project, 'autopilot', stage), most recent first.
  *
- * Vercel cron is minute-resolution. To keep advance latency under 30s,
- * this handler runs TWO tick passes: one immediately, one after a 30s
- * sleep. Net: effective 30s cadence at 1-minute cron frequency.
+ *     - status='done'      → `advance()` (or `markDone()` if last stage)
+ *     - status='running'   → if age < 5 min, skip; if older, mark
+ *                            STALE_ABANDONED and fall through to fire
+ *     - status='failed'    → count historical failed rows for this stage;
+ *                            if < maxAttempts, fire (retry); else
+ *                            `recordFailure()` (terminal)
+ *     - no row             → fire (first attempt)
  *
- * ## Security
+ * Fire = `await fetch('/api/autopilot-step', { signal: AbortSignal.timeout(2000) })`.
+ * The cron's HTTP connection drops at 2 s but the receiving Lambda runs
+ * to completion in its own 300 s container — Vercel does not tie Lambda
+ * lifetime to client connection. The fire endpoint inserts the
+ * `pipeline_runs` running row immediately, so the next cron tick sees
+ * it and skips re-firing.
  *
- * - Standard CRON_SECRET Bearer auth (Vercel cron injects this header)
- * - Service-role admin client only — no user session
- * - Bounded work per invocation: max 10 projects per pass, timeout 300s
+ * ## Why this exists (history)
+ *
+ * Earlier orchestrator architecture: `after(() => dispatchAutopilotStep)`
+ * → `stepWaitForX` polling loop holding a Vercel function open for 240 s.
+ * Frontier-model architectural review on 2026-04-25 (Gemini 3.1 Pro +
+ * GPT-5.5) diagnosed the polling-on-serverless shape as the root cause
+ * of 9+ documented orchestration bugs. This is the rewrite.
  *
  * @related
- * - Stage dispatcher:   src/actions/forge-v2-autopilot.ts (dispatchAutopilotStep)
- * - Cron auth:          src/lib/security/cron-auth.ts
- * - Vercel cron config: vercel.json
+ *  - Stage map:        src/lib/forge-v2/stage-config.ts
+ *  - Fire endpoint:    src/app/api/autopilot-step/route.ts
+ *  - State helpers:    src/actions/forge-v2-autopilot.ts (advance, recordFailure, markDone, lockBriefSynchronously)
+ *  - Cron auth:        src/lib/security/cron-auth.ts
+ *  - Vercel cron cfg:  vercel.json
  */
 
-import { NextResponse, after } from "next/server"
+import { NextResponse } from "next/server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyCronSecret } from "@/lib/security/cron-auth"
 import {
-    dispatchAutopilotStep,
-    type AutopilotStepName,
+    advance,
+    recordFailure,
+    markDone,
+    lockBriefSynchronously,
+    type AutopilotStage,
     type AutopilotState,
 } from "@/actions/forge-v2-autopilot"
+import {
+    STAGE_CONFIG,
+    AUTOPILOT_TRACKING_SPECIALIST,
+    STALE_RUNNING_MS,
+    FIRE_TIMEOUT_MS,
+    MAX_PROJECTS_PER_TICK,
+} from "@/lib/forge-v2/stage-config"
 
 export const dynamic = "force-dynamic"
-// Two tick passes with a 30s sleep between = ~35s minimum, plus per-project
-// dispatch time (each stepXxx can take up to ~120s for stalled self-heal).
-// Set maxDuration to allow comfortable margin.
-export const maxDuration = 300
+export const maxDuration = 60
 
-// Map autopilot_state.stage → the step name that drives that stage.
-// Inlined here because "use server" files can't export non-async maps.
-const STAGE_TO_STEP: Record<string, AutopilotStepName> = {
-    waiting_chase: "waitForChase",
-    locking_brief: "lockBrief",
-    waiting_max: "waitForMax",
-    waiting_sizing: "waitForSizing",
-    waiting_layout: "waitForLayout",
-    waiting_bom: "waitForBom",
-    waiting_finn: "waitForFinn",
-    generating_illustration: "generateIllustration",
-    matching_suppliers: "matchSuppliers",
-    running_fang_reviews: "runFangReviews",
-    generating_pdf: "generatePdf",
-    // "done" has no step — excluded from dispatch
+type TickAction =
+    | "advance"
+    | "advance_done"
+    | "fire"
+    | "fire_retry"
+    | "fire_after_stale"
+    | "skip_running"
+    | "skip_no_config"
+    | "skip_terminal"
+    | "synchronous_ok"
+    | "synchronous_fail"
+    | "terminal_fail"
+
+interface TickDetail {
+    projectId: string
+    stage: string
+    action: TickAction
+    ok: boolean
+    reason?: string
 }
 
-const MAX_PROJECTS_PER_PASS = 10
-
-async function tickOnce(): Promise<{
-    dispatched: number
+interface TickResult {
+    advanced: number
+    fired: number
     skipped: number
     failed: number
-    details: Array<{ projectId: string; stage: string; ok: boolean; err?: string }>
-}> {
-    const admin = createAdminClient()
-    const details: Array<{
-        projectId: string
-        stage: string
-        ok: boolean
-        err?: string
-    }> = []
-    let dispatched = 0
-    let skipped = 0
-    const failed = 0
+    details: TickDetail[]
+}
 
-    // Fetch active autopilot projects. Push the finished_at / started_at
-    // filters INTO the SQL — filtering only in JS after a LIMIT was a
-    // latent bug: old abandoned projects at the tail of the oldest-first
-    // sort crowded out freshly-started projects, which then never got
-    // dispatched. Observed 2026-04-24 run 15: project 4cff19f8 with
-    // finished_at=null was dropped because 30 older projects (all with
-    // finished_at set from stale recordFailure calls) filled the limit.
+/** GET /api/cron/autopilot-tick — Bearer CRON_SECRET. Vercel cron-injected. */
+export async function GET(request: Request): Promise<NextResponse> {
+    const authFailure = verifyCronSecret(request)
+    if (authFailure) return authFailure
+
+    const result = await tickOnce(request)
+    console.info(
+        `[autopilot-tick] advanced=${result.advanced} fired=${result.fired} ` +
+            `skipped=${result.skipped} failed=${result.failed}`,
+    )
+    return NextResponse.json({ ok: true, pass: result }, { status: 200 })
+}
+
+async function tickOnce(request: Request): Promise<TickResult> {
+    const admin = createAdminClient()
+    const details: TickDetail[] = []
+    let advanced = 0
+    let fired = 0
+    let skipped = 0
+    let failed = 0
+
+    // Active projects only — push the filters into SQL (filtering after a
+    // LIMIT was a latent bug that crowded out fresh projects with old
+    // abandoned ones; observed 2026-04-24 run 15).
     const { data: projects, error } = await admin
         .from("cad_lab_projects")
         .select("id, autopilot_state")
@@ -103,81 +132,263 @@ async function tickOnce(): Promise<{
         .is("autopilot_state->>finished_at", null)
         .not("autopilot_state->>started_at", "is", null)
         .order("updated_at", { ascending: false })
-        .limit(MAX_PROJECTS_PER_PASS * 2)
+        .limit(MAX_PROJECTS_PER_TICK * 2)
 
     if (error) {
         console.error("[autopilot-tick] project lookup failed:", error.message)
-        return { dispatched: 0, skipped: 0, failed: 0, details: [] }
+        return { advanced: 0, fired: 0, skipped: 0, failed: 0, details: [] }
     }
 
-    const active = (projects ?? []).filter((p) => {
-        const state = p.autopilot_state as AutopilotState | null
-        if (!state) return false
-        if (state.finished_at) return false
-        if (!state.started_at) return false
-        return true
-    })
+    const active = (projects ?? [])
+        .filter((p) => {
+            const state = p.autopilot_state as AutopilotState | null
+            if (!state) return false
+            if (state.finished_at) return false
+            if (!state.started_at) return false
+            if (state.stage === "done") return false
+            return true
+        })
+        .slice(0, MAX_PROJECTS_PER_TICK)
 
-    for (const project of active.slice(0, MAX_PROJECTS_PER_PASS)) {
+    // Pre-compute the fire URL + bearer secret once. The cron's per-project
+    // fire is awaited with a 2 s abort signal; receiving Lambda continues
+    // independently for its full 300 s budget (Vercel client-disconnect
+    // semantics — see memory `forgeos_vercel_after_silent_drop.md`).
+    const proto = request.headers.get("x-forwarded-proto") ?? "https"
+    const host =
+        request.headers.get("x-forwarded-host") ??
+        request.headers.get("host") ??
+        "fractionalforge.app"
+    const fireUrl = `${proto}://${host}/api/autopilot-step`
+    const renderSecret = process.env.FORGE_RENDER_STAGE_SECRET ?? ""
+
+    if (!renderSecret) {
+        console.error(
+            "[autopilot-tick] FORGE_RENDER_STAGE_SECRET is empty — cannot fire stages",
+        )
+        // Still process synchronous (locking_brief) projects; fire stages
+        // will be skipped with the secret-missing reason.
+    }
+
+    for (const project of active) {
         const state = project.autopilot_state as AutopilotState
-        const step = STAGE_TO_STEP[state.stage]
-        if (!step) {
-            skipped++
+        const stage = state.stage as AutopilotStage
+
+        if (stage === "done") {
             details.push({
                 projectId: project.id,
-                stage: state.stage,
-                ok: false,
-                err: "no step mapping",
+                stage,
+                action: "skip_terminal",
+                ok: true,
             })
+            skipped++
             continue
         }
 
-        // Fire-and-forget dispatch via after(): stepXxx runners internally
-        // call waitForStage which polls for up to 240s. If cron awaited
-        // each dispatch synchronously, one stuck project would blow the
-        // whole tick's 300s budget. after() keeps the Vercel container
-        // alive past the response so the stage runner's active polling
-        // work continues, while cron itself returns in <1s per project.
-        //
-        // Caveat: after() has been unreliable for FETCH hops (empty-body,
-        // tiny-flush-window case). But for long-running active work like
-        // waitForStage's 5s interval polling, the container stays busy
-        // and after() fires reliably. Not a fetch-hop situation.
-        const pid = project.id
-        const stageSlug = state.stage
-        after(async () => {
+        const config = STAGE_CONFIG[stage as Exclude<AutopilotStage, "done">]
+        if (!config) {
+            details.push({
+                projectId: project.id,
+                stage,
+                action: "skip_no_config",
+                ok: false,
+                reason: `no STAGE_CONFIG for ${stage}`,
+            })
+            skipped++
+            continue
+        }
+
+        // ── Synchronous stages (locking_brief) ──────────────────────
+        if (config.kind === "synchronous") {
             try {
-                await dispatchAutopilotStep(pid, step)
+                const result = await lockBriefSynchronously(project.id)
+                if (result.ok) {
+                    await advance(project.id, stage, config.nextStage)
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "synchronous_ok",
+                        ok: true,
+                    })
+                    advanced++
+                } else {
+                    await recordFailure(project.id, stage, result.error)
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "synchronous_fail",
+                        ok: false,
+                        reason: result.error,
+                    })
+                    failed++
+                }
             } catch (err) {
-                console.error(
-                    `[autopilot-tick] dispatch ${step} for ${pid} (stage=${stageSlug}) threw:`,
-                    err instanceof Error ? err.message : err,
+                const msg = err instanceof Error ? err.message : String(err)
+                await recordFailure(project.id, stage, msg)
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "synchronous_fail",
+                    ok: false,
+                    reason: msg,
+                })
+                failed++
+            }
+            continue
+        }
+
+        // ── Fire stages ────────────────────────────────────────────
+        // Most-recent autopilot tracking row for this (project, stage).
+        const { data: trackingRow } = await admin
+            .from("pipeline_runs")
+            .select("id, status, started_at, error_code, error_message")
+            .eq("project_id", project.id)
+            .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+            .eq("stage", stage)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (trackingRow?.status === "done") {
+            if (config.nextStage === "done") {
+                await markDone(project.id, stage)
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "advance_done",
+                    ok: true,
+                })
+            } else {
+                await advance(project.id, stage, config.nextStage)
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "advance",
+                    ok: true,
+                })
+            }
+            advanced++
+            continue
+        }
+
+        if (trackingRow?.status === "running") {
+            const age = Date.now() - new Date(trackingRow.started_at).getTime()
+            if (age < STALE_RUNNING_MS) {
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "skip_running",
+                    ok: true,
+                    reason: `running for ${Math.round(age / 1000)}s`,
+                })
+                skipped++
+                continue
+            }
+            // Stale — orphaned by a SIGKILLed Lambda. Mark and re-fire.
+            await admin
+                .from("pipeline_runs")
+                .update({
+                    status: "failed",
+                    error_code: "STALE_ABANDONED",
+                    error_message: `Tracking row stale (${Math.round(age / 1000)}s > ${STALE_RUNNING_MS / 1000}s threshold)`,
+                    finished_at: new Date().toISOString(),
+                } as never)
+                .eq("id", trackingRow.id)
+            // Fall through to fire below.
+        }
+
+        if (
+            trackingRow?.status === "failed" &&
+            trackingRow.error_code !== "STALE_ABANDONED"
+        ) {
+            // Real failure (not just stale). Check attempt count: how many
+            // failed rows already exist for this (project, stage)?
+            const { count: failedCount } = await admin
+                .from("pipeline_runs")
+                .select("id", { count: "exact", head: true })
+                .eq("project_id", project.id)
+                .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+                .eq("stage", stage)
+                .eq("status", "failed")
+
+            const attempts = failedCount ?? 0
+            if (attempts >= config.maxAttempts) {
+                await recordFailure(
+                    project.id,
+                    stage,
+                    trackingRow.error_message ??
+                        `Stage failed after ${attempts} attempts`,
+                )
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "terminal_fail",
+                    ok: false,
+                    reason: `${attempts} >= ${config.maxAttempts}`,
+                })
+                failed++
+                continue
+            }
+            // Else: fall through to fire (retry).
+        }
+
+        // ── No row, or stale-just-marked, or failed-with-retries-left: fire ─
+        if (!renderSecret) {
+            details.push({
+                projectId: project.id,
+                stage,
+                action: "fire",
+                ok: false,
+                reason: "FORGE_RENDER_STAGE_SECRET missing",
+            })
+            failed++
+            continue
+        }
+
+        const fireAction: TickAction =
+            trackingRow?.status === "failed"
+                ? "fire_retry"
+                : trackingRow?.status === "running"
+                  ? "fire_after_stale"
+                  : "fire"
+
+        try {
+            await fetch(fireUrl, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${renderSecret}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    projectId: project.id,
+                    step: config.fireStep,
+                }),
+                signal: AbortSignal.timeout(FIRE_TIMEOUT_MS),
+            })
+        } catch (err) {
+            // Expected: AbortError after FIRE_TIMEOUT_MS. The receiving
+            // Lambda is running. Only log unexpected (DNS/connect) errors.
+            const msg = err instanceof Error ? err.message : String(err)
+            const isExpectedAbort =
+                msg.toLowerCase().includes("aborted") ||
+                msg.includes("AbortError") ||
+                (err instanceof Error && err.name === "TimeoutError")
+            if (!isExpectedAbort) {
+                console.warn(
+                    `[autopilot-tick] fire ${config.fireStep} for ${project.id} unexpected error:`,
+                    msg,
                 )
             }
+        }
+
+        details.push({
+            projectId: project.id,
+            stage,
+            action: fireAction,
+            ok: true,
         })
-        dispatched++
-        details.push({ projectId: project.id, stage: state.stage, ok: true })
+        fired++
     }
 
-    return { dispatched, skipped, failed, details }
-}
-
-/**
- * GET /api/cron/autopilot-tick
- *
- * Headers: `Authorization: Bearer $CRON_SECRET`
- *
- * Response: `{ ok: true, passes: [tick1, tick2] }`
- */
-export async function GET(request: Request): Promise<NextResponse> {
-    const authFailure = verifyCronSecret(request)
-    if (authFailure) return authFailure
-
-    const pass = await tickOnce()
-    console.info(
-        `[autopilot-tick] dispatched=${pass.dispatched} ` +
-            `skipped=${pass.skipped} failed=${pass.failed}`,
-    )
-
-    return NextResponse.json({ ok: true, pass }, { status: 200 })
+    return { advanced, fired, skipped, failed, details }
 }
