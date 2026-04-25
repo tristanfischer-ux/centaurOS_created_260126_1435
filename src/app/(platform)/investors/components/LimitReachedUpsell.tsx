@@ -48,6 +48,13 @@ interface LimitReachedUpsellProps {
   currentCount?: number
   /** The cap value itself (e.g. 5 for free saved searches, 15 for free leads). */
   limitMax?: number
+  /**
+   * When true, the user is within their early-access free month.
+   * Switches the primary CTA from "Upgrade to Starter" to "Copy invite link"
+   * and reframes the copy around the generous free mechanic.
+   * 2026-04-25 early-access addition.
+   */
+  isEarlyAccess?: boolean
 }
 
 /**
@@ -88,20 +95,11 @@ export function LimitReachedUpsell({
   limit,
   currentCount,
   limitMax,
+  isEarlyAccess = false,
 }: LimitReachedUpsellProps) {
   const [copied, setCopied] = useState(false)
   const starter = getStarterCopy()
   const referralUrl = userId ? buildReferralUrl(userId) : null
-
-  const headline =
-    limit === 'saved_searches'
-      ? 'Two ways to keep going'
-      : 'Two ways to keep going'
-
-  const subline =
-    limit === 'saved_searches'
-      ? `Free includes ${limitMax ?? 5} saved searches across the lifetime of your account. Pick one of the routes below to keep building your investor list.`
-      : `Free includes ${limitMax ?? 15} investor profile views a month. Pick one of the routes below to keep building your investor list.`
 
   const handleCopy = useCallback(async () => {
     if (!referralUrl) return
@@ -131,6 +129,116 @@ export function LimitReachedUpsell({
     )
     window.location.href = `mailto:?subject=${subject}&body=${body}`
   }, [referralUrl])
+
+  // -----------------------------------------------------------------------
+  // Early-access variant: generous framing, invite link as primary CTA
+  // -----------------------------------------------------------------------
+  if (isEarlyAccess) {
+    return (
+      <Card className="border-international-orange/30 bg-international-orange/[0.03]">
+        <CardContent className="p-6 space-y-5">
+          <div>
+            <p className="text-base font-semibold text-foreground">
+              Free for your first month
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-1">
+              Invite a friend to extend your free time and get them a free month too.
+              Both of you get +50 searches for each friend who joins.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Primary CTA: Copy invite link */}
+            <div className="rounded-lg border border-international-orange/30 bg-card p-5 space-y-3 flex flex-col">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">
+                  Invite a friend
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  They get a free month. You both get +50 investor searches the moment they sign up.
+                </p>
+              </div>
+              <div className="flex-1" />
+              <div className="space-y-2">
+                {referralUrl ? (
+                  <>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleCopy}
+                        className="flex-1 justify-center gap-2"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                            Copy invite link
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={handleEmailShare}
+                        className="flex-1 justify-center gap-2"
+                      >
+                        <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                        Email
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Up to +500 searches per month from invites.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Sign in to share your invite link.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Secondary CTA: Starter after your free month */}
+            <div className="rounded-lg border border-border bg-card p-5 space-y-3 flex flex-col">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">
+                  After your free month
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Starter gives you 100 investor leads per month with full why-fit and a drafted email.
+                </p>
+              </div>
+              <div className="flex-1" />
+              <div className="space-y-2">
+                <Button asChild variant="secondary" className="w-full justify-center gap-2">
+                  <Link href="/pricing?plan=starter_v2">
+                    Read about Starter, £20 per month
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Link>
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Cancel anytime, no contract.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // -----------------------------------------------------------------------
+  // Standard variant (non-early-access users)
+  // -----------------------------------------------------------------------
+
+  const headline = 'Two ways to keep going'
+
+  const subline =
+    limit === 'saved_searches'
+      ? `Free includes ${limitMax ?? 5} saved searches across the lifetime of your account. Pick one of the routes below to keep building your investor list.`
+      : `Free includes ${limitMax ?? 15} investor profile views a month. Pick one of the routes below to keep building your investor list.`
 
   return (
     <Card className="border-international-orange/30 bg-international-orange/[0.03]">
@@ -234,18 +342,54 @@ interface ApproachingLimitBannerProps {
   limit: LimitKind
   currentCount: number
   limitMax: number
+  /** When true, shows early-access copy (invite CTA instead of upgrade CTA). */
+  isEarlyAccess?: boolean
+  /** Referral URL for the invite link CTA (only used when isEarlyAccess is true). */
+  referralUrl?: string
 }
 
 export function ApproachingLimitBanner({
   limit,
   currentCount,
   limitMax,
+  isEarlyAccess = false,
+  referralUrl,
 }: ApproachingLimitBannerProps) {
   const remaining = Math.max(0, limitMax - currentCount)
   const label =
     limit === 'saved_searches'
       ? `${currentCount} of ${limitMax} lifetime saved searches used`
       : `${currentCount} of ${limitMax} investor profile views used this month`
+
+  if (isEarlyAccess) {
+    return (
+      <div
+        role="status"
+        className="rounded-lg border border-international-orange/30 bg-international-orange/[0.06] px-4 py-3 text-sm leading-relaxed text-foreground"
+      >
+        <span className="font-semibold">{label}.</span>{' '}
+        <span className="text-muted-foreground">
+          {remaining > 0 ? `${remaining} remaining. ` : ''}
+          Invite a friend to get both of you +50 more searches.
+        </span>{' '}
+        {referralUrl && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(referralUrl)
+              } catch {
+                // Silent fallback — full upsell panel handles the error case
+              }
+            }}
+            className="text-international-orange hover:underline font-medium cursor-pointer"
+          >
+            Copy invite link
+          </button>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div

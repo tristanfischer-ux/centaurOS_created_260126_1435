@@ -278,7 +278,7 @@ export async function getEffectiveSearchAllowance(): Promise<
 }
 
 // ---------------------------------------------------------------------------
-// Forge Ambassador status (Tier 5 step 23)
+// Forge Ambassador status
 // ---------------------------------------------------------------------------
 
 export interface ForgeAmbassadorStatus {
@@ -286,6 +286,13 @@ export interface ForgeAmbassadorStatus {
   activePaidCount: number
   /** ISO timestamp when the user first crossed 10 active paid referrals, or null */
   since: string | null
+  /**
+   * Number of referral signups this calendar month where the invitee has signed
+   * up (any status >= signed_up). Counts free-signup referrals, not only paid
+   * conversions. Used by the early-access progress chip to show the free loop.
+   * 2026-04-25 early-access addition.
+   */
+  freeSignupsThisMonth: number
 }
 
 /**
@@ -294,6 +301,9 @@ export interface ForgeAmbassadorStatus {
  * @description A founder is a Forge Ambassador when they have 10 or more
  * referrals that are CURRENTLY on an active paid subscription. Status is
  * live — if referrals churn, isAmbassador flips to false on the next call.
+ *
+ * Also returns freeSignupsThisMonth for the early-access progress chip:
+ * all signups (any status) that occurred this calendar month.
  *
  * Used by:
  *   - Billing settings page (badge beside the plan label)
@@ -308,6 +318,7 @@ export async function getForgeAmbassadorStatus(): Promise<
   return withAuth(async ({ user }) => {
     const admin = createAdminClient()
 
+    // Count active paid referrals via the existing RPC
     const { data: activePaidCount, error: countError } = await admin.rpc(
       'get_active_paid_referral_count',
       { p_inviter_user_id: user.id }
@@ -328,10 +339,79 @@ export async function getForgeAmbassadorStatus(): Promise<
       .eq('id', user.id)
       .single()
 
+    // Count free signups this calendar month (any status >= signed_up)
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    const { count: freeSignupsCount } = await admin
+      .from('referral_signups')
+      .select('id', { count: 'exact', head: true })
+      .eq('inviter_user_id', user.id)
+      .gte('signup_at', monthStart.toISOString())
+
     return {
       isAmbassador,
       activePaidCount: count,
       since: (profile?.forge_ambassador_since as string | null) ?? null,
+      freeSignupsThisMonth: freeSignupsCount ?? 0,
     }
   })
 }
+
+// ---------------------------------------------------------------------------
+// Early-access profile
+// ---------------------------------------------------------------------------
+
+export interface EarlyAccessProfile {
+  isEarlyAccess: boolean
+  /** ISO timestamp when early access expires, or null if not in cohort */
+  earlyAccessUntil: string | null
+  /** 1-based sequential position in the 100-user cohort, or null */
+  earlyAccessUserNumber: number | null
+  /** How many of the 100 cohort spots have been taken so far */
+  cohortCount: number
+}
+
+/**
+ * Get the current user's early-access status.
+ *
+ * @description Returns whether the user is in the first-100 early-access
+ * cohort and when their free month expires. Used by:
+ *   - The at-limit upsell copy (shows generous framing for early-access users)
+ *   - The sidebar footer chip (optional "Early access" label)
+ *
+ * @returns EarlyAccessProfile or { error }
+ */
+export async function getEarlyAccessProfile(): Promise<
+  EarlyAccessProfile | { error: string }
+> {
+  return withAuth(async ({ user }) => {
+    const admin = createAdminClient()
+
+    const { data: profile, error: profileError } = await admin
+      .from('profiles')
+      .select('early_access_until, early_access_user_number')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      console.error('[getEarlyAccessProfile] error:', profileError.message)
+      return { error: profileError.message }
+    }
+
+    const until = profile?.early_access_until ?? null
+    const isEarlyAccess = until !== null && new Date(until) > new Date()
+
+    const { data: cohortCountData } = await admin.rpc('get_early_access_cohort_count')
+    const cohortCount = typeof cohortCountData === 'number' ? cohortCountData : 0
+
+    return {
+      isEarlyAccess,
+      earlyAccessUntil: until,
+      earlyAccessUserNumber: profile?.early_access_user_number ?? null,
+      cohortCount,
+    }
+  })
+}
+
