@@ -215,7 +215,7 @@ const STAGES: StageDefinition[] = [
             "We score every supplier in the directory against the parts in your bill of materials: geometry, tolerance, material, volume, lead time, certifications, recent similar work. We filter to suppliers who have actually made parts like yours in the last 24 months, then rank the top of the list with a short note on why each one fits and what to ask them on the qualifying call. The point is to save you the 90-minute supplier qualification call by walking in already knowing the right questions.",
         workingFrom: "The bill of materials.",
         producingNext: "A ranked supplier shortlist with capability-fit reasoning per supplier.",
-        liveCounterTemplate: "Scoring roughly 13,700 indexed suppliers against your bill-of-materials specs.",
+        liveCounterTemplate: "Scoring roughly 19,900 indexed suppliers against your bill-of-materials specs.",
         costPoints: 4600,
         specialists: ["Chase"],
     },
@@ -224,7 +224,7 @@ const STAGES: StageDefinition[] = [
         label: "Red-teaming every module",
         hint: "Design-for-manufacturing review per module.",
         whatHappens:
-            "Fang takes every module in turn and runs a design-for-manufacturing review against it: which features will be expensive to make, which tolerances are tighter than they need to be, which assembly steps will trip up a contract manufacturer, which parts could collapse into one if we re-thought the geometry. The output is a list of named issues per module with a recommended fix for each. This is the pass that turns a plan into one a manufacturer respects.",
+            "Fang reads each module and works out what will cost you in production. Features that add machining time, tolerances tighter than the geometry actually needs, assembly steps that will slow a line down, parts that could be one part instead of three. Every issue gets named, with a specific fix attached. The output is a short list per module — the things a contract manufacturer would flag on their first read, before you've spent anything getting there.",
         workingFrom: "The bill of materials and the spatial plan.",
         producingNext: "A red-team review with named issues and recommended fixes per module.",
         liveCounterTemplate: "Reviewing each module for manufacturability and assembly risk.",
