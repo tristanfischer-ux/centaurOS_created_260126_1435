@@ -163,6 +163,8 @@ export interface MonthlyUsage {
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
   'gpt-5.4': { input: 2.50, output: 15.00 },
   'gpt-4.1': { input: 2.00, output: 8.00 },
+  // GPT-4.1-mini — fast, cost-efficient sibling of GPT-4.1 (per OpenAI pricing 2026)
+  'gpt-4.1-mini': { input: 0.40, output: 1.60 },
   'o3': { input: 5.00, output: 20.00 },
   'o4-mini': { input: 1.10, output: 4.40 },
   'gemini-3.1-pro-preview': { input: 1.25, output: 5.00 },
@@ -172,9 +174,17 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
   'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
   'claude-opus-4-7': { input: 5.00, output: 25.00 },
   'claude-haiku-4-5': { input: 1.00, output: 5.00 },
+  // Pinned Haiku snapshot — same Anthropic price tier
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
   // DeepSeek V4 models (https://api.deepseek.com — Apr 2026)
   'deepseek-chat': { input: 0.30, output: 0.50 },
   'deepseek-reasoner': { input: 0.30, output: 0.50 },
+  // DeepSeek V4-Pro — direct API pricing $1.74/$3.48; Together typically matches publisher rates
+  'deepseek-ai/DeepSeek-V4-Pro': { input: 1.74, output: 3.48 },
+  // Qwen 3 235B-A22B via DashScope (Alibaba publisher pricing)
+  'qwen3-235b-a22b': { input: 0.26, output: 0.90 },
+  // Together-hosted Qwen 3.5 397B MoE — kept here so failover cost-tracking works
+  'Qwen/Qwen3.5-397B-A17B': { input: 0.88, output: 0.88 },
   // MiniMax models — dramatically cheaper than OpenAI/Anthropic
   // M2.7: same pricing tier as M2.5 (OpenAI-compatible endpoint)
   'MiniMax-M2.7': { input: 0.15, output: 1.20 },
