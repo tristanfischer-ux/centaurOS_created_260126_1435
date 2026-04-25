@@ -33,17 +33,25 @@ const UPGRADE_REWARDS: Record<
 }
 
 /**
- * Grant a referral upgrade reward (with 30-day vesting).
+ * Grant a referral upgrade reward.
  *
  * Called from handleSubscriptionEvent() when a `customer.subscription.created` event fires.
- * Does NOT grant credits immediately — inserts into `referral_rewards_pending` instead.
  *
- * @param userId - The user who just subscribed (the referee)
+ * Two grant mechanisms run in parallel:
+ *
+ *   1. Immediate investor-search credits via `grant_referral_credits_on_paid_conversion` RPC.
+ *      Fires for both UUID-format refs (from the in-app upsells CTA) and legacy-code refs.
+ *      Inviter: +100 investor searches (capped at 500/month).
+ *      Invitee: +50 investor searches as a welcome bonus.
+ *
+ *   2. Vested AI-task credits via `referral_rewards_pending` (30-day vesting).
+ *      Only fires for legacy 7-char-code referrals (where `profiles.referred_by` is set).
+ *
+ * @param userId - The user who just subscribed (the invitee)
  * @param tier - The subscription tier they upgraded to
  *
  * @security Uses admin client — this is a system operation triggered by Stripe webhook.
- * No user session available. Cross-foundry lookup is intentional (referrer and referee
- * may be in different foundries).
+ * No user session available. Cross-foundry lookup is intentional.
  */
 export async function grantReferralUpgradeReward(
   userId: string,
@@ -61,6 +69,35 @@ export async function grantReferralUpgradeReward(
   try {
     const admin = createAdminClient()
 
+    // FLOW: Immediate investor-search credit grant for UUID-format referrals.
+    // Fires for any paid conversion where a referral_signups row exists for the
+    // invitee (recorded during signup via the in-app upsells CTA).
+    // The function is idempotent — safe to call even if no referral_signups row exists.
+    try {
+      const { data: conversionResult, error: conversionError } = await admin.rpc(
+        'grant_referral_credits_on_paid_conversion',
+        { p_invitee_user_id: userId, p_paid_tier: tier }
+      )
+      if (conversionError) {
+        console.error('[Referral] grant_referral_credits_on_paid_conversion error:', conversionError.message)
+      } else {
+        const result = conversionResult as { status: string; inviter_capped?: boolean } | null
+        console.info('[Referral] grant_referral_credits_on_paid_conversion:', {
+          userId,
+          tier,
+          status: result?.status,
+          inviterCapped: result?.inviter_capped,
+        })
+      }
+    } catch (conversionErr) {
+      // Non-blocking — investor-search grants must not fail the subscription webhook
+      console.error('[Referral] grant_referral_credits_on_paid_conversion threw:', conversionErr)
+    }
+
+    // FLOW: Vested AI-task credit grant for legacy 7-char-code referrals.
+    // Only fires when profiles.referred_by is set (7-char-code path sets this;
+    // UUID-format path does not — it uses referral_signups instead).
+
     // Look up the subscribing user's referrer
     const { data: profile, error: profileError } = await admin
       .from('profiles')
@@ -69,7 +106,7 @@ export async function grantReferralUpgradeReward(
       .single()
 
     if (profileError || !profile?.referred_by) {
-      // No referrer — nothing to do (most users won't have one)
+      // No legacy referrer — nothing more to do
       return
     }
 

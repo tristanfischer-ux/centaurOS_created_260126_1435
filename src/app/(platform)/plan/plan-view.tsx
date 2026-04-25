@@ -28,6 +28,11 @@ import Link from "next/link"
 import "./plan-v2.css"
 
 import type { FoundryPurposeData } from "@/types/foundry"
+import { StreakChip } from "./_components/streak-chip"
+import { WhatChangedBanner, type PlanMonthlySummary } from "./_components/what-changed-banner"
+import { PlanHistoryFeed, type PlanHistoryEntry } from "./_components/plan-history-feed"
+import { DecisionLog, type DecisionRecord } from "./_components/decision-log"
+import { logDecision } from "@/actions/plan/log-decision"
 
 // ── Data shapes (mirrors what page.tsx loads from Supabase) ──────────
 
@@ -88,6 +93,16 @@ export interface PlanViewProps {
   unlinkedCount: number
   /** Whether the current user can create new pillars / objectives. */
   canCreate: boolean
+
+  // ── Stickiness levers ──────────────────────────────────────────────
+  /** Lever #1: last 30 plan_history rows for the right-rail feed */
+  historyEntries: PlanHistoryEntry[]
+  /** Lever #2: consecutive weeks of plan activity (cached in profiles) */
+  streakWeeks: number
+  /** Lever #3: month-to-date stats for the "what changed" banner */
+  monthlySummary: PlanMonthlySummary
+  /** Lever #4: strategic decisions for the decision log */
+  decisions: DecisionRecord[]
 }
 
 export interface SageBriefing {
@@ -207,7 +222,10 @@ function CaretRight(): React.ReactElement {
 type FilterKey = "all" | "on-track" | "at-risk" | "off-track"
 
 export function PlanView(props: PlanViewProps): React.ReactElement {
-  const { sageBriefing, purpose, totalProgress, pillars, unlinkedCount, canCreate } = props
+  const {
+    sageBriefing, purpose, totalProgress, pillars, unlinkedCount, canCreate,
+    historyEntries, streakWeeks, monthlySummary, decisions,
+  } = props
 
   const [openPillars, setOpenPillars] = React.useState<Set<string>>(() => {
     // Start with the first pillar open if any exist (mirrors mockup default)
@@ -268,6 +286,7 @@ export function PlanView(props: PlanViewProps): React.ReactElement {
           <h1>Plan</h1>
           <div className="sub">Purpose → Pillars → Objectives → Tasks, in one view.</div>
         </div>
+        <StreakChip weeks={streakWeeks} />
         <div className="head-actions">
           <button
             type="button"
@@ -301,7 +320,10 @@ export function PlanView(props: PlanViewProps): React.ReactElement {
         </div>
       </div>
 
-      {/* ── 3. Sage hero ─────────────────────────────────────────── */}
+      {/* ── 3. What changed banner (lever #3 + #4 link) ──────────── */}
+      <WhatChangedBanner summary={monthlySummary} />
+
+      {/* ── 4. Sage hero ─────────────────────────────────────────── */}
       <SageHero briefing={sageBriefing} purpose={purpose} pillars={pillars} />
 
       {/* ── 4. View tabs ─────────────────────────────────────────── */}
@@ -464,6 +486,21 @@ export function PlanView(props: PlanViewProps): React.ReactElement {
           </div>
         </div>
       ) : null}
+
+      {/* ── 9. Decision log (lever #4) ────────────────────────────── */}
+      <DecisionLog
+        decisions={decisions}
+        canLog={canCreate}
+        onLog={async (data) => {
+          const result = await logDecision(data)
+          if (result.error) throw new Error(result.error)
+        }}
+      />
+
+      {/* ── 10. Activity history feed (lever #1) — right rail on wide ── */}
+      <div style={{ marginTop: "32px" }}>
+        <PlanHistoryFeed entries={historyEntries} showViewAll />
+      </div>
     </div>
   )
 }

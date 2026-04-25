@@ -37,6 +37,10 @@ import {
   type PlanTaskRow,
   type SageBriefing,
 } from "./plan-view"
+import { fetchPlanHistory } from "@/actions/plan/fetch-plan-history"
+import { fetchPlanStreak } from "@/actions/plan/fetch-plan-streak"
+import { fetchPlanMonthlySummary } from "@/actions/plan/fetch-plan-summary"
+import { fetchDecisions } from "@/actions/plan/log-decision"
 
 export const metadata: Metadata = {
   title: "Plan",
@@ -269,6 +273,14 @@ export default async function PlanPage(): Promise<React.ReactNode> {
   const totalProgress = computeTotalProgress(pillars)
   const sageBriefing: SageBriefing | null = pillars.length === 0 ? null : buildSageBriefing(pillars)
 
+  // ── 7. Stickiness levers — load in parallel, never block the page ───
+  const [historyResult, streakResult, summaryResult, decisionsResult] = await Promise.all([
+    fetchPlanHistory(),
+    fetchPlanStreak(),
+    fetchPlanMonthlySummary(),
+    fetchDecisions(),
+  ])
+
   return (
     <PlanView
       sageBriefing={sageBriefing}
@@ -277,6 +289,10 @@ export default async function PlanPage(): Promise<React.ReactNode> {
       pillars={pillars}
       unlinkedCount={unlinkedCount}
       canCreate={canCreate}
+      historyEntries={historyResult.entries}
+      streakWeeks={streakResult.weeks}
+      monthlySummary={summaryResult}
+      decisions={decisionsResult.decisions}
     />
   )
 }

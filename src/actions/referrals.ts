@@ -16,9 +16,14 @@ import { unstable_cache } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { SubscriptionTier } from '@/lib/billing/plans'
+import { SUBSCRIPTION_PLANS as PLANS_STATIC } from '@/lib/billing/plans'
+import type { InvestorSearchAllowance } from '@/lib/referrals/investor-search-allowance'
 
 /** VALIDATION: Referral codes are exactly 7 uppercase alphanumeric chars */
 const REFERRAL_CODE_REGEX = /^[A-Z0-9]{7}$/
+
+/** UUID v4 pattern — detects user IDs from the in-app upsells CTA (?ref=<user_id>) */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export interface ReferralInfo {
   referralCode: string
@@ -67,27 +72,46 @@ export async function getMyReferralInfo(): Promise<ReferralInfo | { error: strin
 }
 
 /**
- * Look up a referrer by code for display on the join page.
+ * Look up a referrer for display on the join page.
  *
- * @param code - The 7-char referral code from ?ref= param
- * @returns Referrer's first name and company for warm banner
+ * Supports two ref formats:
+ *   - 7-char referral code (e.g. "AB12CD3") — legacy mechanism
+ *   - UUID user ID (e.g. "550e8400-...") — in-app upsells CTA (?ref=<user_id>)
+ *
+ * @param code - The referral code or user UUID from the ?ref= query param
+ * @returns Referrer's first name and company for the warm banner
  */
 export async function lookupReferrer(
   code: string
 ): Promise<{ name: string; company: string | null } | null> {
   try {
-    // VALIDATION: Only accept properly formatted referral codes
-    const sanitized = code.toUpperCase().trim()
-    if (!REFERRAL_CODE_REGEX.test(sanitized)) return null
+    const trimmed = code.trim()
 
-    // SECURITY: admin client — cross-foundry referral code lookup (intentional), foundry_id not needed
+    // SECURITY: admin client — cross-foundry referral lookup (intentional)
     const admin = createAdminClient()
 
-    const { data: referrer } = await admin
-      .from('profiles')
-      .select('full_name, foundry_id')
-      .eq('referral_code', sanitized)
-      .single()
+    let referrer: { full_name: string | null; foundry_id: string | null } | null = null
+
+    if (UUID_REGEX.test(trimmed)) {
+      // UUID-format: look up directly by profile id
+      const { data } = await admin
+        .from('profiles')
+        .select('full_name, foundry_id')
+        .eq('id', trimmed)
+        .maybeSingle()
+      referrer = data
+    } else {
+      // 7-char code format
+      const sanitized = trimmed.toUpperCase()
+      if (!REFERRAL_CODE_REGEX.test(sanitized)) return null
+
+      const { data } = await admin
+        .from('profiles')
+        .select('full_name, foundry_id')
+        .eq('referral_code', sanitized)
+        .maybeSingle()
+      referrer = data
+    }
 
     if (!referrer) return null
 
@@ -203,3 +227,52 @@ export async function getAIUsageForCreditsBar(): Promise<
   })
 }
 
+/**
+ * Get the effective investor-search allowance for the authenticated user.
+ *
+ * Combines the subscription tier's base investorLeadsPerMonth with any
+ * unconsumed referral bonus credits (investor_monthly_views), so the
+ * caller gets a single source of truth for how many searches remain.
+ *
+ * Used by:
+ *   - The sidebar usage indicator (Tier 5 step 22 UI follow-up — TODO comment
+ *     already planted in the sidebar by the in-app upsells subagent)
+ *   - The InvestorSearchHeroClient cap display
+ *
+ * @returns { baseAllowance, creditsRemaining, totalAvailable } or { error }
+ */
+export async function getEffectiveSearchAllowance(): Promise<
+  InvestorSearchAllowance | { error: string }
+> {
+  return withAuth(async ({ foundryId, supabase }) => {
+    // Resolve tier from the user's subscription row
+    let tier: SubscriptionTier = 'free'
+    try {
+      const { data: foundry } = await supabase
+        .from('foundries')
+        .select('owner_id')
+        .eq('id', foundryId)
+        .single()
+
+      if (foundry?.owner_id) {
+        const { data: subscription } = await supabase
+          .from('user_subscriptions')
+          .select('tier')
+          .eq('user_id', foundry.owner_id)
+          .in('status', ['active', 'trialing'])
+          .maybeSingle()
+
+        if (subscription?.tier && subscription.tier in PLANS_STATIC) {
+          tier = subscription.tier as SubscriptionTier
+        }
+      }
+    } catch {
+      // Fall through with free-tier default
+    }
+
+    const { getEffectiveSearchAllowance: computeAllowance } = await import(
+      '@/lib/referrals/investor-search-allowance'
+    )
+    return computeAllowance(foundryId, tier)
+  })
+}

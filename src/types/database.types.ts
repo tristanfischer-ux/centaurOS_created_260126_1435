@@ -4728,6 +4728,7 @@ export type Database = {
           status: string
           subject: string
           system_illustration_url: string | null
+          target_launch_date: string | null
           target_unit_cost_gbp: number | null
           thumbnail_svg: string | null
           unified_code: string | null
@@ -4791,6 +4792,7 @@ export type Database = {
           status?: string
           subject: string
           system_illustration_url?: string | null
+          target_launch_date?: string | null
           target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
@@ -4854,6 +4856,7 @@ export type Database = {
           status?: string
           subject?: string
           system_illustration_url?: string | null
+          target_launch_date?: string | null
           target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
@@ -6095,6 +6098,53 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decisions: {
+        Row: {
+          author_user_id: string | null
+          created_at: string
+          decided_at: string
+          foundry_id: string
+          id: string
+          rationale: string | null
+          related_objective_ids: Json | null
+          related_task_ids: Json | null
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          author_user_id?: string | null
+          created_at?: string
+          decided_at?: string
+          foundry_id: string
+          id?: string
+          rationale?: string | null
+          related_objective_ids?: Json | null
+          related_task_ids?: Json | null
+          summary: string
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string | null
+          created_at?: string
+          decided_at?: string
+          foundry_id?: string
+          id?: string
+          rationale?: string | null
+          related_objective_ids?: Json | null
+          related_task_ids?: Json | null
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decisions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]
@@ -15769,6 +15819,50 @@ export type Database = {
           },
         ]
       }
+      plan_history: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          after_data: Json | null
+          before_data: Json | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          foundry_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_history_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_line_items: {
         Row: {
           accounting_tags: string[]
@@ -16409,6 +16503,41 @@ export type Database = {
         }
         Relationships: []
       }
+      procurement_diary_entries: {
+        Row: {
+          author_user_id: string
+          created_at: string
+          entry: string
+          id: string
+          occurred_at: string
+          project_id: string
+        }
+        Insert: {
+          author_user_id: string
+          created_at?: string
+          entry: string
+          id?: string
+          occurred_at?: string
+          project_id: string
+        }
+        Update: {
+          author_user_id?: string
+          created_at?: string
+          entry?: string
+          id?: string
+          occurred_at?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_diary_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_iterations: {
         Row: {
           changes_made: Json | null
@@ -16687,6 +16816,8 @@ export type Database = {
           onboarding_data: Json
           paired_ai_id: string | null
           phone_number: string | null
+          plan_streak_updated_at: string | null
+          plan_streak_weeks: number
           preferred_currency: string | null
           primary_function_id: string | null
           professional_background: Json | null
@@ -16733,6 +16864,8 @@ export type Database = {
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
+          plan_streak_updated_at?: string | null
+          plan_streak_weeks?: number
           preferred_currency?: string | null
           primary_function_id?: string | null
           professional_background?: Json | null
@@ -16779,6 +16912,8 @@ export type Database = {
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
+          plan_streak_updated_at?: string | null
+          plan_streak_weeks?: number
           preferred_currency?: string | null
           primary_function_id?: string | null
           professional_background?: Json | null
@@ -16997,6 +17132,120 @@ export type Database = {
             columns: ["assigned_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_supplier_shortlists: {
+        Row: {
+          added_by_user_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["supplier_shortlist_status"]
+          supplier_id: string
+          supplier_name: string
+          updated_at: string
+        }
+        Insert: {
+          added_by_user_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id: string
+          status?: Database["public"]["Enums"]["supplier_shortlist_status"]
+          supplier_id: string
+          supplier_name: string
+          updated_at?: string
+        }
+        Update: {
+          added_by_user_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["supplier_shortlist_status"]
+          supplier_id?: string
+          supplier_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_supplier_shortlists_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_technique_annotations: {
+        Row: {
+          author_user_id: string
+          created_at: string
+          id: string
+          note: string
+          project_technique_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_user_id: string
+          created_at?: string
+          id?: string
+          note: string
+          project_technique_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          project_technique_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_technique_annotations_project_technique_id_fkey"
+            columns: ["project_technique_id"]
+            isOneToOne: false
+            referencedRelation: "project_techniques"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_techniques: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          saved_by_user_id: string
+          technique_id: string
+          technique_title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          saved_by_user_id: string
+          technique_id: string
+          technique_title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          saved_by_user_id?: string
+          technique_id?: string
+          technique_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_techniques_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -18220,6 +18469,68 @@ export type Database = {
           {
             foreignKeyName: "referral_rewards_pending_referrer_user_id_fkey"
             columns: ["referrer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_signups: {
+        Row: {
+          converted_to_paid_at: string | null
+          created_at: string
+          id: string
+          invitee_user_id: string
+          inviter_user_id: string
+          paid_tier: string | null
+          signup_at: string
+          status: string
+        }
+        Insert: {
+          converted_to_paid_at?: string | null
+          created_at?: string
+          id?: string
+          invitee_user_id: string
+          inviter_user_id: string
+          paid_tier?: string | null
+          signup_at?: string
+          status?: string
+        }
+        Update: {
+          converted_to_paid_at?: string | null
+          created_at?: string
+          id?: string
+          invitee_user_id?: string
+          inviter_user_id?: string
+          paid_tier?: string | null
+          signup_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_signups_invitee_user_id_fkey"
+            columns: ["invitee_user_id"]
+            isOneToOne: true
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "referral_signups_invitee_user_id_fkey"
+            columns: ["invitee_user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_signups_inviter_user_id_fkey"
+            columns: ["inviter_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "referral_signups_inviter_user_id_fkey"
+            columns: ["inviter_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -21142,6 +21453,62 @@ export type Database = {
           },
         ]
       }
+      supplier_quotes: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          currency: string
+          id: string
+          lead_time_days: number | null
+          notes: string | null
+          project_id: string
+          quote_amount_pence: number | null
+          received_at: string | null
+          supplier_id: string
+          terms: string | null
+          valid_until: string | null
+          volume: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          currency?: string
+          id?: string
+          lead_time_days?: number | null
+          notes?: string | null
+          project_id: string
+          quote_amount_pence?: number | null
+          received_at?: string | null
+          supplier_id: string
+          terms?: string | null
+          valid_until?: string | null
+          volume?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          currency?: string
+          id?: string
+          lead_time_days?: number | null
+          notes?: string | null
+          project_id?: string
+          quote_amount_pence?: number | null
+          received_at?: string | null
+          supplier_id?: string
+          terms?: string | null
+          valid_until?: string | null
+          volume?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_ratings: {
         Row: {
           commercial_fairness: number | null
@@ -22300,6 +22667,79 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      technique_answers: {
+        Row: {
+          answer: string
+          author_user_id: string | null
+          created_at: string
+          id: string
+          question_id: string
+          specialist_id: string | null
+        }
+        Insert: {
+          answer: string
+          author_user_id?: string | null
+          created_at?: string
+          id?: string
+          question_id: string
+          specialist_id?: string | null
+        }
+        Update: {
+          answer?: string
+          author_user_id?: string | null
+          created_at?: string
+          id?: string
+          question_id?: string
+          specialist_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technique_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "technique_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technique_questions: {
+        Row: {
+          asker_user_id: string
+          created_at: string
+          id: string
+          project_id: string | null
+          question: string
+          status: Database["public"]["Enums"]["technique_question_status"]
+          technique_id: string
+        }
+        Insert: {
+          asker_user_id: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          question: string
+          status?: Database["public"]["Enums"]["technique_question_status"]
+          technique_id: string
+        }
+        Update: {
+          asker_user_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          question?: string
+          status?: Database["public"]["Enums"]["technique_question_status"]
+          technique_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technique_questions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       telegram_decisions: {
         Row: {
@@ -24215,6 +24655,7 @@ export type Database = {
         }
         Returns: number
       }
+      compute_plan_streak: { Args: { p_foundry_id: string }; Returns: number }
       consume_bonus_credit: { Args: { p_foundry_id: string }; Returns: boolean }
       consume_bonus_feature_credit: {
         Args: { p_feature: string; p_foundry_id: string }
@@ -24783,6 +25224,10 @@ export type Database = {
           role: Database["public"]["Enums"]["member_role"]
         }[]
       }
+      get_inviter_monthly_referral_credits: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       get_listing_executives: {
         Args: { p_listing_id: string }
         Returns: {
@@ -25026,6 +25471,10 @@ export type Database = {
         Returns: Json
       }
       gettransactionid: { Args: never; Returns: unknown }
+      grant_referral_credits_on_paid_conversion: {
+        Args: { p_invitee_user_id: string; p_paid_tier: string }
+        Returns: Json
+      }
       has_foundry_admin_access: {
         Args: { target_foundry_id: string; user_id: string }
         Returns: boolean
@@ -26643,6 +27092,13 @@ export type Database = {
         | "cancelled"
       rfq_type: "commodity" | "custom" | "service"
       risk_level: "Low" | "Medium" | "High"
+      supplier_shortlist_status:
+        | "researching"
+        | "contacted"
+        | "quoting"
+        | "negotiating"
+        | "selected"
+        | "rejected"
       supplier_tier: "verified_partner" | "approved" | "pending" | "suspended"
       task_status:
         | "Pending"
@@ -26653,6 +27109,7 @@ export type Database = {
         | "Completed"
         | "Pending_Peer_Review"
         | "Pending_Executive_Approval"
+      technique_question_status: "queued" | "answered" | "closed"
       verification_tier: "unverified" | "claimed" | "verified"
       working_style: "proactive" | "responsive" | "blended"
     }
@@ -27008,6 +27465,14 @@ export const Constants = {
       ],
       rfq_type: ["commodity", "custom", "service"],
       risk_level: ["Low", "Medium", "High"],
+      supplier_shortlist_status: [
+        "researching",
+        "contacted",
+        "quoting",
+        "negotiating",
+        "selected",
+        "rejected",
+      ],
       supplier_tier: ["verified_partner", "approved", "pending", "suspended"],
       task_status: [
         "Pending",
@@ -27019,6 +27484,7 @@ export const Constants = {
         "Pending_Peer_Review",
         "Pending_Executive_Approval",
       ],
+      technique_question_status: ["queued", "answered", "closed"],
       verification_tier: ["unverified", "claimed", "verified"],
       working_style: ["proactive", "responsive", "blended"],
     },
