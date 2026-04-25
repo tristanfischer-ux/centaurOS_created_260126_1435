@@ -203,7 +203,10 @@ export async function setupNewUser({
       ok: true,
       isNewUser: false,
       // DECISION 2026-04-25 (RED-TEAM-PIVOT-PLAN Tier 2 step 17):
-      // post-signup default landing is now /investors.
+      // Idempotency path (profile already exists — repeat signup call) lands
+      // on /investors directly, skipping the welcome tour the user already saw.
+      // New users (PATH A below) go to /welcome first; the welcome page's
+      // "skip" handler then routes to /investors per the same spec step.
       redirect: "/investors",
     };
   }
