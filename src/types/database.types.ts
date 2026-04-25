@@ -10066,79 +10066,6 @@ export type Database = {
         }
         Relationships: []
       }
-      investor_match_cache: {
-        Row: {
-          cost_usd: number
-          created_at: string
-          drafted_email_body: string
-          drafted_email_subject: string
-          foundry_context_hash: string
-          foundry_id: string
-          how_to_pitch: string
-          id: string
-          investor_listing_id: string
-          model_used: string
-          source_citations: Json | null
-          tokens_in: number
-          tokens_out: number
-          why_fit: string
-        }
-        Insert: {
-          cost_usd?: number
-          created_at?: string
-          drafted_email_body: string
-          drafted_email_subject: string
-          foundry_context_hash: string
-          foundry_id: string
-          how_to_pitch: string
-          id?: string
-          investor_listing_id: string
-          model_used: string
-          source_citations?: Json | null
-          tokens_in?: number
-          tokens_out?: number
-          why_fit: string
-        }
-        Update: {
-          cost_usd?: number
-          created_at?: string
-          drafted_email_body?: string
-          drafted_email_subject?: string
-          foundry_context_hash?: string
-          foundry_id?: string
-          how_to_pitch?: string
-          id?: string
-          investor_listing_id?: string
-          model_used?: string
-          source_citations?: Json | null
-          tokens_in?: number
-          tokens_out?: number
-          why_fit?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "investor_match_cache_foundry_id_fkey"
-            columns: ["foundry_id"]
-            isOneToOne: false
-            referencedRelation: "foundries"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "investor_match_cache_investor_listing_id_fkey"
-            columns: ["investor_listing_id"]
-            isOneToOne: false
-            referencedRelation: "marketplace_listings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "investor_match_cache_investor_listing_id_fkey"
-            columns: ["investor_listing_id"]
-            isOneToOne: false
-            referencedRelation: "supplier_search_ranking"
-            referencedColumns: ["listing_id"]
-          },
-        ]
-      }
       investor_news_intel: {
         Row: {
           current_focus: string | null
@@ -11482,6 +11409,65 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      llm_usage: {
+        Row: {
+          action: string
+          anon_id: string | null
+          cost_usd: number
+          created_at: string
+          error_message: string | null
+          foundry_id: string | null
+          id: string
+          ip_address: unknown
+          model_used: string
+          specialist_id: string | null
+          status: string
+          tokens_in: number
+          tokens_out: number
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          anon_id?: string | null
+          cost_usd: number
+          created_at?: string
+          error_message?: string | null
+          foundry_id?: string | null
+          id?: string
+          ip_address?: unknown
+          model_used: string
+          specialist_id?: string | null
+          status?: string
+          tokens_in: number
+          tokens_out: number
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          anon_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          error_message?: string | null
+          foundry_id?: string | null
+          id?: string
+          ip_address?: unknown
+          model_used?: string
+          specialist_id?: string | null
+          status?: string
+          tokens_in?: number
+          tokens_out?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_usage_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -15249,6 +15235,7 @@ export type Database = {
           foundry_id: string
           id: string
           input_ref: Json | null
+          input_ref_module_id: string
           input_tokens: number | null
           model_id: string | null
           model_provider: string | null
@@ -15272,6 +15259,7 @@ export type Database = {
           foundry_id: string
           id?: string
           input_ref?: Json | null
+          input_ref_module_id?: string
           input_tokens?: number | null
           model_id?: string | null
           model_provider?: string | null
@@ -15295,6 +15283,7 @@ export type Database = {
           foundry_id?: string
           id?: string
           input_ref?: Json | null
+          input_ref_module_id?: string
           input_tokens?: number | null
           model_id?: string | null
           model_provider?: string | null
