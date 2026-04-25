@@ -24,6 +24,7 @@
 
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { withRetry } from '@/lib/retry'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // ==========================================
 // TYPES
@@ -58,6 +59,15 @@ export interface ClaudeCallOptions {
   imageBase64?: string
   /** Optional base64-encoded SVG of previous render for visual comparison */
   renderedSvgBase64?: string
+  // ----- Cost-logging metadata (optional, fire-and-forget tracking) -----
+  /** Action slug for cost attribution, e.g. 'cad_lab_generate', 'outreach_compose'. */
+  actionSlug?: string
+  /** Foundry id for tenant-scoped cost roll-up. */
+  foundryId?: string
+  /** Authenticated user id, if known. */
+  userId?: string
+  /** Specialist id, if this call is on behalf of a specialist persona. */
+  specialistId?: string
 }
 
 export interface ClaudeCallResult {
@@ -101,6 +111,10 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
     retryOnServerErrors = false,
     imageBase64,
     renderedSvgBase64,
+    actionSlug,
+    foundryId,
+    userId,
+    specialistId,
   } = options
 
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
@@ -165,6 +179,23 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
 
     if (!response.ok) {
       const errText = await response.text()
+      // Cost-log the failure path: tokens unknown but model + status are useful for cost attribution.
+      // Cache-read/write tokens are 0 (no usage block from a non-OK response).
+      const status: 'rate_limited' | 'timeout' | 'error' =
+        response.status === 429 || response.status === 529 ? 'rate_limited' :
+        response.status === 408 || response.status === 504 ? 'timeout' :
+        'error'
+      void logLlmUsage({
+        action: actionSlug ?? 'claude_central_unknown',
+        modelUsed: modelId,
+        tokensIn: 0,
+        tokensOut: 0,
+        status,
+        errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+        foundryId,
+        userId,
+        specialistId,
+      })
       throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
     }
 
@@ -176,13 +207,29 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
       console.warn(`[ClaudeClient] Response truncated at ${maxTokens} tokens — model: ${modelId}`)
     }
 
+    const tokensIn = data.usage?.input_tokens ?? 0
+    const tokensOut = data.usage?.output_tokens ?? 0
+    const cacheReadTokens = data.usage?.cache_read_input_tokens ?? 0
+    const cacheWriteTokens = data.usage?.cache_creation_input_tokens ?? 0
+
+    void logLlmUsage({
+      action: actionSlug ?? 'claude_central_unknown',
+      modelUsed: modelId,
+      tokensIn,
+      tokensOut,
+      status: 'success',
+      foundryId,
+      userId,
+      specialistId,
+    })
+
     return {
       text,
-      tokensIn: data.usage?.input_tokens ?? 0,
-      tokensOut: data.usage?.output_tokens ?? 0,
+      tokensIn,
+      tokensOut,
       truncated,
-      cacheReadTokens: data.usage?.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: data.usage?.cache_creation_input_tokens ?? 0,
+      cacheReadTokens,
+      cacheWriteTokens,
     }
   }
 
