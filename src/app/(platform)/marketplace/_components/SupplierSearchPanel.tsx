@@ -3,28 +3,295 @@
 /**
  * @file SupplierSearchPanel.tsx
  *
- * @description Interactive supplier search panel. Matches the SUPPLIES-MOCKUP-SUPPLIERS.html layout:
- *   1. Paste-textarea at top — "describe what type of company you're looking for"
- *   2. Category filter chips (CNC machining, PCB assembly, Sheet metal, etc.)
+ * @description Interactive supplier search panel with pre-search directory charts.
+ *
+ * Layout (mirrors the investor /investors page pattern):
+ *   1. SupplierStatsCharts — visible ONLY when no active search; hides when results render
+ *   2. Search textarea + category filter chips
  *   3. Results count bar
- *   4. Supplier match cards — one per result, ordered by semantic similarity
+ *   4. Supplier match cards (Forge Capital card structure via SupplierMatchCard)
  *
  * FLOW:
- *   - On load: renders initial listings passed as props (browse all)
- *   - On submit: calls searchSuppliers server action with the textarea query
- *   - Semantic path (query > 5 chars): calls match_marketplace_listings RPC via suppliers.ts
- *   - Browse path: renders initial server-fetched listings unfiltered
+ *   - On load: shows SupplierStatsCharts (pre-search) + initial listings (browse all)
+ *   - On submit: hides charts, shows ranked match cards
+ *   - On clear: charts reappear
  *
- * INTENT: This is a client component because the search is interactive. The initial
- * listings are passed from the server page so we get instant LCP with no flash.
+ * DECISION: SupplierStatsCharts is defined inline in this file (not a separate file)
+ * per the brief's "keep file count to the three above" constraint.
+ * DECISION: stats are fetched in the server page (page.tsx) and passed as a prop
+ * because this is a client component and cannot await server actions directly.
  */
 
 import { useState, useTransition, useCallback, useRef } from 'react'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts'
 import { Search, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SupplierMatchCard } from './SupplierMatchCard'
 import { searchSuppliers } from '@/actions/suppliers'
+import type { SupplierDirectoryStats } from '@/actions/suppliers'
 import type { MarketplaceListing } from '@/actions/marketplace'
+
+// ---------------------------------------------------------------------------
+// Forge Capital chart palette (07b-export-python.py line 1298)
+// ---------------------------------------------------------------------------
+
+const COLORS = [
+  '#4f46e5',
+  '#0891b2',
+  '#db2777',
+  '#d97706',
+  '#059669',
+  '#dc2626',
+  '#7c3aed',
+  '#0284c7',
+  '#c026d3',
+  '#65a30d',
+]
+
+const BAR_COLOR_CAPABILITIES = '#4f46e5' // horizontal bar — Forge Capital sectors colour
+const BAR_COLOR_MATERIALS    = '#0891b2' // vertical bar   — Forge Capital stage colour
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function fmt(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`
+  return String(n)
+}
+
+// ---------------------------------------------------------------------------
+// Stat tile (mirrors InvestorStatsCharts StatTile)
+// ---------------------------------------------------------------------------
+
+function StatTile({ label, value }: { label: string; value: string | number | null }) {
+  return (
+    <div className="bg-card border border-border rounded-xl px-5 py-4 text-center">
+      <div className="text-2xl font-black text-foreground leading-none mb-1">
+        {value == null ? '—' : typeof value === 'number' ? fmt(value) : value}
+      </div>
+      <div className="text-xs text-muted-foreground font-medium">{label}</div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SupplierStatsCharts — inline chart block (no separate file per brief constraint)
+// ---------------------------------------------------------------------------
+
+interface SupplierStatsChartsProps {
+  stats: SupplierDirectoryStats
+}
+
+function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
+  const tooltipStyle = {
+    background: 'hsl(var(--card))',
+    border: '1px solid hsl(var(--border))',
+    borderRadius: '8px',
+    fontSize: '12px',
+  }
+
+  const tickStyle = { fontSize: 10, fill: 'hsl(var(--muted-foreground))' }
+  const gridStroke = 'hsl(var(--border))'
+
+  return (
+    <div className="space-y-6 mt-2 mb-8">
+      {/* Section header */}
+      <div className="flex items-center gap-2.5">
+        <div className="h-5 w-1 bg-muted-foreground/40 rounded-full" />
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+          Directory overview — {fmt(stats.total)} suppliers
+        </span>
+      </div>
+
+      {/* ── Stat tiles ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatTile label="Total suppliers"        value={stats.total} />
+        <StatTile label="Verified"               value={stats.verified} />
+        <StatTile label="With certifications"    value={stats.withCertifications} />
+        <StatTile label="Countries represented"  value={stats.countries} />
+      </div>
+
+      {/* ── Charts grid ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* Suppliers by Category — donut, 55% cutout, legend right */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h4 className="text-sm font-bold text-foreground mb-4">Suppliers by Category</h4>
+          {stats.categoryBreakdown.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={stats.categoryBreakdown}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="40%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                >
+                  {stats.categoryBreakdown.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(value: any, name: any) => [fmt(Number(value)), String(name)]}
+                  contentStyle={tooltipStyle}
+                />
+                <Legend
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  iconType="circle"
+                  iconSize={8}
+                  formatter={(value: string) => (
+                    <span style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))' }}>
+                      {value.length > 16 ? value.slice(0, 15) + '…' : value}
+                    </span>
+                  )}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Suppliers by Country — donut, COLORS palette, legend right */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h4 className="text-sm font-bold text-foreground mb-4">Suppliers by Country</h4>
+          {stats.suppliersByCountry.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={stats.suppliersByCountry}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="40%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                >
+                  {stats.suppliersByCountry.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(value: any, name: any) => [fmt(Number(value)), String(name)]}
+                  contentStyle={tooltipStyle}
+                />
+                <Legend
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  iconType="circle"
+                  iconSize={8}
+                  formatter={(value: string) => (
+                    <span style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))' }}>
+                      {value.length > 16 ? value.slice(0, 15) + '…' : value}
+                    </span>
+                  )}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Top Capabilities — horizontal bar, #4f46e5, borderRadius 4, no legend */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h4 className="text-sm font-bold text-foreground mb-4">Top Capabilities</h4>
+          {stats.topCapabilities.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={stats.topCapabilities}
+                layout="vertical"
+                margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridStroke} />
+                <XAxis
+                  type="number"
+                  tick={tickStyle}
+                  tickFormatter={fmt}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={100}
+                  tick={tickStyle}
+                  tickFormatter={(v: string) => v.length > 16 ? v.slice(0, 15) + '…' : v}
+                />
+                <Tooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(value: any) => [fmt(Number(value)), 'Suppliers']}
+                  contentStyle={tooltipStyle}
+                />
+                {/* Forge Capital: single colour #4f46e5cc, borderRadius:4, horizontal */}
+                <Bar dataKey="value" fill={BAR_COLOR_CAPABILITIES} fillOpacity={0.8} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Top Materials — vertical bar, #0891b2, borderRadius 4, no legend */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h4 className="text-sm font-bold text-foreground mb-4">Top Materials</h4>
+          {stats.topMaterials.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart
+                data={stats.topMaterials}
+                margin={{ top: 0, right: 8, bottom: 48, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                <XAxis
+                  dataKey="name"
+                  tick={tickStyle}
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                  tickFormatter={(v: string) => v.length > 14 ? v.slice(0, 13) + '…' : v}
+                />
+                <YAxis
+                  tick={tickStyle}
+                  tickFormatter={fmt}
+                />
+                <Tooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(value: any) => [fmt(Number(value)), 'Suppliers']}
+                  contentStyle={tooltipStyle}
+                />
+                {/* Forge Capital: single colour #0891b2cc, borderRadius:4, vertical */}
+                <Bar dataKey="value" fill={BAR_COLOR_MATERIALS} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Category chips — mirrors the mockup's filter pills
@@ -48,6 +315,8 @@ interface SupplierSearchPanelProps {
   initialListings: MarketplaceListing[]
   /** Total supplier count for the count badge */
   totalCount: number
+  /** Pre-fetched directory stats for the chart block */
+  stats: SupplierDirectoryStats
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +326,7 @@ interface SupplierSearchPanelProps {
 export function SupplierSearchPanel({
   initialListings,
   totalCount,
+  stats,
 }: SupplierSearchPanelProps) {
   const [query, setQuery] = useState('')
   const [activeChip, setActiveChip] = useState<string | null>(null)
@@ -68,10 +338,14 @@ export function SupplierSearchPanel({
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // INTENT: Charts are visible pre-search and hidden when a search result set
+  // is active — mirrors the investor page pattern.
+  const isFiltered = activeQuery.trim().length > 0
+
   const runSearch = useCallback(
     (searchQuery: string) => {
       if (!searchQuery.trim()) {
-        // Reset to initial browse
+        // Reset to initial browse — charts reappear
         setResults(initialListings as (MarketplaceListing & { similarity?: number })[])
         setDisplayCount(initialListings.length)
         setActiveQuery('')
@@ -148,10 +422,14 @@ export function SupplierSearchPanel({
     textareaRef.current?.focus()
   }
 
-  const isFiltered = activeQuery.trim().length > 0
-
   return (
     <div className="space-y-4">
+
+      {/* ── Pre-search stats charts — visible when no active search ── */}
+      {!isFiltered && (
+        <SupplierStatsCharts stats={stats} />
+      )}
+
       {/* ── Search form ── */}
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Textarea */}
@@ -277,10 +555,11 @@ export function SupplierSearchPanel({
         </div>
       ) : (
         <div className="space-y-3">
-          {results.map((listing) => (
+          {results.map((listing, idx) => (
             <SupplierMatchCard
               key={listing.id}
               listing={listing}
+              rank={isFiltered ? idx + 1 : undefined}
               searchQuery={activeQuery || undefined}
             />
           ))}

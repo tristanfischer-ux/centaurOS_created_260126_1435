@@ -21,9 +21,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
+import { getSupplierDirectoryStats } from '@/actions/suppliers'
 import { SupplierSearchPanel } from './_components/SupplierSearchPanel'
 import { typography } from '@/lib/design-system'
 import type { MarketplaceListing } from '@/actions/marketplace'
+import type { SupplierDirectoryStats } from '@/actions/suppliers'
 
 export const metadata: Metadata = {
   title: 'Marketplace',
@@ -41,8 +43,9 @@ export default async function MarketplacePage() {
   let listings: MarketplaceListing[] = []
   let totalCount = 0
   let verifiedCount = 0
+  let supplierStats: SupplierDirectoryStats | null = null
 
-  const [searchResult, statsResult] = await Promise.allSettled([
+  const [searchResult, statsResult, supplierStatsResult] = await Promise.allSettled([
     searchMarketplaceListings({
       categories: ['Products', 'Services'],
       page: 1,
@@ -50,6 +53,7 @@ export default async function MarketplacePage() {
       sort: 'verified',
     }),
     getMarketplaceStats(),
+    getSupplierDirectoryStats(),
   ])
 
   if (searchResult.status === 'fulfilled') {
@@ -62,6 +66,24 @@ export default async function MarketplacePage() {
   if (statsResult.status === 'fulfilled' && statsResult.value) {
     totalCount = statsResult.value.totalListings || totalCount
     verifiedCount = statsResult.value.verifiedCount
+  }
+
+  if (supplierStatsResult.status === 'fulfilled') {
+    supplierStats = supplierStatsResult.value
+  } else {
+    console.error('[Marketplace] Failed to fetch supplier stats:', supplierStatsResult.reason)
+  }
+
+  // Fallback stats object if the fetch failed — prevents prop-type errors downstream
+  const statsForPanel: SupplierDirectoryStats = supplierStats ?? {
+    total: totalCount,
+    verified: verifiedCount,
+    withCertifications: 0,
+    countries: 0,
+    categoryBreakdown: [],
+    topCapabilities: [],
+    topMaterials: [],
+    suppliersByCountry: [],
   }
 
   return (
@@ -103,6 +125,7 @@ export default async function MarketplacePage() {
       <SupplierSearchPanel
         initialListings={listings}
         totalCount={totalCount}
+        stats={statsForPanel}
       />
     </div>
   )

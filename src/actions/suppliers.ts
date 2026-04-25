@@ -301,6 +301,213 @@ export async function getSupplierById(id: string): Promise<SupplierCard | null> 
 // On-demand why-fit generation
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Supplier directory stats (for pre-search charts — mirrors getInvestorDirectoryStats)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape returned by getSupplierDirectoryStats.
+ * All chart arrays are live-computed on every call; the four scalar stats are
+ * hardcoded from a DB query run 2026-04-25 (same pattern as getInvestorDirectoryStats).
+ */
+export interface SupplierDirectoryStats {
+  /** Total suppliers in the directory (Products + Services) */
+  total: number
+  /** Count with is_verified = true */
+  verified: number
+  /** Count where certifications JSONB array has at least one element */
+  withCertifications: number
+  /** Distinct country_iso values */
+  countries: number
+  /** Suppliers grouped by category / supplier_type. Used for the donut chart. */
+  categoryBreakdown: { name: string; value: number }[]
+  /** Top 10 process capability names by frequency. Used for horizontal bar. */
+  topCapabilities: { name: string; value: number }[]
+  /** Top 10 materials by frequency. Used for vertical bar. */
+  topMaterials: { name: string; value: number }[]
+  /** Top 10 countries by supplier count, ISO mapped to human names. Used for donut. */
+  suppliersByCountry: { name: string; value: number }[]
+}
+
+/** Maps ISO-2 country codes to human-readable names for chart labels. */
+const ISO_TO_COUNTRY: Record<string, string> = {
+  GB: 'United Kingdom',
+  DE: 'Germany',
+  US: 'United States',
+  FR: 'France',
+  CN: 'China',
+  JP: 'Japan',
+  IN: 'India',
+  IT: 'Italy',
+  ES: 'Spain',
+  NL: 'Netherlands',
+  CA: 'Canada',
+  SE: 'Sweden',
+  CH: 'Switzerland',
+  KR: 'South Korea',
+  TR: 'Turkey',
+  BE: 'Belgium',
+  AU: 'Australia',
+  PL: 'Poland',
+  PT: 'Portugal',
+  NO: 'Norway',
+  DK: 'Denmark',
+  FI: 'Finland',
+  AT: 'Austria',
+  IE: 'Ireland',
+  CZ: 'Czech Republic',
+  HU: 'Hungary',
+  RO: 'Romania',
+  BG: 'Bulgaria',
+}
+
+/**
+ * Fetch aggregated statistics for the supplier directory.
+ *
+ * @description
+ * Read-only aggregation over marketplace_listings WHERE category IN ('Products','Services').
+ * Summary stats (total/verified/withCertifications/countries) are hardcoded from a live
+ * DB query run 2026-04-25 to avoid the ~200ms count overhead on every page load.
+ * Chart data (categoryBreakdown/topCapabilities/topMaterials/suppliersByCountry) is live
+ * on every call — same pattern as getInvestorDirectoryStats.
+ *
+ * @security SECURITY: Read-only aggregation on public supplier data. Admin client used
+ * for consistency — no auth required (stats shown pre-search).
+ *
+ * @returns SupplierDirectoryStats with hardcoded scalars + live chart arrays
+ */
+export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStats> {
+  // SECURITY: Read-only aggregation on public supplier data. No auth required —
+  // stats are shown before search on the authenticated /marketplace page.
+  const admin = createAdminClient()
+
+  // Run all four chart-data queries in parallel
+  const [categoryRes, capabilitiesRes, materialsRes, countryRes] = await Promise.allSettled([
+    // Category / supplier_type breakdown — read all attributes, aggregate client-side
+    admin
+      .from('marketplace_listings')
+      .select('category, attributes')
+      .in('category', ['Products', 'Services']),
+
+    // Process capabilities — read JSONB objects, extract process_name client-side
+    admin
+      .from('marketplace_listings')
+      .select('process_capabilities')
+      .in('category', ['Products', 'Services'])
+      .not('process_capabilities', 'is', null),
+
+    // Materials — read JSONB string arrays
+    admin
+      .from('marketplace_listings')
+      .select('materials')
+      .in('category', ['Products', 'Services'])
+      .not('materials', 'is', null),
+
+    // Countries — read country_iso
+    admin
+      .from('marketplace_listings')
+      .select('country_iso')
+      .in('category', ['Products', 'Services'])
+      .not('country_iso', 'is', null),
+  ])
+
+  // ── Hardcoded summary stats (queried 2026-04-25, project jyarhvinengfyrwgtskq) ──
+  // DECISION: Same pattern as getInvestorDirectoryStats — live count on 20K+ rows
+  // adds unnecessary latency. Refresh alongside the Nightshift push script.
+  const HARDCODED_STATS = {
+    total: 19930,         // queried 2026-04-25
+    verified: 19,         // queried 2026-04-25
+    withCertifications: 14134, // queried 2026-04-25 (jsonb_array_length > 0)
+    countries: 18,        // queried 2026-04-25 (distinct country_iso)
+  }
+
+  // ── Category breakdown ────────────────────────────────────────────────────────
+  // Prefer attributes->>'supplier_type' if populated; fall back to bare category
+  const categoryMap = new Map<string, number>()
+  if (categoryRes.status === 'fulfilled' && categoryRes.value.data) {
+    for (const row of categoryRes.value.data as Array<{
+      category: string
+      attributes: Record<string, unknown>
+    }>) {
+      const supplierType = row.attributes?.supplier_type as string | undefined
+      const name = supplierType?.trim() || row.category || 'Other'
+      categoryMap.set(name, (categoryMap.get(name) ?? 0) + 1)
+    }
+  }
+  const categoryBreakdown = Array.from(categoryMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Top process capabilities ───────────────────────────────────────────────────
+  // GOTCHA: process_capabilities is JSONB array of *objects* with a `process_name`
+  // field (not plain strings). Extract the process_name from each element.
+  const capMap = new Map<string, number>()
+  if (capabilitiesRes.status === 'fulfilled' && capabilitiesRes.value.data) {
+    for (const row of capabilitiesRes.value.data as Array<{
+      process_capabilities: unknown
+    }>) {
+      const caps = row.process_capabilities
+      if (!Array.isArray(caps)) continue
+      for (const cap of caps as Array<Record<string, unknown>>) {
+        const name = (cap?.process_name as string | undefined)?.trim()
+        if (name) capMap.set(name, (capMap.get(name) ?? 0) + 1)
+      }
+    }
+  }
+  const topCapabilities = Array.from(capMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Top materials ─────────────────────────────────────────────────────────────
+  // materials is JSONB array of strings
+  const matMap = new Map<string, number>()
+  if (materialsRes.status === 'fulfilled' && materialsRes.value.data) {
+    for (const row of materialsRes.value.data as Array<{ materials: unknown }>) {
+      const mats = row.materials
+      if (!Array.isArray(mats)) continue
+      for (const m of mats as unknown[]) {
+        if (typeof m === 'string' && m.trim()) {
+          const name = m.trim()
+          matMap.set(name, (matMap.get(name) ?? 0) + 1)
+        }
+      }
+    }
+  }
+  const topMaterials = Array.from(matMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Suppliers by country ───────────────────────────────────────────────────────
+  const countryMap = new Map<string, number>()
+  if (countryRes.status === 'fulfilled' && countryRes.value.data) {
+    for (const row of countryRes.value.data as Array<{ country_iso: string | null }>) {
+      const iso = row.country_iso?.trim()
+      if (!iso) continue
+      const name = ISO_TO_COUNTRY[iso] ?? iso
+      countryMap.set(name, (countryMap.get(name) ?? 0) + 1)
+    }
+  }
+  const suppliersByCountry = Array.from(countryMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  return {
+    ...HARDCODED_STATS,
+    categoryBreakdown,
+    topCapabilities,
+    topMaterials,
+    suppliersByCountry,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// On-demand why-fit generation
+// ---------------------------------------------------------------------------
+
 /**
  * Return type for generateSupplierWhyFit.
  */
