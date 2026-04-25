@@ -6,6 +6,7 @@
  */
 
 import { DailyPulseData, UserRole, Insight } from './types'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 interface SummaryContext {
     data: DailyPulseData
@@ -55,33 +56,67 @@ Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anyw
             topInsights: insights.slice(0, 2).map(i => ({ type: i.type, title: i.title }))
         }
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-            },
-            body: JSON.stringify({
-                model: 'claude-haiku-4-5-20251001',
-                max_tokens: 200,
-                temperature: 0.7,
-                system: systemPrompt,
-                messages: [
-                    {
-                        role: 'user',
-                        content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`,
-                    },
-                ],
-            }),
-        })
+        const summaryModel = 'claude-haiku-4-5-20251001'
+        let response: Response
+        try {
+            response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                },
+                body: JSON.stringify({
+                    model: summaryModel,
+                    max_tokens: 200,
+                    temperature: 0.7,
+                    system: systemPrompt,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`,
+                        },
+                    ],
+                }),
+            })
+        } catch (err) {
+            void logLlmUsage({
+                action: 'report_summary',
+                modelUsed: summaryModel,
+                tokensIn: 0,
+                tokensOut: 0,
+                status: 'error',
+                errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+            })
+            throw err
+        }
 
         if (!response.ok) {
-            console.error('[summary-generator] Anthropic API error:', response.status, await response.text())
+            const errText = await response.text()
+            const status: 'rate_limited' | 'timeout' | 'error' =
+                response.status === 429 || response.status === 529 ? 'rate_limited' :
+                response.status === 408 || response.status === 504 ? 'timeout' :
+                'error'
+            void logLlmUsage({
+                action: 'report_summary',
+                modelUsed: summaryModel,
+                tokensIn: 0,
+                tokensOut: 0,
+                status,
+                errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+            })
+            console.error('[summary-generator] Anthropic API error:', response.status, errText)
             return generateTemplateSummary(context)
         }
 
         const json = await response.json()
+        void logLlmUsage({
+            action: 'report_summary',
+            modelUsed: summaryModel,
+            tokensIn: json.usage?.input_tokens ?? 0,
+            tokensOut: json.usage?.output_tokens ?? 0,
+            status: 'success',
+        })
         const text = (json.content?.[0]?.text ?? '').trim()
         return text || generateTemplateSummary(context)
     } catch (error) {

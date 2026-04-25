@@ -20,6 +20,7 @@ import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 // Artifacts are created via direct supabase insert in _delegateInner.
 import { buildContextLayers } from '@/lib/agents/prompt-builder'
 import { buildAIContextWithServiceClient } from '@/lib/agents/sweep-context'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -254,46 +255,92 @@ Do NOT:
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 120_000)
 
+    // DECISION: Opus for high-judgment specialists AND data-heavy specialists.
+    // Round 3 testing: Opus scored 23-25/25 on strategy/legal tasks. Sal's prospect
+    // lists keep truncating with Sonnet (31KB+ incomplete). Opus produces more
+    // proportionate output that respects the 15KB scope cap.
+    // Sonnet is faster/cheaper for marketing content (Mia, Cal, Max, etc.).
+    const taskDelegationModel = ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist', 'sales-lead'].includes(specialistId)
+      ? 'claude-opus-4-7'
+      : 'claude-sonnet-4-6'
+
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          // DECISION: Opus for high-judgment specialists AND data-heavy specialists.
-          // Round 3 testing: Opus scored 23-25/25 on strategy/legal tasks. Sal's prospect
-          // lists keep truncating with Sonnet (31KB+ incomplete). Opus produces more
-          // proportionate output that respects the 15KB scope cap.
-          // Sonnet is faster/cheaper for marketing content (Mia, Cal, Max, etc.).
-          model: ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist', 'sales-lead'].includes(specialistId)
-            ? 'claude-opus-4-7'
-            : 'claude-sonnet-4-6',
-          max_tokens: 8192,
-          system: executionPrompt,
-          messages: [
-            {
-              role: "user",
-              content: feedback
-                ? `Please revise your previous deliverable based on the feedback above. Produce the complete updated version.`
-                : `Complete this task now. Produce the full deliverable.`,
-            },
-          ],
-        }),
-        signal: controller.signal,
-      })
+      let response: Response
+      try {
+        response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: taskDelegationModel,
+            max_tokens: 8192,
+            system: executionPrompt,
+            messages: [
+              {
+                role: "user",
+                content: feedback
+                  ? `Please revise your previous deliverable based on the feedback above. Produce the complete updated version.`
+                  : `Complete this task now. Produce the full deliverable.`,
+              },
+            ],
+          }),
+          signal: controller.signal,
+        })
+      } catch (err) {
+        clearTimeout(timeout)
+        void logLlmUsage({
+          action: 'task_delegation',
+          modelUsed: taskDelegationModel,
+          tokensIn: 0,
+          tokensOut: 0,
+          status: 'error',
+          errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+          foundryId: profile.foundry_id ?? undefined,
+          userId: user.id,
+          specialistId,
+        })
+        throw err
+      }
 
       clearTimeout(timeout)
 
       if (!response.ok) {
+        const errText = await response.text().catch(() => '')
+        const errStatus: 'rate_limited' | 'timeout' | 'error' =
+          response.status === 429 || response.status === 529 ? 'rate_limited' :
+          response.status === 408 || response.status === 504 ? 'timeout' :
+          'error'
+        void logLlmUsage({
+          action: 'task_delegation',
+          modelUsed: taskDelegationModel,
+          tokensIn: 0,
+          tokensOut: 0,
+          status: errStatus,
+          errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+          foundryId: profile.foundry_id ?? undefined,
+          userId: user.id,
+          specialistId,
+        })
         console.error('[task-delegation] API error:', response.status)
         return { error: 'Failed to generate deliverable' }
       }
 
       const data = await response.json()
       const content = (data.content?.[0]?.text ?? "").trim()
+
+      void logLlmUsage({
+        action: 'task_delegation',
+        modelUsed: taskDelegationModel,
+        tokensIn: data.usage?.input_tokens ?? 0,
+        tokensOut: data.usage?.output_tokens ?? 0,
+        status: 'success',
+        foundryId: profile.foundry_id ?? undefined,
+        userId: user.id,
+        specialistId,
+      })
 
       if (!content) return { error: 'Specialist returned empty response' }
 

@@ -14,6 +14,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { getSupplierDetail } from "@/actions/cad-lab-supplier-detail"
+import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -192,33 +193,71 @@ Assess each company's fitness. Be specific — reference actual capabilities vs 
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15_000)
+  const companyReviewModel = "deepseek-chat"
 
   try {
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        max_tokens: 2048,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-      signal: controller.signal,
-    })
+    let response: Response
+    try {
+      response = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: companyReviewModel,
+          max_tokens: 2048,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+        signal: controller.signal,
+      })
+    } catch (err) {
+      clearTimeout(timeout)
+      void logLlmUsage({
+        action: 'company_review',
+        modelUsed: companyReviewModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+        userId: user.id,
+      })
+      throw err
+    }
 
     clearTimeout(timeout)
 
     if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      const status: 'rate_limited' | 'timeout' | 'error' =
+        response.status === 429 || response.status === 529 ? 'rate_limited' :
+        response.status === 408 || response.status === 504 ? 'timeout' :
+        'error'
+      void logLlmUsage({
+        action: 'company_review',
+        modelUsed: companyReviewModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status,
+        errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+        userId: user.id,
+      })
       console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "company_review", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
       return { reviews: [], summary: "AI review failed — try again later." }
     }
 
     const data = await response.json()
+    void logLlmUsage({
+      action: 'company_review',
+      modelUsed: companyReviewModel,
+      tokensIn: data.usage?.prompt_tokens ?? 0,
+      tokensOut: data.usage?.completion_tokens ?? 0,
+      status: 'success',
+      userId: user.id,
+    })
     const text = (data.choices?.[0]?.message?.content ?? "").trim()
 
     if (!text) {

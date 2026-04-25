@@ -10,6 +10,7 @@
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { getInvestorById } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,6 +113,7 @@ Output ONLY this exact JSON format with no other text:
     // Call Claude Haiku with 30s timeout
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 30_000)
+    const investorOutreachModel = 'deepseek-chat'
     let response: Response
     try {
       response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -121,7 +123,7 @@ Output ONLY this exact JSON format with no other text:
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'deepseek-chat',
+          model: investorOutreachModel,
           max_tokens: 1024,
           messages: [
             { role: 'system', content: systemPrompt },
@@ -132,12 +134,37 @@ Output ONLY this exact JSON format with no other text:
       })
     } catch (err) {
       clearTimeout(timeout)
+      void logLlmUsage({
+        action: 'investor_outreach',
+        modelUsed: investorOutreachModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+        foundryId,
+        userId: user.id,
+      })
       console.error('[generateOutreachDraft] Fetch failed:', err)
       return { error: 'Request timed out — please try again' }
     }
     clearTimeout(timeout)
 
     if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      const status: 'rate_limited' | 'timeout' | 'error' =
+        response.status === 429 || response.status === 529 ? 'rate_limited' :
+        response.status === 408 || response.status === 504 ? 'timeout' :
+        'error'
+      void logLlmUsage({
+        action: 'investor_outreach',
+        modelUsed: investorOutreachModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status,
+        errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+        foundryId,
+        userId: user.id,
+      })
       console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_outreach", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
       return { error: 'Failed to generate outreach draft' }
     }
@@ -145,9 +172,19 @@ Output ONLY this exact JSON format with no other text:
     const data = await response.json()
     const text = data.choices?.[0]?.message?.content ?? ''
 
+    void logLlmUsage({
+      action: 'investor_outreach',
+      modelUsed: investorOutreachModel,
+      tokensIn: data.usage?.prompt_tokens ?? 0,
+      tokensOut: data.usage?.completion_tokens ?? 0,
+      status: 'success',
+      foundryId,
+      userId: user.id,
+    })
+
     // Track usage
     await trackUsage({
-      model: 'deepseek-chat',
+      model: investorOutreachModel,
       promptTokens: data.usage?.prompt_tokens ?? 0,
       completionTokens: data.usage?.completion_tokens ?? 0,
     })

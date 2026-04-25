@@ -17,29 +17,76 @@ import { createClient } from "@/lib/supabase/server"
 import { aiGuard } from "@/lib/ai/guard"
 import { calculateSupplierMatchScore } from "@/lib/supplier-match"
 import type { CompanyMatchProfile, SupplierListing } from "@/lib/supplier-match"
+import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 // ─── DeepSeek Call ───────────────────────────────────────────────
 
-async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
+async function callHaiku(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens = 2000,
+  context: { foundryId?: string; userId?: string } = {},
+): Promise<string> {
+  const { foundryId, userId } = context
   // Try DeepSeek first (cheaper), fall back to Anthropic Haiku
   const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (deepseekKey) {
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        max_tokens: maxTokens,
-        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      }),
-    })
+    const deepseekModel = "deepseek-chat"
+    let response: Response
+    try {
+      response = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
+        body: JSON.stringify({
+          model: deepseekModel,
+          max_tokens: maxTokens,
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+        }),
+      })
+    } catch (err) {
+      void logLlmUsage({
+        action: 'supplier_match',
+        modelUsed: deepseekModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+        foundryId,
+        userId,
+      })
+      throw err
+    }
     if (response.ok) {
       const data = await response.json()
+      void logLlmUsage({
+        action: 'supplier_match',
+        modelUsed: deepseekModel,
+        tokensIn: data.usage?.prompt_tokens ?? 0,
+        tokensOut: data.usage?.completion_tokens ?? 0,
+        status: 'success',
+        foundryId,
+        userId,
+      })
       return data.choices?.[0]?.message?.content ?? ""
     }
+    const errText = await response.text().catch(() => '')
+    const ds_status: 'rate_limited' | 'timeout' | 'error' =
+      response.status === 429 || response.status === 529 ? 'rate_limited' :
+      response.status === 408 || response.status === 504 ? 'timeout' :
+      'error'
+    void logLlmUsage({
+      action: 'supplier_match',
+      modelUsed: deepseekModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status: ds_status,
+      errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+      foundryId,
+      userId,
+    })
     console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "supplier_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
   }
 
@@ -47,23 +94,65 @@ async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!anthropicKey) throw new Error("No AI API key configured (DEEPSEEK_API_KEY or ANTHROPIC_API_KEY)")
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  })
+  const anthropicModel = "claude-haiku-4-5-20251001"
+  let response: Response
+  try {
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: anthropicModel,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    })
+  } catch (err) {
+    void logLlmUsage({
+      action: 'supplier_match',
+      modelUsed: anthropicModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status: 'error',
+      errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      foundryId,
+      userId,
+    })
+    throw err
+  }
 
-  if (!response.ok) throw new Error(`Anthropic API error: ${response.status}`)
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    const status: 'rate_limited' | 'timeout' | 'error' =
+      response.status === 429 || response.status === 529 ? 'rate_limited' :
+      response.status === 408 || response.status === 504 ? 'timeout' :
+      'error'
+    void logLlmUsage({
+      action: 'supplier_match',
+      modelUsed: anthropicModel,
+      tokensIn: 0,
+      tokensOut: 0,
+      status,
+      errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+      foundryId,
+      userId,
+    })
+    throw new Error(`Anthropic API error: ${response.status}`)
+  }
   const data = await response.json()
+  void logLlmUsage({
+    action: 'supplier_match',
+    modelUsed: anthropicModel,
+    tokensIn: data.usage?.input_tokens ?? 0,
+    tokensOut: data.usage?.output_tokens ?? 0,
+    status: 'success',
+    foundryId,
+    userId,
+  })
   return (data.content?.[0]?.text ?? "").trim()
 }
 
@@ -440,7 +529,12 @@ Only return the JSON array.`
 
           let rationales: { rationale: string }[] = []
           try {
-            const result = await callHaiku("Be concise, specific, and reference real supplier data.", rationalePrompt)
+            const result = await callHaiku(
+              "Be concise, specific, and reference real supplier data.",
+              rationalePrompt,
+              2000,
+              { foundryId, userId: user.id },
+            )
             rationales = safeParseJSON<{ rationale: string }>(result)
           } catch (err) {
             console.warn("[SupplierMatch] Rationale generation failed:", err)
