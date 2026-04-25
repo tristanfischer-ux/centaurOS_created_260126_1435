@@ -38,8 +38,7 @@ import { getSpecialistActivities } from "@/actions/agent-memory"
 import type { SpecialistActivity } from "@/actions/agent-memory"
 import { getInsightFeed } from "@/actions/agent-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
-import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
-import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
+import type { HandoffTrailEntry } from "@/lib/agents/specialist-handoff-types"
 import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 function formatTimeAgo(dateStr: string): string {
@@ -96,16 +95,6 @@ export function SpecialistsLanding({
 }: SpecialistsLandingProps) {
     const searchParams = useSearchParams()
     const router = useRouter()
-    const advisorPanel = useAdvisorPanel()
-
-    const [isDesktop, setIsDesktop] = useState(false)
-    useEffect(() => {
-        const mql = window.matchMedia("(min-width: 1024px)")
-        setIsDesktop(mql.matches)
-        const handler = (e: MediaQueryListEvent): void => setIsDesktop(e.matches)
-        mql.addEventListener("change", handler)
-        return () => mql.removeEventListener("change", handler)
-    }, [])
 
     const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
     const [isMeetingOpen, setIsMeetingOpen] = useState(false)
@@ -139,19 +128,16 @@ export function SpecialistsLanding({
         })
     }, [])
 
-    // GOTCHA: advisorPanel changes on every render (context value), causing
-    // infinite re-render if included in deps. Use a ref to run only once.
+    // INTENT: Honour ?specialist=<id> on first render, then strip the query
+    // string so a refresh doesn't reopen the dialog. Ref guard ensures we
+    // never re-fire on subsequent searchParams changes.
     const specialistParamHandled = useRef(false)
     useEffect(() => {
         if (specialistParamHandled.current) return
         const specialistParam = searchParams.get('specialist')
         if (specialistParam && SPECIALISTS.some(s => s.id === specialistParam)) {
             specialistParamHandled.current = true
-            if (isDesktop) {
-                advisorPanel.openPanel(specialistParam)
-            } else {
-                setBriefSpecialistId(specialistParam)
-            }
+            setBriefSpecialistId(specialistParam)
             router.replace('/agents', { scroll: false })
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,17 +170,13 @@ export function SpecialistsLanding({
     const selectedSpecialist = SPECIALISTS.find((s) => s.id === briefSpecialistId)
 
     const handleBrief = useCallback((specialistId: string) => {
-        if (isDesktop) {
-            advisorPanel.openPanel(specialistId)
-        } else {
-            setHandoffContext(null)
-            setReferredByName(null)
-            setHandoffTrail([]) // Direct open = fresh start
-            setHandoffSourceThreadId(null)
-            setHandoffSourceSpecialistId(null)
-            setBriefSpecialistId(specialistId)
-        }
-    }, [isDesktop, advisorPanel])
+        setHandoffContext(null)
+        setReferredByName(null)
+        setHandoffTrail([]) // Direct open = fresh start
+        setHandoffSourceThreadId(null)
+        setHandoffSourceSpecialistId(null)
+        setBriefSpecialistId(specialistId)
+    }, [])
 
     const handleJoinHuddle = useCallback((huddleId: string, participantIds: string[], topic: string) => {
         setMeetingPreset({ participantIds, topic })
@@ -529,8 +511,24 @@ export function SpecialistsLanding({
                 </Card>
             </motion.div>
 
-            {/* ── Brief Dialog (mobile only — desktop uses advisor panel) ── */}
-            {selectedSpecialist && !isDesktop && (
+            {/* ── "You're in charge" footer disclaimer ────────────────── */}
+            <div className="flex items-start gap-3 rounded-lg bg-status-info-light/50 border border-status-info/20 px-4 py-3">
+                <Shield className="h-4 w-4 text-status-info mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                    <p className="text-sm font-medium text-foreground">
+                        You&apos;re in charge
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        Your Specialists are fast, knowledgeable, and tireless&nbsp;&mdash;&nbsp;but
+                        like any team member, they can make mistakes or miss nuances. You&apos;re the
+                        decision-maker. Always verify critical information, especially legal and
+                        financial guidance.
+                    </p>
+                </div>
+            </div>
+
+            {/* ── Brief Dialog (always — sidebar removed, modal is the single fallback) ── */}
+            {selectedSpecialist && (
                 <BriefSpecialistDialog
                     specialist={selectedSpecialist}
                     open={briefSpecialistId !== null}

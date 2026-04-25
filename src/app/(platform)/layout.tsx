@@ -19,13 +19,11 @@ import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider";
 import { MainContentArea } from "@/components/MainContentArea";
 import { ScreenContextProvider } from "@/contexts/screen-context";
-import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
 import { BackgroundOpsProvider } from "@/contexts/background-ops-context"
 import { CadLabProvider } from "@/app/(platform)/the-forge/cad-lab/cad-lab-context";
 
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { BrowseContextProvider } from "@/contexts/browse-context";
-import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
@@ -127,7 +125,6 @@ export default async function PlatformLayout({
                 <ZoomProvider>
                   <BackgroundOpsProvider>
                   <CadLabProvider>
-                  <AdvisorPanelProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
                     <div className="flex h-screen overflow-hidden gap-0">
@@ -152,9 +149,6 @@ export default async function PlatformLayout({
                                 )}
                             </main>
                         </MainContentArea>
-                        <Suspense fallback={null}>
-                            <AdvisorPanel />
-                        </Suspense>
                         <MobileNav foundryName={foundryName} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} />
                         <Suspense fallback={null}>
                             <FloatingSpecialistFAB />
@@ -182,7 +176,6 @@ export default async function PlatformLayout({
                     </div>
                   </ScreenContextProvider>
                   </BrowseContextProvider>
-                  </AdvisorPanelProvider>
                   </CadLabProvider>
                   </BackgroundOpsProvider>
                 </ZoomProvider>
