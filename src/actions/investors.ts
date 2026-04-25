@@ -857,8 +857,14 @@ async function searchInvestorsCore(
       // Fix 2026-04-25: PAGES reduced 8 → 2. This eliminates the timeout that
       // caused semantic search to silently fall through to the keyword path,
       // which returned 0 results for natural-language deck descriptions.
-      const PAGE = 1500
-      const PAGES = 1 // 1 × 1500 = 1,500 candidates. Even 2 parallel scans intermittently hit statement_timeout 57014; single scan is reliable.
+      // 2026-04-25: PAGES=1, PAGE=200 — even 1500 still timed out. The IVFFlat
+      // index on Finance embedding is more efficient with smaller match_count;
+      // 200 nearest neighbours is plenty for downstream ranking. Approximate
+      // ANN over 8K rows with probes=1 returns in <1s; raising match_count
+      // back toward N*1000 forces near-exhaustive scan and re-introduces the
+      // 57014 statement_timeout.
+      const PAGE = 200
+      const PAGES = 1
       const embJson = JSON.stringify(queryEmbedding) as unknown as string
       const pageResults = await Promise.all(
         Array.from({ length: PAGES }, (_, i) =>
