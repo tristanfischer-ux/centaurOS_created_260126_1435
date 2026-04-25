@@ -177,6 +177,17 @@ export async function setupNewUser({
   businessType,
   referralCode,
 }: SetupNewUserParams): Promise<SetupResult> {
+  // INTENT: foundry bootstrap (insert with owner_id=NULL, then UPDATE to set
+  // owner) cannot pass the foundries INSERT RLS policies, which require
+  // owner_id = auth.uid() at the point of insert. We have to break the
+  // circular FK (profiles.foundry_id → foundries.id ←→ foundries.owner_id
+  // → profiles.id) somehow, so the bootstrap is run with the service-role
+  // admin client. The auth user has already been verified above
+  // (signUpInitiate created the auth row), so using admin here for the
+  // setup-once writes is intentional and safe — RLS still applies to
+  // every other surface in the app.
+  const adminFoundries = createAdminClient();
+
   // SECURITY: Idempotency guard — if profile already exists, this is a duplicate
   // call (e.g., signup race condition, double-click). Return early to prevent
   // duplicate foundry/membership creation.
@@ -210,11 +221,11 @@ export async function setupNewUser({
 
   for (const sharedId of neededFoundries) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: exists } = await (supabase as any).from("foundries").select("id").eq("id", sharedId).single();
+    const { data: exists } = await (adminFoundries as any).from("foundries").select("id").eq("id", sharedId).single();
     if (!exists) {
       console.error(`[setupNewUser] Shared foundry "${sharedId}" missing. Creating.`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: sharedErr } = await (supabase as any).from("foundries").insert({
+      const { error: sharedErr } = await (adminFoundries as any).from("foundries").insert({
         id: sharedId,
         name: sharedId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
         slug: sharedId,
@@ -237,9 +248,10 @@ export async function setupNewUser({
     const baseSlug = generateSlug(companyName);
     const uniqueSlug = `${baseSlug}-${userId.slice(0, 6)}`;
 
-    // Step 1: Create foundry with NULL owner (no profile FK dependency)
+    // Step 1: Create foundry with NULL owner (no profile FK dependency).
+    // Admin client — see top-of-function comment about RLS bootstrap.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let { data: foundry, error: foundryError } = await (supabase as any)
+    let { data: foundry, error: foundryError } = await (adminFoundries as any)
       .from("foundries")
       .insert({
         id: uniqueSlug,
@@ -256,7 +268,7 @@ export async function setupNewUser({
       // Retry with more unique slug (likely slug collision)
       const retrySlug = `${baseSlug}-${Date.now().toString(36)}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const retry = await (supabase as any)
+      const retry = await (adminFoundries as any)
         .from("foundries")
         .insert({
           id: retrySlug,
@@ -319,8 +331,10 @@ export async function setupNewUser({
       console.error("[setupNewUser] Founder profile creation failed:", profileError.message);
       // INTENT: Clean up orphaned foundry — it has NULL owner and no profile pointing to it.
       // Without this, retries create additional orphans via slug collision → retry slug.
+      // Admin client because the user has no profile yet, and the DELETE RLS
+      // policy requires owner_id = auth.uid() — but we set owner_id to null.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries table type constraints require cast
-      await (supabase as any).from("foundries").delete().eq("id", foundryId);
+      await (adminFoundries as any).from("foundries").delete().eq("id", foundryId);
 
       const errorId = generateErrorId();
       const reason = "profile_creation_failed" as const;
@@ -346,9 +360,14 @@ export async function setupNewUser({
       return { ok: false, reason, userMessage, supportContext: { userId, email, role, foundryId }, errorId };
     }
 
-    // Step 3: Set the foundry owner now that profile exists
+    // Step 3: Set the foundry owner now that profile exists.
+    // Admin client because the foundries UPDATE RLS policy requires
+    // owner_id = auth.uid() in BOTH using and with_check, and the row
+    // currently has owner_id = null (so the user can't see it via RLS,
+    // let alone update it). Setting the owner is a one-shot bootstrap.
     if (foundryId !== "forge-guild") {
-      const { error: ownerError } = await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: ownerError } = await (adminFoundries as any).from("foundries").update({ owner_id: userId }).eq("id", foundryId);
       if (ownerError) {
         // Non-fatal: foundry works without owner (membership-based access).
         // But founder can't manage foundry settings. Repair RPC can fix.
@@ -372,8 +391,9 @@ export async function setupNewUser({
     const firstName = fullName.split(" ")[0] || "My";
     const sandboxSlug = `sandbox-${userId.slice(0, 8)}`;
 
+    // Admin client — see top-of-function comment about RLS bootstrap.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let { data: sandboxFoundry, error: sandboxError } = await (supabase as any)
+    let { data: sandboxFoundry, error: sandboxError } = await (adminFoundries as any)
       .from("foundries")
       .insert({
         id: sandboxSlug,
@@ -389,7 +409,7 @@ export async function setupNewUser({
       // Retry with more unique slug (unlikely collision but safety net)
       const retrySlug = `sandbox-${Date.now().toString(36)}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const retry = await (supabase as any)
+      const retry = await (adminFoundries as any)
         .from("foundries")
         .insert({
           id: retrySlug,
@@ -475,9 +495,12 @@ export async function setupNewUser({
       return { ok: false, reason, userMessage, supportContext: { userId, email, role, foundryId }, errorId };
     }
 
-    // Set owner on sandbox foundries (same circular FK pattern as founders)
+    // Set owner on sandbox foundries (same circular FK pattern as founders).
+    // Admin client because the foundry currently has owner_id = null and the
+    // UPDATE RLS policy requires owner_id = auth.uid() to find the row.
     if (foundryId.startsWith("sandbox-")) {
-      const { error: ownerError } = await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: ownerError } = await (adminFoundries as any).from("foundries").update({ owner_id: userId }).eq("id", foundryId);
       if (ownerError) {
         console.error("[setupNewUser] Failed to set sandbox owner:", ownerError.message);
       }
