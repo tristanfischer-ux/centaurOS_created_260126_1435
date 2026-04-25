@@ -42,7 +42,7 @@ import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
 import { moneyLegacyNavigation } from "@/components/sidebar/data/money"
 import { getWorkshopNavigation } from "@/components/sidebar/data/workshop"
-import { marketplacePeopleNavigation, marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
+import { marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
 import type { SidebarNavItem } from "@/components/sidebar/data/types"
 
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -398,74 +398,21 @@ export function Sidebar({
                     </>
                 )}
 
-                {/* PLAN removed 2026-04-25 — not on the keep list for Wave 6 cutover */}
-
-                {/* CASH BURN (Money legacy — Phase 4 will re-scope per SHARED-SIDEBAR) */}
+                {/* Wave 7 sidebar trim (2026-04-25): four primary surfaces only —
+                    Brainstorming, The Forge, Investors, Suppliers. No section
+                    headers / collapsibles for the primary nav. */}
                 <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Cash Burn"
-                    introRoute="/cash-burn"
-                    isOpen={openSections.cashBurn}
-                    onToggle={() => toggleSection("cashBurn")}
-                />
-                <Collapsible open={openSections.cashBurn}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {moneyLegacyNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* WORKSHOP */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Workshop"
-                    introRoute="/workshop"
-                    hasNew={badges.workshop}
-                    isOpen={openSections.workshop}
-                    onToggle={() => toggleSection("workshop")}
-                />
-                <Collapsible open={openSections.workshop}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {workshopNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* MARKETPLACE — People + Supplies sub-groups */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Marketplace"
-                    introRoute="/marketplace-hub"
-                    hasNew={badges.marketplace}
-                    isOpen={openSections.marketplace}
-                    onToggle={() => toggleSection("marketplace")}
-                />
-                <Collapsible open={openSections.marketplace}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {marketplacePeopleNavigation.length > 0 && (
-                            <>
-                                <div className="px-3 pt-1 pb-0.5">
-                                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                                        People
-                                    </p>
-                                </div>
-                                {marketplacePeopleNavigation.map((item) => (
-                                    <NavLink key={item.name} item={item} pathname={pathname} />
-                                ))}
-                            </>
-                        )}
-                        <div className="px-3 pt-2 pb-0.5">
-                            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                                Supplies
-                            </p>
-                        </div>
-                        {marketplaceSuppliesNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
+                <div className="space-y-0.5">
+                    {workshopNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                    {moneyLegacyNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                    {marketplaceSuppliesNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                </div>
             </nav>
 
             {/* ─── Getting Started — gated on onboarding_data presence ── */}

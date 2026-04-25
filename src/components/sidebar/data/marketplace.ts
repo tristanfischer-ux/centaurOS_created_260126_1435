@@ -18,5 +18,5 @@ import type { SidebarNavItem } from './types'
 export const marketplacePeopleNavigation: SidebarNavItem[] = []
 
 export const marketplaceSuppliesNavigation: SidebarNavItem[] = [
-  { name: 'Marketplace', href: '/marketplace', icon: Store, tooltip: 'Find experts, suppliers, products, and services' },
+  { name: 'Suppliers', href: '/marketplace', icon: Store, tooltip: 'Find suppliers and manufacturers' },
 ]
