@@ -68,6 +68,10 @@ import { getMyReferralInfo } from "@/actions/referrals"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 import { getUnreadAlertCount } from "@/actions/match-alerts"
 import { toast } from "sonner"
+import {
+    ForgeAmbassadorBadge,
+    ForgeAmbassadorMilestoneToast,
+} from "@/components/referrals/ForgeAmbassadorBadge"
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -99,6 +103,18 @@ interface SidebarProps {
      * /the-forge-v2 (PR #2+ surface). Default false preserves current behaviour.
      */
     newForgeExperienceEnabled?: boolean
+    /**
+     * Whether the user currently has Forge Ambassador status (10+ active paid
+     * referrals). When true, a "Forge Ambassador" badge appears in the footer
+     * and they have unlimited investor searches.
+     */
+    isForgeAmbassador?: boolean
+    /**
+     * ISO timestamp when the user first crossed the 10-referral threshold.
+     * Passed to ForgeAmbassadorMilestoneToast so it fires only on the
+     * first sign-in after the milestone.
+     */
+    ambassadorSince?: string | null
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -208,6 +224,8 @@ export function Sidebar({
     onboardingData,
     isSupplier,
     newForgeExperienceEnabled = false,
+    isForgeAmbassador = false,
+    ambassadorSince = null,
 }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
@@ -528,12 +546,22 @@ export function Sidebar({
                     </form>
                 </div>
 
+                {/* Forge Ambassador badge — visible when user has 10+ active paid referrals */}
+                {isForgeAmbassador && (
+                    <div className="px-1">
+                        <ForgeAmbassadorBadge className="text-[9px]" />
+                    </div>
+                )}
+
                 {/* Status bars: Time (this week) + Credits. Per CLAUDE.md no-AI-emphasis
                     rule, the in-product label stays "Credits", not "AI Credits". */}
                 <div className="space-y-1">
                     <TimeWeekBarLoader />
                     <AICreditsBarLoader />
                 </div>
+
+                {/* Milestone toast — fires once per session when ambassador threshold is crossed */}
+                <ForgeAmbassadorMilestoneToast since={ambassadorSince} />
 
                 {/* TODO Tier 5 step 22 (RED-TEAM-PIVOT-PLAN): usage counter +
                  * invite-friend CTA in sidebar footer. Render a running

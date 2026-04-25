@@ -69,6 +69,7 @@ import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { MeetingOutputs } from "./meeting-outputs"
 import { HuddleReport } from "./huddle-report"
 import { createArtifact } from "@/actions/agent-artifacts"
+import { createMeetingThread } from "@/actions/meeting-threads"
 import { parseProposedActions, stripProposedActionsBlock } from "@/lib/agents/message-parsers"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "@/lib/agents/specialists-config"
@@ -847,6 +848,8 @@ export function TeamMeetingDialog({
     const [showThoughtsInput, setShowThoughtsInput] = useState(false)
     const [meetingOutputs, setMeetingOutputs] = useState<MeetingOutputData | null>(null)
     const [isAutoSaved, setIsAutoSaved] = useState(false)
+    /** The persisted meeting_threads id — set after wrap-up saves */
+    const [meetingThreadId, setMeetingThreadId] = useState<string | null>(null)
     const [isGeneratingOutputs, setIsGeneratingOutputs] = useState(false)
     const [showReportDialog, setShowReportDialog] = useState(false)
     const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
@@ -904,6 +907,7 @@ export function TeamMeetingDialog({
                 setUserThoughts("")
                 setShowThoughtsInput(false)
                 setMeetingOutputs(null)
+                setMeetingThreadId(null)
                 setIsGeneratingOutputs(false)
                 setExpandedEntries(new Set())
                 setWantsToSpeak(new Set())
@@ -1640,6 +1644,36 @@ export function TeamMeetingDialog({
 
                 if (!saveResult.error) {
                     setIsAutoSaved(true)
+
+                    // INTENT: Also persist a structured meeting_thread so the
+                    // session gets a permanent /agents/m/<id> URL the founder
+                    // can return to, share, or branch from.
+                    const artifactId = (saveResult.data as { id?: string } | null)?.id
+                    const threadEntries = entries.map((e) => ({
+                        specialistId: e.specialistId,
+                        specialistName: e.specialistName,
+                        councilPosition: e.councilPosition,
+                        arrivalMs: e.arrivalMs,
+                        roundNumber: e.round,
+                        content: e.content,
+                        role: "specialist" as const,
+                    }))
+
+                    createMeetingThread({
+                        topic,
+                        councilTier,
+                        specialistIds: [...selectedIds],
+                        outputs: parsed as unknown as Record<string, unknown>,
+                        artifactId,
+                        entries: threadEntries,
+                    }).then(({ threadId, error: threadErr }) => {
+                        if (threadErr) {
+                            console.error("[TeamMeeting] Failed to create meeting_thread:", threadErr)
+                        } else if (threadId) {
+                            setMeetingThreadId(threadId)
+                        }
+                    }).catch(() => {})
+
                     // INTENT: Feed meeting insights into Knowledge Vault.
                     import("@/actions/knowledge").then(({ extractKnowledgeFromText }) => {
                         extractKnowledgeFromText(notesMarkdown, `Meeting: ${topic.slice(0, 60)}`).catch(() => {})
@@ -1657,7 +1691,7 @@ export function TeamMeetingDialog({
         } finally {
             setIsGeneratingOutputs(false)
         }
-    }, [selectedSpecialists, entries, topic, currentRound])
+    }, [selectedSpecialists, entries, topic, currentRound, councilTier, selectedIds])
 
     // ─── Toggle Entry Expansion ───────────────────────────────────────────
     const toggleEntry = useCallback((idx: number) => {
@@ -2606,6 +2640,29 @@ export function TeamMeetingDialog({
                                             .brainstormSessionsPerMonth ?? null
                                     }
                                 />
+
+                                {/* Persistent URL nudge — shown once the thread has been saved */}
+                                {meetingThreadId && (
+                                    <div className="px-6 pb-6">
+                                        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                                            <p className="text-xs text-muted-foreground">
+                                                This meeting has a permanent link you can return to, share, or branch from.
+                                            </p>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="flex-shrink-0 gap-1.5 text-xs"
+                                                onClick={() => {
+                                                    router.push(`/agents/m/${meetingThreadId}`)
+                                                    onOpenChange(false)
+                                                }}
+                                            >
+                                                View meeting
+                                                <ArrowRight className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         ) : error ? (
                             <div className="space-y-4 py-8">

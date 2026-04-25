@@ -276,3 +276,62 @@ export async function getEffectiveSearchAllowance(): Promise<
     return computeAllowance(foundryId, tier)
   })
 }
+
+// ---------------------------------------------------------------------------
+// Forge Ambassador status (Tier 5 step 23)
+// ---------------------------------------------------------------------------
+
+export interface ForgeAmbassadorStatus {
+  isAmbassador: boolean
+  activePaidCount: number
+  /** ISO timestamp when the user first crossed 10 active paid referrals, or null */
+  since: string | null
+}
+
+/**
+ * Get the current user's Forge Ambassador status.
+ *
+ * @description A founder is a Forge Ambassador when they have 10 or more
+ * referrals that are CURRENTLY on an active paid subscription. Status is
+ * live — if referrals churn, isAmbassador flips to false on the next call.
+ *
+ * Used by:
+ *   - Billing settings page (badge beside the plan label)
+ *   - Sidebar footer (badge visible without entering settings)
+ *   - Milestone toast (fire on first crossing of threshold)
+ *
+ * @returns ForgeAmbassadorStatus or { error }
+ */
+export async function getForgeAmbassadorStatus(): Promise<
+  ForgeAmbassadorStatus | { error: string }
+> {
+  return withAuth(async ({ user }) => {
+    const admin = createAdminClient()
+
+    const { data: activePaidCount, error: countError } = await admin.rpc(
+      'get_active_paid_referral_count',
+      { p_inviter_user_id: user.id }
+    )
+
+    if (countError) {
+      console.error('[getForgeAmbassadorStatus] RPC error:', countError.message)
+      return { error: countError.message }
+    }
+
+    const count = typeof activePaidCount === 'number' ? activePaidCount : 0
+    const isAmbassador = count >= 10
+
+    // Read forge_ambassador_since from the profile cache
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('forge_ambassador_since')
+      .eq('id', user.id)
+      .single()
+
+    return {
+      isAmbassador,
+      activePaidCount: count,
+      since: (profile?.forge_ambassador_since as string | null) ?? null,
+    }
+  })
+}

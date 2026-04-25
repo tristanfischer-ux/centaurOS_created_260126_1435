@@ -399,6 +399,7 @@ export async function getInvestorTierAccess(): Promise<InvestorTierAccess> {
  * - Seed: 50 new views/month
  * - Starter: 200 new views/month
  * - Professional/Enterprise: unlimited
+ * - Forge Ambassador (10+ active paid referrals): unlimited regardless of tier
  *
  * Library: Previously-viewed investors can be revisited unlimited times.
  * Anti-scraping: MAX_DAILY_INVESTOR_VIEWS hard ceiling regardless of tier.
@@ -406,12 +407,14 @@ export async function getInvestorTierAccess(): Promise<InvestorTierAccess> {
  * @param foundryId - The foundry viewing the investor
  * @param tier - The foundry's subscription tier
  * @param investorId - The investor listing being viewed
+ * @param userId - Optional user ID; used to check Forge Ambassador status
  * @returns View cap result with allowed/remaining/cap/period
  */
 export async function checkInvestorViewCap(
   foundryId: string,
   tier: SubscriptionTier,
   investorId: string,
+  userId?: string,
 ): Promise<InvestorViewCapResult> {
   // Professional/Enterprise: always allowed, no cap
   if (tier === 'professional' || tier === 'enterprise') {
@@ -424,6 +427,36 @@ export async function checkInvestorViewCap(
       isRevisit: false,
       period: 'monthly',
       remaining: null,
+    }
+  }
+
+  // FORGE AMBASSADOR: Founders with 10+ active paid referrals get unlimited
+  // investor searches as long as their referrals stay on a paid tier.
+  // The check is per-request (not cached) so status reverts immediately if
+  // referrals churn. get_active_paid_referral_count is a STABLE sql function
+  // so it is fast (single join, indexed on inviter_user_id + status).
+  if (userId) {
+    try {
+      const adminSupabase = createAdminClient()
+      const { data: activePaidCount } = await adminSupabase.rpc(
+        'get_active_paid_referral_count',
+        { p_inviter_user_id: userId }
+      )
+      if (typeof activePaidCount === 'number' && activePaidCount >= 10) {
+        return {
+          allowed: true,
+          viewsUsedThisMonth: 0,
+          viewsRemaining: null,
+          librarySize: 0,
+          cap: null,
+          isRevisit: false,
+          period: 'monthly',
+          remaining: null,
+        }
+      }
+    } catch (ambassadorErr) {
+      // Non-critical — fall through to normal cap check
+      console.warn('[checkInvestorViewCap] Ambassador check error, continuing:', ambassadorErr)
     }
   }
 
@@ -1432,8 +1465,8 @@ export async function getInvestorById(id: string): Promise<{
     }
   }
 
-  // Check the view cap
-  const viewCap = await checkInvestorViewCap(foundryId, access.tier, id)
+  // Check the view cap (pass userId so ambassador status can be verified)
+  const viewCap = await checkInvestorViewCap(foundryId, access.tier, id, user.id)
 
   if (!viewCap.allowed) {
     // INTENT: Return teaser data (name, type, location) plus viewCapHit flag

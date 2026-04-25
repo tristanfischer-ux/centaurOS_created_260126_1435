@@ -81,13 +81,37 @@ export async function grantReferralUpgradeReward(
       if (conversionError) {
         console.error('[Referral] grant_referral_credits_on_paid_conversion error:', conversionError.message)
       } else {
-        const result = conversionResult as { status: string; inviter_capped?: boolean } | null
+        const result = conversionResult as { status: string; inviter_capped?: boolean; inviter_user_id?: string } | null
         console.info('[Referral] grant_referral_credits_on_paid_conversion:', {
           userId,
           tier,
           status: result?.status,
           inviterCapped: result?.inviter_capped,
         })
+
+        // FLOW: Forge Ambassador lane (Tier 5 step 23).
+        // On a successful conversion, refresh the inviter's ambassador status cache
+        // so forge_ambassador_since is set when they first cross 10 active paid referrals.
+        // We look up the inviter from referral_signups directly (the SQL function does
+        // the join). Fire-and-forget: ambassador cache failures must never fail the webhook.
+        if (result?.status === 'ok' || result?.status === 'already_converted') {
+          try {
+            const { data: signupRow } = await admin
+              .from('referral_signups')
+              .select('inviter_user_id')
+              .eq('invitee_user_id', userId)
+              .maybeSingle()
+
+            if (signupRow?.inviter_user_id) {
+              await admin.rpc('update_forge_ambassador_status', {
+                p_inviter_user_id: signupRow.inviter_user_id,
+              })
+              console.info('[Referral] update_forge_ambassador_status called for inviter:', signupRow.inviter_user_id)
+            }
+          } catch (ambassadorErr) {
+            console.warn('[Referral] update_forge_ambassador_status failed (non-blocking):', ambassadorErr)
+          }
+        }
       }
     } catch (conversionErr) {
       // Non-blocking — investor-search grants must not fail the subscription webhook

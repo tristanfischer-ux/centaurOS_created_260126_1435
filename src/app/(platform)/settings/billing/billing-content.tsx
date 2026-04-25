@@ -37,6 +37,10 @@ import { cn } from '@/lib/utils'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/plans'
 import type { MonthlyUsage } from '@/lib/ai/usage-tracking'
+import {
+  ForgeAmbassadorBadge,
+  ForgeAmbassadorMilestoneToast,
+} from '@/components/referrals/ForgeAmbassadorBadge'
 
 interface BillingContentProps {
   userId: string
@@ -51,6 +55,10 @@ interface BillingContentProps {
   hasStripeCustomer: boolean
   /** When true, upgrade buttons use test-activate instead of Stripe checkout */
   isTestMode?: boolean
+  /** Whether the user currently has Forge Ambassador status (10+ active paid referrals) */
+  isForgeAmbassador?: boolean
+  /** ISO timestamp when they first crossed the 10-referral threshold; triggers milestone toast */
+  ambassadorSince?: string | null
 }
 
 /**
@@ -67,6 +75,8 @@ export function BillingContent({
   aiUsage,
   hasStripeCustomer,
   isTestMode = false,
+  isForgeAmbassador = false,
+  ambassadorSince = null,
 }: BillingContentProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -159,6 +169,9 @@ export function BillingContent({
 
   return (
     <div className="space-y-8 max-w-5xl">
+      {/* Forge Ambassador milestone toast — fires once per session on first crossing */}
+      <ForgeAmbassadorMilestoneToast since={ambassadorSince ?? null} />
+
       {/* Success / Canceled alerts */}
       {isSuccess && (
         <Alert>
@@ -218,14 +231,19 @@ export function BillingContent({
                 </p>
               </div>
             </div>
-            <Badge
-              variant={currentTier === 'free' ? 'secondary' : 'default'}
-              className={cn(
-                currentTier !== 'free' && 'bg-international-orange text-white'
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge
+                variant={currentTier === 'free' ? 'secondary' : 'default'}
+                className={cn(
+                  currentTier !== 'free' && 'bg-international-orange text-white'
+                )}
+              >
+                {currentPlan.name}
+              </Badge>
+              {isForgeAmbassador && (
+                <ForgeAmbassadorBadge />
               )}
-            >
-              {currentPlan.name}
-            </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
