@@ -154,6 +154,40 @@ Recommendation: **bundle in Starter £20** for the launch. Drafted emails are th
 
 ---
 
+### Brainstorming Council — speed-as-feature + asymmetric arrival (Tristan, 2026-04-25)
+
+When a user submits a Council brainstorm, **specialists return on different time-scales because they're on different model tiers** (Haiku ~2s, Sonnet ~8s, Opus / V4-Pro reasoning ~18-30s, host synthesis ~5s after the last). Instead of hiding latency, the UX SURFACES it as a feature: depth arrives staircased, the user reads top-down as new voices stream in, never sits idle.
+
+**Copy pattern (locked)**:
+- Fast agent: **"Quick take —"** (~150 words, punchy, directionally correct)
+- Mid-tier agent: **"On reflection —"** (~300 words, refined, surfaces tensions the fast agent missed)
+- Deep agent: **"Thinking about this further —"** (~500 words, numerical, may CONTRADICT the fast take, includes reasoning trace if extended-thinking enabled)
+- Host close: **"Council split:"** (named tensions + concrete next action; runs after the deepest specialist returns)
+
+**Why this matters commercially**:
+- **Speed is the on-ramp to depth, not in tension with it.** Free user gets 2 fast voices in 8s. Paid user gets the same 2 fast voices PLUS a deeper voice arriving later. Each tier ADDS depth without removing speed.
+- A founder who reads "Quick take — funding window favours raise-now" at t=2s, then "On reflection — the timing tension is your next-round comparable" at t=8s, then "Thinking about this further — I ran the dilution maths..." at t=18s, FEELS the depth grow. They tell other founders.
+- Justifies the multi-model spend: the user can SEE that more agents were involved, and they were involved at different depths.
+
+**Tier sizing under this pattern**:
+
+| Tier | Council size | Arrival staircase | What user feels |
+|---|---|---|---|
+| Quick Council (Free) | 2 specialists | t≈2s + t≈8s | "Two voices, fast" |
+| Full Council (Starter) | 4 specialists | 2s + 8s + 18s + host synth | "Four voices, depth grows over 20s" |
+| Deep Council (Pro) | 5 specialists w/ extended thinking | 2s + 8s + 18s + 30s + host synth | "Reasoning visible; longer wait rewarded" |
+| Strategy Council (Enterprise) | Same + custom personas | Same staircase, foundry-tuned | "Tells me what MY cap-table / runway / sector looks like" |
+
+**Implementation notes for the Council UI build**:
+- Streaming infra already exists in `team-meeting-dialog.tsx` — responses stream in as they arrive. The change is INTENTIONAL agent ordering: Council picks 2-5 specialists whose latencies create a staircase, not 4 specialists who all return in the same window.
+- The fast agent's role is critical: it must give a directionally-correct answer, not a "let me think about it". If the Quick take is wrong, the deeper agents have to spend tokens correcting it. The Quick agent's prompt should be tuned for "decisive directional answer with one caveat".
+- The deep agent's role is to ADD numbers, surface non-obvious tensions, and contradict the Quick take if the maths warrants. Don't make every agent agree — the dissent is the value.
+- **Council product names use TIER labels, not model names** (per Tristan's "no model exposure" rule): Quick Council, Full Council, Deep Council, Strategy Council. Internal docs name the providers; user-facing copy never does.
+
+**Pending follow-up test** (after the BRAINSTORM-TIER-DEBATE-TEST.md baseline lands): a second focused test measuring arrival timings per tier-config + perceived UX of staggered reveal. Likely better measured during implementation than as a separate test.
+
+---
+
 ### Brainstorming → Forge handoff + Brainstorming → Investor-test (Tristan, 2026-04-25)
 
 Two cross-surface flows that turn Brainstorming from a sticky retention tool into the funnel feeder for the killer features. Both build on the existing `/agents` Brainstorming page.
