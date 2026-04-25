@@ -58,12 +58,33 @@ function insightToAgentInsight(insight: PageInsight, index: number): AgentInsigh
   }
 }
 
-// DECISION: Dual-stream insight generation. Haiku fires first for a fast ~1-2s
-// response, then Sonnet upgrades with sharper analysis ~5-8s later. The hook
-// calls the same server action twice with fast=true and fast=false.
+// DECISION: Dual-stream insight generation. Fast tier (Gemini 3.1 Flash Lite,
+// ~1-2s response) fires first for cheap on-load insights, then deep tier
+// (Sonnet, ~5-8s) upgrades with sharper analysis. The hook calls the same
+// server action twice with fast=true and fast=false.
+//
+// COST CUT 2026-04-24: Fast tier swapped from claude-haiku-4-5 ($1.00 / $5.00
+// per 1M) to gemini-3.1-flash-lite-preview ($0.075 / $0.30 per 1M) — ~13x
+// cheaper input, ~17x cheaper output. Page-insight workload is small JSON
+// emission with simple persona — Flash Lite handles it fine and the deep
+// Sonnet pass still upgrades shortly after for analytical quality.
+//
+// Provider notes: fast tier uses Google Gemini's non-streaming generateContent
+// REST endpoint (mirrors the pattern in src/lib/cad-lab/multi-model-consensus.ts).
+// Deep tier stays on the existing Anthropic direct fetch.
 const MODEL_CONFIG = {
-  fast: { model: "claude-haiku-4-5-20251001", maxTokens: 512, timeout: 8_000 },
-  deep: { model: "claude-sonnet-4-6", maxTokens: 768, timeout: 15_000 },
+  fast: {
+    model: "gemini-3.1-flash-lite-preview",
+    provider: "google" as const,
+    maxTokens: 512,
+    timeout: 8_000,
+  },
+  deep: {
+    model: "claude-sonnet-4-6",
+    provider: "anthropic" as const,
+    maxTokens: 768,
+    timeout: 15_000,
+  },
 } as const
 
 async function callModelForInsights(
@@ -72,13 +93,15 @@ async function callModelForInsights(
   tier: 'fast' | 'deep' = 'deep',
   surface?: string,
 ): Promise<PageInsight[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const config = MODEL_CONFIG[tier]
+  const apiKey = config.provider === 'google'
+    ? (process.env.GOOGLE_AI_API_KEY?.trim() ?? process.env.GEMINI_API_KEY?.trim())
+    : process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) return []
 
   const specialist = getSpecialistById(specialistId)
   if (!specialist) return []
 
-  const config = MODEL_CONFIG[tier]
   const action = `page_insights_${surface ?? specialistId}`
 
   const systemPrompt = `You are ${specialist.name}, ${specialist.title} at Fractional Forge. You speak in first person, concisely and confidently. Your personality: ${specialist.tagline}
@@ -98,67 +121,137 @@ Respond ONLY with the JSON array, no markdown fences.`
 
   try {
     let response: Response
-    try {
-      response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: config.model,
-          max_tokens: config.maxTokens,
-          system: systemPrompt,
-          messages: [{ role: "user", content: context }],
-        }),
-        signal: controller.signal,
-      })
-    } catch (err) {
+    let text = ""
+    let tokensIn = 0
+    let tokensOut = 0
+
+    if (config.provider === 'google') {
+      // Gemini non-streaming generateContent — same pattern as multi-model-consensus.ts
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // Gemini supports system_instruction in the v1beta REST API.
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: "user", parts: [{ text: context }] }],
+            generationConfig: {
+              maxOutputTokens: config.maxTokens,
+              // INTENT: response_mime_type forces strict JSON output, avoiding the markdown-fence
+              // strip path entirely. Supported on all Gemini 1.5+ models including 3.1 Flash Lite.
+              response_mime_type: "application/json",
+            },
+          }),
+          signal: controller.signal,
+        })
+      } catch (err) {
+        clearTimeout(timeout)
+        void logLlmUsage({
+          action,
+          modelUsed: config.model,
+          tokensIn: 0,
+          tokensOut: 0,
+          status: 'error',
+          errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+          specialistId,
+        })
+        return []
+      }
+
       clearTimeout(timeout)
-      void logLlmUsage({
-        action,
-        modelUsed: config.model,
-        tokensIn: 0,
-        tokensOut: 0,
-        status: 'error',
-        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
-        specialistId,
-      })
-      return []
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '')
+        const status: 'rate_limited' | 'timeout' | 'error' =
+          response.status === 429 || response.status === 529 ? 'rate_limited' :
+          response.status === 408 || response.status === 504 ? 'timeout' :
+          'error'
+        void logLlmUsage({
+          action,
+          modelUsed: config.model,
+          tokensIn: 0,
+          tokensOut: 0,
+          status,
+          errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+          specialistId,
+        })
+        console.error(`[page-insights] ${tier} (gemini) API error:`, response.status)
+        return []
+      }
+
+      const data = await response.json()
+      // Gemini response shape: { candidates: [{ content: { parts: [{ text }] } }], usageMetadata: { promptTokenCount, candidatesTokenCount } }
+      text = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim()
+      tokensIn = data.usageMetadata?.promptTokenCount ?? 0
+      tokensOut = data.usageMetadata?.candidatesTokenCount ?? 0
+    } else {
+      // Anthropic direct fetch (deep tier — Sonnet)
+      try {
+        response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: config.model,
+            max_tokens: config.maxTokens,
+            system: systemPrompt,
+            messages: [{ role: "user", content: context }],
+          }),
+          signal: controller.signal,
+        })
+      } catch (err) {
+        clearTimeout(timeout)
+        void logLlmUsage({
+          action,
+          modelUsed: config.model,
+          tokensIn: 0,
+          tokensOut: 0,
+          status: 'error',
+          errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+          specialistId,
+        })
+        return []
+      }
+
+      clearTimeout(timeout)
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '')
+        const status: 'rate_limited' | 'timeout' | 'error' =
+          response.status === 429 || response.status === 529 ? 'rate_limited' :
+          response.status === 408 || response.status === 504 ? 'timeout' :
+          'error'
+        void logLlmUsage({
+          action,
+          modelUsed: config.model,
+          tokensIn: 0,
+          tokensOut: 0,
+          status,
+          errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+          specialistId,
+        })
+        console.error(`[page-insights] ${tier} API error:`, response.status)
+        return []
+      }
+
+      const data = await response.json()
+      text = (data.content?.[0]?.text ?? "").trim()
+      tokensIn = data.usage?.input_tokens ?? 0
+      tokensOut = data.usage?.output_tokens ?? 0
     }
 
-    clearTimeout(timeout)
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '')
-      const status: 'rate_limited' | 'timeout' | 'error' =
-        response.status === 429 || response.status === 529 ? 'rate_limited' :
-        response.status === 408 || response.status === 504 ? 'timeout' :
-        'error'
-      void logLlmUsage({
-        action,
-        modelUsed: config.model,
-        tokensIn: 0,
-        tokensOut: 0,
-        status,
-        errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
-        specialistId,
-      })
-      console.error(`[page-insights] ${tier} API error:`, response.status)
-      return []
-    }
-
-    const data = await response.json()
     void logLlmUsage({
       action,
       modelUsed: config.model,
-      tokensIn: data.usage?.input_tokens ?? 0,
-      tokensOut: data.usage?.output_tokens ?? 0,
+      tokensIn,
+      tokensOut,
       status: 'success',
       specialistId,
     })
-    const text = (data.content?.[0]?.text ?? "").trim()
     if (!text) return []
 
     // VALIDATION: Strip markdown fences
