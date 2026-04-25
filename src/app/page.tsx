@@ -89,8 +89,8 @@ const ARTICLES = [
 // stay until they upgrade or churn). Added the \u00a310 / 100-leads Investor
 // Search Add-On as the cash-cow upsell.
 const PRICING_TIERS = [
-  { name: "Free", price: "Free", detail: "1 brainstorm/mo, 5 saved searches lifetime" },
-  { name: "Starter", price: "\u00a320/mo", detail: "100 investor leads with full why-fit + drafted email, 10 brainstorms" },
+  { name: "Free", price: "Free", detail: "5 brainstorms/mo, 5 saved searches lifetime" },
+  { name: "Starter", price: "\u00a320/mo", detail: "100 investor leads with full why-fit + drafted email, 50 brainstorms" },
   { name: "Add-on", price: "\u00a310 / 100", detail: "Extra investor leads, one click from inside Investors" },
   { name: "Pro", price: "\u00a3149/mo", detail: "Unlimited leads, Deep Council, dual-side data" },
 ] as const
@@ -118,7 +118,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "ForgeOS is free to try \u2014 1 brainstorming session a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is \u00a320/month and gives you 100 investor leads with full why-fit, how-to-pitch, and drafted email. Need more leads? \u00a310 per 100 extra, one click from inside Investors. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "ForgeOS is free to try \u2014 5 brainstorming sessions a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is \u00a320/month and gives you 100 investor leads with full why-fit, how-to-pitch, and drafted email. Need more leads? \u00a310 per 100 extra, one click from inside Investors. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
   },
 ] as const
 

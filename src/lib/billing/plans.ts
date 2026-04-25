@@ -73,7 +73,7 @@ export type EffectiveTier = SubscriptionTier | 'early_access'
  */
 export const EARLY_ACCESS_LIMITS = {
   investorLeadsPerMonth: 100,
-  brainstormSessionsPerMonth: 10,
+  brainstormSessionsPerMonth: 50, // loosened 2026-04-25 to match Starter; viral-first directive
   savedSearchesLifetime: null, // no lifetime cap during early access
   maxAiTasksPerMonth: 200,
   maxComputeBudgetUsd: 18,
@@ -237,11 +237,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     name: 'Free',
     description: 'Try ForgeOS without a credit card',
     bestFor:
-      'Sandbox the platform and tease the workflow. 1 brainstorm a month and a lifetime cap of 5 saved investor searches, perfect for a single founder kicking the tyres.',
+      'Sandbox the platform and tease the workflow. 5 brainstorms a month and a lifetime cap of 5 saved investor searches, perfect for a single founder kicking the tyres.',
     priceMonthlyGBP: 0,
     priceAnnualGBP: 0,
     features: [
-      '1 brainstorming session per month',
+      '5 brainstorming sessions per month',
       '5 saved investor searches (lifetime)',
       'All 13 specialists in read-only sandbox',
       'Marketplace browse',
@@ -251,9 +251,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxOrders: undefined, // unlimited — we earn commission on every order
       maxTeamMembers: undefined, // no team limit — each person pays individually
       maxRetainers: 0,
-      // Freemium-gate enforcement (1 brainstorm/mo, 5 lifetime saved searches)
-      // is wired in a follow-up commit. Holding the legacy 50 here so existing
-      // free-tier users are not price-shocked the moment this ships.
       maxAiTasksPerMonth: 50,
       apiAccess: false,
       dedicatedAccount: false,
@@ -267,8 +264,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxStorageMB: 500,
       maxComputeBudgetUsd: 9,
       investorLeadsPerMonth: 0, // browse-only on Free; full leads start on Starter
-      brainstormSessionsPerMonth: 1, // new freemium policy
-      savedSearchesLifetime: 5, // new freemium policy
+      brainstormSessionsPerMonth: 5, // loosened 2026-04-25 from 1 to 5; viral-first directive
+      savedSearchesLifetime: 5,
     },
   },
 
@@ -380,7 +377,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     name: 'Starter',
     description: 'The new entry tier for hardware founders',
     bestFor:
-      '100 investor leads a month with full why-fit + how-to-pitch + drafted-email, plus 10 brainstorming sessions. Top up with £10 per 100 extra leads when you need more.',
+      '100 investor leads a month with full why-fit + how-to-pitch + drafted-email, plus 50 brainstorming sessions. Top up with £10 per 100 extra leads when you need more.',
     priceMonthlyGBP: 2000, // £20/month
     priceAnnualGBP: 19200, // £192/year (save 20%)
     legacy: false,
@@ -388,7 +385,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     features: [
       '100 investor leads per month',
       'Full why-fit + how-to-pitch + drafted-email',
-      '10 brainstorming sessions per month',
+      '50 brainstorming sessions per month',
       'All 13 specialists',
       'Marketplace browse + orders',
       '£10 per 100 extra investor leads',
@@ -411,7 +408,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxStorageMB: 2_000,
       maxComputeBudgetUsd: 18,
       investorLeadsPerMonth: 100,
-      brainstormSessionsPerMonth: 10,
+      brainstormSessionsPerMonth: 50, // loosened 2026-04-25 from 10 to 50; viral-first directive
       savedSearchesLifetime: null,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_V2_MONTHLY?.trim(),

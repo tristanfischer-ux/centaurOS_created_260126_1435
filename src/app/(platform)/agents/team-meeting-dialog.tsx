@@ -2911,7 +2911,7 @@ function PostMeetingUpsell({ userId, tier, used, cap }: PostMeetingUpsellProps) 
     const starter = SUBSCRIPTION_PLANS['starter_v2']
     const pro = SUBSCRIPTION_PLANS['professional']
     const starterPrice = starter ? `£${(starter.priceMonthlyGBP / 100).toFixed(0)}` : '£20'
-    const starterBrainstorms = starter?.limits.brainstormSessionsPerMonth ?? 10
+    const starterBrainstorms = starter?.limits.brainstormSessionsPerMonth ?? 50
     const starterLeads = starter?.limits.investorLeadsPerMonth ?? 100
     const proPrice = pro ? `£${(pro.priceMonthlyGBP / 100).toFixed(0)}` : '£149'
 

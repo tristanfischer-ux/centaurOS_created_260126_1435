@@ -85,7 +85,7 @@ const PRICING_TIERS = [
     price: 'Free',
     cadence: '',
     detail:
-      '1 brainstorming session a month. 5 saved investor searches over the life of the account. Specialist support across thirteen disciplines. Manufacturer search across 13,700 UK and European suppliers.',
+      '5 brainstorming sessions a month. 5 saved investor searches over the life of the account. Specialist support across thirteen disciplines. Manufacturer search across 13,700 UK and European suppliers.',
     cta: 'Get Started Free',
     ctaSubtext: 'Free forever · No credit card required',
     emphasised: false,
