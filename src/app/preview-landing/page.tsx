@@ -295,7 +295,7 @@ export default function PreviewLandingPage() {
                 FRACTIONAL FORGE
               </p>
               <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-                Expert teams, AI-enabled execution, and manufacturing capacity — without owning a factory.
+                Build the smart version of everyday products — fractional experts, specialist support across thirteen disciplines, and a UK and European manufacturing network, all in one place.
               </p>
             </div>
             <div>
@@ -396,7 +396,7 @@ function HeroSection() {
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Access fractional experts, AI-enabled execution, and on-demand manufacturing capacity — all through one platform. No factory required.
+          Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under £5 a unit, so the wave is hardware-side now. ForgeOS pulls the design, supply, and capital cycle for the smart version into one place — fractional experts, specialist support across thirteen disciplines, and on-demand manufacturing capacity. No factory required.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
@@ -534,15 +534,15 @@ const SOLUTION_PILLARS = [
   },
   {
     icon: Brain,
-    label: "AI-Enabled Execution",
-    headline: "AI Speed. Human Judgement.",
+    label: "Specialist Support",
+    headline: "Thirteen disciplines, your judgement.",
     image: "/images/marketing/role-apprentice.png",
-    imageAlt: "Young engineers working with AI tools",
-    quote: "Ambitious apprentices — digital natives fresh from university — execute tasks using AI tools at remarkable speed. Senior experts review and verify every output. You aren't hiring juniors. You're deploying Founders-in-Training.",
+    imageAlt: "Specialists collaborating on a hardware product",
+    quote: "Specialist support across thirteen disciplines, strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, product, hiring, fundraising, and operations. A finance specialist runs your model. A legal specialist drafts your founder agreements. A manufacturing specialist sanity-checks your supplier shortlist. The decisions remain yours.",
     highlights: [
-      "Senior directs. Junior executes with AI. Senior verifies.",
-      "Every output grounded in real-world experience",
-      "More output, lower cost than traditional hiring",
+      "Strategy, engineering, finance, legal, and nine more disciplines",
+      "Grounded in real supplier, investor, and industry data",
+      "Your context, your decisions, supported at every step",
     ],
   },
   {
@@ -575,9 +575,9 @@ function SolutionSection() {
             <span className="text-international-orange">So Why Build a Factory?</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Modern software companies use AWS instead of buying servers.
+            Modern software companies use cloud infrastructure instead of buying servers.
             Fractional Forge gives hardware companies the same model —
-            expert teams, AI-enabled execution, and manufacturing capacity, all on demand.
+            expert teams, specialist support across thirteen disciplines, and manufacturing capacity, all on demand.
           </p>
         </AnimatedSection>
 
@@ -706,8 +706,8 @@ const AUDIENCES = [
   {
     icon: GraduationCap,
     role: "Apprentices",
-    value: "Become a Founder-in-Training",
-    description: "Pair with a seasoned executive, learn cutting-edge AI workflows, and multiply your output.",
+    value: "Learn alongside experienced founders",
+    description: "Pair with a seasoned executive on a real hardware company. Learn how products get from a paragraph to a manufacturer, and build the experience to start your own.",
     cta: "Start Apprenticeship",
     href: "/join?role=apprentice",
   },
@@ -792,7 +792,7 @@ function WhoItsForSection() {
  * ═══════════════════════════════════════════════════════════════════════ */
 
 const TRUST_SIGNALS = [
-  { icon: Shield, label: "Your IP, 100%" },
+  { icon: Shield, label: "Your intellectual property, 100%" },
   { icon: UserCheck, label: "Verified Experts" },
   { icon: DollarSign, label: "No Equity Required" },
   { icon: CheckCircle2, label: "Cancel Anytime" },
@@ -853,15 +853,15 @@ function FinalCTASection() {
 const FAQS = [
   {
     question: "What is a Cloud Factory?",
-    answer: "Think of it like AWS for manufacturing. Just as modern software companies use cloud compute instead of building their own server racks, Fractional Forge lets you build hardware products using existing factory capacity, expert teams, and AI-enabled execution — without owning any of it. You get the same results, at a fraction of the cost and time.",
+    answer: "Think of it like cloud infrastructure for manufacturing. Just as modern software companies use cloud compute instead of building their own server racks, Fractional Forge lets you build hardware products using existing factory capacity, fractional experts, and specialist support across thirteen disciplines — without owning any of it. You get the same results, at a fraction of the cost and time.",
   },
   {
-    question: "Who owns the IP I create on the platform?",
+    question: "Who owns the intellectual property I create on the platform?",
     answer: "You do. 100%. Fractional Forge provides the team and infrastructure, but all intellectual property, designs, prototypes, and products belong entirely to you. This is baked into our contracts.",
   },
   {
     question: "How does the fractional model actually work?",
-    answer: "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. They direct AI-enabled apprentices who execute at speed, then verify the output based on decades of real-world experience. You only pay for the hours and outcomes you need.",
+    answer: "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. ForgeOS combines that with specialist support across thirteen disciplines — strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, product, hiring, fundraising, chief of staff, and chief technology — so you have breadth and depth without the standing army. You only pay for the hours and outcomes you need.",
   },
   {
     question: "How quickly can I go from idea to prototype?",
@@ -869,7 +869,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "We're in early access and working directly with early customers to define pricing. No equity is required. Reach out and we'll walk you through what engagement looks like for your situation.",
+    answer: "ForgeOS is free to try — one brainstorming session a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is £20/month and gives you 100 investor leads with the why-fit, how-to-pitch, and drafted email per match. £10 buys another 100 leads when you need them. Pro is £149/month for unlimited leads and the Deep Council multi-specialist deep dive. No equity required.",
   },
 ] as const
 
