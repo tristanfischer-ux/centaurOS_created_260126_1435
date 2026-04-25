@@ -18,10 +18,15 @@
 
 "use server"
 
+// INTENT: a "use server" file may ONLY export async functions. Re-exporting
+// the synchronous `computeLeadTimeBuffer` helper from this file broke the
+// build on /the-forge-v2/projects/<id>/suppliers. Consumers (currently only
+// `shortlist-view.tsx`) import the helper and its type directly from
+// `@/lib/supplier-lead-time`, so the re-exports here were dead — they only
+// existed to fail the bundle. Removed.
+
 import { withAuth } from "@/lib/server-action-utils"
 import type { Database } from "@/types/database.types"
-export { computeLeadTimeBuffer } from "@/lib/supplier-lead-time"
-export type { LeadTimeBuffer } from "@/lib/supplier-lead-time"
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 

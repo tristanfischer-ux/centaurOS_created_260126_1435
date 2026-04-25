@@ -1708,12 +1708,27 @@ export function TeamMeetingDialog({
 
     /**
      * Extract a short preview from a response (first 1-2 sentences).
+     *
+     * Specialist responses include markdown ladder phrases like
+     * `**Quick take —**` and inline emphasis. The preview is rendered as
+     * plain text in a collapsed row, so we strip the markdown markers
+     * before truncating — otherwise the user sees literal asterisks.
      */
     function getPreview(content: string): string {
+        // INTENT: strip the markdown the message body uses so the
+        // collapsed-row preview reads as plain prose. We only strip
+        // emphasis markers (** __ *), not destructive transforms like
+        // headings — those would change the sentence structure.
+        const stripped = content
+            .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
+            .replace(/__([^_]+)__/g, '$1') // alt-bold
+            .replace(/\*([^*]+)\*/g, '$1') // italic
+            .replace(/_([^_]+)_/g, '$1') // alt-italic
+            .replace(/`([^`]+)`/g, '$1') // inline code
         // Split on sentence boundaries, take first 2
-        const sentences = content.split(/(?<=[.!?])\s+/)
+        const sentences = stripped.split(/(?<=[.!?])\s+/)
         const preview = sentences.slice(0, 2).join(" ")
-        if (preview.length < content.length) {
+        if (preview.length < stripped.length) {
             return preview.length > 200 ? preview.slice(0, 200) + "..." : preview + "..."
         }
         return preview
