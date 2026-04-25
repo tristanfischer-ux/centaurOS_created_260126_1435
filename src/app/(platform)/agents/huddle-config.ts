@@ -17,7 +17,7 @@
  * - sweep-prompts.ts — Background sweep that generates discussion topics
  */
 
-import { Lightbulb, Cpu, Scale, TrendingUp, Rocket, RefreshCw, Truck, Target, UserPlus, Search } from "lucide-react"
+import { Lightbulb, Cpu, Scale, TrendingUp, Rocket, RefreshCw, Truck, Target, UserPlus, Search, Sparkles } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { SpecialistId } from "@/lib/agents/specialists-config"
 
@@ -42,12 +42,29 @@ export interface HuddleConfig {
     accentColor: string
 }
 
-// DECISION: Ten huddles covering the natural business rhythms a hardware
-// startup founder engages with. The first four are evergreen (strategy,
-// tech, legal/finance, finance deep dive). The remaining six are
-// situational — founders jump into them at specific inflection points.
-// Cal sits in all of them as the operational glue.
+// DECISION: Eleven huddles. Product Ideation leads the list because the
+// killer-product loop starts here — Sage/Priya/Fang/Fiona invent a new
+// product candidate, and the meeting outputs feed directly into The Forge
+// (build it) AND the Investors search (test investor appetite). Every
+// other huddle is downstream of having a product to build.
+//
+// The next four are evergreen rhythms (strategy, tech, legal/finance,
+// finance deep dive). The remaining six are situational — founders jump
+// into them at specific inflection points. Cal sits in all of them as the
+// operational glue.
 export const HUDDLES: HuddleConfig[] = [
+    {
+        id: "product-ideation",
+        name: "Product Ideation Huddle",
+        description:
+            "Dream up new products that would survive contact with manufacturing AND investors. Cheap intelligence makes most physical products re-imaginable — what's the smart version?",
+        leadId: "strategist",
+        memberIds: ["product-lead", "vp-manufacturing", "fundraising-advisor"],
+        chiefOfStaffId: "chief-of-staff",
+        insightSpecialistIds: ["strategist", "product-lead", "vp-manufacturing", "fundraising-advisor"],
+        icon: Sparkles,
+        accentColor: "text-international-orange",
+    },
     {
         id: "strategy",
         name: "Strategy Huddle",

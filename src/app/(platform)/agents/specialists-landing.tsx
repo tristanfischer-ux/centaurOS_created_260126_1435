@@ -389,11 +389,17 @@ export function SpecialistsLanding({
                 transition={{ duration: 0.4, delay: 0.3 }}
                 className="space-y-4"
             >
-                <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                        Team Huddles
-                    </h3>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                            Team Huddles
+                        </h3>
+                    </div>
+                    <p className="text-xs text-muted-foreground hidden sm:block">
+                        Start with <strong className="text-foreground">Product Ideation</strong> — every
+                        other huddle is downstream of deciding what to build.
+                    </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {HUDDLES.map((huddle, idx) => (

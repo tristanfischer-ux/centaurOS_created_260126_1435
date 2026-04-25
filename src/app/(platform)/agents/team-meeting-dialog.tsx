@@ -22,6 +22,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import {
     Dialog,
     DialogContent,
@@ -49,6 +50,9 @@ import {
     ChevronUp,
     Hand,
     Square,
+    Hammer,
+    Building2,
+    ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
@@ -135,7 +139,24 @@ interface TeamMeetingDialogProps {
 
 /** Suggestions for specific specialist pair/triple combinations (sorted key = specialist IDs joined). */
 const COMBINATION_SUGGESTIONS: Record<string, string[]> = {
+    // Product Ideation pairs — whenever Sage is paired with the
+    // ideation-relevant specialists (Priya for product feasibility, Fang
+    // for manufacturability, Fiona for investor appetite), surface
+    // smart-version product-ideation prompts. These drive the killer
+    // feedback loop: brainstorming → Forge (build it) AND → Investors
+    // (test it).
+    "product-lead,strategist": [
+        "What new physical product could we build that becomes 10× better with cheap intelligence embedded?",
+        "Pick a boring commodity in our domain — what's the smart-version that nobody has shipped yet?",
+        "What should our product roadmap look like? How do we prioritize?",
+        "How do we validate product-market fit with limited resources?",
+    ],
+    "strategist,vp-manufacturing": [
+        "What new product idea has both a clear bill of materials AND a sharp investor pitch?",
+        "Which physical product category has the cheapest BOM-to-intelligence-uplift ratio right now?",
+    ],
     "fundraising-advisor,strategist": [
+        "What new product idea would investors back today? Stress-test our top candidate.",
         "Should we raise a Series A? What's our fundraising timeline?",
         "How do we position ourselves for investors given our current traction?",
     ],
@@ -150,10 +171,6 @@ const COMBINATION_SUGGESTIONS: Record<string, string[]> = {
     "hiring-team,legal-counsel": [
         "What employment contracts and equity agreements do we need?",
         "How do we structure compensation and stay compliant?",
-    ],
-    "product-lead,strategist": [
-        "What should our product roadmap look like? How do we prioritize?",
-        "How do we validate product-market fit with limited resources?",
     ],
     "growth-marketer,product-lead": [
         "How do we drive adoption for our new feature launch?",
@@ -188,6 +205,7 @@ const COMBINATION_SUGGESTIONS: Record<string, string[]> = {
 /** Per-specialist fallback suggestions when no combination matches. */
 const SPECIALIST_SUGGESTIONS: Record<string, string[]> = {
     strategist: [
+        "What new product could we build that becomes 10× better with cheap intelligence embedded?",
         "What's the best go-to-market strategy for our product?",
         "How should we think about competitive positioning?",
     ],
@@ -746,6 +764,7 @@ export function TeamMeetingDialog({
     onOpenChange,
     preset,
 }: TeamMeetingDialogProps) {
+    const router = useRouter()
     // ─── State ────────────────────────────────────────────────────────────
     const [phase, setPhase] = useState<MeetingPhase>("setup")
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -2121,17 +2140,85 @@ export function TeamMeetingDialog({
                         {isGeneratingOutputs ? (
                             <MeetingOutputsLoading attendees={selectedSpecialists} topic={topic} />
                         ) : meetingOutputs ? (
-                            <MeetingOutputs
-                                outputs={meetingOutputs}
-                                topic={topic}
-                                attendees={selectedSpecialists.map((s) => s.name)}
-                                transcript={entries
-                                    .map((e) => `**${e.specialistName}** (Round ${e.round}):\n${e.content}`)
-                                    .join("\n\n---\n\n")}
-                                roundCount={currentRound}
-                                onShareReport={() => setShowReportDialog(true)}
-                                initialSaved={isAutoSaved}
-                            />
+                            <>
+                                <MeetingOutputs
+                                    outputs={meetingOutputs}
+                                    topic={topic}
+                                    attendees={selectedSpecialists.map((s) => s.name)}
+                                    transcript={entries
+                                        .map((e) => `**${e.specialistName}** (Round ${e.round}):\n${e.content}`)
+                                        .join("\n\n---\n\n")}
+                                    roundCount={currentRound}
+                                    onShareReport={() => setShowReportDialog(true)}
+                                    initialSaved={isAutoSaved}
+                                />
+                                {/* Cross-surface handoff CTAs (RED-TEAM-PIVOT-PLAN.md):
+                                    turn the brainstorm into a Forge build OR an investor
+                                    test in one click. localStorage carries topic + a short
+                                    summary; the receiving page reads on mount. Both CTAs are
+                                    weighted equally — building and testing investor appetite
+                                    are the two killer surfaces a brainstorm should feed. */}
+                                <div className="px-6 pb-4 pt-2">
+                                    <div className="rounded-lg border border-international-orange/20 bg-international-orange/[0.04] p-4">
+                                        <p className="text-sm font-semibold text-foreground mb-2">
+                                            What next?
+                                        </p>
+                                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                                            Carry this conversation into the killer surfaces — your specialists already framed the problem, now build it AND test it with investors.
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="gap-2"
+                                                onClick={() => {
+                                                    try {
+                                                        localStorage.setItem(
+                                                            "forge-from-brainstorm-context",
+                                                            JSON.stringify({
+                                                                topic,
+                                                                summary: meetingOutputs?.notes.summary ?? "",
+                                                                createdAt: new Date().toISOString(),
+                                                            }),
+                                                        )
+                                                    } catch {
+                                                        /* localStorage may be disabled — proceed anyway */
+                                                    }
+                                                    router.push("/the-forge-v2/new?fromBrainstorm=1")
+                                                }}
+                                            >
+                                                <Hammer className="h-3.5 w-3.5" />
+                                                Build this in The Forge
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="gap-2"
+                                                onClick={() => {
+                                                    try {
+                                                        localStorage.setItem(
+                                                            "investor-from-brainstorm-context",
+                                                            JSON.stringify({
+                                                                topic,
+                                                                summary: meetingOutputs?.notes.summary ?? "",
+                                                                createdAt: new Date().toISOString(),
+                                                            }),
+                                                        )
+                                                    } catch {
+                                                        /* localStorage may be disabled — proceed anyway */
+                                                    }
+                                                    router.push("/investors?fromBrainstorm=1")
+                                                }}
+                                            >
+                                                <Building2 className="h-3.5 w-3.5" />
+                                                See which investors would back this
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
                         ) : error ? (
                             <div className="space-y-4 py-8">
                                 <Alert variant="destructive">

@@ -54,8 +54,8 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useMemo, useState, useTransition } from "react"
 
 import { createCadLabProject } from "@/actions/cad-lab-projects"
 
@@ -78,13 +78,21 @@ interface FormState {
     starterReference: StarterReferenceChoice | null
 }
 
+interface BrainstormHandoff {
+    topic: string
+    summary: string
+    createdAt: string
+}
+
 const SUBJECT_MIN = 20
 const SUBJECT_MAX = 1000
+const BRAINSTORM_HANDOFF_KEY = "forge-from-brainstorm-context"
 
 // ─── View ──────────────────────────────────────────────────────────────
 
 export function ProjectCreateView(): React.ReactElement {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [form, setForm] = useState<FormState>({
         name: "",
         subject: "",
@@ -99,6 +107,51 @@ export function ProjectCreateView(): React.ReactElement {
     })
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+    const [brainstormHandoff, setBrainstormHandoff] =
+        useState<BrainstormHandoff | null>(null)
+
+    // INTENT: receive a brainstorming hand-off. Sender lives in
+    // src/app/(platform)/agents/team-meeting-dialog.tsx — when a founder
+    // clicks "Build this in The Forge" at the end of a brainstorming
+    // meeting, it stashes { topic, summary, createdAt } in localStorage
+    // and routes here with `?fromBrainstorm=1`. We seed the brief textarea
+    // + project name + mission from that payload so Chase has the meeting
+    // context to draft rev 0.1 against, then clear localStorage so a stale
+    // payload doesn't leak into a future "+ New project" click.
+    useEffect(() => {
+        if (searchParams.get("fromBrainstorm") !== "1") return
+        if (typeof window === "undefined") return
+
+        const raw = window.localStorage.getItem(BRAINSTORM_HANDOFF_KEY)
+        if (!raw) return
+
+        try {
+            const parsed = JSON.parse(raw) as Partial<BrainstormHandoff>
+            const topic = typeof parsed.topic === "string" ? parsed.topic.trim() : ""
+            const summary =
+                typeof parsed.summary === "string" ? parsed.summary.trim() : ""
+            const createdAt =
+                typeof parsed.createdAt === "string" ? parsed.createdAt : ""
+
+            if (!topic && !summary) return
+
+            const seededSubject = summary
+                ? `From brainstorming session "${topic || "Untitled"}":\n\n${summary}\n\n— continue refining the brief from here.`
+                : `From brainstorming session "${topic}". Continue the brief from here.`
+
+            setForm((s) => ({
+                ...s,
+                subject: s.subject ? s.subject : seededSubject,
+                name: s.name ? s.name : topic,
+                mission: s.mission ? s.mission : summary,
+            }))
+            setBrainstormHandoff({ topic, summary, createdAt })
+        } catch {
+            // Corrupt payload — silently ignore, founder can still type fresh.
+        } finally {
+            window.localStorage.removeItem(BRAINSTORM_HANDOFF_KEY)
+        }
+    }, [searchParams])
 
     const subjectCount = form.subject.length
     const subjectOverLimit = subjectCount > SUBJECT_MAX
@@ -236,6 +289,21 @@ export function ProjectCreateView(): React.ReactElement {
                 what the constraint is. Chase and Max draft rev 0.1 of the Brief from what you wrote.
                 You review before anything else happens.
             </p>
+
+            {brainstormHandoff ? (
+                <div className="pc2-handoff-banner" role="status">
+                    <div className="pc2-handoff-banner-icon" aria-hidden="true">↳</div>
+                    <div className="pc2-handoff-banner-body">
+                        <strong>Continued from brainstorming.</strong>
+                        <span>
+                            Seeded from your meeting
+                            {brainstormHandoff.topic ? ` on "${brainstormHandoff.topic}"` : ""}
+                            . The brief, project name, and mission are pre-filled from the meeting summary —
+                            edit anything before you draft.
+                        </span>
+                    </div>
+                </div>
+            ) : null}
 
             {/* ── Wizard ─────────────────────────────────────────── */}
             <div className="pc2-wizard">
