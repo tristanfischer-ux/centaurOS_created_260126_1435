@@ -357,6 +357,11 @@ export function RunningState({ projectId, projectName, state }: RunningStateProp
         })
     }
 
+    // Derive currentIndex early so the commentary useEffect can reference it.
+    // Safe to compute before the !state early-return because it's a pure
+    // derivation with a null-safe fallback (-1 when state is null).
+    const _earlyServerIndex = state ? STAGES.findIndex((s) => s.id === state.stage) : -1
+
     // ─── Live commentary panel state ───────────────────────────────────
     // Fades in over ~400ms when the active stage changes, persists for the
     // duration of the stage, then transitions to the next stage's quote.
@@ -366,7 +371,7 @@ export function RunningState({ projectId, projectName, state }: RunningStateProp
 
     useEffect(() => {
         if (!state || state.finished_at) return
-        const activeStage = STAGES[currentIndex]
+        const activeStage = STAGES[_earlyServerIndex]
         if (!activeStage) return
         if (activeStage.id !== commentaryStageId) {
             // Stage changed — fade out then back in with new quote
@@ -377,12 +382,12 @@ export function RunningState({ projectId, projectName, state }: RunningStateProp
             }, 200)
             return () => clearTimeout(t)
         }
-    }, [state, currentIndex, commentaryStageId])
+    }, [state, _earlyServerIndex, commentaryStageId])
 
     // Initialise on first render
     useEffect(() => {
         if (!state || state.finished_at) return
-        const activeStage = STAGES[currentIndex]
+        const activeStage = STAGES[_earlyServerIndex]
         if (!activeStage) return
         setCommentaryStageId(activeStage.id)
         const t = setTimeout(() => setCommentaryVisible(true), 400)
