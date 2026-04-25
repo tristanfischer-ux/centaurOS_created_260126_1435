@@ -10066,6 +10066,79 @@ export type Database = {
         }
         Relationships: []
       }
+      investor_match_cache: {
+        Row: {
+          cost_usd: number
+          created_at: string
+          drafted_email_body: string
+          drafted_email_subject: string
+          foundry_context_hash: string
+          foundry_id: string
+          how_to_pitch: string
+          id: string
+          investor_listing_id: string
+          model_used: string
+          source_citations: Json | null
+          tokens_in: number
+          tokens_out: number
+          why_fit: string
+        }
+        Insert: {
+          cost_usd?: number
+          created_at?: string
+          drafted_email_body: string
+          drafted_email_subject: string
+          foundry_context_hash: string
+          foundry_id: string
+          how_to_pitch: string
+          id?: string
+          investor_listing_id: string
+          model_used: string
+          source_citations?: Json | null
+          tokens_in?: number
+          tokens_out?: number
+          why_fit: string
+        }
+        Update: {
+          cost_usd?: number
+          created_at?: string
+          drafted_email_body?: string
+          drafted_email_subject?: string
+          foundry_context_hash?: string
+          foundry_id?: string
+          how_to_pitch?: string
+          id?: string
+          investor_listing_id?: string
+          model_used?: string
+          source_citations?: Json | null
+          tokens_in?: number
+          tokens_out?: number
+          why_fit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_match_cache_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_match_cache_investor_listing_id_fkey"
+            columns: ["investor_listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_match_cache_investor_listing_id_fkey"
+            columns: ["investor_listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       investor_news_intel: {
         Row: {
           current_focus: string | null

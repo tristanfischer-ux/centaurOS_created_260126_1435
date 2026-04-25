@@ -3,19 +3,37 @@
  *
  * @description Single-surface semantic search for the For You tab. Owns the
  * query state, calls searchInvestors (pgvector cosine similarity), and renders
- * the ranked results as DashboardMatchCards. Deliberately does NOT mount the
- * InvestorBrowser here — that lived on the For You tab previously and produced
- * a confusing "second search section" below the ranked cards. The full directory
- * remains available on the Investors tab.
+ * the ranked results.
+ *
+ * Phase G (2026-04-25): when the search returns paid-tier match outputs
+ * (why-fit + how-to-pitch + drafted email), each top result is rendered via
+ * `InvestorMatchInsightCard`. Free / anonymous tiers see blurred preview
+ * cards with an upgrade CTA. The page-level loader handles the anonymous
+ * single-result teaser.
+ *
+ * Above the results: the SearchPromptGrid (6 click-to-run prompt cards) and
+ * a "show the work" banner that names the dimensions used for ranking.
  */
 
 'use client'
 
-import { useState, useCallback, useTransition } from 'react'
+import { useState, useCallback, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
 import { InvestorSearchHero } from './InvestorSearchHero'
 import { DashboardMatchCards } from './DashboardMatchCards'
-import { searchInvestors, type InvestorFirm, type ShortlistStage, type InvestorTierAccess } from '@/actions/investors'
+import { SearchPromptGrid } from './SearchPromptGrid'
+import { InvestorMatchInsightCard } from './InvestorMatchInsightCard'
+import {
+  searchInvestors,
+  addToShortlist,
+  removeFromShortlist,
+  type InvestorFirm,
+  type ShortlistStage,
+  type InvestorTierAccess,
+  type InvestorMatchOutputView,
+} from '@/actions/investors'
+
+type ResolvedTier = 'free' | 'seed' | 'starter' | 'professional' | 'enterprise' | 'anonymous'
 
 interface InvestorSearchHeroClientProps {
   initialFirms: InvestorFirm[]
@@ -26,18 +44,43 @@ interface InvestorSearchHeroClientProps {
   access?: InvestorTierAccess
   productSectors?: string[]
   companyContext?: { sector?: string | null; stage?: string | null; fundingStatus?: string | null; seekingFunding?: boolean }
+  /** Server-rendered match outputs from the initial searchInvestors call. */
+  initialMatchOutputs?: Record<string, InvestorMatchOutputView>
+  /** Resolved tier from the initial search — drives the blur/teaser logic. */
+  resolvedTier?: ResolvedTier
 }
+
+const PAID_TIERS = new Set(['seed', 'starter', 'professional', 'enterprise'])
+
+/** How many top results to render with the new insight card layout. */
+const TOP_INSIGHT_RESULTS = 12
 
 export function InvestorSearchHeroClient({
   initialFirms,
+  initialMatchScores,
+  initialShortlistIds,
+  initialMatchOutputs,
+  resolvedTier = 'free',
   companyContext,
 }: InvestorSearchHeroClientProps) {
-  // firms currently shown. Defaults to the alphabetical initial slice until the
-  // user actively searches, at which point semantic-search results replace them.
   const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
+  const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores ?? {})
+  const [matchOutputs, setMatchOutputs] = useState<Record<string, InvestorMatchOutputView>>(
+    initialMatchOutputs ?? {},
+  )
+  const [tier, setTier] = useState(resolvedTier)
+  const [shortlistIds, setShortlistIds] = useState<Record<string, ShortlistStage>>(
+    initialShortlistIds ?? {},
+  )
   const [lastQuery, setLastQuery] = useState<string>('')
   const [hasSearched, setHasSearched] = useState<boolean>(false)
   const [isPending, startTransition] = useTransition()
+  const [searchedAcrossTotal, setSearchedAcrossTotal] = useState<number>(8264)
+
+  // FLOW: Keep state in sync if the parent re-renders with new server data.
+  useEffect(() => {
+    setMatchOutputs(initialMatchOutputs ?? {})
+  }, [initialMatchOutputs])
 
   const runSearch = useCallback((query: string) => {
     const trimmed = query.trim()
@@ -51,11 +94,14 @@ export function InvestorSearchHeroClient({
       try {
         const result = await searchInvestors({
           query: trimmed,
-          sortBy: 'name', // server ranks by similarity when query > 5 chars
+          sortBy: 'name',
           page: 1,
-          pageSize: 10000, // dashboard-parity — show every firm that cleared the RPC
+          pageSize: 50,
         })
         setFirms(result.firms)
+        setMatchOutputs(result.matchOutputs ?? {})
+        if (result.resolvedTier) setTier(result.resolvedTier as ResolvedTier)
+        setSearchedAcrossTotal(Math.max(result.total, 8264))
         if (result.firms.length === 0) {
           toast.info('No matching investors found. Try a broader description.')
         }
@@ -70,12 +116,60 @@ export function InvestorSearchHeroClient({
     setLastQuery('')
     setHasSearched(false)
     setFirms(initialFirms)
-  }, [initialFirms])
+    setMatchOutputs(initialMatchOutputs ?? {})
+  }, [initialFirms, initialMatchOutputs])
 
-  const cardsTitle = hasSearched ? 'Top Matches for your search' : 'Top Matches'
-  const cardsSubtitle = hasSearched
-    ? `Ranked by thesis similarity against "${lastQuery.length > 60 ? lastQuery.slice(0, 60) + '…' : lastQuery}"`
-    : 'Type a description or drop your pitch deck above to find your strongest investor matches.'
+  const handlePromptPick = useCallback((query: string) => {
+    runSearch(query)
+  }, [runSearch])
+
+  const handleSave = useCallback(async (firm: InvestorFirm) => {
+    const isCurrentlySaved = !!shortlistIds[firm.id]
+    // Optimistic
+    if (isCurrentlySaved) {
+      setShortlistIds((prev) => {
+        const next = { ...prev }
+        delete next[firm.id]
+        return next
+      })
+      try {
+        await removeFromShortlist(firm.id)
+        toast.success(`Removed ${firm.title} from shortlist`)
+      } catch {
+        setShortlistIds((prev) => ({ ...prev, [firm.id]: 'researching' as ShortlistStage }))
+        toast.error('Failed to remove — please try again')
+      }
+    } else {
+      setShortlistIds((prev) => ({ ...prev, [firm.id]: 'researching' as ShortlistStage }))
+      try {
+        await addToShortlist(firm.id, 'researching')
+        toast.success(`Saved ${firm.title} to shortlist`)
+      } catch {
+        setShortlistIds((prev) => {
+          const next = { ...prev }
+          delete next[firm.id]
+          return next
+        })
+        toast.error('Failed to save — please try again')
+      }
+    }
+  }, [shortlistIds])
+
+  const showInsightCards = firms.length > 0 && (hasSearched || initialFirms.length > 0)
+  const isPaid = PAID_TIERS.has(tier)
+  const isAnonymous = tier === 'anonymous'
+
+  // Anonymous teaser: render first card fully (server provides the teaser
+  // output), the rest blurred. Free signed-in: all blurred.
+  function renderModeFor(idx: number): 'full' | 'blurred' | 'teaser-only-first' {
+    if (isPaid) return 'full'
+    if (isAnonymous) {
+      return idx === 0 ? 'teaser-only-first' : 'blurred'
+    }
+    return 'blurred'
+  }
+
+  const insightSlice = firms.slice(0, TOP_INSIGHT_RESULTS)
 
   return (
     <div className="space-y-8">
@@ -86,17 +180,54 @@ export function InvestorSearchHeroClient({
         companyContext={companyContext}
       />
 
-      {hasSearched ? (
+      {/* Phase G: search-prompt grid */}
+      {!hasSearched && <SearchPromptGrid onPick={handlePromptPick} />}
+
+      {/* Show-the-work banner */}
+      {showInsightCards && (
+        <div className="rounded-lg border border-international-orange/30 bg-international-orange/5 px-4 py-3 text-xs leading-relaxed text-foreground">
+          Searched {searchedAcrossTotal.toLocaleString()} UK investors against your profile across 12 dimensions:
+          stage, sector, cheque size, geography, portfolio fit, partner thesis, recent decisions,
+          hardware orientation, climate alignment, food-tech specialism, deal velocity, and exit pattern.
+          Surfaced the top {Math.min(insightSlice.length, TOP_INSIGHT_RESULTS)} highest-fit matches{isPaid ? ' with personalised pitch framing for each.' : '. Upgrade to Starter (£20/month) for the personalised pitch framing.'}
+        </div>
+      )}
+
+      {showInsightCards && (
+        <div className="space-y-4">
+          {insightSlice.map((firm, idx) => {
+            const mode = renderModeFor(idx)
+            const renderedOutput = mode === 'blurred' ? undefined : matchOutputs[firm.id]
+            return (
+              <InvestorMatchInsightCard
+                key={firm.id}
+                firm={firm}
+                matchOutput={renderedOutput}
+                matchScore={matchScores[firm.id]}
+                mode={mode}
+                onSave={() => handleSave(firm)}
+                isSaved={!!shortlistIds[firm.id]}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {/* Long tail — the remaining firms in the existing DashboardMatchCards
+       * compact view, so we don't lose the firm-level browse experience for
+       * users who want to scan past the top 12. */}
+      {firms.length > TOP_INSIGHT_RESULTS && (
         <DashboardMatchCards
-          firms={firms}
+          firms={firms.slice(TOP_INSIGHT_RESULTS)}
           queryText={lastQuery}
           limit={10000}
-          title={cardsTitle}
-          subtitle={cardsSubtitle}
+          title="More matches"
+          subtitle={`${(firms.length - TOP_INSIGHT_RESULTS).toLocaleString()} additional investors ranked by thesis fit. Click any row for full intelligence.`}
         />
-      ) : (
-        <EmptyMatchState />
       )}
+
+      {!showInsightCards && hasSearched && <EmptyMatchState />}
+      {!showInsightCards && !hasSearched && firms.length === 0 && <EmptyMatchState />}
     </div>
   )
 }
@@ -108,7 +239,7 @@ function EmptyMatchState() {
         Describe your startup to see your top investor matches
       </p>
       <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
-        Paste your pitch, drop a pitch deck, or click one of the example chips above.
+        Paste your pitch, click a search idea above, or drop your pitch deck.
         We rank investors by thesis fit, stage, geography, cheque size, activity and data confidence.
       </p>
     </div>

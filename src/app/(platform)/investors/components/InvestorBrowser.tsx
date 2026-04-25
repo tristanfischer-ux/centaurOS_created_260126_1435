@@ -305,6 +305,9 @@ export function InvestorBrowser({
           sortBy: sortBy !== 'match' ? sortBy : 'name', // match sort is client-side
           page: 1,
           pageSize: PAGE_SIZE,
+          // Phase G: directory browse doesn't need per-result LLM insights —
+          // the For You / dashboard surfaces handle that. Saves cost + latency.
+          skipMatchEnrichment: true,
         })
         // DECISION: Discard stale results if filters changed while this was in-flight
         if (gen !== filterGeneration.current) return
@@ -372,6 +375,7 @@ export function InvestorBrowser({
         sortBy: sortBy !== 'match' ? sortBy : 'name',
         page: nextPage,
         pageSize: PAGE_SIZE,
+        skipMatchEnrichment: true,
       })
       // Discard results if filters changed while load-more was in flight
       if (gen !== filterGeneration.current) return

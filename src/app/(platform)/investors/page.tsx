@@ -72,6 +72,10 @@ export default async function InvestorDirectoryPage() {
   let initialFirms: Awaited<ReturnType<typeof searchInvestors>>['firms'] = []
   let initialTotal = 0
   let initialHasMore = false
+  // Phase G — match outputs (why-fit / how-to-pitch / drafted-email) and the
+  // resolved tier flow through to the client component for paid-vs-free UI.
+  let initialMatchOutputs: Awaited<ReturnType<typeof searchInvestors>>['matchOutputs'] = {}
+  let resolvedTier: Awaited<ReturnType<typeof searchInvestors>>['resolvedTier'] = 'free'
   let stats: InvestorStats | null = null
   let matchScores: Record<string, number> = {}
   let shortlistIds: Record<string, ShortlistStage> = {}
@@ -96,6 +100,8 @@ export default async function InvestorDirectoryPage() {
     initialFirms = searchResult.value.firms
     initialTotal = searchResult.value.total
     initialHasMore = searchResult.value.hasMore
+    initialMatchOutputs = searchResult.value.matchOutputs ?? {}
+    resolvedTier = searchResult.value.resolvedTier ?? 'free'
   } else {
     console.error('[InvestorDirectoryPage] Failed to fetch investors:', searchResult.reason)
   }
@@ -284,6 +290,8 @@ export default async function InvestorDirectoryPage() {
                 initialHasMore={initialHasMore}
                 initialMatchScores={matchScores}
                 initialShortlistIds={shortlistIds}
+                initialMatchOutputs={initialMatchOutputs}
+                resolvedTier={resolvedTier as 'free' | 'seed' | 'starter' | 'professional' | 'enterprise' | 'anonymous'}
                 access={access}
                 productSectors={productSectors}
                 companyContext={companyContext}
