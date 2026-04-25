@@ -432,7 +432,12 @@ function buildMeetingPrompt(
     const priorBlock = buildPriorDiscussionBlock(priorResponses)
     const displayName = getSpecialistDisplayName(specialist)
 
-    // First speaker in the meeting -- no prior context
+    // First speaker in the meeting -- no prior context.
+    // Council copy ladder: opening speaker uses "Quick take —" so the
+    // founder reads a short pointed reaction first while later speakers
+    // (using "On reflection —" / "Thinking about this further —") arrive
+    // with more nuance. The ladder is per-round, not per-specialist —
+    // any specialist can be the opener.
     if (priorResponses.length === 0) {
         return `You are ${specialist.name}, the ${specialist.title} specialist in a team meeting.
 
@@ -449,9 +454,10 @@ ${specialist.workingStyle}
 You are opening this meeting. Give your single strongest take on this topic. Be direct — this is a live meeting, not a memo.
 
 Rules:
-- State your position clearly in 2-3 sentences
-- Flag your biggest concern or opportunity
-- Pose one sharp question for the group to react to
+- **Open your reply with the literal phrase "**Quick take —**" in bold (markdown), then your position.** This is part of the ForgeOS Council pattern: the opener gives the fastest, sharpest read; later speakers add nuance.
+- State your position clearly in 2-3 sentences after the "Quick take —" opener.
+- Flag your biggest concern or opportunity.
+- Pose one sharp question for the group to react to.
 - **Keep it under 150 words.** Short and punchy. You'll get to elaborate if asked.
 
 Use markdown formatting. Sign off as "${displayName}".
@@ -480,9 +486,10 @@ ${priorBlock}
 React to what you've heard. This is a meeting — be conversational, not formal.
 
 Rules:
-- Lead with where you agree or disagree (name the person)
-- Add ONE new insight from your area of expertise
-- If something concerns you, say so directly
+- **Open your reply with the literal phrase "**On reflection —**" in bold (markdown), then your reaction.** This is part of the ForgeOS Council pattern: you arrive after the opener with more nuance.
+- Lead with where you agree or disagree (name the person).
+- Add ONE new insight from your area of expertise.
+- If something concerns you, say so directly.
 - **Keep it under 200 words.** Be concise — you can elaborate if the founder asks.
 
 Use markdown formatting. Sign off as "${displayName}".
@@ -507,9 +514,11 @@ ${priorBlock}
 The founder has asked for your perspective. Respond directly to the discussion so far.
 
 Rules:
-- Reference specific points others made (by name)
-- Build on what resonated, challenge what you disagree with
-- Propose something concrete — a decision, a next step, a framework
+- **Open your reply with the literal phrase "**Thinking about this further —**" in bold (markdown), then your contribution.** This is part of the ForgeOS Council pattern: round-${round} speakers go deeper than round-1 reactors.
+- If you disagree sharply with another specialist's earlier position, you may instead open with "**Council split:**" and state the divergence — only when the disagreement is real, not for flavour.
+- Reference specific points others made (by name).
+- Build on what resonated, challenge what you disagree with.
+- Propose something concrete — a decision, a next step, a framework.
 - **Keep it under 250 words.** Be direct and specific.
 
 Use markdown formatting. Sign off as "${displayName}".
