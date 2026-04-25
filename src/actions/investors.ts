@@ -733,6 +733,21 @@ export async function searchInvestors(
       // caused pgvector "different vector dimensions 1536 and 768" errors that
       // silently dropped the search to keyword fallback.
       const queryEmbedding = await embedQuery(query.trim())
+      // SECURITY/CORRECTNESS: Defensive guard at the RPC boundary. embedQuery
+      // already asserts 1536 dims, but production has fired pgvector "different
+      // vector dimensions 1536 and 768" errors AFTER the assertion landed
+      // (commits 22b1c713 + 94b14d74), implying either a stale Lambda warm
+      // instance or an OpenAI dim-leak the assertion missed. Re-validate here
+      // so the next failure surfaces as a loud, attributable error instead of
+      // a silent fallback to keyword search. THIRD instance of this dim-class
+      // failure per memory (embedding_dim_mismatch_recurring_failure.md).
+      if (queryEmbedding.length !== 1536) {
+        throw new Error(
+          `[searchInvestors] Refused to call match_marketplace_listings_v2 with ` +
+            `${queryEmbedding.length}-dim embedding (column is vector(1536)). ` +
+            `Query: ${query.trim().slice(0, 80)}`,
+        )
+      }
       // DECISION: v2 RPC returns attributes + filters by category at DB level,
       // eliminating the re-fetch + client-side filter pattern.
       // DECISION: threshold=0.0 mirrors the Forge Capital Dashboard behaviour:
@@ -894,8 +909,15 @@ export async function searchInvestors(
 
       return { firms: paginatedFirms, total, hasMore }
     } catch (err) {
-      // FLOW: Semantic search failed — fall through to keyword path below
-      console.error('[searchInvestors] Semantic search failed, falling back to keyword:', err)
+      // FLOW: Semantic search failed — fall through to keyword path below.
+      // INSTRUMENTATION: Log the bound query length so the next dim-mismatch
+      // captures whether the leak was at the embed boundary (caught here as
+      // our pre-RPC assertion) or somewhere downstream we still haven't traced.
+      console.error('[searchInvestors] Semantic search failed, falling back to keyword:', {
+        err,
+        queryLen: query.trim().length,
+        queryPrefix: query.trim().slice(0, 40),
+      })
     }
   }
 
