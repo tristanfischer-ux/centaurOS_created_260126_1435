@@ -135,7 +135,7 @@ export async function GET(request: Request) {
           return NextResponse.redirect(new URL('/login?error=invalid-credentials', requestUrl.origin))
         }
 
-        const { redirectPath } = await setupNewUser({
+        const setupResult = await setupNewUser({
           supabase,
           userId: user.id,
           email: user.email,
@@ -147,11 +147,24 @@ export async function GET(request: Request) {
           referralCode,
         })
 
+        // INTENT: If setup failed, route to the error page so the founder
+        // sees a clear explanation and support options — never a silent blank.
+        if (!setupResult.ok) {
+          console.error('[Auth Callback] setupNewUser failed:', setupResult.reason, setupResult.errorId)
+          const errorUrl = new URL('/auth/setup-error', requestUrl.origin)
+          errorUrl.searchParams.set('reason', setupResult.reason)
+          if (setupResult.errorId) errorUrl.searchParams.set('error_id', setupResult.errorId)
+          const errorResponse = NextResponse.redirect(errorUrl)
+          errorResponse.cookies.set('forge_signup_context', '', { path: '/', maxAge: 0 })
+          errorResponse.cookies.set('forge_ref', '', { path: '/', maxAge: 0 })
+          return errorResponse
+        }
+
         // Honor `next` param for claim flow — user needs to land on /claim/<token>
         // RED-TEAM-PIVOT-PLAN Tier 2 step 17: default landing is /investors,
         // so the "is the next path actually different from the default?" check
         // compares against /investors not /today.
-        const finalRedirect = (next !== '/investors' && next.startsWith('/')) ? next : redirectPath
+        const finalRedirect = (next !== '/investors' && next.startsWith('/')) ? next : setupResult.redirect
 
         // Clear signup cookies
         const response = NextResponse.redirect(new URL(finalRedirect, requestUrl.origin))

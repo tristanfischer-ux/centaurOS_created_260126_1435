@@ -12558,6 +12558,130 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_entries: {
+        Row: {
+          arrival_ms: number | null
+          content: string
+          council_position: string | null
+          created_at: string
+          id: string
+          role: string
+          round_number: number
+          specialist_id: string | null
+          specialist_name: string | null
+          thread_id: string
+        }
+        Insert: {
+          arrival_ms?: number | null
+          content: string
+          council_position?: string | null
+          created_at?: string
+          id?: string
+          role?: string
+          round_number?: number
+          specialist_id?: string | null
+          specialist_name?: string | null
+          thread_id: string
+        }
+        Update: {
+          arrival_ms?: number | null
+          content?: string
+          council_position?: string | null
+          created_at?: string
+          id?: string
+          role?: string
+          round_number?: number
+          specialist_id?: string | null
+          specialist_name?: string | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_entries_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_threads: {
+        Row: {
+          artifact_id: string | null
+          author_user_id: string
+          branched_from_entry_id: string | null
+          citations: Json | null
+          council_tier: string
+          created_at: string
+          foundry_id: string
+          id: string
+          outputs: Json | null
+          parent_thread_id: string | null
+          specialist_ids: string[]
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          artifact_id?: string | null
+          author_user_id: string
+          branched_from_entry_id?: string | null
+          citations?: Json | null
+          council_tier?: string
+          created_at?: string
+          foundry_id: string
+          id?: string
+          outputs?: Json | null
+          parent_thread_id?: string | null
+          specialist_ids?: string[]
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          artifact_id?: string | null
+          author_user_id?: string
+          branched_from_entry_id?: string | null
+          citations?: Json | null
+          council_tier?: string
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          outputs?: Json | null
+          parent_thread_id?: string | null
+          specialist_ids?: string[]
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_threads_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "agent_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_threads_branched_from_entry_id_fkey"
+            columns: ["branched_from_entry_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_threads_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_threads_parent_thread_id_fkey"
+            columns: ["parent_thread_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string | null
@@ -16801,6 +16925,8 @@ export type Database = {
           executive_onboarding_completed: boolean | null
           expertise_areas: string[] | null
           feature_flags: Json
+          forge_ambassador_count: number
+          forge_ambassador_since: string | null
           founding_member_number: number | null
           foundry_id: string
           full_name: string | null
@@ -16849,6 +16975,8 @@ export type Database = {
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
           feature_flags?: Json
+          forge_ambassador_count?: number
+          forge_ambassador_since?: string | null
           founding_member_number?: number | null
           foundry_id: string
           full_name?: string | null
@@ -16897,6 +17025,8 @@ export type Database = {
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
           feature_flags?: Json
+          forge_ambassador_count?: number
+          forge_ambassador_since?: string | null
           founding_member_number?: number | null
           foundry_id?: string
           full_name?: string | null
@@ -20094,6 +20224,33 @@ export type Database = {
             referencedColumns: ["listing_id"]
           },
         ]
+      }
+      signup_setup_errors: {
+        Row: {
+          auth_user_id: string | null
+          id: string
+          occurred_at: string
+          reason: string
+          support_context: Json
+          user_message: string
+        }
+        Insert: {
+          auth_user_id?: string | null
+          id?: string
+          occurred_at?: string
+          reason: string
+          support_context?: Json
+          user_message: string
+        }
+        Update: {
+          auth_user_id?: string | null
+          id?: string
+          occurred_at?: string
+          reason?: string
+          support_context?: Json
+          user_message?: string
+        }
+        Relationships: []
       }
       site_settings: {
         Row: {
@@ -24930,6 +25087,10 @@ export type Database = {
         }[]
       }
       get_active_foundry_id: { Args: { p_user_id: string }; Returns: string }
+      get_active_paid_referral_count: {
+        Args: { p_inviter_user_id: string }
+        Returns: number
+      }
       get_agent_unread_count: { Args: { p_agent_id: string }; Returns: number }
       get_ai_usage_current_month: {
         Args: { p_foundry_id: string }
@@ -26755,6 +26916,10 @@ export type Database = {
       update_company_profile: {
         Args: { p_company_profile: Json; p_foundry_id: string }
         Returns: Json
+      }
+      update_forge_ambassador_status: {
+        Args: { p_inviter_user_id: string }
+        Returns: undefined
       }
       update_foundry_purpose: {
         Args: { p_foundry_id: string; p_purpose_data: Json }

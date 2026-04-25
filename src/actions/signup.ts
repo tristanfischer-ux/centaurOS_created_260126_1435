@@ -276,7 +276,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const referralCode = cookieStore.get('forge_ref')?.value || null;
 
   // 2. Set up profile, foundry, memberships, demo data via shared helper
-  await setupNewUser({
+  const setupResult = await setupNewUser({
     supabase,
     userId,
     email,
@@ -289,6 +289,17 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     businessType,
     referralCode,
   });
+
+  // INTENT: If setup failed, redirect to the error page so the founder
+  // sees a clear explanation + support options instead of a blank screen.
+  // The auth user already exists at this point, so we do NOT delete it —
+  // the founder can retry (setupNewUser is idempotent on profile absence).
+  if (!setupResult.ok) {
+    console.error("[Signup] setupNewUser failed:", setupResult.reason, setupResult.errorId);
+    const errorParams = new URLSearchParams({ reason: setupResult.reason });
+    if (setupResult.errorId) errorParams.set("error_id", setupResult.errorId);
+    redirect(`/auth/setup-error?${errorParams.toString()}`);
+  }
 
   // 3. Store booking intent if present
   if (intent && listingId) {

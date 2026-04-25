@@ -5,6 +5,11 @@
  * post-signup user provisioning: foundry creation, profile, memberships,
  * demo data seeding, and marketplace listing creation.
  *
+ * Tests cover the SetupResult discriminated union:
+ *   ok: true  — happy path + idempotency
+ *   ok: false — foundry_creation_failed, foundry_slug_collision, rls_denied,
+ *               profile_creation_failed, unknown
+ *
  * @security Verifies that executives get isolated sandbox foundries
  * (not the shared forge-guild), and that founders/suppliers follow
  * their respective paths.
@@ -13,7 +18,7 @@
 import { setupNewUser, capitalizeRole } from '../setup-new-user'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Suppress expected console warnings from non-fatal error paths
+// Suppress expected console warnings / errors from non-fatal error paths
 let consoleWarnSpy: jest.SpyInstance
 let consoleErrorSpy: jest.SpyInstance
 beforeAll(() => {
@@ -24,6 +29,16 @@ afterAll(() => {
   consoleWarnSpy.mockRestore()
   consoleErrorSpy.mockRestore()
 })
+
+// ─── Mock the admin client used by persistSetupError ────────────────────────
+// persistSetupError imports createAdminClient — mock it so tests don't hit Supabase
+jest.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: () => ({
+      insert: jest.fn().mockResolvedValue({ error: null }),
+    }),
+  }),
+}))
 
 // ─── Mock Supabase ──────────────────────────────────────────────
 
@@ -164,8 +179,68 @@ describe('setupNewUser', () => {
     })
   })
 
-  it('returns early if profile already exists (idempotency)', async () => {
-    // Profile already exists
+  // ─── Happy path ─────────────────────────────────────────────────────────────
+
+  it('happy path: new executive → ok: true, redirect: /welcome, isNewUser: true', async () => {
+    mock.from.mockImplementation((table: string) => {
+      const chain = createMockChain()
+
+      if (table === 'profiles') {
+        chain.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+        chain.insert.mockResolvedValue({ error: null })
+      }
+
+      if (table === 'foundries') {
+        chain.single.mockResolvedValue({ data: { id: 'forge-guild' }, error: null })
+        chain.insert.mockImplementation((data: unknown) => {
+          const record = data as Record<string, unknown>
+          return {
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: { id: record.id }, error: null }),
+            }),
+          }
+        })
+        chain.update.mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) })
+      }
+
+      if (table === 'foundry_memberships') {
+        chain.upsert.mockResolvedValue({ error: null })
+      }
+
+      if (table === 'provider_profiles') {
+        chain.insert.mockResolvedValue({ error: null })
+      }
+
+      if (table === 'marketplace_listings') {
+        chain.insert.mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({ data: { id: 'listing-123' }, error: null }),
+          }),
+        })
+      }
+
+      return chain
+    })
+
+    mock.rpc.mockResolvedValue({ data: null, error: null })
+
+    const result = await setupNewUser({
+      supabase: mock.client,
+      userId: TEST_USER_ID,
+      email: 'exec@example.com',
+      fullName: 'Jane Smith',
+      role: 'executive',
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('expected ok: true')
+    expect(result.redirect).toBe('/welcome')
+    expect(result.isNewUser).toBe(true)
+  })
+
+  // ─── Idempotency ────────────────────────────────────────────────────────────
+
+  it('existing profile: returning user → ok: true, redirect: /investors, isNewUser: false', async () => {
     mock.from.mockImplementation((table: string) => {
       const chain = mock.getChain(table)
       if (table === 'profiles') {
@@ -185,11 +260,14 @@ describe('setupNewUser', () => {
       role: 'executive',
     })
 
-    expect(result.foundryId).toBe('existing-foundry')
-    // RED-TEAM-PIVOT-PLAN Tier 2 step 17: post-signup default landing
-    // is /investors. Idempotency / fallback returns updated to match.
-    expect(result.redirectPath).toBe('/investors')
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('expected ok: true')
+    // RED-TEAM-PIVOT-PLAN Tier 2 step 17: post-signup default landing is /investors.
+    expect(result.redirect).toBe('/investors')
+    expect(result.isNewUser).toBe(false)
   })
+
+  // ─── Sandbox foundry for executives ─────────────────────────────────────────
 
   it('creates sandbox foundry for executives (not forge-guild)', async () => {
     const insertedData: Record<string, unknown>[] = []
@@ -256,7 +334,6 @@ describe('setupNewUser', () => {
       return chain
     })
 
-    // RPC calls succeed
     mock.rpc.mockResolvedValue({ data: null, error: null })
 
     const result = await setupNewUser({
@@ -267,19 +344,18 @@ describe('setupNewUser', () => {
       role: 'executive',
     })
 
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('expected ok: true')
     // Should NOT be forge-guild
-    expect(result.foundryId).not.toBe('forge-guild')
-    expect(result.foundryId).toBe(`sandbox-${TEST_USER_ID.slice(0, 8)}`)
-    // DECISION 2026-04-17: every brand-new user lands on /welcome for the guided tour
-    // before /today. See setup-new-user.ts return statement comment.
-    expect(result.redirectPath).toBe('/welcome')
-
-    // Verify sandbox foundry was created with is_sandbox: true
     const foundryInsert = insertedData.find(d => d.table === 'foundries' && (d.id as string)?.startsWith('sandbox-'))
     expect(foundryInsert).toBeDefined()
     expect(foundryInsert?.is_sandbox).toBe(true)
     expect(foundryInsert?.name).toBe("Jane's Company")
+    // DECISION 2026-04-17: every brand-new user lands on /welcome for the guided tour
+    expect(result.redirect).toBe('/welcome')
   })
+
+  // ─── Marketplace listing for executives ─────────────────────────────────────
 
   it('creates marketplace listing for executives without function_category', async () => {
     const insertedData: Record<string, unknown>[] = []
@@ -347,10 +423,9 @@ describe('setupNewUser', () => {
     expect(attrs?.profile_id).toBe(TEST_USER_ID)
   })
 
-  // Post founder-first architecture (2026-04-16): supplier role still assigns to
-  // forge-suppliers foundry, but the redirectPath is now /today for everyone.
-  // Supplier becomes an opt-in flag on the founder side (Phase 2).
-  it('assigns suppliers to forge-suppliers and redirects to /today', async () => {
+  // ─── Supplier ───────────────────────────────────────────────────────────────
+
+  it('assigns suppliers to forge-suppliers and redirects to /welcome', async () => {
     mock.from.mockImplementation((table: string) => {
       const chain = createMockChain()
 
@@ -378,8 +453,147 @@ describe('setupNewUser', () => {
       role: 'supplier',
     })
 
-    expect(result.foundryId).toBe('forge-suppliers')
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('expected ok: true')
     // DECISION 2026-04-17: brand-new users land on /welcome (see setup-new-user.ts).
-    expect(result.redirectPath).toBe('/welcome')
+    expect(result.redirect).toBe('/welcome')
+  })
+
+  // ─── Error paths (ok: false) ─────────────────────────────────────────────────
+
+  describe('error paths', () => {
+    /**
+     * Helper: wire up a mock that makes foundry creation fail with the given error
+     * (both the first attempt and the retry).
+     */
+    function mockWithFoundryError(error: { code?: string; message: string }) {
+      mock.from.mockImplementation((table: string) => {
+        const chain = createMockChain()
+
+        if (table === 'profiles') {
+          // Idempotency check: no existing profile
+          chain.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+        }
+
+        if (table === 'foundries') {
+          // Shared foundry check: exists
+          chain.single.mockResolvedValue({ data: { id: 'forge-guild' }, error: null })
+          // Both insert attempts fail
+          chain.insert.mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: null, error }),
+            }),
+          })
+        }
+
+        return chain
+      })
+    }
+
+    it('RLS denial on foundry creation → ok: false, reason: rls_denied', async () => {
+      mockWithFoundryError({ code: '42501', message: 'permission denied for table foundries' })
+
+      const result = await setupNewUser({
+        supabase: mock.client,
+        userId: TEST_USER_ID,
+        email: 'founder@example.com',
+        fullName: 'Blocked Founder',
+        role: 'founder',
+        companyName: 'Blocked Corp',
+      })
+
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('expected ok: false')
+      expect(result.reason).toBe('rls_denied')
+      expect(result.userMessage).toContain('tristan.fischer@gmail.com')
+      expect(result.errorId).toBeTruthy()
+    })
+
+    it('slug collision after 2 attempts → ok: false, reason: foundry_slug_collision', async () => {
+      mockWithFoundryError({ code: '23505', message: 'duplicate key value violates unique constraint' })
+
+      const result = await setupNewUser({
+        supabase: mock.client,
+        userId: TEST_USER_ID,
+        email: 'founder@example.com',
+        fullName: 'Slug Collider',
+        role: 'founder',
+        companyName: 'Widget Corp',
+      })
+
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('expected ok: false')
+      expect(result.reason).toBe('foundry_slug_collision')
+      expect(result.errorId).toBeTruthy()
+    })
+
+    it('profile creation fails → ok: false, reason: profile_creation_failed', async () => {
+      mock.from.mockImplementation((table: string) => {
+        const chain = createMockChain()
+
+        if (table === 'profiles') {
+          // Idempotency check: no existing profile
+          chain.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+          // Profile insert fails
+          chain.insert.mockResolvedValue({ error: { code: '23502', message: 'not-null violation' } })
+        }
+
+        if (table === 'foundries') {
+          // Shared foundry check: exists
+          chain.single.mockResolvedValue({ data: { id: 'forge-guild' }, error: null })
+          // Foundry insert succeeds
+          chain.insert.mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({
+                data: { id: `sandbox-${TEST_USER_ID.slice(0, 8)}` },
+                error: null,
+              }),
+            }),
+          })
+          // delete for orphan cleanup
+          chain.delete.mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) })
+          chain.update.mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) })
+        }
+
+        return chain
+      })
+
+      // For executive: the profile insert happens after foundry. Use executive so we
+      // hit the non-founder profile branch.
+      const result = await setupNewUser({
+        supabase: mock.client,
+        userId: TEST_USER_ID,
+        email: 'exec@example.com',
+        fullName: 'Failed Profile',
+        role: 'executive',
+      })
+
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('expected ok: false')
+      expect(result.reason).toBe('profile_creation_failed')
+      expect(result.userMessage).toContain('tristan.fischer@gmail.com')
+      expect(result.errorId).toBeTruthy()
+    })
+
+    it('unknown / unexpected foundry error → ok: false, reason: foundry_creation_failed', async () => {
+      mockWithFoundryError({ code: '99999', message: 'unexpected database error' })
+
+      const result = await setupNewUser({
+        supabase: mock.client,
+        userId: TEST_USER_ID,
+        email: 'founder@example.com',
+        fullName: 'Mystery Founder',
+        role: 'founder',
+        companyName: 'Mystery Corp',
+      })
+
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('expected ok: false')
+      expect(result.reason).toBe('foundry_creation_failed')
+      expect(result.errorId).toBeTruthy()
+      // friendly message — no raw error text
+      expect(result.userMessage).toContain('tristan.fischer@gmail.com')
+      expect(result.userMessage).not.toContain('unexpected database error')
+    })
   })
 })
