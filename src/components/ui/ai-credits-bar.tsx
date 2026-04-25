@@ -4,7 +4,7 @@
  * @file ai-credits-bar.tsx
  *
  * @description Compact account pill for the sidebar footer. Shows tier name
- * and a mini AI tasks progress bar. Click opens a popover with full detail:
+ * and a mini specialist tasks progress bar. Click opens a popover with full detail:
  * usage stats, upgrade link, and referral invite.
  */
 
@@ -94,7 +94,7 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free',
       <PopoverTrigger asChild>
         <button
           className={`w-full text-left px-2 py-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer ${isNearLimit ? 'border border-warning/40 bg-warning/5' : ''}`}
-          aria-label={`${tierName}: ${currentUsage} of ${limit} AI tasks used${bonusCredits > 0 ? `, ${bonusCredits} bonus` : ''}`}
+          aria-label={`${tierName}: ${currentUsage} of ${limit} specialist tasks used${bonusCredits > 0 ? `, ${bonusCredits} bonus` : ''}`}
         >
           {/* Row 1: Tier + usage count */}
           <div className="flex items-center justify-between mb-1">
@@ -118,7 +118,7 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free',
           </div>
           {isExhausted && (
             <p className="text-[9px] text-destructive mt-1 font-medium">
-              Out of AI tasks — click for options
+              Out of specialist tasks — click for options
             </p>
           )}
         </button>
@@ -206,7 +206,7 @@ function AccountPopoverContent({
       {/* Usage detail */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-muted-foreground">AI Tasks</span>
+          <span className="text-xs text-muted-foreground">Specialist Tasks</span>
           <span className="text-xs font-semibold text-foreground">
             {currentUsage}/{limit}
             {bonusCredits > 0 && (
@@ -231,14 +231,14 @@ function AccountPopoverContent({
           <div className="flex items-center gap-2">
             <Gift className="h-4 w-4 text-international-orange" />
             <h4 className="text-sm font-semibold text-foreground">
-              {isExhausted ? 'Get more AI tasks' : 'Invite a friend'}
+              {isExhausted ? 'Get more specialist tasks' : 'Invite a friend'}
             </h4>
           </div>
 
           <p className="text-xs text-muted-foreground">
             {isExhausted
-              ? 'You\'ve used all your AI tasks this month. Invite a friend and you both get 10 more.'
-              : 'Share your link — you both get +10 AI tasks.'}
+              ? 'You\'ve used all your specialist tasks this month. Invite a friend and you both get 10 more.'
+              : 'Share your link — you both get +10 specialist tasks.'}
           </p>
 
           <div className="flex gap-2">

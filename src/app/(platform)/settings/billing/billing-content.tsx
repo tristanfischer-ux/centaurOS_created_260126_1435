@@ -335,7 +335,7 @@ export function BillingContent({
               <p className="text-2xl font-semibold text-foreground">
                 {aiUsage.totalAiTasks}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">AI Tasks</p>
+              <p className="text-xs text-muted-foreground mt-1">Specialist Tasks</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <p className="text-2xl font-semibold text-foreground">
