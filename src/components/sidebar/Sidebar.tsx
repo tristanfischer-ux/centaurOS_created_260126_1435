@@ -315,7 +315,7 @@ export function Sidebar({
                         className="h-[7px] w-[7px] rounded-full bg-international-orange shadow-[0_0_8px_rgba(255,69,0,0.6)] animate-pulse"
                         aria-hidden="true"
                     />
-                    ForgeOS
+                    Fractional Forge
                 </Link>
                 <div className="ml-auto flex items-center gap-0.5">
                     <Tooltip delayDuration={200}>

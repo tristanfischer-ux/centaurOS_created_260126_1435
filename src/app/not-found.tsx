@@ -35,7 +35,7 @@ export default function NotFound() {
               <Button asChild>
                 <Link href="/">
                   <Home className="h-4 w-4 mr-2" />
-                  Back to ForgeOS
+                  Back to Fractional Forge
                 </Link>
               </Button>
               <Button variant="secondary" asChild>

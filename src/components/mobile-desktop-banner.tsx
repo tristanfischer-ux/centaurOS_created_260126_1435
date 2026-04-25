@@ -55,7 +55,7 @@ export function MobileDesktopBanner() {
     <div className="sm:hidden flex items-center gap-3 px-4 py-3 mb-4 rounded-lg bg-muted border text-foreground">
       <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
       <p className="text-xs leading-relaxed flex-1">
-        ForgeOS works best on desktop. Some features are limited on mobile.
+        Fractional Forge works best on desktop. Some features are limited on mobile.
       </p>
       <button
         type="button"

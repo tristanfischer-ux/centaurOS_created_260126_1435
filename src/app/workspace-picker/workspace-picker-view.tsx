@@ -51,7 +51,7 @@ export function WorkspacePickerView({ foundries }: { foundries: Foundry[] }) {
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-2 mb-4">
             <span className="font-display text-2xl font-bold tracking-[0.05em] text-foreground">
-              ForgeOS
+              Fractional Forge
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse shadow-[0_0_8px_rgba(255,69,0,0.6)]" />
           </div>

@@ -20,7 +20,7 @@ import type { Metadata } from "next";
 import SetupErrorContent from "./setup-error-content";
 
 export const metadata: Metadata = {
-  title: "Account Setup Issue — ForgeOS",
+  title: "Account Setup Issue — Fractional Forge",
   robots: { index: false, follow: false },
 };
 

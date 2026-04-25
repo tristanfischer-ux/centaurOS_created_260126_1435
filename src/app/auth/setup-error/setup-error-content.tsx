@@ -42,9 +42,9 @@ export default function SetupErrorContent() {
       ? decodeURIComponent(customMessage)
       : REASON_MESSAGES[reason] ?? REASON_MESSAGES.unknown;
 
-  const emailSubject = encodeURIComponent("ForgeOS account setup issue");
+  const emailSubject = encodeURIComponent("Fractional Forge account setup issue");
   const emailBody = encodeURIComponent(
-    `Hi Tristan,\n\nI ran into an issue setting up my account on ForgeOS.\n\nError code: ${errorId || "unknown"}\n\nPlease let me know how to get this sorted.\n\nThanks`
+    `Hi Tristan,\n\nI ran into an issue setting up my account on Fractional Forge.\n\nError code: ${errorId || "unknown"}\n\nPlease let me know how to get this sorted.\n\nThanks`
   );
   const mailtoHref = `mailto:${SUPPORT_EMAIL}?subject=${emailSubject}&body=${emailBody}`;
 

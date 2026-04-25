@@ -35,7 +35,7 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
     title: "Welcome, Founder.",
     subtitle: "Your command center is being prepared.",
     description:
-      "Check your email to verify your account. Once verified, you'll have immediate access to ForgeOS.",
+      "Check your email to verify your account. Once verified, you'll have immediate access to Fractional Forge.",
     nextStep: "Verify your email → Access your dashboard → Start building",
     ctaText: "Go to Login",
     ctaLink: "/login",
