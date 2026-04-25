@@ -2,6 +2,7 @@
 
 > **System architecture reference:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for a comprehensive overview of how ForgeOS works — tech stack, 13 AI specialists, CAD lab, marketplace, data flows, security model, and database schema.
 > **Lessons learned:** See [tasks/lessons.md](./tasks/lessons.md) — read at session start, update after every correction.
+> **Sub-agent + non-Anthropic model selection:** See `~/.claude/CLAUDE.md` "Sub-Agent Model Selection — Auto-Toggle Rule" + "When to use ask_alt_llm" sections. Auto-loads in every session — DON'T duplicate the rule here. The "Live Specialist→Model Mapping" section below is the project-specific overlay (which Anthropic + non-Anthropic models map to which of the 13 ForgeOS specialists). When working on this project: **(a)** sub-agents auto-toggle Haiku/Sonnet/Opus per task class per the global rule, **(b)** use the `ask_alt_llm` MCP tool for any prose >500 tokens (default: `deepseek/deepseek-v4-pro`), **(c)** for specialist-personality work, the per-specialist model in the Live Mapping section is the source of truth — re-grep `src/lib/agents/specialists-config.ts` if uncertain.
 
 ---
 
