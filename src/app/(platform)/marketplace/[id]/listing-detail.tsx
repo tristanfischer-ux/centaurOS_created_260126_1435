@@ -45,6 +45,7 @@ import {
     Globe,
     Mail,
     Send,
+    ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
 import { QuoteRequestDialog } from "@/components/marketplace/quote-request-dialog"
@@ -112,6 +113,14 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
 
     return (
         <div className="space-y-4">
+            {/* Breadcrumb — Forge Capital pattern: Home › Suppliers › <name> */}
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Link href="/today" className="hover:text-foreground transition-colors">Home</Link>
+                <ChevronRight className="h-3 w-3" />
+                <Link href="/marketplace" className="hover:text-foreground transition-colors">Suppliers</Link>
+                <ChevronRight className="h-3 w-3" />
+                <span className="text-foreground font-medium truncate max-w-[280px]">{listing.title}</span>
+            </nav>
             {/* Header - Matches Strategic Objectives style exactly */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-border">
                 <div className="min-w-0 flex-1">
