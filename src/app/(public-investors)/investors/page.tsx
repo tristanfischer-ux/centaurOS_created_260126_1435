@@ -10,7 +10,7 @@
  */
 
 import type { Metadata } from 'next'
-import { searchInvestors, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser, getInvestorDirectoryStats } from '@/actions/investors'
+import { searchInvestors, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser, getInvestorDirectoryStats, type FirmMatchResult } from '@/actions/investors'
 import type { InvestorDirectoryStats } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
 import { InvestorDeckSearchClient } from './components/InvestorDeckSearchClient'
@@ -56,7 +56,7 @@ export default async function InvestorDirectoryPage() {
   const initialTotal = 0
   const initialMatchOutputs: SearchOutputs = {}
   let resolvedTier: SearchTier = 'free'
-  const matchScores: Record<string, number> = {}
+  const matchScores: Record<string, FirmMatchResult> = {}
   let shortlistIds: Record<string, import('@/actions/investors').ShortlistStage> = {}
   let access: import('@/actions/investors').InvestorTierAccess = {
     tier: 'free',

@@ -9,10 +9,9 @@
  *
  * @mockup FORGEOS-INVESTORS-PAGE-MOCKUP.html (2026-04-24)
  *
- * Score breakdown pillars (Thesis / Stage / Geo / Cheque / Active / Confidence):
- * These are computed server-side by calculateMatchScore() but computeMatchScores()
- * only returns the composite total. Per-dimension scores will be wired in a future
- * round. Cards currently show the overall Fit score only.
+ * Score breakdown pillars (Thesis / Stage / Geo / Cheque / Activity / Confidence):
+ * computeMatchScores() now returns { score, pillars } per firm. Each match card
+ * renders all 6 pillar bars via MatchPillarBars below the thesis paragraph.
  */
 
 'use client'
@@ -21,6 +20,7 @@ import { useState, useCallback, useTransition, useRef } from 'react'
 import { toast } from 'sonner'
 import {
   searchInvestors,
+  computeMatchScores,
   enrichInvestorMatchOnDemand,
   addToShortlist,
   removeFromShortlist,
@@ -29,9 +29,11 @@ import {
   type InvestorTierAccess,
   type InvestorMatchOutputView,
   type InvestorViewCapResult,
+  type FirmMatchResult,
 } from '@/actions/investors'
 import { Loader2 } from 'lucide-react'
 import { InvestorStatsCharts } from './InvestorStatsCharts'
+import { MatchPillarBars } from '@/app/(platform)/investors/components/MatchPillarBars'
 import type { InvestorDirectoryStats } from '@/actions/investors'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ interface ExtractedProfile {
 interface Props {
   initialFirms: InvestorFirm[]
   initialTotal: number
-  initialMatchScores: Record<string, number>
+  initialMatchScores: Record<string, FirmMatchResult>
   initialShortlistIds: Record<string, ShortlistStage>
   initialMatchOutputs: Record<string, InvestorMatchOutputView>
   resolvedTier: ResolvedTier
@@ -149,7 +151,7 @@ export function InvestorDeckSearchClient({
   const [query, setQuery] = useState('')
   const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
   const [total, setTotal] = useState(initialTotal)
-  const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores)
+  const [matchScores, setMatchScores] = useState<Record<string, FirmMatchResult>>(initialMatchScores)
   const [matchOutputs, setMatchOutputs] = useState<Record<string, InvestorMatchOutputView>>(initialMatchOutputs)
   const [shortlistIds, setShortlistIds] = useState<Record<string, ShortlistStage>>(initialShortlistIds)
   const [tier, setTier] = useState<ResolvedTier>(resolvedTier)
@@ -193,6 +195,14 @@ export function InvestorDeckSearchClient({
         setExtractedProfile(extractProfile(trimmed, result.firms))
         if (result.firms.length === 0) {
           toast.info('No matching investors found. Try a broader description.')
+        }
+        // Fire-and-forget: score all returned firms and store { score, pillars }
+        // so each card can render the 6-pillar breakdown.
+        if (result.firms.length > 0) {
+          const ids = result.firms.map(f => f.id)
+          computeMatchScores(ids)
+            .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+            .catch(() => { /* non-critical — cards show without bars */ })
         }
       } catch (err) {
         console.error('[InvestorDeckSearchClient] search failed:', err)
@@ -310,7 +320,8 @@ export function InvestorDeckSearchClient({
         <MatchCard
           key={firm.id}
           firm={firm}
-          matchScore={matchScores[firm.id]}
+          matchScore={matchScores[firm.id]?.score}
+          pillars={matchScores[firm.id]?.pillars}
           matchOutput={matchOutputs[firm.id]}
           isSaved={!!shortlistIds[firm.id]}
           onSave={() => handleSave(firm)}
@@ -330,7 +341,8 @@ export function InvestorDeckSearchClient({
         <MatchCard
           key={firm.id}
           firm={firm}
-          matchScore={matchScores[firm.id]}
+          matchScore={matchScores[firm.id]?.score}
+          pillars={matchScores[firm.id]?.pillars}
           matchOutput={undefined}
           isSaved={false}
           onSave={undefined}
@@ -595,6 +607,8 @@ function FilterChip({ children, active }: { children: React.ReactNode; active?: 
 interface MatchCardProps {
   firm: InvestorFirm
   matchScore?: number
+  /** 6-pillar breakdown from calculateMatchScore — drives MatchPillarBars. */
+  pillars?: FirmMatchResult['pillars']
   matchOutput?: InvestorMatchOutputView
   isSaved: boolean
   onSave?: () => void
@@ -606,6 +620,7 @@ interface MatchCardProps {
 function MatchCard({
   firm,
   matchScore,
+  pillars,
   matchOutput,
   isSaved,
   onSave,
@@ -686,10 +701,10 @@ function MatchCard({
           {sectors.slice(0, 2).map(s => (
             <PillarChip key={s} label="" value={s} isText />
           ))}
-          {/* Honest note: per-dimension scores not yet wired */}
-          <span className="text-[10px] text-muted-foreground/60 self-center italic">
-            per-dimension scoring shipping next round
-          </span>
+          {/* 6-pillar breakdown bars — wired from calculateMatchScore */}
+          {pillars && !isLocked && (
+            <MatchPillarBars pillars={pillars} compact className="w-full mt-1" />
+          )}
         </div>
 
         {/* Why-fit / how-to-pitch expand panel (paid only) */}

@@ -22,7 +22,7 @@ import { getUserSubscription } from '@/lib/billing/subscriptions'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
-import type { FoundryProfile } from '@/lib/investor-match'
+import type { FoundryProfile, MatchBreakdown } from '@/lib/investor-match'
 import { embedQuery } from '@/lib/embeddings'
 import { normaliseFirmTypeLabel } from '@/lib/investors/firm-type-labels'
 import { checkRateLimit } from '@/lib/security/rate-limit'
@@ -1958,14 +1958,24 @@ async function getFoundryProfile(): Promise<FoundryProfile | null> {
 }
 
 /**
+ * Per-firm match result returned by computeMatchScores.
+ * Exposes both the composite score and the 6-pillar breakdown so the UI can
+ * render MatchPillarBars without a second round-trip.
+ */
+export interface FirmMatchResult {
+  score: number
+  pillars: MatchBreakdown['pillars']
+}
+
+/**
  * Computes match scores for a set of investor firms against the current user's profile.
  *
  * @param firmIds - Array of listing IDs to score. Max 200 per call.
- * @returns Record mapping listing ID to 0–100 match score.
+ * @returns Record mapping listing ID to { score, pillars }.
  */
 export async function computeMatchScores(
   firmIds: string[]
-): Promise<Record<string, number>> {
+): Promise<Record<string, FirmMatchResult>> {
   const profile = await getFoundryProfile()
   if (!profile) return {}
 
@@ -1982,11 +1992,11 @@ export async function computeMatchScores(
 
   if (error || !data) return {}
 
-  const result: Record<string, number> = {}
+  const result: Record<string, FirmMatchResult> = {}
   for (const row of data) {
     const firm = rowToFirm(row as Record<string, unknown>)
     const breakdown = calculateMatchScore(firm, profile)
-    result[firm.id] = breakdown.total
+    result[firm.id] = { score: breakdown.total, pillars: breakdown.pillars }
   }
   return result
 }
