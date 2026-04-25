@@ -328,7 +328,15 @@ async function runMaxDecompositionInternal(
         try {
             // 5. Skeleton decomposition — fast, single Claude call, produces
             //    id/name/purpose/inputs/outputs for every module.
-            const modelId = (project.model_id || "claude-opus-4-7") as Parameters<
+            //
+            // COST TRIAL (2026-04-25): default to claude-sonnet-4-6 for Max
+            // decomposition. Skeleton + per-module expansion are STRUCTURED
+            // JSON outputs with a known schema — model voice doesn't matter,
+            // just shape correctness. Sonnet is ~5× cheaper than Opus
+            // ($3/M-in vs $15/M-in). Per-run drop ≈ £15. The autopilot still
+            // honours an explicit `project.model_id` set by the founder, so
+            // anyone who wants Opus (or Haiku) can still pin it.
+            const modelId = (project.model_id || "claude-sonnet-4-6") as Parameters<
                 typeof skeletonDecompose
             >[2]
             const skeletonResult = await skeletonDecompose(

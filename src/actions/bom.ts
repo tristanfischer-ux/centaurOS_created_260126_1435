@@ -60,7 +60,15 @@ import { withLlmPermit } from "@/lib/ai/llm-permit"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const BOM_MODEL = "claude-opus-4-7"
+// COST TRIAL (2026-04-25): swap from claude-opus-4-7 to claude-haiku-4-5.
+// BOM generation is structured JSON extraction — pulls part rows out of
+// a module spec into a known schema. Voice / reasoning depth is not the
+// signal here; shape correctness is. Haiku is ~20× cheaper than Opus
+// ($0.80/M-in vs $15/M-in). Per-run drop ≈ £6. Watch for: Haiku may
+// produce thinner descriptions or miss some edge-case parts; if quality
+// regresses on the next demo run we step back up to Sonnet (~5× cheaper
+// than Opus, still 4× cheaper than Sonnet's predecessor).
+const BOM_MODEL = "claude-haiku-4-5-20251001"
 const BOM_MAX_TOKENS = 8192
 /** Max depth for BOM tree recursion to prevent infinite loops from cyclic data */
 const MAX_BOM_DEPTH = 20
