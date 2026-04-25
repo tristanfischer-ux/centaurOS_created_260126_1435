@@ -111,7 +111,7 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                         icon={CalendarDays}
                         label="Today"
                         description="What's on your plate — tasks, risks, wins, and the calendar for the day — in one morning brief."
-                        href="/today"
+                        href="/investors"
                         ctaLabel="Open Today"
                     />
                     <SectionTile

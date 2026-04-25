@@ -253,7 +253,7 @@ function NotInFoundry(): React.ReactElement {
                 pending invite to start tracking investors.
             </p>
             <Link
-                href="/today"
+                href="/investors"
                 style={{
                     display: "inline-block",
                     marginTop: 18,

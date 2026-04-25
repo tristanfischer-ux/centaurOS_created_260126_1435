@@ -112,7 +112,9 @@ export default async function InvestorDirectoryPage() {
   }
 
   const [searchResult, statsResult, shortlistResult, accessResult, viewCapResult, earlyAccessResult] = await Promise.allSettled([
-    searchInvestors({ page: 1, pageSize: 24 }),
+    // PERF: skipMatchEnrichment=true so the page renders in <3s. Cards load
+    // why-fit on click via enrichInvestorMatchOnDemand (per-card lazy fetch).
+    searchInvestors({ page: 1, pageSize: 24, skipMatchEnrichment: true }),
     getInvestorStats(),
     getShortlistIds(),
     getInvestorTierAccess(),

@@ -81,10 +81,6 @@ interface ScreenContextValue {
 
 /** Maps route patterns to human-readable page titles and summaries */
 const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
-  "/today": {
-    title: "Today (Daily Briefing)",
-    summary: "The user is viewing their daily briefing — focus tasks, blockers, pending approvals, and team activity.",
-  },
   "/strategy": {
     title: "Strategy Dashboard",
     summary: "The user is viewing the company strategy — strategic pillars, health indicators, and progress across the organization.",

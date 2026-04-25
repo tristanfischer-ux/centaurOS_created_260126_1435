@@ -38,7 +38,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 
-import { welcomeNavItem, todayNavItem, meNavigation } from "@/components/sidebar/data/me"
+import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
 import { planNavigation } from "@/components/sidebar/data/plan"
 import { moneyLegacyNavigation } from "@/components/sidebar/data/money"
@@ -241,7 +241,6 @@ export function Sidebar({
     // RSC payload is in the client cache before the click fires.
     React.useEffect(() => {
         const topRoutes = [
-            "/today",
             "/new-tasks",
             "/new-objectives",
             "/team",
@@ -310,7 +309,7 @@ export function Sidebar({
             {/* ─── Brand row ─────────────────────────────────── */}
             <div className="px-3 pt-4 pb-1 flex items-center gap-2">
                 <Link
-                    href="/today"
+                    href="/investors"
                     className="group flex items-center gap-2 font-display text-[15px] font-bold tracking-tight text-foreground hover:text-international-orange transition-colors"
                 >
                     <span
@@ -365,7 +364,6 @@ export function Sidebar({
                 <Collapsible open={openSections.me}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
                         <NavLink item={welcomeNavItem} pathname={pathname} />
-                        <NavLink item={todayNavItem} pathname={pathname} />
                         {meNavigation.map((item) => (
                             <NavLink
                                 key={item.name}

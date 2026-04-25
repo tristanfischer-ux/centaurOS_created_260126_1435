@@ -119,7 +119,7 @@ export default async function OnboardingFoundryPage(): Promise<React.ReactNode> 
     // Users can still revisit Settings to edit names; this route is the
     // first-time-setup surface.
     if (hasCompletedStep && alreadyRealFoundry) {
-        redirect("/today")
+        redirect("/investors")
     }
 
     const firstName = profile?.full_name?.split(" ")[0] || undefined

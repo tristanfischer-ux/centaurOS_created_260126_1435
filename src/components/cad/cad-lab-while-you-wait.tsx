@@ -298,7 +298,7 @@ export function CadLabWhileYouWait({
       title: "Check today's tasks",
       description: "You'll be notified when generation completes. Use this time to review your task list, clear blockers, or respond to messages.",
       action: (
-        <Link href="/today">
+        <Link href="/investors">
           <Button variant="outline" size="sm" className="h-8 text-xs">
             Go to Today
             <ArrowRight className="h-3 w-3 ml-1" />

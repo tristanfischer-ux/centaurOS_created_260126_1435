@@ -169,7 +169,7 @@ export function OnboardingFoundryView({
             // DECISION: Onboarding step 3 (first product) doesn't exist yet, so we
             // land back on /today until the next page ships. Sidebar still shows
             // the onboarding progress stamp.
-            router.push("/today")
+            router.push("/investors")
             router.refresh()
         })
     }
@@ -179,7 +179,7 @@ export function OnboardingFoundryView({
         <div className="ofn2">
             {/* Skip link top right */}
             <div className="ofn2-skip">
-                <Link href="/today">Skip setup →</Link>
+                <Link href="/investors">Skip setup →</Link>
             </div>
 
             <div className="ofn2-wrap">

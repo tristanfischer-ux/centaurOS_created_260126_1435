@@ -38,7 +38,7 @@ export function CockpitTourView({ firstName }: CockpitTourViewProps): React.Reac
     const handleStart = (): void => {
         startTransition(async () => {
             await markCockpitTourComplete()
-            router.push("/today")
+            router.push("/investors")
         })
     }
 
@@ -48,7 +48,7 @@ export function CockpitTourView({ firstName }: CockpitTourViewProps): React.Reac
         <div className="oct2">
             {/* Close-tour link, top-right */}
             <div className="oct2-skip">
-                <Link href="/today" className="oct2-skip-link">
+                <Link href="/investors" className="oct2-skip-link">
                     Close tour →
                 </Link>
             </div>

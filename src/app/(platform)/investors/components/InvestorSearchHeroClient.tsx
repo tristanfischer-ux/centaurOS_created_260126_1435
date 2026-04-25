@@ -27,6 +27,7 @@ import { InvestorMatchInsightCard } from './InvestorMatchInsightCard'
 import { LimitReachedUpsell, ApproachingLimitBanner } from './LimitReachedUpsell'
 import {
   searchInvestors,
+  enrichInvestorMatchOnDemand,
   addToShortlist,
   removeFromShortlist,
   type InvestorFirm,
@@ -124,11 +125,13 @@ export function InvestorSearchHeroClient({
     setHasSearched(true)
     startTransition(async () => {
       try {
+        // PERF: skip server-side LLM enrichment — cards load why-fit on click.
         const result = await searchInvestors({
           query: trimmed,
           sortBy: 'name',
           page: 1,
           pageSize: 50,
+          skipMatchEnrichment: true,
         })
         setFirms(result.firms)
         setMatchOutputs(result.matchOutputs ?? {})
@@ -235,6 +238,23 @@ export function InvestorSearchHeroClient({
     }
   }, [shortlistIds])
 
+  // Per-card on-demand enrichment. Called when the founder clicks "Reveal
+  // why-fit" on a card that has no matchOutput yet. Updates the matchOutputs
+  // map for that card only — no re-render of the full list.
+  const handleRevealWhyFit = useCallback(async (firmId: string) => {
+    if (matchOutputs[firmId]) return // already enriched — idempotent guard
+    try {
+      const output = await enrichInvestorMatchOnDemand(firmId)
+      if (output) {
+        setMatchOutputs((prev) => ({ ...prev, [firmId]: output }))
+      } else {
+        toast.error('Could not load the insight — please try again.')
+      }
+    } catch {
+      toast.error('Could not load the insight — please try again.')
+    }
+  }, [matchOutputs])
+
   const showInsightCards = firms.length > 0 && (hasSearched || initialFirms.length > 0)
   const isPaid = PAID_TIERS.has(tier)
   const isAnonymous = tier === 'anonymous'
@@ -334,6 +354,7 @@ export function InvestorSearchHeroClient({
                 mode={mode}
                 onSave={() => handleSave(firm)}
                 isSaved={!!shortlistIds[firm.id]}
+                onRevealWhyFit={mode === 'full' ? () => handleRevealWhyFit(firm.id) : undefined}
               />
             )
           })}

@@ -59,7 +59,7 @@ export default async function OnboardProductPage(): Promise<React.ReactNode> {
         .eq("foundry_id", foundryId)
 
     if ((count ?? 0) > 0) {
-        redirect("/today")
+        redirect("/investors")
     }
 
     return <OnboardProductView />

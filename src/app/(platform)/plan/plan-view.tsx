@@ -274,7 +274,7 @@ export function PlanView(props: PlanViewProps): React.ReactElement {
     <div className="plan2">
       {/* ── 1. Breadcrumb ─────────────────────────────────────────── */}
       <div className="crumbs">
-        <Link href="/today">Brainstorming</Link>
+        <Link href="/investors">Brainstorming</Link>
         <span className="sep">›</span>
         <span className="current">Plan</span>
       </div>

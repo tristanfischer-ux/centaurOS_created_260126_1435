@@ -45,7 +45,7 @@ export default async function LoginPage({
 
         // DECISION 2026-04-16: founder-first architecture. Everyone lands on /today.
         // Supplier / fractional-executive are opt-in flags, not routing paths.
-        redirect('/today')
+        redirect('/investors')
     }
 
     return (

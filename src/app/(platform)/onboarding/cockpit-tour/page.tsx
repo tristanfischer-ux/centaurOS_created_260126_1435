@@ -53,7 +53,7 @@ export default async function CockpitTourPage(): Promise<React.ReactNode> {
     // straight to Today. Keeps repeat logins unburdened.
     const onboarding = (profile?.onboarding_data as Record<string, unknown> | null) ?? {}
     if (onboarding.has_completed_tour === true) {
-        redirect("/today")
+        redirect("/investors")
     }
 
     const firstName = profile?.full_name?.split(" ")[0] || undefined

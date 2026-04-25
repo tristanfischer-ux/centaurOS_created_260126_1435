@@ -47,16 +47,16 @@ export function GmailImportView(): React.ReactElement {
                 {/* 1 · Breadcrumb + 2 · Cancel */}
                 <div className="gml2-pagehead">
                     <nav className="gml2-crumbs" aria-label="Breadcrumb">
-                        <Link href="/today">Money</Link>
+                        <Link href="/investors">Money</Link>
                         <span className="gml2-crumb-sep" aria-hidden="true">›</span>
-                        <Link href="/today">Raise</Link>
+                        <Link href="/investors">Raise</Link>
                         <span className="gml2-crumb-sep" aria-hidden="true">›</span>
-                        <Link href="/today">Log touch</Link>
+                        <Link href="/investors">Log touch</Link>
                         <span className="gml2-crumb-sep" aria-hidden="true">›</span>
                         <span className="gml2-crumb-current">Import from Gmail</span>
                     </nav>
                     <div className="gml2-pagehead-actions">
-                        <Link href="/today" className="gml2-btn gml2-btn-sm">
+                        <Link href="/investors" className="gml2-btn gml2-btn-sm">
                             ← Cancel
                         </Link>
                     </div>
@@ -339,7 +339,7 @@ export function GmailImportView(): React.ReactElement {
                         King&rsquo;s record · creates 3 tasks
                     </div>
                     <div className="gml2-footbar-actions">
-                        <Link href="/today" className="gml2-btn">
+                        <Link href="/investors" className="gml2-btn">
                             Cancel
                         </Link>
                         <button

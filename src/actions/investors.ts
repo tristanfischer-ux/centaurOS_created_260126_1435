@@ -2953,3 +2953,58 @@ export async function getContactById(contactId: string): Promise<ContactDetail |
     last_contacted_at: data.last_contacted_at ?? null,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Per-card on-demand enrichment (Phase G lazy-load path)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates (or returns cached) why-fit / how-to-pitch / drafted-email
+ * for a single investor. Called client-side via useTransition when the
+ * founder clicks "Reveal why-fit" on an un-enriched card.
+ *
+ * Returns `null` when the user is not on a paid tier, the investor id is
+ * invalid, or the foundry profile is missing — the card stays in its
+ * un-enriched state and shows an honest fallback.
+ */
+export async function enrichInvestorMatchOnDemand(
+  investorListingId: string
+): Promise<InvestorMatchOutputView | null> {
+  if (!UUID_RE.test(investorListingId)) return null
+
+  const access = await getInvestorTierAccess()
+  if (access.tier === 'free') return null
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .maybeSingle()
+  const foundryId = profile?.foundry_id ?? null
+  if (!foundryId) return null
+
+  try {
+    const { generateInvestorMatchOutput } = await import('@/actions/investors-match-generation')
+    const result = await generateInvestorMatchOutput({
+      foundryId,
+      userId: user.id,
+      investorListingId,
+    })
+    return {
+      whyFit: result.whyFit,
+      howToPitch: result.howToPitch,
+      draftedEmailSubject: result.draftedEmailSubject,
+      draftedEmailBody: result.draftedEmailBody,
+      sourceCitations: result.sourceCitations,
+      fromCache: result.fromCache,
+      modelUsed: result.modelUsed,
+    }
+  } catch (err) {
+    console.error('[enrichInvestorMatchOnDemand] Generation failed:', err)
+    return null
+  }
+}

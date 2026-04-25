@@ -33,7 +33,7 @@ export default async function ProductsPage() {
   if (!user) redirect('/login')
 
   const foundryId = await getFoundryIdCached()
-  if (!foundryId) redirect('/today')
+  if (!foundryId) redirect('/investors')
 
   const result = await getProducts()
   const products = result.data ?? []

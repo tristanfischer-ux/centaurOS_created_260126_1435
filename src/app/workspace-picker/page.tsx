@@ -23,15 +23,15 @@ export default async function WorkspacePickerPage() {
 
   const { foundries } = await getUserFoundries()
 
-  // If user only has one foundry, go straight to /today.
-  // DECISION 2026-04-16: founder-first architecture — no more supplier divert.
+  // If user only has one foundry, go straight to /investors.
+  // DECISION 2026-04-25: /today removed; /investors is the killer-feature default.
   if (foundries.length === 1) {
-    redirect('/today')
+    redirect('/investors')
   }
 
   // If user has no foundries at all, redirect to default page
   if (foundries.length === 0) {
-    redirect('/today')
+    redirect('/investors')
   }
 
   return <WorkspacePickerView foundries={foundries} />

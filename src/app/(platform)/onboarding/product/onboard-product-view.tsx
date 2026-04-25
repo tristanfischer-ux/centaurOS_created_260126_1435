@@ -36,7 +36,7 @@ export function OnboardProductView(): React.ReactElement {
         <div className="opd2">
             {/* ── Top-right skip link ────────────────────────────────── */}
             <div className="opd2-skip-wrap">
-                <Link href="/today">Skip setup →</Link>
+                <Link href="/investors">Skip setup →</Link>
             </div>
 
             <div className="opd2-wrap">
@@ -161,7 +161,7 @@ export function OnboardProductView(): React.ReactElement {
 
                 {/* ── Skip-line (centered, subtle) ────────────────────── */}
                 <div className="opd2-skip-line">
-                    <Link href="/today">
+                    <Link href="/investors">
                         or skip for now — I&apos;ll come back to this
                     </Link>
                 </div>
@@ -172,7 +172,7 @@ export function OnboardProductView(): React.ReactElement {
                 <div className="opd2-foot-meta">
                     Step 3 of 7 · Both paths stay available from the sidebar after setup
                 </div>
-                <Link href="/today" className="opd2-foot-back">
+                <Link href="/investors" className="opd2-foot-back">
                     ← Back
                 </Link>
             </div>

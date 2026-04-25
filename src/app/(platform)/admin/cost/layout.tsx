@@ -37,7 +37,7 @@ export default async function AdminCostLayout({
   // too broad for cross-foundry cost data), so we gate by email until a
   // dedicated role lands.
   if (user.email !== TRISTAN_EMAIL) {
-    redirect('/today')
+    redirect('/investors')
   }
 
   return <>{children}</>
