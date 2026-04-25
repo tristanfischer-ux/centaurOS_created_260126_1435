@@ -101,7 +101,7 @@ export function SpecialistsPageClient({
                         )}
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight inline-flex items-center gap-1.5">
-                            {view === "specialists" ? "AI Team" : "Team Project"}
+                            {view === "specialists" ? "Your Specialists" : "Team Project"}
                             {view === "project-builder" && (
                                 <HelpTooltip content="Chain multiple specialists together. Each step's output feeds into the next." />
                             )}
@@ -124,7 +124,7 @@ export function SpecialistsPageClient({
                     fallbackMessage="Thirteen specialists, each with a different lens on your business. Sage will challenge your strategy, Finn will stress-test your numbers, Harper will tell you who to hire next. You don't need to know which one to pick — describe your problem and the right one will surface. Start with whoever's closest to the thing keeping you up at night."
                     isLoading={briefing.isLoading}
                     severity={briefing.severity}
-                    context={{ type: 'general', title: 'AI Team', description: 'Cal on specialists.', metadata: {} }}
+                    context={{ type: 'general', title: 'Your Specialists', description: 'Cal on specialists.', metadata: {} }}
                     storageKey="specialists"
                 />
             </div>

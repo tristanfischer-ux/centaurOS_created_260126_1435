@@ -24,6 +24,7 @@ import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
 import type { FoundryProfile } from '@/lib/investor-match'
 import { embedQuery } from '@/lib/embeddings'
+import { normaliseFirmTypeLabel } from '@/lib/investors/firm-type-labels'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import {
   getFoundryTier,
@@ -1506,6 +1507,12 @@ const INVESTOR_FIRM_TYPES = new Set([
   'Impact Fund', 'EIS Fund', 'SEIS Fund',
 ])
 
+// INTENT: raw firm_type values in marketplace_listings.attributes have drifted
+// over multiple imports — uppercase slugs ("GOVT_GRANT"), legacy camel-case,
+// and human-readable strings co-exist for the same concept. We import the
+// canonical normaliser from the shared firm-type-labels module so server
+// and client agree (see top-of-file imports).
+
 /**
  * Fetches aggregated stats for the investor directory insights panel.
  */
@@ -1604,9 +1611,12 @@ export const getInvestorStats = unstable_cache(
         serviceProviderCount++
       }
 
-      // Track type breakdown
+      // Track type breakdown — normalise raw slugs to human labels first so
+      // duplicates like "GOVT_GRANT" + "Government Grant" collapse to one
+      // bucket and acronyms like "CVC" / "VC" / "PE" never reach the UI.
       if (firmType) {
-        typeCounts[firmType] = (typeCounts[firmType] ?? 0) + 1
+        const label = normaliseFirmTypeLabel(firmType)
+        typeCounts[label] = (typeCounts[label] ?? 0) + 1
       }
 
       if (attrs.website_url) withWebsiteCount++
