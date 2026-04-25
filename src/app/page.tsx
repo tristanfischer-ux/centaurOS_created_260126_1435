@@ -97,28 +97,28 @@ const PRICING_TIERS = [
 
 const FAQS = [
   {
-    question: "Who owns the IP I create?",
-    answer: "You do. 100%. Fractional Forge provides the team and infrastructure, but all intellectual property, designs, prototypes, and products belong entirely to you. This is baked into our contracts.",
+    question: "What does Fractional Forge actually do?",
+    answer: "Four things. First, the Brainstorming Council: describe a question, and four specialists answer in parallel from different angles, then close with one concrete action to take. Second, The Forge: type a paragraph about your product and the autopilot produces a brief, bill of materials, cost estimate, risk list, and supplier shortlist in about twenty minutes. Third, Investors: paste your deck or describe your company and get a ranked list of investors with a fit score, why that firm would be interested, and how to pitch them. Fourth, Suppliers: describe what you need and get a semantic-matched shortlist from 18,459 indexed manufacturers, with a why-fit summary per match.",
+  },
+  {
+    question: "Who is this for?",
+    answer: "Hardware founders who are building or about to build a physical product \u2014 especially anything that is becoming smarter, connected, or sensor-enabled. If you are trying to find investors to back you, or suppliers to make your product, or you want a fast structured brief before you spend money on engineering, Fractional Forge is built for that.",
+  },
+  {
+    question: "How does the investor matching work?",
+    answer: "Our investor database covers 7,800 firms built from Companies House, FCA disclosures, public fund websites, and the British Business Bank co-investment list. Every record carries its source so you can audit the citation. When you describe your company or paste your deck, we score each firm against your stage, sector, geography, and thesis. Free accounts get 5 saved searches over the life of the account. Starter at \u00a320/month gives you 100 leads per month with the full why-fit, how-to-pitch rationale, and a drafted first email.",
   },
   {
     question: "How is my data protected?",
-    answer: "Designs are visible only to team members you choose. Manufacturing partners on the network see only what is needed to quote and manufacture. All parties sign confidentiality agreements before accessing any of your data. We use row-level security and encryption at rest to ensure your information stays private.",
+    answer: "Your company data and project information are visible only to you. We use row-level security so no other user or foundry can see your work. Data is encrypted at rest. We do not use your project content to train models.",
   },
   {
-    question: "What if something goes wrong?",
-    answer: "Responsibility is clearly allocated in writing. Manufacturing partners are responsible for manufacturing defects and spec conformance. You are responsible for your design specifications. Fractional Forge facilitates the relationship but does not guarantee manufacturing outcomes. Written terms govern every engagement.",
-  },
-  {
-    question: "How does the fractional model actually work?",
-    answer: "Fractional Forge combines two things. First, specialist support across strategy, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, hiring, fundraising, chief technology, and chief of staff, providing structured analysis across every part of a hardware company. Second, a marketplace of experienced professionals with decades of domain expertise who set their own day rates and work project-based with startups. You engage them directly. The specialists provide the breadth; the professionals bring the depth.",
-  },
-  {
-    question: "How quickly can I go from idea to prototype?",
-    answer: "The aim of Fractional Forge is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge helps you understand what materials, equipment, and suppliers your product will need. Specialists work through the technical, commercial, and operational questions in parallel. 13,700+ UK and European manufacturers are indexed and searchable, so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
+    question: "How quickly can The Forge produce a product brief?",
+    answer: "About twenty minutes for a first pass from a paragraph of intent. The autopilot produces a brief, module breakdown, bill of materials, cost estimate, risk list, and a shortlist of matched suppliers from 18,459 indexed manufacturers. It is a starting point for engineering conversations, not a finished design \u2014 but it compresses weeks of research into an afternoon.",
   },
   {
     question: "How much does it cost?",
-    answer: "Fractional Forge is free to try \u2014 5 brainstorming sessions a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is \u00a320/month and gives you 100 investor leads with full why-fit, how-to-pitch, and drafted email. Need more leads? \u00a310 per 100 extra, one click from inside Investors. All new accounts get 0% marketplace fees on their first 3 orders. No equity required \u2014 check our pricing page for full details.",
+    answer: "Free to try \u2014 5 brainstorming sessions a month plus 5 saved investor searches over the life of the account, no credit card required. Starter is \u00a320/month and gives you 100 investor leads per month with full why-fit, how-to-pitch rationale, and a drafted email. Need more leads? \u00a310 per 100 extra, one click from inside Investors. The first 100 accounts get Starter-level access free for 30 days. No equity required \u2014 see the full pricing page for details.",
   },
 ] as const
 
@@ -554,63 +554,51 @@ function TristanIntroSection() {
 
 const HOW_IT_WORKS_PILLARS = [
   {
-    label: "The Smart-Product Wave",
-    title: "Designed for what hardware is becoming.",
+    label: "Brainstorming Council",
+    title: "Four specialists. One concrete action.",
     image: "/images/marketing/ecosystem-os.png",
     imageAlt: "Connected sensors and intelligent product concepts",
-    body: "Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under \u00a35 a unit, and that is what makes the smart version commercially viable. Fractional Forge coordinates the design, supply, and capital cycle for the smart version of whatever you are building, so you skip the eighteen months of reinventing wheels.",
+    body: "Frame a question and four specialists answer in parallel \u2014 each from a different angle \u2014 then close with a consensus and the one thing to do next. Choose how deep you want to go: a quick take, a considered view, a deeper analysis, or a full council split showing where the specialists genuinely disagree. Each session takes about two minutes.",
     highlights: [
-      "Tools tuned for sensor, edge-compute, and connected-product builds",
-      "From a paragraph of intent to a bill of materials, fast",
-      "Move from idea to manufacturer conversation in a single afternoon",
+      "Parallel specialist perspectives in a single session",
+      "Consensus close with one concrete next action",
+      "Four depth levels from quick take to full council split",
     ],
   },
   {
-    label: "Fractional Expertise",
-    title: "Experienced Professionals, On Your Terms",
-    image: "/images/marketing/role-executive.png",
-    imageAlt: "Experienced executive reviewing engineering plans",
-    body: "Access a marketplace of experienced professionals \u2014 people with decades of domain expertise in manufacturing, engineering, finance, supply chain, and operations. They set their own day rates, work project-based, and are available for defined engagements with your company.",
-    highlights: [
-      "Experienced manufacturing, engineering, finance, and operations specialists",
-      "Flexible engagements \u2014 short projects or multi-month retainers",
-      "Rates set by the professionals themselves, transparent to you",
-    ],
-  },
-  {
-    label: "Specialists",
-    title: "Specialist support, your judgement.",
-    image: "/images/marketing/role-apprentice.png",
-    imageAlt: "Young engineers collaborating on product design",
-    body: "Specialist support across thirteen disciplines, strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, product, hiring, fundraising, and operations. A finance specialist runs your model. A legal specialist drafts your founder agreements. A manufacturing specialist sanity-checks your supplier shortlist. The decisions remain yours.",
-    highlights: [
-      "Strategy, engineering, finance, legal, and nine more disciplines",
-      "Grounded in real supplier, investor, and industry data",
-      "Your context, your decisions, supported at every step",
-    ],
-  },
-  {
-    label: "Manufacturing Network",
-    title: "A Connected Manufacturing Network",
+    label: "The Forge",
+    title: "Brief, bill of materials, and suppliers in twenty minutes.",
     image: "/images/marketing/factory-partner.png",
     imageAlt: "Factory floor with manufacturing equipment",
-    body: "13,700+ manufacturers across the UK and Europe indexed with capability data. From early prototype design through to production, understand what materials and equipment you need, and find the right partners to make it real — including suppliers experienced in sensor and edge-compute integration for smart products.",
+    body: "Type a paragraph about your product. The Forge autopilot breaks it into modules, generates a bill of materials, estimates cost, flags risks, and matches every component against 18,459 indexed manufacturers. The first pass takes about twenty minutes. It is a starting point for engineering conversations, not a finished design \u2014 but it compresses weeks of research into an afternoon.",
     highlights: [
-      "13,700+ UK and European manufacturers and suppliers indexed",
-      "Find suppliers experienced in sensor, electronics, and edge-compute integration",
-      "Search by capability, location, and specialism to find the right match",
+      "Brief, modules, bill of materials, and cost estimate from a paragraph",
+      "Supplier shortlist matched from 18,459 indexed manufacturers",
+      "Twenty-minute first pass, hours of detail available after",
     ],
   },
   {
-    label: "What is already in the box",
-    title: "The data you can use on day one.",
-    image: "/images/marketing/ecosystem-os.png",
-    imageAlt: "Map view of UK and European manufacturers",
-    body: "We are pre-launch on customers, so we are not going to put words in a founder's mouth. Instead, here is what is in the platform the moment you sign up. 13,700 UK and European manufacturers indexed with capability data, weighted toward the UK, Germany, Italy, France, and the Netherlands. 7,800 investors built from Companies House, FCA disclosures, public fund websites, and the British Business Bank co-investment list. 49,000 partner contacts attached to those investors. Every record carries the source it was pulled from, so you can audit the citation before you send the email.",
+    label: "Investors",
+    title: "Ranked investor matches with why-fit and how-to-pitch.",
+    image: "/images/marketing/role-executive.png",
+    imageAlt: "Experienced executive reviewing engineering plans",
+    body: "Paste your deck or describe your company. We score 7,800 investors — built from Companies House, FCA disclosures, public fund websites, and the British Business Bank co-investment list — against your stage, sector, geography, and thesis. You get a ranked shortlist with a fit score per firm, a paragraph on why that firm would be interested, and how to pitch them. Starter accounts get a drafted first email.",
     highlights: [
-      "13,700 manufacturers across the UK, Germany, Italy, France and the Netherlands",
-      "7,800 investors, sources disclosed: Companies House, FCA, fund websites, British Business Bank",
-      "Pre-launch on customers — building the proof in public, not borrowing other people's quotes",
+      "7,800 investors scored against your stage, sector, and thesis",
+      "Fit score, why-this-firm, and how-to-pitch for each match",
+      "Drafted first email included on Starter and above",
+    ],
+  },
+  {
+    label: "Suppliers",
+    title: "Semantic supplier matching from 18,459 manufacturers.",
+    image: "/images/marketing/role-apprentice.png",
+    imageAlt: "Young engineers collaborating on product design",
+    body: "Describe what you need to make. We run a semantic search across 18,459 UK and European manufacturers indexed with capability data — weighted toward the UK, Germany, Italy, France, and the Netherlands — and return a shortlist with a why-fit summary per match. No cold Google searches, no trade-show guesswork.",
+    highlights: [
+      "18,459 manufacturers indexed with capability and specialism data",
+      "Semantic search understands what you need, not just keywords",
+      "Why-fit summary per supplier so you can prioritise outreach",
     ],
   },
 ] as const
@@ -733,7 +721,7 @@ function FounderArticlesSection() {
               The factory itself is the biggest time sink. Finding a location takes months. Then come the lease negotiations, and as a startup you can easily be asked to pay one, two, or three years of rent up front, which raises the obvious question of where that money is meant to come from. After that comes procuring the equipment, installing it, and hiring the people to run it. You can easily be twelve or eighteen months in before you have built anything at all.
             </p>
             <p>
-              Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels, finding engineers, finding investors, sorting out intellectual property, building a finance team, all pre-revenue, all without the budget for any of it. Fractional Forge is my attempt at that equivalent: 13,700 UK and European manufacturers who already have the building and the machinery, an investor database of 7,800 firms, specialist support across strategy, finance, legal, manufacturing and the rest, and a marketplace of experienced fractional executives, all in one place.
+              Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels, finding engineers, finding investors, sorting out intellectual property, building a finance team, all pre-revenue, all without the budget for any of it. Fractional Forge is my attempt at that equivalent: a Brainstorming Council that works through questions in parallel, an autopilot that produces a brief and bill of materials in twenty minutes, 18,459 UK and European manufacturers indexed and searchable, and an investor database of 7,800 firms with fit scores and drafted emails — all in one place.
             </p>
             <p>
               Have a look and let me know how you get on.
@@ -800,7 +788,7 @@ function PricingTeaserSection() {
             Start free. Scale <span className="text-international-orange">when ready.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-            Start free with 50 AI assists and specialist support across strategy, finance, legal, manufacturing and the rest. Upgrade when you need more.
+            Start free with 5 brainstorming sessions a month and 5 saved investor searches. Upgrade when you need more investor leads or deeper council sessions.
           </p>
         </AnimatedSection>
 
