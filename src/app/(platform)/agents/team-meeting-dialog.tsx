@@ -189,6 +189,14 @@ const COMBINATION_SUGGESTIONS: Record<string, string[]> = {
         "What should we know about term sheets and investor agreements?",
         "How do we protect our interests during fundraising?",
     ],
+    // Deep-tech / regulated-product founders: pair Leo with Sage to map a
+    // de-risking sequence the seed round can underwrite. Picks the most
+    // actionable of the three candidate prompts — once founders see how
+    // the milestones nest, the regulatory-pathway and prototype questions
+    // tend to fall out of the conversation naturally.
+    "legal-counsel,strategist": [
+        "How do we sequence the technical milestones so each one de-risks the next round?",
+    ],
     "finance-lead,hiring-team": [
         "Can we afford to hire right now? What's the cost per new hire?",
         "How do we plan headcount against our runway?",
