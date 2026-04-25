@@ -267,6 +267,12 @@ function StepOne({
                     co-founder over coffee. Call out the problem, envelope
                     (cost, mass, timeline), and anything non-obvious.
                 </p>
+                <p className={cn(typography.bodySmall, "text-international-orange")}>
+                    <strong>What&rsquo;s the smart version?</strong> Cheap intelligence makes most physical
+                    products re-imaginable. If your idea is a normal product, mention what
+                    sensors, data, or learning loop would make it 10× better — the specialists
+                    will design the BOM around that.
+                </p>
             </div>
 
             <div className="space-y-2">

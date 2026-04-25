@@ -9,7 +9,7 @@ import type { SpecialistId } from "@/lib/agents/specialists-config"
  * most, these can be reordered or made dynamic from the user's context.
  */
 
-export type IdeaCategory = "Strategy" | "Finance" | "Operations" | "Hiring" | "Go-to-market"
+export type IdeaCategory = "Strategy" | "Finance" | "Operations" | "Hiring" | "Go-to-market" | "Intelligence"
 
 export type IdeaPrompt = {
     id: string
@@ -75,5 +75,37 @@ export const IDEA_PROMPTS: IdeaPrompt[] = [
         question: "What's our positioning against competitors?",
         subtitle: "Differentiate before marketing spend starts.",
         specialistIds: ["strategist", "growth-marketer"],
+    },
+    // Intelligence-embedded hardware prompts (added 2026-04-25 per the
+    // homepage thesis: cheap intelligence makes every commodity hardware
+    // product re-imaginable). Each forces the founder to think about the
+    // smart-version opportunity in their category.
+    {
+        id: "smart-version",
+        category: "Intelligence",
+        question: "What's the smart version of my product?",
+        subtitle: "Find the intelligence layer your competitors haven't added yet.",
+        specialistIds: ["cto", "product-lead", "strategist"],
+    },
+    {
+        id: "intelligence-economics",
+        category: "Intelligence",
+        question: "How would intelligence change the unit economics of my category?",
+        subtitle: "Move from one-time hardware sale to recurring data + service revenue.",
+        specialistIds: ["finance-lead", "strategist", "growth-marketer"],
+    },
+    {
+        id: "sensor-or-edge",
+        category: "Intelligence",
+        question: "Where does intelligence belong in my BOM — at the chip, the edge, or the cloud?",
+        subtitle: "Trade-off latency, cost, privacy, and connectivity in one decision.",
+        specialistIds: ["cto", "vp-engineering", "vp-manufacturing"],
+    },
+    {
+        id: "tenx-with-intelligence",
+        category: "Intelligence",
+        question: "What sensors or learning loop would make my product 10× better?",
+        subtitle: "Identify the data the product creates and the value that compounds from it.",
+        specialistIds: ["cto", "product-lead", "vp-engineering"],
     },
 ]
