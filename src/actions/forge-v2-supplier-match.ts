@@ -31,6 +31,10 @@ import {
 import { addToShortlist } from "@/actions/forge-shortlist"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import {
+    callOpenRouter,
+    CHEAP_STRUCTURED_MODEL,
+} from "@/lib/ai/openrouter"
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -48,6 +52,74 @@ export interface MatchSuppliersForProjectResult {
         | "PROJECT_FORBIDDEN"
         | "NO_MODULES"
         | "INTERNAL"
+}
+
+// ─── Project-specific supplier synthesis ──────────────────────────────
+
+/**
+ * Generates a 1-2 sentence project-specific synthesis for a supplier — what
+ * THIS supplier can do for THIS project's bill of materials. Replaces the
+ * supplier's own marketing blurb in the PDF.
+ *
+ * Routes via OpenRouter to DeepSeek V4-Flash (~$0.14 / $0.28 per M tokens —
+ * roughly 7-18× cheaper than Anthropic Haiku). Tristan's 2026-04-25 NIGHT
+ * directive: every OR tier is cheaper than Haiku per equivalent quality, so
+ * stop using Haiku for low-judgement work like supplier prose synthesis.
+ *
+ * Cost estimate per supplier: ~250 input tokens (brief excerpt + supplier
+ * desc + matched parts) + ~80 output tokens (1-2 sentences) = ~£0.0005.
+ * For 80 suppliers × £0.0005 = £0.04 per project — negligible.
+ *
+ * Returns null on any failure (network, parse, empty output) so the PDF
+ * falls back to the existing `description` field rather than blocking.
+ */
+async function synthesizeSupplierForProject(
+    match: { id: string; name: string; description?: string | null; supplierType: string },
+    matchedParts: Array<{
+        partNumber: string
+        partName: string
+        moduleName: string | null
+        process: string | null
+        material: string | null
+    }>,
+    briefSummary: string | null,
+): Promise<string | null> {
+    if (matchedParts.length === 0) return null
+    const partsLines = matchedParts.slice(0, 6).map((p) => {
+        const procMat = [p.process, p.material]
+            .filter((v): v is string => typeof v === "string" && v.length > 0)
+            .join(" / ")
+        const forModule = p.moduleName ? ` for ${p.moduleName}` : ""
+        return `• ${p.partNumber} ${p.partName}${procMat ? ` (${procMat})` : ""}${forModule}`
+    })
+    const supplierDesc = (match.description ?? "").slice(0, 600)
+    const briefBlock = briefSummary
+        ? `\n\nPROJECT BRIEF (excerpt):\n${briefSummary}`
+        : ""
+    const prompt =
+        `You are writing a 1-2 sentence synthesis explaining why a specific supplier is a candidate for a specific project's bill of materials. The synthesis replaces the supplier's own marketing blurb in an engineering report — so it must be SPECIFIC to this project, not generic.\n\nSUPPLIER: ${match.name}\n\nSUPPLIER DESCRIPTION (their own copy):\n${supplierDesc || "(no description on file)"}\n\nMATCHED BOM PARTS (this is what the matcher thinks they could supply):\n${partsLines.join("\n")}${briefBlock}\n\nWrite ONE sentence (≤50 words) that names what the supplier brings, what they would supply for this specific project, and any caveat the founder should weigh. No marketing language. No hyperbole. Plain engineering prose. Output ONLY the sentence — no preamble, no markdown, no quote marks.`
+    const result = await callOpenRouter({
+        model: CHEAP_STRUCTURED_MODEL,
+        prompt,
+        maxTokens: 256,
+        temperature: 0.2,
+        timeoutMs: 25_000,
+    })
+    if (!result.ok) {
+        console.warn(
+            `[forge-v2-supplier-match] synthesis failed for ${match.id}: ${result.error}`,
+        )
+        return null
+    }
+    const text = result.text.trim().replace(/^["']|["']$/g, "")
+    if (text.length < 10) return null
+    // Cap to 350 chars defensively (~50 words). Truncate on word boundary.
+    if (text.length > 350) {
+        const cut = text.slice(0, 350)
+        const lastSpace = cut.lastIndexOf(" ")
+        return (lastSpace > 200 ? cut.slice(0, lastSpace) : cut).replace(/[,;:]$/, "") + "…"
+    }
+    return text
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────
@@ -419,9 +491,49 @@ async function matchSuppliersForProjectInternal(
             if (inMarketReason && reasons.length < 3) reasons.push(inMarketReason)
             return reasons
         }
+        // ── Per-supplier project-specific synthesis (cheap-LLM, parallel) ──
+        // Tristan 2026-04-25 NIGHT: the supplier shortlist was rendering each
+        // supplier's own marketing blurb ("GE Aerospace is a world-leading
+        // manufacturer of jet and turboprop engines..."). The founder wants a
+        // 1-2 sentence synthesis specific to THIS project — what this supplier
+        // can do for THIS bill of materials. Using cheap OpenRouter (DeepSeek
+        // V4-Flash) — every OR tier is cheaper than Anthropic Haiku.
+        const briefSummary = (() => {
+            const briefText = research?.designBrief?.report
+            if (typeof briefText === "string" && briefText.length > 0) {
+                return briefText.slice(0, 800)
+            }
+            return null
+        })()
+        const supplierEntries = Array.from(bySupplier.entries())
+        const synthesisResults = await Promise.allSettled(
+            supplierEntries.map(([_id, { match, matchedParts }]) =>
+                synthesizeSupplierForProject(match, matchedParts, briefSummary),
+            ),
+        )
+        const synthesisBySupplierId = new Map<string, string>()
+        for (let i = 0; i < supplierEntries.length; i++) {
+            const [id] = supplierEntries[i]
+            const r = synthesisResults[i]
+            if (r.status === "fulfilled" && r.value) {
+                synthesisBySupplierId.set(id, r.value)
+            }
+        }
+
         let suppliersAdded = 0
         for (const { match, moduleIds, matchedParts } of bySupplier.values()) {
             const richReasons = buildMatchReasons(match, matchedParts)
+            // Distinct, sorted BOM part numbers this supplier can supply.
+            // The PDF renders these as "Supplies BOM rows: BATT-005-PUR,
+            // CONT-001, ..." so the founder can trace supplier → BOM row.
+            const matchedPartNumbers = Array.from(
+                new Set(
+                    matchedParts
+                        .map((p) => p.partNumber)
+                        .filter((n): n is string => typeof n === "string" && n.length > 0),
+                ),
+            ).sort()
+            const projectSynthesis = synthesisBySupplierId.get(match.id) ?? null
             const res = await addToShortlist({
                 projectId,
                 supplierId: match.id,
@@ -429,6 +541,8 @@ async function matchSuppliersForProjectInternal(
                 isVerified: match.isVerified,
                 supplierType: match.supplierType,
                 moduleIds,
+                matchedPartNumbers,
+                projectSynthesis,
                 bestMatchScore: match.matchScore,
                 bestScoreBreakdown: match.scoreBreakdown,
                 allMatchReasons: richReasons,

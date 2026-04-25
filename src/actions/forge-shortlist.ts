@@ -33,6 +33,10 @@ export interface ShortlistRow {
   isVerified: boolean
   supplierType: string
   moduleIds: string[]
+  /** BOM part numbers this supplier was matched against (e.g. ["BATT-005-PUR", "CONT-001"]). */
+  matchedPartNumbers: string[]
+  /** Cheap-LLM-generated 1-2 sentence synthesis of why this supplier fits THIS project. */
+  projectSynthesis: string | null
   bestMatchScore: number
   bestScoreBreakdown: ScoreBreakdown
   allMatchReasons: string[]
@@ -49,6 +53,8 @@ export interface ShortlistUpsertInput {
   isVerified: boolean
   supplierType: string
   moduleIds: string[]
+  matchedPartNumbers?: string[]
+  projectSynthesis?: string | null
   bestMatchScore: number
   bestScoreBreakdown: ScoreBreakdown
   allMatchReasons: string[]
@@ -74,6 +80,8 @@ interface DbRow {
   is_verified: boolean
   supplier_type: string | null
   module_ids: string[]
+  matched_part_numbers: string[] | null
+  project_synthesis: string | null
   best_match_score: number | null
   best_score_breakdown: ScoreBreakdown | null
   all_match_reasons: string[]
@@ -90,6 +98,8 @@ function rowToClient(r: DbRow): ShortlistRow {
     isVerified: r.is_verified,
     supplierType: r.supplier_type ?? "service",
     moduleIds: r.module_ids ?? [],
+    matchedPartNumbers: r.matched_part_numbers ?? [],
+    projectSynthesis: r.project_synthesis ?? null,
     bestMatchScore: r.best_match_score ?? 0,
     bestScoreBreakdown: r.best_score_breakdown ?? {
       semantic: 0, process: 0, material: 0, quality: 0, keyword: 0,
@@ -113,7 +123,7 @@ export async function getProjectShortlist(projectId: string): Promise<ShortlistR
 
   const { data, error } = await supabase
     .from("forge_supplier_shortlist")
-    .select("supplier_id, supplier_name, is_verified, supplier_type, module_ids, best_match_score, best_score_breakdown, all_match_reasons, ramp_role, notes, added_at, updated_at")
+    .select("supplier_id, supplier_name, is_verified, supplier_type, module_ids, matched_part_numbers, project_synthesis, best_match_score, best_score_breakdown, all_match_reasons, ramp_role, notes, added_at, updated_at")
     .eq("project_id", projectId)
     .order("added_at", { ascending: true })
 
@@ -155,6 +165,8 @@ export async function addToShortlist(
       is_verified: input.isVerified,
       supplier_type: input.supplierType,
       module_ids: input.moduleIds,
+      matched_part_numbers: input.matchedPartNumbers ?? [],
+      project_synthesis: input.projectSynthesis ?? null,
       best_match_score: input.bestMatchScore,
       best_score_breakdown: input.bestScoreBreakdown as unknown as never,
       all_match_reasons: input.allMatchReasons,

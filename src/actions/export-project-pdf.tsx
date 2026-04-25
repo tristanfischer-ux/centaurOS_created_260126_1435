@@ -440,6 +440,10 @@ interface SupplierPdf {
     name: string
     hq: string | null
     moduleNames: string[]
+    /** BOM part numbers this supplier was matched against (e.g. ["BATT-005-PUR"]). */
+    matchedPartNumbers: string[]
+    /** Cheap-LLM project-specific synthesis — replaces the supplier's marketing blurb. */
+    projectSynthesis: string | null
     matchScore: number | null
     scoreBreakdown: Record<string, unknown> | null
     matchReasons: string[]
@@ -1319,12 +1323,12 @@ function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sourc
                     }
                     return s.name
                 })()
-                // Compose a single-line "what they offer" lead — pulled
-                // directly from the supplier's listing description so the
-                // founder reads "LiFePO4 battery cell manufacturer; rack
-                // assembly + thermal management" rather than the opaque
-                // factor labels we were rendering before.
-                const offering = s.description?.trim() || s.name
+                // PROJECT-SPECIFIC SYNTHESIS (2026-04-25 NIGHT, Loop 2) —
+                // prefer the cheap-LLM-generated synthesis that explains
+                // what THIS supplier brings to THIS project. Falls back
+                // to the supplier's own marketing blurb only when the
+                // synthesis call failed (network/timeout).
+                const offering = (s.projectSynthesis?.trim()) || s.description?.trim() || s.name
                 // Compose a single-line "company facts" row.
                 const facts: string[] = []
                 if (s.hq) facts.push(s.hq)
@@ -1363,9 +1367,16 @@ function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sourc
                                 Certifications: {s.certifications.join(", ")}
                             </Text>
                         )}
-                        {s.description && (
+                        {(s.projectSynthesis || s.description) && (
                             <Text style={[{ fontSize: 9, marginTop: 4 }]}>
                                 {offering}
+                            </Text>
+                        )}
+                        {s.matchedPartNumbers.length > 0 && (
+                            <Text style={[styles.small, { marginTop: 4 }]}>
+                                <Text style={{ fontWeight: "bold" }}>Supplies BOM rows:</Text>
+                                {" "}
+                                {s.matchedPartNumbers.join(", ")}
                             </Text>
                         )}
                         {s.moduleNames.length > 0 && (
@@ -2574,7 +2585,7 @@ async function exportProjectPdfInternal(
         const { data: shortlistRows } = await admin
             .from("forge_supplier_shortlist")
             .select(
-                "supplier_id, supplier_name, module_ids, best_match_score, best_score_breakdown, all_match_reasons, ramp_role",
+                "supplier_id, supplier_name, module_ids, matched_part_numbers, project_synthesis, best_match_score, best_score_breakdown, all_match_reasons, ramp_role",
             )
             .eq("project_id", projectId)
 
@@ -2667,6 +2678,13 @@ async function exportProjectPdfInternal(
             moduleNames: Array.isArray(r.module_ids)
                 ? (r.module_ids as string[]).map((id) => moduleNameById.get(id) ?? id)
                 : [],
+            matchedPartNumbers: Array.isArray(r.matched_part_numbers)
+                ? (r.matched_part_numbers as string[])
+                : [],
+            projectSynthesis:
+                typeof r.project_synthesis === "string" && r.project_synthesis.length > 0
+                    ? (r.project_synthesis as string)
+                    : null,
             matchScore:
                 typeof r.best_match_score === "number" ? r.best_match_score : null,
             scoreBreakdown:
