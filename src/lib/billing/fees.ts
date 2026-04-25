@@ -2,10 +2,10 @@
  * Fee Calculation Utilities
  * Handles tier-based and introductory platform fee calculation with database lookup
  *
- * DECISION: Fee structure as of Mar 2026:
+ * DECISION: Fee structure as of 2026-04-25 (post pricing restructure):
  * - All new accounts: 0% fee on first 3 marketplace orders (intro offer)
- * - Explorer / Startup tiers: 10% standard fee after intro
- * - Professional tier: 5% reduced fee after intro
+ * - Free / Starter (and legacy Seed / Startup Team): 10% standard fee after intro
+ * - Pro: 5% reduced fee after intro
  * - Enterprise: custom (via DB config)
  *
  * FLOW: getEffectiveFeePercent() checks intro eligibility first, then tier-based rate.
@@ -22,8 +22,9 @@ const INTRO_FREE_ORDERS = 3
 /** Fee percentage by subscription tier (after intro orders are used) */
 const TIER_FEE_PERCENT: Record<SubscriptionTier, number> = {
   free: 10,
-  seed: 10,
-  starter: 10,
+  seed: 10, // legacy
+  starter: 10, // legacy Startup Team
+  starter_v2: 10, // new Starter £20 (2026-04-25)
   professional: 5,
   enterprise: 5, // Enterprise may be overridden by DB config
 }
@@ -201,28 +202,43 @@ export function calculateFeeBreakdownSync(
 /**
  * Fee tier information by subscription tier
  *
- * @description Updated Mar 2026: tiered by subscription, not role.
+ * @description Updated 2026-04-25 for the pricing restructure.
  * - All accounts: 0% on first 3 orders (intro offer)
- * - Explorer / Starter: 10% after intro
- * - Professional / Enterprise: 5% after intro
+ * - Free / Starter (and legacy Seed / Startup Team): 10% after intro
+ * - Pro / Enterprise: 5% after intro
  */
 export const FEE_TIERS = {
   free: {
-    label: 'Explorer',
+    label: 'Free',
+    standardFee: 10,
+    introFee: 0,
+    introOrders: INTRO_FREE_ORDERS,
+    description: '0% on first 3 orders, then 10%',
+  },
+  starter_v2: {
+    label: 'Starter',
+    standardFee: 10,
+    introFee: 0,
+    introOrders: INTRO_FREE_ORDERS,
+    description: '0% on first 3 orders, then 10%',
+  },
+  // Legacy entries kept for any UI that looks up by the old key
+  seed: {
+    label: 'Seed (legacy)',
     standardFee: 10,
     introFee: 0,
     introOrders: INTRO_FREE_ORDERS,
     description: '0% on first 3 orders, then 10%',
   },
   starter: {
-    label: 'Startup Team',
+    label: 'Startup Team (legacy)',
     standardFee: 10,
     introFee: 0,
     introOrders: INTRO_FREE_ORDERS,
     description: '0% on first 3 orders, then 10%',
   },
   professional: {
-    label: 'Professional',
+    label: 'Pro',
     standardFee: 5,
     introFee: 0,
     introOrders: INTRO_FREE_ORDERS,

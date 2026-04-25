@@ -16,7 +16,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/security/rate-limit'
 import type { SubscriptionTier } from '@/lib/billing/subscriptions'
 
-const VALID_TIERS: SubscriptionTier[] = ['starter', 'professional', 'enterprise']
+const VALID_TIERS: SubscriptionTier[] = ['starter', 'starter_v2', 'professional', 'enterprise']
 
 /**
  * Verifies whether test subscription activation is explicitly enabled and authorized.

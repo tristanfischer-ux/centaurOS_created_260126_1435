@@ -152,7 +152,15 @@ export function BillingContent({
     }
   }
 
-  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => p.tier !== 'enterprise')
+  // Hide enterprise (sales-led) AND legacy plans (Seed £19 / Startup Team £49,
+  // retired 2026-04-25) from the upgrade catalogue. Existing legacy subscribers
+  // still see their CURRENT plan card via the `isCurrent` branch below — only
+  // the upgrade options are filtered.
+  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => {
+    if (p.tier === 'enterprise') return false
+    if (p.legacy && p.tier !== currentTier) return false
+    return true
+  })
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -457,14 +465,20 @@ export function BillingContent({
 
 /**
  * Get numeric order of a tier for comparison.
+ *
+ * 2026-04-25: `seed` (legacy £19) and `starter` (legacy Startup Team £49)
+ * sit BELOW `starter_v2` (the new £20 entry) so anyone on a legacy plan
+ * sees `starter_v2` as a sideways move rather than an upgrade. Pro and
+ * Enterprise still sit above everything.
  */
 function getPlanOrder(tier: SubscriptionTier): number {
   const order: Record<SubscriptionTier, number> = {
     free: 0,
-    seed: 1,
-    starter: 2,
-    professional: 3,
-    enterprise: 4,
+    starter_v2: 1,
+    seed: 2, // legacy — slightly above starter_v2 by historical price
+    starter: 3, // legacy Startup Team — above seed by historical price
+    professional: 4,
+    enterprise: 5,
   }
   return order[tier]
 }

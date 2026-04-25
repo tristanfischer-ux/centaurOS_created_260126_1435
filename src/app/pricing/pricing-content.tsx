@@ -39,22 +39,33 @@ import {
 import { MarketingNav } from '@/components/marketing/marketing-nav'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { cn } from '@/lib/utils'
-import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
+import { SUBSCRIPTION_PLANS, INVESTOR_SEARCH_ADDON } from '@/lib/billing/plans'
 
 type BillingPeriod = 'monthly' | 'annual'
 
-/** Tooltip explanation for what an "Assist" / "AI task" is */
-const AI_TASK_TOOLTIP =
-  'Each message to an AI specialist counts as 1 assist. Generating a CAD Lab engineering package uses 3–5 assists depending on complexity. Marketplace searches and browsing are free.'
+/** Tooltip explanation for what an investor lead is */
+const INVESTOR_LEAD_TOOLTIP =
+  'Each lead bundles a verified investor profile with the why-fit reasoning, a tailored how-to-pitch, and a drafted email you can send straight from the platform.'
+
+/** Tooltip explanation for what a brainstorming session is */
+const BRAINSTORM_TOOLTIP =
+  'A brainstorming session is one full pass with the Council — bring a question or a brief, get the specialists\' structured back-and-forth and a written summary you can act on.'
+
+/** Tooltip explanation for what an "Assist" is */
+const ASSIST_TOOLTIP =
+  'Each message to a specialist counts as 1 assist. Generating a CAD Lab engineering package uses 3–5 assists depending on complexity. Marketplace searches and browsing are free.'
 
 /** Tooltip explanations for complex/jargon features */
 const FEATURE_TOOLTIPS: Record<string, string> = {
   'Comparison assistant': 'Analyses and compares marketplace providers side-by-side so you can choose with confidence.',
   'Voice-to-task': 'Speak your tasks out loud and they are converted into structured action items instantly.',
   'Supplier matching': '6-factor matching that scores UK suppliers on capability, process, material, quality, and relevance.',
-  'Assists': AI_TASK_TOOLTIP,
-  'AI tasks': AI_TASK_TOOLTIP,
-  'Assists per month': AI_TASK_TOOLTIP,
+  'Investor leads': INVESTOR_LEAD_TOOLTIP,
+  'Brainstorming sessions': BRAINSTORM_TOOLTIP,
+  'Deep Council': 'The full 13 specialists with extended thinking turned on — used for deep-dive sessions where you want every angle pressure-tested.',
+  'Strategy Council': 'The Strategy Council adds custom specialists tuned for your company plus retrieval over your own foundry data — board-room depth, not just general reasoning.',
+  'Assists': ASSIST_TOOLTIP,
+  'Assists per month': ASSIST_TOOLTIP,
 }
 
 /** FAQ items addressing common pricing objections */
@@ -65,7 +76,11 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Do I need a credit card to start?',
-    answer: 'No. The Explorer plan is free forever — 50 AI tasks per month with all 13 specialists. No credit card required. Upgrade anytime for more capacity.',
+    answer: 'No. The Free plan lets you try ForgeOS without a credit card — 1 brainstorming session a month and a lifetime cap of 5 saved investor searches. Upgrade to Starter at £20/month when you want full investor leads with why-fit and drafted email.',
+  },
+  {
+    question: 'What happens when I run out of investor leads on Starter?',
+    answer: 'You get 100 leads bundled into Starter every month. If you need more, the £10-per-100 Investor Search Add-On is a one-click top-up from inside the Investors section — no resubscription, no admin.',
   },
   {
     question: 'Can I upgrade or downgrade later?',
@@ -73,11 +88,11 @@ const FAQ_ITEMS = [
   },
   {
     question: 'What are the marketplace fees?',
-    answer: 'Every new account gets 0% marketplace fees on their first 3 orders — so you can try the full supplier matching experience risk-free. After that, Explorer and Startup plans have a 10% platform fee, and Professional plans pay just 5%. This covers payment processing, escrow, dispute resolution, and platform maintenance.',
+    answer: 'Every new account gets 0% marketplace fees on their first 3 orders — so you can try the full supplier matching experience risk-free. After that, Free and Starter plans have a 10% platform fee, and Pro plans pay just 5%. This covers payment processing, escrow, dispute resolution, and platform maintenance.',
   },
   {
     question: 'Is there a discount for annual billing?',
-    answer: 'Yes! When you choose annual billing, you save 20% compared to monthly billing. That\'s effectively getting over 2 months free every year.',
+    answer: 'Yes. When you choose annual billing, you save 20% compared to monthly billing — effectively getting over 2 months free every year.',
   },
 ]
 
@@ -104,10 +119,14 @@ export function PricingContent() {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
 
+  // 2026-04-25 pricing restructure: public catalogue is Free / Starter / Pro,
+  // with Enterprise on the contact-sales row below and the Investor Search
+  // Add-On on its own card. Legacy Seed (£19) and Startup Team (£49) are
+  // hidden — existing subscribers continue to be honoured at their existing
+  // limits but the public surface only shows the new tiers.
   const plans = [
     SUBSCRIPTION_PLANS.free,
-    SUBSCRIPTION_PLANS.seed,
-    SUBSCRIPTION_PLANS.starter,
+    SUBSCRIPTION_PLANS.starter_v2,
     SUBSCRIPTION_PLANS.professional,
   ]
 
@@ -142,10 +161,10 @@ export function PricingContent() {
               The Operating System for Hardware Companies
             </p>
             <h1 className="text-4xl sm:text-5xl font-display font-bold text-foreground tracking-tight">
-              From Idea to First Prototype, Faster
+              Investor leads, brainstorms, and the marketplace — one subscription
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Start free with all 13 specialists. Upgrade when you need more. No hidden fees, no contracts.
+              Starter is £20 a month for 100 investor leads with full why-fit + how-to-pitch + drafted email. Need more? £10 per 100 extra, one click. Free still works.
             </p>
           </div>
 
@@ -160,7 +179,7 @@ export function PricingContent() {
                   Transparent marketplace fees — 0% on your first 3 orders
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Every new account gets 0% marketplace fees on their first 3 orders. After that, Explorer and Startup Team plans pay 10%, Professional plans pay 5%. This covers payment processing, escrow, and dispute resolution.
+                  Every new account gets 0% marketplace fees on their first 3 orders. After that, Free and Starter plans pay 10%, Pro plans pay 5%. This covers payment processing, escrow, and dispute resolution.
                 </p>
               </div>
             </div>
@@ -202,23 +221,26 @@ export function PricingContent() {
             </button>
           </div>
 
-          {/* Pricing cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+          {/* Pricing cards — 3 columns: Free, Starter (highlighted), Pro */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {plans.map((plan) => {
-              const isProfessional = plan.tier === 'professional'
+              const isHighlighted = plan.tier === 'starter_v2'
               const monthlyPrice = billingPeriod === 'monthly'
                 ? plan.priceMonthlyGBP
                 : Math.round(plan.priceAnnualGBP / 12)
+
+              const investorLeads = plan.limits.investorLeadsPerMonth
+              const brainstorms = plan.limits.brainstormSessionsPerMonth
 
               return (
                 <Card
                   key={plan.tier}
                   className={cn(
                     'relative flex flex-col',
-                    isProfessional && 'border-international-orange border-2 shadow-lg'
+                    isHighlighted && 'border-international-orange border-2 shadow-lg'
                   )}
                 >
-                  {isProfessional && (
+                  {isHighlighted && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                       <Badge className="bg-international-orange text-white px-4">
                         Most Popular
@@ -253,30 +275,35 @@ export function PricingContent() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Key limits */}
+                    {/* Key limits — investor leads, brainstorms, orders */}
                     <div className="space-y-3">
                       <LimitRow
-                        icon={Bot}
-                        label="Assists/month"
-                        value={plan.limits.maxAiTasksPerMonth >= 10000
-                          ? 'Unlimited'
-                          : plan.limits.maxAiTasksPerMonth.toLocaleString()
+                        icon={Users}
+                        label="Investor leads/month"
+                        value={
+                          investorLeads === null
+                            ? 'Unlimited'
+                            : investorLeads === 0
+                              ? 'Browse only'
+                              : investorLeads.toLocaleString()
                         }
-                        tooltip={AI_TASK_TOOLTIP}
+                        tooltip={INVESTOR_LEAD_TOOLTIP}
+                      />
+                      <LimitRow
+                        icon={Bot}
+                        label="Brainstorms/month"
+                        value={
+                          brainstorms === null
+                            ? 'Unlimited'
+                            : brainstorms.toLocaleString()
+                        }
+                        tooltip={BRAINSTORM_TOOLTIP}
                       />
                       <LimitRow
                         icon={ShoppingBag}
-                        label="Orders/month"
+                        label="Marketplace orders"
                         value={plan.limits.maxOrders
                           ? plan.limits.maxOrders.toLocaleString()
-                          : 'Unlimited'
-                        }
-                      />
-                      <LimitRow
-                        icon={Users}
-                        label="Team members"
-                        value={plan.limits.maxTeamMembers
-                          ? plan.limits.maxTeamMembers.toLocaleString()
                           : 'Unlimited'
                         }
                       />
@@ -295,17 +322,17 @@ export function PricingContent() {
                         asChild
                         className={cn(
                           'w-full',
-                          isProfessional
+                          isHighlighted
                             ? 'bg-international-orange hover:bg-international-orange-hover'
                             : ''
                         )}
-                        variant={isProfessional ? 'default' : 'outline'}
+                        variant={isHighlighted ? 'default' : 'outline'}
                       >
                         <Link href="/join">
                           {plan.tier === 'free'
-                            ? 'Get Started Free'
-                            : plan.tier === 'seed'
-                              ? 'Start with Seed'
+                            ? 'Stay on Free'
+                            : plan.tier === 'starter_v2'
+                              ? 'Start Starter — £20/mo'
                               : `Upgrade to ${plan.name}`}
                           <ArrowRight className="h-4 w-4 ml-2" />
                         </Link>
@@ -313,7 +340,9 @@ export function PricingContent() {
                       <p className="text-xs text-muted-foreground text-center">
                         {plan.tier === 'free'
                           ? 'Free forever · No credit card required'
-                          : 'Cancel anytime · Pay-as-you-go beyond limits'
+                          : plan.tier === 'starter_v2'
+                            ? 'Cancel anytime · £10 per 100 extra leads'
+                            : 'Cancel anytime · Pay-as-you-go beyond limits'
                         }
                       </p>
                     </div>
@@ -323,7 +352,39 @@ export function PricingContent() {
             })}
           </div>
 
-          {/* Enterprise section */}
+          {/* Investor Search Add-On — one-click upsell card */}
+          <div className="mb-16">
+            <Card className="border-dashed border-2 border-international-orange/40 bg-international-orange/5">
+              <CardContent className="py-6 px-6 sm:py-8 sm:px-8">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="h-12 w-12 rounded-xl bg-international-orange/15 flex items-center justify-center shrink-0">
+                      <Users className="h-6 w-6 text-international-orange" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <h3 className="text-lg font-semibold text-foreground">
+                          {INVESTOR_SEARCH_ADDON.label}
+                        </h3>
+                        <span className="text-sm text-muted-foreground">
+                          One-click top-up from inside Investors
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Burned through your Starter allowance this month? Add another 100 investor leads — full why-fit, how-to-pitch, and drafted email — for £10. No resubscription, no admin.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-start md:items-end shrink-0">
+                    <span className="text-3xl font-bold text-foreground">£{(INVESTOR_SEARCH_ADDON.priceGBP / 100).toFixed(0)}</span>
+                    <span className="text-sm text-muted-foreground">per {INVESTOR_SEARCH_ADDON.searchesPerPurchase} extra leads</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Enterprise section — Strategy Council tier */}
           <Card className="mb-16 bg-muted/30">
             <CardContent className="py-8">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -332,9 +393,9 @@ export function PricingContent() {
                     <Zap className="h-7 w-7 text-international-orange" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold text-foreground">Enterprise</h3>
+                    <h3 className="text-xl font-semibold text-foreground">Enterprise — Strategy Council</h3>
                     <p className="text-muted-foreground">
-                      Unlimited assists and team members. Dedicated account manager, custom onboarding, and priority support.
+                      Custom specialists tuned for your company, retrieval over your foundry data, audit log, SSO, and SLA. Unlimited brainstorms and dedicated account manager.
                     </p>
                   </div>
                 </div>
@@ -367,21 +428,20 @@ export function PricingContent() {
             </p>
             <div className="relative">
               <div className="overflow-x-auto">
-                <div className="min-w-[600px]">
-                {/* Header row */}
-                <div className="grid grid-cols-6 gap-2 sm:gap-4 pb-4 border-b border-muted">
+                <div className="min-w-[560px]">
+                {/* Header row — Free / Starter (highlighted) / Pro / Enterprise */}
+                <div className="grid grid-cols-5 gap-2 sm:gap-4 pb-4 border-b border-muted">
                   <div className="text-xs sm:text-sm font-medium text-muted-foreground">Feature</div>
-                  <div className="text-xs sm:text-sm font-medium text-center">Explorer</div>
-                  <div className="text-xs sm:text-sm font-medium text-center">Seed</div>
-                  <div className="text-xs sm:text-sm font-medium text-center">Startup Team</div>
-                  <div className="text-xs sm:text-sm font-medium text-center text-international-orange">Professional</div>
+                  <div className="text-xs sm:text-sm font-medium text-center">Free</div>
+                  <div className="text-xs sm:text-sm font-medium text-center text-international-orange">Starter</div>
+                  <div className="text-xs sm:text-sm font-medium text-center">Pro</div>
                   <div className="text-xs sm:text-sm font-medium text-center">Enterprise</div>
                 </div>
 
                 {COMPARISON_FEATURES.map((feature) => (
                   <div
                     key={feature.name}
-                    className="grid grid-cols-6 gap-2 sm:gap-4 py-3 border-b border-muted/50"
+                    className="grid grid-cols-5 gap-2 sm:gap-4 py-3 border-b border-muted/50"
                   >
                     <div className="text-xs sm:text-sm text-foreground flex items-center gap-1.5">
                       {feature.name}
@@ -397,8 +457,7 @@ export function PricingContent() {
                       )}
                     </div>
                     <ComparisonCell value={feature.free} />
-                    <ComparisonCell value={feature.seed} />
-                    <ComparisonCell value={feature.starter} />
+                    <ComparisonCell value={feature.starter_v2} />
                     <ComparisonCell value={feature.professional} />
                     <ComparisonCell value={feature.enterprise} />
                   </div>
@@ -452,7 +511,7 @@ export function PricingContent() {
           <div className="text-center pb-12">
             <p className="text-sm text-muted-foreground">
               All new accounts get 0% marketplace fees on their first 3 orders.
-              After that: Explorer &amp; Startup at 10%, Professional at 5%.
+              After that: Free &amp; Starter at 10%, Pro at 5%.
               No hidden fees. Cancel anytime.
             </p>
           </div>
@@ -560,27 +619,35 @@ function ComparisonCell({ value }: { value: boolean | string }) {
   return <div className="text-sm text-center text-foreground">{value}</div>
 }
 
-/** Feature comparison data — only features that are actually implemented */
+/**
+ * Feature comparison data — Free / Starter (the new £20 tier) / Pro / Enterprise.
+ *
+ * 2026-04-25: legacy Seed (£19) and legacy Startup Team (£49) are intentionally
+ * not in the comparison grid. Existing subscribers continue to be honoured at
+ * their current limits but don't get advertised on the public surface.
+ */
 const COMPARISON_FEATURES: Array<{
   name: string
   free: boolean | string
-  seed: boolean | string
-  starter: boolean | string
+  starter_v2: boolean | string
   professional: boolean | string
   enterprise: boolean | string
 }> = [
-  { name: 'Assists per month', free: '50', seed: '250', starter: '750', professional: '2,500', enterprise: 'Unlimited' },
-  { name: 'AI specialists', free: '13', seed: '13', starter: '13', professional: '13', enterprise: '13' },
-  { name: 'Investor profiles/month', free: '15', seed: '50', starter: '150', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'Partner names & LinkedIn', free: true, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Verified investor emails', free: false, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Fund performance & hardware fit', free: true, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Marketplace orders', free: 'Unlimited', seed: 'Unlimited', starter: 'Unlimited', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'Marketplace + supplier matching', free: true, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Voice-to-task', free: true, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Engineering reports', free: true, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'Pay-as-you-go overage', free: false, seed: true, starter: true, professional: true, enterprise: true },
-  { name: 'API access', free: false, seed: false, starter: false, professional: true, enterprise: true },
-  { name: 'Dedicated account manager', free: false, seed: false, starter: false, professional: false, enterprise: true },
-  { name: 'Platform fee', free: '10%', seed: '10%', starter: '10% (0% first 3 orders)', professional: '5%', enterprise: '5%' },
+  { name: 'Investor leads/month', free: 'Browse only', starter_v2: '100', professional: 'Unlimited', enterprise: 'Unlimited' },
+  { name: 'Why-fit + how-to-pitch + drafted email', free: false, starter_v2: true, professional: true, enterprise: true },
+  { name: 'Investor Search Add-On (£10 / 100 extra)', free: false, starter_v2: true, professional: true, enterprise: true },
+  { name: 'Brainstorming sessions', free: '1/month', starter_v2: '10/month', professional: 'Unlimited', enterprise: 'Unlimited' },
+  { name: 'Saved investor searches', free: '5 lifetime', starter_v2: 'Unlimited', professional: 'Unlimited', enterprise: 'Unlimited' },
+  { name: 'All 13 specialists', free: 'Read-only sandbox', starter_v2: true, professional: true, enterprise: true },
+  { name: 'Deep Council', free: false, starter_v2: false, professional: true, enterprise: true },
+  { name: 'Strategy Council', free: false, starter_v2: false, professional: false, enterprise: true },
+  { name: 'Verified investor emails', free: false, starter_v2: true, professional: true, enterprise: true },
+  { name: 'Fund performance & hardware fit', free: false, starter_v2: true, professional: true, enterprise: true },
+  { name: 'Marketplace orders', free: 'Unlimited', starter_v2: 'Unlimited', professional: 'Unlimited', enterprise: 'Unlimited' },
+  { name: 'Supplier matching', free: true, starter_v2: true, professional: true, enterprise: true },
+  { name: 'Voice-to-task', free: false, starter_v2: false, professional: true, enterprise: true },
+  { name: 'Engineering reports', free: false, starter_v2: true, professional: true, enterprise: true },
+  { name: 'API access', free: false, starter_v2: false, professional: true, enterprise: true },
+  { name: 'Dedicated account manager', free: false, starter_v2: false, professional: false, enterprise: true },
+  { name: 'Platform fee', free: '10% (0% first 3 orders)', starter_v2: '10% (0% first 3 orders)', professional: '5%', enterprise: '5%' },
 ]
