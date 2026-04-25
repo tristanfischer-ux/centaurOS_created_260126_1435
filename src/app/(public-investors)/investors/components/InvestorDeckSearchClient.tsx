@@ -17,6 +17,7 @@
 'use client'
 
 import { useState, useCallback, useTransition, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   searchInvestors,
@@ -637,13 +638,16 @@ function MatchCard({
   const stages = attrs.stage_focus ?? []
   const sectors = attrs.sectors ?? []
   const contactEmail = attrs.contact_email ?? null
+  const router = useRouter()
 
   // Why-fit / how-to-pitch — expand state
   const [expanded, setExpanded] = useState(false)
   const [isEnriching, startEnrichTransition] = useTransition()
   const [enrichFailed, setEnrichFailed] = useState(false)
 
-  const handleExpand = () => {
+  const handleExpand = (e: React.MouseEvent) => {
+    // Stop propagation so the card-level click-to-navigate doesn't fire
+    e.stopPropagation()
     if (!isPaid) return
     if (!expanded && !matchOutput && onRevealWhyFit) {
       setExpanded(true)
@@ -659,10 +663,33 @@ function MatchCard({
     }
   }
 
+  const handleCardClick = () => {
+    if (!isLocked) {
+      router.push(`/investors/${firm.id}`)
+    }
+  }
+
+  const handleSaveClick = (e: React.MouseEvent) => {
+    // Stop propagation so the card-level click-to-navigate doesn't fire
+    e.stopPropagation()
+    onSave?.()
+  }
+
+  const handleContactEmailClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+  }
+
   return (
-    <div className={`bg-card border border-border rounded-xl px-5 py-4.5 mb-2.5 grid gap-5 transition-all hover:border-international-orange/30 hover:shadow-sm ${
-      isLocked ? 'opacity-80' : ''
-    }`} style={{ gridTemplateColumns: '1fr 88px' }}>
+    <div
+      className={`bg-card border border-border rounded-xl px-5 py-4.5 mb-2.5 grid gap-5 transition-all hover:border-international-orange/30 hover:shadow-sm ${
+        isLocked ? 'opacity-80' : 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md'
+      }`}
+      style={{ gridTemplateColumns: '1fr 88px' }}
+      onClick={handleCardClick}
+      role={isLocked ? undefined : 'link'}
+      tabIndex={isLocked ? undefined : 0}
+      onKeyDown={isLocked ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick() }}
+    >
       {/* Left col */}
       <div>
         {/* Header */}
@@ -758,6 +785,7 @@ function MatchCard({
           {contactEmail && !isLocked && (
             <a
               href={`mailto:${contactEmail}`}
+              onClick={handleContactEmailClick}
               className="ml-auto text-international-orange font-semibold no-underline hover:underline"
             >
               {contactEmail} →
@@ -765,7 +793,7 @@ function MatchCard({
           )}
           {!contactEmail && !isLocked && (
             <span className="ml-auto text-muted-foreground">
-              {isPaid ? 'Contact via investor profile →' : 'Upgrade to unlock contact details'}
+              {isPaid ? 'View full profile →' : 'Upgrade to unlock contact details'}
             </span>
           )}
           {isLocked && (
@@ -779,7 +807,7 @@ function MatchCard({
         {matchScore !== undefined ? (
           <>
             <div className="text-[28px] font-black text-international-orange leading-none">
-              {isLocked ? Math.round(matchScore) : Math.round(matchScore)}
+              {Math.round(matchScore)}
             </div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Fit</div>
           </>
@@ -788,7 +816,7 @@ function MatchCard({
         )}
         {onSave && !isLocked && (
           <button
-            onClick={onSave}
+            onClick={handleSaveClick}
             className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
               isSaved
                 ? 'border-international-orange text-international-orange bg-international-orange/10'

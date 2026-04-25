@@ -10,6 +10,10 @@
  * Why-fit: on expand, calls generateSupplierWhyFit(listingId, query) and shows
  * 1-2 LLM-generated sentences explaining the match. Renders a spinner while loading
  * and an honest fallback message on error.
+ *
+ * 6-pillar breakdown: mirrors the investor match pillar bars pattern with dimensions
+ * specific to supplier matching — Match / Capability / Materials / Certifications /
+ * Verified / Region. Scores computed client-side from the listing record + search query.
  */
 
 import { useState, useTransition } from 'react'
@@ -20,6 +24,135 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { MarketplaceListing } from '@/actions/marketplace'
 import { generateSupplierWhyFit } from '@/actions/suppliers'
+
+// ---------------------------------------------------------------------------
+// Supplier pillar score computation
+// ---------------------------------------------------------------------------
+
+/**
+ * 6-pillar supplier match breakdown.
+ * All values are 0-100 (whole numbers).
+ *
+ * INTENT: Mirrors the Investor MatchPillarBars pattern so both pages share
+ * the same visual language. Scores are heuristic-but-honest — dimensions where
+ * data doesn't exist render as 0 (displayed as "—" via hideEmpty flag).
+ */
+export interface SupplierPillars {
+  match: number        // Overall semantic similarity (0-100 from pgvector cosine)
+  capability: number   // % of listed process_capabilities present
+  materials: number    // % of listed materials present (honest-empty if no data)
+  certifications: number // Certification signal (honest-empty if no data)
+  verified: number     // 100 if verified, 0 if not (shown as full/empty bar)
+  region: number       // Geography match derived from query + listing.country
+}
+
+function fillHex(value: number): string {
+  if (value >= 70) return '#22c55e'
+  if (value >= 40) return '#f59e0b'
+  return '#94a3b8'
+}
+
+const SUPPLIER_PILLAR_ORDER: Array<{ key: keyof SupplierPillars; label: string }> = [
+  { key: 'match',         label: 'MATCH' },
+  { key: 'capability',    label: 'CAPABILITY' },
+  { key: 'materials',     label: 'MATERIALS' },
+  { key: 'certifications', label: 'CERTS' },
+  { key: 'verified',      label: 'VERIFIED' },
+  { key: 'region',        label: 'REGION' },
+]
+
+/**
+ * Compute supplier pillars client-side from the listing record + search query.
+ * Returns honest-empty (0) for any dimension where the data isn't structured
+ * enough to compute a real score — the UI renders these as "—".
+ */
+function computeSupplierPillars(
+  listing: MarketplaceListing & { similarity?: number },
+  searchQuery?: string,
+): SupplierPillars {
+  // Match: cosine similarity from pgvector, scaled to 0-100
+  const match = listing.similarity != null
+    ? Math.round(Math.min(100, Math.max(0, listing.similarity * 100)))
+    : 0
+
+  // Capability: if the listing has process_capabilities, score as 100
+  // (we can't compare against query intent without parsing, so presence = signal)
+  const capCount = listing.process_capabilities?.length ?? 0
+  const capability = capCount > 0 ? Math.min(100, 40 + capCount * 12) : 0
+
+  // Materials: presence signal — same heuristic as capability
+  const matCount = listing.materials?.length ?? 0
+  const materials = matCount > 0 ? Math.min(100, 40 + matCount * 15) : 0
+
+  // Certifications: each cert adds ~25 points, capped at 100
+  const certCount = listing.certifications?.length ?? 0
+  const certifications = certCount > 0 ? Math.min(100, certCount * 25) : 0
+
+  // Verified: boolean flag → full bar or empty
+  const verified = listing.is_verified ? 100 : 0
+
+  // Region: simple token-match between listing country and search query
+  let region = 0
+  if (searchQuery && listing.country) {
+    const q = searchQuery.toLowerCase()
+    const c = listing.country.toLowerCase()
+    // Try direct substring match and common aliases
+    if (q.includes(c) || c.includes('united kingdom') && (q.includes('uk') || q.includes('united kingdom') || q.includes('london') || q.includes('england'))
+      || c.includes('united states') && (q.includes('us') || q.includes('usa') || q.includes('united states'))
+      || c.includes('germany') && q.includes('german')
+      || c.includes('france') && q.includes('french')
+      || c.includes('china') && (q.includes('china') || q.includes('chinese'))) {
+      region = 90
+    } else if (q.includes('europe') && ['united kingdom', 'germany', 'france', 'netherlands', 'sweden', 'norway', 'denmark', 'spain', 'italy'].some(eu => c.includes(eu))) {
+      region = 70
+    }
+  }
+
+  return { match, capability, materials, certifications, verified, region }
+}
+
+// ---------------------------------------------------------------------------
+// SupplierPillarBars — compact 6-bar row matching InvestorMatchCard layout
+// ---------------------------------------------------------------------------
+
+function SupplierPillarBars({
+  pillars,
+  className,
+}: {
+  pillars: SupplierPillars
+  className?: string
+}) {
+  return (
+    <div className={cn('grid grid-cols-6 gap-1.5', className)}>
+      {SUPPLIER_PILLAR_ORDER.map(({ key, label }) => {
+        const value = pillars[key]
+        const isEmpty = value === 0
+        return (
+          <div
+            key={key}
+            className="flex flex-col items-center gap-0.5"
+            title={isEmpty ? `${label}: —` : `${label}: ${value}`}
+          >
+            <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+              {!isEmpty && (
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, value))}%`,
+                    backgroundColor: fillHex(value),
+                  }}
+                />
+              )}
+            </div>
+            <span className="text-[9px] font-medium text-muted-foreground leading-none tabular-nums">
+              {isEmpty ? '—' : value}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Logo initials helper
@@ -239,6 +372,9 @@ export function SupplierMatchCard({ listing, searchQuery }: SupplierMatchCardPro
 
   const similarity = (listing as MarketplaceListing & { similarity?: number }).similarity
 
+  // 6-pillar breakdown — computed client-side from listing record + search query
+  const pillars = computeSupplierPillars(listing, searchQuery)
+
   return (
     <Link
       href={`/marketplace/${listing.id}`}
@@ -300,6 +436,9 @@ export function SupplierMatchCard({ listing, searchQuery }: SupplierMatchCardPro
             ))}
           </div>
         )}
+
+        {/* 6-pillar breakdown bars — mirrors InvestorMatchCard layout */}
+        <SupplierPillarBars pillars={pillars} className="w-full mt-1 mb-1" />
 
         {/* Why-fit — expand on demand */}
         {searchQuery && (
