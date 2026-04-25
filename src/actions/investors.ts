@@ -857,8 +857,8 @@ async function searchInvestorsCore(
       // Fix 2026-04-25: PAGES reduced 8 → 2. This eliminates the timeout that
       // caused semantic search to silently fall through to the keyword path,
       // which returned 0 results for natural-language deck descriptions.
-      const PAGE = 1000
-      const PAGES = 2 // 2 × 1000 = 2,000 candidates — top 2K by cosine similarity
+      const PAGE = 1500
+      const PAGES = 1 // 1 × 1500 = 1,500 candidates. Even 2 parallel scans intermittently hit statement_timeout 57014; single scan is reliable.
       const embJson = JSON.stringify(queryEmbedding) as unknown as string
       const pageResults = await Promise.all(
         Array.from({ length: PAGES }, (_, i) =>
