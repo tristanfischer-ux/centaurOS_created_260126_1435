@@ -1,8 +1,15 @@
 /**
  * Summary Generator
  *
- * Generates natural language summaries from report data using Claude Haiku 4.5.
- * Note: While this uses AI internally, user-facing copy avoids the term "AI".
+ * Generates natural language summaries from report data using DeepSeek V4.
+ * Note: While this uses an LLM internally, user-facing copy avoids the term "AI".
+ *
+ * COST CUT 2026-04-24: Swapped from Anthropic Haiku ($1.00 / $5.00 per 1M)
+ * to DeepSeek V4 chat ($0.30 / $0.50 per 1M) — ~3x cheaper input, ~10x
+ * cheaper output. Same long-form 2-3 sentence prose use case; V4 handles it
+ * well. Provider notes: DeepSeek's chat completions API is OpenAI-compatible
+ * so we use the OpenAI SDK with a custom baseURL (mirrors the pattern in
+ * src/lib/ai-providers/registry.ts streamDeepSeek).
  */
 
 import { DailyPulseData, UserRole, Insight } from './types'
@@ -17,15 +24,17 @@ interface SummaryContext {
 
 /**
  * Generate a natural language summary for the daily pulse.
- * Uses Claude Haiku 4.5 (cheap + great at short prose) via direct Anthropic fetch.
+ * Uses DeepSeek V4 (cheap + great at short prose) via OpenAI-compatible API.
  */
 export async function generateDailySummary(context: SummaryContext): Promise<string> {
     const { data, userName, userRole, insights } = context
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
     if (!apiKey) {
         return generateTemplateSummary(context)
     }
+
+    const summaryModel = 'deepseek-chat'
 
     try {
         const isLeader = userRole === 'Executive' || userRole === 'Founder' || userRole === 'Team Lead'
@@ -56,46 +65,44 @@ Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anyw
             topInsights: insights.slice(0, 2).map(i => ({ type: i.type, title: i.title }))
         }
 
-        const summaryModel = 'claude-haiku-4-5-20251001'
-        let response: Response
-        try {
-            response = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                },
-                body: JSON.stringify({
-                    model: summaryModel,
-                    max_tokens: 200,
-                    temperature: 0.7,
-                    system: systemPrompt,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`,
-                        },
-                    ],
-                }),
-            })
-        } catch (err) {
-            void logLlmUsage({
-                action: 'report_summary',
-                modelUsed: summaryModel,
-                tokensIn: 0,
-                tokensOut: 0,
-                status: 'error',
-                errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
-            })
-            throw err
-        }
+        // DeepSeek exposes an OpenAI-compatible chat completions endpoint at
+        // api.deepseek.com — we use the OpenAI SDK with a custom baseURL.
+        const OpenAI = (await import('openai')).default
+        const client = new OpenAI({
+            apiKey,
+            baseURL: 'https://api.deepseek.com',
+            timeout: 30_000,
+            maxRetries: 0,
+        })
 
-        if (!response.ok) {
-            const errText = await response.text()
+        let completion: Awaited<ReturnType<typeof client.chat.completions.create>> & {
+            choices: Array<{ message?: { content?: string | null } }>
+            usage?: { prompt_tokens?: number; completion_tokens?: number }
+        }
+        try {
+            const raw = await client.chat.completions.create({
+                model: summaryModel,
+                max_tokens: 200,
+                temperature: 0.7,
+                stream: false,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    {
+                        role: 'user',
+                        content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`,
+                    },
+                ],
+            })
+            // OpenAI SDK returns a union type that includes streaming; we set
+            // stream:false above so the cast is safe.
+            completion = raw as typeof completion
+        } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err)
+            // Map common HTTP status patterns surfaced by the OpenAI SDK to our
+            // logLlmUsage status enum so the cost dashboard can split failures.
             const status: 'rate_limited' | 'timeout' | 'error' =
-                response.status === 429 || response.status === 529 ? 'rate_limited' :
-                response.status === 408 || response.status === 504 ? 'timeout' :
+                /429|529|rate.?limit|overloaded/i.test(errMsg) ? 'rate_limited' :
+                /408|504|timeout|timed out|aborted/i.test(errMsg) ? 'timeout' :
                 'error'
             void logLlmUsage({
                 action: 'report_summary',
@@ -103,24 +110,23 @@ Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anyw
                 tokensIn: 0,
                 tokensOut: 0,
                 status,
-                errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+                errorMessage: errMsg.slice(0, 200),
             })
-            console.error('[summary-generator] Anthropic API error:', response.status, errText)
+            console.error('[summary-generator] DeepSeek API error:', errMsg)
             return generateTemplateSummary(context)
         }
 
-        const json = await response.json()
         void logLlmUsage({
             action: 'report_summary',
             modelUsed: summaryModel,
-            tokensIn: json.usage?.input_tokens ?? 0,
-            tokensOut: json.usage?.output_tokens ?? 0,
+            tokensIn: completion.usage?.prompt_tokens ?? 0,
+            tokensOut: completion.usage?.completion_tokens ?? 0,
             status: 'success',
         })
-        const text = (json.content?.[0]?.text ?? '').trim()
+        const text = (completion.choices?.[0]?.message?.content ?? '').trim()
         return text || generateTemplateSummary(context)
     } catch (error) {
-        console.error('Failed to generate summary with Claude Haiku:', error)
+        console.error('Failed to generate summary with DeepSeek V4:', error)
         return generateTemplateSummary(context)
     }
 }
