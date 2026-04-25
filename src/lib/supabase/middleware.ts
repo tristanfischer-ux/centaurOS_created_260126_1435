@@ -16,6 +16,9 @@ const PUBLIC_ROUTES = [
     '/api/waitlist',  // One-click approve/reject from email (token-signed)
     '/api/webhooks',
     '/api/dev-login',  // Dev-only auto-login for AI agents/tests (returns 404 in production)
+    '/api/cron',  // Cron endpoints (Bearer secret auth at route level — see lib/security/cron-auth.ts)
+    '/api/autopilot-step',  // Internal autopilot stage hop (FORGE_RENDER_STAGE_SECRET Bearer at route)
+    '/api/render-stage',  // Internal per-module render hop (same secret as autopilot-step)
     '/access-revoked',  // Access revoked page for deactivated users
     '/workspace-picker', // Multi-foundry workspace selector
     '/claim',  // Public listing claim flow (outreach)
