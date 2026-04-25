@@ -34,6 +34,7 @@ import {
   type InvestorTierAccess,
   type InvestorMatchOutputView,
 } from '@/actions/investors'
+import { APP_DOMAIN } from '@/lib/domains'
 
 type ResolvedTier = 'free' | 'seed' | 'starter' | 'professional' | 'enterprise' | 'anonymous'
 
@@ -66,6 +67,13 @@ interface InvestorSearchHeroClientProps {
     viewsUsedThisMonth: number
     viewsRemaining: number | null
   }
+  /**
+   * When true the user is within their early-access free month.
+   * Passes through to LimitReachedUpsell and ApproachingLimitBanner so they
+   * show the invite-a-friend framing instead of the paid-conversion upsell.
+   * Resolved server-side via getEarlyAccessProfile() in the page loader.
+   */
+  isEarlyAccess?: boolean
 }
 
 const PAID_TIERS = new Set(['seed', 'starter', 'professional', 'enterprise'])
@@ -82,6 +90,7 @@ export function InvestorSearchHeroClient({
   companyContext,
   userId,
   viewCapSnapshot,
+  isEarlyAccess = false,
 }: InvestorSearchHeroClientProps) {
   const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
   const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores ?? {})
@@ -271,6 +280,8 @@ export function InvestorSearchHeroClient({
           limit="monthly_searches"
           currentCount={usedThisMonth}
           limitMax={cap as number}
+          isEarlyAccess={isEarlyAccess}
+          referralUrl={isEarlyAccess && userId ? `${APP_DOMAIN}/signup?ref=${userId}` : undefined}
         />
       )}
 
@@ -351,6 +362,7 @@ export function InvestorSearchHeroClient({
           limit="monthly_searches"
           currentCount={usedThisMonth}
           limitMax={cap as number}
+          isEarlyAccess={isEarlyAccess}
         />
       )}
 
