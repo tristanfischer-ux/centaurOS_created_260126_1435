@@ -29,7 +29,7 @@ import { StartForgeBox } from "./_components/start-forge-box"
 
 export const metadata: Metadata = {
     title: "The Forge",
-    description: "Describe what you want to build — the Forge drafts a full plan in about 20 minutes.",
+    description: "Describe what you want to build — the Forge drafts a first pass in twenty minutes, then the detail comes in over the hours after.",
 }
 
 export const dynamic = "force-dynamic"
@@ -47,7 +47,7 @@ export default async function ForgeV2LandingPage(): Promise<React.ReactNode> {
 
     return (
         <WorkspaceShell
-            subtitle="Describe what you're building. The Forge drafts a full plan — brief, modules, bill of materials, cost, risks, suppliers — in about 20 minutes."
+            subtitle="Describe what you're building. Twenty minutes for the first pass — brief, modules, bill of materials, cost, risks, suppliers — and hours of detail after."
             maxWidth="narrow"
         >
             {loadError && (

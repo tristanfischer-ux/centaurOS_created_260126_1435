@@ -195,7 +195,7 @@ export function AutopilotButton({
                 onClick={handleStart}
                 disabled={isPending}
                 aria-busy={isPending}
-                title="Walks Chase → Max → BOM → Finn → illustration → suppliers → Fang reviews. About 10-20 minutes. You can close this tab."
+                title="Walks Chase → Max → bill of materials → Finn → illustration → suppliers → Fang reviews. Twenty minutes for the first pass, hours of detail after. You can close this tab."
             >
                 {isPending ? "Starting…" : "Run autopilot"}
             </button>
