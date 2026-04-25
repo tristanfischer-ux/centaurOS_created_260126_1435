@@ -75,12 +75,12 @@ Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anyw
             model: 'gpt-5.4',
             messages: [
                 { role: 'system', content: systemPrompt },
-                { 
-                    role: 'user', 
+                {
+                    role: 'user',
                     content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`
                 }
             ],
-            max_tokens: 200,
+            max_completion_tokens: 200,
             temperature: 0.7
         })
         

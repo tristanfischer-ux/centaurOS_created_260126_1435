@@ -288,7 +288,7 @@ ${analysis?.dfm ? `DFM: ${analysis.dfm.printable ? "Printable" : "NOT printable"
       },
     ],
     temperature: 0.3,
-    max_tokens: 2000,
+    max_completion_tokens: 2000,
   })
 
   const rawContent = completion.choices[0]?.message?.content

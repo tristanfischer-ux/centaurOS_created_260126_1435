@@ -70,7 +70,7 @@ No other text. Example: {"relevance":0.9,"completeness":0.8,"actionability":0.85
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      max_tokens: 200,
+      max_completion_tokens: 200,
     })
 
     const raw = res.choices[0]?.message?.content?.trim() ?? '{}'
@@ -209,7 +209,7 @@ Return ONLY a JSON object with those exact keys. No other text. Example:
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      max_tokens: 300,
+      max_completion_tokens: 300,
     })
 
     const raw = res.choices[0]?.message?.content?.trim() ?? '{}'

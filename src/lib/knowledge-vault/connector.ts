@@ -258,7 +258,7 @@ async function evaluateWithLLM(
   const response = await openai.chat.completions.create({
     model: 'gpt-5.4',
     temperature: 0,
-    max_tokens: 1000,
+    max_completion_tokens: 1000,
     messages: [
       {
         role: 'system',

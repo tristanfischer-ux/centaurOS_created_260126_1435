@@ -274,6 +274,14 @@ export async function callOpenAI(
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
 
+  // GPT-5+/o3/o4 reasoning models REJECT `max_tokens` — they require `max_completion_tokens`.
+  // gpt-4.1*, gpt-4o*, and older models still accept `max_tokens`.
+  const isReasoningModel =
+    modelId.startsWith("gpt-5") || modelId.startsWith("o3") || modelId.startsWith("o4")
+  const tokenParam = isReasoningModel
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens }
+
   const response = await fetchWithTimeout(
     "https://api.openai.com/v1/chat/completions",
     {
@@ -284,7 +292,7 @@ export async function callOpenAI(
       },
       body: JSON.stringify({
         model: modelId,
-        max_tokens: maxTokens,
+        ...tokenParam,
         temperature: 0.2,
         messages: [
           { role: "system", content: systemPrompt },

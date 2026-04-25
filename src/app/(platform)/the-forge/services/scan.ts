@@ -288,7 +288,7 @@ Derive the process class and identify risks.`,
       },
     ],
     response_format: zodResponseFormat(ProcessClassDerivationSchema, "process_class"),
-    max_tokens: 2048,
+    max_completion_tokens: 2048,
   })
 
   const parsed = completion.choices[0]?.message?.parsed
@@ -378,7 +378,7 @@ export async function refineScanAI(
       { role: "user", content: userContent },
     ],
     response_format: zodResponseFormat(AIScanOutputSchema, "xray_scan"),
-    max_tokens: 8192,
+    max_completion_tokens: 8192,
   })
 
   const parsed = completion.choices[0]?.message?.parsed
@@ -570,7 +570,7 @@ export async function refineModuleAI(
       },
     ],
     response_format: zodResponseFormat(SingleModuleOutputSchema, "refined_module"),
-    max_tokens: 4096,
+    max_completion_tokens: 4096,
   })
 
   const parsed = completion.choices[0]?.message?.parsed
