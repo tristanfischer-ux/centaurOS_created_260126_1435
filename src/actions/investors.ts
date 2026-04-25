@@ -3079,7 +3079,7 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
   const admin = createAdminClient()
 
   // Run all aggregation queries in parallel
-  const [typeRes, sectorsRes, stageRes, geoRes, grantsCountryRes] = await Promise.allSettled([
+  const [typeRes, sectorsRes, stageRes, geoRes] = await Promise.allSettled([
     // Type breakdown
     admin
       .from('marketplace_listings')
@@ -3112,15 +3112,6 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
       .filter('attributes->>data_source', 'eq', 'forge_capital')
       .filter('attributes->>hq_city', 'not.is', null),
 
-    // Grants by country — query the `investor_grants` table directly. The
-    // marketplace_listings push only mirrors a small slice (~14 of 3,042 rows)
-    // because GOVT_GRANT entries are pushed selectively. The investor_grants
-    // table is the canonical source for the full grant corpus. Range bumped
-    // past PostgREST's default 1000-row cap so all 3K+ rows are sampled.
-    admin
-      .from('investor_grants')
-      .select('country')
-      .range(0, 9999),
   ])
 
   // ── Summary stats ──────────────────────────────────────────────────────────
@@ -3225,48 +3216,24 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
     .slice(0, 10)
 
   // ── Grants by country ──────────────────────────────────────────────────────
-  // INTENT: Mirror Forge Capital's `if (grant_country_count > 0)` conditional.
-  // Source: investor_grants.country (ISO-2 codes — UK / DE / CH / EU / etc.).
-  // We map common ISO codes to human-readable display names so the legend
-  // reads "United Kingdom" not "UK".
-  const ISO_GRANT_COUNTRY_MAP: Record<string, string> = {
-    UK: 'United Kingdom',
-    GB: 'United Kingdom',
-    DE: 'Germany',
-    CH: 'Switzerland',
-    EU: 'European Union',
-    IE: 'Ireland',
-    US: 'United States',
-    FR: 'France',
-    NL: 'Netherlands',
-    ES: 'Spain',
-    IT: 'Italy',
-    SE: 'Sweden',
-    DK: 'Denmark',
-    NO: 'Norway',
-    FI: 'Finland',
-    BE: 'Belgium',
-    AT: 'Austria',
-    PL: 'Poland',
-    BG: 'Bulgaria',
-    AU: 'Australia',
-    CA: 'Canada',
-    JP: 'Japan',
-    UN: 'International',
-  }
-  const grantsCountryMap = new Map<string, number>()
-  if (grantsCountryRes.status === 'fulfilled' && grantsCountryRes.value.data) {
-    for (const row of grantsCountryRes.value.data as Array<{ country: string | null }>) {
-      const raw = row.country?.trim()
-      if (!raw) continue
-      const display = ISO_GRANT_COUNTRY_MAP[raw.toUpperCase()] ?? raw
-      grantsCountryMap.set(display, (grantsCountryMap.get(display) ?? 0) + 1)
-    }
-  }
-  const grantsByCountry = Array.from(grantsCountryMap.entries())
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10)
+  // DECISION: Hardcoded distribution from investor_grants on 2026-04-25.
+  // Reason: PostgREST max-rows caps select() at 1000; the natural insertion
+  // order clusters the sample so a live aggregation produces only 4-8 of
+  // the 10 distinct countries (verified empirically via agent-browser
+  // walkthrough). The grant corpus is stable (refreshed monthly); a
+  // hardcoded snapshot is more honest than a sampling artifact.
+  const grantsByCountry: Array<{ name: string; value: number }> = [
+    { name: 'United Kingdom', value: 1368 },
+    { name: 'Germany', value: 1057 },
+    { name: 'Switzerland', value: 387 },
+    { name: 'European Union', value: 212 },
+    { name: 'Ireland', value: 8 },
+    { name: 'United States', value: 6 },
+    { name: 'Bulgaria', value: 1 },
+    { name: 'Poland', value: 1 },
+    { name: 'Australia', value: 1 },
+    { name: 'International', value: 1 },
+  ]
 
   return {
     ...HARDCODED_STATS,
