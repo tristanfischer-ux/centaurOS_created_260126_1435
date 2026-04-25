@@ -138,6 +138,11 @@ const MODEL_TIERS = {
     qwen: { providerId: "qwen", modelId: "qwen3.5-plus" },
     "qwen-local": { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
     minimax: { providerId: "minimax", modelId: "MiniMax-M2.7" },
+    // 2026-04-25 swap tiers — keep aligned with FALLBACK_CHAINS in failover.ts
+    haiku: { providerId: "anthropic", modelId: "claude-haiku-4-5-20251001" },
+    "gpt-mini": { providerId: "openai", modelId: "gpt-4.1-mini" },
+    "qwen-235b": { providerId: "qwen", modelId: "qwen3-235b-a22b" },
+    "deepseek-v4-pro": { providerId: "together", modelId: "deepseek-ai/DeepSeek-V4-Pro" },
 } as const
 
 /** Resolve the provider + model for a specialist based on their declared tier. */

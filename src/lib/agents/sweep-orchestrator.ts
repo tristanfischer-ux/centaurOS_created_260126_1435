@@ -147,6 +147,12 @@ const EXECUTION_MODEL_MAP: Record<string, { model: string; provider: 'anthropic'
   'google': { model: 'gemini-3.1-pro-preview', provider: 'openai-compat', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKeyEnv: 'GOOGLE_AI_API_KEY' },
   'openai': { model: 'gpt-5.4', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
   'minimax': { model: 'MiniMax-M2.7', provider: 'openai-compat', baseURL: 'https://api.minimax.io/v1', apiKeyEnv: 'MINIMAX_API_KEY' },
+  // 2026-04-25 swap tiers — specialist execution sweeps must honour the new model assignments,
+  // otherwise sweeps silently fall back to Sonnet and contradict the validated swap.
+  'haiku': { model: 'claude-haiku-4-5-20251001', provider: 'anthropic', apiKeyEnv: 'ANTHROPIC_API_KEY' },
+  'gpt-mini': { model: 'gpt-4.1-mini', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
+  'qwen-235b': { model: 'qwen3-235b-a22b', provider: 'openai-compat', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', apiKeyEnv: 'DASHSCOPE_API_KEY' },
+  'deepseek-v4-pro': { model: 'deepseek-ai/DeepSeek-V4-Pro', provider: 'openai-compat', baseURL: 'https://api.together.xyz/v1', apiKeyEnv: 'TOGETHER_API_KEY' },
 }
 
 /** Fallback execution model when specialist's model is unavailable */

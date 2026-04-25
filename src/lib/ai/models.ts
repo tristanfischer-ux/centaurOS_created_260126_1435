@@ -54,6 +54,8 @@ export type GoogleModelId = (typeof GOOGLE_MODELS)[keyof typeof GOOGLE_MODELS]
 /** OpenAI model IDs. Used as final-fallback in CAD Lab breakdown. */
 export const OPENAI_MODELS = {
   gpt5: "gpt-5.4",
+  /** GPT-4.1 mini — Sal (sales-lead) primary as of 2026-04-25 swap. */
+  gpt41_mini: "gpt-4.1-mini",
 } as const
 
 export type OpenAIModelId = (typeof OPENAI_MODELS)[keyof typeof OPENAI_MODELS]
@@ -62,9 +64,19 @@ export type OpenAIModelId = (typeof OPENAI_MODELS)[keyof typeof OPENAI_MODELS]
  *  April 7 2026 cross-model benchmark (see CLAUDE.md). */
 export const DEEPSEEK_MODELS = {
   v4: "deepseek-v4",
+  /** V4-Pro reasoning routed via Together — Finn (finance-lead) primary as of 2026-04-25. */
+  v4_pro_together: "deepseek-ai/DeepSeek-V4-Pro",
 } as const
 
 export type DeepSeekModelId = (typeof DEEPSEEK_MODELS)[keyof typeof DEEPSEEK_MODELS]
+
+/** Qwen model IDs. Routed via DashScope (Alibaba publisher) or Together (mirror). */
+export const QWEN_MODELS = {
+  /** Fang (vp-manufacturing) primary as of 2026-04-25 swap. */
+  qwen3_235b: "qwen3-235b-a22b",
+} as const
+
+export type QwenModelId = (typeof QWEN_MODELS)[keyof typeof QWEN_MODELS]
 
 /** Combined manifest — convenience for the monitor workflow and for code that
  *  wants one object to introspect. Keep this as the SINGLE shape the GitHub
@@ -74,6 +86,7 @@ export const MODELS = {
   google: GOOGLE_MODELS,
   openai: OPENAI_MODELS,
   deepseek: DEEPSEEK_MODELS,
+  qwen: QWEN_MODELS,
 } as const
 
 /** Version metadata — one entry per alias. Consumed by the weekly version
@@ -88,5 +101,8 @@ export const MODEL_METADATA = {
   "gemini-3.1-pro-preview":    { provider: "google",    family: "gemini-pro", version: [3, 1] },
   "gemini-2.5-flash":          { provider: "google",    family: "gemini-flash", version: [2, 5] },
   "gpt-5.4":                   { provider: "openai",    family: "gpt-5", version: [5, 4] },
+  "gpt-4.1-mini":              { provider: "openai",    family: "gpt-4.1-mini", version: [4, 1] },
   "deepseek-v4":               { provider: "deepseek",  family: "deepseek-v", version: [4, 0] },
+  "deepseek-ai/DeepSeek-V4-Pro": { provider: "together", family: "deepseek-v4-pro", version: [4, 0] },
+  "qwen3-235b-a22b":           { provider: "qwen",      family: "qwen3-235b", version: [3, 0] },
 } as const satisfies Record<string, { provider: string; family: string; version: readonly [number, number] }>

@@ -48,6 +48,10 @@ export type ModelTier =
     | "deepseek"
     | "google"
     | "openai"
+    | "haiku"
+    | "gpt-mini"
+    | "qwen-235b"
+    | "deepseek-v4-pro"
 
 /**
  * A concrete provider/model pair the failover loop will attempt.
@@ -117,6 +121,39 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "openai", modelId: "gpt-5.4" },
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
+    ],
+    // Benchmark-validated swap 2026-04-25 — Mia (growth-marketer)
+    haiku: [
+        { providerId: "anthropic", modelId: "claude-haiku-4-5-20251001" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "google", modelId: "gemini-2.5-flash" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
+    ],
+    // Benchmark-validated swap 2026-04-25 — Sal (sales-lead)
+    "gpt-mini": [
+        { providerId: "openai", modelId: "gpt-4.1-mini" },
+        { providerId: "openai", modelId: "gpt-5.4" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
+    ],
+    // Benchmark-validated swap 2026-04-25 — Fang (vp-manufacturing)
+    // Routes Qwen 3 235B via DashScope first (publisher), Together as backup (Qwen 3.5 397B)
+    "qwen-235b": [
+        { providerId: "qwen", modelId: "qwen3-235b-a22b" },
+        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
+    ],
+    // Benchmark-validated swap 2026-04-25 — Finn (finance-lead)
+    // V4-Pro reasoning via Together; falls back to V4 (chat) on DeepSeek direct.
+    "deepseek-v4-pro": [
+        { providerId: "together", modelId: "deepseek-ai/DeepSeek-V4-Pro" },
+        { providerId: "deepseek", modelId: "deepseek-reasoner" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "anthropic", modelId: "claude-opus-4-7" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
     ],
 }
 
