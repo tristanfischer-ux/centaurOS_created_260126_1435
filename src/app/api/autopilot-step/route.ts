@@ -256,6 +256,16 @@ async function runStep(
                 "@/actions/specialists/run-fang-sizing"
             )
             const result = await runFangSizingBackground(projectId, foundryId)
+            // Sizing has a `skipped: true` legitimate outcome for exotic
+            // domains (e.g. HAPS stratospheric platform — no solver
+            // support). Treat as advance, not failure.
+            if (
+                !result.ok &&
+                "skipped" in result &&
+                result.skipped === true
+            ) {
+                return { ok: true }
+            }
             return result.ok
                 ? { ok: true }
                 : { ok: false, error: result.error ?? "Sizing failed" }
@@ -266,6 +276,14 @@ async function runStep(
                 "@/actions/specialists/run-fang-layout"
             )
             const result = await runFangLayoutBackground(projectId, foundryId)
+            // Layout has the same skipped-outcome pattern as Sizing.
+            if (
+                !result.ok &&
+                "skipped" in result &&
+                result.skipped === true
+            ) {
+                return { ok: true }
+            }
             return result.ok
                 ? { ok: true }
                 : { ok: false, error: result.error ?? "Layout failed" }
