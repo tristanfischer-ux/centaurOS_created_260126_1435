@@ -871,7 +871,13 @@ async function searchInvestorsCore(
           supabase.rpc('match_marketplace_listings_v2', {
             query_embedding: embJson,
             filter_category: 'Finance',
-            match_threshold: -1.0, // include every embedded firm, regardless of hemisphere
+            // 2026-04-25 evening: bumped from -1.0 to 0.0. The "-1 → include
+            // every row regardless of hemisphere" knob was forcing IVFFlat to
+            // scan the full Finance corpus on busy probes, which intermittently
+            // hit Supabase statement_timeout (57014). Cosine ≥ 0 still yields
+            // ~all real matches (any negative-similarity row is a useless hit
+            // and gets dropped downstream anyway).
+            match_threshold: 0.0,
             match_count: PAGE,
             p_offset: i * PAGE,
           }),

@@ -442,8 +442,25 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
   // Helper: case-insensitive Title Case dedupe key. Listings use mixed casing
   // ("Stainless Steel" vs "stainless steel" vs "STAINLESS STEEL") which would
   // otherwise produce duplicate chart entries with the same label.
+  // Preserves common manufacturing acronyms (MIG, TIG, CNC, EDM, AS9100, ABS,
+  // PCB, PLA, PEEK, etc.) so labels read sensibly in the chart legend.
+  const ACRONYMS = new Set([
+    'MIG', 'TIG', 'CNC', 'EDM', 'PCB', 'ABS', 'PLA', 'PEEK', 'FDM', 'SLA',
+    'SLS', 'DMLS', 'EBM', 'WAAM', 'HVAC', 'OEM', 'ODM', 'IP', 'UV', 'ESD',
+    'EMI', 'EMC', 'RoHS', 'REACH', 'GDPR',
+  ])
   const titleCase = (s: string) =>
-    s.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+    s
+      .trim()
+      .toLowerCase()
+      .split(/(\s+)/)
+      .map(part => {
+        if (!part.trim()) return part
+        const upper = part.toUpperCase()
+        if (ACRONYMS.has(upper)) return upper
+        return part.charAt(0).toUpperCase() + part.slice(1)
+      })
+      .join('')
 
   // ── Top process capabilities ───────────────────────────────────────────────────
   // GOTCHA: process_capabilities is JSONB array of *objects* with a `process_name`
