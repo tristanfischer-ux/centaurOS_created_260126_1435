@@ -461,9 +461,92 @@ async function runStep(
                 projectId,
                 foundryId,
             )
-            return result.ok
-                ? { ok: true }
-                : { ok: false, error: result.error ?? "PDF export failed" }
+            if (!result.ok) {
+                return {
+                    ok: false,
+                    error: result.error ?? "PDF export failed",
+                }
+            }
+
+            // exportProjectPdfBackground only PRODUCES the bytes — it doesn't
+            // write them anywhere. The previous (deleted) stepGeneratePdf
+            // wrote to storage + report_downloads inline; the zero-wait
+            // rewrite dropped that step on the floor. Restored 2026-04-25
+            // NIGHT after Loop 2 regen revealed PDFs marked done but no
+            // storage rows. (Diagnosed by querying report_downloads — empty
+            // since 16:36 today despite multiple generating_pdf done rows.)
+            const admin = createAdminClient()
+            const STORAGE_BUCKET = "report-downloads"
+            try {
+                // Look up foundry slug for the storage prefix — matches the
+                // `forge-guild/<projectId>/...` pattern observed in prior
+                // production rows.
+                const { data: foundryRow } = await admin
+                    .from("foundries")
+                    .select("slug")
+                    .eq("id", foundryId)
+                    .maybeSingle()
+                const foundrySlug =
+                    typeof foundryRow?.slug === "string" && foundryRow.slug.length > 0
+                        ? foundryRow.slug
+                        : foundryId
+                const storagePath = `${foundrySlug}/${projectId}/${result.filename}`
+                const pdfBytes = Buffer.from(result.base64, "base64")
+
+                const { error: uploadErr } = await admin.storage
+                    .from(STORAGE_BUCKET)
+                    .upload(storagePath, pdfBytes, {
+                        contentType: "application/pdf",
+                        upsert: true,
+                    })
+                if (uploadErr) {
+                    return {
+                        ok: false,
+                        error: `Storage upload failed: ${uploadErr.message}`,
+                    }
+                }
+
+                // Resolve foundry-owner profile_id for the report_downloads
+                // row (the table requires non-null profile_id; autopilot
+                // runs with no user session, so foundry-owner is the
+                // canonical author).
+                const { data: foundryOwner } = await admin
+                    .from("foundries")
+                    .select("owner_id")
+                    .eq("id", foundryId)
+                    .maybeSingle()
+                const profileId = foundryOwner?.owner_id ?? null
+
+                const { error: insertErr } = await admin
+                    .from("report_downloads")
+                    .insert({
+                        foundry_id: foundryId,
+                        profile_id: profileId,
+                        report_name: result.filename.replace(/\.pdf$/i, ""),
+                        report_source: "cad-lab",
+                        file_format: "pdf",
+                        file_size_bytes: result.sizeBytes,
+                        storage_path: storagePath,
+                    } as never)
+                if (insertErr) {
+                    // Soft fail — the PDF IS in storage; the row is the
+                    // index for the Downloads tab to find it. Log + return ok
+                    // so the autopilot stamps done; the row can be backfilled.
+                    console.warn(
+                        "[autopilot-step] report_downloads insert failed:",
+                        insertErr.message,
+                    )
+                }
+                return { ok: true }
+            } catch (err) {
+                return {
+                    ok: false,
+                    error:
+                        err instanceof Error
+                            ? `PDF persist failed: ${err.message}`
+                            : "PDF persist failed",
+                }
+            }
         }
     }
 }
