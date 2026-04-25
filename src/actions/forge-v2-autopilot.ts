@@ -381,6 +381,49 @@ export async function startAutopilot(
  * research seeded without a pipeline_runs row.
  */
 async function stepWaitForChase(projectId: string): Promise<void> {
+    // Self-fire if no Chase run exists yet. Normally Chase is fired by
+    // createCadLabProject's after() chain, but autopilot can also be started
+    // against projects seeded another way (admin SQL, fork, recovery from
+    // a stale run). Mirrors stepWaitForMax's self-heal pattern.
+    const admin = createAdminClient()
+    const { data: existingChase } = await admin
+        .from("pipeline_runs")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("specialist_id", "vp-supply-chain")
+        .eq("stage", "research.seed")
+        .limit(1)
+        .maybeSingle()
+    if (!existingChase) {
+        console.info("[autopilot] stepWaitForChase: no Chase run found, firing it now")
+        const foundryId = await getProjectFoundryId(projectId)
+        if (foundryId) {
+            try {
+                const { runChaseResearchBackground } = await import(
+                    "@/actions/specialists/run-chase-research"
+                )
+                // AWAIT not fire-and-forget — see stepWaitForMax for rationale.
+                // Chase research runs ~120-180s; we have 240s budget on the
+                // poll plus the orchestrator's own 300s lambda.
+                const chaseResult = await runChaseResearchBackground(
+                    projectId,
+                    foundryId,
+                    null,
+                    "auto.project-create",
+                )
+                console.info(
+                    "[autopilot] stepWaitForChase self-fire result:",
+                    chaseResult.ok ? `ok runId=${chaseResult.runId}` : `error=${"error" in chaseResult ? chaseResult.error : "unknown"}`,
+                )
+            } catch (err) {
+                console.error(
+                    "[autopilot] stepWaitForChase self-fire threw:",
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        }
+    }
+
     await waitForStage(projectId, {
         specialistId: "vp-supply-chain",
         stage: "research.seed",
