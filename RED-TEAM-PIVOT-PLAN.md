@@ -188,6 +188,68 @@ When a user submits a Council brainstorm, **specialists return on different time
 
 ---
 
+### Council tier-debate test result — Strategy Council REPOSITION required (2026-04-25)
+
+The 4-tier debate test (full report at `BRAINSTORM-TIER-DEBATE-TEST.md`, runner at `experiments/brainstorming-council-tier-test.py`, cost £1.25) returned a clear pricing-rule answer with one BIG surprise.
+
+| Step | Composite delta | What changed | Sales pitch |
+|---|---|---|---|
+| Free → Starter (£20) | **+0.16** | Every model-quality dimension lifts +0.5. Tier A says "the math is bad", Tier B brings probability-weighted dilution scenarios. | "Smarter Council" — works |
+| Starter → Pro (£100) | **+0.17** | Lift entirely in dissent quality + multi-specialist coherence. Tier C's Mia explicitly disagrees with Fiona. Tier B's specialists answer politely in parallel. | "The Council that actually disagrees" — works, but DIFFERENT pitch from Free→Starter |
+| Pro → Enterprise (extended thinking + V4-Pro reasoning + 40% bigger token budgets) | **+0.00 across every single dimension** | Tier D is *longer* and more cinematic, but the underlying insight is the same shape as Tier C. Extended thinking added prose density, not new strategic moves. | "Smarter still" — does NOT work |
+
+All 4 tiers cleared the 4.0 voice floor. Single question + Anthropic-judging-Anthropic, but the gap (0.00 vs +0.16 / +0.17) is wide enough that judge noise alone is unlikely.
+
+**MANDATORY consequence — Strategy Council (Enterprise) must be repositioned.** Charging for extended thinking on its own is mathematically indefensible from this test. Enterprise must sell on what's NOT in the test:
+
+1. **Volume / seats / consolidated billing** — multi-user organisations
+2. **Private knowledge-base integration** — Council reads YOUR foundry's docs / decks / cap-table / prior decisions (this is the depth-of-CONTEXT pitch, not depth-of-reasoning)
+3. **Audit trail / SSO / compliance** — enterprise procurement requirements
+4. **Specialist customisation** — founder defines a custom specialist tuned to their constraints + sector, optionally fine-tuned on their own data
+5. **SLA + dedicated support**
+
+The test data backs walking away from the "Strategy Council = smarter Deep Council" pitch. The compute budget that was going to extended thinking is better spent on RAG over the foundry's own knowledge OR custom-specialist fine-tuning. **Tier D's value is depth-of-context, not depth-of-reasoning.**
+
+3-question replication + non-Anthropic judge cross-check queued before this becomes a hard pricing rule. But the rest of the tier ladder (Quick / Full / Deep) has the test's full backing.
+
+---
+
+### Intelligence-embedded hardware — the homepage thesis (Tristan, 2026-04-25)
+
+> "Super cheap intelligence is available and thus all hardware products could be reimagined and redesigned for intelligence. What if you made normal things smart?"
+> — Tristan citing Greg Isenberg's framing.
+
+This is the WHY-NOW for ForgeOS, not a feature. It changes how every public-facing surface positions the product.
+
+**Macro shift**:
+- **Pre-cheap-intelligence hardware**: design → manufacture → sell. Margins compressed by global supply chain. SaaS economics unavailable to hardware.
+- **Post-cheap-intelligence hardware**: design → embed intelligence (sensors, edge ML, voice, learning loops, recurring data products) → manufacture → sell + recurring revenue. Software-style economics on a physical substrate. Margin restored.
+
+ForgeOS sits at the intersection — helping hardware founders identify the intelligence-embedding opportunity in their category, design accordingly, find the right suppliers (sensor + edge-compute is a different supply chain than dumb-hardware), and raise the capital that VCs fund eagerly because intelligence-embedded hardware is the new theme.
+
+**Implications across surfaces**:
+
+1. **Homepage hero copy** — replace "operating system for hardware startups" with the intelligence-embedded thesis. Working draft: *"Cheap intelligence makes every commodity hardware product re-imaginable. ForgeOS helps hardware founders ship the smart version of what already exists — find the spec, the suppliers, and the investors who fund it."* Specific, time-bound, explains why a founder should care NOW vs three years ago.
+2. **`/agents` Brainstorming idea grid** — add prompts that force the intelligence question:
+   - *"What's the smart version of [my product]?"*
+   - *"How would intelligence change the unit economics of [my category]?"*
+   - *"What sensors / data loop / learning model would make this product 10× better?"*
+   - *"Where in my BOM does intelligence belong — at the chip, at the edge, or in the cloud?"*
+3. **`/the-forge-v2` default flow** — when a founder pastes "I'm building a kettle" into the brief, the running-state checklist (already built per `feat/forge-v2-cutover` commit `f6c94c1b`) should include a stage: *"Considering intelligence layer — what makes this 10× better with cheap compute embedded?"* Forge's BOM output then includes optional sensor + edge-compute lines. The "smart version" becomes a one-click upsell from any Forge brief.
+4. **`/investors` redesign (Phase G)** — surface a VC sub-segmentation for "intelligence-embedded hardware". Funds that have led 3+ rounds in this category in the last 18 months get a special tag. Why-fit copy explicitly cites the intelligence layer in the matched founder's product when relevant ("Conviction VC has led 4 of the last 6 UK food-tech intelligence-embedded rounds at this stage").
+5. **`/learn` Manufacturing Techniques** — add a section: *"Adding intelligence to physical products"*. Sensor selection, edge-vs-cloud trade-offs, certification pathways for connected devices (FCC, CE, GDPR, FDA where applicable), BOM-cost impact of embedded compute, recurring-revenue mechanics for connected hardware.
+6. **Marketing positioning vs competitors** — Crunchbase / LinkedIn / generic SaaS tools cannot reason about *intelligence layered on hardware*. ChatGPT / Perplexity can talk about it but can't generate the BOM, the supplier shortlist, or the investor list. ForgeOS is the only place where the founder's "what's the smart version of X?" → "here's the spec, the suppliers, the investors" cycle closes in one product.
+
+**Why this is the strongest possible homepage thesis**:
+- **Time-bound**: cheap intelligence became viable in 2024-2025; the re-imagining wave is now. This won't be the framing in 2030.
+- **Specific**: targets a clear founder type (hardware, considering intelligence layer) without alienating the broader hardware-founder audience (who will arrive at the same conclusion as they design).
+- **Differentiating**: no other tool covers the design + supply + capital cycle for intelligence-embedded hardware.
+- **Tristan's voice**: this is a frame Tristan can talk about credibly on LinkedIn / podcasts / pitches — it's a real macro thesis, not corporate-product-marketing copy.
+
+This goes in as a Tier 3 acquisition-polish item (homepage rewrite) and a Tier 4 Brainstorming idea-grid update. Forge running-state stage addition is Tier 0 (kills two birds — running-state copy already needs refresh, intelligence-layer prompt is the fix). The Investors and Manufacturing Techniques surfacing slots into the broader Phase G + retention rebuild.
+
+---
+
 ### Brainstorming → Forge handoff + Brainstorming → Investor-test (Tristan, 2026-04-25)
 
 Two cross-surface flows that turn Brainstorming from a sticky retention tool into the funnel feeder for the killer features. Both build on the existing `/agents` Brainstorming page.
