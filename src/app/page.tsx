@@ -2,7 +2,6 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { ProductShowcase } from "@/components/marketing/product-showcase"
 import { useState, useEffect } from "react"
 import {
   motion,
@@ -421,9 +420,6 @@ export default function MarketingPage() {
 
         {/* ═══ Section 3: How It Works (5 Pillars) ═══ */}
         <HowItWorksSection />
-
-        {/* ═══ Section 4: Manufacturer / Product Showcase ═══ */}
-        <ProductShowcaseSection />
 
         {/* ═══ Section 5: Pricing + Comparison Table ═══ */}
         <PricingTeaserSection />
@@ -869,14 +865,6 @@ function PricingTeaserSection() {
 /* ═══════════════════════════════════════════════════════════════════════════
  * SECTION 7: FAQ
  * ═══════════════════════════════════════════════════════════════════════ */
-
-function ProductShowcaseSection() {
-  return (
-    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted">
-      <ProductShowcase />
-    </section>
-  )
-}
 
 function FAQSection() {
   return (
