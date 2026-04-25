@@ -10,6 +10,63 @@ import type {
     ToolCall,
     ToolDefinition,
 } from "./types"
+import { logLlmUsage, type LlmUsageStatus } from "@/lib/cost-logging/llm-usage"
+
+// ─── Cost-logging helpers ────────────────────────────────────────────
+
+/**
+ * Map a provider error to the `llm_usage.status` enum.
+ *
+ * @description Inspects HTTP status (when present in the message), keyword
+ * markers (`overloaded`, `timeout`, `aborted`), and Anthropic SDK error names
+ * to bucket failures into the four allowed statuses. Used inside every
+ * `stream*` catch block so cost auditors can split spend by failure mode.
+ */
+function classifyStreamError(
+    err: unknown,
+    httpStatus?: number,
+): LlmUsageStatus {
+    if (httpStatus !== undefined) {
+        if (httpStatus === 429 || httpStatus === 529) return "rate_limited"
+        if (httpStatus === 408 || httpStatus === 504) return "timeout"
+    }
+    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+    if (
+        msg.includes("429") ||
+        msg.includes("529") ||
+        msg.includes("overloaded") ||
+        msg.includes("rate limit") ||
+        msg.includes("rate_limit")
+    ) {
+        return "rate_limited"
+    }
+    if (
+        msg.includes("408") ||
+        msg.includes("504") ||
+        msg.includes("timeout") ||
+        msg.includes("timed out") ||
+        msg.includes("aborted")
+    ) {
+        return "timeout"
+    }
+    return "error"
+}
+
+/**
+ * Rough char-count → token estimator used when a provider's streaming API
+ * does not emit a `usage` block. The 4-chars-per-token heuristic is the
+ * widely-cited GPT/Claude rule of thumb. Off by ±25% on average — fine for
+ * cost dashboards, never used for billing decisions.
+ *
+ * GOTCHA: Streaming OpenAI / MiniMax / DeepSeek / Together / Qwen / Ollama
+ * do NOT return usage in chunks unless `stream_options.include_usage` is
+ * set. We don't enable it here to avoid changing semantics — instead we
+ * estimate and tag the row with a comment in code so future devs know.
+ */
+function estimateTokens(text: string): number {
+    if (!text) return 0
+    return Math.ceil(text.length / 4)
+}
 
 // ─── Common types for provider implementations ──────────────────────
 
@@ -62,6 +119,28 @@ export interface StreamingTextOptions {
     onDone: () => void
     onError: (error: string) => void
     signal?: AbortSignal
+    // ----- Cost-logging metadata (optional, fire-and-forget tracking) ----
+    /**
+     * Action slug for cost attribution, e.g. `agent_execute`,
+     * `specialist_chat`, `sweep_<specialist>`. Surfaces in the `/admin/cost`
+     * dashboard's "what was the model doing" column.
+     */
+    actionSlug?: string
+    /**
+     * Foundry id (TEXT, not UUID — `foundries.id` is text) for tenant-scoped
+     * cost roll-up. Pass through from `withAuth({ foundryId })` callers.
+     */
+    foundryId?: string
+    /**
+     * Authenticated user id (`auth.users.id`), if known. Lets the cost
+     * dashboard split spend per-user inside a foundry.
+     */
+    userId?: string
+    /**
+     * Specialist id when this stream is on behalf of a specialist persona
+     * (e.g. `strategist`, `cto`). Used to compute cost-per-specialist.
+     */
+    specialistId?: string
 }
 
 export interface ImageGenerationOptions {
@@ -145,6 +224,10 @@ async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
         ? { max_completion_tokens: opts.maxTokens ?? 4096 }
         : { max_tokens: opts.maxTokens ?? 4096 }
 
+    // estimated, no usage block from provider — accumulate output chars to
+    // estimate completion tokens at end-of-stream.
+    let outputCharCount = 0
+
     try {
         const stream = await client.chat.completions.create({
             model: opts.modelId,
@@ -156,12 +239,39 @@ async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
         for await (const chunk of stream) {
             if (opts.signal?.aborted) break
             const text = chunk.choices[0]?.delta?.content ?? ""
-            if (text) opts.onChunk(text)
+            if (text) {
+                outputCharCount += text.length
+                opts.onChunk(text)
+            }
         }
+        // estimated, no usage block from provider — input from prompt size.
+        const tokensIn = estimateTokens(opts.systemPrompt + opts.userPrompt)
+        const tokensOut = Math.ceil(outputCharCount / 4)
+        void logLlmUsage({
+            action: opts.actionSlug ?? "openai_unknown",
+            modelUsed: opts.modelId,
+            tokensIn,
+            tokensOut,
+            status: "success",
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onDone()
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.error("[streamOpenAI] Stream failed:", { model: opts.modelId, error: errorMessage })
+        void logLlmUsage({
+            action: opts.actionSlug ?? "openai_unknown",
+            modelUsed: opts.modelId,
+            tokensIn: 0,
+            tokensOut: 0,
+            status: classifyStreamError(err),
+            errorMessage: errorMessage.slice(0, 200),
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onError(errorMessage)
     }
 }
@@ -212,6 +322,9 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
         }),
     }
 
+    // Fallback estimator — only used if `finalMessage()` cannot be read.
+    let outputCharCount = 0
+
     try {
         const stream = await client.messages.stream(streamParams)
 
@@ -220,17 +333,27 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
             // Only stream text deltas to the user -- thinking blocks are internal
             // reasoning that improves quality silently without exposing raw chain-of-thought.
             if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+                outputCharCount += event.delta.text.length
                 opts.onChunk(event.delta.text)
             }
         }
 
         // AUDIT: Log cache metrics from streaming response for observability.
         // The Anthropic SDK provides usage data on the final message.
+        let tokensIn = 0
+        let tokensOut = 0
+        let usedEstimator = false
         try {
             const finalMsg = await stream.finalMessage()
             const usageAny = finalMsg.usage as unknown as Record<string, number>
             const cacheRead = usageAny?.cache_read_input_tokens ?? 0
             const cacheWrite = usageAny?.cache_creation_input_tokens ?? 0
+            // For cost-logging, sum cache reads + cache writes into tokensIn so
+            // the dashboard never under-reports input volume. The price map
+            // bills the full input rate; cache-aware pricing is a future
+            // enhancement requiring per-row cache columns.
+            tokensIn = (finalMsg.usage?.input_tokens ?? 0) + cacheRead + cacheWrite
+            tokensOut = finalMsg.usage?.output_tokens ?? 0
             if (cacheRead > 0 || cacheWrite > 0) {
                 console.info("[streamAnthropic] Cache metrics:", {
                     model: opts.modelId,
@@ -240,8 +363,26 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
                 })
             }
         } catch {
-            // Non-critical — cache metrics are observability, not functional
+            // Non-critical — cache metrics are observability, not functional.
+            // Fall back to char-count estimator for cost logging.
+            usedEstimator = true
+            tokensIn = estimateTokens(opts.systemPrompt + opts.userPrompt)
+            tokensOut = Math.ceil(outputCharCount / 4)
         }
+
+        void logLlmUsage({
+            action: opts.actionSlug ?? "anthropic_unknown",
+            modelUsed: opts.modelId,
+            tokensIn,
+            tokensOut,
+            status: "success",
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+            errorMessage: usedEstimator
+                ? "estimated tokens — finalMessage() unavailable"
+                : undefined,
+        })
 
         opts.onDone()
     } catch (err) {
@@ -251,6 +392,17 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
             model: opts.modelId,
             enableThinking: opts.enableThinking,
             error: errorMessage,
+        })
+        void logLlmUsage({
+            action: opts.actionSlug ?? "anthropic_unknown",
+            modelUsed: opts.modelId,
+            tokensIn: 0,
+            tokensOut: 0,
+            status: classifyStreamError(err),
+            errorMessage: errorMessage.slice(0, 200),
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
         })
         opts.onError(errorMessage)
     }
@@ -301,9 +453,20 @@ async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise
         betas: [WEB_SEARCH_BETA],
     }
 
+    // Token totals across the (potentially multiple) pause_turn loops.
+    let totalTokensIn = 0
+    let totalTokensOut = 0
+
     try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let response = await client.beta.messages.create(createParams as any) as any
+        // Sum tokens from the first response. Beta API returns usage blocks
+        // with the same shape as the standard messages API.
+        const firstUsage = response?.usage ?? {}
+        totalTokensIn += (firstUsage.input_tokens ?? 0)
+            + (firstUsage.cache_read_input_tokens ?? 0)
+            + (firstUsage.cache_creation_input_tokens ?? 0)
+        totalTokensOut += firstUsage.output_tokens ?? 0
 
         // Handle pause_turn continuation
         let continueCount = 0
@@ -317,6 +480,11 @@ async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise
             ]
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             response = await client.beta.messages.create({ ...createParams, messages: prevMessages } as any) as any
+            const u = response?.usage ?? {}
+            totalTokensIn += (u.input_tokens ?? 0)
+                + (u.cache_read_input_tokens ?? 0)
+                + (u.cache_creation_input_tokens ?? 0)
+            totalTokensOut += u.output_tokens ?? 0
         }
 
         // Extract text and citations from response
@@ -357,12 +525,35 @@ async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise
             opts.onChunk(fullText.slice(i, i + chunkSize))
         }
 
+        void logLlmUsage({
+            action: opts.actionSlug ?? "anthropic_websearch_unknown",
+            modelUsed: opts.modelId,
+            tokensIn: totalTokensIn,
+            tokensOut: totalTokensOut,
+            status: "success",
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onDone()
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.error("[streamAnthropicWithWebSearch] Failed:", {
             model: opts.modelId,
             error: errorMessage,
+        })
+        void logLlmUsage({
+            action: opts.actionSlug ?? "anthropic_websearch_unknown",
+            // Even on error, keep any tokens already consumed by completed
+            // pause_turn loops — they were billed.
+            modelUsed: opts.modelId,
+            tokensIn: totalTokensIn,
+            tokensOut: totalTokensOut,
+            status: classifyStreamError(err),
+            errorMessage: errorMessage.slice(0, 200),
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
         })
         opts.onError(errorMessage)
     }
@@ -389,6 +580,9 @@ async function streamGoogle(opts: StreamingTextOptions): Promise<void> {
 
     contents.push({ role: "user", parts: [{ text: opts.userPrompt }] })
 
+    // Estimator fallback if response.usageMetadata is unavailable.
+    let outputCharCount = 0
+
     try {
         const result = await model.generateContentStream({
             contents,
@@ -400,12 +594,63 @@ async function streamGoogle(opts: StreamingTextOptions): Promise<void> {
         for await (const chunk of result.stream) {
             if (opts.signal?.aborted) break
             const text = chunk.text()
-            if (text) opts.onChunk(text)
+            if (text) {
+                outputCharCount += text.length
+                opts.onChunk(text)
+            }
         }
+
+        // The Google SDK exposes `result.response` (a Promise) which resolves
+        // to the aggregated final response, including `usageMetadata` with
+        // promptTokenCount / candidatesTokenCount. Read it for accurate
+        // cost-logging; fall back to the char-count estimator if missing.
+        let tokensIn = 0
+        let tokensOut = 0
+        let usedEstimator = false
+        try {
+            const finalResp = await result.response
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const usage = (finalResp as any)?.usageMetadata
+            if (usage) {
+                tokensIn = usage.promptTokenCount ?? 0
+                tokensOut = usage.candidatesTokenCount ?? 0
+            } else {
+                throw new Error("no usageMetadata")
+            }
+        } catch {
+            usedEstimator = true
+            tokensIn = estimateTokens(opts.systemPrompt + opts.userPrompt)
+            tokensOut = Math.ceil(outputCharCount / 4)
+        }
+
+        void logLlmUsage({
+            action: opts.actionSlug ?? "google_unknown",
+            modelUsed: opts.modelId,
+            tokensIn,
+            tokensOut,
+            status: "success",
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+            errorMessage: usedEstimator
+                ? "estimated tokens — usageMetadata unavailable"
+                : undefined,
+        })
         opts.onDone()
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.error("[streamGoogle] Stream failed:", { model: opts.modelId, error: errorMessage })
+        void logLlmUsage({
+            action: opts.actionSlug ?? "google_unknown",
+            modelUsed: opts.modelId,
+            tokensIn: 0,
+            tokensOut: 0,
+            status: classifyStreamError(err),
+            errorMessage: errorMessage.slice(0, 200),
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onError(errorMessage)
     }
 }
@@ -602,6 +847,9 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
 
     const messages = buildMessages(opts)
 
+    // estimated, no usage block from provider — accumulate output chars.
+    let outputCharCount = 0
+
     try {
         const stream = await client.chat.completions.create({
             model: opts.modelId,
@@ -613,12 +861,39 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
         for await (const chunk of stream) {
             if (opts.signal?.aborted) break
             const text = chunk.choices[0]?.delta?.content ?? ""
-            if (text) opts.onChunk(text)
+            if (text) {
+                outputCharCount += text.length
+                opts.onChunk(text)
+            }
         }
+        // estimated, no usage block from MiniMax stream chunks.
+        const tokensIn = estimateTokens(opts.systemPrompt + opts.userPrompt)
+        const tokensOut = Math.ceil(outputCharCount / 4)
+        void logLlmUsage({
+            action: opts.actionSlug ?? "minimax_unknown",
+            modelUsed: opts.modelId,
+            tokensIn,
+            tokensOut,
+            status: "success",
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onDone()
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.error("[streamMiniMax] Stream failed:", { model: opts.modelId, error: errorMessage })
+        void logLlmUsage({
+            action: opts.actionSlug ?? "minimax_unknown",
+            modelUsed: opts.modelId,
+            tokensIn: 0,
+            tokensOut: 0,
+            status: classifyStreamError(err),
+            errorMessage: errorMessage.slice(0, 200),
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onError(errorMessage)
     }
 }
@@ -641,23 +916,63 @@ async function streamDeepSeek(opts: StreamingTextOptions): Promise<void> {
 
     const messages = buildMessages(opts)
 
+    // GOTCHA: DeepSeek API rejects max_tokens above its model cap with HTTP 400.
+    // V4-Pro reasoning_content is billed as output and a complex Finn analysis
+    // can blow past 8192 mid-stream — see forgeos_deepseek_max_tokens_cap.md.
+    // The DeepSeek chat completions API accepts up to 32768 (per AWS Bedrock + DeepSeek docs)
+    // so we clamp at that ceiling. Callers requesting more (e.g. 32768 thinking budget) get
+    // clamped DOWN; callers requesting less pass through unchanged.
+    const DEEPSEEK_MAX_TOKENS = 32768
+    const requestedMaxTokens = opts.maxTokens ?? 4096
+    const clampedMaxTokens = Math.min(requestedMaxTokens, DEEPSEEK_MAX_TOKENS)
+
+    // estimated, no usage block from provider — accumulate output chars.
+    let outputCharCount = 0
+
     try {
         const stream = await client.chat.completions.create({
             model: opts.modelId,
             messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
             stream: true,
-            max_tokens: opts.maxTokens ?? 4096,
+            max_tokens: clampedMaxTokens,
         })
 
         for await (const chunk of stream) {
             if (opts.signal?.aborted) break
             const text = chunk.choices[0]?.delta?.content ?? ""
-            if (text) opts.onChunk(text)
+            if (text) {
+                outputCharCount += text.length
+                opts.onChunk(text)
+            }
         }
+        // estimated, no usage block from DeepSeek stream chunks.
+        const tokensIn = estimateTokens(opts.systemPrompt + opts.userPrompt)
+        const tokensOut = Math.ceil(outputCharCount / 4)
+        void logLlmUsage({
+            action: opts.actionSlug ?? "deepseek_unknown",
+            modelUsed: opts.modelId,
+            tokensIn,
+            tokensOut,
+            status: "success",
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onDone()
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.error("[streamDeepSeek] Stream failed:", { model: opts.modelId, error: errorMessage })
+        void logLlmUsage({
+            action: opts.actionSlug ?? "deepseek_unknown",
+            modelUsed: opts.modelId,
+            tokensIn: 0,
+            tokensOut: 0,
+            status: classifyStreamError(err),
+            errorMessage: errorMessage.slice(0, 200),
+            foundryId: opts.foundryId,
+            userId: opts.userId,
+            specialistId: opts.specialistId,
+        })
         opts.onError(errorMessage)
     }
 }
