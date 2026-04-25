@@ -3833,6 +3833,7 @@ export type Database = {
           foundry_id: string
           granted_to: string
           id: string
+          metadata: Json | null
           reason: string
         }
         Insert: {
@@ -3844,6 +3845,7 @@ export type Database = {
           foundry_id: string
           granted_to: string
           id?: string
+          metadata?: Json | null
           reason: string
         }
         Update: {
@@ -3855,6 +3857,7 @@ export type Database = {
           foundry_id?: string
           granted_to?: string
           id?: string
+          metadata?: Json | null
           reason?: string
         }
         Relationships: [
@@ -16921,6 +16924,8 @@ export type Database = {
           capacity_score: number | null
           created_at: string | null
           deactivated_at: string | null
+          early_access_until: string | null
+          early_access_user_number: number | null
           email: string
           executive_onboarding_completed: boolean | null
           expertise_areas: string[] | null
@@ -16971,6 +16976,8 @@ export type Database = {
           capacity_score?: number | null
           created_at?: string | null
           deactivated_at?: string | null
+          early_access_until?: string | null
+          early_access_user_number?: number | null
           email: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
@@ -17021,6 +17028,8 @@ export type Database = {
           capacity_score?: number | null
           created_at?: string | null
           deactivated_at?: string | null
+          early_access_until?: string | null
+          early_access_user_number?: number | null
           email?: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
@@ -18609,6 +18618,7 @@ export type Database = {
         Row: {
           converted_to_paid_at: string | null
           created_at: string
+          early_access_signup_credited: boolean
           id: string
           invitee_user_id: string
           inviter_user_id: string
@@ -18619,6 +18629,7 @@ export type Database = {
         Insert: {
           converted_to_paid_at?: string | null
           created_at?: string
+          early_access_signup_credited?: boolean
           id?: string
           invitee_user_id: string
           inviter_user_id: string
@@ -18629,6 +18640,7 @@ export type Database = {
         Update: {
           converted_to_paid_at?: string | null
           created_at?: string
+          early_access_signup_credited?: boolean
           id?: string
           invitee_user_id?: string
           inviter_user_id?: string
@@ -25353,6 +25365,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_early_access_cohort_count: { Args: never; Returns: number }
+      get_early_access_profile: {
+        Args: { p_user_id: string }
+        Returns: {
+          early_access_until: string
+          early_access_user_number: number
+        }[]
+      }
       get_escrow_balance_atomic: {
         Args: { p_order_id: string }
         Returns: {
@@ -25636,6 +25656,10 @@ export type Database = {
         Args: { p_invitee_user_id: string; p_paid_tier: string }
         Returns: Json
       }
+      grant_referral_credits_on_signup_if_inviter_early_access: {
+        Args: { p_invitee_user_id: string; p_inviter_user_id: string }
+        Returns: Json
+      }
       has_foundry_admin_access: {
         Args: { target_foundry_id: string; user_id: string }
         Returns: boolean
@@ -25712,6 +25736,7 @@ export type Database = {
         Args: { conv_id: string }
         Returns: boolean
       }
+      is_early_access_active: { Args: { p_user_id: string }; Returns: boolean }
       is_foundry_admin: {
         Args: { p_foundry_id: string; p_user_id: string }
         Returns: boolean

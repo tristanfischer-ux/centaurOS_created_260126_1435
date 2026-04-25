@@ -51,6 +51,35 @@ export type SubscriptionTier =
   | 'starter_v2' // NEW 2026-04-25 — Starter £20/mo, the new entry tier
   | 'professional'
   | 'enterprise'
+
+/**
+ * Virtual tier sentinel used by limit-check logic to signal "this free-tier
+ * user is currently in their early-access window and should be treated as
+ * starter_v2 for the purposes of limit enforcement".
+ *
+ * This is NOT a Stripe product and NOT stored in user_subscriptions.tier.
+ * It is returned by getEffectiveTier() when profiles.early_access_until > now().
+ * All downstream code that reads tier should use getEffectiveTier(), not the
+ * raw DB tier, so that early-access users transparently receive Starter limits.
+ */
+export type EffectiveTier = SubscriptionTier | 'early_access'
+
+/**
+ * Starter-level limits used for both starter_v2 subscribers and early-access
+ * free users. Centralised here so the two code paths stay in sync.
+ *
+ * Do NOT export this as a plan entry — it is intentionally absent from
+ * SUBSCRIPTION_PLANS so it never appears in pricing catalogues.
+ */
+export const EARLY_ACCESS_LIMITS = {
+  investorLeadsPerMonth: 100,
+  brainstormSessionsPerMonth: 10,
+  savedSearchesLifetime: null, // no lifetime cap during early access
+  maxAiTasksPerMonth: 200,
+  maxComputeBudgetUsd: 18,
+  investorDeepAccess: true,
+  investorIntelligenceAccess: true,
+} as const
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'incomplete'
 
 export interface SubscriptionPlan {

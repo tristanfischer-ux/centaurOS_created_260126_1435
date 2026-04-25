@@ -14,22 +14,103 @@ import Stripe from 'stripe'
 
 // Re-export types and static data from the shared plans module so
 // existing server-side imports from this file continue to work.
-export { SUBSCRIPTION_PLANS } from './plans'
+export { SUBSCRIPTION_PLANS, EARLY_ACCESS_LIMITS } from './plans'
 export type {
   SubscriptionTier,
+  EffectiveTier,
   SubscriptionStatus,
   SubscriptionPlan,
   UserSubscription,
 } from './plans'
 
-import type { SubscriptionTier } from './plans'
+import type { SubscriptionTier, EffectiveTier } from './plans'
 import type {
   SubscriptionPlan,
   SubscriptionStatus,
   UserSubscription,
 } from './plans'
-import { SUBSCRIPTION_PLANS, ENTERPRISE_OVERAGE_CONFIG } from './plans'
+import { SUBSCRIPTION_PLANS, EARLY_ACCESS_LIMITS, ENTERPRISE_OVERAGE_CONFIG } from './plans'
 import { grantReferralUpgradeReward } from '@/lib/referrals/process-upgrade'
+
+// ==========================================
+// EARLY-ACCESS TIER RESOLUTION
+// ==========================================
+
+/**
+ * Resolves the user's effective tier for limit-checking purposes.
+ *
+ * @description When a user's `profiles.early_access_until` is in the future,
+ * they receive Starter-level limits for free. This function reads the DB and
+ * returns `'early_access'` for those users so callers can branch on it without
+ * knowing the underlying mechanism.
+ *
+ * Usage: always call this instead of reading `subscription.tier` directly when
+ * making limit-enforcement decisions. Surfaces that only need the display label
+ * (billing settings page, pricing comparison table) should still use the raw
+ * `subscription.tier` from `getUserSubscription()`.
+ *
+ * @param userId - Authenticated user id
+ * @returns The effective tier string (may be 'early_access' for free users in cohort)
+ *
+ * @security Uses admin client — no foundry_id scope needed (per-user lookup).
+ */
+export async function getEffectiveTier(userId: string): Promise<EffectiveTier> {
+  try {
+    const admin = createAdminClient()
+
+    // Check early-access window first (fast path for the majority of early users)
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('early_access_until')
+      .eq('id', userId)
+      .single()
+
+    if (profile?.early_access_until) {
+      const until = new Date(profile.early_access_until)
+      if (until > new Date()) {
+        return 'early_access'
+      }
+    }
+
+    // Fall back to subscription tier
+    const { subscription } = await getUserSubscription(userId)
+    return subscription?.tier ?? 'free'
+  } catch {
+    return 'free'
+  }
+}
+
+/**
+ * Resolves the plan limits that apply to a user, accounting for early-access.
+ *
+ * @description Returns the `SubscriptionPlan['limits']` shape for the
+ * user's effective tier. When `effectiveTier` is `'early_access'`, returns
+ * a limits object built from EARLY_ACCESS_LIMITS merged over the Starter plan
+ * (so all non-overridden fields — voiceMinutes, etc. — still resolve correctly).
+ *
+ * @param effectiveTier - Result from getEffectiveTier()
+ */
+export function resolveEffectiveLimits(
+  effectiveTier: EffectiveTier
+): SubscriptionPlan['limits'] {
+  if (effectiveTier === 'early_access') {
+    // Merge early-access overrides into the starter_v2 plan limits.
+    // This ensures any limit not explicitly overridden (voiceMinutesPerMonth,
+    // maxConversationMode, etc.) still has a sensible value.
+    const starterLimits = SUBSCRIPTION_PLANS['starter_v2'].limits
+    return {
+      ...starterLimits,
+      investorLeadsPerMonth: EARLY_ACCESS_LIMITS.investorLeadsPerMonth,
+      brainstormSessionsPerMonth: EARLY_ACCESS_LIMITS.brainstormSessionsPerMonth,
+      savedSearchesLifetime: EARLY_ACCESS_LIMITS.savedSearchesLifetime,
+      maxAiTasksPerMonth: EARLY_ACCESS_LIMITS.maxAiTasksPerMonth,
+      maxComputeBudgetUsd: EARLY_ACCESS_LIMITS.maxComputeBudgetUsd,
+      investorDeepAccess: EARLY_ACCESS_LIMITS.investorDeepAccess,
+      investorIntelligenceAccess: EARLY_ACCESS_LIMITS.investorIntelligenceAccess,
+    }
+  }
+  return SUBSCRIPTION_PLANS[effectiveTier].limits
+}
 
 // SECURITY: Reverse lookup from Stripe price ID to tier.
 // Prevents tier escalation via metadata tampering — the actual price paid
