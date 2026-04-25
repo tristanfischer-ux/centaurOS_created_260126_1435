@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Card } from "@/components/ui/card";
 
 const COOKIE_NAME = "cookie_consent";
 const COOKIE_VALUE_ACCEPTED = "accepted";
@@ -21,6 +20,22 @@ function setCookie(name: string, value: string, maxAgeSeconds: number): void {
   document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
 }
 
+/**
+ * CookieConsent — bottom-right toast that does not block page content.
+ *
+ * @description Renders as a small fixed toast in the bottom-right corner on
+ * desktop (bottom-stretched on mobile) so the page underneath stays clickable.
+ * The wrapper uses `pointer-events-none` and the toast itself sets
+ * `pointer-events-auto` so only the toast intercepts clicks. Buttons are kept
+ * compact to honour the "small, doesn't intercept" brief.
+ *
+ * Layout decisions:
+ *  - Desktop: bottom-right, max width ~360px, content can wrap.
+ *  - Mobile: bottom-stretched (left + right insets) so the message stays
+ *    legible on a narrow screen.
+ *  - z-index 40 keeps the toast above page content but below modal overlays
+ *    (which sit at z-50 per the design system).
+ */
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
@@ -44,48 +59,44 @@ export function CookieConsent() {
   return (
     <AnimatePresence>
       {visible && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed top-0 left-0 right-0 z-40 flex justify-center px-4"
-        >
-          <Card className="max-w-4xl w-full p-4 sm:p-6 shadow-lg">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <p className="text-sm text-muted-foreground flex-1">
-                We use cookies to improve your experience. By continuing to use
-                this site, you agree to our use of cookies.{" "}
-                <Link
-                  href="/privacy"
-                  className="text-international-orange underline underline-offset-2 hover:opacity-80 transition-opacity"
-                >
-                  Privacy Policy
-                </Link>
-              </p>
-              <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  href="/privacy"
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors px-2 py-2"
-                >
-                  Privacy Policy
-                </Link>
-                <button
-                  onClick={handleReject}
-                  className="inline-flex items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-                >
-                  Decline
-                </button>
-                <button
-                  onClick={handleAccept}
-                  className="inline-flex items-center justify-center rounded-md bg-international-orange px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
-                >
-                  Accept
-                </button>
-              </div>
+        // INTENT: pointer-events-none on the wrapper so the rest of the page
+        // stays clickable. The toast itself opts back in with pointer-events-auto.
+        <div className="pointer-events-none fixed inset-x-4 bottom-4 z-40 flex justify-end sm:inset-x-auto sm:right-4 sm:left-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ type: "spring", stiffness: 320, damping: 30 }}
+            role="region"
+            aria-label="Cookie preferences"
+            className="pointer-events-auto w-full max-w-[360px] rounded-lg border border-border bg-card p-4 shadow-lg"
+          >
+            <p className="text-xs text-muted-foreground">
+              We use cookies to improve your experience.{" "}
+              <Link
+                href="/privacy"
+                className="text-international-orange underline underline-offset-2 hover:opacity-80 transition-opacity"
+              >
+                Privacy
+              </Link>
+              .
+            </p>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button
+                onClick={handleReject}
+                className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                Decline
+              </button>
+              <button
+                onClick={handleAccept}
+                className="inline-flex items-center justify-center rounded-md bg-international-orange px-2.5 py-1 text-xs font-medium text-white hover:opacity-90 transition-opacity"
+              >
+                Accept
+              </button>
             </div>
-          </Card>
-        </motion.div>
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );
