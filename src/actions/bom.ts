@@ -444,7 +444,7 @@ Respond with ONLY valid JSON:
 
   let response
   try {
-    response = await response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
+    response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
       model: BOM_MODEL,
       max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
@@ -600,7 +600,7 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
     const Anthropic = (await import("@anthropic-ai/sdk")).default
     const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
-    const response = await response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
+    const response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
       model: BOM_MODEL,
       max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
@@ -724,7 +724,7 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
 
   let response
   try {
-    response = await response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
+    response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
       model: BOM_MODEL,
       max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
