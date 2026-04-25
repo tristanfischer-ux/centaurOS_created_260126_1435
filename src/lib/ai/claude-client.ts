@@ -33,6 +33,7 @@ import { withRetry } from '@/lib/retry'
 // Re-export so callers that import from claude-client get the same type.
 export type { ClaudeModelId } from '@/lib/cad-lab-types'
 import type { ClaudeModelId } from '@/lib/cad-lab-types'
+import { withLlmPermit } from "@/lib/ai/llm-permit"
 
 export interface ClaudeCallOptions {
   systemPrompt: string
@@ -185,7 +186,7 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
     }
   }
 
-  return await withRetry(makeRequest, {
+  return await withRetry(() => withLlmPermit('anthropic', modelId, makeRequest), {
     maxRetries,
     baseDelay: 4000,
     maxDelay: 30000,

@@ -56,6 +56,7 @@ import type {
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { fetchCatalogueForPrompt, extractSearchKeywords } from "./component-library"
 import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
+import { withLlmPermit } from "@/lib/ai/llm-permit"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -443,12 +444,12 @@ Respond with ONLY valid JSON:
 
   let response
   try {
-    response = await client.messages.create({
+    response = await response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
       model: BOM_MODEL,
       max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
-    })
+    }))
   } catch (err) {
     return {
       success: false,
@@ -599,12 +600,12 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
     const Anthropic = (await import("@anthropic-ai/sdk")).default
     const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
-    const response = await client.messages.create({
+    const response = await response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
       model: BOM_MODEL,
       max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
-    })
+    }))
 
     const textBlock = response.content.find((b) => b.type === "text")
     if (!textBlock || textBlock.type !== "text") {
@@ -723,12 +724,12 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
 
   let response
   try {
-    response = await client.messages.create({
+    response = await response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
       model: BOM_MODEL,
       max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
-    })
+    }))
   } catch (err) {
     return {
       success: false,

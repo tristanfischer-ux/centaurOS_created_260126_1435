@@ -46,6 +46,7 @@ import {
     processMemory,
 } from "@/lib/agent-memory"
 import type { ConversationMessage } from "@/lib/agent-memory"
+import { withLlmPermit } from "@/lib/ai/llm-permit"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -291,7 +292,7 @@ const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
         while (loopCount <= MAX_TOOL_LOOPS) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const response = await client.messages.create(createParams) as any
+            const response = await withLlmPermit("anthropic", REVIEW_MODEL, () => client.messages.create(createParams)) as any
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const content: any[] = response.content ?? []
 
@@ -503,7 +504,7 @@ SUMMARY: <one sentence explaining the verdict>`
 // was raised. Total worst-case retry latency: ~30s, still inside timeout.
 const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
-        const response = await client.messages.create({
+        const response = await await withLlmPermit("anthropic", QUICK_VERDICT_MODEL, () => client.messages.create({
             model: QUICK_VERDICT_MODEL,
             max_tokens: QUICK_VERDICT_MAX_TOKENS,
             system: systemPrompt,
@@ -511,7 +512,7 @@ const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
                 role: "user",
                 content: `Quick verdict on module "${targetModule.name}" — PASS, WARN, or FAIL?`,
             }],
-        })
+        }))
 
         const text = response.content
             .filter(b => b.type === "text")
@@ -771,7 +772,7 @@ FLAGGED_MODULES: <comma-separated module IDs needing attention, or "none">`
 
                 // DECISION: Use Sonnet for checkpoints — fast gut-level assessment,
                 // not full Opus review. Saves cost and latency.
-                const response = await client.messages.create({
+                const response = await await withLlmPermit("anthropic", QUICK_VERDICT_MODEL, () => client.messages.create({
                     model: QUICK_VERDICT_MODEL,
                     max_tokens: CHECKPOINT_MAX_TOKENS,
                     system: systemPrompt,
@@ -779,7 +780,7 @@ FLAGGED_MODULES: <comma-separated module IDs needing attention, or "none">`
                         role: "user",
                         content: `Assess this module decomposition for "${req.projectSubject}":\n\n${moduleSummary}\n\nResearch context (first 2000 chars):\n${req.researchReport.slice(0, 2000)}`,
                     }],
-                })
+                }))
 
                 const text = response.content
                     .filter(b => b.type === "text")
@@ -1128,12 +1129,12 @@ Return the revised fields as a single JSON object now.`
                     const hint = attempt === 0
                         ? ""
                         : "\n\nIMPORTANT: Your previous response was not valid JSON matching the required shape. Output ONLY the JSON object this time, starting with { and ending with }. No prose.\n"
-                    const response = await client.messages.create({
+                    const response = await await withLlmPermit("anthropic", REVIEW_MODEL, () => client.messages.create({
                         model: REVIEW_MODEL,
                         max_tokens: 2048,
                         system: systemPrompt,
                         messages: [{ role: "user", content: buildUserContent(mod, hint) }],
-                    })
+                    }))
                     const text = response.content
                         .filter((b) => b.type === "text")
                         .map((b) => b.type === "text" ? b.text : "")
@@ -1274,7 +1275,7 @@ const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
                     ? `\nDiagnostic specs: Process=${diagnostics.mfg_process || "unspecified"}, Material=${diagnostics.material || "unspecified"}, Tolerance=${diagnostics.tolerance || "unspecified"}, Finish=${diagnostics.finish || "unspecified"}, Batch=${diagnostics.batch_size || "unspecified"}`
                     : ""
 
-                const response = await client.messages.create({
+                const response = await await withLlmPermit("anthropic", REVIEW_MODEL, () => client.messages.create({
                     model: REVIEW_MODEL,
                     max_tokens: 2048,
                     system: `You revise product module descriptions to address specific specialist review issues. Rules:
@@ -1305,7 +1306,7 @@ ${issueText}
 
 Revise the module fields to address all the issues above. Return a JSON object with keys: purpose, description, keyParts, whyItMatters, failureModes, unknowns.`,
                     }],
-                })
+                }))
 
                 const text = response.content
                     .filter((b) => b.type === "text")
