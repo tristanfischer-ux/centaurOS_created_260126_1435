@@ -1112,15 +1112,24 @@ function ModulePage({
     )
 }
 
-function BomMasterPage({ parts, sources }: { parts: PartRow[]; sources: PdfInput["sources"] }): React.ReactElement {
+function BomMasterPage({
+    parts,
+    sources,
+    suppliersByPart,
+}: {
+    parts: PartRow[]
+    sources: PdfInput["sources"]
+    suppliersByPart: Map<string, string[]>
+}): React.ReactElement {
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>4. BOM master ({parts.length} rows)</Text>
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
                 BOM derived from the module decomposition&apos;s keyParts,
                 expanded into typed part rows. Part records live in the
-                `parts` table and are joined back to
-                modules via source_module_id.
+                `parts` table and are joined back to modules via
+                source_module_id. The Suppliers column shows up to 3
+                candidate suppliers (full details in §7).
             </Text>
             {parts.length === 0 ? (
                 <Text style={styles.muted}>No parts generated yet.</Text>
@@ -1128,41 +1137,54 @@ function BomMasterPage({ parts, sources }: { parts: PartRow[]; sources: PdfInput
                 <View style={styles.table}>
                     <View style={styles.tableHead}>
                         <Text style={[styles.tableHeadCell, { width: 60 }]}>Part #</Text>
-                        <Text style={[styles.tableHeadCell, { flex: 3 }]}>Name</Text>
-                        <Text style={[styles.tableHeadCell, { flex: 1.4 }]}>Module</Text>
-                        <Text style={[styles.tableHeadCell, { width: 50 }]}>Type</Text>
-                        <Text style={[styles.tableHeadCell, { flex: 1.2 }]}>Process / material</Text>
-                        <Text style={[styles.tableHeadCell, { width: 44, textAlign: "right" }]}>Mass</Text>
-                        <Text style={[styles.tableHeadCell, { width: 55, textAlign: "right" }]}>Cost</Text>
+                        <Text style={[styles.tableHeadCell, { flex: 2.5 }]}>Name</Text>
+                        <Text style={[styles.tableHeadCell, { flex: 1.2 }]}>Module</Text>
+                        <Text style={[styles.tableHeadCell, { width: 40 }]}>Type</Text>
+                        <Text style={[styles.tableHeadCell, { flex: 1 }]}>Process / material</Text>
+                        <Text style={[styles.tableHeadCell, { width: 38, textAlign: "right" }]}>Mass</Text>
+                        <Text style={[styles.tableHeadCell, { width: 50, textAlign: "right" }]}>Cost</Text>
+                        <Text style={[styles.tableHeadCell, { flex: 1.6 }]}>Suppliers</Text>
                     </View>
-                    {parts.map((p, i) => (
-                        <View key={i} style={styles.tableRow} wrap={false}>
-                            <Text style={[styles.tableCell, { width: 60 }]}>{p.partNumber}</Text>
-                            <Text style={[styles.tableCell, { flex: 3 }]}>
-                                {p.name}
-                                {p.description ? (
-                                    <Text style={{ color: MUTED }}>{" — " + p.description}</Text>
-                                ) : null}
-                            </Text>
-                            <Text style={[styles.tableCell, { flex: 1.4 }]}>
-                                {p.sourceModuleName ?? "—"}
-                            </Text>
-                            <Text style={[styles.tableCell, { width: 50 }]}>
-                                {p.isPurchased ? "buy" : "make"}
-                            </Text>
-                            <Text style={[styles.tableCell, { flex: 1.2 }]}>
-                                {p.isPurchased
+                    {parts.map((p, i) => {
+                        const suppliers = suppliersByPart.get(p.partNumber) ?? []
+                        const supplierLabel =
+                            suppliers.length === 0
+                                ? p.isPurchased
                                     ? "—"
-                                    : `${p.process ?? "—"}${p.material ? " · " + p.material : ""}${p.tolerance ? " · ±" + p.tolerance : ""}`}
-                            </Text>
-                            <Text style={[styles.tableCell, { width: 44, textAlign: "right" }]}>
-                                {p.massKg != null ? `${p.massKg.toFixed(2)}kg` : "—"}
-                            </Text>
-                            <Text style={[styles.tableCell, { width: 55, textAlign: "right" }]}>
-                                {fmtGbp(p.estimatedUnitCostGbp)}
-                            </Text>
-                        </View>
-                    ))}
+                                    : "(make)"
+                                : suppliers.slice(0, 3).join(" · ")
+                        return (
+                            <View key={i} style={styles.tableRow} wrap={false}>
+                                <Text style={[styles.tableCell, { width: 60 }]}>{p.partNumber}</Text>
+                                <Text style={[styles.tableCell, { flex: 2.5 }]}>
+                                    {p.name}
+                                    {p.description ? (
+                                        <Text style={{ color: MUTED }}>{" — " + p.description}</Text>
+                                    ) : null}
+                                </Text>
+                                <Text style={[styles.tableCell, { flex: 1.2 }]}>
+                                    {p.sourceModuleName ?? "—"}
+                                </Text>
+                                <Text style={[styles.tableCell, { width: 40 }]}>
+                                    {p.isPurchased ? "buy" : "make"}
+                                </Text>
+                                <Text style={[styles.tableCell, { flex: 1 }]}>
+                                    {p.isPurchased
+                                        ? "—"
+                                        : `${p.process ?? "—"}${p.material ? " · " + p.material : ""}${p.tolerance ? " · ±" + p.tolerance : ""}`}
+                                </Text>
+                                <Text style={[styles.tableCell, { width: 38, textAlign: "right" }]}>
+                                    {p.massKg != null ? `${p.massKg.toFixed(2)}kg` : "—"}
+                                </Text>
+                                <Text style={[styles.tableCell, { width: 50, textAlign: "right" }]}>
+                                    {fmtGbp(p.estimatedUnitCostGbp)}
+                                </Text>
+                                <Text style={[styles.tableCell, { flex: 1.6 }]}>
+                                    {supplierLabel}
+                                </Text>
+                            </View>
+                        )
+                    })}
                 </View>
             )}
             <Text style={styles.footer} fixed>
@@ -2339,8 +2361,38 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 <ModulePage key={m.id} mod={m} index={i} />
             ))}
 
-            {/* 4. BOM master */}
-            <BomMasterPage parts={data.parts} sources={data.sources} />
+            {/* 4. BOM master — with per-row supplier candidates inline.
+                 suppliersByPart is computed from data.suppliers'
+                 matchedPartNumbers (added 2026-04-25 NIGHT). */}
+            <BomMasterPage
+                parts={data.parts}
+                sources={data.sources}
+                suppliersByPart={(() => {
+                    const map = new Map<string, string[]>()
+                    for (const s of data.suppliers) {
+                        // Render the supplier under each part number it
+                        // was matched against. Use the host as the
+                        // display label (PDF supplier-section uses the
+                        // same convention).
+                        const label = (() => {
+                            if (s.websiteUrl && /^https?:\/\//i.test(s.websiteUrl)) {
+                                try {
+                                    return new URL(s.websiteUrl).hostname.replace(/^www\./, "")
+                                } catch {
+                                    return s.name
+                                }
+                            }
+                            return s.name
+                        })()
+                        for (const partNumber of s.matchedPartNumbers) {
+                            const list = map.get(partNumber) ?? []
+                            if (!list.includes(label)) list.push(label)
+                            map.set(partNumber, list)
+                        }
+                    }
+                    return map
+                })()}
+            />
 
             {/* 5. Cost */}
             <CostPage data={data} />
