@@ -363,16 +363,20 @@ export function SupplierMatchCard({ listing, rank, searchQuery }: SupplierMatchC
     ''
   const snippet = description.length > 260 ? description.slice(0, 257) + '…' : description
 
-  // Capability tags — top 4 process_capability names
-  const capTags =
-    listing.process_capabilities
-      ?.slice(0, 4)
-      .map((c) => {
-        if (typeof c === 'string') return c
-        return (c as Record<string, unknown>)?.process_name as string | undefined
-          ?? (c as Record<string, unknown>)?.process_category as string | undefined
-      })
-      .filter((t): t is string => Boolean(t)) ?? []
+  // Capability tags — top 4 UNIQUE process_capability names. Dedupe before
+  // slicing so React never sees duplicate keys when a listing has repeated
+  // process_name entries in process_capabilities[].
+  const capTags = Array.from(
+    new Set(
+      (listing.process_capabilities ?? [])
+        .map((c) => {
+          if (typeof c === 'string') return c
+          return (c as Record<string, unknown>)?.process_name as string | undefined
+            ?? (c as Record<string, unknown>)?.process_category as string | undefined
+        })
+        .filter((t): t is string => Boolean(t)),
+    ),
+  ).slice(0, 4)
 
   // 6-pillar breakdown
   const pillars = computeSupplierPillars(listing, searchQuery)

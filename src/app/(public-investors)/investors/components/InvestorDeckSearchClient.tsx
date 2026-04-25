@@ -763,6 +763,8 @@ function MatchCard({
 
       {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
       {/* Score-na state: shown when pillars are missing (scores still loading or no match yet) */}
+      {/* PAYWALL: locked free-tier preview cards must not leak per-pillar scores. */}
+      {!isLocked && (
       <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
         {SCORECARD_PILLARS.map(({ key, label }) => {
           const raw   = pillars?.[key]
@@ -814,6 +816,7 @@ function MatchCard({
           )
         })}
       </div>
+      )}
 
       {/* ── Thesis paragraph — 260 chars max ── */}
       {thesis && !isLocked && (
