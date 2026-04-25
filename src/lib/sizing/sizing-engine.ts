@@ -29,6 +29,13 @@ import type {
     SlotDefinition,
 } from "./types"
 import { pickRulesForDomain, getRulesByDomain } from "./rules/_registry"
+import {
+    CONTAINER_40FT_ISO,
+    CONTAINER_20FT_ISO,
+    CONTAINER_53FT_HC,
+    WAREHOUSE_BAY_100,
+    HEATPUMP_CABINET,
+} from "./envelopes"
 
 export interface RunSizingInput {
     /** Industry domain emitted by Max (or overridden by the founder). */
@@ -245,4 +252,124 @@ export function inferTargetsFromBrief(
         }
     }
     return out
+}
+
+/**
+ * Extract numeric capacity targets from a free-text brief — handles the
+ * common case where the founder states "3.5 MWh and 1.5 MW" in a sentence
+ * but Max didn't populate brief.capacity / brief.targets. Returns only
+ * brief-derived values (no library defaults) so the caller can tell what
+ * came from the brief vs a fallback.
+ *
+ * Recognised patterns:
+ *   - "3.5 MWh", "1.5 MW", "1500 kW", "500 kWh"
+ *   - "200 m² canopy", "8 kW thermal"
+ *   - mixes of upper/lower case, with or without spaces
+ *
+ * Conservative: returns the LARGEST extracted value for each unit. Briefs
+ * typically state "X to Y", "around X", or "up to X" — taking the largest
+ * matches the founder's stated ceiling, not a min.
+ */
+export function inferTargetsFromBriefText(
+    industryDomain: string | null | undefined,
+    text: string,
+): Record<string, number> {
+    if (!industryDomain || !text) return {}
+    const out: Record<string, number> = {}
+    const haystack = text.toLowerCase()
+
+    const captureAll = (re: RegExp, multiplier = 1): number[] => {
+        const values: number[] = []
+        const flags = re.flags.includes("g") ? re.flags : `${re.flags}g`
+        const globalRe = new RegExp(re.source, flags)
+        for (const match of haystack.matchAll(globalRe)) {
+            const n = Number.parseFloat(match[1])
+            if (Number.isFinite(n)) values.push(n * multiplier)
+        }
+        return values
+    }
+
+    const max = (xs: number[]): number | undefined => (xs.length === 0 ? undefined : Math.max(...xs))
+
+    if (industryDomain === "battery_energy_storage") {
+        // MWh → kWh (×1000), GWh → kWh (×1_000_000)
+        const kwh = max([
+            ...captureAll(/(\d+(?:\.\d+)?)\s*kwh/i),
+            ...captureAll(/(\d+(?:\.\d+)?)\s*mwh/i, 1000),
+            ...captureAll(/(\d+(?:\.\d+)?)\s*gwh/i, 1_000_000),
+        ])
+        // Negative-lookahead to avoid matching "kWh" as "kW"
+        const kw = max([
+            ...captureAll(/(\d+(?:\.\d+)?)\s*kw(?![a-z])/i),
+            ...captureAll(/(\d+(?:\.\d+)?)\s*mw(?![a-z])/i, 1000),
+        ])
+        if (kwh !== undefined) out.kwh = kwh
+        if (kw !== undefined) out.kw = kw
+    } else if (industryDomain === "vertical_farm") {
+        const canopy = max([
+            ...captureAll(/(\d+(?:\.\d+)?)\s*m(?:²|2|\^2)\s*(?:canopy|growing|grow)/i),
+        ])
+        const tiers = max([...captureAll(/(\d+)\s*tiers?/i)])
+        if (canopy !== undefined) out.canopy_m2 = canopy
+        if (tiers !== undefined) out.tiers = tiers
+    } else if (industryDomain === "heat_pump") {
+        const kw = max([
+            ...captureAll(/(\d+(?:\.\d+)?)\s*kw\s*(?:thermal|output)/i),
+            ...captureAll(/(\d+(?:\.\d+)?)\s*kw(?![a-z])/i),
+        ])
+        if (kw !== undefined) out.kw_thermal = kw
+    }
+    return out
+}
+
+/**
+ * Detect the founder's stated form factor / envelope from a free-text brief.
+ * Returns null if no signal — caller falls back to the rule library's
+ * defaultEnvelope.
+ *
+ * Currently handles: 40ft / 20ft / 53ft ISO containers, warehouse bays,
+ * heat-pump cabinets.
+ *
+ * VF demo regression: brief said "40-foot containerised modular vertical
+ * farm" but the rule library hardcoded WAREHOUSE_BAY_100 — every spatial
+ * row then overflowed. With this function the orchestrator picks
+ * CONTAINER_40FT_ISO from the brief text and the rack count drops to fit.
+ */
+export function inferEnvelopeFromBriefText(
+    text: string,
+): import("./types").Envelope | null {
+    if (!text) return null
+    const haystack = text.toLowerCase()
+
+    // 40ft container — most common BESS / containerised farm signal
+    if (/\b(?:40[\s-]?ft|40[\s-]?foot|40['']|forty[\s-]?foot)\b.*\b(?:iso|container|containerised|containerized|shipping)\b/i.test(haystack)
+        || /\b(?:iso|shipping)?\s*container.*\b(?:40[\s-]?ft|40[\s-]?foot)\b/i.test(haystack)
+        || (/\b40[\s-]?ft\b/.test(haystack) && /\b(container|cont\b)/.test(haystack))) {
+        return CONTAINER_40FT_ISO
+    }
+
+    // 20ft container
+    if (/\b(?:20[\s-]?ft|20[\s-]?foot|twenty[\s-]?foot)\b.*\b(?:iso|container|shipping)\b/i.test(haystack)
+        || (/\b20[\s-]?ft\b/.test(haystack) && /\b(container|cont\b)/.test(haystack))) {
+        return CONTAINER_20FT_ISO
+    }
+
+    // 53ft high-cube
+    if (/\b53[\s-]?(?:ft|foot)\b.*\b(?:hc|high.cube|container)\b/i.test(haystack)) {
+        return CONTAINER_53FT_HC
+    }
+
+    // Heat-pump cabinet (only when domain is heat-pump-shaped)
+    if (/\b(?:cabinet|outdoor[\s-]?unit)\b.*\b(?:heat[\s-]?pump|ashp|gshp|wshp)\b/i.test(haystack)
+        || /\b(?:heat[\s-]?pump|ashp)\b.*\b(?:cabinet|outdoor[\s-]?unit)\b/i.test(haystack)) {
+        return HEATPUMP_CABINET
+    }
+
+    // Warehouse bay (explicit only — don't match "warehouse-style" or
+    // generic uses of the word "warehouse")
+    if (/\b(?:warehouse[\s-]?bay|grow[\s-]?room|cea[\s-]?facility)\b/i.test(haystack)) {
+        return WAREHOUSE_BAY_100
+    }
+
+    return null
 }

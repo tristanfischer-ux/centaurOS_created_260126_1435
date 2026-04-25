@@ -371,8 +371,22 @@ async function runMaxDecompositionInternal(
             //    We accept partial success here — if 8 of 9 expand and 1
             //    fails, we still save the 8 and mark the run 'done'. Only
             //    if EVERY expansion fails do we roll back to failed.
-            const expansions = await runWithConcurrency(
-                skeletonModules,
+            //
+            // CROSS-MODULE SYMMETRY FIX (2026-04-25): when a module sets
+            // `mirrorOf`, the parallel fan-out raced its primary and the
+            // pair came back with different materials (HAPS demo: port wing
+            // got monolithic gallium-arsenide cells, starboard got
+            // interdigitated-back-contact silicon — same role, opposite
+            // substrate). Split the expansion into two phases so the mirror's
+            // prompt sees the primary's resolved spec as a consistencyBrief.
+            //
+            // Phase A: every module that is NOT a mirror (primaries + standalones).
+            // Phase B: every module that IS a mirror, with primary's spec injected.
+            const primarySkeletons = skeletonModules.filter((sk) => !sk.mirrorOf)
+            const mirrorSkeletons = skeletonModules.filter((sk) => !!sk.mirrorOf)
+
+            const primaryExpansions = await runWithConcurrency(
+                primarySkeletons,
                 EXPAND_CONCURRENCY,
                 async (sk) =>
                     expandModuleDetail(
@@ -382,11 +396,64 @@ async function runMaxDecompositionInternal(
                         report,
                         modelId,
                         undefined, // domainHint
-                        undefined, // consistencyBrief
+                        undefined, // consistencyBrief — primaries don't need one
                         undefined, // documentContext
-                        user.id ?? undefined, // trustedUserId — use resolved user.id (owner-fallback applied above)
+                        user.id ?? undefined, // trustedUserId
                     ),
             )
+
+            // Build a quick lookup so phase B can read primary specs.
+            const primaryExpById = new Map(
+                primaryExpansions
+                    .filter((e) => e.success && e.expansion)
+                    .map((e) => [e.moduleId, e.expansion!]),
+            )
+
+            const mirrorExpansions = mirrorSkeletons.length === 0
+                ? []
+                : await runWithConcurrency(
+                      mirrorSkeletons,
+                      EXPAND_CONCURRENCY,
+                      async (sk) => {
+                          // Find the primary's resolved spec — if its expansion
+                          // failed, mirror still expands without a brief
+                          // (better partial output than no output).
+                          const primarySk = skeletonModules.find((s) => s.id === sk.mirrorOf)
+                          const primaryExp = primarySk
+                              ? primaryExpById.get(primarySk.id)
+                              : undefined
+                          let consistencyBrief: string | undefined
+                          if (primarySk && primaryExp) {
+                              consistencyBrief =
+                                  `This module is the geometric mirror of "${primarySk.name}". ` +
+                                  `It MUST use the same materials, manufacturing processes, key part list, ` +
+                                  `and structural specifications as its mirror. The two halves of a symmetric ` +
+                                  `product (e.g. port/starboard wings, left/right legs) are produced from the ` +
+                                  `same drawings and tooling — they are not independently designed.\n\n` +
+                                  `MIRROR'S RESOLVED SPEC:\n` +
+                                  `- keyParts: ${JSON.stringify(primaryExp.keyParts)}\n` +
+                                  `- description (preview): ${primaryExp.description.slice(0, 400)}${primaryExp.description.length > 400 ? "…" : ""}\n` +
+                                  `- estimatedMassKg: ${primaryExp.estimatedMassKg}\n` +
+                                  `- leadWeeks: ${primaryExp.leadWeeks}\n\n` +
+                                  `Your output MUST mirror these. Diverge ONLY when geometry forces it ` +
+                                  `(handedness, mounting orientation) — and even then, materials and ` +
+                                  `processes stay identical.`
+                          }
+                          return expandModuleDetail(
+                              skeletonModules,
+                              sk.id,
+                              description,
+                              report,
+                              modelId,
+                              undefined, // domainHint
+                              consistencyBrief,
+                              undefined, // documentContext
+                              user.id ?? undefined,
+                          )
+                      },
+                  )
+
+            const expansions = [...primaryExpansions, ...mirrorExpansions]
 
             let successfulExpansions = 0
             for (const exp of expansions) {

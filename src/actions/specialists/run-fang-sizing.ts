@@ -42,7 +42,12 @@ import {
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { CadLabModule } from "@/lib/cad-lab-types"
-import { inferTargetsFromBrief, runSizing } from "@/lib/sizing/sizing-engine"
+import {
+    inferTargetsFromBrief,
+    inferTargetsFromBriefText,
+    inferEnvelopeFromBriefText,
+    runSizing,
+} from "@/lib/sizing/sizing-engine"
 import { getRulesByDomain } from "@/lib/sizing/rules/_registry"
 import type { DimensionSheet, Envelope } from "@/lib/sizing/types"
 import type { Database } from "@/types/database.types"
@@ -221,7 +226,19 @@ async function runFangSizingInternal(
     // schema regression Tristan hit on BESS 931e0220 (research.report
     // existed but industryDomain + capacity came back null).
     const research = (project.research ?? null) as
-        | { industryDomain?: string; designBrief?: { capacity?: Record<string, number>; targets?: Record<string, number> } }
+        | {
+              industryDomain?: string
+              designBrief?: {
+                  capacity?: Record<string, number>
+                  targets?: Record<string, number>
+                  useCase?: string
+                  mission?: string
+                  complianceNotes?: string
+                  targetCustomers?: string
+                  whyNow?: string
+              }
+              report?: string | { content?: string }
+          }
         | null
     const subject = typeof project.subject === "string" ? project.subject : ""
     const industryDomain =
@@ -229,25 +246,72 @@ async function runFangSizingInternal(
         research?.industryDomain ??
         inferDomainFromSubject(subject)
 
+    // Build a single free-text haystack from every brief field that might
+    // mention capacity / form factor / market. Order matters only for
+    // debugging — extraction is unit-aware so duplicates are fine.
+    const briefTextHaystack = [
+        subject,
+        research?.designBrief?.useCase ?? "",
+        research?.designBrief?.mission ?? "",
+        research?.designBrief?.complianceNotes ?? "",
+        research?.designBrief?.targetCustomers ?? "",
+        research?.designBrief?.whyNow ?? "",
+        typeof research?.report === "string"
+            ? research.report
+            : research?.report?.content ?? "",
+    ]
+        .filter((s) => typeof s === "string" && s.length > 0)
+        .join(" \n ")
+
+    // Track WHERE each target value came from so the orchestrator can flag
+    // a default-only fallback as a conflict on the dimension sheet — that's
+    // the bug pattern observed on BESS demo (1.5 MW asked, 100 kW returned
+    // because brief extraction failed and the engine silently used the
+    // library default).
+    const targetProvenance: Record<string, "override" | "brief-structured" | "brief-text" | "subject" | "library-default"> = {}
     let targets: Record<string, number>
     if (overrides?.targets) {
         targets = overrides.targets
+        for (const k of Object.keys(targets)) targetProvenance[k] = "override"
     } else {
-        const fromBrief = inferTargetsFromBrief(industryDomain, research?.designBrief)
+        const fromBriefStructured = inferTargetsFromBrief(industryDomain, research?.designBrief)
+        const fromBriefText = inferTargetsFromBriefText(industryDomain, briefTextHaystack)
         const fromSubject = inferTargetsFromSubject(subject, industryDomain)
-        // Brief wins when present; subject fills gaps; library defaults fill
-        // remaining gaps (the registry-aware path in inferTargetsFromBrief
-        // already folds in defaults when no other signal exists).
-        targets = { ...fromSubject, ...fromBrief }
-        if (industryDomain && Object.keys(targets).length === 0) {
+        // Priority: brief-structured > brief-text > subject > library-default.
+        // Free-text extraction beats subject because briefs are richer than
+        // the project name. Library defaults are last resort and recorded as
+        // such so downstream conflict-flagging can warn the founder.
+        targets = {}
+        for (const [k, v] of Object.entries(fromSubject)) {
+            targets[k] = v
+            targetProvenance[k] = "subject"
+        }
+        for (const [k, v] of Object.entries(fromBriefText)) {
+            targets[k] = v
+            targetProvenance[k] = "brief-text"
+        }
+        for (const [k, v] of Object.entries(fromBriefStructured)) {
+            targets[k] = v
+            targetProvenance[k] = "brief-structured"
+        }
+        if (industryDomain) {
             const rules = getRulesByDomain(industryDomain)
             if (rules) {
                 for (const [k, spec] of Object.entries(rules.targetSpec)) {
-                    if (spec.default !== undefined) targets[k] = spec.default
+                    if (targets[k] === undefined && spec.default !== undefined) {
+                        targets[k] = spec.default
+                        targetProvenance[k] = "library-default"
+                    }
                 }
             }
         }
     }
+
+    // Infer envelope from the brief text BEFORE invoking the solver — this
+    // is the VF demo regression fix (brief said "40-foot containerised"
+    // but the rule library hardcoded WAREHOUSE_BAY_100 → spatial overflow).
+    const briefEnvelope =
+        overrides?.envelope ?? inferEnvelopeFromBriefText(briefTextHaystack) ?? undefined
 
     // 3. Open pipeline_run row.
     let runId = ""
@@ -283,7 +347,7 @@ async function runFangSizingInternal(
         const outcome = runSizing({
             industryDomain,
             domainOverride: overrides?.domainOverride,
-            envelope: overrides?.envelope,
+            envelope: briefEnvelope,
             targets,
             modules,
         })
@@ -310,6 +374,46 @@ async function runFangSizingInternal(
 
         // 5. Persist dimension_sheet on the project.
         const sheet: DimensionSheet = outcome.sheet
+
+        // Brief-vs-final-config validation. The [FEASIBLE] tag on the sheet
+        // only checks "config fits the envelope" — it does NOT check "config
+        // matches what the brief asked for". When targets came from the
+        // library default rather than the brief, the resolved config is
+        // probably solving the wrong problem (BESS asked 1.5 MW / 3.5 MWh,
+        // engine returned 100 kW / 500 kWh because brief extraction failed).
+        // Surface this as an explicit conflict so downstream consumers (PDF,
+        // founder UI, summary card) can flag it instead of trusting the
+        // green [FEASIBLE] badge.
+        const defaultedKeys = Object.entries(targetProvenance)
+            .filter(([, p]) => p === "library-default")
+            .map(([k]) => k)
+        if (defaultedKeys.length > 0) {
+            const rules = getRulesByDomain(sheet.rules_domain)
+            const labels = defaultedKeys
+                .map((k) => rules?.targetSpec[k]?.label ?? k)
+                .join(", ")
+            sheet.conflicts.push(
+                `BRIEF UNRESOLVED — sizing fell back to library defaults for: ${labels}. The brief did not declare these targets in a recognised form, so the engine sized for the default config, not what the founder asked for. Re-run after declaring targets explicitly in the brief.`,
+            )
+            sheet.recommendations.unshift(
+                `Re-run sizing with explicit ${labels} targets — the [FEASIBLE] badge below reflects envelope fit only, not brief satisfaction.`,
+            )
+            // Mark the sheet infeasible — even if the config fits the envelope
+            // it does not solve the brief, and a green [FEASIBLE] badge here
+            // misleads the founder.
+            sheet.feasible = false
+        }
+        // Provenance log so the trace shows where each target came from.
+        sheet.notes = [
+            ...(sheet.notes ?? []),
+            `target provenance: ${Object.entries(targetProvenance)
+                .map(([k, p]) => `${k}=${p}`)
+                .join(", ")}`,
+            briefEnvelope
+                ? `envelope: ${briefEnvelope.label} (from brief text)`
+                : `envelope: ${sheet.envelope.label} (library default)`,
+        ]
+
         const { error: writeErr } = await admin
             .from("cad_lab_projects")
             .update({

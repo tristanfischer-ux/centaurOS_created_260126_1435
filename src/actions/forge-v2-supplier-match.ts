@@ -108,7 +108,7 @@ async function matchSuppliersForProjectInternal(
 
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, modules, diagnostic_answers")
+            .select("id, foundry_id, modules, diagnostic_answers, research")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -160,23 +160,170 @@ async function matchSuppliersForProjectInternal(
 
         const diagnostics = (project.diagnostic_answers as DiagnosticAnswers | null) ?? {}
 
-        // Run the scorer against each module. Sequential rather than parallel —
-        // the underlying scorer embeds + queries Postgres per call and a large
-        // fan-out would hammer the DB. 10 modules * ~2s/call = ~20s, fits
-        // comfortably under Vercel's 300s cap.
+        // Extract target market from the brief so the scorer can apply a
+        // region bonus. The brief's constraints.markets is a string[] of
+        // ISO codes or short market names ("United Kingdom", "GB", "Europe").
+        // Joined comma-separated so substring matching in scoreRegionMatch
+        // can match the listing's country / country_iso against any of them.
+        const research = project.research as { designBrief?: { constraints?: { markets?: unknown; batchSize?: number } } } | null
+        const briefMarkets = research?.designBrief?.constraints?.markets
+        const targetMarket = Array.isArray(briefMarkets) && briefMarkets.length > 0
+            ? briefMarkets.filter((m): m is string => typeof m === "string").join(", ")
+            : null
+        const briefBatchSize = research?.designBrief?.constraints?.batchSize
+        const batchSizeHint =
+            typeof briefBatchSize === "number" && briefBatchSize > 0
+                ? briefBatchSize >= 1000
+                    ? "production"
+                    : briefBatchSize >= 100
+                    ? "low"
+                    : "prototype"
+                : null
+
+        // BOM-DRIVEN MATCHING (2026-04-25 rebuild): the previous approach
+        // searched suppliers per MODULE, which produced shallow matches
+        // because module names like "Battery enclosure" embed similarly to
+        // every battery-adjacent listing in the corpus. The bill-of-materials
+        // is the actual procurement source — each PART has a process,
+        // material, tolerance, and module reference, which lets the scorer
+        // surface specific manufacturers ("CNC machined 6063 aluminium
+        // for the battery rack frame") instead of generic battery shops.
         //
-        // We dedupe across modules: a single supplier matched to three
-        // subsystems gets one row with moduleIds = ["m1","m2","m3"], not
-        // three rows.
+        // We still fall back to module-level matching when:
+        //   - The BOM hasn't been generated yet (parts table empty)
+        //   - A module has no purchased parts (services-only module)
+        const moduleNameById = new Map<string, string>()
+        for (const m of modules) moduleNameById.set(m.id, m.name)
+        const moduleById = new Map<string, CadLabModule>()
+        for (const m of modules) moduleById.set(m.id, m)
+
+        const { data: rawParts } = await admin
+            .from("parts")
+            .select(
+                "id, part_number, name, description, source_module_id, process, material, material_spec, tolerance, mass_kg, finish, is_purchased",
+            )
+            .eq("cad_lab_project_id", projectId)
+            .order("part_number", { ascending: true })
+        // Only purchased parts are candidates for supplier matching —
+        // in-house-fabricated parts won't be sourced externally.
+        const purchasedParts = (rawParts ?? []).filter((p) => p.is_purchased !== false)
+
+        // Each match accumulator carries the parts a supplier can supply +
+        // the modules those parts belong to. Display layer (PDF/UI) reads
+        // both lists to render "Provides {part} for {module}" reasons.
+        interface MatchedPart {
+            partId: string
+            partNumber: string
+            partName: string
+            moduleId: string | null
+            moduleName: string | null
+            process: string | null
+            material: string | null
+        }
         interface Accumulator {
             match: CadLabSupplierMatch
             moduleIds: string[]
+            matchedParts: MatchedPart[]
         }
         const bySupplier = new Map<string, Accumulator>()
         let modulesMatched = 0
         let modulesEmpty = 0
+        const matchedModuleIdSet = new Set<string>()
 
+        // Process tolerance string ("±0.05 mm", "0.1 mm", "IT7") into a
+        // numeric mm value when it's parseable. Falls back to null otherwise.
+        const parseToleranceMm = (raw: string | null | undefined): number | null => {
+            if (!raw) return null
+            const m = raw.match(/(\d+(?:\.\d+)?)\s*mm/i)
+            if (m) {
+                const n = Number.parseFloat(m[1])
+                return Number.isFinite(n) ? n : null
+            }
+            return null
+        }
+
+        // ── Phase 1: per-part matching ────────────────────────────────────
+        if (purchasedParts.length > 0) {
+            console.info(
+                `[forge-v2-supplier-match] BOM-driven match — ${purchasedParts.length} purchased parts across ${modules.length} modules`,
+            )
+            for (const part of purchasedParts) {
+                const moduleId = part.source_module_id ?? null
+                const moduleName = moduleId ? moduleNameById.get(moduleId) ?? null : null
+                const partKeyParts = [
+                    part.material_spec,
+                    part.process,
+                    part.finish,
+                    part.tolerance,
+                ].filter((v): v is string => typeof v === "string" && v.length > 0)
+
+                // Build a search query that's specific to the part — embedding
+                // text emphasises the buyable noun + process + material rather
+                // than a high-level module concept.
+                const searchPurpose = moduleName
+                    ? `${part.process ?? "manufactured"} ${part.material ?? ""} part for the ${moduleName} sub-assembly`
+                    : `${part.process ?? "manufactured"} ${part.material ?? ""} part`
+                const input: CadLabModuleInput = {
+                    id: `part:${part.id}`,
+                    name: part.name,
+                    purpose: searchPurpose,
+                    keyParts: partKeyParts,
+                    description: typeof part.description === "string" ? part.description : undefined,
+                    process: part.process ?? null,
+                    material: part.material ?? null,
+                    toleranceMm: parseToleranceMm(part.tolerance),
+                    batchSize: batchSizeHint,
+                    targetMarket,
+                }
+                let matches: CadLabSupplierMatch[] = []
+                try {
+                    matches = await matchCadLabModuleSuppliers(input, trusted)
+                } catch (err) {
+                    console.error(
+                        `[forge-v2-supplier-match] scorer threw for part ${part.part_number}:`,
+                        err instanceof Error ? err.message : err,
+                    )
+                    continue
+                }
+                if (matches.length === 0) continue
+                if (moduleId) matchedModuleIdSet.add(moduleId)
+                const topN = matches.slice(0, TOP_N_PER_MODULE)
+                for (const m of topN) {
+                    const matchedPart: MatchedPart = {
+                        partId: part.id,
+                        partNumber: part.part_number,
+                        partName: part.name,
+                        moduleId,
+                        moduleName,
+                        process: part.process ?? null,
+                        material: part.material ?? null,
+                    }
+                    const existing = bySupplier.get(m.id)
+                    if (existing) {
+                        if (moduleId && !existing.moduleIds.includes(moduleId)) {
+                            existing.moduleIds.push(moduleId)
+                        }
+                        existing.matchedParts.push(matchedPart)
+                        if (m.matchScore > existing.match.matchScore) {
+                            existing.match = m
+                        }
+                    } else {
+                        bySupplier.set(m.id, {
+                            match: m,
+                            moduleIds: moduleId ? [moduleId] : [],
+                            matchedParts: [matchedPart],
+                        })
+                    }
+                }
+            }
+            modulesMatched = matchedModuleIdSet.size
+            modulesEmpty = modules.length - modulesMatched
+        }
+
+        // ── Phase 2: module-level fallback for modules the parts loop
+        //    didn't cover (BOM empty, or no purchased parts in this module) ──
         for (const mod of modules) {
+            if (matchedModuleIdSet.has(mod.id)) continue
             const diag = diagnostics[mod.id] ?? {}
             const input: CadLabModuleInput = {
                 id: mod.id,
@@ -186,6 +333,8 @@ async function matchSuppliersForProjectInternal(
                 description: typeof mod.description === "string" ? mod.description : undefined,
                 process: diag.mfg_process ?? null,
                 material: diag.material ?? null,
+                batchSize: batchSizeHint,
+                targetMarket,
             }
             let matches: CadLabSupplierMatch[] = []
             try {
@@ -214,7 +363,11 @@ async function matchSuppliersForProjectInternal(
                         existing.match = m
                     }
                 } else {
-                    bySupplier.set(m.id, { match: m, moduleIds: [mod.id] })
+                    bySupplier.set(m.id, {
+                        match: m,
+                        moduleIds: [mod.id],
+                        matchedParts: [],
+                    })
                 }
             }
         }
@@ -222,8 +375,53 @@ async function matchSuppliersForProjectInternal(
         // Upsert each unique supplier. addToShortlist handles the (project,
         // supplier) uniqueness via its ON CONFLICT clause, so re-runs update
         // instead of duplicating.
+        //
+        // BETTER MATCH REASONS (2026-04-25): the previous reasons read
+        // "Semantic match, Manufacturing, Aerospace" — labels that tell the
+        // founder nothing about why this supplier matters for THEIR project.
+        // Rewrite reasons to lead with what the supplier can supply for what:
+        //   "Can supply Battery rack frame member (CNC machined 6063 aluminium)
+        //    for Battery enclosure"
+        // Falls back to the legacy factor labels only when no parts matched
+        // (module-level fallback path).
+        const buildMatchReasons = (
+            match: CadLabSupplierMatch,
+            matchedParts: MatchedPart[],
+        ): string[] => {
+            if (matchedParts.length === 0) {
+                // Module-fallback path — keep existing labels but at least
+                // tell the founder which factor was strong.
+                return match.matchReasons.slice(0, 3)
+            }
+            // Show up to 3 representative parts. Sort by part number so the
+            // first few are usually structural-type parts (lower numbers).
+            const sortedParts = [...matchedParts].sort((a, b) =>
+                (a.partNumber || "").localeCompare(b.partNumber || ""),
+            )
+            const reasons: string[] = []
+            const seen = new Set<string>()
+            for (const p of sortedParts) {
+                const procMat = [p.process, p.material]
+                    .filter((v): v is string => typeof v === "string" && v.length > 0)
+                    .join(" · ")
+                const forModule = p.moduleName ? ` for ${p.moduleName}` : ""
+                const reason = procMat.length > 0
+                    ? `Can supply ${p.partName} (${procMat})${forModule}`
+                    : `Can supply ${p.partName}${forModule}`
+                if (!seen.has(reason)) {
+                    reasons.push(reason)
+                    seen.add(reason)
+                }
+                if (reasons.length >= 3) break
+            }
+            // Append a region tag at the end if it hit (preserve from scorer).
+            const inMarketReason = match.matchReasons.find((r) => r.startsWith("In ") || r.startsWith("Regional fit"))
+            if (inMarketReason && reasons.length < 3) reasons.push(inMarketReason)
+            return reasons
+        }
         let suppliersAdded = 0
-        for (const { match, moduleIds } of bySupplier.values()) {
+        for (const { match, moduleIds, matchedParts } of bySupplier.values()) {
+            const richReasons = buildMatchReasons(match, matchedParts)
             const res = await addToShortlist({
                 projectId,
                 supplierId: match.id,
@@ -233,7 +431,7 @@ async function matchSuppliersForProjectInternal(
                 moduleIds,
                 bestMatchScore: match.matchScore,
                 bestScoreBreakdown: match.scoreBreakdown,
-                allMatchReasons: match.matchReasons,
+                allMatchReasons: richReasons,
             }, trusted)
             if (res.ok) {
                 suppliersAdded += 1

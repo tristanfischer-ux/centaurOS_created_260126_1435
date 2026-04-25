@@ -603,7 +603,12 @@ export async function renderNextModuleStage(
  * no-op. If it's stale, the refire is itself idempotent because
  * renderNextModuleStage reads state fresh before doing any work.
  */
-const RENDER_CHAIN_STALE_MS = 90_000
+// 2026-04-25: lowered from 90s → 30s. The HTTP-hop POST has a short abort
+// window; if Vercel cold-start delays the next stage, the chain looks idle
+// from the founder's perspective. Tighter stall threshold means the next
+// page-load (from /modules or /the-forge-v2) recovers the chain inside ~30s
+// of going quiet, instead of letting the user stare at "4/8 done" for 90s.
+const RENDER_CHAIN_STALE_MS = 30_000
 
 export async function tickImageRenderChain(projectId: string): Promise<void> {
     return withAuth<void>(async ({ foundryId }) => {
@@ -791,11 +796,15 @@ async function scheduleNextStageViaHttp(projectId: string): Promise<void> {
     // GOTCHA (2026-04-24, run 11): `after(fetch)` was unreliable when the
     // calling handler returned in <1s — Vercel tore down the container
     // before the `after()` queue ran the callback. Same root cause as in
-    // scheduleAutopilotStep. Fix: inline-await the fetch with a 2s abort.
-    // The target route gets the request within ~200ms and runs on a fresh
-    // 300s container independently of our client socket.
+    // scheduleAutopilotStep. Fix: inline-await the fetch with a 5s abort.
+    //
+    // 2026-04-25 retune: bumped from 2s → 5s. Vercel cold-start can take
+    // 2-3s on the render-stage container; a 2s abort sometimes fired
+    // BEFORE the request landed, leaving the chain genuinely orphaned
+    // (not just "container teardown safe"). 5s is still short enough to
+    // unblock the caller cleanly, but generous enough to absorb cold-start.
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 2000)
+    const timer = setTimeout(() => controller.abort(), 5000)
     try {
         await fetch(url, {
             method: "POST",
@@ -810,7 +819,7 @@ async function scheduleNextStageViaHttp(projectId: string): Promise<void> {
         console.info("[render-all-modules:stage] hop dispatched")
     } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-            console.info("[render-all-modules:stage] hop sent (aborted after 2s)")
+            console.info("[render-all-modules:stage] hop sent (aborted after 5s)")
         } else {
             console.error(
                 "[render-all-modules:stage] next stage fetch failed:",

@@ -1154,18 +1154,46 @@ async function stepGenerateIllustration(projectId: string): Promise<void> {
 
     await advance(projectId, "generating_illustration", "matching_suppliers")
 
-    // V1 CUT (2026-04-24, per Tristan PDF review): drop per-module renders.
-    // Rationale: 2/8 modules rendered on the last autopilot run — inconsistent
-    // "half-built" look. Cover + hero illustration above already ship. Module
-    // renders add ~12 min of the 20 min runtime, are the flakiest pipeline
-    // (gpt-image-2 timeouts, consistency retries), and the PDF already
-    // degrades gracefully to "no render generated" rows. Bringing them back
-    // in V1.1 after we can guarantee 8/8 reliability. To re-enable, restore
-    // the startRenderAllRemainingModuleImagesBackground block that was here.
+    // V1.1 (2026-04-25, Tristan engine-fix sprint): bring back per-module
+    // renders as a parallel fire-and-forget that runs DURING the supplier-
+    // match + Fang-review stages. This way module renders don't extend
+    // total autopilot runtime — they finish on the same wall clock as the
+    // long-running review chain. PDF generator polls right before export.
     //
-    // Page-load auto-fire on /modules still works (tickImageRenderChain +
-    // the user clicking "Render all"), so founders who want per-module
-    // imagery can trigger it manually. Autopilot just won't wait for it.
+    // The original V1 cut reasoning (gpt-image-2 timeouts, consistency
+    // retries, ~12 min) is mitigated by:
+    //   - Module-render orchestrator already chunks at concurrency 3
+    //   - tickImageRenderChain has its own retry + timeout
+    //   - PDF gen happens after Fang reviews, which run ~12 min — same
+    //     budget the renders need, so they overlap
+    //
+    // Per-module renders fire here because:
+    //   - cad_lab_modules already populated by Max
+    //   - dimension_sheet (sizing) populated by Fang
+    //   - spatial plan (Fang layout) populated — best shot at consistent
+    //     module placement across renders
+    try {
+        const { startRenderAllRemainingModuleImagesBackground } =
+            await import("@/actions/forge-v2-render-all-modules")
+        // Foreground await — chain returns immediately after queueing the
+        // first stage; subsequent stages self-fire via after(). This isn't
+        // blocking on render completion, just on chain initiation.
+        const queueRes = await startRenderAllRemainingModuleImagesBackground(
+            projectId,
+            foundryIdForChain,
+        )
+        if (!queueRes.ok) {
+            console.warn(
+                "[autopilot] per-module render chain failed to start (non-fatal):",
+                queueRes.error,
+            )
+        }
+    } catch (err) {
+        console.warn(
+            "[autopilot] per-module render chain threw (non-fatal):",
+            err instanceof Error ? err.message : err,
+        )
+    }
 
     // P0.1b: HTTP hop — fresh container for supplier matching. The
     // after() above that kicks the per-module render chain STAYS as-is
@@ -1353,6 +1381,53 @@ async function stepGeneratePdf(projectId: string): Promise<void> {
     if (!foundryId) {
         await recordFailure(projectId, "generating_pdf", "project not found")
         return
+    }
+
+    // V1.1: wait for per-module renders to finish before generating the PDF
+    // so it doesn't ship with "No render generated yet" placeholders. The
+    // render chain was kicked off back in stepGenerateImages and has been
+    // running in parallel with supplier-match + Fang reviews. By the time
+    // we reach this stage the renders are usually done — but we poll a
+    // short window just in case.
+    //
+    // Cap: 90 seconds. Beyond that we ship with whatever renders landed.
+    // The PDF degrades gracefully (empty placeholder) for missing renders,
+    // and the founder can re-export from the project page after renders
+    // complete.
+    try {
+        const admin = createAdminClient()
+        const RENDER_WAIT_MAX_MS = 90_000
+        const POLL_INTERVAL_MS = 5_000
+        const startedAt = Date.now()
+        let lastSummary = ""
+        while (Date.now() - startedAt < RENDER_WAIT_MAX_MS) {
+            const { data: row } = await admin
+                .from("cad_lab_projects")
+                .select("modules")
+                .eq("id", projectId)
+                .maybeSingle()
+            const mods = (row?.modules ?? []) as Array<{ id: string; imageUrl?: string | null; imageStatus?: string | null }>
+            if (mods.length === 0) break
+            const total = mods.length
+            const ready = mods.filter((m) => typeof m.imageUrl === "string" && m.imageUrl.length > 0).length
+            const inFlight = mods.filter((m) =>
+                m.imageStatus === "generating" || m.imageStatus === "pending",
+            ).length
+            const summary = `${ready}/${total} renders ready, ${inFlight} in flight`
+            if (summary !== lastSummary) {
+                console.info(`[autopilot] PDF render-wait: ${summary}`)
+                lastSummary = summary
+            }
+            if (ready === total || inFlight === 0) break
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+        }
+    } catch (err) {
+        // Polling is best-effort. If it fails we still try the PDF gen — the
+        // PDF won't crash from missing renders, it'll just be ugly.
+        console.warn(
+            "[autopilot] render-wait poll threw (non-fatal):",
+            err instanceof Error ? err.message : err,
+        )
     }
 
     try {

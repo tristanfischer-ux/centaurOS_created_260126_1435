@@ -63,6 +63,14 @@ export interface CadLabModuleInput {
    * (name/purpose/description/keyParts) which is weaker signal.
    */
   projectIndustries?: string[]
+  /**
+   * Optional target-market hint extracted from the brief (e.g. "United Kingdom",
+   * "GB", "Europe"). When provided, listings whose country/country_iso match
+   * the market receive a region bonus on top of the 100-pt base score, so a
+   * UK-HQ supplier outranks an overseas one on otherwise-equivalent matches.
+   * Free text is fine — substring + ISO + region-bucket matching applied.
+   */
+  targetMarket?: string | null
 }
 
 export interface ScoreBreakdown {
@@ -75,6 +83,12 @@ export interface ScoreBreakdown {
   industry: number
   certifications: number
   specialties: number
+  /**
+   * Region bonus (0-8 pts) — added on top of the 100-pt base when a target
+   * market is declared on the input and the listing's country matches.
+   * Stays at 0 when the brief doesn't declare a target market.
+   */
+  region: number
   total: number
 }
 
@@ -185,6 +199,139 @@ const BASE_WEIGHTS = {
 
 const MIN_SCORE_THRESHOLD = 15
 const MAX_RESULTS = 8
+
+// ─── URL Shape Filter ────────────────────────────────────────────────
+//
+// Why: the marketplace_listings table is enriched from web crawls, and
+// many rows are blog articles, university research pages, industry
+// guidebooks, or news/press posts that semantically embed close to real
+// supplier pages. They have no business in a procurement shortlist.
+// Observed across all five 2026-04-25 demo PDFs:
+//   pyrophobic.com/blog/thermal-runaway-mitigation-and-containment/
+//   uwyo.edu/.../argus-system.html
+//   ledinside.com/press/2017/...
+//   atlas-scientific.com/blog/nutrient-dosing-systems/
+// Founders read these as legitimate suppliers and try to contact them.
+//
+// The filter is applied at candidate-fetch time so non-supplier URLs
+// never enter the scoring loop — both faster and harder to bypass.
+
+const NON_SUPPLIER_URL_PATH_PATTERNS = [
+  "/blog/",
+  "/blogs/",
+  "/news/",
+  "/press/",
+  "/press-release",
+  "/article/",
+  "/articles/",
+  "/guide/",
+  "/guides/",
+  "/whitepaper",
+  "/case-study",
+  "/case-studies",
+  "/learn/",
+  "/help/",
+  "/faq/",
+  "/wiki/",
+  "/research/",
+  "/papers/",
+  "/post/",
+  "/posts/",
+] as const
+
+const NON_SUPPLIER_TLD_PATTERNS = [
+  ".edu",
+  ".edu.",
+  ".ac.uk",
+  ".ac.",
+  ".gov",
+  ".gov.uk",
+  "wikipedia.org",
+  "youtube.com",
+  "youtu.be",
+  "linkedin.com",
+  "medium.com",
+  "substack.com",
+  "wordpress.com",
+] as const
+
+/**
+ * Returns true if the URL points at a non-manufacturer surface — blog,
+ * article, news, university research, government page, or major content
+ * platform. False if the URL looks like a supplier homepage or product
+ * page.
+ *
+ * Conservative: returns false (allow) for unknown shapes so we never drop
+ * a legitimate supplier whose URL we can't classify.
+ */
+function isNonSupplierUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  const lower = url.toLowerCase()
+  for (const tld of NON_SUPPLIER_TLD_PATTERNS) {
+    if (lower.includes(tld)) return true
+  }
+  for (const path of NON_SUPPLIER_URL_PATH_PATTERNS) {
+    if (lower.includes(path)) return true
+  }
+  return false
+}
+
+// ─── Region Match ────────────────────────────────────────────────────
+//
+// Why: when a brief specifies "United Kingdom market", a UK-domiciled
+// supplier should rank above an otherwise-equivalent overseas one.
+// Currently a Chinese wholesaler and a UK supplier with identical
+// semantic scores rank together — bad procurement signal.
+//
+// Region match is awarded as a bonus on top of the 100-pt base score
+// rather than redistributing weights, because not every brief has a
+// declared market and we don't want missing-market projects to score
+// systematically lower.
+
+const REGION_BONUS_MAX_POINTS = 8
+
+/**
+ * Scores how well a listing's country/country_iso aligns with a target
+ * market. Returns 0-1 normalized.
+ *
+ * targetMarket can be a free-text market label ("United Kingdom",
+ * "Europe", "United States"), an ISO-2 country code ("GB", "US"), or
+ * a comma-separated list. Listing country values come in both shapes
+ * across the corpus, so we match leniently on substring / ISO match.
+ */
+function scoreRegionMatch(
+  listingCountry: string | null | undefined,
+  listingCountryIso: string | null | undefined,
+  targetMarket: string | null | undefined,
+): number {
+  if (!targetMarket) return 0
+  const target = targetMarket.toLowerCase().trim()
+  if (target.length === 0) return 0
+  const country = (listingCountry ?? "").toLowerCase().trim()
+  const iso = (listingCountryIso ?? "").toLowerCase().trim()
+  if (country.length === 0 && iso.length === 0) return 0
+
+  // Exact ISO-2 match (e.g. target="GB", iso="GB")
+  if (iso.length === 2 && target.includes(iso)) return 1.0
+  if (country.length === 2 && target.includes(country)) return 1.0
+
+  // Free-text substring (e.g. target="United Kingdom market", country="United Kingdom")
+  if (country.length >= 3 && target.includes(country)) return 1.0
+  if (country.length >= 3 && country.includes(target.replace(/\s+market$/i, ""))) return 1.0
+
+  // Region buckets — close-but-not-exact partial credit.
+  const REGION_BUCKETS: Record<string, string[]> = {
+    europe: ["gb", "united kingdom", "uk", "ireland", "germany", "france", "spain", "italy", "netherlands", "belgium", "sweden", "denmark", "finland", "poland", "portugal", "austria", "switzerland", "norway"],
+    "north america": ["us", "united states", "usa", "canada", "mexico"],
+    asia: ["china", "japan", "south korea", "korea", "taiwan", "singapore", "india", "vietnam", "thailand", "malaysia"],
+  }
+  for (const [bucket, members] of Object.entries(REGION_BUCKETS)) {
+    if (target.includes(bucket)) {
+      if (members.some((m) => country.includes(m) || iso === m)) return 0.5
+    }
+  }
+  return 0
+}
 
 /**
  * Calculates dynamic weights based on which structured inputs are available.
@@ -611,11 +758,26 @@ export async function matchCadLabModuleSuppliers(
   // Observed in 2026-04-23 BESS PDF where 11/11 "suppliers" were funds.
   // Filter category to Products/Services at the candidate-fetch step so
   // Finance/People/AI rows never enter the scoring loop.
-  const { data: listings } = await supabase
+  const { data: rawListings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, city, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, data_quality_score")
+    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, country_iso, city, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, data_quality_score")
     .in("id", [...candidateIds])
     .in("category", ["Products", "Services"])
+
+  // SHIP-BLOCKER FIX (2026-04-25): drop listings whose website_url shape is
+  // a blog, news/press, university research, government page, or major
+  // content platform. The marketplace_listings corpus contains these because
+  // crawls don't distinguish between manufacturer homepages and editorial
+  // pages on the same domain — the embedding similarity then ranks them
+  // alongside actual suppliers. See NON_SUPPLIER_URL_PATH_PATTERNS for the
+  // full list and the comment block above isNonSupplierUrl().
+  const listings = (rawListings ?? []).filter((l) => !isNonSupplierUrl(l.website_url))
+  const droppedNonSupplierCount = (rawListings?.length ?? 0) - listings.length
+  if (droppedNonSupplierCount > 0) {
+    console.info(
+      `[CadLabMatch] Dropped ${droppedNonSupplierCount} non-supplier URLs from candidate set (blogs/news/research/edu)`,
+    )
+  }
 
   const matches: CadLabSupplierMatch[] = []
 
@@ -630,8 +792,8 @@ export async function matchCadLabModuleSuppliers(
         [input.name, input.purpose, input.description ?? "", input.material ?? "", ...input.keyParts].join(" "),
       )
 
-  if (listings) {
-    for (const listing of listings) {
+  for (const listing of listings) {
+    {
       // INTENT: Read enrichment arrays with fallback to attributes JSONB.
       // Top-level columns are sparsely populated (industries 0.8%, materials
       // 11%, specialties 35%, key_equipment 5%), but the same fields in
@@ -714,15 +876,28 @@ export async function matchCadLabModuleSuppliers(
       // Factor 9: Specialties match (listing specialties vs search terms)
       const specialtiesRaw = scoreSpecialtiesMatch(specialtiesList, searchTerms)
 
+      // Factor 10: Region match (bonus, only when brief declares target market)
+      const regionRaw = scoreRegionMatch(
+        listing.country,
+        listing.country_iso,
+        input.targetMarket,
+      )
+
       // Relevance gate. Now includes industry + cert alignment — an aerospace
       // shop with AS9100 but weak semantic overlap still surfaces.
-      const hasRelevance =
-        semanticRaw >= 0.3 ||
+      // SEMANTIC-ONLY FLOOR: a high semantic score alone (without process /
+      // material / capability / industry / cert overlap) is a weak signal —
+      // it just means the page text reads like the module description.
+      // Without one of the structured signals, the listing might be a
+      // tangentially-related product. Require structured corroboration.
+      const hasStructuredSignal =
         processScore >= 1.0 ||
         materialScore >= 1.0 ||
         capabilityRaw > 0 ||
         industryRaw >= 0.5 ||
-        certificationsRaw >= 1.0
+        certificationsRaw >= 1.0 ||
+        specialtiesRaw > 0
+      const hasRelevance = hasStructuredSignal || semanticRaw >= 0.5
       if (!hasRelevance) {
         qualityRaw = 0
         keywordRaw = 0
@@ -738,12 +913,13 @@ export async function matchCadLabModuleSuppliers(
         industry: Math.round(industryRaw * weights.industry * 10) / 10,
         certifications: Math.round(certificationsRaw * weights.certifications * 10) / 10,
         specialties: Math.round(specialtiesRaw * weights.specialties * 10) / 10,
+        region: Math.round(regionRaw * REGION_BONUS_MAX_POINTS * 10) / 10,
         total: 0,
       }
       breakdown.total = Math.round(
         (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality +
          breakdown.keyword + breakdown.capability + breakdown.industry +
-         breakdown.certifications + breakdown.specialties) * 10,
+         breakdown.certifications + breakdown.specialties + breakdown.region) * 10,
       ) / 10
 
       if (breakdown.total >= MIN_SCORE_THRESHOLD) {
@@ -757,6 +933,11 @@ export async function matchCadLabModuleSuppliers(
         }
         if (certificationsRaw >= 1.0) reasons.push("Regulated-industry certs")
         if (capabilityRaw >= 0.4) reasons.push("Verified capabilities")
+        if (regionRaw >= 1.0 && input.targetMarket) {
+          reasons.push(`In ${input.targetMarket}`)
+        } else if (regionRaw > 0 && input.targetMarket) {
+          reasons.push(`Regional fit: ${input.targetMarket}`)
+        }
         if (listing.subcategory) reasons.push(listing.subcategory)
 
         // Coerce for UI consumption — certsList already includes attributes-JSONB fallback.

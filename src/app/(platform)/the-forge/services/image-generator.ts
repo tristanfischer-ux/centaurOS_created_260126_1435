@@ -531,11 +531,14 @@ async function callOpenAIImage(
   }
 
   const OpenAI = (await import("openai")).default
-  // RELIABILITY: 180s timeout + no retries. gpt-image-2 default-quality
-  // renders land in ~50s typical; gpt-image-1 high-quality ~45s typical.
-  // 180s gives headroom for pathological prompts without blowing past
-  // Vercel's 300s function ceiling.
-  const client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 0 })
+  // RELIABILITY (2026-04-25 retune): 60s timeout. gpt-image-2 default-quality
+  // typical render is ~50s — 180s was meant as headroom for pathological
+  // prompts but in practice it just let one slow module burn the whole
+  // stage budget on Vercel (300s ceiling), starving the rest of the chain.
+  // At 60s: pathological prompts fail fast and the fallback chain takes
+  // over; the chain advances to the next module on schedule. No retries
+  // here — retries happen at the chain level (next stage) instead.
+  const client = new OpenAI({ apiKey, timeout: 60_000, maxRetries: 0 })
 
   // DECISION: Tristan explicitly chose gpt-image-2 DEFAULT quality over
   // "high"/thinking mode after the 4-way shootout — high mode produced
@@ -1436,36 +1439,13 @@ export async function generateModuleImage(
     moduleCropBase64,
   })
 
-  // Layer 3: Geometric consistency verification + single retry
-  if (referenceBase64 && process.env.ANTHROPIC_API_KEY?.trim()) {
-    // Pass the hero's actual mime-type — when it's a JPEG re-encoded hero
-    // (Fix 1) Claude Vision needs the matching media_type or it 400s.
-    const consistencyResult = await scoreImageConsistency(
-      referenceBase64,
-      imageData.data,
-      module.name,
-      referenceMimeType,
-    )
-    if (consistencyResult) {
-      console.log(`[XRayImageGen] Geometric consistency score ${consistencyResult.score}/10 for ${module.name}`)
-      if (consistencyResult.shouldRegenerate) {
-        console.log(`[XRayImageGen] Score below threshold, retrying with constraints for ${module.name}`)
-        const retryPrompt = buildConstrainedRetryPrompt(module, consistencyResult.issues, visualStyle, !!moduleCropBase64)
-        try {
-          const retryData = await callImageWithFallback(retryPrompt, {
-            aspectRatio: "3:2",
-            referenceBase64,
-            referenceMimeType,
-            moduleCropBase64,
-          })
-          imageData = retryData
-        } catch (retryErr) {
-          console.warn(`[XRayImageGen] Retry failed for ${module.name}, keeping original:`, retryErr instanceof Error ? retryErr.message : retryErr)
-          // Keep original imageData on retry failure
-        }
-      }
-    }
-  }
+  // Layer 3 REMOVED (2026-04-25 reliability retune): the consistency-score
+  // retry loop added 30-50s per module and a second full fallback chain.
+  // The reference-aware prompt (multimodal — referenceBase64 fed through
+  // OpenAI's responses API) already anchors each module to the hero's
+  // geometry, so the retry was optimisation, not correctness. Removing it
+  // was the difference between 2/8 and 8/8 modules completing on the
+  // 2026-04-25 demo run. The hero stays referenced as the visual anchor.
 
   // INTENT: overlayModuleLabels() was removed here because Sharp's SVG composite
   // falls back to missing-glyph tofu boxes on Vercel's Linux container — the

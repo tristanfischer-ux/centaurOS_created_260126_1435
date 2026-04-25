@@ -341,7 +341,8 @@ RULES:
 - Use dimensions from the research report — do not invent new ones
 - If the research report mentions sub-components, those are good module candidates
 - Output ONLY the JSON object — no markdown, no explanation
-- SYMMETRY (CRITICAL): If a module is the mirrored counterpart of another (e.g. "Right Leg" mirrors "Left Leg", "Right Drive Module" mirrors "Left Drive Module"), you MUST set mirrorOf to the ID of the primary module. Only ONE module in a symmetric pair sets mirrorOf — the other is the primary (mirrorOf: null). Modules that happen to be similar but aren't geometric mirrors should NOT use mirrorOf. Downstream image generation depends on mirrorOf to produce visually consistent illustrations — if you omit it, mirror pairs will look completely different.`
+- SYMMETRY (CRITICAL): If a module is the mirrored counterpart of another (e.g. "Right Leg" mirrors "Left Leg", "Right Drive Module" mirrors "Left Drive Module"), you MUST set mirrorOf to the ID of the primary module. Only ONE module in a symmetric pair sets mirrorOf — the other is the primary (mirrorOf: null). Modules that happen to be similar but aren't geometric mirrors should NOT use mirrorOf. Downstream image generation depends on mirrorOf to produce visually consistent illustrations — if you omit it, mirror pairs will look completely different.
+- NO ACRONYMS — spell out every acronym IN FULL on first AND every subsequent mention. Write "battery management system" not "BMS", "energy management system" not "EMS", "contract manufacturer" not "CM", "design for manufacturing" not "DFM", "bill of materials" not "BOM", "thermal runaway" not "TR". Narrow exceptions: proper nouns (ForgeOS), standards codes (AS9100D, ISO 13485, NFPA 855), file extensions (.step), and "United Kingdom" / "European Union" / "United States" written out in full only.`
 
 const MODULE_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
   electronics:
@@ -388,7 +389,17 @@ RULES:
 - Modules should cover the ENTIRE product — no gaps
 - Output ONLY the JSON object — no markdown, no explanation
 - Keep it lightweight — purpose should be ONE sentence
-- SYMMETRY (CRITICAL): If a module is the mirrored counterpart of another (e.g. "Right Leg" mirrors "Left Leg", "Right Drive Module" mirrors "Left Drive Module"), you MUST set mirrorOf to the ID of the primary module. Only ONE module in a symmetric pair sets mirrorOf — the other is the primary (mirrorOf: null). Modules that happen to be similar but aren't geometric mirrors should NOT use mirrorOf. Downstream image generation depends on mirrorOf to produce visually consistent illustrations — if you omit it, mirror pairs will look completely different.`
+- SYMMETRY (CRITICAL): If a module is the mirrored counterpart of another (e.g. "Right Leg" mirrors "Left Leg", "Right Drive Module" mirrors "Left Drive Module"), you MUST set mirrorOf to the ID of the primary module. Only ONE module in a symmetric pair sets mirrorOf — the other is the primary (mirrorOf: null). Modules that happen to be similar but aren't geometric mirrors should NOT use mirrorOf. Downstream image generation depends on mirrorOf to produce visually consistent illustrations — if you omit it, mirror pairs will look completely different.
+- NO ACRONYMS — spell out every acronym IN FULL on first AND every subsequent mention. Acronyms make the document confusing because the same letters mean different things to different readers. Examples:
+  - Write "battery management system" not "BMS"
+  - Write "energy management system" not "EMS"
+  - Write "contract manufacturer" not "CM"
+  - Write "design for manufacturing" not "DFM"
+  - Write "bill of materials" not "BOM"
+  - Write "internet of things" not "IoT"
+  - Write "controlled environment agriculture" not "CEA"
+  - Write "thermal runaway" not "TR"
+  Narrow exceptions: proper nouns (ForgeOS, NFPA 855), file extensions (.step, .pdf), code identifiers, and "United Kingdom" / "European Union" / "United States" can be written out in full but never abbreviated. Standards codes (AS9100D, ISO 13485, NFPA 855) stay as-is — they're proper nouns.`
 
 const SKELETON_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
   electronics:
@@ -431,6 +442,7 @@ RULES:
 - failureModes: 2-4 realistic engineering failure modes
 - unknowns: 1-3 open questions that need resolution
 - Use dimensions from the research report — do not invent new ones
+- NO ACRONYMS — every acronym MUST be written in full on first AND every subsequent mention, in keyParts, description, whyItMatters, failureModes, unknowns. Write "battery management system" not "BMS", "energy management system" not "EMS", "contract manufacturer" not "CM", "design for manufacturing" not "DFM", "bill of materials" not "BOM", "thermal runaway" not "TR", "controlled environment agriculture" not "CEA". Narrow exceptions: proper nouns, standards codes (AS9100D, ISO 13485, NFPA 855), file extensions (.step), and "United Kingdom" / "European Union" / "United States" written out in full only.
 - Output ONLY the JSON object — no markdown, no explanation`
 
 const MODULE_EXPANSION_ROLE: Record<CadLabDomain, string> = {

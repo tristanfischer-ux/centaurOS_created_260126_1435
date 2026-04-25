@@ -403,6 +403,8 @@ interface ModulePdf {
     leadWeeks: number | null
     leadTimeSource: string | null
     mirrorOf: string | null
+    /** Human-readable name of the mirror module — resolved from the slug at PDF-build time so the page shows "mirrors Left wing" instead of "mirrors left_wing". */
+    mirrorOfName: string | null
     keyParts: string[]
     failureModes: string[]
     unknowns: string[]
@@ -444,6 +446,18 @@ interface SupplierPdf {
     rampRole: string | null
     websiteUrl: string | null
     contactEmail: string | null
+    /** Year the company was founded (when known). Helps the founder gauge maturity. */
+    foundedYear: number | null
+    /** Headcount when the directory has it. */
+    employeeCount: number | null
+    /** Typical lead time as the supplier states it (e.g. "4-6 weeks"). */
+    leadTime: string | null
+    /** Minimum order quantity / value, when declared. */
+    minimumOrder: string | null
+    /** Active certifications (AS9100D, ISO 13485, NFPA 855). */
+    certifications: string[] | null
+    /** One-paragraph blurb the supplier directory holds about them. */
+    description: string | null
 }
 
 interface AuditRowPdf {
@@ -711,7 +725,7 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
             <Text style={styles.h2}>1. Brief</Text>
             {b.subject && (
                 <View style={styles.para}>
-                    <Text style={styles.h5}>Founder subject</Text>
+                    <Text style={styles.h5}>What we are building</Text>
                     <Text>{b.subject}</Text>
                 </View>
             )}
@@ -739,31 +753,53 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
                     <Text>{b.whyNow}</Text>
                 </View>
             )}
-            <Text style={styles.h3}>Constraints declared</Text>
-            <View style={styles.row}>
-                <Text style={styles.rowLabel}>Unit cost ceiling</Text>
-                <Text style={styles.rowValue}>{fmtGbp(b.unitCostCeilingGbp)}</Text>
-            </View>
-            <View style={styles.row}>
-                <Text style={styles.rowLabel}>Max mass</Text>
-                <Text style={styles.rowValue}>{fmtKg(b.maxMassKg)}</Text>
-            </View>
-            <View style={styles.row}>
-                <Text style={styles.rowLabel}>Target process</Text>
-                <Text style={styles.rowValue}>{b.targetProcess || "not declared"}</Text>
-            </View>
-            <View style={styles.row}>
-                <Text style={styles.rowLabel}>Target material</Text>
-                <Text style={styles.rowValue}>{b.targetMaterial || "not declared"}</Text>
-            </View>
-            <View style={styles.row}>
-                <Text style={styles.rowLabel}>Tolerance target</Text>
-                <Text style={styles.rowValue}>{b.toleranceTarget || "not declared"}</Text>
-            </View>
-            <View style={styles.row}>
-                <Text style={styles.rowLabel}>Quantity target</Text>
-                <Text style={styles.rowValue}>{b.quantityTarget || "not declared"}</Text>
-            </View>
+            {/* Hide rows entirely when the founder didn't declare a value —
+                "not declared" filler clutters the PDF and looks like a bug.
+                Show the section header only when at least one constraint has a value. */}
+            {(b.unitCostCeilingGbp != null
+                || b.maxMassKg != null
+                || b.targetProcess
+                || b.targetMaterial
+                || b.toleranceTarget
+                || b.quantityTarget) && (
+                <Text style={styles.h3}>Constraints declared</Text>
+            )}
+            {b.unitCostCeilingGbp != null && (
+                <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Unit cost ceiling</Text>
+                    <Text style={styles.rowValue}>{fmtGbp(b.unitCostCeilingGbp)}</Text>
+                </View>
+            )}
+            {b.maxMassKg != null && (
+                <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Max mass</Text>
+                    <Text style={styles.rowValue}>{fmtKg(b.maxMassKg)}</Text>
+                </View>
+            )}
+            {b.targetProcess && (
+                <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Target process</Text>
+                    <Text style={styles.rowValue}>{b.targetProcess}</Text>
+                </View>
+            )}
+            {b.targetMaterial && (
+                <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Target material</Text>
+                    <Text style={styles.rowValue}>{b.targetMaterial}</Text>
+                </View>
+            )}
+            {b.toleranceTarget && (
+                <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Tolerance target</Text>
+                    <Text style={styles.rowValue}>{b.toleranceTarget}</Text>
+                </View>
+            )}
+            {b.quantityTarget && (
+                <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Quantity target</Text>
+                    <Text style={styles.rowValue}>{b.quantityTarget}</Text>
+                </View>
+            )}
             {b.complianceNotes && (
                 <View style={styles.para}>
                     <Text style={styles.h5}>Compliance notes</Text>
@@ -808,16 +844,14 @@ function ModulePage({
                 3.{index + 1} · {mod.name}
             </Text>
             <View style={styles.moduleHead}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.small}>Module id: {mod.id}</Text>
-                </View>
+                <View style={{ flex: 1 }} />
                 <Text style={styles.moduleMeta}>
                     {fmtKg(mod.massKg)}
                     {mod.budgetMassKg != null ? ` / budget ${fmtKg(mod.budgetMassKg)}` : ""}
                     {typeof mod.leadWeeks === "number"
                         ? ` · ${mod.leadWeeks} wk lead · ${leadSourcePdfCaption(mod.leadTimeSource)}`
                         : ""}
-                    {mod.mirrorOf ? ` · mirrors ${mod.mirrorOf}` : ""}
+                    {mod.mirrorOfName ? ` · mirrors ${mod.mirrorOfName}` : ""}
                 </Text>
             </View>
 
@@ -1154,7 +1188,16 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
                 </View>
                 <View style={styles.stat}>
                     <Text style={styles.statLabel}>Headroom</Text>
-                    <Text style={styles.statValue}>{fmtGbp(headroom)}</Text>
+                    <Text
+                        style={
+                            headroom !== null && headroom < 0
+                                ? [styles.statValue, { color: "#B91C1C" }]
+                                : styles.statValue
+                        }
+                    >
+                        {fmtGbp(headroom)}
+                        {headroom !== null && headroom < 0 ? "  (over)" : ""}
+                    </Text>
                 </View>
             </View>
 
@@ -1260,17 +1303,12 @@ function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sourc
                 <Text style={styles.muted}>No suppliers shortlisted yet.</Text>
             )}
             {suppliers.map((s, i) => {
-                const sb = s.scoreBreakdown ?? {}
-                const keys = Object.keys(sb).filter((k) => typeof sb[k] === "number")
-                // V1 FIX (2026-04-24, per Tristan PDF review): marketplace_listings
-                // titles are scraped product descriptions ("LiFePo4 19\" Rack-Mount
-                // Lithium iron phosphate battery"), not company names. Derive the
-                // supplier's primary name from the domain portion of website_url
-                // when available — founders can actually reach out to cmxbattery.com
-                // but not to "rack mount lithium iron". Fall back to the raw title
-                // only when no website URL exists.
+                // marketplace_listings titles are often scraped product
+                // descriptions, not company names. Derive the company name
+                // from the domain when available — founders reach out to
+                // cmxbattery.com, not to "rack mount lithium iron".
                 const companyName = (() => {
-                    const url = (s as unknown as { websiteUrl?: string | null }).websiteUrl
+                    const url = s.websiteUrl
                     if (typeof url === "string" && /^https?:\/\//i.test(url)) {
                         try {
                             const host = new URL(url).hostname.replace(/^www\./, "")
@@ -1281,52 +1319,68 @@ function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sourc
                     }
                     return s.name
                 })()
-                const websiteUrl = (s as unknown as { websiteUrl?: string | null }).websiteUrl
-                const contactEmail = (s as unknown as { contactEmail?: string | null }).contactEmail
+                // Compose a single-line "what they offer" lead — pulled
+                // directly from the supplier's listing description so the
+                // founder reads "LiFePO4 battery cell manufacturer; rack
+                // assembly + thermal management" rather than the opaque
+                // factor labels we were rendering before.
+                const offering = s.description?.trim() || s.name
+                // Compose a single-line "company facts" row.
+                const facts: string[] = []
+                if (s.hq) facts.push(s.hq)
+                if (s.foundedYear) facts.push(`founded ${s.foundedYear}`)
+                if (s.employeeCount) {
+                    const headcount = s.employeeCount >= 1000
+                        ? `${Math.round(s.employeeCount / 1000)}k employees`
+                        : `${s.employeeCount} employees`
+                    facts.push(headcount)
+                }
+                if (s.leadTime) facts.push(`lead time ${s.leadTime}`)
+                if (s.minimumOrder) facts.push(`MOQ ${s.minimumOrder}`)
                 return (
                     <View key={i} style={{ marginBottom: 14 }} wrap={false}>
                         <Text style={{ fontWeight: "bold", fontSize: 12 }}>{companyName}</Text>
-                        <Text style={[styles.small, { fontStyle: "italic", color: MUTED }]}>
-                            {s.name}
-                        </Text>
-                        {websiteUrl && (
-                            <Text style={[styles.small, { color: "#2563eb" }]}>
-                                {websiteUrl}
+                        {companyName !== s.name && (
+                            <Text style={[styles.small, { fontStyle: "italic", color: MUTED }]}>
+                                {s.name}
                             </Text>
                         )}
-                        {contactEmail && !contactEmail.toLowerCase().includes("unknown") && (
-                            <Text style={styles.small}>Contact: {contactEmail}</Text>
+                        {s.websiteUrl && (
+                            <Text style={[styles.small, { color: "#2563eb" }]}>
+                                {s.websiteUrl}
+                            </Text>
                         )}
-                        <Text style={styles.small}>
-                            {s.hq ?? "HQ not declared"}
-                            {s.rampRole ? ` · ramp role ${s.rampRole}` : ""}
-                            {typeof s.matchScore === "number"
-                                ? ` · match score ${s.matchScore.toFixed(1)}`
-                                : ""}
-                        </Text>
-                        {s.moduleNames.length > 0 && (
+                        {s.contactEmail && !s.contactEmail.toLowerCase().includes("unknown") && (
+                            <Text style={styles.small}>Contact: {s.contactEmail}</Text>
+                        )}
+                        {facts.length > 0 && (
                             <Text style={[styles.small, { marginTop: 2 }]}>
-                                Matched across {s.moduleNames.length} module
+                                {facts.join(" · ")}
+                            </Text>
+                        )}
+                        {s.certifications && s.certifications.length > 0 && (
+                            <Text style={[styles.small, { marginTop: 2 }]}>
+                                Certifications: {s.certifications.join(", ")}
+                            </Text>
+                        )}
+                        {s.description && (
+                            <Text style={[{ fontSize: 9, marginTop: 4 }]}>
+                                {offering}
+                            </Text>
+                        )}
+                        {s.moduleNames.length > 0 && (
+                            <Text style={[styles.small, { marginTop: 4, color: MUTED }]}>
+                                Matched against {s.moduleNames.length} module
                                 {s.moduleNames.length === 1 ? "" : "s"}:{" "}
                                 {s.moduleNames.join(", ")}
+                                {typeof s.matchScore === "number"
+                                    ? ` · match score ${s.matchScore.toFixed(1)}/100`
+                                    : ""}
+                                {s.rampRole ? ` · ramp role ${s.rampRole}` : ""}
                             </Text>
-                        )}
-                        {keys.length > 0 && (
-                            <View style={{ marginTop: 4 }}>
-                                <Text style={styles.h5}>Score breakdown</Text>
-                                {keys.map((k) => (
-                                    <View key={k} style={styles.row}>
-                                        <Text style={styles.rowLabel}>{k}</Text>
-                                        <Text style={styles.rowValue}>
-                                            {String((sb as Record<string, unknown>)[k])}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
                         )}
                         {s.matchReasons.length > 0 && (
                             <View style={{ marginTop: 4 }}>
-                                <Text style={styles.h5}>Why they scored well</Text>
                                 {s.matchReasons.map((r, j) => (
                                     <View key={j} style={styles.bullet}>
                                         <Text style={styles.bulletDot}>•</Text>
@@ -2462,6 +2516,10 @@ async function exportProjectPdfInternal(
                 leadTimeSource:
                     typeof m.leadTimeSource === "string" ? m.leadTimeSource : null,
                 mirrorOf: typeof m.mirrorOf === "string" ? m.mirrorOf : null,
+                mirrorOfName:
+                    typeof m.mirrorOf === "string"
+                        ? moduleNameById.get(m.mirrorOf) ?? m.mirrorOf
+                        : null,
                 keyParts: Array.isArray(m.keyParts) ? m.keyParts : [],
                 failureModes: Array.isArray(m.failureModes) ? m.failureModes : [],
                 unknowns: Array.isArray(m.unknowns) ? m.unknowns : [],
@@ -2527,6 +2585,12 @@ async function exportProjectPdfInternal(
         const hqById = new Map<string, string | null>()
         const websiteById = new Map<string, string | null>()
         const contactEmailById = new Map<string, string | null>()
+        const foundedYearById = new Map<string, number | null>()
+        const employeeCountById = new Map<string, number | null>()
+        const leadTimeById = new Map<string, string | null>()
+        const minimumOrderById = new Map<string, string | null>()
+        const certificationsById = new Map<string, string[] | null>()
+        const descriptionById = new Map<string, string | null>()
         if (supplierIds.length > 0) {
             const { data: globals } = await admin
                 .from("suppliers")
@@ -2539,21 +2603,59 @@ async function exportProjectPdfInternal(
                     hqById.set(g.id as string, hq)
                 }
             }
-            // V1 FIX (2026-04-24): marketplace_listings.title is often a product
-            // description scraped from a listing page ("LiFePo4 19\" Rack-Mount
-            // battery"), not a company name. Pull website_url + contact_email
-            // from the listing row so the PDF can render a clickable domain
-            // + outreach email instead of the opaque product-title name.
+            // V1.1 FIX (2026-04-25, per Tristan supply-chain critique): the PDF
+            // was previously rendering only company name + HQ + score. The
+            // marketplace_listings table holds far richer data (founded year,
+            // employee count, lead time, MOQ, certifications, description) —
+            // founders need ALL of that to decide whether to engage a supplier.
+            // Surface it here. "What we have about that company" was Tristan's
+            // direct ask.
             const { data: listingsMeta } = await admin
                 .from("marketplace_listings")
-                .select("id, website_url, contact_email")
+                .select(
+                    "id, website_url, contact_email, country, founded_year, employee_count_exact, lead_time, minimum_order, certifications, description",
+                )
                 .in("id", supplierIds)
             if (listingsMeta) {
                 for (const l of listingsMeta) {
-                    websiteById.set(l.id as string, (l.website_url as string | null) ?? null)
-                    contactEmailById.set(
-                        l.id as string,
-                        (l.contact_email as string | null) ?? null,
+                    const id = l.id as string
+                    websiteById.set(id, (l.website_url as string | null) ?? null)
+                    contactEmailById.set(id, (l.contact_email as string | null) ?? null)
+                    // marketplace_listings has its own country — prefer that
+                    // over the suppliers table HQ when the directory join was empty.
+                    if (!hqById.has(id) || hqById.get(id) === null) {
+                        const country = l.country as string | null
+                        if (country) hqById.set(id, country)
+                    }
+                    foundedYearById.set(
+                        id,
+                        typeof l.founded_year === "number" ? (l.founded_year as number) : null,
+                    )
+                    employeeCountById.set(
+                        id,
+                        typeof l.employee_count_exact === "number"
+                            ? (l.employee_count_exact as number)
+                            : null,
+                    )
+                    leadTimeById.set(id, (l.lead_time as string | null) ?? null)
+                    minimumOrderById.set(id, (l.minimum_order as string | null) ?? null)
+                    const certs = l.certifications as unknown
+                    certificationsById.set(
+                        id,
+                        Array.isArray(certs)
+                            ? certs.filter((c): c is string => typeof c === "string")
+                            : null,
+                    )
+                    const desc = l.description as string | null
+                    // Truncate description to keep the PDF section dense — the
+                    // founder gets a flavour, not a wall of marketing copy.
+                    descriptionById.set(
+                        id,
+                        typeof desc === "string"
+                            ? desc.length > 280
+                                ? desc.slice(0, 277).trimEnd() + "…"
+                                : desc
+                            : null,
                     )
                 }
             }
@@ -2577,6 +2679,12 @@ async function exportProjectPdfInternal(
             rampRole: typeof r.ramp_role === "string" ? r.ramp_role : null,
             websiteUrl: websiteById.get(r.supplier_id as string) ?? null,
             contactEmail: contactEmailById.get(r.supplier_id as string) ?? null,
+            foundedYear: foundedYearById.get(r.supplier_id as string) ?? null,
+            employeeCount: employeeCountById.get(r.supplier_id as string) ?? null,
+            leadTime: leadTimeById.get(r.supplier_id as string) ?? null,
+            minimumOrder: minimumOrderById.get(r.supplier_id as string) ?? null,
+            certifications: certificationsById.get(r.supplier_id as string) ?? null,
+            description: descriptionById.get(r.supplier_id as string) ?? null,
         }))
 
         // Source-attribution counts — so the PDF can tell the reader

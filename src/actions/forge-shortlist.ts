@@ -93,7 +93,8 @@ function rowToClient(r: DbRow): ShortlistRow {
     bestMatchScore: r.best_match_score ?? 0,
     bestScoreBreakdown: r.best_score_breakdown ?? {
       semantic: 0, process: 0, material: 0, quality: 0, keyword: 0,
-      capability: 0, industry: 0, certifications: 0, specialties: 0, total: 0,
+      capability: 0, industry: 0, certifications: 0, specialties: 0,
+      region: 0, total: 0,
     },
     allMatchReasons: r.all_match_reasons ?? [],
     rampRole: r.ramp_role ?? "unassigned",
