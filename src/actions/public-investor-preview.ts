@@ -465,8 +465,21 @@ export const searchPublicInvestors = unstable_cache(
       return { results: [], totalMatches: 0 }
     }
 
-    // 2. Paginated RPC fetch — same pattern as src/actions/investors.ts
-    //    (8 × 1000 covers the full 7,800-row Finance set).
+    // SECURITY/CORRECTNESS: Defensive RPC-boundary guard. Mirrors searchInvestors
+    // — see comment there. Marketplace_listings.embedding is vector(1536); a
+    // mismatched query dim must abort loudly rather than silently fall back.
+    if (queryEmbedding.length !== 1536) {
+      console.error(
+        `[publicSearch] Refused to call match_marketplace_listings_v2 with ` +
+          `${queryEmbedding.length}-dim embedding (column is vector(1536)).`,
+      )
+      return { results: [], totalMatches: 0 }
+    }
+
+    // 2. Paginated RPC fetch — same pattern as src/actions/investors.ts.
+    //    GOTCHA: 8 × 1000-row pgvector scans triggered Postgres statement_timeout
+    //    (57014) on production 2026-04-24. Public preview only displays the top
+    //    ~12 anonymized cards; 2000 candidates is ample recall.
     const PAGE = 1000
     const PAGES = 8
     const embJson = JSON.stringify(queryEmbedding) as unknown as string
