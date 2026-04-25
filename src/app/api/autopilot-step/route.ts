@@ -225,7 +225,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             { status: 200 },
         )
     }
-    if (state.finished_at !== null) {
+    if (state.finished_at != null) {
         return NextResponse.json(
             { ok: true, ran: false, reason: "already_finished" },
             { status: 200 },
