@@ -118,7 +118,7 @@ export default async function DemoPage() {
                     </div>
                   )}
 
-                  <Link href={`/join/${role.id}?demo=true`} className="block">
+                  <Link href={`/signup/${role.id}?demo=true`} className="block">
                     <Button className="w-full" variant="default">
                       Test {role.name} Flow
                       <ArrowRight className="h-4 w-4 ml-2" />

@@ -235,7 +235,7 @@ export function PricingContent() {
                       variant={tier.emphasised ? 'default' : 'outline'}
                       disabled={tier.name === 'Add-on'}
                     >
-                      <Link href={tier.name === 'Add-on' ? '/pricing' : '/join'}>
+                      <Link href={tier.name === 'Add-on' ? '/pricing' : '/signup'}>
                         {tier.cta}
                         {tier.name !== 'Add-on' && (
                           <ArrowRight className="h-4 w-4 ml-2" />
@@ -336,7 +336,7 @@ export function PricingContent() {
           <div className="text-center pb-12 space-y-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
               <Link
-                href="/join"
+                href="/signup"
                 className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
               >
                 Get Started Free <ArrowRight className="h-4 w-4" />

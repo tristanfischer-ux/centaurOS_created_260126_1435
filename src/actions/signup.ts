@@ -359,7 +359,7 @@ export async function submitApplication(formData: FormData) {
   const clientIP = getClientIP(headersList);
   const rateLimitResult = await rateLimit("signup", clientIP);
   if (!rateLimitResult.success) {
-    return redirect("/join?error=Too+many+attempts.+Please+try+again+later.");
+    return redirect("/signup?error=Too+many+attempts.+Please+try+again+later.");
   }
 
   const supabase = await createClient();
@@ -373,17 +373,17 @@ export async function submitApplication(formData: FormData) {
   // SECURITY: Validate role against allowlist to prevent path traversal in redirect
   const validAppRoles: ApplicationRole[] = ["vc", "factory", "university", "network"];
   if (!role || !validAppRoles.includes(role)) {
-    return redirect("/join?error=Invalid+role");
+    return redirect("/signup?error=Invalid+role");
   }
 
   if (!rawEmail || !rawFullName) {
-    return redirect(`/join/${role}?error=All+fields+are+required`);
+    return redirect(`/signup/${role}?error=All+fields+are+required`);
   }
 
   // SECURITY: Sanitize all inputs
   const email = sanitizeEmail(rawEmail);
   if (!email) {
-    return redirect(`/join/${role}?error=Invalid+email+address`);
+    return redirect(`/signup/${role}?error=Invalid+email+address`);
   }
   const fullName = rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '');
 
@@ -432,10 +432,10 @@ export async function submitApplication(formData: FormData) {
   if (error) {
     console.error("Application submission error:", error);
     return redirect(
-      `/join/${role}?error=${encodeURIComponent("Failed to submit application. Please try again.")}`
+      `/signup/${role}?error=${encodeURIComponent("Failed to submit application. Please try again.")}`
     );
   }
 
   // Redirect to success page
-  redirect(`/join/success?type=application&role=${role}`);
+  redirect(`/signup/success?type=application&role=${role}`);
 }

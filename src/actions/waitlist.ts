@@ -146,7 +146,7 @@ export async function approveWaitlistEntry(entryId: string): Promise<{ error?: s
     return { error: "Failed to update entry." };
   }
 
-  const inviteUrl = `${BASE_URL}/join?token=${entry.invite_token}`;
+  const inviteUrl = `${BASE_URL}/signup?token=${entry.invite_token}`;
   await sendEmail({
     to: entry.email,
     subject: "You're in! Your Fractional Forge invitation",

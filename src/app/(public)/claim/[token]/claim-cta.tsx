@@ -50,7 +50,7 @@ export function ClaimCta({
 
     const handleSignUp = () => {
         if (!safeToken) return
-        router.push(`/join/factory?redirect=/claim/${safeToken}`)
+        router.push(`/signup/factory?redirect=/claim/${safeToken}`)
     }
 
     const handleLogin = () => {
@@ -98,7 +98,7 @@ export function ClaimCta({
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 Not a supplier?{' '}
-                                <Link href="/join?role=founder" className="text-international-orange hover:underline font-medium">
+                                <Link href="/signup?role=founder" className="text-international-orange hover:underline font-medium">
                                     Register as a founder
                                 </Link>
                             </p>

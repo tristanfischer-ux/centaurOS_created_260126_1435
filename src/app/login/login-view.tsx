@@ -268,7 +268,7 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                     <span className="text-sm text-muted-foreground">
                         Don&apos;t have an account?{' '}
                         <Link
-                            href={redirect ? `/join?redirect=${encodeURIComponent(redirect)}` : '/join'}
+                            href={redirect ? `/signup?redirect=${encodeURIComponent(redirect)}` : '/signup'}
                             className="text-international-orange hover:underline font-medium"
                         >
                             Create one for free

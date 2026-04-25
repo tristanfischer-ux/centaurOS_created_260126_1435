@@ -272,7 +272,7 @@ export function Sidebar({
                 toast.error("Could not load your referral link.")
                 return
             }
-            const url = `${window.location.origin}/join?ref=${info.referralCode}`
+            const url = `${window.location.origin}/signup?ref=${info.referralCode}`
             await navigator.clipboard.writeText(url)
             toast.success("Referral link copied to clipboard!")
             await updateOnboardingData({ checklist_friend_invited: true })

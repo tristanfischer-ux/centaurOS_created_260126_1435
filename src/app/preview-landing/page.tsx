@@ -173,7 +173,7 @@ export default function PreviewLandingPage() {
             </a>
             <motion.div whileHover={buttonHover} whileTap={buttonTap}>
               <Link
-                href="/join"
+                href="/signup"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
                 Get Started Free
@@ -221,7 +221,7 @@ export default function PreviewLandingPage() {
               >
                 <div className="px-4 sm:px-6 py-4 flex flex-col gap-1">
                   <Link
-                    href="/join"
+                    href="/signup"
                     className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -277,7 +277,7 @@ export default function PreviewLandingPage() {
             className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
           >
             <Link
-              href="/join"
+              href="/signup"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
               Get Started Free
@@ -303,15 +303,15 @@ export default function PreviewLandingPage() {
               <div className="flex flex-col gap-1 sm:gap-2">
                 <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Pricing</Link>
                 <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Login</a>
-                <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Get Started Free</Link>
+                <Link href="/signup" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Get Started Free</Link>
               </div>
             </div>
             <div>
               <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">Join As</p>
               <div className="flex flex-col gap-1 sm:gap-2">
-                <Link href="/join?role=founder" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Founder</Link>
-                <Link href="/join?role=executive" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Expert / Factory</Link>
-                <Link href="/join?role=apprentice" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Apprentice</Link>
+                <Link href="/signup?role=founder" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Founder</Link>
+                <Link href="/signup?role=executive" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Expert / Factory</Link>
+                <Link href="/signup?role=apprentice" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Apprentice</Link>
               </div>
             </div>
           </div>
@@ -402,7 +402,7 @@ function HeroSection() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
             <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
-              <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
+              <Link href="/signup" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
                 Get Started Free <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
@@ -665,7 +665,7 @@ function SolutionSection() {
               </div>
               <div className="mt-6 sm:mt-8 text-center">
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
-                  <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+                  <Link href="/signup" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
                     Get Started Free <ArrowRight className="h-4 w-4" />
                   </Link>
                 </motion.div>
@@ -693,7 +693,7 @@ const AUDIENCES = [
     value: "Launch without the overhead",
     description: "Validate fast, risk less, and retain maximum equity. No standing army required.",
     cta: "Start Building",
-    href: "/join?role=founder",
+    href: "/signup?role=founder",
   },
   {
     icon: Briefcase,
@@ -701,7 +701,7 @@ const AUDIENCES = [
     value: "Monetize your expertise",
     description: "Join as a fractional executive to accelerate deep-tech startups. Then invest in them or launch your own.",
     cta: "Join as Expert",
-    href: "/join?role=executive",
+    href: "/signup?role=executive",
   },
   {
     icon: GraduationCap,
@@ -709,7 +709,7 @@ const AUDIENCES = [
     value: "Learn alongside experienced founders",
     description: "Pair with a seasoned executive on a real hardware company. Learn how products get from a paragraph to a manufacturer, and build the experience to start your own.",
     cta: "Start Apprenticeship",
-    href: "/join?role=apprentice",
+    href: "/signup?role=apprentice",
   },
   {
     icon: LineChart,
@@ -717,7 +717,7 @@ const AUDIENCES = [
     value: "More bets, same fund",
     description: "Compressed validation cycles mean you can validate cheaper, kill failures faster, and place more winning bets.",
     cta: "Partner With Us",
-    href: "/join",
+    href: "/signup",
   },
   {
     icon: Building2,
@@ -725,7 +725,7 @@ const AUDIENCES = [
     value: "Fill your spare capacity",
     description: "List available capacity on the marketplace. Every company your experts advise is a potential manufacturing order.",
     cta: "List Your Factory",
-    href: "/join?role=executive",
+    href: "/signup?role=executive",
   },
   {
     icon: Beaker,
@@ -733,7 +733,7 @@ const AUDIENCES = [
     value: "Commercialize research",
     description: "Turn IP-rich research into venture-backed startups. Transform students into Apprentices with real-world experience.",
     cta: "Partner",
-    href: "/join",
+    href: "/signup",
   },
 ] as const
 
@@ -836,7 +836,7 @@ function FinalCTASection() {
             Stop burning cash on infrastructure you don&apos;t need. Join the founders, experts, and factories building hardware at software speed.
           </p>
           <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
-            <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-10 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+            <Link href="/signup" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-10 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
               Get Started Free <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>

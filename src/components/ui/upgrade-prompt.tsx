@@ -88,7 +88,7 @@ export function UpgradePrompt({
 
   function handleCopyReferral() {
     if (!referralCode) return
-    const referralUrl = `${window.location.origin}/join?ref=${referralCode}`
+    const referralUrl = `${window.location.origin}/signup?ref=${referralCode}`
     navigator.clipboard.writeText(referralUrl).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)

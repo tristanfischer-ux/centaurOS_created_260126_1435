@@ -142,7 +142,7 @@ export default function AboutPage() {
               Free tier, no credit card needed. Have a look and let me know how you get on.
             </p>
             <Link
-              href="/join"
+              href="/signup"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-international-orange text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
             >
               Get started

@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const inviteUrl = `${BASE_URL}/join?token=${entry.invite_token}`;
+  const inviteUrl = `${BASE_URL}/signup?token=${entry.invite_token}`;
   const { success: emailOk } = await sendEmail({
     to: entry.email,
     subject: "You're in! Your Fractional Forge invitation",

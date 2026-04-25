@@ -181,7 +181,7 @@ export function ExampleInvestorMatch() {
             100 of them a month for £20.
           </p>
           <Link
-            href="/join"
+            href="/signup"
             className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white font-bold px-8 py-3.5 rounded-lg transition-colors text-sm sm:text-base"
           >
             Start Free, See Your Matches

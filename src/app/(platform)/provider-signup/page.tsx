@@ -236,7 +236,7 @@ async function SignupContent({ listingId }: { listingId?: string }) {
                                         <ArrowRight className="ml-2 h-4 w-4" />
                                     </Button>
                                 </Link>
-                                <Link href={`/join?redirect=/provider-signup${listingId ? `?listing=${listingId}` : ''}`}>
+                                <Link href={`/signup?redirect=/provider-signup${listingId ? `?listing=${listingId}` : ''}`}>
                                     <Button variant="secondary">
                                         Create Account
                                     </Button>

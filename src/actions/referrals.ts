@@ -57,7 +57,7 @@ export async function getMyReferralInfo(): Promise<ReferralInfo | { error: strin
 
     return {
       referralCode: code,
-      referralLink: code ? `${baseUrl.replace(/\/$/, '')}/join?ref=${code}` : '',
+      referralLink: code ? `${baseUrl.replace(/\/$/, '')}/signup?ref=${code}` : '',
       referralCount: profile.referral_count || 0,
       bonusCredits: bonusCredits || 0,
       isFoundingMember: profile.is_founding_member || false,

@@ -199,7 +199,7 @@ export function CloudFactorySection() {
                   className="inline-block"
                 >
                   <Link
-                    href="/join"
+                    href="/signup"
                     className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
                   >
                     Join the Forge

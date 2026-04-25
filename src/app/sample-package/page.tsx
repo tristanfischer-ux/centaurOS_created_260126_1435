@@ -559,7 +559,7 @@ export default function SamplePackagePage() {
               manufacturers. Twenty-minute first pass, hours of detail after.
             </p>
             <Link
-              href="/join?role=founder"
+              href="/signup?role=founder"
               className="inline-flex items-center gap-2 rounded-lg bg-international-orange px-8 py-3.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
               Start free, generate your package

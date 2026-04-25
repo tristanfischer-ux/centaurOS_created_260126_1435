@@ -8,7 +8,8 @@ const PUBLIC_ROUTES = [
     '/login',
     '/auth',
     '/auth/callback',  // Email verification callback
-    '/join',
+    '/signup',  // Canonical signup URL (industry convention)
+    '/join',  // Legacy alias — redirects to /signup
     '/invite',
     '/experts',  // Public expert directory (SEO)
     '/expert',   // Individual expert profiles (SEO)

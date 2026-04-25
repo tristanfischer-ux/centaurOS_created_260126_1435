@@ -63,7 +63,7 @@ export function MarketingFooter() {
                             </li>
                             <li>
                                 <Link
-                                    href="/join"
+                                    href="/signup"
                                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                                 >
                                     Get Started

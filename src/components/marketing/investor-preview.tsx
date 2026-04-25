@@ -75,7 +75,7 @@ export function InvestorPreviewSection() {
 
         <AnimatedSection className="text-center">
           <Link
-            href="/join"
+            href="/signup"
             className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white font-bold px-8 py-3.5 rounded-lg transition-colors text-sm sm:text-base"
           >
             Get Started Free — See All Investors
