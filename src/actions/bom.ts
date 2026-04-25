@@ -487,8 +487,16 @@ Respond with ONLY valid JSON:
     return { success: false, error: "No parts in skeleton", parts: [], bomLines: [] }
   }
 
-  // Validate skeleton parts
-  const skeletonParts: SkeletonPart[] = parsed.parts.map((p) => ({
+  // Validate + RENUMBER skeleton parts.
+  //
+  // Tristan 2026-04-25 NIGHT: BOM rows need a stable module-prefix scheme
+  // so the supplier shortlist can reference them ("Supplies BOM rows
+  // BAT-005-PUR, CON-001"). Claude's freeform partNumber generation is
+  // inconsistent (some have prefix, some don't, some clash). Post-process
+  // here to enforce: <MODULE_PREFIX>-NNN[-PUR] where NNN is per-module
+  // sequence. Rewrites parentPartNumber refs in lockstep so bomLines stay
+  // consistent.
+  const rawSkeleton: SkeletonPart[] = parsed.parts.map((p) => ({
     partNumber: truncate(String(p.partNumber ?? ""), 50),
     name: truncate(String(p.name ?? ""), 200),
     sourceModuleId: truncate(String(p.sourceModuleId ?? ""), 50),
@@ -497,25 +505,108 @@ Respond with ONLY valid JSON:
     parentPartNumber: p.parentPartNumber ? truncate(String(p.parentPartNumber), 50) : null,
   }))
 
-  // Check for duplicate part numbers
-  const partNumbers = new Set<string>()
-  for (const p of skeletonParts) {
-    if (!p.partNumber) {
-      return { success: false, error: "Skeleton part missing part number", parts: [], bomLines: [] }
+  for (const p of rawSkeleton) {
+    if (!p.sourceModuleId) {
+      return { success: false, error: "Skeleton part missing sourceModuleId", parts: [], bomLines: [] }
     }
-    if (partNumbers.has(p.partNumber)) {
-      return { success: false, error: `Duplicate skeleton part: ${p.partNumber}`, parts: [], bomLines: [] }
-    }
-    partNumbers.add(p.partNumber)
   }
 
-  const bomLines = (parsed.bomLines ?? []).map((bl) => ({
-    parentPartNumber: bl.parentPartNumber ? truncate(String(bl.parentPartNumber), 50) : null,
-    childPartNumber: truncate(String(bl.childPartNumber ?? ""), 50),
-    quantity: typeof bl.quantity === "number" && bl.quantity > 0 ? Math.round(bl.quantity) : 1,
-  }))
+  const renumber = renumberPartsByModulePrefix(rawSkeleton)
+  const skeletonParts = renumber.parts
+  const numberMap = renumber.numberMap
+
+  const bomLines = (parsed.bomLines ?? []).map((bl) => {
+    const parent = bl.parentPartNumber ? truncate(String(bl.parentPartNumber), 50) : null
+    const child = truncate(String(bl.childPartNumber ?? ""), 50)
+    return {
+      parentPartNumber: parent ? numberMap.get(parent) ?? parent : null,
+      childPartNumber: numberMap.get(child) ?? child,
+      quantity: typeof bl.quantity === "number" && bl.quantity > 0 ? Math.round(bl.quantity) : 1,
+    }
+  })
 
   return { success: true, parts: skeletonParts, bomLines }
+}
+
+/**
+ * Compute a stable module-prefix part-number scheme (<PREFIX>-NNN[-PUR])
+ * for the skeleton parts. Tristan 2026-04-25 NIGHT: founders need to
+ * trace BOM rows back to modules ("which module does FUS-006 belong
+ * to? — Fuselage and Empennage Structure"). Renames every part_number
+ * and returns the old→new map so bomLines parent/child refs can be
+ * rewritten in lockstep.
+ *
+ * Prefix derivation: take the module ID, split on underscores, drop
+ * stop-words ("system", "assembly", "module", "and", "the", "of",
+ * "in", "a"), take first letter of each remaining word, cap at 4
+ * chars, uppercase. Falls back to first 3 chars of first non-stopword
+ * if abbreviation is too short.
+ *
+ * Per-module sequence resets at 001. `-PUR` suffix appended for
+ * purchased parts so the founder can scan for buy-vs-make at a glance.
+ */
+function renumberPartsByModulePrefix(
+    rawParts: SkeletonPart[],
+): { parts: SkeletonPart[]; numberMap: Map<string, string> } {
+    const STOP = new Set([
+        "system",
+        "assembly",
+        "module",
+        "subsystem",
+        "and",
+        "the",
+        "of",
+        "in",
+        "a",
+        "an",
+    ])
+    const prefixCache = new Map<string, string>()
+    const computePrefix = (moduleId: string): string => {
+        const cached = prefixCache.get(moduleId)
+        if (cached) return cached
+        const words = moduleId
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, "")
+            .split(/[_-]+/)
+            .filter((w) => w.length > 0 && !STOP.has(w))
+        let prefix: string
+        if (words.length === 0) {
+            prefix = moduleId.slice(0, 3).toUpperCase()
+        } else {
+            const initials = words.map((w) => w[0]).join("").toUpperCase()
+            if (initials.length >= 2) {
+                prefix = initials.slice(0, 4)
+            } else {
+                prefix = words[0].slice(0, 3).toUpperCase()
+            }
+        }
+        // Defensive: prefixes must collide with neither each other nor
+        // existing usage. We don't dedupe across modules here because
+        // distinct modules with the same abbreviation (rare — e.g. two
+        // "Power" modules) are caught by the per-module sequence space
+        // anyway.
+        prefixCache.set(moduleId, prefix)
+        return prefix
+    }
+    const seqByModule = new Map<string, number>()
+    const numberMap = new Map<string, string>()
+    const renamedParts: SkeletonPart[] = []
+    for (const p of rawParts) {
+        const prefix = computePrefix(p.sourceModuleId)
+        const seq = (seqByModule.get(p.sourceModuleId) ?? 0) + 1
+        seqByModule.set(p.sourceModuleId, seq)
+        const seqStr = String(seq).padStart(3, "0")
+        const newNumber = `${prefix}-${seqStr}${p.isPurchased ? "-PUR" : ""}`
+        numberMap.set(p.partNumber, newNumber)
+        renamedParts.push({ ...p, partNumber: newNumber })
+    }
+    // Rewrite parentPartNumber refs in lockstep.
+    for (const p of renamedParts) {
+        if (p.parentPartNumber && numberMap.has(p.parentPartNumber)) {
+            p.parentPartNumber = numberMap.get(p.parentPartNumber) ?? p.parentPartNumber
+        }
+    }
+    return { parts: renamedParts, numberMap }
 }
 
 // ─── Progressive BOM: Phase 2 — Expand Specs ───────────────────────
