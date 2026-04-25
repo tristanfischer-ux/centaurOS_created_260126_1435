@@ -120,7 +120,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Pre-flight: project must exist and have an active autopilot state.
     const { data: project, error: projectErr } = await admin
         .from("cad_lab_projects")
-        .select("id, autopilot_state")
+        .select("id, foundry_id, autopilot_state")
         .eq("id", projectId)
         .maybeSingle()
 
@@ -145,11 +145,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // ── 1. Insert tracking row (status=running) ─────────────────────
+    // foundry_id is NOT NULL on pipeline_runs — must be included.
     const startedAt = new Date().toISOString()
     const { data: trackingInsert, error: insertErr } = await admin
         .from("pipeline_runs")
         .insert({
             project_id: projectId,
+            foundry_id: project.foundry_id,
             specialist_id: AUTOPILOT_TRACKING_SPECIALIST,
             stage,
             status: "running",
