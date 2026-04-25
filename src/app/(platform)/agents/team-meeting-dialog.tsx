@@ -22,6 +22,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import {
     Dialog,
     DialogContent,
@@ -49,6 +50,9 @@ import {
     ChevronUp,
     Hand,
     Square,
+    Hammer,
+    Building2,
+    ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
@@ -747,6 +751,7 @@ export function TeamMeetingDialog({
     onOpenChange,
     preset,
 }: TeamMeetingDialogProps) {
+    const router = useRouter()
     // ─── State ────────────────────────────────────────────────────────────
     const [phase, setPhase] = useState<MeetingPhase>("setup")
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -2135,17 +2140,83 @@ export function TeamMeetingDialog({
                         {isGeneratingOutputs ? (
                             <MeetingOutputsLoading attendees={selectedSpecialists} topic={topic} />
                         ) : meetingOutputs ? (
-                            <MeetingOutputs
-                                outputs={meetingOutputs}
-                                topic={topic}
-                                attendees={selectedSpecialists.map((s) => s.name)}
-                                transcript={entries
-                                    .map((e) => `**${e.specialistName}** (Round ${e.round}):\n${e.content}`)
-                                    .join("\n\n---\n\n")}
-                                roundCount={currentRound}
-                                onShareReport={() => setShowReportDialog(true)}
-                                initialSaved={isAutoSaved}
-                            />
+                            <>
+                                <MeetingOutputs
+                                    outputs={meetingOutputs}
+                                    topic={topic}
+                                    attendees={selectedSpecialists.map((s) => s.name)}
+                                    transcript={entries
+                                        .map((e) => `**${e.specialistName}** (Round ${e.round}):\n${e.content}`)
+                                        .join("\n\n---\n\n")}
+                                    roundCount={currentRound}
+                                    onShareReport={() => setShowReportDialog(true)}
+                                    initialSaved={isAutoSaved}
+                                />
+                                {/* ── Cross-surface handoff CTAs (RED-TEAM-PIVOT-PLAN.md):
+                                    turn the brainstorm into a Forge build OR an investor
+                                    test in one click. localStorage carries topic + a short
+                                    summary; the receiving page reads on mount. */}
+                                <div className="px-6 pb-4 pt-2">
+                                    <div className="rounded-lg border border-international-orange/20 bg-international-orange/[0.04] p-4">
+                                        <p className="text-sm font-semibold text-foreground mb-2">
+                                            What next?
+                                        </p>
+                                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                                            Carry this conversation into the killer surfaces — your specialists already framed the problem, now build it or test it with investors.
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="gap-2"
+                                                onClick={() => {
+                                                    try {
+                                                        localStorage.setItem(
+                                                            "forge-from-brainstorm-context",
+                                                            JSON.stringify({
+                                                                topic,
+                                                                summary: meetingOutputs?.notes.summary ?? "",
+                                                                createdAt: new Date().toISOString(),
+                                                            }),
+                                                        )
+                                                    } catch {
+                                                        /* localStorage may be disabled — proceed anyway */
+                                                    }
+                                                    router.push("/the-forge-v2/new?fromBrainstorm=1")
+                                                }}
+                                            >
+                                                <Hammer className="h-3.5 w-3.5" />
+                                                Build this in The Forge
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="gap-2"
+                                                onClick={() => {
+                                                    try {
+                                                        localStorage.setItem(
+                                                            "investor-from-brainstorm-context",
+                                                            JSON.stringify({
+                                                                topic,
+                                                                summary: meetingOutputs?.notes.summary ?? "",
+                                                                createdAt: new Date().toISOString(),
+                                                            }),
+                                                        )
+                                                    } catch {
+                                                        /* localStorage may be disabled — proceed anyway */
+                                                    }
+                                                    router.push("/investors?fromBrainstorm=1")
+                                                }}
+                                            >
+                                                <Building2 className="h-3.5 w-3.5" />
+                                                See which investors would back this
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
                         ) : error ? (
                             <div className="space-y-4 py-8">
                                 <Alert variant="destructive">
