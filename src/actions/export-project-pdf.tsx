@@ -932,6 +932,77 @@ function FeasibilityExceptionPage({
     )
 }
 
+/** Loop 5 P1: cross-section RED-state framing (3/3 unanimous Loop 4 council).
+ *
+ * When the feasibility verdict is RED, downstream sections (BOM, cost,
+ * suppliers) need to signal that their content is tentative. This banner
+ * renders inline under each section heading and references the upstream
+ * blocker IDs so the founder traces what's invalidated and why.
+ *
+ * The council's exact concern (V4-Pro): "Once the envelope check returns
+ * 'infeasible', all downstream sections (cost, BOM, risks) should be
+ * automatically invalidated and replaced with a 're-baseline required'
+ * notice." We don't suppress the sections (they're still useful as design
+ * estimates) but we frame them as INVALIDATED / TENTATIVE / DEFERRED so the
+ * founder doesn't treat them as a procurement-ready package.
+ *
+ * sectionKind selects which blockers are most relevant for the section's
+ * audience — cost section foregrounds cost+transport blockers; BOM
+ * foregrounds envelope+cost; suppliers foregrounds the whole verdict.
+ */
+function RedStateBanner({
+    verdict,
+    sectionKind,
+}: {
+    verdict: NonNullable<PdfInput["feasibilityVerdict"]>
+    sectionKind: "bom" | "cost" | "suppliers"
+}): React.ReactElement {
+    const blockers = verdict.fails.filter((f) => f.severity === "blocker")
+    const c = VERDICT_COLORS.red
+    const sectionMessage =
+        sectionKind === "cost"
+            ? "This estimate is invalidated until the upstream feasibility blockers are resolved — figures below are illustrative, not procurement-ready."
+            : sectionKind === "bom"
+              ? "Tentative bill of materials. Quantities and selections are derived from a configuration the engine could not fit; expect material churn once the blockers below are resolved."
+              : "Procurement deferred. Suppliers below are research candidates — do not begin RFQ work until the upstream feasibility blockers are closed."
+    return (
+        <View
+            style={{
+                backgroundColor: c.bg,
+                borderLeftWidth: 3,
+                borderLeftColor: c.border,
+                paddingTop: 6,
+                paddingBottom: 6,
+                paddingLeft: 8,
+                paddingRight: 8,
+                marginBottom: 8,
+            }}
+        >
+            <Text
+                style={{
+                    fontSize: 10,
+                    fontWeight: "bold",
+                    color: c.text,
+                    marginBottom: 2,
+                }}
+            >
+                Tentative under failed feasibility
+            </Text>
+            <Text style={{ fontSize: 9, color: c.text, marginBottom: 3 }}>
+                {sectionMessage}
+            </Text>
+            {blockers.length > 0 && (
+                <Text style={{ fontSize: 9, color: c.text }}>
+                    Blockers:{" "}
+                    {blockers
+                        .map((f) => `${axisLabel(f.axis)} (${f.summary.replace(/\.$/, "")})`)
+                        .join(" · ")}
+                </Text>
+            )}
+        </View>
+    )
+}
+
 function axisLabel(axis: NonNullable<PdfInput["feasibilityVerdict"]>["fails"][number]["axis"]): string {
     switch (axis) {
         case "envelope":
@@ -1375,14 +1446,20 @@ function BomMasterPage({
     parts,
     sources,
     suppliersByPart,
+    verdict,
 }: {
     parts: PartRow[]
     sources: PdfInput["sources"]
     suppliersByPart: Map<string, string[]>
+    verdict: PdfInput["feasibilityVerdict"]
 }): React.ReactElement {
+    const isRed = verdict?.status === "red"
     return (
         <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>4. BOM master ({parts.length} rows)</Text>
+            <Text style={styles.h2}>
+                4. BOM master {isRed ? "— TENTATIVE " : ""}({parts.length} rows{isRed ? "; design not yet feasible" : ""})
+            </Text>
+            {isRed && <RedStateBanner verdict={verdict!} sectionKind="bom" />}
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
                 BOM derived from the module decomposition&apos;s keyParts,
                 expanded into typed part rows. Part records live in the
@@ -1466,12 +1543,18 @@ function fmtInt(n: number | null | undefined): string {
 }
 
 function CostPage({ data }: { data: PdfInput }): React.ReactElement {
+    const isRed = data.feasibilityVerdict?.status === "red"
     const hasCeiling = typeof data.cost.ceilingGbp === "number"
     const hasUnit = typeof data.cost.unitTotalGbp === "number"
     const headroom = hasCeiling && hasUnit ? data.cost.ceilingGbp! - data.cost.unitTotalGbp! : null
     return (
         <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>5. Cost waterfall</Text>
+            <Text style={styles.h2}>
+                5. Cost waterfall{isRed ? " — INVALIDATED ESTIMATE" : ""}
+            </Text>
+            {isRed && (
+                <RedStateBanner verdict={data.feasibilityVerdict!} sectionKind="cost" />
+            )}
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
                 Cost estimates grounded against the material-properties
                 library ({fmtInt(data.sources.materialPropertyCount)} rows, freshest
@@ -1590,12 +1673,24 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
     )
 }
 
-function SuppliersPage({ suppliers, sources }: { suppliers: SupplierPdf[]; sources: PdfInput["sources"] }): React.ReactElement {
+function SuppliersPage({
+    suppliers,
+    sources,
+    verdict,
+}: {
+    suppliers: SupplierPdf[]
+    sources: PdfInput["sources"]
+    verdict: PdfInput["feasibilityVerdict"]
+}): React.ReactElement {
     const dirCount = fmtInt(sources.supplierDirectoryCount)
     const listingCount = fmtInt(sources.marketplaceListingCount)
+    const isRed = verdict?.status === "red"
     return (
         <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>7. Supplier shortlist ({suppliers.length})</Text>
+            <Text style={styles.h2}>
+                7. Supplier {isRed ? "candidates — PROCUREMENT DEFERRED" : "shortlist"} ({suppliers.length})
+            </Text>
+            {isRed && <RedStateBanner verdict={verdict!} sectionKind="suppliers" />}
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
                 Shortlist built by scoring each supplier in the directory
                 ({dirCount} companies) and marketplace listings
@@ -2634,6 +2729,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             <BomMasterPage
                 parts={data.parts}
                 sources={data.sources}
+                verdict={data.feasibilityVerdict}
                 suppliersByPart={(() => {
                     const map = new Map<string, string[]>()
                     for (const s of data.suppliers) {
@@ -2668,7 +2764,11 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             <RisksPage modules={data.modules} />
 
             {/* 7. Suppliers */}
-            <SuppliersPage suppliers={data.suppliers} sources={data.sources} />
+            <SuppliersPage
+                suppliers={data.suppliers}
+                sources={data.sources}
+                verdict={data.feasibilityVerdict}
+            />
 
             {/* 8. Engine self-review (Phase 1 proofreader, 2026-04-25 NIGHT)
                 — only renders when the proofreader specialist found
