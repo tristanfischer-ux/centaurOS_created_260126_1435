@@ -67,7 +67,13 @@ import { withLlmPermit } from "@/lib/ai/llm-permit"
 // Sonnet 4.6 ≈ £0.10/call → ~£5-6/regen on fang alone.
 const REVIEW_MODEL = "claude-sonnet-4-6"
 const MAX_TOOL_LOOPS = 5
-const MAX_TOKENS = 8192
+// Loop 7 critique fix A7 (LOOP-7-CRITIQUE.md): reviews were truncating
+// mid-sentence at the 8192 ceiling on every demo. Sample evidence: BESS
+// p.12 mid-Failure Mode bullet, Hedgerow p.13 mid-parenthesis, VertFarm
+// p.14 "...slot profile (alrea", p.15 '...the "cha'. Sonnet 4.6 supports
+// up to 64K output tokens — bump to 16384 for headroom while staying
+// inside the per-call budget envelope.
+const MAX_TOKENS = 16384
 
 /** Valid moduleId pattern — alphanumeric, hyphens, underscores */
 const MODULE_ID_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/
