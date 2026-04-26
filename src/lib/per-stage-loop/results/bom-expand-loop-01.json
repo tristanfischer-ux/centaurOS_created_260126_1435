@@ -1,0 +1,214 @@
+{
+  "stage": "bom-expand",
+  "loop": 1,
+  "engineCommit": "e6a71d08",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "bess",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 1,
+      "costPence": 0,
+      "output": {
+        "rowCount": 0,
+        "moduleCount": 8,
+        "hasQuantity": 0,
+        "hasCost": 0,
+        "hasMass": 0,
+        "hasProcess": 0,
+        "hasMaterial": 0,
+        "hasModuleId": 0,
+        "samplePartNumbers": []
+      },
+      "diagnostics": [
+        "no BOM rows"
+      ]
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 0,
+        "moduleCount": 7,
+        "hasQuantity": 0,
+        "hasCost": 0,
+        "hasMass": 0,
+        "hasProcess": 0,
+        "hasMaterial": 0,
+        "hasModuleId": 0,
+        "samplePartNumbers": []
+      },
+      "diagnostics": [
+        "no BOM rows"
+      ]
+    },
+    {
+      "inputId": "vertfarm",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 0,
+        "moduleCount": 9,
+        "hasQuantity": 0,
+        "hasCost": 0,
+        "hasMass": 0,
+        "hasProcess": 0,
+        "hasMaterial": 0,
+        "hasModuleId": 0,
+        "samplePartNumbers": []
+      },
+      "diagnostics": [
+        "no BOM rows"
+      ]
+    },
+    {
+      "inputId": "desal",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 0,
+        "moduleCount": 9,
+        "hasQuantity": 0,
+        "hasCost": 0,
+        "hasMass": 0,
+        "hasProcess": 0,
+        "hasMaterial": 0,
+        "hasModuleId": 0,
+        "samplePartNumbers": []
+      },
+      "diagnostics": [
+        "no BOM rows"
+      ]
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 0,
+        "moduleCount": 7,
+        "hasQuantity": 0,
+        "hasCost": 0,
+        "hasMass": 0,
+        "hasProcess": 0,
+        "hasMaterial": 0,
+        "hasModuleId": 0,
+        "samplePartNumbers": []
+      },
+      "diagnostics": [
+        "no BOM rows"
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "bess",
+      "score": 0.5,
+      "dimensions": {
+        "quantity_field_present": 0,
+        "cost_field_present": 0,
+        "mass_field_present": 0,
+        "process_material_named": 0,
+        "module_attribution": 0,
+        "row_count_plausibility": 0,
+        "mutex_resolved": 5,
+        "naming_specificity": 0,
+        "process_material_realism": 0,
+        "module_attribution_correctness": 0
+      },
+      "summary": "BOM is completely empty (0 rows); no content exists to evaluate against any dimension, making this output entirely unusable for procurement or cost estimation.",
+      "nextFix": "Generate a complete BOM with a minimum of 80–120 line items covering all major subsystems: LFP cell stack, battery racks, BMS (cell-level and system-level), bi-directional PCS/inverter, MV transformer, LV switchgear, liquid cooling loop (pump, chiller, CDUs, pipework), fire detection and suppression (NFPA/NFCC-compliant), container shell and structural steelwork, cable management, DC busbars, safety disconnects, HMI/SCADA, and commissioning consumables — each row with a specific part name, quantity, unit, unit cost, supplier, and module attribution.",
+      "costPence": 49
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 0.5,
+      "dimensions": {
+        "quantity_field_present": 0,
+        "cost_field_present": 0,
+        "mass_field_present": 0,
+        "process_material_named": 0,
+        "module_attribution": 0,
+        "row_count_plausibility": 0,
+        "mutex_resolved": 5,
+        "naming_specificity": 0,
+        "process_material_realism": 0,
+        "module_attribution_correctness": 0
+      },
+      "summary": "BOM is entirely empty (0 rows returned) — no content exists to evaluate on any dimension; mutex and structural scores default to neutral/penalised accordingly.",
+      "nextFix": "Generate the full BOM rows before scoring: prompt the LLM to enumerate every distinct purchased or manufactured part across all modules (body, optics, compute, power, sensors, seed reservoirs, fasteners, packaging) as individual line items with part name, description, quantity, unit, material, process, supplier tier, and module attribution — targeting ~80–140 rows for a project of this complexity.",
+      "costPence": 42
+    },
+    {
+      "inputId": "vertfarm",
+      "score": 0.5,
+      "dimensions": {
+        "quantity_field_present": 0,
+        "cost_field_present": 0,
+        "mass_field_present": 0,
+        "process_material_named": 0,
+        "module_attribution": 0,
+        "row_count_plausibility": 0,
+        "mutex_resolved": 5,
+        "naming_specificity": 0,
+        "process_material_realism": 0,
+        "module_attribution_correctness": 0
+      },
+      "summary": "BOM is completely empty (0 rows); no content exists to evaluate against any dimension, making this output entirely unusable for procurement or cost estimation.",
+      "nextFix": "Generate a full BOM with a minimum of 80–120 line items covering all major subsystems: LED grow-light assemblies, hydroponic racking and channels, nutrient dosing and recirculation pumps, HVAC and CO2 dosing, electrical distribution (3-phase incomer, MCBs, RCDs), IoT sensor nodes and gateway, container structural modifications, insulation, controls cabinet, and consumables — each row must include part name, quantity, unit, supplier reference, unit cost GBP, and module attribution.",
+      "costPence": 46
+    },
+    {
+      "inputId": "desal",
+      "score": 0.5,
+      "dimensions": {
+        "quantity_field_present": 0,
+        "cost_field_present": 0,
+        "mass_field_present": 0,
+        "process_material_named": 0,
+        "module_attribution": 0,
+        "row_count_plausibility": 0,
+        "mutex_resolved": 5,
+        "naming_specificity": 0,
+        "process_material_realism": 0,
+        "module_attribution_correctness": 0
+      },
+      "summary": "BOM is entirely empty (0 rows returned); no content exists to evaluate on any dimension, making this output completely unusable for procurement or cost estimation.",
+      "nextFix": "Regenerate the BOM with an explicit instruction to produce a minimum of 80–120 line items covering all major subsystems: seawater intake/pre-treatment, high-pressure pumping, first-pass RO membrane array, second-pass RO membrane array, energy-recovery device, post-treatment (remineralisation dosing, chlorination), instrumentation & control, pipework & valves, structural/container fitout, electrical distribution, and commissioning consumables — each row must include part name, quantity, unit, material/process, module tag, and indicative unit cost in GBP.",
+      "costPence": 47
+    },
+    {
+      "inputId": "sentinel",
+      "score": 0.5,
+      "dimensions": {
+        "quantity_field_present": 0,
+        "cost_field_present": 0,
+        "mass_field_present": 0,
+        "process_material_named": 0,
+        "module_attribution": 0,
+        "row_count_plausibility": 0,
+        "mutex_resolved": 5,
+        "naming_specificity": 0,
+        "process_material_realism": 0,
+        "module_attribution_correctness": 0
+      },
+      "summary": "BOM is completely empty (0 rows); no content exists to evaluate against any dimension, making this output entirely unusable for procurement or costing.",
+      "nextFix": "Generate a complete BOM with at minimum 30–50 rows covering all major modules: handle assembly (wood blank, machined grip, capacitive sensor PCB, haptic actuator, speaker, microphone, pressure sensor), shaft assembly (carbon-fibre tube, length-adjustment collar, locking mechanism), electronics (IMU, GPS receiver, cellular module, LiPo cell, PMIC, antenna), ferrule assembly (tungsten tip, rubber overmould), and fasteners/finishes — each row with MPN or full descriptive spec, quantity, unit, supplier, and module attribution.",
+      "costPence": 47
+    }
+  ],
+  "aggregateScore": 0.5,
+  "deltaSincePrior": null,
+  "totalCostPence": 231,
+  "completedAt": "2026-04-26T09:22:47.087Z"
+}

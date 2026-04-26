@@ -1,0 +1,269 @@
+{
+  "stage": "bom-expand",
+  "loop": 2,
+  "engineCommit": "83219092",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "bess",
+      "loop": 2,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 67,
+        "moduleCount": 8,
+        "hasQuantity": 67,
+        "hasCost": 59,
+        "hasMass": 59,
+        "hasProcess": 67,
+        "hasMaterial": 59,
+        "hasModuleId": 67,
+        "samplePartNumbers": [
+          "BM-007-PUR",
+          "BM-008-PUR",
+          "APD-008-PUR",
+          "BR-006-PUR",
+          "BR-007",
+          "PC-001",
+          "PC-002-PUR",
+          "PC-003-PUR",
+          "PC-004-PUR",
+          "PC-005-PUR",
+          "PC-006-PUR",
+          "PC-007-PUR"
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 2,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 52,
+        "moduleCount": 7,
+        "hasQuantity": 52,
+        "hasCost": 44,
+        "hasMass": 44,
+        "hasProcess": 52,
+        "hasMaterial": 44,
+        "hasModuleId": 52,
+        "samplePartNumbers": [
+          "OBS-001",
+          "OBS-002",
+          "OBS-003",
+          "OBS-004-PUR",
+          "OBS-005",
+          "OBS-006",
+          "OBS-007",
+          "SP-001",
+          "SP-002-PUR",
+          "SP-003-PUR",
+          "SP-004-PUR",
+          "SP-005-PUR"
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "vertfarm",
+      "loop": 2,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 62,
+        "moduleCount": 9,
+        "hasQuantity": 62,
+        "hasCost": 62,
+        "hasMass": 62,
+        "hasProcess": 62,
+        "hasMaterial": 62,
+        "hasModuleId": 62,
+        "samplePartNumbers": [
+          "CS-001-PUR",
+          "CS-002",
+          "CS-003",
+          "CS-004",
+          "CS-005-PUR",
+          "CS-006-PUR",
+          "CS-007-PUR",
+          "CS-008-PUR",
+          "GRP-001",
+          "GRP-002-PUR",
+          "GRP-003",
+          "GRP-004"
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 2,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 90,
+        "moduleCount": 9,
+        "hasQuantity": 90,
+        "hasCost": 82,
+        "hasMass": 82,
+        "hasProcess": 90,
+        "hasMaterial": 82,
+        "hasModuleId": 90,
+        "samplePartNumbers": [
+          "CON-010",
+          "CON-011",
+          "CON-012",
+          "CSS-ASY",
+          "CSS-001",
+          "CSS-002",
+          "CSS-003",
+          "CSS-004",
+          "CSS-005",
+          "CSS-006",
+          "PRE-ASY",
+          "PRE-001"
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 2,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "rowCount": 45,
+        "moduleCount": 7,
+        "hasQuantity": 45,
+        "hasCost": 45,
+        "hasMass": 45,
+        "hasProcess": 45,
+        "hasMaterial": 45,
+        "hasModuleId": 44,
+        "samplePartNumbers": [
+          "HAND-ASY",
+          "HAND-001",
+          "HAND-002",
+          "HAND-003",
+          "HAND-004",
+          "HAND-005",
+          "HAND-006",
+          "UPSH-ASY",
+          "UPSH-001",
+          "UPSH-002",
+          "UPSH-003",
+          "UPSH-004"
+        ]
+      },
+      "diagnostics": []
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "bess",
+      "score": 8.34,
+      "dimensions": {
+        "quantity_field_present": 10,
+        "cost_field_present": 8.8,
+        "mass_field_present": 8.8,
+        "process_material_named": 8.8,
+        "module_attribution": 10,
+        "row_count_plausibility": 7,
+        "mutex_resolved": 7,
+        "naming_specificity": 7,
+        "process_material_realism": 7,
+        "module_attribution_correctness": 9
+      },
+      "summary": "BOM is structurally sound with good module attribution and reasonable specificity, but 67 rows is lean for a 3.5 MWh containerised BESS (LFP cells, rack busbars, container structure, and civil/commissioning items appear under-resolved), a few material specs mix alternatives within a single field, and the top-level assembly rows (PC-001, LCS-001) shadow their child purchased items creating potential double-count risk.",
+      "nextFix": "Explode the top-level assembly phantom rows (PC-001 'Bi-directional Grid-Forming Power Conversion System Assembly' at £187,500 and LCS-001 'Liquid Cooling Skid Assembly' at £28,500) — these cost values overlap with their child COTS rows (PC-002 at £95,000, LCS-002 etc.); either make them roll-up zero-cost parents or delete them and let children carry cost, then add missing LFP cell rows with Ah rating, cell count, and unit cost to make the battery rack BOM traceable to the 3.5 MWh capacity claim.",
+      "costPence": 153
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 8.45,
+      "dimensions": {
+        "quantity_field_present": 10,
+        "cost_field_present": 8.5,
+        "mass_field_present": 8.5,
+        "process_material_named": 8.5,
+        "module_attribution": 10,
+        "row_count_plausibility": 8,
+        "mutex_resolved": 6,
+        "naming_specificity": 8,
+        "process_material_realism": 8,
+        "module_attribution_correctness": 9
+      },
+      "summary": "Solid, well-attributed BOM with good specificity and realistic process/material pairings, but several rows carry unresolved architectural alternatives (PC vs ASA, ceramic vs steel body) that inflate apparent cost and prevent deterministic procurement.",
+      "nextFix": "Force the BOM generator to commit to a single material/process choice per row before output — add a pre-pass instruction: 'Resolve all OR/alternative material choices to the single selected option; do not list alternatives in the same row. If a design decision is genuinely open, create a separate design-decision log outside the BOM.'",
+      "costPence": 134
+    },
+    {
+      "inputId": "vertfarm",
+      "score": 8.5,
+      "dimensions": {
+        "quantity_field_present": 10,
+        "cost_field_present": 10,
+        "mass_field_present": 10,
+        "process_material_named": 10,
+        "module_attribution": 10,
+        "row_count_plausibility": 7,
+        "mutex_resolved": 6,
+        "naming_specificity": 7,
+        "process_material_realism": 6,
+        "module_attribution_correctness": 9
+      },
+      "summary": "BOM shows reasonable coverage and good module attribution but suffers from port/starboard rack duplication with inconsistent specs (mass, cost, material callouts differ between GRP and GRS mirror parts), process tags are occasionally misapplied (FRP lining as 'sheet_metal', cross-bracing as 'machining'), and net-pot unit mass discrepancy (GRP-004 0.012 kg vs GRS-004 0.008 kg) signals copy-paste drift rather than a resolved single configuration.",
+      "nextFix": "Enforce a single canonical rack assembly with a quantity field (qty=2) rather than duplicating port and starboard as separate numbered assemblies with divergent specs; simultaneously audit process tags so fabricated-in-place items (spray foam, FRP lining) use 'fabrication' or 'site_applied' rather than 'sheet_metal' or 'other', and cross-bracing uses 'welded_fabrication' not 'machining'.",
+      "costPence": 150
+    },
+    {
+      "inputId": "desal",
+      "score": 8.23,
+      "dimensions": {
+        "quantity_field_present": 10,
+        "cost_field_present": 9.1,
+        "mass_field_present": 9.1,
+        "process_material_named": 9.1,
+        "module_attribution": 10,
+        "row_count_plausibility": 7,
+        "mutex_resolved": 6,
+        "naming_specificity": 6,
+        "process_material_realism": 7,
+        "module_attribution_correctness": 9
+      },
+      "summary": "BOM structure and module attribution are sound, but several rows carry vague dual-material specs that hint at unresolved design alternatives, naming lacks supplier-grade specificity, and the 90-row total is plausible but borderline sparse for a two-pass RO system with full post-treatment.",
+      "nextFix": "Force single-material resolution per row by adding the constraint 'each row must specify exactly one material grade; if two options exist, select the one that meets the worst-case seawater duty and delete the alternative' — this will collapse 'Stainless Steel 304/316' and 'PVC/Fiberglass' hedge entries and raise mutex_resolved and naming_specificity simultaneously.",
+      "costPence": 134
+    },
+    {
+      "inputId": "sentinel",
+      "score": 8.18,
+      "dimensions": {
+        "quantity_field_present": 10,
+        "cost_field_present": 10,
+        "mass_field_present": 10,
+        "process_material_named": 10,
+        "module_attribution": 9.8,
+        "row_count_plausibility": 7,
+        "mutex_resolved": 6,
+        "naming_specificity": 6,
+        "process_material_realism": 6,
+        "module_attribution_correctness": 7
+      },
+      "summary": "BOM has reasonable structure and module attribution but suffers from mixed-material handle (ash body + walnut insert as separate parts without clear mutex resolution), a misplaced power module row (POW-002 sandwiched inside ferrule_assembly rows), vague COTS part names lacking manufacturer part numbers, and one process misclassification (glass-fibre wrap labelled sheet_metal).",
+      "nextFix": "Enforce strict mutex resolution: the BOM must commit to ONE handle wood species (ash OR walnut, not both as parallel structural parts); add manufacturer part numbers and exact series names to all COTS rows (IMU, LRA, pressure sensors, cellular module); fix UPSH-002 process from 'sheet_metal' to 'composite_layup'; and relocate POW-002 to power_module source_module_id to eliminate the ordering anomaly.",
+      "costPence": 133
+    }
+  ],
+  "aggregateScore": 8.34,
+  "deltaSincePrior": 7.84,
+  "totalCostPence": 704,
+  "completedAt": "2026-04-26T09:26:20.960Z"
+}

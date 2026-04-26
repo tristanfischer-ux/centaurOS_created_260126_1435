@@ -1,0 +1,652 @@
+{
+  "stage": "finn-cost",
+  "loop": 1,
+  "engineCommit": "e6a71d08",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "moduleCount": 9,
+        "costedModuleCount": 9,
+        "confidenceFilled": 9,
+        "totalSum": 243861,
+        "totalsCounted": 9,
+        "ceilingGbp": null,
+        "targetUnitCostGbp": null,
+        "oracleBand": {
+          "productClass": "uk-vertical-farm-container",
+          "aggregateLowGbp": 138000,
+          "aggregateMedianGbp": 212000,
+          "aggregateHighGbp": 324000,
+          "caption": "Council benchmark band for UK container vertical farm: £138k (low) / £212k (median) / £324k (high). Source: Loop 7 frontier-LLM council priors aggregated across module classes.",
+          "targetBelowLow": false,
+          "targetAboveHigh": false,
+          "targetVsLowRatio": null,
+          "targetVsHighRatio": null
+        },
+        "sampleEstimates": [
+          {
+            "moduleId": "climate_unit",
+            "totalPerUnit": 14640,
+            "confidence": "medium",
+            "costJustification": "Mainly COTS HVAC and sensors with minor custom metalwork",
+            "assumptions": [
+              "No custom ductwork except filter frame",
+              "Standard CO2 bottle hire model"
+            ]
+          },
+          {
+            "moduleId": "controls_iot",
+            "totalPerUnit": 8520,
+            "confidence": "medium",
+            "costJustification": "Primarily COTS components with integration labour; sensor nodes are purchased assemblies.",
+            "assumptions": [
+              "Node costs averaged per node including sensors",
+              "Software licensing cost is approximate"
+            ]
+          },
+          {
+            "moduleId": "grow_rack_port",
+            "totalPerUnit": 10450,
+            "confidence": "medium",
+            "costJustification": "Rack is predominantly bought off-the-shelf extrusions and hydroponic parts with minor make braces.",
+            "assumptions": [
+              "Aluminium extrusion price includes fasteners and connectors.",
+              "Channels and pots are standard products."
+            ]
+          },
+          {
+            "moduleId": "lighting_array",
+            "totalPerUnit": 170520,
+            "confidence": "medium",
+            "costJustification": "Majority buy-in components with labour for assembly",
+            "assumptions": [
+              "Scale of 160 bars reduces per-unit cost",
+              "COTS parts dominant, minimal custom making"
+            ]
+          },
+          {
+            "moduleId": "container_shell",
+            "totalPerUnit": 15940,
+            "confidence": "high",
+            "costJustification": "Container shell is mostly buy parts with custom insulation and lining make items.",
+            "assumptions": [
+              "Container shell price valid for used but compliant unit.",
+              "Custom doors priced as semi-bespoke item."
+            ]
+          },
+          {
+            "moduleId": "nutrient_system",
+            "totalPerUnit": 9710,
+            "confidence": "medium",
+            "costJustification": "Predominantly off-the-shelf tanks, pumps, and sensors with custom manifold",
+            "assumptions": [
+              "All controls via PLC not included here",
+              "Pipe runs average 50m each"
+            ]
+          },
+          {
+            "moduleId": "service_vestibule",
+            "totalPerUnit": 1760,
+            "confidence": "medium",
+            "costJustification": "Mix of standard and custom-made items; labour includes custom fabrication of bench and rack.",
+            "assumptions": [
+              "Extra labour for custom welding and assembly",
+              "Some items are modified standard parts"
+            ]
+          },
+          {
+            "moduleId": "power_distribution",
+            "totalPerUnit": 1871,
+            "confidence": "high",
+            "costJustification": "All parts are commercially available electrical distribution components requiring no custom fabrication.",
+            "assumptions": [
+              "All items are standard electrical components",
+              "Labour based on typical panel wiring time"
+            ]
+          },
+          {
+            "moduleId": "grow_rack_starboard",
+            "totalPerUnit": 10450,
+            "confidence": "medium",
+            "costJustification": "Starboard rack is a mirrored copy of port rack with same buy parts and minor make braces.",
+            "assumptions": [
+              "Mirrored rack shares identical part costs.",
+              "Assembly labor same as port side."
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "moduleCount": 7,
+        "costedModuleCount": 7,
+        "confidenceFilled": 7,
+        "totalSum": 194.72,
+        "totalsCounted": 7,
+        "ceilingGbp": 155,
+        "targetUnitCostGbp": null,
+        "oracleBand": {
+          "productClass": "uk-connected-mobility-aid",
+          "aggregateLowGbp": 162,
+          "aggregateMedianGbp": 270,
+          "aggregateHighGbp": 452,
+          "caption": "Council benchmark band for UK connected mobility aid: £162 (low) / £270 (median) / £452 (high). Source: Loop 7 frontier-LLM council priors aggregated across module classes.",
+          "targetBelowLow": true,
+          "targetAboveHigh": false,
+          "targetVsLowRatio": 0.9567901234567902,
+          "targetVsHighRatio": 0.34292035398230086
+        },
+        "sampleEstimates": [
+          {
+            "moduleId": "power_module",
+            "totalPerUnit": 42.5,
+            "confidence": "medium",
+            "costJustification": "Battery pack and inductive charging electronics with custom bracket.",
+            "assumptions": [
+              "Standard lithium battery and Qi coil",
+              "Manual wiring and bracket fitting"
+            ]
+          },
+          {
+            "moduleId": "charging_stand",
+            "totalPerUnit": 11.62,
+            "confidence": "medium",
+            "costJustification": "Simple inductive stand using standard Qi module, moulded base, basic assembly.",
+            "assumptions": [
+              "Low volume (batch <100) injection moulding tooling cost amortised over 1000 units.",
+              "No enclosure sealing or IP rating required."
+            ]
+          },
+          {
+            "moduleId": "handle_assembly",
+            "totalPerUnit": 14.23,
+            "confidence": "medium",
+            "costJustification": "Minimal parts based on common handle design.",
+            "assumptions": [
+              "Handle is simple machined hardwood.",
+              "Grip is standard off-the-shelf.",
+              "Only one fastener needed for attachment."
+            ]
+          },
+          {
+            "moduleId": "ferrule_assembly",
+            "totalPerUnit": 22.2,
+            "confidence": "medium",
+            "costJustification": "Ferrule uses custom ground carbide and moulded rubber, plus standard hardware.",
+            "assumptions": [
+              "Small batch, manual assembly",
+              "Standard O-ring and fasteners"
+            ]
+          },
+          {
+            "moduleId": "lower_shaft_assembly",
+            "totalPerUnit": 17.87,
+            "confidence": "medium",
+            "costJustification": "Telescopic shaft with adjustable locking mechanism.",
+            "assumptions": [
+              "Collars are simple turned and threaded.",
+              "Locking pin is COTS.",
+              "Pin and grub screw secure adjustment."
+            ]
+          },
+          {
+            "moduleId": "upper_shaft_assembly",
+            "totalPerUnit": 17,
+            "confidence": "medium",
+            "costJustification": "Simple assembly with bought tube and machined insert.",
+            "assumptions": [
+              "Tube is standard carbon fibre.",
+              "Ferrule is simple turned part.",
+              "Epoxy is generic."
+            ]
+          },
+          {
+            "moduleId": "main_electronics_module",
+            "totalPerUnit": 69.3,
+            "confidence": "medium",
+            "costJustification": "Custom PCB and enclosure with COTS electronic parts and connectors.",
+            "assumptions": [
+              "Low volume PCB assembly in UK",
+              "Standard electronic components"
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "moduleCount": 7,
+        "costedModuleCount": 7,
+        "confidenceFilled": 7,
+        "totalSum": 753.5999999999999,
+        "totalsCounted": 7,
+        "ceilingGbp": null,
+        "targetUnitCostGbp": null,
+        "oracleBand": {
+          "productClass": "uk-bess-containerised",
+          "aggregateLowGbp": 1330000,
+          "aggregateMedianGbp": 2150000,
+          "aggregateHighGbp": 3580000,
+          "caption": "Council benchmark band for UK containerised BESS: £1.3M (low) / £2.1M (median) / £3.6M (high). Source: Loop 7 frontier-LLM council priors aggregated across module classes.",
+          "targetBelowLow": false,
+          "targetAboveHigh": false,
+          "targetVsLowRatio": null,
+          "targetVsHighRatio": null
+        },
+        "sampleEstimates": [
+          {
+            "moduleId": "compute_module",
+            "totalPerUnit": 142.8,
+            "confidence": "high",
+            "costJustification": "Mostly standard COTS chips and passives plus custom PCB and coating.",
+            "assumptions": [
+              "Batch size 1000, PCB cost per unit at volume",
+              "SoC and memory prices from Octopart/UK disti",
+              "Conformal coating applied as part of assembly"
+            ]
+          },
+          {
+            "moduleId": "connectivity_module",
+            "totalPerUnit": 48.5,
+            "confidence": "high",
+            "costJustification": "Standard wireless connectivity module using COTS components",
+            "assumptions": [
+              "All modules are pre-certified and bought as COTS",
+              "No custom board fabrication included",
+              "Components grouped into SMT assembly batch"
+            ]
+          },
+          {
+            "moduleId": "perch_weight_sensor",
+            "totalPerUnit": 39,
+            "confidence": "high",
+            "costJustification": "Simple assembly with standard parts and minor custom work.",
+            "assumptions": [
+              "Low volume, hand assembly."
+            ]
+          },
+          {
+            "moduleId": "camera_sensor_module",
+            "totalPerUnit": 179.5,
+            "confidence": "medium",
+            "costJustification": "Most parts are COTS, but custom lens and window increase cost.",
+            "assumptions": [
+              "Lens assembly is custom and costed as low-volume prototype."
+            ]
+          },
+          {
+            "moduleId": "outer_body_structure",
+            "totalPerUnit": 192,
+            "confidence": "high",
+            "costJustification": "Mix of custom cast/sheet metal parts and standard fasteners/gaskets.",
+            "assumptions": [
+              "Batch size 1000 units",
+              "Ceramic body chosen over steel for typical order",
+              "UK labour rate £40/hr"
+            ]
+          },
+          {
+            "moduleId": "solar_power_subsystem",
+            "totalPerUnit": 85.8,
+            "confidence": "high",
+            "costJustification": "All parts are standard COTS electronic components and solar panel.",
+            "assumptions": [
+              "Solar panel price for typical order of 100+",
+              "Battery pack is assembled (cells+BMS) COTS",
+              "Mains PSU optional; not included in base total"
+            ]
+          },
+          {
+            "moduleId": "seed_reservoir_assembly",
+            "totalPerUnit": 66,
+            "confidence": "medium",
+            "costJustification": "All parts are custom manufactured, increasing cost and complexity.",
+            "assumptions": [
+              "Low volume, custom tooling costs amortised over small batch."
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "bess",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "moduleCount": 8,
+        "costedModuleCount": 8,
+        "confidenceFilled": 8,
+        "totalSum": 681505,
+        "totalsCounted": 8,
+        "ceilingGbp": 180000,
+        "targetUnitCostGbp": null,
+        "oracleBand": {
+          "productClass": "uk-bess-containerised",
+          "aggregateLowGbp": 1330000,
+          "aggregateMedianGbp": 2150000,
+          "aggregateHighGbp": 3580000,
+          "caption": "Council benchmark band for UK containerised BESS: £1.3M (low) / £2.1M (median) / £3.6M (high). Source: Loop 7 frontier-LLM council priors aggregated across module classes.",
+          "targetBelowLow": true,
+          "targetAboveHigh": false,
+          "targetVsLowRatio": 0.13533834586466165,
+          "targetVsHighRatio": 0.05027932960893855
+        },
+        "sampleEstimates": [
+          {
+            "moduleId": "fire_safety_system",
+            "totalPerUnit": 35500,
+            "confidence": "high",
+            "costJustification": "Mostly buy items; custom stainless pipework welded.",
+            "assumptions": [
+              "Clean agent cost includes full system",
+              "Vent panels are off-the-shelf certified"
+            ]
+          },
+          {
+            "moduleId": "container_enclosure",
+            "totalPerUnit": 16020,
+            "confidence": "high",
+            "costJustification": "Container base is standard buy; custom lining and coating add cost.",
+            "assumptions": [
+              "New container price ~£4500",
+              "Standard vent panels <£800 each",
+              "Labour moderate for modification"
+            ]
+          },
+          {
+            "moduleId": "liquid_cooling_skid",
+            "totalPerUnit": 45100,
+            "confidence": "high",
+            "costJustification": "Primarily buy heavy equipment plus custom frame and manifold.",
+            "assumptions": [
+              "Chiller skid price based on 80kW commercial unit",
+              "Manifold fabrication includes welding and valves"
+            ]
+          },
+          {
+            "moduleId": "battery_rack_assembly",
+            "totalPerUnit": 410200,
+            "confidence": "high",
+            "costJustification": "Cells dominate cost; rack and cooling are custom fabricated.",
+            "assumptions": [
+              "Cell price ~$130/kWh at 2026 volume",
+              "Contactors ~£1500 each",
+              "Labour for cell module build"
+            ]
+          },
+          {
+            "moduleId": "power_conversion_system",
+            "totalPerUnit": 141600,
+            "confidence": "high",
+            "costJustification": "Inverter skid is major cost; supporting parts are standard buy.",
+            "assumptions": [
+              "1.5MW inverter skid ~£120k market price",
+              "Controller includes G99 protection"
+            ]
+          },
+          {
+            "moduleId": "battery_management_system",
+            "totalPerUnit": 13600,
+            "confidence": "high",
+            "costJustification": "Entirely buy items; no custom fabricated parts in BMS.",
+            "assumptions": [
+              "All BMS components are COTS purchased items",
+              "Labour includes rack wiring and integration"
+            ]
+          },
+          {
+            "moduleId": "auxiliary_power_distribution",
+            "totalPerUnit": 7255,
+            "confidence": "high",
+            "costJustification": "Module uses only buy parts; no custom fabrication needed",
+            "assumptions": [
+              "All parts are standard COTS items",
+              "UPS includes internal battery",
+              "Installation labour at 8 hours",
+              "RS Components as primary source"
+            ]
+          },
+          {
+            "moduleId": "controls_supervisory_cabinet",
+            "totalPerUnit": 12230,
+            "confidence": "medium",
+            "costJustification": "Two make parts for mounting plates; rest buy; labour at 15 hours for fabrication and wiring",
+            "assumptions": [
+              "PLC and relay are high-cost items based on functionality",
+              "Mounting plate made from mild steel with sheet metal work",
+              "All electronic modules are COTS with distributor prices",
+              "Labour includes custom gland plate cutting"
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "moduleCount": 9,
+        "costedModuleCount": 9,
+        "confidenceFilled": 9,
+        "totalSum": 50920,
+        "totalsCounted": 9,
+        "ceilingGbp": 350000,
+        "targetUnitCostGbp": null,
+        "oracleBand": {
+          "productClass": "uk-desal-containerised",
+          "aggregateLowGbp": 473000,
+          "aggregateMedianGbp": 719000,
+          "aggregateHighGbp": 1118000,
+          "caption": "Council benchmark band for UK containerised desalination: £473k (low) / £719k (median) / £1.1M (high). Source: Loop 7 frontier-LLM council priors aggregated across module classes.",
+          "targetBelowLow": true,
+          "targetAboveHigh": false,
+          "targetVsLowRatio": 0.7399577167019028,
+          "targetVsHighRatio": 0.31305903398926654
+        },
+        "sampleEstimates": [
+          {
+            "moduleId": "cip_system",
+            "totalPerUnit": 4170,
+            "confidence": "medium",
+            "costJustification": "CIP system with tank, pump, heater, and controls; mostly bought-in components plus custom stainless fabrications.",
+            "assumptions": [
+              "Batch size 1",
+              "No automation level given"
+            ]
+          },
+          {
+            "moduleId": "ro_first_pass",
+            "totalPerUnit": 17190,
+            "confidence": "high",
+            "costJustification": "First pass RO uses COTS seawater components plus custom skid and end caps for durability.",
+            "assumptions": [
+              "Standard seawater RO train",
+              "Membrane and pump prices from UK distributors 2026",
+              "Skid frame fabricated in-house"
+            ]
+          },
+          {
+            "moduleId": "control_system",
+            "totalPerUnit": 1930,
+            "confidence": "medium",
+            "costJustification": "PLC/HMI cabinet with standard bought-in components and minimal custom metalwork.",
+            "assumptions": [
+              "Basic control only",
+              "No field instruments included"
+            ]
+          },
+          {
+            "moduleId": "ro_second_pass",
+            "totalPerUnit": 9116,
+            "confidence": "high",
+            "costJustification": "Second pass uses brackish RO components with custom skid and seals; lower pressure reduces cost.",
+            "assumptions": [
+              "Standard brackish RO train",
+              "Smaller pump and fewer membranes than first pass",
+              "Same construction approach"
+            ]
+          },
+          {
+            "moduleId": "power_distribution",
+            "totalPerUnit": 1650,
+            "confidence": "medium",
+            "costJustification": "Standard power distribution cabinet with commercial breakers, starters, and minimal custom steelwork.",
+            "assumptions": [
+              "No VFDs included",
+              "Small motor control centre"
+            ]
+          },
+          {
+            "moduleId": "pretreatment_module",
+            "totalPerUnit": 2545,
+            "confidence": "medium",
+            "costJustification": "Mostly COTS items with simple bracket fabrication.",
+            "assumptions": [
+              "Filter vessel is standard COTS.",
+              "No custom machining required."
+            ]
+          },
+          {
+            "moduleId": "post_treatment_module",
+            "totalPerUnit": 4724,
+            "confidence": "high",
+            "costJustification": "Post-treatment uses COTS UV and dosing equipment; custom skid and bracket for mounting.",
+            "assumptions": [
+              "Post-treatment includes UV and chemical dosing",
+              "Standard COTS components",
+              "Simple skid construction"
+            ]
+          },
+          {
+            "moduleId": "high_pressure_pump_erd",
+            "totalPerUnit": 5045,
+            "confidence": "medium",
+            "costJustification": "High-value COTS components with simple custom baseplate.",
+            "assumptions": [
+              "Pump and ERD are standard off-the-shelf.",
+              "Baseplate is simple machined part."
+            ]
+          },
+          {
+            "moduleId": "container_skid_structure",
+            "totalPerUnit": 4550,
+            "confidence": "high",
+            "costJustification": "Low-complexity structure with standard container and welded frame.",
+            "assumptions": [
+              "Container is used/second-hand.",
+              "Skid frame is simple welded construction."
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 6.666666666666667,
+      "dimensions": {
+        "coverage_per_module": 10,
+        "confidence_field_filled": 10,
+        "total_within_oracle_band": 10,
+        "total_matches_unit_cost": 5,
+        "cost_justification_specificity": 2,
+        "assumptions_explicit": 3
+      },
+      "summary": "Justifications are generic buy/make labels with no £/unit, £/kg, £/hr, or supplier-level data; assumption blocks exist but omit volume, NRE horizon, lead time, tariffs, and BOM source, making them structurally present but substantively thin.",
+      "nextFix": "Require each costJustification to cite at least three concrete figures (e.g. '160 LED bars @ £820/bar ex-Shenzhen landed, 2 hr wiring labour @ £45/hr, £1,200 NRE amortised over 20 units') and each assumptions block to state annual build volume, primary supplier region, NRE amortisation horizon, and whether UK import tariffs are included.",
+      "costPence": 61
+    },
+    {
+      "inputId": "sentinel",
+      "score": 6.666666666666667,
+      "dimensions": {
+        "coverage_per_module": 10,
+        "confidence_field_filled": 10,
+        "total_within_oracle_band": 10,
+        "total_matches_unit_cost": 5,
+        "cost_justification_specificity": 2,
+        "assumptions_explicit": 3
+      },
+      "summary": "Justifications are generic one-liners with no £/kg, £/hr, tooling-cavity or volume-band figures; assumptions exist but lack concrete values (volumes are vague or absent, no supplier region, no NRE horizon, no tariff or lead-time data).",
+      "nextFix": "Require each moduleId to cite: (a) a named BOM line with a £/unit or £/kg price, (b) an explicit annual volume and NRE amortisation horizon, (c) a labour rate in £/hr and estimated assembly minutes, and (d) supplier region — e.g. 'UK PCBA at £65/hr, 45 min assembly = £48.75 labour; IMU @ £3.20/unit (Mouser UK, 500-off); tooling £4,200 amortised over 1,000 units = £4.20/unit'.",
+      "costPence": 62
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 5.333333333333333,
+      "dimensions": {
+        "coverage_per_module": 10,
+        "confidence_field_filled": 10,
+        "total_within_oracle_band": 0,
+        "total_matches_unit_cost": 5,
+        "cost_justification_specificity": 3,
+        "assumptions_explicit": 4
+      },
+      "summary": "Justifications are generic module-level labels ('standard COTS', 'custom parts increase cost') with no cited £/kg material rates, tooling amortisation figures, supplier regions, or labour-hour breakdowns; assumption blocks exist but are thin and inconsistent across modules.",
+      "nextFix": "Require each module's costJustification to cite at minimum: a per-unit BOM subtotal (£), a named labour rate (£/hr) × estimated hours, any NRE/tooling cost and the batch size over which it is amortised, and the primary supplier region — e.g. 'Ceramic casting £38/unit ex-UK foundry at 1000-off; 2.5 hr finishing @ £40/hr = £100; gasket/fasteners £12; tooling £8k ÷ 1000 = £8; total £158 before margin'.",
+      "costPence": 62
+    },
+    {
+      "inputId": "bess",
+      "score": 5.333333333333333,
+      "dimensions": {
+        "coverage_per_module": 10,
+        "confidence_field_filled": 10,
+        "total_within_oracle_band": 0,
+        "total_matches_unit_cost": 5,
+        "cost_justification_specificity": 3,
+        "assumptions_explicit": 4
+      },
+      "summary": "Justifications name the dominant cost driver per module but lack £/hr labour rates, £/kg material rates, volume context, NRE amortisation, and supplier-region/tariff detail; assumption blocks are present but thin and inconsistently populated across modules.",
+      "nextFix": "Require each costJustification to state: (a) assumed annual build volume, (b) explicit £/hr labour rate and hours broken out by trade, (c) material unit prices with source (e.g. spot, distributor, framework contract) and currency/tariff basis, and (d) NRE or tooling cost amortised over that volume — penalise any module that omits these four elements.",
+      "costPence": 58
+    },
+    {
+      "inputId": "desal",
+      "score": 5,
+      "dimensions": {
+        "coverage_per_module": 10,
+        "confidence_field_filled": 10,
+        "total_within_oracle_band": 0,
+        "total_matches_unit_cost": 5,
+        "cost_justification_specificity": 2,
+        "assumptions_explicit": 3
+      },
+      "summary": "Justifications are generic one-liners citing 'COTS components' and 'custom skid' without a single £/kg, £/hr, membrane unit price, pump list price, or labour-hour breakdown; assumption blocks exist but omit annual volume, BOM source, supplier region, NRE amortisation, tariffs, and lead times throughout.",
+      "nextFix": "Require the model to decompose each module into a mini-BOM with named line items (e.g. 'Grundfos CM10-3 HP pump: £2,100 list / 0.85 trade factor = £1,785; 4 hr fitting @ £55/hr = £220') plus explicit volume, supplier-region, and NRE-amortisation fields before producing a totalPerUnit figure.",
+      "costPence": 63
+    }
+  ],
+  "aggregateScore": 5.8,
+  "deltaSincePrior": null,
+  "totalCostPence": 306,
+  "completedAt": "2026-04-26T09:22:42.534Z"
+}

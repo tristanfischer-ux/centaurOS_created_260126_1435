@@ -1,0 +1,317 @@
+{
+  "stage": "chase-regulatory",
+  "loop": 2,
+  "engineCommit": "3e7e2d87",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 2,
+      "engineCommit": "3e7e2d87",
+      "elapsedMs": 505,
+      "costPence": 0,
+      "output": {
+        "regulatory": [],
+        "count": 0,
+        "extractedFresh": false
+      },
+      "diagnostics": [
+        "fresh extraction returned empty regulatory; using persisted",
+        "no regulatory rows",
+        "scored persisted output (no fresh extraction)"
+      ]
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 2,
+      "engineCommit": "3e7e2d87",
+      "elapsedMs": 271,
+      "costPence": 0,
+      "output": {
+        "regulatory": [
+          {
+            "code": "UK MDR Class I",
+            "name": "UK Medical Devices Regulations — Class I",
+            "status": "not-started",
+            "summary": "Launch classification as a mobility aid with safety features; no notified body required at Class I but technical file and registration with MHRA mandatory."
+          },
+          {
+            "code": "UK MDR Class IIa",
+            "name": "UK Medical Devices Regulations — Class IIa",
+            "status": "not-started",
+            "summary": "Upgrade path once the cellular emergency-call pathway is validated; requires UK Approved Body conformity assessment."
+          },
+          {
+            "code": "UKCA (RED)",
+            "name": "UK Conformity Assessed — Radio Equipment Regulations 2017",
+            "status": "not-started",
+            "summary": "Cellular module (nRF9160) carries module-level certification; full product UKCA marking required for UK market placement."
+          },
+          {
+            "code": "CE (RED)",
+            "name": "Conformité Européenne — Radio Equipment Directive 2014/53/EU",
+            "status": "not-started",
+            "summary": "Module-level CE RED certification on nRF9160 typically carries to product level; required if sold in EU."
+          },
+          {
+            "code": "Ofcom",
+            "name": "Ofcom Spectrum Compliance (UK)",
+            "status": "not-started",
+            "summary": "LTE-M/NB-IoT radio use compliant via nRF9160 module certification; eSIM provisioning to follow GSMA SGP.02 embedded SIM specification."
+          },
+          {
+            "code": "IEC 62133",
+            "name": "Safety for portable sealed secondary lithium cells and batteries",
+            "status": "not-started",
+            "summary": "Battery pack compliance required for UK/EU market; covers overcharge, short circuit, and thermal protection."
+          },
+          {
+            "code": "IEC 60335-1",
+            "name": "Household and similar electrical appliances — Safety",
+            "status": "not-started",
+            "summary": "Governs the mains-powered inductive charging stand as a household appliance."
+          },
+          {
+            "code": "BS EN ISO 11334-1",
+            "name": "Assistive products for walking — Walking sticks",
+            "status": "not-started",
+            "summary": "Governing structural and load standard for walking sticks on the UK market; shaft and telescoping joint must meet stated static and dynamic load cases."
+          },
+          {
+            "code": "EN 61000-4-2",
+            "name": "EMC — Electrostatic discharge immunity",
+            "status": "not-started",
+            "summary": "Handle is a frequently grasped surface; contact discharge immunity to ±4 kV minimum recommended."
+          },
+          {
+            "code": "IPC-2221B",
+            "name": "Generic Standard on Printed Board Design",
+            "status": "not-started",
+            "summary": "PCB design standard governing clearance, current capacity, and via sizing for the long narrow shaft-cavity board."
+          }
+        ],
+        "count": 10,
+        "extractedFresh": false
+      },
+      "diagnostics": [
+        "fresh extraction returned empty regulatory; using persisted",
+        "scored persisted output (no fresh extraction)"
+      ]
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 2,
+      "engineCommit": "3e7e2d87",
+      "elapsedMs": 299,
+      "costPence": 0,
+      "output": {
+        "regulatory": [],
+        "count": 0,
+        "extractedFresh": false
+      },
+      "diagnostics": [
+        "fresh extraction returned empty regulatory; using persisted",
+        "no regulatory rows",
+        "scored persisted output (no fresh extraction)"
+      ]
+    },
+    {
+      "inputId": "bess",
+      "loop": 2,
+      "engineCommit": "3e7e2d87",
+      "elapsedMs": 362,
+      "costPence": 0,
+      "output": {
+        "regulatory": [
+          {
+            "code": "ENA G99",
+            "name": "Requirements for the Connection of Generation Equipment in Parallel with Public Distribution Networks above 16 A",
+            "status": "not-started",
+            "summary": "Mandatory UK grid code for behind-the-meter storage connecting in parallel with the distribution network; grid-forming capability required."
+          },
+          {
+            "code": "BS EN IEC 62619",
+            "name": "Safety requirements for secondary lithium cells and batteries for use in industrial applications",
+            "status": "not-started",
+            "summary": "Cell-level safety certification required for the LFP modules within the system."
+          },
+          {
+            "code": "BS EN IEC 63056",
+            "name": "Safety requirements for secondary lithium cells and batteries for use in electrical energy storage systems",
+            "status": "not-started",
+            "summary": "System-level safety certification required for the complete BESS installation."
+          },
+          {
+            "code": "UL 9540",
+            "name": "Standard for Energy Storage Systems and Equipment",
+            "status": "not-started",
+            "summary": "System-level listing recommended to support NFCC alignment for planning and fire authority approval."
+          },
+          {
+            "code": "UL 9540A",
+            "name": "Test Method for Evaluating Thermal Runaway Fire Propagation in Battery Energy Storage Systems",
+            "status": "not-started",
+            "summary": "Thermal-runaway propagation test recommended to demonstrate fire safety in support of NFCC guidance compliance."
+          },
+          {
+            "code": "NFPA 855",
+            "name": "Standard for the Installation of Stationary Energy Storage Systems",
+            "status": "not-started",
+            "summary": "Governs minimum fire separation distances, deflagration venting, and suppression requirements; referenced by NFCC planning guidance."
+          },
+          {
+            "code": "ISO 1496-1",
+            "name": "Series 1 freight containers — specification and testing",
+            "status": "not-started",
+            "summary": "Defines the structural and dimensional standard for the 40 ft High Cube container shell."
+          },
+          {
+            "code": "ISO 1161",
+            "name": "Series 1 freight containers — corner fittings",
+            "status": "not-started",
+            "summary": "Specifies corner casting geometry used for lifting, transport, and foundation anchorage."
+          }
+        ],
+        "count": 8,
+        "extractedFresh": false
+      },
+      "diagnostics": [
+        "fresh extraction returned empty regulatory; using persisted",
+        "scored persisted output (no fresh extraction)"
+      ]
+    },
+    {
+      "inputId": "desal",
+      "loop": 2,
+      "engineCommit": "3e7e2d87",
+      "elapsedMs": 353,
+      "costPence": 0,
+      "output": {
+        "regulatory": [
+          {
+            "code": "NSF/ANSI 61",
+            "name": "Drinking water system components — health effects",
+            "status": "not-started",
+            "summary": "All potable-water-contact materials and components must be certified under this standard"
+          },
+          {
+            "code": "NSF/ANSI 372",
+            "name": "Drinking water system components — lead content",
+            "status": "not-started",
+            "summary": "All potable-water-contact components must comply with lead-free requirements"
+          },
+          {
+            "code": "ISO 1496-1",
+            "name": "Series 1 freight containers — specification and testing",
+            "status": "not-started",
+            "summary": "Container shell must conform to this standard for structural integrity and intermodal compatibility"
+          },
+          {
+            "code": "WHO Guidelines for Drinking-water Quality",
+            "name": "WHO potable water quality guidelines",
+            "status": "not-started",
+            "summary": "Permeate TDS target of less than 500 mg/L and residual chlorine 0.2–0.5 mg/L align with WHO potable-water thresholds"
+          },
+          {
+            "code": "IEC 60529 / NEMA 4X",
+            "name": "Degrees of protection — enclosures (IP65)",
+            "status": "not-started",
+            "summary": "Electrical control panel must meet IP65 ingress-protection rating for outdoor and coastal environments"
+          }
+        ],
+        "count": 5,
+        "extractedFresh": false
+      },
+      "diagnostics": [
+        "fresh extraction returned empty regulatory; using persisted",
+        "scored persisted output (no fresh extraction)"
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 0,
+      "dimensions": {
+        "matrix_not_bibliography": 0,
+        "statutory_vs_reference_distinguished": 0,
+        "uk_specific_correctness": 0,
+        "applicability_specificity": 0,
+        "evidence_required_actionable": 0,
+        "coverage": 0,
+        "owner_role_specific": 0
+      },
+      "summary": "No regulatory matrix was produced, so there is no project-mapped compliance content, UK statutory/reference distinction, evidence, ownership, or coverage to assess.",
+      "nextFix": "Require the engine to output a non-empty UK regulatory compliance matrix with one row per applicable obligation or standard, including: statutory/reference status, applicability to a specific container-farm subsystem, design impact, concrete evidence required, accountable owner role, and gap action.",
+      "costPence": 41
+    },
+    {
+      "inputId": "sentinel",
+      "score": 3,
+      "dimensions": {
+        "matrix_not_bibliography": 2,
+        "statutory_vs_reference_distinguished": 4,
+        "uk_specific_correctness": 5,
+        "applicability_specificity": 4,
+        "evidence_required_actionable": 2,
+        "coverage": 4,
+        "owner_role_specific": 0
+      },
+      "summary": "The output identifies some relevant UK regimes but is mostly a bibliography-style list with no owners, evidence artefacts, gap actions, or clear statutory-versus-design-standard separation.",
+      "nextFix": "Require every row to include: statutory/reference status, specific Sentinel design trigger, compliance impact, concrete evidence artefact, owner role, current gap, and next action; also force a UK gap scan for MDR, UKCA/RER/EMC/RoHS/WEEE/REACH, battery transport, charger safety, data/privacy, software, usability, and assistive walking-stick standards.",
+      "costPence": 136
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 0,
+      "dimensions": {
+        "matrix_not_bibliography": 0,
+        "statutory_vs_reference_distinguished": 0,
+        "uk_specific_correctness": 0,
+        "applicability_specificity": 0,
+        "evidence_required_actionable": 0,
+        "coverage": 0,
+        "owner_role_specific": 0
+      },
+      "summary": "The regulatory section is empty, so it provides no project-mapped UK compliance matrix, evidence plan, ownership, or coverage of applicable product requirements.",
+      "nextFix": "Require the engine to generate a UK-specific compliance matrix with one row per applicable obligation/reference standard, including applicability to Hedgerow, statutory/reference status, design impact, concrete evidence artefact, owner role, and gap action.",
+      "costPence": 42
+    },
+    {
+      "inputId": "bess",
+      "score": 1.7142857142857142,
+      "dimensions": {
+        "matrix_not_bibliography": 1,
+        "statutory_vs_reference_distinguished": 2,
+        "uk_specific_correctness": 3,
+        "applicability_specificity": 3,
+        "evidence_required_actionable": 0,
+        "coverage": 3,
+        "owner_role_specific": 0
+      },
+      "summary": "The output is mostly a short bibliography of standards, with some relevant items but no UK statutory/reference separation, no evidence artefacts, no owners, and several major UK compliance gaps.",
+      "nextFix": "Require the engine to output a UK BESS compliance matrix with columns for legal/reference status, project-specific applicability, design impact, required evidence artefact, responsible role, gap/action, and include UKCA/LVD/EMC/Supply of Machinery, BS 7671, ESQCR/G99, UN 38.3 transport, BS EN IEC 62933 series, IEC 62477/61439, and UK fire-detection/suppression standards while labelling UL/NFPA as non-statutory insurer/fire-service references.",
+      "costPence": 103
+    },
+    {
+      "inputId": "desal",
+      "score": 1.4285714285714286,
+      "dimensions": {
+        "matrix_not_bibliography": 1,
+        "statutory_vs_reference_distinguished": 1,
+        "uk_specific_correctness": 2,
+        "applicability_specificity": 3,
+        "evidence_required_actionable": 1,
+        "coverage": 2,
+        "owner_role_specific": 0
+      },
+      "summary": "The output is mostly a short bibliography of partially relevant international references, with no UK statutory compliance structure, no owners, no evidence artefacts, and major omissions for electrical safety, UKCA/CE, machinery, potable-water approval, brine discharge and site installation.",
+      "nextFix": "Prompt the engine to produce a UK-specific compliance matrix with columns for statutory/reference status, applicable subsystem, design impact, required evidence artefact, owner role, current gap and next action, and to prioritise UKCA/CE, BS 7671, EMC/LVD/Machinery/PED, Water Supply regulations/WRAS/DWI, environmental permitting for brine discharge, container/transport rules and potable-water testing.",
+      "costPence": 92
+    }
+  ],
+  "aggregateScore": 1.2285714285714286,
+  "deltaSincePrior": 0.057142857142857384,
+  "totalCostPence": 414,
+  "completedAt": "2026-04-26T06:27:14.467Z"
+}

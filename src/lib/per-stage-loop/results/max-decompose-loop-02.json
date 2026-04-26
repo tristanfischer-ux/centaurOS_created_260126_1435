@@ -1,0 +1,444 @@
+{
+  "stage": "max-decompose",
+  "loop": 2,
+  "engineCommit": "2036985e",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "container_shell",
+            "name": "Insulated Container Shell and Bund",
+            "purpose": "Provides the structural ISO 40-foot High-Cube envelope, thermal insulation, hygienic internal lining, and watertight floor bund that houses all internal subsystems and resists road-transport loads.",
+            "massKg": 4800,
+            "keyPartCount": 7
+          },
+          {
+            "id": "grow_rack_port",
+            "name": "Port-Side Multi-Tier Grow Rack",
+            "purpose": "Holds plant sites across multiple hydroponic tiers on the port side of the centre aisle, supporting channels, root zones, and integrated lighting rails.",
+            "massKg": 320,
+            "keyPartCount": 7
+          },
+          {
+            "id": "grow_rack_starboard",
+            "name": "Starboard-Side Multi-Tier Grow Rack",
+            "purpose": "Mirror counterpart of the port rack, holding plant sites on the starboard side of the centre aisle with identical tier and channel geometry.",
+            "massKg": 320,
+            "keyPartCount": 7
+          },
+          {
+            "id": "lighting_array",
+            "name": "LED Lighting Array and Drivers",
+            "purpose": "Delivers full-spectrum photosynthetic light to all tiers under daily light integral control, with centralised drivers in the service end.",
+            "massKg": 480,
+            "keyPartCount": 6
+          },
+          {
+            "id": "climate_unit",
+            "name": "Climate Control and Carbon-Dioxide Dosing Unit",
+            "purpose": "Maintains internal air temperature, humidity, circulation, and carbon-dioxide concentration via a ducted air-handling unit, dehumidifier, in-canopy fans, and bottled carbon-dioxide dosing manifold.",
+            "massKg": 180,
+            "keyPartCount": 7
+          },
+          {
+            "id": "nutrient_system",
+            "name": "Recirculating Nutrient and Water System",
+            "purpose": "Stores, doses, filters, sterilises, and circulates hydroponic nutrient solution between the central reservoir and grow rack channels with pH and electrical conductivity control.",
+            "massKg": 180,
+            "keyPartCount": 10
+          },
+          {
+            "id": "power_distribution",
+            "name": "Electrical Power Distribution",
+            "purpose": "Receives the external three-phase mains supply and distributes protected, metered power to lighting, climate, nutrient, and control loads via the main distribution board.",
+            "massKg": 85,
+            "keyPartCount": 8
+          },
+          {
+            "id": "controls_iot",
+            "name": "Controls, Sensor Mesh, and Internet-of-Things Gateway",
+            "purpose": "Hosts the programmable logic controller, distributed environmental and process sensors, and cloud uplink that orchestrate all subsystems and report to the remote farm-management dashboard.",
+            "massKg": 35,
+            "keyPartCount": 8
+          },
+          {
+            "id": "service_vestibule",
+            "name": "Service Vestibule and Workstation",
+            "purpose": "Provides the door-end work area for transplanting, propagation, hand-washing, and human access to control cabinets, carbon-dioxide bottles, and reservoir service points.",
+            "massKg": 95,
+            "keyPartCount": 7
+          }
+        ],
+        "moduleCount": 9,
+        "totalMassKg": 6495,
+        "modulesWithoutKeyParts": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "handle_assembly",
+            "name": "Hardwood Handle Assembly",
+            "purpose": "Machined ash or walnut handle housing the user interface transducers, grip sensor, and inertial measurement unit, providing the primary hand contact and acoustic chamber.",
+            "massKg": 0.18,
+            "keyPartCount": 0
+          },
+          {
+            "id": "upper_shaft_assembly",
+            "name": "Upper Carbon-Fibre Shaft Assembly",
+            "purpose": "Twenty-two millimetre outer diameter upper carbon-fibre tube containing the tubular electronics cavity, antenna radio-frequency window, and inductive charging receiver coil.",
+            "massKg": 0.09,
+            "keyPartCount": 0
+          },
+          {
+            "id": "lower_shaft_assembly",
+            "name": "Lower Carbon-Fibre Shaft and Adjustment Mechanism",
+            "purpose": "Nineteen millimetre outer diameter lower telescoping shaft with spring-loaded pin-clip length adjustment, transferring axial load between handle and ferrule.",
+            "massKg": null,
+            "keyPartCount": 0
+          },
+          {
+            "id": "ferrule_assembly",
+            "name": "Rubber and Tungsten-Carbide Ferrule Assembly",
+            "purpose": "Replaceable ground-contact tip with tungsten-carbide insert in moulded rubber body, instrumented with a pressure sensor for ground-contact and gait-cycle detection.",
+            "massKg": 0.04,
+            "keyPartCount": 0
+          },
+          {
+            "id": "main_electronics_module",
+            "name": "Main Electronics and Connectivity Module",
+            "purpose": "Long, narrow printed circuit board carrying the Nordic nRF9160 cellular module, embedded subscriber identity module, neural co-processor, global positioning system receiver, antennas, and impact accelerometer for sensing, compute, and cellular communication.",
+            "massKg": 0.025,
+            "keyPartCount": 0
+          },
+          {
+            "id": "power_module",
+            "name": "Battery and Inductive Charging Receiver Module",
+            "purpose": "Custom cylindrical lithium-polymer cell, charge controller, and protection circuitry providing two-week runtime and managing inductive charging.",
+            "massKg": 0.045,
+            "keyPartCount": 0
+          },
+          {
+            "id": "charging_stand",
+            "name": "Inductive Charging Stand",
+            "purpose": "Floor-standing front-door dock containing the inductive transmit coil and mains power supply, cradling the stick to maintain the three-to-six millimetre coupling air-gap.",
+            "massKg": 2.2,
+            "keyPartCount": 0
+          }
+        ],
+        "moduleCount": 7,
+        "totalMassKg": 2.58,
+        "modulesWithoutKeyParts": 7
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "outer_body_structure",
+            "name": "Outer Body and Structural Chassis",
+            "purpose": "Ceramic or powder-coated steel weatherproof enclosure that houses all internal modules, mounts the solar panel and reservoirs, and provides the radome aperture for radios.",
+            "massKg": 2.4,
+            "keyPartCount": 6
+          },
+          {
+            "id": "solar_power_subsystem",
+            "name": "Solar Panel, Battery and Power Management Subsystem",
+            "purpose": "Captures solar energy, stores it in a lithium iron phosphate battery, and regulates power rails for all electronic modules; supports an optional mains-powered variant.",
+            "massKg": 0.45,
+            "keyPartCount": 8
+          },
+          {
+            "id": "compute_module",
+            "name": "Compute and Inference Module",
+            "purpose": "Main printed circuit board assembly carrying the neural processing unit system-on-chip, memory and storage, running on-device species and individual identification and video clipping.",
+            "massKg": 0.08,
+            "keyPartCount": 8
+          },
+          {
+            "id": "camera_sensor_module",
+            "name": "Camera and Environmental Sensor Module",
+            "purpose": "Provides the 12-megapixel optical-zoom camera, microphone, and temperature, light and weather sensors with their weatherproof apertures and acoustic ports.",
+            "massKg": 0.18,
+            "keyPartCount": 8
+          },
+          {
+            "id": "perch_weight_sensor",
+            "name": "Perch and Weight Sensing Assembly",
+            "purpose": "Mechanically isolated perch with integrated load cell that measures individual bird mass for identification.",
+            "massKg": 0.18,
+            "keyPartCount": 5
+          },
+          {
+            "id": "seed_reservoir_assembly",
+            "name": "Modular Seed Reservoir Assembly",
+            "purpose": "Interchangeable nyjer, sunflower and suet ball reservoirs that attach to the body via a common mechanical interface and gravity-feed seed to the feeding zone.",
+            "massKg": 0.45,
+            "keyPartCount": 5
+          },
+          {
+            "id": "connectivity_module",
+            "name": "Wireless Connectivity Module",
+            "purpose": "Pre-certified Wi-Fi and Bluetooth Low Energy radio with optional cellular and LoRa mesh radios, providing antenna isolation and uplink to home network, cellular network and neighbouring feeders.",
+            "massKg": 0.04,
+            "keyPartCount": 5
+          }
+        ],
+        "moduleCount": 7,
+        "totalMassKg": 3.7800000000000007,
+        "modulesWithoutKeyParts": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "bess",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "container_enclosure",
+            "name": "Container Enclosure and Structural Frame",
+            "purpose": "Provides the ISO 1496-1 compliant 40-foot High Cube weatherproof, fire-rated, transportable shell that houses and structurally supports all internal sub-assemblies and anchors to the concrete pad via ISO 1161 corner castings.",
+            "massKg": 4200,
+            "keyPartCount": 8
+          },
+          {
+            "id": "battery_rack_assembly",
+            "name": "Lithium Iron Phosphate Battery Rack Assembly",
+            "purpose": "Stores 3.5 megawatt-hours of electrical energy in lithium iron phosphate cell modules arranged in floor-mounted racks along both long walls of the container.",
+            "massKg": 22000,
+            "keyPartCount": 6
+          },
+          {
+            "id": "power_conversion_system",
+            "name": "Bi-directional Grid-Forming Power Conversion System",
+            "purpose": "Converts between direct current battery power and 1.5 megawatt three-phase alternating current with grid-forming capability, compliant with United Kingdom G99 grid code, and routes alternating current to the external gland plate.",
+            "massKg": 2800,
+            "keyPartCount": 8
+          },
+          {
+            "id": "liquid_cooling_skid",
+            "name": "Liquid Cooling Skid",
+            "purpose": "Maintains battery and power electronics within operating temperature range using a glycol-water liquid loop with an externally serviceable chiller mounted on the roof or end wall.",
+            "massKg": 850,
+            "keyPartCount": 8
+          },
+          {
+            "id": "battery_management_system",
+            "name": "Battery Management System",
+            "purpose": "Distributed cell, rack, and system-level monitoring and protection electronics that manage state of charge, balancing, isolation, and thermal limits per IEC 62619 and IEC 63056.",
+            "massKg": 45,
+            "keyPartCount": 7
+          },
+          {
+            "id": "fire_safety_system",
+            "name": "Fire Detection and Suppression System",
+            "purpose": "Provides off-gas, smoke, and heat detection together with gas-based suppression and deflagration venting aligned to National Fire Chiefs Council guidance and NFPA 855.",
+            "massKg": 450,
+            "keyPartCount": 8
+          },
+          {
+            "id": "auxiliary_power_distribution",
+            "name": "Auxiliary Power and Low-Voltage Distribution",
+            "purpose": "Provides uninterruptible low-voltage power, distribution, and protection to all internal sub-assemblies including controls, battery management, cooling, and fire safety.",
+            "massKg": 180,
+            "keyPartCount": 7
+          },
+          {
+            "id": "controls_supervisory_cabinet",
+            "name": "Controls and Supervisory Cabinet",
+            "purpose": "Houses the system-level controller, supervisory control and data acquisition gateway, and communications interfaces that orchestrate dispatch, protection coordination, and remote monitoring.",
+            "massKg": 85,
+            "keyPartCount": 8
+          }
+        ],
+        "moduleCount": 8,
+        "totalMassKg": 30610,
+        "modulesWithoutKeyParts": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "container_skid_structure",
+            "name": "Container and Skid Structure",
+            "purpose": "Provides the 40-foot ISO shipping container enclosure, internal base skid, service aisle, and wall penetrations that house and mechanically support all process modules during transport and operation.",
+            "massKg": 4200,
+            "keyPartCount": 0
+          },
+          {
+            "id": "pretreatment_module",
+            "name": "Seawater Pre-treatment Module",
+            "purpose": "Conditions raw seawater feed via multimedia filtration, 5 micrometre cartridge filtration, antiscalant dosing and dechlorination to protect downstream reverse osmosis membranes.",
+            "massKg": 850,
+            "keyPartCount": 0
+          },
+          {
+            "id": "high_pressure_pump_erd",
+            "name": "High Pressure Pump and Energy Recovery Device Assembly",
+            "purpose": "Boosts filtered feedwater to seawater reverse osmosis operating pressure while recovering hydraulic energy from the brine stream via an isobaric pressure exchanger to meet the specific energy consumption target.",
+            "massKg": 850,
+            "keyPartCount": 0
+          },
+          {
+            "id": "ro_first_pass",
+            "name": "First Pass Seawater Reverse Osmosis Train",
+            "purpose": "Separates fresh permeate from pressurised seawater feed across an array of eight inch fibreglass pressure vessels containing seawater reverse osmosis membrane elements at fifty per cent recovery.",
+            "massKg": 1100,
+            "keyPartCount": 0
+          },
+          {
+            "id": "ro_second_pass",
+            "name": "Second Pass Brackish Water Reverse Osmosis Train",
+            "purpose": "Polishes first pass permeate through a brackish water reverse osmosis stage at ten to twenty bar to deliver permeate meeting World Health Organization drinking water guidelines.",
+            "massKg": 380,
+            "keyPartCount": 0
+          },
+          {
+            "id": "post_treatment_module",
+            "name": "Post-treatment Module",
+            "purpose": "Remineralises permeate through a calcite contactor with carbon dioxide dosing and disinfects with sodium hypochlorite to produce stable potable water meeting NSF/ANSI 61 wetted component requirements.",
+            "massKg": 320,
+            "keyPartCount": 0
+          },
+          {
+            "id": "cip_system",
+            "name": "Clean-in-Place System",
+            "purpose": "Provides a polyethylene tank, circulation pump and chemical injection points to periodically flush and clean the reverse osmosis membranes without disassembly.",
+            "massKg": 180,
+            "keyPartCount": 0
+          },
+          {
+            "id": "power_distribution",
+            "name": "Motor Control Centre and Power Distribution Cabinet",
+            "purpose": "Receives external three phase mains or diesel genset supply and distributes filtered, protected three phase and low voltage power to the high pressure pump motor and all auxiliary electrical loads.",
+            "massKg": null,
+            "keyPartCount": 0
+          },
+          {
+            "id": "control_system",
+            "name": "Programmable Logic Controller and Instrumentation Cabinet",
+            "purpose": "Executes process automation, monitors pressures, flows, conductivity and tank levels, and provides operator interface for startup, shutdown, alarms and remote telemetry.",
+            "massKg": 85,
+            "keyPartCount": 0
+          }
+        ],
+        "moduleCount": 9,
+        "totalMassKg": 7965,
+        "modulesWithoutKeyParts": 9
+      },
+      "diagnostics": []
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 8,
+      "dimensions": {
+        "module_count_plausibility": 9,
+        "module_distinctness": 8,
+        "domain_coverage": 7,
+        "mass_rollup_plausibility": 6,
+        "key_parts_coverage": 10,
+        "naming_clarity": 8
+      },
+      "summary": "Well-structured 9-module decomposition with clear functional separation and good parts coverage, but total mass (~6495 kg) sits at the low end of plausibility for a fully fitted 40 ft HC container, fire safety and water treatment/drainage are absent, and the port/starboard rack split is a near-duplicate pair that could be consolidated with a note on mirroring.",
+      "nextFix": "Add a dedicated Fire Detection and Suppression module (smoke/heat detectors, gaseous or water-mist suppression, emergency ventilation interlock) — its absence is the most significant domain gap for a UK-market enclosed growing environment and will block compliance review downstream.",
+      "costPence": 78
+    },
+    {
+      "inputId": "sentinel",
+      "score": 5.333333333333333,
+      "dimensions": {
+        "module_count_plausibility": 8,
+        "module_distinctness": 7,
+        "domain_coverage": 6,
+        "mass_rollup_plausibility": 3,
+        "key_parts_coverage": 0,
+        "naming_clarity": 8
+      },
+      "summary": "Structurally coherent 7-module decomposition with clear naming and good mechanical/electronic separation, but fatally undermined by zero key parts across all modules, a mass rollup dominated by the charging stand (2.20 kg) that pushes the stick+stand total to ~2.60 kg versus a plausible ~0.45 kg stick-only target, and missing sub-systems for audio/haptic transducers and firmware/OTA.",
+      "nextFix": "Populate every module with ≥3 key parts (part name, material/spec, and estimated mass) — this single change unlocks BOM, sizing, and supplier-matching stages and is the highest-leverage gap in the current output.",
+      "costPence": 85
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 8.5,
+      "dimensions": {
+        "module_count_plausibility": 9,
+        "module_distinctness": 9,
+        "domain_coverage": 8,
+        "mass_rollup_plausibility": 8,
+        "key_parts_coverage": 9,
+        "naming_clarity": 8
+      },
+      "summary": "A well-structured 7-module decomposition with clear functional separation, plausible mass rollup (3.78 kg total, within the 3–5 kg premium IoT garden device range), and good domain coverage; minor gaps in user-interface/indicator and mounting/installation subsystems.",
+      "nextFix": "Add an explicit mounting and installation module (ground spike, wall bracket, pole clamp, anti-tamper fixings) — currently implied by the chassis module but absent as a distinct BOM-able assembly, which will cause downstream supplier-matching and packaging gaps.",
+      "costPence": 69
+    },
+    {
+      "inputId": "bess",
+      "score": 8.833333333333334,
+      "dimensions": {
+        "module_count_plausibility": 9,
+        "module_distinctness": 9,
+        "domain_coverage": 9,
+        "mass_rollup_plausibility": 7,
+        "key_parts_coverage": 10,
+        "naming_clarity": 9
+      },
+      "summary": "Well-structured 8-module decomposition covering all major BESS sub-systems with clear naming and full key-parts population; total mass of ~30,610 kg sits at the low end of the 30–40 t plausible range for a fully loaded 40 ft HC BESS and warrants a cross-check against cell energy density assumptions.",
+      "nextFix": "Verify and justify the battery rack assembly mass (22,000 kg) against the LFP cell-level energy density (typically ~160–180 Wh/kg at pack level implies ~19,400–21,900 kg for 3.5 MWh) and add a brief mass-budget note per module so downstream sizing engineers can audit the rollup against the 40 t gross vehicle weight limit.",
+      "costPence": 77
+    },
+    {
+      "inputId": "desal",
+      "score": 6.333333333333333,
+      "dimensions": {
+        "module_count_plausibility": 8,
+        "module_distinctness": 9,
+        "domain_coverage": 7,
+        "mass_rollup_plausibility": 6,
+        "key_parts_coverage": 0,
+        "naming_clarity": 8
+      },
+      "summary": "Functionally well-structured 9-module decomposition with clear separation of process stages, but critically undermined by zero key parts across all modules, a missing mass entry for the MCC cabinet, a total rollup of ~7965 kg that sits at the low edge of plausibility for a fully-fitted 40 ft container desal unit, and absent sub-systems for product water storage/transfer and chemical dosing storage.",
+      "nextFix": "Populate every module with at least 3–5 key parts (e.g. pressure vessels, membrane elements, pump model, PLC hardware, switchgear) — the complete absence of key parts makes the decomposition unusable for BOM, supplier matching, and cost estimation downstream.",
+      "costPence": 80
+    }
+  ],
+  "aggregateScore": 7.4,
+  "deltaSincePrior": 0.16666666666666785,
+  "totalCostPence": 389,
+  "completedAt": "2026-04-26T09:52:21.362Z"
+}

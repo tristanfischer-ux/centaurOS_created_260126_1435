@@ -1,0 +1,669 @@
+{
+  "stage": "illustration",
+  "loop": 1,
+  "engineCommit": "2036985e",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 1251,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "container_shell",
+            "name": "Insulated Container Shell and Bund",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-container_shell.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "grow_rack_port",
+            "name": "Port-Side Multi-Tier Grow Rack",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-grow_rack_port.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "grow_rack_starboard",
+            "name": "Starboard-Side Multi-Tier Grow Rack",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "lighting_array",
+            "name": "LED Lighting Array and Drivers",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-lighting_array.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "climate_unit",
+            "name": "Climate Control and Carbon-Dioxide Dosing Unit",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-climate_unit.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "nutrient_system",
+            "name": "Recirculating Nutrient and Water System",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "power_distribution",
+            "name": "Electrical Power Distribution",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "controls_iot",
+            "name": "Controls, Sensor Mesh, and Internet-of-Things Gateway",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "service_vestibule",
+            "name": "Service Vestibule and Workstation",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          }
+        ],
+        "moduleCount": 9,
+        "completeCount": 4,
+        "failedCount": 0,
+        "pendingCount": 5,
+        "coveragePct": 44.44444444444444,
+        "modelsUsed": [
+          {
+            "model": "(unknown)",
+            "count": 5
+          },
+          {
+            "model": "gpt-image-2",
+            "count": 4
+          }
+        ],
+        "dominantModelShare": 0.5555555555555556,
+        "headChecks": [
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-container_shell.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-grow_rack_port.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-lighting_array.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/517ae649-b3d3-42ad-94d7-99ac408e428b/module-climate_unit.png",
+            "ok": true,
+            "status": 200
+          }
+        ],
+        "promptSamples": []
+      },
+      "diagnostics": [
+        "no moduleImagePrompt strings to sample"
+      ]
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 1891,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "handle_assembly",
+            "name": "Hardwood Handle Assembly",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-handle_assembly.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "upper_shaft_assembly",
+            "name": "Upper Carbon-Fibre Shaft Assembly",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-upper_shaft_assembly.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "lower_shaft_assembly",
+            "name": "Lower Carbon-Fibre Shaft and Adjustment Mechanism",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-lower_shaft_assembly.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "ferrule_assembly",
+            "name": "Rubber and Tungsten-Carbide Ferrule Assembly",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-ferrule_assembly.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "main_electronics_module",
+            "name": "Main Electronics and Connectivity Module",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "power_module",
+            "name": "Battery and Inductive Charging Receiver Module",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "charging_stand",
+            "name": "Inductive Charging Stand",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          }
+        ],
+        "moduleCount": 7,
+        "completeCount": 4,
+        "failedCount": 0,
+        "pendingCount": 3,
+        "coveragePct": 57.14285714285714,
+        "modelsUsed": [
+          {
+            "model": "gpt-image-2",
+            "count": 4
+          },
+          {
+            "model": "(unknown)",
+            "count": 3
+          }
+        ],
+        "dominantModelShare": 0.5714285714285714,
+        "headChecks": [
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-handle_assembly.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-upper_shaft_assembly.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-lower_shaft_assembly.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3830be2c-84e8-4446-bb84-a06527a4dfe9/module-ferrule_assembly.png",
+            "ok": true,
+            "status": 200
+          }
+        ],
+        "promptSamples": []
+      },
+      "diagnostics": [
+        "no moduleImagePrompt strings to sample"
+      ]
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 4075,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "outer_body_structure",
+            "name": "Outer Body and Structural Chassis",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-outer_body_structure.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "solar_power_subsystem",
+            "name": "Solar Panel, Battery and Power Management Subsystem",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-solar_power_subsystem.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "compute_module",
+            "name": "Compute and Inference Module",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-compute_module.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "camera_sensor_module",
+            "name": "Camera and Environmental Sensor Module",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-camera_sensor_module.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "perch_weight_sensor",
+            "name": "Perch and Weight Sensing Assembly",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "seed_reservoir_assembly",
+            "name": "Modular Seed Reservoir Assembly",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "connectivity_module",
+            "name": "Wireless Connectivity Module",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          }
+        ],
+        "moduleCount": 7,
+        "completeCount": 4,
+        "failedCount": 0,
+        "pendingCount": 3,
+        "coveragePct": 57.14285714285714,
+        "modelsUsed": [
+          {
+            "model": "gpt-image-2",
+            "count": 4
+          },
+          {
+            "model": "(unknown)",
+            "count": 3
+          }
+        ],
+        "dominantModelShare": 0.5714285714285714,
+        "headChecks": [
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-outer_body_structure.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-solar_power_subsystem.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-compute_module.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/3acf3007-b720-400b-8dc4-818394df102d/module-camera_sensor_module.png",
+            "ok": true,
+            "status": 200
+          }
+        ],
+        "promptSamples": []
+      },
+      "diagnostics": [
+        "no moduleImagePrompt strings to sample"
+      ]
+    },
+    {
+      "inputId": "bess",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 2157,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "container_enclosure",
+            "name": "Container Enclosure and Structural Frame",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-container_enclosure.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "battery_rack_assembly",
+            "name": "Lithium Iron Phosphate Battery Rack Assembly",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-battery_rack_assembly.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "power_conversion_system",
+            "name": "Bi-directional Grid-Forming Power Conversion System",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-power_conversion_system.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "liquid_cooling_skid",
+            "name": "Liquid Cooling Skid",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-liquid_cooling_skid.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "battery_management_system",
+            "name": "Battery Management System",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "fire_safety_system",
+            "name": "Fire Detection and Suppression System",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "auxiliary_power_distribution",
+            "name": "Auxiliary Power and Low-Voltage Distribution",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "controls_supervisory_cabinet",
+            "name": "Controls and Supervisory Cabinet",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          }
+        ],
+        "moduleCount": 8,
+        "completeCount": 4,
+        "failedCount": 0,
+        "pendingCount": 4,
+        "coveragePct": 50,
+        "modelsUsed": [
+          {
+            "model": "gpt-image-2",
+            "count": 4
+          },
+          {
+            "model": "(unknown)",
+            "count": 4
+          }
+        ],
+        "dominantModelShare": 0.5,
+        "headChecks": [
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-container_enclosure.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-battery_rack_assembly.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-power_conversion_system.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/0ab0457a-ab32-4d2a-b1e3-32d8b877222c/module-liquid_cooling_skid.png",
+            "ok": true,
+            "status": 200
+          }
+        ],
+        "promptSamples": []
+      },
+      "diagnostics": [
+        "no moduleImagePrompt strings to sample"
+      ]
+    },
+    {
+      "inputId": "desal",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 1166,
+      "costPence": 0,
+      "output": {
+        "modules": [
+          {
+            "id": "container_skid_structure",
+            "name": "Container and Skid Structure",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-container_skid_structure.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "pretreatment_module",
+            "name": "Seawater Pre-treatment Module",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-pretreatment_module.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "high_pressure_pump_erd",
+            "name": "High Pressure Pump and Energy Recovery Device Assembly",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-high_pressure_pump_erd.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "ro_first_pass",
+            "name": "First Pass Seawater Reverse Osmosis Train",
+            "imageUrl": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-ro_first_pass.png",
+            "imageStatus": "complete",
+            "imageModelUsed": "gpt-image-2",
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "ro_second_pass",
+            "name": "Second Pass Brackish Water Reverse Osmosis Train",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "post_treatment_module",
+            "name": "Post-treatment Module",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "cip_system",
+            "name": "Clean-in-Place System",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "power_distribution",
+            "name": "Motor Control Centre and Power Distribution Cabinet",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          },
+          {
+            "id": "control_system",
+            "name": "Programmable Logic Controller and Instrumentation Cabinet",
+            "imageUrl": null,
+            "imageStatus": null,
+            "imageModelUsed": null,
+            "moduleImagePrompt": null
+          }
+        ],
+        "moduleCount": 9,
+        "completeCount": 4,
+        "failedCount": 0,
+        "pendingCount": 5,
+        "coveragePct": 44.44444444444444,
+        "modelsUsed": [
+          {
+            "model": "(unknown)",
+            "count": 5
+          },
+          {
+            "model": "gpt-image-2",
+            "count": 4
+          }
+        ],
+        "dominantModelShare": 0.5555555555555556,
+        "headChecks": [
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-container_skid_structure.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-pretreatment_module.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-high_pressure_pump_erd.png",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "url": "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/xray-images/330e1bec-58f8-422c-b225-ea42b18580d1/module-ro_first_pass.png",
+            "ok": true,
+            "status": 200
+          }
+        ],
+        "promptSamples": []
+      },
+      "diagnostics": [
+        "no moduleImagePrompt strings to sample"
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 6,
+      "dimensions": {
+        "image_coverage": 4.444444444444445,
+        "style_consistency": 5.555555555555555,
+        "image_url_resolves": 10,
+        "failure_recovery": 10,
+        "prompt_quality_specific": 0
+      },
+      "summary": "no moduleImagePrompt strings sampled; prompt_quality_specific defaulted to 0",
+      "nextFix": null,
+      "costPence": 0
+    },
+    {
+      "inputId": "sentinel",
+      "score": 6.285714285714286,
+      "dimensions": {
+        "image_coverage": 5.7142857142857135,
+        "style_consistency": 5.7142857142857135,
+        "image_url_resolves": 10,
+        "failure_recovery": 10,
+        "prompt_quality_specific": 0
+      },
+      "summary": "no moduleImagePrompt strings sampled; prompt_quality_specific defaulted to 0",
+      "nextFix": null,
+      "costPence": 0
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 6.285714285714286,
+      "dimensions": {
+        "image_coverage": 5.7142857142857135,
+        "style_consistency": 5.7142857142857135,
+        "image_url_resolves": 10,
+        "failure_recovery": 10,
+        "prompt_quality_specific": 0
+      },
+      "summary": "no moduleImagePrompt strings sampled; prompt_quality_specific defaulted to 0",
+      "nextFix": null,
+      "costPence": 0
+    },
+    {
+      "inputId": "bess",
+      "score": 6,
+      "dimensions": {
+        "image_coverage": 5,
+        "style_consistency": 5,
+        "image_url_resolves": 10,
+        "failure_recovery": 10,
+        "prompt_quality_specific": 0
+      },
+      "summary": "no moduleImagePrompt strings sampled; prompt_quality_specific defaulted to 0",
+      "nextFix": null,
+      "costPence": 0
+    },
+    {
+      "inputId": "desal",
+      "score": 6,
+      "dimensions": {
+        "image_coverage": 4.444444444444445,
+        "style_consistency": 5.555555555555555,
+        "image_url_resolves": 10,
+        "failure_recovery": 10,
+        "prompt_quality_specific": 0
+      },
+      "summary": "no moduleImagePrompt strings sampled; prompt_quality_specific defaulted to 0",
+      "nextFix": null,
+      "costPence": 0
+    }
+  ],
+  "aggregateScore": 6.114285714285714,
+  "deltaSincePrior": null,
+  "totalCostPence": 0,
+  "completedAt": "2026-04-26T09:50:01.623Z"
+}

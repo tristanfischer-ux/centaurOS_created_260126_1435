@@ -17,7 +17,7 @@
 'use client'
 
 import { useState, useCallback, useTransition, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   searchInvestors,
@@ -679,8 +679,6 @@ function MatchCard({
   const thesis  = attrs.investment_thesis ?? firm.description ?? null
   const sectors = attrs.sectors ?? []
 
-  const router = useRouter()
-
   // Why-fit / how-to-pitch — expand state
   const [expanded, setExpanded] = useState(false)
   const [isEnriching, startEnrichTransition] = useTransition()
@@ -703,45 +701,33 @@ function MatchCard({
     }
   }
 
-  const handleCardClick = () => {
-    if (!isLocked) {
-      router.push(`/investors/${firm.id}`)
-    }
-  }
-
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onSave?.()
   }
 
-  return (
-    // STRUCTURE: Forge Capital search-result-card
-    // 1px border · white bg · 12px radius · 14px padding (p-3.5)
-    <div
-      className={`bg-card border border-border rounded-xl p-3.5 mb-2.5 transition-all ${
-        isLocked
-          ? 'opacity-80'
-          : 'cursor-pointer hover:border-border hover:shadow-sm hover:-translate-y-px'
-      }`}
-      onClick={handleCardClick}
-      role={isLocked ? undefined : 'link'}
-      tabIndex={isLocked ? undefined : 0}
-      onKeyDown={isLocked ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick() }}
-    >
+  // When locked, render as a div. When unlocked, render as a Link.
+  if (isLocked) {
+    return (
+      // STRUCTURE: Forge Capital search-result-card (locked variant)
+      // 1px border · white bg · 12px radius · 14px padding (p-3.5)
+      <div
+        className={`bg-card border border-border rounded-xl p-3.5 mb-2.5 transition-all opacity-80`}
+      >
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <div className="min-w-0 flex-1">
           {/* Result name */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={`font-bold text-sm text-foreground leading-snug ${isLocked ? 'blur-[5px] select-none' : ''}`}>
-              {rank}. {isLocked ? '████████ Capital' : firm.title}
+            <span className={`font-bold text-sm text-foreground leading-snug blur-[5px] select-none`}>
+              {rank}. {'████████ Capital'}
             </span>
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-bold tracking-wider uppercase flex-shrink-0">
               {firmType}
             </span>
           </div>
           {/* Meta line: geo · cheque · stage */}
-          <div className={`text-xs text-muted-foreground mt-0.5 ${isLocked ? 'blur-[5px]' : ''}`}>
+          <div className={`text-xs text-muted-foreground mt-0.5 blur-[5px]`}>
             {[city, chequeStr, stageStr].filter(Boolean).join(' · ') || ' '}
           </div>
         </div>
@@ -777,8 +763,76 @@ function MatchCard({
             return null
           })()}
 
+        </div>
+      </div>
+
+      {/* Thesis paragraph — blurred for locked cards */}
+      {thesis && (
+        <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed blur-[5px] select-none">
+          {'██████ seed-stage ██████ & hardware. £███k–£███m cheques. Portfolio includes ██████████ — active deployer.'}
+        </p>
+      )}
+    </div>
+    )
+  }
+
+  // Unlocked card — render as a Link
+  return (
+    <Link
+      href={`/investors/${firm.id}`}
+      className={`block bg-card border border-border rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:border-border hover:shadow-sm hover:-translate-y-px`}
+    >
+      {/* ── Header row: rank + name + type chip | composite % ── */}
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        <div className="min-w-0 flex-1">
+          {/* Result name */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`font-bold text-sm text-foreground leading-snug`}>
+              {rank}. {firm.title}
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-bold tracking-wider uppercase flex-shrink-0">
+              {firmType}
+            </span>
+          </div>
+          {/* Meta line: geo · cheque · stage */}
+          <div className={`text-xs text-muted-foreground mt-0.5`}>
+            {[city, chequeStr, stageStr].filter(Boolean).join(' · ') || ' '}
+          </div>
+        </div>
+
+        {/* Composite score — top right */}
+        <div className="text-right flex-shrink-0">
+          {matchScore !== undefined ? (
+            <>
+              <div className="text-xl font-black text-foreground leading-none tabular-nums">
+                {Math.round(matchScore)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground leading-none mt-0.5">match</div>
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground">—</div>
+          )}
+
+          {/* Hardware fit score badge */}
+          {(() => {
+            const hwScore = (firm.attributes as { hardware_fit_score?: number }).hardware_fit_score ??
+                            (firm as unknown as { hardware_fit_score?: number }).hardware_fit_score
+            if (typeof hwScore === 'number' && hwScore >= 0 && hwScore <= 10) {
+              let badgeColor = 'bg-muted text-muted-foreground'
+              if (hwScore >= 7.0) badgeColor = 'bg-green-100 text-green-700'
+              else if (hwScore >= 4.0) badgeColor = 'bg-amber-100 text-amber-700'
+
+              return (
+                <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full inline-flex items-center ${badgeColor}`}>
+                  Hardware fit {hwScore.toFixed(1)}/10
+                </div>
+              )
+            }
+            return null
+          })()}
+
           {/* Save button — below score, paid only */}
-          {onSave && !isLocked && (
+          {onSave && (
             <button
               onClick={handleSaveClick}
               className={`mt-1.5 text-[10px] px-2 py-0.5 rounded border transition-all ${
@@ -794,8 +848,7 @@ function MatchCard({
       </div>
 
       {/* ── Metadata chip row: firm type · stage focus · cheque range · active deploying ── */}
-      {/* PAYWALL: only shown on unlocked cards — mirrors scorecard lock guard. */}
-      {!isLocked && (() => {
+      {(() => {
         // Probe cheque_range_gbp shape at runtime (could be null, object {min,max}, or array)
         const chequeRange = attrs.cheque_range_gbp
         let chequeChip: string | null = null
@@ -862,9 +915,6 @@ function MatchCard({
       })()}
 
       {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
-      {/* Score-na state: shown when pillars are missing (scores still loading or no match yet) */}
-      {/* PAYWALL: locked free-tier preview cards must not leak per-pillar scores. */}
-      {!isLocked && (
       <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
         {SCORECARD_PILLARS.map(({ key, label }) => {
           const raw   = pillars?.[key]
@@ -916,17 +966,11 @@ function MatchCard({
           )
         })}
       </div>
-      )}
 
       {/* ── Thesis paragraph — 260 chars max ── */}
-      {thesis && !isLocked && (
+      {thesis && (
         <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
           {thesis.length > 260 ? thesis.slice(0, 260) + '…' : thesis}
-        </p>
-      )}
-      {thesis && isLocked && (
-        <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed blur-[5px] select-none">
-          {'██████ seed-stage ██████ & hardware. £███k–£███m cheques. Portfolio includes ██████████ — active deployer.'}
         </p>
       )}
 
@@ -945,7 +989,7 @@ function MatchCard({
       )}
 
       {/* ── Why-fit / how-to-pitch expand panel (paid only) ── */}
-      {isPaid && !isLocked && (
+      {isPaid && (
         <div className="mt-1">
           <button
             onClick={handleExpand}
@@ -986,6 +1030,263 @@ function MatchCard({
         </div>
       )}
     </div>
+    )
+  }
+
+  // Unlocked card — render as a Link
+  return (
+    <Link
+      href={`/investors/${firm.id}`}
+      className={`block bg-card border border-border rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:border-border hover:shadow-sm hover:-translate-y-px`}
+    >
+      {/* ── Header row: rank + name + type chip | composite % ── */}
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        <div className="min-w-0 flex-1">
+          {/* Result name */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`font-bold text-sm text-foreground leading-snug`}>
+              {rank}. {firm.title}
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-bold tracking-wider uppercase flex-shrink-0">
+              {firmType}
+            </span>
+          </div>
+          {/* Meta line: geo · cheque · stage */}
+          <div className={`text-xs text-muted-foreground mt-0.5`}>
+            {[city, chequeStr, stageStr].filter(Boolean).join(' · ') || ' '}
+          </div>
+        </div>
+
+        {/* Composite score — top right */}
+        <div className="text-right flex-shrink-0">
+          {matchScore !== undefined ? (
+            <>
+              <div className="text-xl font-black text-foreground leading-none tabular-nums">
+                {Math.round(matchScore)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground leading-none mt-0.5">match</div>
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground">—</div>
+          )}
+
+          {/* Hardware fit score badge */}
+          {(() => {
+            const hwScore = (firm.attributes as { hardware_fit_score?: number }).hardware_fit_score ??
+                            (firm as unknown as { hardware_fit_score?: number }).hardware_fit_score
+            if (typeof hwScore === 'number' && hwScore >= 0 && hwScore <= 10) {
+              let badgeColor = 'bg-muted text-muted-foreground'
+              if (hwScore >= 7.0) badgeColor = 'bg-green-100 text-green-700'
+              else if (hwScore >= 4.0) badgeColor = 'bg-amber-100 text-amber-700'
+
+              return (
+                <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full inline-flex items-center ${badgeColor}`}>
+                  Hardware fit {hwScore.toFixed(1)}/10
+                </div>
+              )
+            }
+            return null
+          })()}
+
+          {/* Save button — below score, paid only */}
+          {onSave && (
+            <button
+              onClick={handleSaveClick}
+              className={`mt-1.5 text-[10px] px-2 py-0.5 rounded border transition-all ${
+                isSaved
+                  ? 'border-international-orange text-international-orange bg-international-orange/10'
+                  : 'border-border text-muted-foreground hover:border-international-orange hover:text-international-orange'
+              }`}
+            >
+              {isSaved ? '★ Saved' : '☆ Save'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Metadata chip row: firm type · stage focus · cheque range · active deploying ── */}
+      {(() => {
+        // Probe cheque_range_gbp shape at runtime (could be null, object {min,max}, or array)
+        const chequeRange = attrs.cheque_range_gbp
+        let chequeChip: string | null = null
+        if (chequeRange && typeof chequeRange === 'object' && !Array.isArray(chequeRange)) {
+          const { min, max } = chequeRange as { min?: number; max?: number }
+          if (min || max) {
+            chequeChip = [
+              min ? `£${fmtCheque(min)}` : null,
+              max ? `£${fmtCheque(max)}` : null,
+            ].filter(Boolean).join(' – ')
+          }
+        } else if (Array.isArray(chequeRange) && chequeRange.length >= 2) {
+          const arr = chequeRange as unknown as [number, number]
+          chequeChip = `£${fmtCheque(arr[0])} – £${fmtCheque(arr[1])}`
+        }
+
+        const stageFocusChips = (attrs.stage_focus ?? []).slice(0, 3)
+        const isActiveDeploying: boolean | null =
+          typeof attrs.is_active_deploying === 'boolean' ? attrs.is_active_deploying : null
+        const firmTypeChip = attrs.firm_type ? normaliseFirmType(attrs.firm_type) : null
+
+        const hasAnyChip = firmTypeChip || stageFocusChips.length > 0 || chequeChip || isActiveDeploying !== null
+        if (!hasAnyChip) return null
+
+        return (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {/* Firm type */}
+            {firmTypeChip && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground font-semibold uppercase tracking-wide">
+                {firmTypeChip}
+              </span>
+            )}
+
+            {/* Stage focus — up to 3 chips */}
+            {stageFocusChips.map((stage) => (
+              <span
+                key={stage}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground uppercase tracking-wide"
+              >
+                {stage}
+              </span>
+            ))}
+
+            {/* Cheque range */}
+            {chequeChip && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground uppercase tracking-wide">
+                {chequeChip}
+              </span>
+            )}
+
+            {/* Active deploying */}
+            {isActiveDeploying === true && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">
+                ✓ Active
+              </span>
+            )}
+            {isActiveDeploying === false && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground italic">
+                Not actively deploying
+              </span>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
+      <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+        {SCORECARD_PILLARS.map(({ key, label }) => {
+          const raw   = pillars?.[key]
+          const hasScore = raw !== undefined
+          const value = hasScore ? raw : 0
+          const isNA  = !hasScore
+
+          // Colour tiers from Forge Capital CSS (lines 937-950 of 07b)
+          let fillColor = '#d1d5db' // score-na grey
+          if (!isNA) {
+            if (value >= 70) fillColor = '#16a34a'      // green  (score-high)
+            else if (value >= 40) fillColor = '#f59e0b' // amber  (score-mid)
+            else fillColor = '#dc2626'                   // red    (score-low)
+          }
+
+          return (
+            <div key={key} className="text-center">
+              {/* 9px uppercase label */}
+              <div
+                className="font-medium uppercase mb-1 truncate"
+                style={{ fontSize: '9px', color: 'hsl(var(--muted-foreground))', letterSpacing: '0.3px' }}
+              >
+                {label}
+              </div>
+              {/* 5px-tall bar */}
+              <div
+                className="w-full overflow-hidden"
+                style={{ height: '5px', borderRadius: '3px', background: '#e5e7eb' }}
+              >
+                {!isNA && (
+                  <div
+                    style={{
+                      height: '100%',
+                      borderRadius: '3px',
+                      width: `${Math.min(100, Math.max(0, value))}%`,
+                      background: fillColor,
+                    }}
+                  />
+                )}
+              </div>
+              {/* Small bold value below */}
+              <div
+                className="font-semibold mt-0.5 tabular-nums"
+                style={{ fontSize: '10px', color: isNA ? '#9ca3af' : 'hsl(var(--foreground))' }}
+              >
+                {isNA ? 'N/A' : value}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Thesis paragraph — 260 chars max ── */}
+      {thesis && (
+        <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
+          {thesis.length > 260 ? thesis.slice(0, 260) + '…' : thesis}
+        </p>
+      )}
+
+      {/* ── Sector tags — max 4 visible ── */}
+      {sectors.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {sectors.slice(0, 4).map(s => (
+            <span
+              key={s}
+              className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground truncate max-w-[120px]"
+            >
+              {s.length > 16 ? s.slice(0, 15) + '…' : s}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── Why-fit / how-to-pitch expand panel (paid only) ── */}
+      {isPaid && (
+        <div className="mt-1">
+          <button
+            onClick={handleExpand}
+            className="text-xs text-international-orange font-semibold hover:underline cursor-pointer"
+          >
+            {expanded ? '▲ Hide insight' : '▼ Why this investor · How to pitch'}
+          </button>
+          {expanded && (
+            <div className="mt-3 space-y-3 rounded-lg bg-muted/40 border border-border p-4">
+              {isEnriching && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating insight…
+                </div>
+              )}
+              {!isEnriching && enrichFailed && (
+                <p className="text-sm text-muted-foreground">
+                  Could not generate insight — try refining your description.
+                </p>
+              )}
+              {!isEnriching && !enrichFailed && matchOutput && (
+                <>
+                  <div>
+                    <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">Why they would back you</p>
+                    <p className="text-sm text-foreground leading-relaxed">{matchOutput.whyFit}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">How to pitch</p>
+                    <p className="text-sm text-foreground leading-relaxed">{matchOutput.howToPitch}</p>
+                  </div>
+                </>
+              )}
+              {!isEnriching && !enrichFailed && !matchOutput && (
+                <p className="text-sm text-muted-foreground">Generating insight…</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </Link>
   )
 }
 

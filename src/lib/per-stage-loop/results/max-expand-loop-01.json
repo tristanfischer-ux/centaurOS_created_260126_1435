@@ -1,0 +1,411 @@
+{
+  "stage": "max-expand",
+  "loop": 1,
+  "engineCommit": "e6a71d08",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "subject": "A 40-foot containerised modular vertical farm growing year-round leafy greens (lettuce, herbs, brassicas) for the United Kingdom market. Six thousand simultaneous plant slots across multi-tier hydroponic stacks, target yield four tonnes per year per container. LED grow-lights with daily light integral control, climate and carbon-dioxide dosing, recirculating nutrient system, IoT sensor mesh feeding a remote farm-management dashboard. Energy use under 250 kilowatt-hours per day in standard mode. Target installed capital cost under 150,000 pounds. Designed to ship complete on a flatbed lorry, plug into a three-phase mains supply, and run unattended between weekly plantings.",
+        "brief": {
+          "useCase": "",
+          "targetProcess": "",
+          "quantityTarget": "",
+          "targetMaterial": "",
+          "complianceNotes": "",
+          "toleranceTarget": ""
+        },
+        "constraintsGroundingRatio": 0,
+        "filledConstraintFields": [],
+        "missingConstraintFields": [
+          "unitCostCeilingGbp",
+          "firstShipDate",
+          "maxMassKg",
+          "batchSize",
+          "markets",
+          "productionRegion"
+        ]
+      },
+      "diagnostics": [
+        "mission missing or empty",
+        "targetCustomers missing or empty",
+        "whyNow missing or empty",
+        "useCase missing or empty"
+      ]
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "subject": "A premium walking stick for the United Kingdom market — working name Sentinel — with invisible falls-detection and gait-analysis intelligence. Wood handle (ash or walnut, machined and finished), carbon-fibre shaft, rubber and tungsten ferrule, adjustable length, weight target 450 grams or under. The intelligence is invisible to the user: 9-axis inertial measurement unit and capacitive grip sensor in the handle, pressure sensors at handle and ferrule, cellular module and battery in a tubular cavity in the upper shaft, speaker / microphone / haptic on the underside of the handle. Sensors: 9-axis inertial measurement unit, capacitive grip sensor, pressure sensors at handle and ferrule, Global Positioning System receiver, accelerometer for impact detection, optional barometer for stair detecti",
+        "brief": {
+          "whyNow": "The UK ageing population is driving record NHS falls-related costs (£3,000–£10,000 per prevented fall); LTE-M/NB-IoT network coverage has matured to support always-on low-power cellular without smartphone dependency; UK MDR and UKCA post-Brexit regulatory frameworks create a defined Class I launch path with a clear upgrade route to Class IIa; and NHS direct-payments and integrated-care-system commissioning mechanisms now provide a scalable B2B channel alongside direct-to-consumer.",
+          "mission": "Sentinel is a premium walking stick that provides invisible falls detection and gait analysis for older adults in the United Kingdom, delivered through always-on cellular connectivity to a family-facing companion app and a 24/7 alarm receiving centre.",
+          "useCase": "An adult child buys Sentinel for their parent; the parent uses it as a conventional walking stick while the device silently monitors gait, detects falls, and sends location and weekly health summaries to the family via a companion app — with emergency escalation to a 24/7 alarm receiving centre requiring no action from the user.",
+          "regulatory": [
+            {
+              "code": "UK MDR Class I",
+              "name": "UK Medical Devices Regulations — Class I",
+              "status": "not-started",
+              "summary": "Launch classification as a mobility aid with safety features; no notified body required at Class I but technical file and registration with MHRA mandatory."
+            },
+            {
+              "code": "UK MDR Class IIa",
+              "name": "UK Medical Devices Regulations — Class IIa",
+              "status": "not-started",
+              "summary": "Upgrade path once the cellular emergency-call pathway is validated; requires UK Approved Body conformity assessment."
+            },
+            {
+              "code": "UKCA (RED)",
+              "name": "UK Conformity Assessed — Radio Equipment Regulations 2017",
+              "status": "not-started",
+              "summary": "Cellular module (nRF9160) carries module-level certification; full product UKCA marking required for UK market placement."
+            },
+            {
+              "code": "CE (RED)",
+              "name": "Conformité Européenne — Radio Equipment Directive 2014/53/EU",
+              "status": "not-started",
+              "summary": "Module-level CE RED certification on nRF9160 typically carries to product level; required if sold in EU."
+            },
+            {
+              "code": "Ofcom",
+              "name": "Ofcom Spectrum Compliance (UK)",
+              "status": "not-started",
+              "summary": "LTE-M/NB-IoT radio use compliant via nRF9160 module certification; eSIM provisioning to follow GSMA SGP.02 embedded SIM specification."
+            },
+            {
+              "code": "IEC 62133",
+              "name": "Safety for portable sealed secondary lithium cells and batteries",
+              "status": "not-started",
+              "summary": "Battery pack compliance required for UK/EU market; covers overcharge, short circuit, and thermal protection."
+            },
+            {
+              "code": "IEC 60335-1",
+              "name": "Household and similar electrical appliances — Safety",
+              "status": "not-started",
+              "summary": "Governs the mains-powered inductive charging stand as a household appliance."
+            },
+            {
+              "code": "BS EN ISO 11334-1",
+              "name": "Assistive products for walking — Walking sticks",
+              "status": "not-started",
+              "summary": "Governing structural and load standard for walking sticks on the UK market; shaft and telescoping joint must meet stated static and dynamic load cases."
+            },
+            {
+              "code": "EN 61000-4-2",
+              "name": "EMC — Electrostatic discharge immunity",
+              "status": "not-started",
+              "summary": "Handle is a frequently grasped surface; contact discharge immunity to ±4 kV minimum recommended."
+            },
+            {
+              "code": "IPC-2221B",
+              "name": "Generic Standard on Printed Board Design",
+              "status": "not-started",
+              "summary": "PCB design standard governing clearance, current capacity, and via sizing for the long narrow shaft-cavity board."
+            }
+          ],
+          "constraints": {
+            "markets": [
+              "GB"
+            ],
+            "maxMassKg": 0.45,
+            "unitCostCeilingGbp": 155
+          },
+          "targetProcess": "",
+          "quantityTarget": "",
+          "targetMaterial": "",
+          "complianceNotes": "",
+          "targetCustomers": "Adult children aged 40–60 purchasing for an older parent; private occupational therapists; Age UK referral network; NHS integrated care systems (falls prevention pilots); private health, home, and life insurers",
+          "toleranceTarget": ""
+        },
+        "constraintsGroundingRatio": 0.5,
+        "filledConstraintFields": [
+          "unitCostCeilingGbp",
+          "maxMassKg",
+          "markets"
+        ],
+        "missingConstraintFields": [
+          "firstShipDate",
+          "batchSize",
+          "productionRegion"
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "subject": "A premium garden bird feeder for the United Kingdom market — working name Hedgerow — with integrated camera, solar power, and on-device machine-learning inference. Body in ceramic or powder-coated steel, real horticultural-grade materials, designed to look beautiful in a garden in year five not just year one (deliberately not the plastic of competitors). Modular seed reservoirs (nyjer, sunflower, suet ball) so the user can attract specific species. Sensors: 12-megapixel camera with optical zoom (key differentiator — competitors skimp on optics), microphone, weight sensor on the perch for individual-bird identification (mass plus visual), temperature, light, and weather sensors. Compute: ~5 trillion operations per second neural processing unit, on-device species identification, individual i",
+        "brief": {
+          "useCase": "",
+          "targetProcess": "",
+          "quantityTarget": "",
+          "targetMaterial": "",
+          "complianceNotes": "",
+          "toleranceTarget": ""
+        },
+        "constraintsGroundingRatio": 0,
+        "filledConstraintFields": [],
+        "missingConstraintFields": [
+          "unitCostCeilingGbp",
+          "firstShipDate",
+          "maxMassKg",
+          "batchSize",
+          "markets",
+          "productionRegion"
+        ]
+      },
+      "diagnostics": [
+        "mission missing or empty",
+        "targetCustomers missing or empty",
+        "whyNow missing or empty",
+        "useCase missing or empty"
+      ]
+    },
+    {
+      "inputId": "bess",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "subject": "A 40-foot containerised battery energy storage system delivering 3.5 MWh and 1.5 MW for behind-the-meter commercial and industrial sites in the United Kingdom. Lithium iron phosphate cells, integrated battery management, bi-directional power conversion with grid-forming capability, liquid-cooled thermal management, and certified fire detection and suppression. Target installed capital cost under 180,000 pounds. Must ship complete on a flatbed lorry, install on a prepared concrete pad, and commission inside two days. Compliant with United Kingdom G99 grid code and the latest National Fire Chiefs Council guidance for lithium battery storage.",
+        "brief": {
+          "whyNow": "UK grid code G99 now mandates grid-forming capability for new behind-the-meter storage connections; NFCC guidance on lithium battery storage has matured into a de-facto planning requirement; LFP cell costs have fallen sufficiently to make containerised C&I BESS commercially viable at scale; DNOs are actively incentivising demand-side flexibility.",
+          "mission": "Deliver a factory-integrated, containerised lithium iron phosphate battery energy storage system that enables UK commercial and industrial sites to optimise energy costs and support grid stability behind the meter, without specialist on-site build work.",
+          "useCase": "A prepared-pad, two-day-commission containerised BESS that ships complete on a flatbed lorry and connects behind the meter to reduce peak demand charges and provide grid services for UK C&I sites.",
+          "regulatory": [
+            {
+              "code": "ENA G99",
+              "name": "Requirements for the Connection of Generation Equipment in Parallel with Public Distribution Networks above 16 A",
+              "status": "not-started",
+              "summary": "Mandatory UK grid code for behind-the-meter storage connecting in parallel with the distribution network; grid-forming capability required."
+            },
+            {
+              "code": "BS EN IEC 62619",
+              "name": "Safety requirements for secondary lithium cells and batteries for use in industrial applications",
+              "status": "not-started",
+              "summary": "Cell-level safety certification required for the LFP modules within the system."
+            },
+            {
+              "code": "BS EN IEC 63056",
+              "name": "Safety requirements for secondary lithium cells and batteries for use in electrical energy storage systems",
+              "status": "not-started",
+              "summary": "System-level safety certification required for the complete BESS installation."
+            },
+            {
+              "code": "UL 9540",
+              "name": "Standard for Energy Storage Systems and Equipment",
+              "status": "not-started",
+              "summary": "System-level listing recommended to support NFCC alignment for planning and fire authority approval."
+            },
+            {
+              "code": "UL 9540A",
+              "name": "Test Method for Evaluating Thermal Runaway Fire Propagation in Battery Energy Storage Systems",
+              "status": "not-started",
+              "summary": "Thermal-runaway propagation test recommended to demonstrate fire safety in support of NFCC guidance compliance."
+            },
+            {
+              "code": "NFPA 855",
+              "name": "Standard for the Installation of Stationary Energy Storage Systems",
+              "status": "not-started",
+              "summary": "Governs minimum fire separation distances, deflagration venting, and suppression requirements; referenced by NFCC planning guidance."
+            },
+            {
+              "code": "ISO 1496-1",
+              "name": "Series 1 freight containers — specification and testing",
+              "status": "not-started",
+              "summary": "Defines the structural and dimensional standard for the 40 ft High Cube container shell."
+            },
+            {
+              "code": "ISO 1161",
+              "name": "Series 1 freight containers — corner fittings",
+              "status": "not-started",
+              "summary": "Specifies corner casting geometry used for lifting, transport, and foundation anchorage."
+            }
+          ],
+          "constraints": {
+            "markets": [
+              "GB"
+            ],
+            "maxMassKg": 40000,
+            "unitCostCeilingGbp": 180000
+          },
+          "targetProcess": "",
+          "quantityTarget": "",
+          "targetMaterial": "",
+          "complianceNotes": "",
+          "targetCustomers": "UK commercial and industrial site operators, energy-intensive manufacturers, logistics and distribution centres, property developers with large commercial tenants",
+          "toleranceTarget": ""
+        },
+        "constraintsGroundingRatio": 0.5,
+        "filledConstraintFields": [
+          "unitCostCeilingGbp",
+          "maxMassKg",
+          "markets"
+        ],
+        "missingConstraintFields": [
+          "firstShipDate",
+          "batchSize",
+          "productionRegion"
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "subject": "A 40-foot containerised seawater reverse-osmosis desalination unit producing 500 cubic metres per day of potable water from seawater feed. Pre-treatment, two-pass reverse osmosis, post-treatment (remineralisation and chlorination), 50 per cent recovery rate, energy-recovery device on the brine stream. Target specific energy consumption under 3.5 kilowatt-hours per cubic metre. Designed for coastal disaster relief, remote-island municipal water, and construction-site freshwater supply. Target installed capital cost under 350,000 pounds. Must ship complete on a flatbed lorry, plug into a three-phase mains supply or local diesel genset, and start producing within four hours of arrival on site.",
+        "brief": {
+          "whyNow": "Increasing frequency of coastal humanitarian crises, island-community water insecurity, and remote-construction activity has created demand for rapidly deployable potable-water infrastructure that requires no civil works and can be mobilised within hours; advances in isobaric energy-recovery technology now make containerised SWRO viable at target energy and capital-cost thresholds.",
+          "mission": "To deliver containerised seawater desalination capability that can be transported on a standard flatbed lorry, connected to shore power or a diesel genset, and producing potable water within four hours of arrival on site — serving coastal disaster relief, remote-island municipalities, and construction operations.",
+          "useCase": "A self-contained 40-ft ISO container unit connects to seawater feed, three-phase power, and brine-discharge pipework on site and produces 500 cubic metres per day of chlorinated, remineralised potable water within four hours of lorry delivery.",
+          "regulatory": [
+            {
+              "code": "NSF/ANSI 61",
+              "name": "Drinking water system components — health effects",
+              "status": "not-started",
+              "summary": "All potable-water-contact materials and components must be certified under this standard"
+            },
+            {
+              "code": "NSF/ANSI 372",
+              "name": "Drinking water system components — lead content",
+              "status": "not-started",
+              "summary": "All potable-water-contact components must comply with lead-free requirements"
+            },
+            {
+              "code": "ISO 1496-1",
+              "name": "Series 1 freight containers — specification and testing",
+              "status": "not-started",
+              "summary": "Container shell must conform to this standard for structural integrity and intermodal compatibility"
+            },
+            {
+              "code": "WHO Guidelines for Drinking-water Quality",
+              "name": "WHO potable water quality guidelines",
+              "status": "not-started",
+              "summary": "Permeate TDS target of less than 500 mg/L and residual chlorine 0.2–0.5 mg/L align with WHO potable-water thresholds"
+            },
+            {
+              "code": "IEC 60529 / NEMA 4X",
+              "name": "Degrees of protection — enclosures (IP65)",
+              "status": "not-started",
+              "summary": "Electrical control panel must meet IP65 ingress-protection rating for outdoor and coastal environments"
+            }
+          ],
+          "constraints": {
+            "maxMassKg": 18000,
+            "unitCostCeilingGbp": 350000
+          },
+          "targetProcess": "",
+          "quantityTarget": "",
+          "targetMaterial": "",
+          "complianceNotes": "",
+          "targetCustomers": "Coastal disaster-relief operators, remote-island municipal water authorities, construction-site freshwater supply contractors",
+          "toleranceTarget": ""
+        },
+        "constraintsGroundingRatio": 0.3333333333333333,
+        "filledConstraintFields": [
+          "unitCostCeilingGbp",
+          "maxMassKg"
+        ],
+        "missingConstraintFields": [
+          "firstShipDate",
+          "batchSize",
+          "markets",
+          "productionRegion"
+        ]
+      },
+      "diagnostics": []
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 0,
+      "dimensions": {
+        "mission_present_and_specific": 0,
+        "target_customers_named_segments": 0,
+        "why_now_substantive": 0,
+        "use_case_concrete": 0,
+        "constraints_grounded_in_report": 0,
+        "unit_cost_ceiling_realistic": 0
+      },
+      "summary": "The generated design brief is completely empty and missing all required strategic fields, resulting in a zero score across all dimensions.",
+      "nextFix": "Enforce a strict JSON schema in the prompt that requires all strategic fields (mission, targetCustomers, whyNow, unitCostCeilingGbp) to be populated using the provided project subject.",
+      "costPence": 49
+    },
+    {
+      "inputId": "sentinel",
+      "score": 9.166666666666666,
+      "dimensions": {
+        "mission_present_and_specific": 10,
+        "target_customers_named_segments": 10,
+        "why_now_substantive": 10,
+        "use_case_concrete": 10,
+        "constraints_grounded_in_report": 5,
+        "unit_cost_ceiling_realistic": 10
+      },
+      "summary": "An exceptionally strong and specific strategic brief, let down only by missing production and timeline constraints.",
+      "nextFix": "Update the prompt to explicitly require firstShipDate, batchSize, and productionRegion in the constraints object.",
+      "costPence": 58
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 0,
+      "dimensions": {
+        "mission_present_and_specific": 0,
+        "target_customers_named_segments": 0,
+        "why_now_substantive": 0,
+        "use_case_concrete": 0,
+        "constraints_grounded_in_report": 0,
+        "unit_cost_ceiling_realistic": 0
+      },
+      "summary": "The generated design brief is entirely empty and missing critical strategic fields, providing zero value for downstream engineering.",
+      "nextFix": "Enforce a strict JSON schema in the prompt that includes mission, targetCustomers, whyNow, and the constraints object, and instruct the model to populate them based on the provided project subject.",
+      "costPence": 45
+    },
+    {
+      "inputId": "bess",
+      "score": 0,
+      "dimensions": {},
+      "summary": "council failed: OpenRouter JSON parse failed: The operation was aborted due to timeout",
+      "nextFix": null,
+      "costPence": 0
+    },
+    {
+      "inputId": "desal",
+      "score": 8.666666666666666,
+      "dimensions": {
+        "mission_present_and_specific": 10,
+        "target_customers_named_segments": 10,
+        "why_now_substantive": 9,
+        "use_case_concrete": 10,
+        "constraints_grounded_in_report": 3,
+        "unit_cost_ceiling_realistic": 10
+      },
+      "summary": "A highly specific and technically grounded brief with excellent mission and use-case definitions, let down only by missing commercial and production constraints.",
+      "nextFix": "Update the prompt to mandate the inclusion or estimation of missing commercial constraints (firstShipDate, batchSize, markets, productionRegion) to ensure downstream DFM and supply chain tasks have a defined scale.",
+      "costPence": 64
+    }
+  ],
+  "aggregateScore": 3.5666666666666664,
+  "deltaSincePrior": null,
+  "totalCostPence": 216,
+  "completedAt": "2026-04-26T09:24:02.595Z"
+}

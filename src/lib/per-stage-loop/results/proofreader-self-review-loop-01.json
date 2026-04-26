@@ -1,0 +1,432 @@
+{
+  "stage": "proofreader-self-review",
+  "loop": 1,
+  "engineCommit": "2036985e",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "findingsCount": 25,
+        "severityDist": {
+          "blocker": 2,
+          "content": 23,
+          "cosmetic": 0,
+          "unknown": 0
+        },
+        "blockerCount": 2,
+        "stage": "design",
+        "status": "researched",
+        "shipped": false,
+        "ranAt": "2026-04-26T06:20:05.794Z",
+        "model": "google/gemini-2.5-flash",
+        "runCostPence": 1,
+        "sample": [
+          {
+            "section": "BRIEF",
+            "severity": "blocker",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "SIZING",
+            "severity": "blocker",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "MODULES",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "findingsCount": 0,
+        "severityDist": {
+          "blocker": 0,
+          "content": 0,
+          "cosmetic": 0,
+          "unknown": 0
+        },
+        "blockerCount": 0,
+        "stage": "design",
+        "status": "researched",
+        "shipped": false,
+        "ranAt": null,
+        "model": null,
+        "runCostPence": null,
+        "sample": []
+      },
+      "diagnostics": [
+        "no proofread_findings — run was missing or empty"
+      ]
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "findingsCount": 27,
+        "severityDist": {
+          "blocker": 1,
+          "content": 26,
+          "cosmetic": 0,
+          "unknown": 0
+        },
+        "blockerCount": 1,
+        "stage": "design",
+        "status": "researched",
+        "shipped": false,
+        "ranAt": "2026-04-26T05:55:22.178Z",
+        "model": "google/gemini-2.5-flash",
+        "runCostPence": 1,
+        "sample": [
+          {
+            "section": "brief",
+            "severity": "blocker",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "brief",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "bess",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "findingsCount": 15,
+        "severityDist": {
+          "blocker": 3,
+          "content": 12,
+          "cosmetic": 0,
+          "unknown": 0
+        },
+        "blockerCount": 3,
+        "stage": "design",
+        "status": "researched",
+        "shipped": false,
+        "ranAt": "2026-04-26T06:00:46.976Z",
+        "model": "google/gemini-2.5-flash",
+        "runCostPence": 1,
+        "sample": [
+          {
+            "section": "brief",
+            "severity": "blocker",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "brief",
+            "severity": "blocker",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "sizing",
+            "severity": "blocker",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "modules",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "bom",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          },
+          {
+            "section": "suppliers",
+            "severity": "content",
+            "message": null,
+            "suggestion": null
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 1,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "findingsCount": 0,
+        "severityDist": {
+          "blocker": 0,
+          "content": 0,
+          "cosmetic": 0,
+          "unknown": 0
+        },
+        "blockerCount": 0,
+        "stage": "design",
+        "status": "researched",
+        "shipped": false,
+        "ranAt": null,
+        "model": null,
+        "runCostPence": null,
+        "sample": []
+      },
+      "diagnostics": [
+        "no proofread_findings — run was missing or empty"
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 5.2,
+      "dimensions": {
+        "findings_count_plausibility": 10,
+        "severity_diversity": 5,
+        "non_correcting_visibility": 10,
+        "actionability": 0,
+        "blocker_calibration": 1
+      },
+      "summary": "Every finding has null message and null suggestion, making the entire proofreader output completely useless — no finding is actionable and blocker severity cannot be validated at all.",
+      "nextFix": "Enforce non-null message and suggestion fields at schema level before the proofreader output is accepted; reject any finding where either field is null or empty string, and re-run until all 25 findings carry a specific cited location and a concrete proposed fix.",
+      "costPence": 45
+    },
+    {
+      "inputId": "sentinel",
+      "score": 1,
+      "dimensions": {
+        "findings_count_plausibility": 0,
+        "severity_diversity": 0,
+        "non_correcting_visibility": 5,
+        "actionability": 0,
+        "blocker_calibration": 0
+      },
+      "summary": "Proofreader returned zero findings on a complex multi-sensor hardware report that almost certainly contains numerical, regulatory, and BOM-level defects — a complete failure to surface any actionable issues.",
+      "nextFix": "Instruct the proofreader to explicitly check: (1) weight budget arithmetic across all listed components vs. the 450 g target, (2) UK/CE/UKCA regulatory classification for a medical-adjacent falls-detection device, (3) supplier names against known catalogues, (4) cross-section consistency of sensor list (e.g. accelerometer listed separately from 9-axis IMU — likely a duplication), and (5) cellular module frequency band compliance for UK spectrum — and require it to emit at least one finding per check category or explicitly state why none apply.",
+      "costPence": 44
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 5.2,
+      "dimensions": {
+        "findings_count_plausibility": 10,
+        "severity_diversity": 5,
+        "non_correcting_visibility": 10,
+        "actionability": 0,
+        "blocker_calibration": 1
+      },
+      "summary": "Every finding has null message and null suggestion, making the entire proofreader output completely useless — no finding is actionable and blocker calibration cannot be assessed beyond the bare severity label.",
+      "nextFix": "Enforce non-null message and suggestion fields at schema level before the proofreader output is accepted; require each finding to cite the specific section/table/line and propose a concrete corrective action, otherwise reject the pass and re-run.",
+      "costPence": 45
+    },
+    {
+      "inputId": "bess",
+      "score": 5,
+      "dimensions": {
+        "findings_count_plausibility": 10,
+        "severity_diversity": 5,
+        "non_correcting_visibility": 10,
+        "actionability": 0,
+        "blocker_calibration": 0
+      },
+      "summary": "Every finding has null message and null suggestion, making the entire proofreader output completely useless — no defect is described, no fix is proposed, and severity labels cannot be evaluated.",
+      "nextFix": "Enforce non-null, non-empty message and suggestion fields at schema level before the proofreader output is accepted; reject and retry any finding where either field is null, empty, or shorter than 20 characters.",
+      "costPence": 43
+    },
+    {
+      "inputId": "desal",
+      "score": 1,
+      "dimensions": {
+        "findings_count_plausibility": 0,
+        "severity_diversity": 0,
+        "non_correcting_visibility": 5,
+        "actionability": 0,
+        "blocker_calibration": 0
+      },
+      "summary": "The proofreader returned zero findings on a technically complex SWRO report that almost certainly contains numerical, regulatory, or cross-section defects worth flagging — a complete failure to engage with the content.",
+      "nextFix": "Instruct the proofreader to explicitly check: (1) energy-balance arithmetic (SEC ≤3.5 kWh/m³ vs. stated pump/ERD figures), (2) 50% recovery consistency across pre-treatment sizing, brine flow, and ERD spec, (3) capital-cost roll-up vs. £350k ceiling, (4) regulatory classification (drinking-water standards: UK DWI / WHO), (5) supplier/component names against known catalogues — and require it to output at least one finding per check category or explicitly state 'verified OK' with evidence.",
+      "costPence": 45
+    }
+  ],
+  "aggregateScore": 3.4799999999999995,
+  "deltaSincePrior": null,
+  "totalCostPence": 222,
+  "completedAt": "2026-04-26T09:50:05.542Z"
+}

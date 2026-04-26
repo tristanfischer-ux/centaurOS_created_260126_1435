@@ -1,0 +1,479 @@
+{
+  "stage": "oracle",
+  "loop": 1,
+  "engineCommit": "83219092",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 1,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "feasible": false,
+        "target": {
+          "tiers": 7,
+          "canopy_m2": 200
+        },
+        "envelope": {
+          "kind": "container_40ft_iso",
+          "label": "40ft ISO container (standard)",
+          "interior_d_mm": 2352,
+          "interior_h_mm": 2393,
+          "interior_w_mm": 12032,
+          "interior_floor_m2": 28.299264,
+          "interior_volume_m3": 67.720138752
+        },
+        "floorBudgetM2": 4.24,
+        "moduleDimensions": {
+          "air_handling": {
+            "d_mm": 1000,
+            "h_mm": 1800,
+            "w_mm": 1732,
+            "mount": "floor",
+            "floor_m2": 3,
+            "scaled_by": "canopy_m²",
+            "prompt_hint": "CO₂ enrichment + airflow fans + filter banks"
+          },
+          "climate_unit": {
+            "d_mm": 1000,
+            "h_mm": 1800,
+            "w_mm": 1500,
+            "mount": "floor",
+            "floor_m2": 7.13,
+            "scaled_by": "peak sensible 30.0kW + peak latent 29.4kW",
+            "prompt_hint": "Floor-mounted HVAC + DEHUMIDIFIER cabinet with visible evaporator coil, condensate drip tray, and clear PVC condensate drain line exiting to a floor drain (dehumidification rate 46.9 L/hour during photoperiod). Integrated reheat coil downstream of the evaporator to prevent supply-air over-cooling.",
+            "requirement": {
+              "unit": "kW",
+              "label": "Peak cooling load",
+              "value": 59.4
+            }
+          },
+          "controls_iot": {
+            "d_mm": 400,
+            "h_mm": 1800,
+            "w_mm": 800,
+            "mount": "wall",
+            "floor_m2": 0.5,
+            "scaled_by": "fixed per project",
+            "prompt_hint": "Wall-mounted climate + SCADA control cabinet with touchscreen"
+          },
+          "harvest_prep": {
+            "d_mm": 2000,
+            "h_mm": 1000,
+            "w_mm": 3162,
+            "mount": "floor",
+            "floor_m2": 10,
+            "scaled_by": "canopy_m²",
+            "prompt_hint": "Stainless-steel harvest prep tables and wash stations"
+          },
+          "grow_rack_port": {
+            "d_mm": 1200,
+            "h_mm": 3700,
+            "w_mm": 5798,
+            "mount": "floor",
+            "floor_m2": 33.61,
+            "scaled_by": "canopy_m² ÷ tiers ÷ aisle_efficiency",
+            "count_hint": "7-tier vertical grow racks · 200 m² canopy total",
+            "prompt_hint": "7-tier stacked grow racks, floor-to-ceiling, hydroponic trays, LED light bars between tiers"
+          },
+          "lighting_array": {
+            "d_mm": 1200,
+            "h_mm": 120,
+            "w_mm": 5798,
+            "mount": "ceiling",
+            "floor_m2": 0,
+            "scaled_by": "canopy_m² × kw/m²",
+            "prompt_hint": "Integrated LED light bars above each tray tier",
+            "requirement": {
+              "unit": "kW",
+              "label": "Lighting load",
+              "value": 50
+            }
+          },
+          "container_shell": {
+            "d_mm": 2352,
+            "h_mm": 2393,
+            "w_mm": 12032,
+            "mount": "envelope",
+            "floor_m2": 28.3,
+            "scaled_by": "fixed envelope",
+            "prompt_hint": "40ft ISO container (standard)"
+          },
+          "nutrient_system": {
+            "d_mm": 1200,
+            "h_mm": 2000,
+            "w_mm": 2000,
+            "mount": "floor",
+            "floor_m2": 4,
+            "scaled_by": "canopy_m²",
+            "prompt_hint": "Water reservoir tanks, nutrient dosing pumps, monitoring sensors"
+          },
+          "dehumidification": {
+            "d_mm": 0,
+            "h_mm": 0,
+            "w_mm": 0,
+            "mount": "floor",
+            "floor_m2": 0,
+            "scaled_by": "transpiration 500 L/day × 1.5× peak / 16h photoperiod",
+            "prompt_hint": "Dehumidification integrated into HVAC cabinet — sized to condense transpired canopy water continuously during photoperiod",
+            "requirement": {
+              "unit": "L/hour",
+              "label": "Dehumidification rate",
+              "value": 46.9
+            }
+          },
+          "service_vestibule": {
+            "d_mm": 1200,
+            "h_mm": 2000,
+            "w_mm": 2000,
+            "mount": "floor",
+            "floor_m2": 4,
+            "scaled_by": "canopy_m²",
+            "prompt_hint": "Water reservoir tanks, nutrient dosing pumps, monitoring sensors"
+          },
+          "power_distribution": {
+            "d_mm": 1200,
+            "h_mm": 120,
+            "w_mm": 5798,
+            "mount": "ceiling",
+            "floor_m2": 0,
+            "scaled_by": "canopy_m² × kw/m²",
+            "prompt_hint": "Integrated LED light bars above each tray tier",
+            "requirement": {
+              "unit": "kW",
+              "label": "Lighting load",
+              "value": 50
+            }
+          },
+          "grow_rack_starboard": {
+            "d_mm": 1200,
+            "h_mm": 3700,
+            "w_mm": 5798,
+            "mount": "floor",
+            "floor_m2": 33.61,
+            "scaled_by": "canopy_m² ÷ tiers ÷ aisle_efficiency",
+            "count_hint": "7-tier vertical grow racks · 200 m² canopy total",
+            "prompt_hint": "7-tier stacked grow racks, floor-to-ceiling, hydroponic trays, LED light bars between tiers"
+          }
+        },
+        "conflicts": [
+          "Floor area shortfall: need 58.2 m², have 4.2 m² available. Over by 54.0 m² (1275%).",
+          "Primary contributor: grow rack footprint (33.6 m², 58% of used floor).",
+          "Required ceiling height (3700 mm for 7 tiers × 500mm spacing + 200mm clearance) exceeds envelope interior height (2393 mm). Drop to 4 tiers, tighten tier spacing, or raise the ceiling."
+        ],
+        "recommendations": [
+          "Add more tiers (7 → 9) to increase canopy without growing floor footprint, if ceiling allows.",
+          "Expand to an adjacent bay or raise the ceiling to unlock higher rack stacks."
+        ],
+        "notes": [
+          "Canopy density: 7 tiers × 85% aisle-efficient packing.",
+          "Lighting installed: 250 W/m² (leafy greens at ~200 DLI).",
+          "Transpiration load: 500 L/day water evaporates from canopy — ALL of it must be condensed by the HVAC evaporator coil and drained out of the envelope or humidity spikes and powdery mildew appears within days.",
+          "Peak cooling budget: 30.0 kW sensible (LED heat) + 29.4 kW latent (condensing transpiration) = 59.4 kW total during photoperiod.",
+          "Required dehumidification rate: 46.9 L/hour. Size the dehumidifier pint-rating at ≥ 57 L/hr at 24°C/65% RH to keep a 20% safety margin.",
+          "Setpoint: 22°C air temperature, 65% RH (below 70% prevents powdery mildew; above 60% keeps stomata open).",
+          "target provenance: tiers=brief-text, canopy_m2=brief-structured",
+          "envelope: 40ft ISO container (standard) (from brief text)"
+        ],
+        "closestFeasibleAlternate": null,
+        "hasAlternate": false
+      },
+      "diagnostics": [
+        "primary infeasible — no alternate"
+      ]
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 1,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "feasible": false,
+        "target": {},
+        "envelope": null,
+        "floorBudgetM2": 0,
+        "moduleDimensions": {},
+        "conflicts": [],
+        "recommendations": [],
+        "notes": [],
+        "closestFeasibleAlternate": null,
+        "hasAlternate": false
+      },
+      "diagnostics": [
+        "dimension_sheet missing on project"
+      ]
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 1,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "feasible": false,
+        "target": {},
+        "envelope": null,
+        "floorBudgetM2": 0,
+        "moduleDimensions": {},
+        "conflicts": [],
+        "recommendations": [],
+        "notes": [],
+        "closestFeasibleAlternate": null,
+        "hasAlternate": false
+      },
+      "diagnostics": [
+        "dimension_sheet missing on project"
+      ]
+    },
+    {
+      "inputId": "bess",
+      "loop": 1,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "feasible": false,
+        "target": {
+          "kw": 1500,
+          "kwh": 3500
+        },
+        "envelope": {
+          "kind": "container_40ft_iso",
+          "label": "40ft ISO container (standard)",
+          "interior_d_mm": 2352,
+          "interior_h_mm": 2393,
+          "interior_w_mm": 12032,
+          "interior_floor_m2": 28.299264,
+          "interior_volume_m3": 67.720138752
+        },
+        "floorBudgetM2": 21.08,
+        "moduleDimensions": {
+          "ac_switchgear": {
+            "d_mm": 700,
+            "h_mm": 2100,
+            "w_mm": 10714,
+            "mount": "floor",
+            "floor_m2": 7.5,
+            "scaled_by": "target_kW",
+            "prompt_hint": "Floor-mounted AC switchgear cabinet, breakers and metering"
+          },
+          "dc_distribution": {
+            "d_mm": 600,
+            "h_mm": 2000,
+            "w_mm": 5833,
+            "mount": "floor",
+            "floor_m2": 3.5,
+            "scaled_by": "target_kWh",
+            "prompt_hint": "Floor-mounted DC distribution cabinet with combiner, bus bars visible inside"
+          },
+          "fire_safety_system": {
+            "d_mm": 400,
+            "h_mm": 300,
+            "w_mm": 500,
+            "mount": "ceiling",
+            "floor_m2": 0,
+            "scaled_by": "enclosure volume (NFPA 2001 clean-agent design concentration)",
+            "prompt_hint": "Ceiling-mounted fire suppression panel with small agent cylinder and nozzle",
+            "requirement": {
+              "unit": "kg",
+              "label": "Agent mass (Novec 1230 @ 6% v/v)",
+              "value": 6.8
+            }
+          },
+          "container_enclosure": {
+            "d_mm": 2352,
+            "h_mm": 2393,
+            "w_mm": 12032,
+            "mount": "envelope",
+            "floor_m2": 28.3,
+            "scaled_by": "fixed envelope",
+            "prompt_hint": "40ft ISO container (standard)"
+          },
+          "liquid_cooling_skid": {
+            "d_mm": 600,
+            "h_mm": 500,
+            "w_mm": 2500,
+            "mount": "ceiling",
+            "floor_m2": 0,
+            "scaled_by": "target_kWh × C-rate",
+            "prompt_hint": "Ceiling-mounted HVAC air handler, supply + return ducts visible",
+            "requirement": {
+              "unit": "kW",
+              "label": "Thermal duty",
+              "value": 52.5
+            }
+          },
+          "battery_rack_assembly": {
+            "d_mm": 1200,
+            "h_mm": 2200,
+            "w_mm": 19200,
+            "mount": "floor",
+            "floor_m2": 35,
+            "scaled_by": "target_kWh",
+            "count_hint": "16 × 232 kWh racks side-by-side",
+            "prompt_hint": "16 LFP battery racks side-by-side, floor-mounted, each rack ~1200×1200×2200mm"
+          },
+          "power_conversion_system": {
+            "d_mm": 800,
+            "h_mm": 2200,
+            "w_mm": 9375,
+            "mount": "floor",
+            "floor_m2": 7.5,
+            "scaled_by": "target_kW",
+            "prompt_hint": "Floor-mounted PCS inverter cabinet, grey metal, air-vent grilles"
+          },
+          "battery_management_system": {
+            "d_mm": 300,
+            "h_mm": 1800,
+            "w_mm": 600,
+            "mount": "wall",
+            "floor_m2": 0,
+            "scaled_by": "fixed per project",
+            "prompt_hint": "Wall-mounted SCADA / controls enclosure with HMI touchscreen"
+          },
+          "auxiliary_power_distribution": {
+            "d_mm": 300,
+            "h_mm": 1800,
+            "w_mm": 600,
+            "mount": "wall",
+            "floor_m2": 0,
+            "scaled_by": "fixed per project",
+            "prompt_hint": "Wall-mounted SCADA / controls enclosure with HMI touchscreen"
+          },
+          "controls_supervisory_cabinet": {
+            "d_mm": 300,
+            "h_mm": 1800,
+            "w_mm": 600,
+            "mount": "wall",
+            "floor_m2": 0,
+            "scaled_by": "fixed per project",
+            "prompt_hint": "Wall-mounted SCADA / controls enclosure with HMI touchscreen"
+          }
+        },
+        "conflicts": [
+          "Floor area shortfall: need 53.5 m², have 21.1 m² available. Over by 32.4 m² (154%).",
+          "Primary contributor: battery rack allocation (35.0 m², 65% of used floor)."
+        ],
+        "recommendations": [
+          "Reduce target to 258 kWh at current 1500 kW power rating — fits 40ft with ~0% margin.",
+          "Upgrade to 2×40ft containers in parallel (batteries in one, ancillaries shared or duplicated).",
+          "Use 53ft high-cube container — adds ~20% floor area, roughly +6 m² usable after aisle.",
+          "Consider 20ft high-density modules stacked 2-high inside the container to double battery floor efficiency."
+        ],
+        "notes": [
+          "Battery density coefficient: 100 kWh/m² floor — conservative LFP rack density with cable trays + 600mm service aisle (15-20% margin against vendor demonstrated maxima of 117 kWh/m²).",
+          "Fire suppression sizing: 0.1 kg/m³ enclosure for Novec 1230 (FK-5-1-12) at 6% v/v design concentration per NFPA 2001 §A.5.4.2 — keyed to enclosure volume, not battery capacity. NFPA 855 governs venting, separation, and detection; the agent quantity is set by NFPA 2001.",
+          "Feasibility label: \"FEASIBLE\" here means \"fits the container envelope with stated targets\". It does NOT confirm cost ceiling, regulatory acceptance, or supplier availability — those gates run downstream (Finn, Chase, Suppliers).",
+          "target provenance: kwh=brief-text, kw=brief-text",
+          "envelope: 40ft ISO container (standard) (from brief text)"
+        ],
+        "closestFeasibleAlternate": null,
+        "hasAlternate": false
+      },
+      "diagnostics": [
+        "primary infeasible — no alternate"
+      ]
+    },
+    {
+      "inputId": "desal",
+      "loop": 1,
+      "engineCommit": "83219092",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "feasible": false,
+        "target": {},
+        "envelope": null,
+        "floorBudgetM2": 0,
+        "moduleDimensions": {},
+        "conflicts": [],
+        "recommendations": [],
+        "notes": [],
+        "closestFeasibleAlternate": null,
+        "hasAlternate": false
+      },
+      "diagnostics": [
+        "dimension_sheet missing on project"
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 4.6,
+      "dimensions": {
+        "feasibility_resolved": 0,
+        "target_grounded_in_brief": 4,
+        "envelope_correct": 10,
+        "recommendations_actionable": 2,
+        "engineering_notes_specificity": 7
+      },
+      "summary": "Envelope is correctly identified and thermal/humidity physics are well-specified, but the engine declares infeasibility without offering a closest_feasible_alternate, silently targets 200 m² canopy that is geometrically impossible in a standard 40ft ISO interior, and the recommendations are vague platitudes rather than concrete re-sizing paths.",
+      "nextFix": "Populate closest_feasible_alternate with a concrete re-sized scenario (e.g. 4-tier × 85% packing × 28.3 m² floor → ~96 m² canopy, ~1.9 t/yr yield, revised kWh/day and capex estimate) so feasibility_resolved scores 6 and the founder has a real decision point rather than a dead end.",
+      "costPence": 108
+    },
+    {
+      "inputId": "sentinel",
+      "score": 0,
+      "dimensions": {
+        "feasibility_resolved": 0,
+        "target_grounded_in_brief": 0,
+        "envelope_correct": 0,
+        "recommendations_actionable": 0,
+        "engineering_notes_specificity": 0
+      },
+      "summary": "The sizing engine returned a completely empty shell — every field is null, zero, or an empty collection — producing zero engineering value against a well-specified brief.",
+      "nextFix": "Force the engine to populate target{} from the brief before feasibility evaluation: at minimum {mass_g: 450, shaft_od_mm: 29, cavity_length_mm: 200, pcb_stack_height_mm: 8, battery_wh: 3.5} and set envelope{kind:'cylindrical_shaft_cavity', od_mm:29, length_mm:220} so downstream conflict-detection and recommendations have concrete numbers to operate on.",
+      "costPence": 55
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 0,
+      "dimensions": {
+        "feasibility_resolved": 0,
+        "target_grounded_in_brief": 0,
+        "envelope_correct": 0,
+        "recommendations_actionable": 0,
+        "engineering_notes_specificity": 0
+      },
+      "summary": "The engine returned a completely empty shell — every field is null, zero, or an empty collection — producing zero engineering value against a well-specified brief.",
+      "nextFix": "Implement a mandatory pre-flight parser that extracts key sizing targets from the brief (camera resolution, NPU TOPS, battery chemistry/capacity, solar panel wattage, enclosure envelope for a pole/post-mount garden product) and populates target{}, envelope{}, and at least three numeric recommendations before the feasibility check runs; a null output should be a hard runtime error, not a valid return state.",
+      "costPence": 53
+    },
+    {
+      "inputId": "bess",
+      "score": 6.8,
+      "dimensions": {
+        "feasibility_resolved": 0,
+        "target_grounded_in_brief": 10,
+        "envelope_correct": 10,
+        "recommendations_actionable": 6,
+        "engineering_notes_specificity": 8
+      },
+      "summary": "Targets and envelope are correctly extracted from the brief and engineering notes cite real standards and coefficients, but the infeasibility flag with a null closest_feasible_alternate scores zero on the deterministic gate, and recommendations lack a concrete alternate configuration that actually closes the 3.5 MWh brief target (e.g. a specific dual-container or high-cube layout with numeric fit confirmation).",
+      "nextFix": "Populate closest_feasible_alternate with a fully-sized alternate that preserves the 3500 kWh / 1500 kW brief targets — e.g. two 40ft ISO containers (batteries in one, PCS+switchgear in second) with numeric floor-area check confirming feasibility — so the deterministic gate can score 6 and the recommendations gain a concrete anchor.",
+      "costPence": 98
+    },
+    {
+      "inputId": "desal",
+      "score": 0,
+      "dimensions": {
+        "feasibility_resolved": 0,
+        "target_grounded_in_brief": 0,
+        "envelope_correct": 0,
+        "recommendations_actionable": 0,
+        "engineering_notes_specificity": 0
+      },
+      "summary": "The sizing engine returned a completely empty shell — every field is null, zero, or an empty collection — providing zero engineering value against a well-defined SWRO brief.",
+      "nextFix": "Implement a mandatory brief-parsing stage that populates target{} with {flow_m3_per_day: 500, recovery_pct: 50, sec_kwh_per_m3: 3.5, capex_gbp: 350000} and sets envelope{kind:'container_40ft_iso', label:'40ft ISO HC'} before any feasibility logic runs, so downstream fields are never null when a valid brief is supplied.",
+      "costPence": 53
+    }
+  ],
+  "aggregateScore": 2.28,
+  "deltaSincePrior": null,
+  "totalCostPence": 367,
+  "completedAt": "2026-04-26T09:23:57.341Z"
+}

@@ -1,0 +1,1025 @@
+{
+  "stage": "chase-regulatory",
+  "loop": 5,
+  "engineCommit": "2fec22ae",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 5,
+      "engineCommit": "2fec22ae",
+      "elapsedMs": 183628,
+      "costPence": 0,
+      "output": {
+        "regulatory": [],
+        "count": 0,
+        "extractedFresh": false
+      },
+      "diagnostics": [
+        "OpenRouter extraction parsed empty regulatory; using persisted",
+        "no regulatory rows",
+        "scored persisted output (no fresh extraction)"
+      ]
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 5,
+      "engineCommit": "2fec22ae",
+      "elapsedMs": 136441,
+      "costPence": 875,
+      "output": {
+        "regulatory": [
+          {
+            "code": "UK MDR 2002",
+            "name": "Medical Devices Regulations 2002 (as amended)",
+            "summary": "UK statutory framework governing classification, conformity assessment, and MHRA registration of medical devices placed on the UK market.",
+            "status": "not-started",
+            "applicability": "UK statutory — Sentinel's fall-detection and emergency-call pathway creates a credible argument for medical device classification; report proposes Class I 'mobility aid with safety features' at launch with an upgrade path to Class IIa once the emergency-call pathway is validated. MHRA classification decision must be obtained before first shipment.",
+            "designImpact": "Class I requires a Declaration of Conformity and MHRA registration before UK market placement; technical file must document intended purpose, risk management, and clinical evaluation. If reclassified to Class IIa, a UK Approved Body must audit the QMS and technical file, adding 6–18 months to the programme.",
+            "evidenceRequired": "MHRA classification ruling or binding opinion; MHRA registration on the UK medical device register; Declaration of Conformity; technical file including clinical evaluation report; if Class IIa, UK Approved Body certificate.",
+            "ownerRole": "Founder",
+            "gapAction": "Submit a formal classification query to MHRA with the intended purpose statement and the fall-detection/alarm-centre escalation pathway described; obtain written ruling before committing to Class I technical file structure."
+          },
+          {
+            "code": "BS EN ISO 14971",
+            "name": "Medical devices — Application of risk management to medical devices",
+            "summary": "International standard for systematic risk management throughout the medical device lifecycle; required under UK MDR 2002 technical file.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Risk management obligation under UK MDR 2002; applies to the complete Sentinel system including fall-detection classifier, alarm escalation logic, cellular connectivity dependency, and inductive charging stand.",
+            "designImpact": "Formal hazard identification and risk control must cover: false-negative fall detection (user falls, no alert), false-positive alerts (nuisance calls to family/ARC), cellular coverage loss, battery depletion without user awareness, inductive charging failure, and handle structural failure under 100 kg gait load.",
+            "evidenceRequired": "Risk management file (hazard log, FMEA, residual risk acceptability statement) reviewed and signed by a competent person; must be maintained throughout product lifecycle.",
+            "ownerRole": "Safety lead",
+            "gapAction": "Initiate risk management file using ISO 14971 process; conduct first FMEA workshop covering sensor failure modes, connectivity loss, and mechanical failure under BS EN ISO 11334-1 load cases."
+          },
+          {
+            "code": "BS EN ISO 13485",
+            "name": "Medical devices — Quality management systems — Requirements for regulatory purposes",
+            "summary": "QMS standard required to support UK MDR 2002 conformity assessment, particularly if device is reclassified to Class IIa.",
+            "status": "not-started",
+            "applicability": "UK designated standard — QMS obligation under UK MDR 2002; Class I allows self-certification but a documented QMS is expected in the technical file; Class IIa mandates UK Approved Body audit of the QMS.",
+            "designImpact": "Design controls, supplier qualification (battery, nRF9160 module, wood handle machining), post-market surveillance, and complaint handling must be documented processes from first shipment.",
+            "evidenceRequired": "ISO 13485 certificate from a UKAS-accredited certification body (if Class IIa); or documented QMS with internal audit records (if Class I self-certification route is maintained).",
+            "ownerRole": "Founder",
+            "gapAction": "Decide QMS scope and begin gap analysis against ISO 13485 clauses; engage a regulatory consultant to draft design-control procedures before hardware design freeze."
+          },
+          {
+            "code": "Radio Equipment Regulations 2017",
+            "name": "Radio Equipment Regulations 2017 (SI 2017/1206) — UK implementation of RED",
+            "summary": "UK statutory regime requiring conformity assessment, technical file, and UKCA marking for radio equipment placed on the UK market; covers LTE-M/NB-IoT cellular and GPS receiver.",
+            "status": "not-started",
+            "applicability": "UK statutory — Sentinel contains an nRF9160 LTE-M/NB-IoT/GPS radio; the Radio Equipment Regulations 2017 apply to the finished product. Module-level certification (nRF9160 carries CE/UKCA) reduces but does not eliminate the system-level obligation — the integrator must confirm the module is used within its certified parameters and that the antenna installation does not invalidate module certification.",
+            "designImpact": "Antenna placement in the wood handle (RF keep-out from carbon-fibre shaft) must be documented; antenna gain and cable loss must remain within the nRF9160 module's certified RF parameters. Any custom antenna design triggers additional RF testing. Inductive charging stand also falls under RED if it contains a radio (check Qi implementation).",
+            "evidenceRequired": "UKCA Declaration of Conformity for the finished Sentinel product referencing Radio Equipment Regulations 2017; technical file including antenna integration evidence; Ofcom spectrum compliance confirmation via module certification reference; if custom antenna, UKAS-accredited RF test report.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Confirm nRF9160 module certification scope covers the intended antenna configuration; commission antenna placement simulation or range test in handle-mounted configuration; prepare system-level RED technical file."
+          },
+          {
+            "code": "Electrical Equipment (Safety) Regulations 2016",
+            "name": "Electrical Equipment (Safety) Regulations 2016 (SI 2016/1101)",
+            "summary": "UK statutory low-voltage safety regime applying to electrical equipment with working voltage 50–1000 V AC or 75–1500 V DC; covers the mains-powered inductive charging stand.",
+            "status": "not-started",
+            "applicability": "UK statutory — The inductive charging stand is mains-powered household electrical equipment; the Electrical Equipment (Safety) Regulations 2016 apply. The Sentinel stick itself operates at battery voltage (below LV threshold) but the stand's mains input and inductive output interface must comply.",
+            "designImpact": "Charging stand must meet IEC 60335-1 (household appliances safety) and IEC 60335-2-29 (battery chargers) as designated standards; creepage and clearance, thermal cutoff, earth continuity, and dielectric strength tests required. Inductive power transfer must not create accessible hazardous voltages.",
+            "evidenceRequired": "UKCA Declaration of Conformity for the charging stand; test report from UKAS-accredited lab demonstrating compliance with IEC 60335-1 and IEC 60335-2-29; UKCA mark on stand and packaging.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Engage a UKAS-accredited test house to scope IEC 60335-1/-2-29 testing for the charging stand; include dielectric strength and inductive leakage current measurements in the test plan."
+          },
+          {
+            "code": "Electromagnetic Compatibility Regulations 2016",
+            "name": "Electromagnetic Compatibility Regulations 2016 (SI 2016/1091)",
+            "summary": "UK statutory EMC regime requiring that apparatus does not cause harmful interference and has adequate immunity; applies to both the Sentinel stick and the charging stand.",
+            "status": "not-started",
+            "applicability": "UK statutory — Both the Sentinel stick (with cellular radio, IMU, haptic actuator, and speaker) and the charging stand (inductive power transfer at switching frequency) are apparatus under the EMC Regulations 2016. The carbon-fibre shaft and wood handle create an unusual EMC enclosure that must be characterised.",
+            "designImpact": "Conducted and radiated emissions testing required for both units; immunity testing per EN 61000-4-2 (ESD, ±4 kV contact discharge on handle is specifically flagged in the report), EN 61000-4-3 (radiated immunity), EN 61000-4-6 (conducted immunity). Inductive charger switching frequency must not interfere with cellular reception during charging.",
+            "evidenceRequired": "UKCA Declaration of Conformity referencing EMC Regulations 2016; EMC test report from UKAS-accredited lab covering emissions (CISPR 32 or EN 55032) and immunity (EN 61000-4-2, -4-3, -4-6 minimum); ESD test record at ±4 kV contact on handle surfaces.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Include EMC test plan in hardware bring-up schedule; specify ESD protection components on all handle-accessible PCB interfaces at schematic stage; book pre-compliance EMC scan at prototype stage."
+          },
+          {
+            "code": "UKCA Marking Regulations",
+            "name": "UK Conformity Assessed (UKCA) Marking — Product Safety and Metrology etc. (Amendment etc.) (EU Exit) Regulations 2019 and associated statutory instruments",
+            "summary": "Umbrella UK marking scheme replacing CE marking for products placed on the Great Britain market; required across multiple statutory regimes applicable to Sentinel.",
+            "status": "not-started",
+            "applicability": "UK statutory — UKCA marking is required on both the Sentinel stick and the charging stand before sale in Great Britain, covering obligations under the Radio Equipment Regulations 2017, Electrical Equipment (Safety) Regulations 2016, EMC Regulations 2016, and UK MDR 2002 (device registration). CE marking alone is no longer sufficient for GB market placement.",
+            "designImpact": "Technical files must be structured to support UKCA declarations; conformity assessment routes must use UK-recognised bodies where third-party assessment is required (e.g. Class IIa medical device). UKCA mark must appear on the product label and packaging with UK Responsible Person address.",
+            "evidenceRequired": "UKCA Declarations of Conformity for stick and stand; UK Responsible Person details on product and packaging; technical files retained for 10 years post last manufacture date.",
+            "ownerRole": "Founder",
+            "gapAction": "Appoint a UK Responsible Person (can be the founder's UK entity); draft UKCA DoC templates for stick and stand referencing all applicable regulations; confirm label space for UKCA mark on handle underside or shaft collar."
+          },
+          {
+            "code": "BS EN ISO 11334-1",
+            "name": "Assistive products for walking manipulated by one arm — Requirements and test methods — Part 1: Elbow crutches",
+            "summary": "Primary UK/EU standard for one-arm walking aids covering structural strength, stability, and ergonomic requirements; the governing standard for walking stick mechanical compliance.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Structural and mechanical safety of the Sentinel stick as a walking aid; demonstrates compliance with the General Product Safety Regulations 2005 (GPSR) and supports the UK MDR 2002 technical file. The report explicitly flags this standard as governing the 100 kg static and dynamic gait load case.",
+            "designImpact": "Shaft, telescoping joint, handle-to-shaft interface, and ferrule must withstand specified static load (typically 1.5× body weight = ~1500 N), fatigue cycling, and drop tests. Carbon-fibre wall thickness (1.0–1.5 mm) and telescoping collar design must be validated against these load cases. Electronics cavity must not compromise shaft cross-section below minimum structural requirement.",
+            "evidenceRequired": "Test report from accredited lab demonstrating compliance with BS EN ISO 11334-1 load and fatigue tests on the production-representative shaft assembly including the electronics cavity; structural calculation pack signed by a mechanical engineer.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Commission structural FEA of the upper shaft with electronics cavity at 1.0 mm and 1.5 mm wall thickness under BS EN ISO 11334-1 load cases; identify accredited test house for physical fatigue and static load testing."
+          },
+          {
+            "code": "BS EN IEC 62133-2",
+            "name": "Secondary cells and batteries containing alkaline or other non-acid electrolytes — Safety requirements for portable sealed lithium secondary cells, and for batteries made from them, for use in portable applications — Part 2: Lithium systems",
+            "summary": "Safety standard for lithium-ion battery packs used in portable consumer and assistive products; required for the Sentinel's tubular Li-ion battery pack.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Lithium-ion battery pack within the Sentinel stick; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 for the battery subsystem. The report specifies a PCM/BMS with over/under-charge, short-circuit, and thermal protection — these must be validated against BS EN IEC 62133-2 abuse test requirements.",
+            "designImpact": "Battery pack (cell + PCM/BMS) must pass overcharge, forced discharge, short circuit, crush, and thermal abuse tests. Custom cylindrical form factor (to fit 19–20 mm ID cavity) means off-the-shelf 18650 pack certification may not transfer — a custom pack requires its own test programme.",
+            "evidenceRequired": "BS EN IEC 62133-2 test report for the specific battery pack configuration (cell + PCM/BMS + mechanical housing) from a UKAS-accredited or IEC-recognised lab; cell supplier's UN 38.3 test summary.",
+            "ownerRole": "Battery lead",
+            "gapAction": "Confirm whether 18650 cell or custom cylindrical cell will be used; obtain cell supplier's UN 38.3 certificate; scope BS EN IEC 62133-2 pack-level testing with a UKAS-accredited lab at battery pack design freeze."
+          },
+          {
+            "code": "UN 38.3",
+            "name": "UN Manual of Tests and Criteria, Part III, Sub-section 38.3 — Lithium metal and lithium ion batteries",
+            "summary": "Mandatory transport safety tests for lithium cells and batteries required before road, sea, or air shipment of finished products or battery packs.",
+            "status": "not-started",
+            "applicability": "UK statutory — Battery cells and packs during inbound supply chain (cell supplier to UK) and outbound distribution (finished Sentinel sticks to customers); UN 38.3 + Carriage of Dangerous Goods and Use of Transportable Pressure Equipment Regulations 2009 (CDG 2009) for road, IMDG for sea, IATA DGR for air.",
+            "designImpact": "Cells must pass altitude simulation, thermal cycling, vibration, shock, overcharge, and forced discharge tests before shipment. If a custom cylindrical cell is specified, the cell supplier must hold a valid UN 38.3 certificate for that specific cell; a change in cell chemistry or form factor invalidates existing certification.",
+            "evidenceRequired": "UN 38.3 test summary report from cell supplier for the specific cell used in production; ADR/CDG dangerous goods documentation for road transport of finished goods; IATA DGR compliance declaration for any air freight.",
+            "ownerRole": "Battery lead",
+            "gapAction": "Request UN 38.3 test summary from shortlisted cell suppliers; confirm cell form factor is locked before supplier qualification to avoid re-testing; prepare CDG dangerous goods note template for outbound logistics."
+          },
+          {
+            "code": "General Product Safety Regulations 2005",
+            "name": "General Product Safety Regulations 2005 (SI 2005/1803)",
+            "summary": "UK statutory baseline safety obligation for all consumer products not covered by a more specific product safety regime; requires products to be safe and imposes post-market surveillance duties.",
+            "status": "not-started",
+            "applicability": "UK statutory — Sentinel is a consumer product sold to members of the public; GPSR applies as the baseline safety net alongside and beneath the more specific regimes (MDR, RED, EES Regs). Post-market surveillance, incident reporting, and recall obligations apply from first sale.",
+            "designImpact": "Founder must establish a post-market surveillance system, maintain a complaints log, and have a documented recall procedure before first shipment. The 24/7 alarm receiving centre creates a real-time adverse event signal that must feed into the GPSR surveillance process.",
+            "evidenceRequired": "Post-market surveillance plan; complaints and incident log procedure; recall procedure document; UK Responsible Person contact details on product and in user documentation.",
+            "ownerRole": "Founder",
+            "gapAction": "Draft post-market surveillance plan and recall procedure; establish a mechanism to capture ARC-reported incidents as product safety signals; include GPSR obligations in the regulatory affairs workplan."
+          },
+          {
+            "code": "PSTI Act 2022",
+            "name": "Product Security and Telecommunications Infrastructure Act 2022 — Part 1: Product Security",
+            "summary": "UK statutory regime requiring minimum security standards for consumer connectable products; applies to any product with network connectivity sold to UK consumers.",
+            "status": "not-started",
+            "applicability": "UK statutory — Sentinel contains an LTE-M/NB-IoT cellular module with always-on connectivity and an eSIM; it is a consumer connectable product under the PSTI Act 2022. Obligations include: no default universal passwords, a published vulnerability disclosure policy, and a defined minimum security support period communicated to consumers.",
+            "designImpact": "nRF9160 firmware must not use default universal credentials; the companion app and cloud backend must have a published vulnerability disclosure policy; the founder must state the minimum period of security update support on packaging and in the app. OTA firmware update capability over LTE-M is required to deliver security patches.",
+            "evidenceRequired": "Statement of compliance with PSTI Act 2022 Schedule 1 requirements; published vulnerability disclosure policy (URL on packaging); security support period statement in user documentation; DCMS registration if required by secondary legislation.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Review PSTI Act 2022 Schedule 1 obligations; confirm nRF9160 firmware has no default universal password; draft vulnerability disclosure policy and publish at a stable URL; define and document the security support period before launch."
+          },
+          {
+            "code": "RoHS 2012",
+            "name": "Restriction of the Use of Certain Hazardous Substances in Electrical and Electronic Equipment Regulations 2012 (SI 2012/3032)",
+            "summary": "UK statutory restriction on hazardous substances (lead, mercury, cadmium, hexavalent chromium, PBBs, PBDEs, and four phthalates) in electrical and electronic equipment.",
+            "status": "not-started",
+            "applicability": "UK statutory — Sentinel stick and charging stand are electrical and electronic equipment placed on the UK market; RoHS 2012 applies to all PCBs, solder, battery pack, and electronic components. Wood handle and carbon-fibre shaft are not EEE but the electronic subassemblies within them are in scope.",
+            "designImpact": "All PCBs must use lead-free solder (SAC alloy); component procurement must include RoHS declarations; battery pack chemistry must be RoHS-compliant. Supplier RoHS declarations must be collected and retained in the technical file.",
+            "evidenceRequired": "RoHS Declaration of Conformity; supplier RoHS declarations for all electronic components and PCB assemblies; material declarations (IPC-1752A or equivalent) from PCB assembly house.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Add RoHS compliance requirement to component procurement specification; request IPC-1752A material declarations from PCB assembly house and battery pack supplier at design freeze."
+          },
+          {
+            "code": "WEEE Regulations 2013",
+            "name": "Waste Electrical and Electronic Equipment Regulations 2013 (SI 2013/3113)",
+            "summary": "UK statutory producer responsibility regime requiring registration, take-back, and reporting for electrical and electronic equipment placed on the UK market.",
+            "status": "not-started",
+            "applicability": "UK statutory — Sentinel stick and charging stand are EEE; the founder is a producer under WEEE Regulations 2013 and must register with an approved compliance scheme before first sale, finance collection and recycling, and mark products with the crossed-out wheelie bin symbol.",
+            "designImpact": "Product label must include WEEE symbol; user documentation must explain take-back options; battery must be designed for removal by an authorised recycler (even if not user-removable) — document the disassembly procedure for WEEE processing.",
+            "evidenceRequired": "WEEE producer registration number from an approved compliance scheme; annual WEEE return submissions; crossed-out wheelie bin mark on product and packaging; battery removal procedure in service documentation.",
+            "ownerRole": "Founder",
+            "gapAction": "Register with a UK WEEE compliance scheme before first product sale; add WEEE symbol to label artwork; document battery removal procedure for WEEE processing in the service manual."
+          },
+          {
+            "code": "IET Code of Practice for Electric Vehicle Charging Equipment Installation",
+            "name": "Ofcom — Wireless Telegraphy Act 2006 and Interface Requirements for LTE-M/NB-IoT devices",
+            "summary": "Ofcom spectrum licensing and interface requirements for devices using licensed cellular spectrum in the UK; LTE-M and NB-IoT operate in licensed bands requiring compliance with published interface requirements.",
+            "status": "not-started",
+            "applicability": "UK statutory — nRF9160 LTE-M/NB-IoT radio operates in Ofcom-licensed spectrum; the finished product must comply with Ofcom Interface Requirements (IR 2030 or relevant IR for the bands used) and the Wireless Telegraphy Act 2006. Module-level certification covers the radio parameters but the system integrator must confirm the antenna installation does not cause out-of-band emissions.",
+            "designImpact": "Antenna placement in the wood handle must be characterised for out-of-band emissions; the dielectric collar or handle window design must not cause the antenna to radiate outside the certified module parameters. eSIM provisioning must use a UK MNO or MVNO with spectrum licences for LTE-M/NB-IoT.",
+            "evidenceRequired": "Ofcom Interface Requirement compliance confirmation via nRF9160 module certification reference; MNO/MVNO agreement confirming LTE-M/NB-IoT coverage SLA for UK; antenna integration test report confirming out-of-band emissions within module certification limits.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Identify target MNO/MVNO for eSIM provisioning and confirm LTE-M/NB-IoT UK coverage; obtain nRF9160 module Ofcom IR compliance documentation; include out-of-band antenna emissions check in EMC test plan."
+          },
+          {
+            "code": "BS EN 60335-1",
+            "name": "Household and similar electrical appliances — Safety — Part 1: General requirements",
+            "summary": "Designated safety standard for household electrical appliances; applies to the mains-powered inductive charging stand as a household appliance.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Inductive charging stand (mains-powered household appliance); demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016. The stand is the only mains-connected element of the Sentinel system.",
+            "designImpact": "Stand must meet requirements for insulation, creepage and clearance, thermal protection, earth continuity, and dielectric strength. Inductive power transfer coil and switching electronics must not create accessible hazardous voltages. Thermal cutoff required if coil misalignment causes heating.",
+            "evidenceRequired": "Test report from UKAS-accredited lab demonstrating compliance with BS EN 60335-1 and BS EN 60335-2-29 (battery chargers); UKCA Declaration of Conformity for the stand.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Engage UKAS-accredited test house to scope BS EN 60335-1 and -2-29 testing for the charging stand at industrial design freeze; include thermal runaway scenario (misaligned coil, foreign object) in the test plan."
+          },
+          {
+            "code": "BS EN 62479",
+            "name": "Assessment of the compliance of low power electronic and electrical equipment with the basic restrictions relating to human exposure to electromagnetic fields (10 MHz–300 GHz)",
+            "summary": "Simplified SAR/EMF assessment standard for low-power radio devices held close to the body; relevant because Sentinel is a body-supported device with an always-on cellular radio.",
+            "status": "not-started",
+            "applicability": "UK designated standard — LTE-M/NB-IoT radio in a device held in the hand and supported against the body during use; demonstrates compliance with the Radio Equipment Regulations 2017 essential requirement on human exposure to electromagnetic fields. The handle-mounted antenna placement (close to the user's hand) requires a specific SAR or EMF assessment.",
+            "designImpact": "Antenna must be positioned and oriented to keep RF exposure within ICNIRP limits for a hand-held device; antenna gain and duty cycle must be characterised in the handle-mounted configuration. If BS EN 62479 simplified assessment is insufficient (antenna too close to body), a full SAR measurement per BS EN 62209-1528 may be required.",
+            "evidenceRequired": "BS EN 62479 compliance assessment report or, if required, BS EN 62209-1528 SAR measurement report from a UKAS-accredited lab; included in the RED technical file.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Determine antenna separation distance from user's hand in normal use; conduct BS EN 62479 simplified assessment at prototype stage; escalate to full SAR measurement if separation distance is below the simplified-assessment threshold."
+          }
+        ],
+        "count": 17,
+        "extractedFresh": true
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 5,
+      "engineCommit": "2fec22ae",
+      "elapsedMs": 132512,
+      "costPence": 885,
+      "output": {
+        "regulatory": [
+          {
+            "code": "Electrical Equipment (Safety) Regulations 2016",
+            "name": "Electrical Equipment (Safety) Regulations 2016 (SI 2016/1101)",
+            "summary": "UK statutory instrument implementing low-voltage directive obligations post-Brexit; requires safe design of electrical equipment operating between 50–1000 V AC or 75–1500 V DC, and underpins UKCA marking for the mains-powered variant.",
+            "status": "not-started",
+            "applicability": "UK statutory — Mains-powered variant (optional AC supply input); the optional mains-powered variant places the product squarely within scope. The solar-only variant with internal LiFePO4 battery operating at low voltage may fall below the LV threshold but the mains variant does not. UKCA marking is required for UK market placement.",
+            "designImpact": "Mains input circuit must meet basic and supplementary insulation requirements, creepage and clearance distances, and fault protection. Power supply module must be designed or sourced to satisfy the Regulations; a pre-certified PSU module with UKCA/CE mark simplifies compliance but system-level integration must be re-assessed.",
+            "evidenceRequired": "Technical construction file including circuit diagrams, insulation coordination calculation, and either a test report from a UKAS-accredited lab or a declaration of conformity referencing harmonised standards (e.g. BS EN 62368-1). UKCA Declaration of Conformity and UK Responsible Person appointment.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Confirm whether mains variant input voltage falls within LV Regulations scope; select pre-certified PSU module; commission insulation coordination review and prepare technical file."
+          },
+          {
+            "code": "Radio Equipment Regulations 2017",
+            "name": "Radio Equipment Regulations 2017 (SI 2017/1206) — UK RED",
+            "summary": "UK statutory instrument requiring radio equipment placed on the UK market to meet essential requirements for health/safety, EMC, and efficient use of spectrum; applies to Wi-Fi, cellular, and LoRa radio modules.",
+            "status": "not-started",
+            "applicability": "UK statutory — Wi-Fi (2.4/5 GHz), optional LTE-M/NB-IoT cellular module, and LoRa 868 MHz ISM radio all constitute radio equipment under the Regulations. All three radio paths must be covered. Pre-certified radio modules carry their own conformity but system-level integration (antenna, enclosure, co-location) requires a fresh assessment.",
+            "designImpact": "Antenna placement, radome aperture in steel body, and inter-antenna isolation (≥λ/4 at 868 MHz ≈ 86 mm) must be validated. Co-location of Wi-Fi, cellular, and LoRa antennas requires desense and spurious emission testing at system level. Steel body requires non-metallic radome window — aperture dimensions and material must be specified and tested.",
+            "evidenceRequired": "System-level radio test report from a UKAS-accredited or Ofcom-recognised test house covering all active radio bands simultaneously; UKCA Declaration of Conformity referencing harmonised standards (BS EN 300 328 for Wi-Fi, BS EN 301 511/BS EN 301 908 for cellular, BS EN 300 220 for LoRa 868 MHz); UK Responsible Person appointment.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Select pre-certified Wi-Fi/BLE, cellular, and LoRa modules; engage RF test house to scope system-level co-existence and radome aperture testing; define antenna positions in ID concept model."
+          },
+          {
+            "code": "Electromagnetic Compatibility Regulations 2016",
+            "name": "Electromagnetic Compatibility Regulations 2016 (SI 2016/1091)",
+            "summary": "UK statutory instrument requiring electrical and electronic apparatus to neither generate electromagnetic disturbance beyond set limits nor be susceptible to such disturbance.",
+            "status": "not-started",
+            "applicability": "UK statutory — Entire Hedgerow product (both solar-only and mains variants); the NPU SoC, switching power management PCBA, and solar charge controller are all potential EMC emission sources. Outdoor garden placement near other consumer electronics means immunity requirements also apply.",
+            "designImpact": "PCB layout must minimise switching noise from solar PMIC and NPU; shielding strategy for NPU SoC must be defined; cable routing (if any external cables) must be filtered. Steel body variant provides inherent shielding but radome apertures re-open emission paths. Ceramic body requires explicit EMC shielding layer or compartment around NPU/PMIC.",
+            "evidenceRequired": "EMC test report (radiated and conducted emissions + immunity) from UKAS-accredited lab; UKCA Declaration of Conformity referencing BS EN 55032 (emissions) and BS EN 55035 (immunity) or equivalent harmonised standards.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Define body material (steel vs ceramic) as this determines shielding strategy; include EMC test scope in RF test house brief; conduct pre-compliance scan on prototype PCB before formal submission."
+          },
+          {
+            "code": "General Product Safety Regulations 2005",
+            "name": "General Product Safety Regulations 2005 (SI 2005/1803) — GPSR",
+            "summary": "UK statutory baseline requiring all consumer products placed on the market to be safe; applies where no sector-specific statutory instrument covers the full safety scope.",
+            "status": "not-started",
+            "applicability": "UK statutory — Consumer-facing garden product sold direct-to-consumer and through retail; GPSR applies as the safety backstop across both solar-only and mains variants, covering mechanical hazards (perch, reservoir interchange, mounting hardware), thermal hazards (battery, solar panel), and any residual risks not addressed by sector-specific regulations.",
+            "designImpact": "Risk assessment must cover mechanical injury from mounting hardware and perch load cell, thermal runaway containment of LiFePO4 battery, ingress protection for outdoor use (minimum IP54 body, IP65 sensor apertures as flagged in report), and child/pet interaction with seed reservoirs and electrical apertures.",
+            "evidenceRequired": "Product risk assessment document; instructions for safe use in multiple languages (English mandatory for UK); incident reporting procedure in place; UK Responsible Person appointed and contact details on product/packaging.",
+            "ownerRole": "Founder",
+            "gapAction": "Commission product risk assessment covering all identified hazard categories; draft safe-use instructions; appoint UK Responsible Person."
+          },
+          {
+            "code": "UKCA Marking",
+            "name": "UK Conformity Assessed (UKCA) Marking Requirements",
+            "summary": "UK post-Brexit conformity marking scheme replacing CE marking for products placed on the Great Britain market; required for products covered by one or more of the new UK product regulations.",
+            "status": "not-started",
+            "applicability": "UK statutory — Entire Hedgerow product placed on the GB market; UKCA marking is required under the Electrical Equipment (Safety) Regulations 2016, Radio Equipment Regulations 2017, and EMC Regulations 2016. CE marking alone is no longer sufficient for GB market placement (transition period ended 31 December 2024 for most categories).",
+            "designImpact": "Technical file must be compiled and held by the UK Responsible Person; conformity assessment route (self-declaration vs third-party) depends on which harmonised standards are used and whether radio equipment essential requirements are fully covered by harmonised standards. UKCA mark must appear on product and packaging with UK Responsible Person address.",
+            "evidenceRequired": "UKCA Declaration of Conformity covering all applicable regulations; technical construction file; UK Responsible Person appointment letter; UKCA mark artwork applied to product label and packaging.",
+            "ownerRole": "Founder",
+            "gapAction": "Appoint UK Responsible Person; compile technical file structure; confirm conformity assessment route for each applicable regulation; add UKCA mark to label and packaging artwork."
+          },
+          {
+            "code": "Waste Electrical and Electronic Equipment Regulations 2013",
+            "name": "Waste Electrical and Electronic Equipment Regulations 2013 (SI 2013/3113) — WEEE",
+            "summary": "UK statutory instrument requiring producers of electrical and electronic equipment to register, finance collection, and meet recycling/recovery targets for end-of-life products.",
+            "status": "not-started",
+            "applicability": "UK statutory — Hedgerow is an electrical and electronic product placed on the UK consumer market; producer registration with a UK-approved WEEE compliance scheme is mandatory before first sale. The LiFePO4 battery is separately subject to battery waste regulations.",
+            "designImpact": "Product must be designed for disassembly to enable battery removal for separate collection; WEEE crossed-bin symbol must appear on product and packaging; battery must be user-removable or service-removable per battery waste regulations.",
+            "evidenceRequired": "WEEE producer registration number from a UK-approved compliance scheme (e.g. Valpak, Recolight); evidence of scheme membership and annual reporting; crossed-bin symbol on product label.",
+            "ownerRole": "Founder",
+            "gapAction": "Register with a UK WEEE compliance scheme before first product sale; confirm battery removal procedure in design; add crossed-bin symbol to label artwork."
+          },
+          {
+            "code": "Batteries and Accumulators (Placing on the Market) Regulations 2008",
+            "name": "Batteries and Accumulators (Placing on the Market) Regulations 2008 (SI 2008/2164) as amended",
+            "summary": "UK statutory instrument controlling the placing on the market of batteries, requiring producer registration, labelling, and end-of-life take-back for batteries placed on the UK market.",
+            "status": "not-started",
+            "applicability": "UK statutory — LiFePO4 battery pack integrated into Hedgerow; the producer (Hedgerow manufacturer/importer) must register as a battery producer and ensure the battery carries the crossed-bin symbol and capacity marking. Note: the UK Batteries Regulation 2023 updates are in progress — monitor DEFRA guidance.",
+            "designImpact": "Battery must be labelled with crossed-bin symbol and chemical composition (LiFePO4 / Li-Fe); battery must be removable by end user or at a service point to enable separate collection; battery capacity (Wh) must be declared on packaging.",
+            "evidenceRequired": "Battery producer registration with UK Environment Agency or approved compliance scheme; battery labelling compliance evidence; take-back scheme documentation.",
+            "ownerRole": "Founder",
+            "gapAction": "Register as battery producer with UK Environment Agency; confirm battery labelling requirements with compliance scheme; design battery compartment for tool-free or single-tool removal."
+          },
+          {
+            "code": "UN 38.3",
+            "name": "UN Manual of Tests and Criteria, Part III, Sub-section 38.3 — Lithium Batteries",
+            "summary": "Mandatory transport safety test series for lithium cells and batteries; required before any road, sea, or air shipment of lithium battery cells or assembled packs.",
+            "status": "not-started",
+            "applicability": "UK statutory — LiFePO4 battery cells and assembled pack during inbound supply chain transport and outbound distribution to consumers; UN 38.3 is mandated by the Carriage of Dangerous Goods and Use of Transportable Pressure Equipment Regulations 2009 (CDG Regs) for road, IMDG Code for sea, and IATA DGR for air freight.",
+            "designImpact": "Battery pack design (cell count, configuration, BMS protection) must be finalised before transport testing; any design change to cell type, pack configuration, or BMS after certification requires re-testing. BMS must include overcharge, over-discharge, and short-circuit protection to pass tests T5 and T6.",
+            "evidenceRequired": "UN 38.3 test summary report from cell supplier or accredited test laboratory covering the specific cell type and pack configuration used in Hedgerow; ADR dangerous goods documentation for road shipment of battery stock.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Confirm cell supplier holds valid UN 38.3 certification for the selected LiFePO4 cell; if pack configuration differs from certified configuration, commission pack-level UN 38.3 testing; prepare ADR documentation template for logistics team."
+          },
+          {
+            "code": "BS EN IEC 62133-2",
+            "name": "Safety requirements for portable sealed secondary lithium cells and batteries for use in portable applications — Part 2: Lithium systems",
+            "summary": "Harmonised standard for safety of lithium battery packs in portable/consumer applications; demonstrates compliance with Electrical Equipment (Safety) Regulations 2016 for the battery subsystem.",
+            "status": "not-started",
+            "applicability": "UK designated standard — LiFePO4 battery pack within Hedgerow (consumer portable application); demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 for the battery subsystem. If the battery is classified as an industrial/stationary system, BS EN IEC 62619 applies instead — classification depends on final Wh capacity and application definition.",
+            "designImpact": "Battery pack must pass cell-level and pack-level abuse tests (overcharge, forced discharge, short circuit, crush, thermal abuse); BMS protection thresholds must be set to prevent conditions that would trigger test failures; pack enclosure must contain any cell venting without propagation.",
+            "evidenceRequired": "BS EN IEC 62133-2 test report from UKAS-accredited or internationally recognised lab for the specific cell type and pack configuration; supplier declaration or type-test certificate.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Determine whether battery pack falls under BS EN IEC 62133-2 (consumer portable) or BS EN IEC 62619 (industrial); obtain cell supplier's existing test report and assess whether pack-level testing is additionally required."
+          },
+          {
+            "code": "BS EN 62368-1",
+            "name": "Audio/video, information and communication technology equipment — Part 1: Safety requirements",
+            "summary": "Harmonised standard for safety of AV/ICT equipment; the primary safety standard for the NPU SoC, camera module, and associated electronics in Hedgerow.",
+            "status": "not-started",
+            "applicability": "UK designated standard — NPU SoC, camera module, power management PCBA, and associated electronics; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 for the electronics subsystem. Replaces BS EN 60950-1 and BS EN 60065 for ICT/AV equipment.",
+            "designImpact": "Creepage and clearance distances, insulation coordination, and thermal limits for the electronics assembly must meet BS EN 62368-1 requirements; mains-powered variant must meet reinforced insulation between mains and SELV circuits; outdoor enclosure must provide adequate protection against ingress (IP rating feeds into this standard's environmental requirements).",
+            "evidenceRequired": "BS EN 62368-1 test report or self-declaration with supporting technical file from UKAS-accredited lab or competent internal test; included in UKCA technical file.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Include BS EN 62368-1 scope in electronics design review; engage test house to confirm applicability and test scope for both solar-only and mains variants."
+          },
+          {
+            "code": "BS EN 300 220",
+            "name": "Short Range Devices (SRD) operating in the frequency range 25 MHz to 1 000 MHz — Part 1/2",
+            "summary": "ETSI harmonised standard for LoRa 868 MHz ISM band short-range devices; demonstrates compliance with Radio Equipment Regulations 2017 spectrum efficiency essential requirement.",
+            "status": "not-started",
+            "applicability": "UK designated standard — LoRa 868 MHz mesh radio between multiple Hedgerow feeders; demonstrates compliance with Radio Equipment Regulations 2017 for the LoRa radio path. UK 868 MHz ISM band duty cycle limits (1% or sub-band specific) apply and must be respected in firmware.",
+            "designImpact": "LoRa firmware must implement duty cycle management to stay within UK 868 MHz sub-band limits; antenna gain and EIRP must not exceed permitted levels; antenna placement must achieve ≥86 mm separation from Wi-Fi and cellular antennas to avoid desense.",
+            "evidenceRequired": "BS EN 300 220 test report for the LoRa module at system level (or pre-certified module test report plus integration assessment); included in UKCA technical file under Radio Equipment Regulations 2017.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Select pre-certified LoRa module with BS EN 300 220 certification; confirm duty cycle management is implemented in firmware; include LoRa antenna placement in RF test house brief."
+          },
+          {
+            "code": "Product Security and Telecommunications Infrastructure Act 2022",
+            "name": "Product Security and Telecommunications Infrastructure Act 2022 (PSTI Act) — Part 1",
+            "summary": "UK statutory requirement for consumer connectable products to meet minimum cybersecurity requirements; mandatory from 29 April 2024.",
+            "status": "not-started",
+            "applicability": "UK statutory — Hedgerow is a consumer connectable product (Wi-Fi, optional cellular, LoRa); PSTI Part 1 applies from 29 April 2024. All three connectivity paths (Wi-Fi, cellular, LoRa) bring the product within scope. The companion app and cloud backend are in scope insofar as they interact with the connectable product.",
+            "designImpact": "No universal default passwords permitted — each unit must have a unique default credential or require user-set password on first use; a published vulnerability disclosure policy (VDP) must be in place; minimum security update support period must be declared to consumers; software bill of materials (SBOM) discipline required to track component vulnerabilities.",
+            "evidenceRequired": "Statement of compliance with PSTI Regulations 2023 (the secondary legislation); published vulnerability disclosure policy URL; declaration of minimum security support period on product packaging or in-box documentation; UK Responsible Person appointment (shared with UKCA obligations).",
+            "ownerRole": "Founder",
+            "gapAction": "Implement unique per-device credential generation in firmware; publish vulnerability disclosure policy on company website; declare minimum security update period on packaging; review companion app authentication against PSTI requirements."
+          },
+          {
+            "code": "UK GDPR / Data Protection Act 2018",
+            "name": "UK General Data Protection Regulation and Data Protection Act 2018",
+            "summary": "UK data protection law governing the collection, processing, and storage of personal data; the camera, microphone, and individual-bird identification features may incidentally capture personal data (images of people, audio).",
+            "status": "not-started",
+            "applicability": "UK statutory — Camera (12 MP with optical zoom) and microphone sensors may capture images or audio of people in or adjacent to the garden; individual identification and citizen-science data contribution features process data that could be linked to individuals (garden location, behavioural patterns). UK GDPR applies to any personal data processed by the companion app or cloud backend.",
+            "designImpact": "Privacy-by-design required: camera field of view and zoom capability must be considered in the context of neighbour privacy; on-device processing (rather than cloud upload of raw video) reduces but does not eliminate data protection obligations; citizen-science contribution toggle must be genuinely opt-in with clear consent; data retention periods must be defined and enforced in the app.",
+            "evidenceRequired": "Data Protection Impact Assessment (DPIA) for camera/microphone data processing; ICO registration (if required); privacy notice published and accessible from companion app; consent mechanism for citizen-science data contribution; data processing agreement with BTO.",
+            "ownerRole": "Founder",
+            "gapAction": "Commission DPIA covering camera, microphone, location, and citizen-science data flows; draft privacy notice and consent mechanism for app; establish data processing agreement with BTO before citizen-science feature launch."
+          },
+          {
+            "code": "RoHS 2012",
+            "name": "Restriction of the Use of Certain Hazardous Substances in Electrical and Electronic Equipment Regulations 2012 (SI 2012/3032) — UK RoHS",
+            "summary": "UK statutory instrument restricting hazardous substances (lead, mercury, cadmium, hexavalent chromium, PBB, PBDE, and four phthalates) in electrical and electronic equipment.",
+            "status": "not-started",
+            "applicability": "UK statutory — Hedgerow PCBAs, solder, cable insulation, and electronic components; applies to all electrical and electronic equipment placed on the UK market. Powder-coated steel body and ceramic body are unlikely to contain restricted substances but must be confirmed with suppliers.",
+            "designImpact": "PCB assembly must use lead-free solder (Sn-Ag-Cu or equivalent); component selection must exclude restricted substances; supplier declarations of conformity (DoC) required for all electronic components and sub-assemblies.",
+            "evidenceRequired": "RoHS Declaration of Conformity; supplier RoHS DoCs for all electronic components; technical documentation demonstrating substance levels are below maximum concentration values.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Include RoHS compliance requirement in component procurement specification; collect supplier RoHS DoCs during BOM finalisation; add RoHS DoC to UKCA technical file."
+          },
+          {
+            "code": "BS EN IEC 60529",
+            "name": "Degrees of Protection Provided by Enclosures (IP Code)",
+            "summary": "Standard defining ingress protection ratings for enclosures against solid particles and liquids; the IP rating of Hedgerow's enclosure determines its fitness for permanent outdoor garden installation.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Outdoor garden installation in UK weather conditions (rain, frost, condensation); IP rating underpins compliance with the Electrical Equipment (Safety) Regulations 2016 and GPSR for outdoor electrical products. Report recommends minimum IP54 for body and IP65 for sensor/connector apertures — these must be formally tested and declared.",
+            "designImpact": "Enclosure design must achieve at least IP54 (dust protected, splash-proof from all directions) for the main body and IP65 (dust-tight, jet-proof) for sensor ports, camera window, microphone port, and connector apertures. Drainage paths, gasket selection, and cable entry glands must all be designed and tested to the declared IP rating. Modular reservoir interchange mechanism must not compromise the IP rating of the electronics enclosure.",
+            "evidenceRequired": "IP test report from UKAS-accredited test house confirming declared IP rating for the production enclosure design; IP rating marked on product label.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Define target IP rating (minimum IP54 body / IP65 apertures) in product specification; design gaskets, drainage, and cable entries to achieve target; commission IP test on first production-representative prototype."
+          },
+          {
+            "code": "BS EN 62479",
+            "name": "Assessment of the compliance of low power electronic and electrical equipment with the basic restrictions related to human exposure to electromagnetic fields (10 MHz – 300 GHz)",
+            "summary": "Simplified assessment standard for RF exposure (SAR/power density) for low-power radio devices; demonstrates compliance with Radio Equipment Regulations 2017 health and safety essential requirement for RF exposure.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Wi-Fi (2.4/5 GHz), cellular (LTE-M/NB-IoT), and LoRa (868 MHz) radio transmitters; demonstrates compliance with Radio Equipment Regulations 2017 Article 3(1)(a) health and safety essential requirement for RF exposure. Garden-mounted product is not body-worn but proximity to users during seed refilling must be assessed.",
+            "designImpact": "Transmit power levels for all radio paths must be confirmed to fall within BS EN 62479 simplified assessment limits; if any radio path exceeds simplified assessment thresholds, full SAR testing per BS EN 50663 or BS EN 62209 is required. Antenna placement relative to likely user hand positions during seed refilling must be considered.",
+            "evidenceRequired": "BS EN 62479 simplified assessment calculation or test report for all radio paths; included in UKCA technical file under Radio Equipment Regulations 2017.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Obtain transmit power specifications for all selected radio modules; perform BS EN 62479 simplified assessment calculation; if any path fails simplified assessment, commission full SAR test."
+          },
+          {
+            "code": "Electricity at Work Regulations 1989",
+            "name": "Electricity at Work Regulations 1989 (EAWR) (SI 1989/635)",
+            "summary": "UK statutory instrument imposing duties on persons who design, construct, and maintain electrical systems to prevent danger; applies to the design of the mains-powered variant.",
+            "status": "not-started",
+            "applicability": "UK statutory — Mains-powered variant design and any installation involving connection to the domestic mains supply; EAWR imposes duties on the designer to ensure the electrical system is constructed so as to prevent danger. Relevant to the design of the mains input circuit, earthing, and fault protection.",
+            "designImpact": "Mains input circuit must include appropriate fusing, earthing (Class I or Class II decision required), and fault current protection; design must prevent danger from electric shock, burn, fire, and explosion under both normal and fault conditions.",
+            "evidenceRequired": "Design review record demonstrating EAWR compliance; for mains variant, electrical safety test report (dielectric strength, earth continuity, leakage current) as part of BS EN 62368-1 type testing.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Confirm Class I vs Class II construction decision for mains variant; include EAWR compliance review in electrical design sign-off process; ensure mains variant electrical safety tests are included in BS EN 62368-1 test scope."
+          }
+        ],
+        "count": 17,
+        "extractedFresh": true
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "bess",
+      "loop": 5,
+      "engineCommit": "2fec22ae",
+      "elapsedMs": 149818,
+      "costPence": 1059,
+      "output": {
+        "regulatory": [
+          {
+            "code": "Electrical Equipment (Safety) Regulations 2016",
+            "name": "Electrical Equipment (Safety) Regulations 2016 (SI 2016/1101)",
+            "summary": "UK statutory instrument implementing the Low Voltage Directive for electrical equipment operating between 50–1000 V AC or 75–1500 V DC; requires UKCA marking and a technical file.",
+            "status": "not-started",
+            "applicability": "UK statutory — The complete BESS unit (PCS AC output, internal LV distribution, BMS, auxiliary supplies) falls within the LV scope; UKCA marking is mandatory before placing on the UK market. Designated standards BS EN IEC 62933-5-2 and BS EN IEC 62619/63056 are the primary conformity route.",
+            "designImpact": "A technical file must be compiled covering design, risk assessment, test evidence, and instructions; UKCA mark and UK-authorised representative declaration of conformity required on the container nameplate before first delivery.",
+            "evidenceRequired": "Declaration of Conformity referencing UKCA scheme; technical construction file; test reports from UKAS-accredited laboratory against designated standards; UK Authorised Representative appointment letter.",
+            "ownerRole": "Founder",
+            "gapAction": "Appoint a UK Authorised Representative and open a technical file; confirm which UKAS-accredited test house will conduct system-level testing against BS EN IEC 62933-5-2."
+          },
+          {
+            "code": "UKCA Marking Regulations",
+            "name": "UK Conformity Assessed (UKCA) Marking — Product Safety and Metrology etc. (Amendment etc.) (EU Exit) Regulations 2019 and successor instruments",
+            "summary": "Umbrella UK market-access scheme replacing CE marking; mandatory for electrical, machinery, EMC, and radio products placed on the GB market.",
+            "status": "not-started",
+            "applicability": "UK statutory — Applies to the complete BESS unit as an electrical/machinery product placed on the GB market; CE marking alone is no longer accepted for new GB placements.",
+            "designImpact": "UKCA mark must appear on the container nameplate alongside rated voltage, current, energy capacity, and manufacturer details; conformity must be assessed against UK-designated standards before first shipment.",
+            "evidenceRequired": "UKCA Declaration of Conformity; technical file index; conformity assessment records referencing UK-designated standards; UK Responsible Person details.",
+            "ownerRole": "Founder",
+            "gapAction": "Confirm UKCA conformity route (self-declaration vs. third-party notified body) and integrate UKCA marking into nameplate design and documentation pack."
+          },
+          {
+            "code": "EMC Regulations 2016",
+            "name": "Electromagnetic Compatibility Regulations 2016 (SI 2016/1091)",
+            "summary": "UK statutory instrument requiring electrical and electronic apparatus to not cause harmful electromagnetic interference and to have adequate immunity.",
+            "status": "not-started",
+            "applicability": "UK statutory — The PCS (1.5 MW bi-directional inverter), BMS electronics, SCADA gateway, and auxiliary controls all generate and are susceptible to electromagnetic disturbance; UKCA marking under EMC is required.",
+            "designImpact": "PCS and control electronics must meet conducted and radiated emission limits and immunity levels per BS EN IEC 61000 series; shielding, filtering, and cable segregation strategy must be documented in the technical file.",
+            "evidenceRequired": "EMC test report from UKAS-accredited laboratory against BS EN IEC 61000-6-2 (immunity, industrial) and BS EN IEC 61000-6-4 (emissions, industrial); EMC Declaration of Conformity.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Confirm PCS supplier holds valid EMC test reports for the 1.5 MW inverter; if not, schedule EMC testing at UKAS-accredited facility and add to technical file."
+          },
+          {
+            "code": "Electricity at Work Regulations 1989",
+            "name": "Electricity at Work Regulations 1989 (EAWR)",
+            "summary": "UK statutory instrument imposing duties on employers and the self-employed to ensure electrical systems are constructed, maintained, and operated safely.",
+            "status": "not-started",
+            "applicability": "UK statutory — Applies to the fixed electrical installation inside the container (DC busbars, AC distribution, protection coordination, isolation) and to all work activities on the energised system during installation, commissioning, and maintenance.",
+            "designImpact": "All electrical systems must be designed to prevent danger; isolation and lock-off provisions, protection coordination, and safe working procedures must be documented; competent persons must carry out all electrical work.",
+            "evidenceRequired": "Electrical installation certificate (EIC) signed by a competent person; schedule of inspections and test results; written safe system of work for energisation and commissioning.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Engage a qualified electrical engineer to design internal distribution to BS 7671 and produce an EIC after installation; draft energisation safe system of work before first commissioning."
+          },
+          {
+            "code": "BS 7671",
+            "name": "Requirements for Electrical Installations (IET Wiring Regulations, 18th Edition)",
+            "summary": "UK wiring regulations governing the design, installation, and verification of fixed electrical installations; de facto enforcement standard for EAWR compliance.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Internal LV wiring, protection devices, earthing, and isolation within the container; demonstrates compliance with the Electricity at Work Regulations 1989. Amendment 2 (2022) requirements for energy storage apply directly.",
+            "designImpact": "Internal distribution must comply with shock protection (ADS), earthing arrangements, overcurrent and fault protection, isolation and switching, and cable sizing; Section 722 (electric vehicle charging) and emerging storage guidance in Amendment 2 inform battery room wiring requirements.",
+            "evidenceRequired": "Electrical Installation Certificate (EIC) with schedule of inspections and test results, signed by a competent person registered with a Part P/ECA-recognised scheme or equivalent.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Design internal distribution board, cable sizing, and protection coordination to BS 7671 Amendment 2; engage qualified electrician to inspect, test, and issue EIC after container installation on site."
+          },
+          {
+            "code": "ESQCR 2002",
+            "name": "Electricity Safety, Quality and Continuity Regulations 2002 (SI 2002/2665, as amended)",
+            "summary": "UK statutory instrument governing the safety and quality of electricity supply networks; underpins DNO requirements for grid-connected generation and storage.",
+            "status": "not-started",
+            "applicability": "UK statutory — The BESS connects in parallel with the public distribution network; ESQCR imposes obligations on the network operator and, via G99, on the owner of the generating/storage plant. The G99 application process is the primary compliance mechanism.",
+            "designImpact": "PCS must meet voltage and frequency limits, power quality requirements, and protection settings mandated by the DNO under ESQCR; islanding prevention and automatic disconnection on loss of mains must be implemented.",
+            "evidenceRequired": "G99 commissioning test record countersigned by the host DNO; generation connection agreement; protection relay settings schedule accepted by DNO.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Initiate G99 application with the host DNO at the earliest opportunity; confirm protection relay type and settings with DNO before PCS procurement is finalised."
+          },
+          {
+            "code": "ENA G99",
+            "name": "ENA Engineering Recommendation G99 — Requirements for the Connection of Generation Equipment in Parallel with Public Distribution Networks above 16 A per Phase",
+            "summary": "Mandatory UK grid code for storage systems connecting in parallel with the distribution network above 16 A per phase; enforced by every DNO under ESQCR.",
+            "status": "not-started",
+            "applicability": "UK approved code — Grid connection point for the 1.5 MW / G99-rated BESS; ENA G99 is the Engineering Recommendation enforced by all UK DNOs, sitting under ESQCR 2002. Grid-forming capability and ride-through parameters are explicitly required.",
+            "designImpact": "PCS must support grid-forming mode, loss-of-mains (LoM) protection (ROCOF and vector shift), frequency and voltage ride-through per G99 Annex, and remote trip capability; protection settings must be agreed with the DNO before commissioning.",
+            "evidenceRequired": "G99 Type Test certificate for the PCS (or equivalent accepted by DNO); G99 commissioning test record signed by host DNO; generation connection agreement; protection relay settings schedule.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Submit G99 application to host DNO; confirm PCS supplier holds a valid G99 Type Test certificate; schedule DNO witness commissioning test within the two-day commissioning window."
+          },
+          {
+            "code": "BS EN IEC 62933-5-2",
+            "name": "Electrical energy storage (EES) systems — Part 5-2: Safety requirements for grid-integrated electrical energy storage systems",
+            "summary": "UK-designated harmonised standard for stationary battery energy storage safety at system level; primary conformity route for UKCA marking under the Electrical Equipment (Safety) Regulations 2016.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Complete BESS enclosure including LFP racks, PCS, BMS, thermal management, and fire system; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 for UKCA marking. Covers thermal runaway propagation, fire containment, ventilation, and electrical safety at system level.",
+            "designImpact": "System must pass thermal runaway propagation tests, fire containment and suppression integration tests, ventilation adequacy assessment, and electrical isolation/protection tests; deflagration vent area and burst pressure calculations required; fire detection and suppression system must be integrated and tested as part of the system.",
+            "evidenceRequired": "Test report from UKAS-accredited laboratory demonstrating compliance with BS EN IEC 62933-5-2 at system level; included in UKCA technical file.",
+            "ownerRole": "Safety lead",
+            "gapAction": "Identify UKAS-accredited test house capable of BS EN IEC 62933-5-2 system-level testing; scope the test programme with the integrator and build test schedule into the product development timeline."
+          },
+          {
+            "code": "BS EN IEC 62619",
+            "name": "Secondary cells and batteries containing alkaline or other non-acid electrolytes — Safety requirements for secondary lithium cells and batteries for use in industrial applications",
+            "summary": "UK-designated standard for safety of lithium cells and battery modules in industrial applications; applies at cell and module level within the BESS.",
+            "status": "not-started",
+            "applicability": "UK designated standard — LFP cells and battery modules within the racks; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 at cell/module level. Cited in the research report as the required cell standard.",
+            "designImpact": "Cells and modules must pass abuse tests (overcharge, over-discharge, short circuit, crush, thermal abuse); BMS must implement the protection functions specified in the standard; cell supplier must provide conformity evidence.",
+            "evidenceRequired": "BS EN IEC 62619 test report or certificate from cell/module supplier; supplier declaration of conformity; include in UKCA technical file.",
+            "ownerRole": "Battery lead",
+            "gapAction": "Request BS EN IEC 62619 test reports and declaration of conformity from the LFP cell/module supplier during procurement; verify reports cover the specific cell format and chemistry selected."
+          },
+          {
+            "code": "BS EN IEC 63056",
+            "name": "Secondary cells and batteries containing alkaline or other non-acid electrolytes — Safety requirements for secondary lithium cells and batteries for use in electrical energy storage systems",
+            "summary": "UK-designated standard extending BS EN IEC 62619 to battery systems (multi-module assemblies) used in stationary energy storage applications.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Battery rack assemblies and the complete battery system within the BESS; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 at system/rack level. Cited in the research report as required alongside BS EN IEC 62619.",
+            "designImpact": "Rack-level and system-level battery assemblies must meet additional safety requirements beyond cell level, including inter-module protection, communication with BMS, and system-level abuse tolerance; rack mechanical design must accommodate test requirements.",
+            "evidenceRequired": "BS EN IEC 63056 test report or certificate for the rack/system assembly; supplier or integrator declaration of conformity; include in UKCA technical file.",
+            "ownerRole": "Battery lead",
+            "gapAction": "Confirm with the battery rack supplier whether BS EN IEC 63056 certification exists for the selected rack configuration; if not, scope additional testing as part of the system qualification programme."
+          },
+          {
+            "code": "UN 38.3",
+            "name": "UN Manual of Tests and Criteria, Part III, Sub-section 38.3 — Lithium metal and lithium ion batteries",
+            "summary": "Mandatory transport safety test protocol for lithium cells and batteries; required before any road, sea, or air shipment of lithium battery modules.",
+            "status": "not-started",
+            "applicability": "UK statutory — LFP cell modules and battery racks during road transport from manufacturer/integrator to UK site; UN 38.3 underpins the Carriage of Dangerous Goods and Use of Transportable Pressure Equipment Regulations 2009 (CDG 2009) and ADR for road transport. Also required for any sea freight under IMDG Code.",
+            "designImpact": "All LFP cells and battery modules must have passed altitude simulation, thermal cycling, vibration, shock, overcharge, forced discharge, and impact/crush tests before transport; transport documentation (dangerous goods note, ADR consignment note) must reference valid UN 38.3 summary report.",
+            "evidenceRequired": "UN 38.3 test summary report from cell/module supplier or accredited laboratory; ADR dangerous goods consignment note for road transport; IMDG documentation if sea freight is used.",
+            "ownerRole": "Battery lead",
+            "gapAction": "Confirm cell and module supplier holds a current UN 38.3 test summary report covering the specific cell format; prepare ADR transport documentation before first road shipment of battery modules."
+          },
+          {
+            "code": "Supply of Machinery (Safety) Regulations 2008",
+            "name": "Supply of Machinery (Safety) Regulations 2008 (SI 2008/1597, as amended)",
+            "summary": "UK statutory instrument implementing the Machinery Directive for machinery placed on the UK market; applies to automated and power-driven equipment with moving parts.",
+            "status": "not-started",
+            "applicability": "UK statutory — The liquid cooling skid (pump, fan, chiller compressor), automated fire suppression actuators, and any motorised switchgear within the BESS constitute machinery under the Regulations; UKCA marking under the Machinery scheme is required for these sub-assemblies if supplied as standalone units, or the integrator must address machinery hazards in the system technical file.",
+            "designImpact": "Risk assessment to BS EN ISO 12100 required for all machinery elements; guarding, emergency stop, and isolation provisions must be designed in; cooling skid must meet relevant machinery safety standards.",
+            "evidenceRequired": "Machinery Declaration of Conformity for the cooling skid and any motorised sub-assemblies; risk assessment to BS EN ISO 12100; include in UKCA technical file.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Confirm cooling skid supplier holds a valid Machinery Declaration of Conformity; if the integrator assembles the skid, commission a BS EN ISO 12100 risk assessment and prepare machinery technical file section."
+          },
+          {
+            "code": "Pressure Systems Safety Regulations 2000",
+            "name": "Pressure Systems Safety Regulations 2000 (PSSR 2000, SI 2000/128)",
+            "summary": "UK statutory instrument governing the safe design, installation, and operation of pressure systems containing relevant fluids; applies to the liquid cooling circuit once installed on site.",
+            "status": "not-started",
+            "applicability": "UK statutory — The glycol/water liquid cooling circuit (pipework, pump, chiller, expansion vessel, pressure relief) constitutes a pressure system under PSSR 2000 once installed and in service on the customer's site; the site operator becomes the duty holder.",
+            "designImpact": "Cooling circuit must be designed with appropriate pressure relief, isolation, and drainage; a written scheme of examination must be prepared by a competent person before the system is brought into service; operating and maintenance instructions must address pressure system safety.",
+            "evidenceRequired": "Written scheme of examination prepared by a competent person (e.g., insurance engineer); pressure test records for the cooling circuit; operating instructions referencing PSSR duties for the site operator.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Engage a competent person (insurance engineer or equivalent) to prepare a written scheme of examination for the cooling circuit; include PSSR obligations in the site operator handover documentation."
+          },
+          {
+            "code": "CDM Regulations 2015",
+            "name": "Construction (Design and Management) Regulations 2015 (SI 2015/51)",
+            "summary": "UK statutory instrument imposing duties on clients, designers, and contractors for health and safety in construction projects; applies to the site installation of the BESS.",
+            "status": "not-started",
+            "applicability": "UK statutory — Installation of the BESS on a prepared concrete pad, including foundation anchorage, AC tie-in, and commissioning, constitutes construction work under CDM 2015; the site client, principal designer, and principal contractor all have statutory duties.",
+            "designImpact": "Pre-construction health and safety information must be provided to the principal contractor; a construction phase plan must be prepared; the health and safety file must be handed over to the client on completion; lifting operations (crane/HIAB for 25–40 t container) require a lifting plan under LOLER 1998.",
+            "evidenceRequired": "Construction phase plan; health and safety file; LOLER lifting plan and crane/HIAB inspection records; principal contractor and principal designer appointment letters.",
+            "ownerRole": "Founder",
+            "gapAction": "Confirm whether the project triggers the CDM notifiable threshold (>30 working days with >20 workers, or >500 person-days); appoint principal designer and principal contractor; prepare pre-construction health and safety information pack for site installation."
+          },
+          {
+            "code": "Health and Safety at Work etc. Act 1974",
+            "name": "Health and Safety at Work etc. Act 1974 (HSWA)",
+            "summary": "Primary UK health and safety legislation imposing general duties on employers, the self-employed, and manufacturers to ensure safety of persons at work and affected by work activities.",
+            "status": "not-started",
+            "applicability": "UK statutory — Applies to all work activities associated with manufacturing, installing, commissioning, and maintaining the BESS; the founder as manufacturer has duties under Section 6 (safe design, testing, information provision) in addition to employer duties.",
+            "designImpact": "Section 6 duty requires the founder to ensure the BESS is designed and constructed to be safe when used as intended; adequate information (installation manual, commissioning procedure, maintenance schedule, emergency response plan) must be provided with every unit.",
+            "evidenceRequired": "Section 6 safety information pack (installation manual, commissioning procedure, maintenance schedule, emergency response plan); risk assessments for foreseeable use and misuse scenarios; records of design verification and testing.",
+            "ownerRole": "Founder",
+            "gapAction": "Compile a Section 6 information pack covering installation, commissioning, normal operation, maintenance, and emergency response; ensure it is reviewed by a competent safety professional before first delivery."
+          },
+          {
+            "code": "NFCC Grid Scale BESS Guidance",
+            "name": "National Fire Chiefs Council — Fire Safety Guidance for Grid Scale Battery Energy Storage Systems (2020, updated 2023)",
+            "summary": "NFCC operational guidance used by UK fire and rescue services, local planning authorities, and insurers when assessing BESS fire risk; not statutory but treated as the de facto standard by AHJs.",
+            "status": "not-started",
+            "applicability": "UK approved code — Fire safety design and planning for the containerised BESS on UK sites; NFCC guidance is referenced by local planning authorities and fire and rescue services as the benchmark for acceptable fire risk management. Cited explicitly in the project brief.",
+            "designImpact": "Minimum 3 m separation from property lines, occupied buildings, and other ESS units; emergency services access on at least one long side; fire detection (smoke, heat, VOC/off-gas) and suppression integrated and tested; thermal runaway propagation prevention demonstrated (UL 9540A or equivalent test data); fire strategy document required for planning.",
+            "evidenceRequired": "Fire strategy document referencing NFCC guidance; thermal runaway propagation test data (UL 9540A or equivalent); fire detection and suppression commissioning certificate; confirmation of separation distances from site layout drawing; fire and rescue service pre-application consultation record.",
+            "ownerRole": "Safety lead",
+            "gapAction": "Engage a fire safety engineer to prepare a fire strategy document aligned with NFCC guidance; confirm separation distances on the site layout drawing; initiate pre-application consultation with the local fire and rescue service."
+          },
+          {
+            "code": "NFPA 855",
+            "name": "NFPA 855 — Standard for the Installation of Stationary Energy Storage Systems (2023 Edition)",
+            "summary": "US reference standard for stationary ESS installation; not UK statutory but widely cited by UK insurers and NFCC guidance as a design reference for fire safety and spacing.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Fire safety design and insurer underwriting; NFPA 855 is not UK statute but is cited in the project brief and by NFCC guidance and commercial insurers as a reference for deflagration venting, suppression system design, and separation distances. UK statutory peer is BS EN IEC 62933-5-2 and NFCC guidance.",
+            "designImpact": "Deflagration vent area calculation and burst pressure design for the container; suppression system density and agent selection; spacing and separation concepts inform site layout, but UK compliance is demonstrated via BS EN IEC 62933-5-2 and NFCC guidance.",
+            "evidenceRequired": "Not mandated; insurer may request an NFPA 855 alignment statement or gap analysis; deflagration vent calculation to be included in the fire strategy document.",
+            "ownerRole": "Safety lead",
+            "gapAction": "Review NFPA 855 Chapter 4 (ESS installation) and incorporate deflagration vent and suppression requirements into the fire strategy document; prepare an alignment statement for the commercial insurer."
+          },
+          {
+            "code": "UL 9540A",
+            "name": "UL 9540A — Test Method for Evaluating Thermal Runaway Fire Propagation in Battery Energy Storage Systems",
+            "summary": "US test method for evaluating thermal runaway propagation at cell, module, unit, and installation level; referenced by NFCC guidance and insurers as evidence of fire propagation control.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Thermal runaway propagation evidence for NFCC fire strategy and insurer underwriting; UL 9540A is not UK statute but is the test method cited by NFCC guidance and commercial insurers to demonstrate that thermal runaway does not propagate between modules or racks. UK statutory peer for system-level fire safety is BS EN IEC 62933-5-2.",
+            "designImpact": "Battery rack and module design must prevent thermal runaway propagation between cells and between modules; UL 9540A test data at module and system level informs the fire strategy and suppression system design; cell-level abuse test data required.",
+            "evidenceRequired": "UL 9540A test report at module level and system/installation level from the battery rack supplier or an accredited laboratory; include in fire strategy document and UKCA technical file.",
+            "ownerRole": "Battery lead",
+            "gapAction": "Request UL 9540A test reports from the battery rack supplier; if not available, scope UL 9540A testing as part of the system qualification programme and include in the fire strategy document."
+          },
+          {
+            "code": "ISO 1496-1",
+            "name": "ISO 1496-1 — Series 1 freight containers — Specification and testing — Part 1: General cargo containers for general purposes",
+            "summary": "Container structural certification standard; the original CSC plate is voided once the container shell is structurally modified by vents, large openings, or internal reinforcements.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Shipping container enclosure structural integrity; the original CSC plate is voided once the container shell is structurally modified (deflagration vents, HVAC penetrations, cable gland plates, internal rack bracing). Re-certification via alternative structural analysis is required; ISO 1496-1 itself is not UK statute.",
+            "designImpact": "Original CSC plate voided by structural modifications; design must rely on alternative structural certification (FEA to BS EN 1993 or classification-society inspection); foundation anchorage design must account for actual corner casting loads up to ~10 t per corner.",
+            "evidenceRequired": "Finite element analysis report to BS EN 1993 or new structural certification from a recognised classification society or structural engineer; include in technical file and provide to site structural engineer for foundation design.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Commission a structural analysis of the modified container under design loads (wind, seismic if applicable, internal pressure from deflagration venting); engage a structural engineer or classification society to certify the modified enclosure."
+          },
+          {
+            "code": "ISO 1161",
+            "name": "ISO 1161 — Series 1 freight containers — Corner fittings — Specification",
+            "summary": "Dimensional and strength standard for ISO corner castings used for lifting, stacking, and foundation anchorage of the container.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Foundation anchorage and lifting interface; ISO 1161 corner castings are the structural interface for M24/M30 foundation anchors and four-point crane lift; compliance with ISO 1161 geometry is required for standard spreader bar and twist-lock compatibility.",
+            "designImpact": "Foundation anchor bolt pattern and pad design must be coordinated with ISO 1161 corner casting geometry; lifting plan must specify a four-point spreader bar rated for up to 40 t; corner casting condition must be inspected before each lift.",
+            "evidenceRequired": "Structural engineer's foundation design referencing ISO 1161 corner casting loads; LOLER lifting plan referencing ISO 1161 geometry and rated capacity; corner casting inspection record.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Provide ISO 1161 corner casting load data to the site structural engineer for foundation pad design; include corner casting inspection in the pre-lift checklist within the LOLER lifting plan."
+          },
+          {
+            "code": "Batteries and Accumulators (Placing on the Market) Regulations 2008",
+            "name": "Batteries and Accumulators (Placing on the Market) Regulations 2008 (SI 2008/2164, as amended for GB)",
+            "summary": "UK statutory instrument controlling the placing on the market of batteries and accumulators; imposes labelling, registration, and take-back obligations.",
+            "status": "not-started",
+            "applicability": "UK statutory — LFP battery modules and the complete battery system placed on the GB market; the Regulations require batteries to be labelled with the crossed-out wheelie bin symbol, capacity, and chemical composition; producer registration with a compliance scheme is required.",
+            "designImpact": "Battery modules and the system must carry the crossed-out wheelie bin label and capacity marking; the founder must register as a battery producer with an approved compliance scheme (e.g., Valpak, Ecosurety) before first sale.",
+            "evidenceRequired": "Battery producer registration certificate from an approved compliance scheme; labelling compliance evidence on battery modules and system documentation.",
+            "ownerRole": "Founder",
+            "gapAction": "Register as a battery producer with a UK-approved compliance scheme before first unit is placed on the market; confirm labelling requirements are met on battery module and system nameplates."
+          },
+          {
+            "code": "WEEE Regulations 2013",
+            "name": "Waste Electrical and Electronic Equipment Regulations 2013 (SI 2013/3113, as amended for GB)",
+            "summary": "UK statutory instrument requiring producers of electrical and electronic equipment to finance the collection, treatment, and recycling of waste EEE; applies to the BESS as a large-scale EEE product.",
+            "status": "not-started",
+            "applicability": "UK statutory — The complete BESS unit (PCS, BMS, SCADA, auxiliary electronics) placed on the GB market; the founder must register as a WEEE producer and join an approved compliance scheme before first sale.",
+            "designImpact": "Product must be designed for disassembly and recycling where practicable; WEEE producer registration number must appear in product documentation; end-of-life take-back obligations must be communicated to customers.",
+            "evidenceRequired": "WEEE producer registration certificate from an approved compliance scheme; evidence of WEEE obligations communicated to customers in product documentation.",
+            "ownerRole": "Founder",
+            "gapAction": "Register as a WEEE producer with a UK-approved compliance scheme; include WEEE take-back information in the product manual and customer contract."
+          },
+          {
+            "code": "RoHS Regulations 2012",
+            "name": "Restriction of the Use of Certain Hazardous Substances in Electrical and Electronic Equipment Regulations 2012 (SI 2012/3032, as amended)",
+            "summary": "UK statutory instrument restricting the use of hazardous substances (lead, mercury, cadmium, hexavalent chromium, PBBs, PBDEs, DEHP, BBP, DBP, DIBP) in electrical and electronic equipment.",
+            "status": "not-started",
+            "applicability": "UK statutory — Electronic sub-assemblies within the BESS (BMS boards, SCADA gateway, PCS control electronics, auxiliary LV distribution) must comply with RoHS substance restrictions; LFP cells are exempt as batteries under Schedule 2 but the electronic assemblies are not.",
+            "designImpact": "BMS, SCADA, and control electronics must be sourced from RoHS-compliant suppliers; technical documentation must include RoHS declarations for all in-scope sub-assemblies; any exemptions claimed must be documented.",
+            "evidenceRequired": "RoHS declarations of conformity from sub-assembly suppliers (BMS, SCADA, PCS control boards); include in UKCA technical file.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Request RoHS declarations of conformity from all electronic sub-assembly suppliers during procurement; compile declarations into the UKCA technical file."
+          },
+          {
+            "code": "Insurer BESS underwriting requirements",
+            "name": "Commercial Property Insurer — BESS-specific underwriting requirements (market practice, 2023–2024)",
+            "summary": "UK commercial property and liability insurers apply specific underwriting requirements to BESS installations, typically referencing NFCC guidance, UL 9540A test data, and fire suppression standards.",
+            "status": "not-started",
+            "applicability": "Insurer best-practice — Commercial property and liability insurance for the BESS installation; UK insurers (Zurich, AXA XL, Allianz, specialist Lloyd's syndicates) require evidence of fire propagation testing, suppression system commissioning, separation distances, and maintenance regime before binding cover.",
+            "designImpact": "Fire suppression system must be from an insurer-approved supplier and commissioned to a recognised standard; UL 9540A test data must be available; maintenance contract for fire suppression and BMS must be in place; site security and remote monitoring must be demonstrated.",
+            "evidenceRequired": "Insurer pre-placement questionnaire completed; UL 9540A test report; fire suppression commissioning certificate; maintenance contract; remote monitoring capability evidence; site security assessment.",
+            "ownerRole": "Founder",
+            "gapAction": "Engage a specialist BESS insurance broker (e.g., Marsh, Aon energy practice) at the earliest opportunity to obtain insurer requirements; incorporate insurer requirements into the product specification and customer site requirements document."
+          }
+        ],
+        "count": 24,
+        "extractedFresh": true
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 5,
+      "engineCommit": "2fec22ae",
+      "elapsedMs": 136168,
+      "costPence": 907,
+      "output": {
+        "regulatory": [
+          {
+            "code": "Water Supply (Water Quality) Regulations 2016",
+            "name": "Water Supply (Water Quality) Regulations 2016 (SI 2016/614)",
+            "summary": "UK statutory instrument setting drinking-water quality standards for water supplied to consumers; enforces WHO Drinking Water Guidelines in England.",
+            "status": "not-started",
+            "applicability": "UK statutory — Permeate output must meet Regulation 4 parametric values (TDS, microbiological, chemical) before supply to any person; applies at the point of supply from the unit's permeate outlet.",
+            "designImpact": "Post-treatment train (remineralisation, chlorination) must be sized and validated to achieve <500 mg/L TDS, residual free chlorine 0.2–0.5 mg/L, and all Schedule 1 parametric values; sampling ports must be designed into the permeate line for compliance testing.",
+            "evidenceRequired": "Water quality test reports from an accredited laboratory demonstrating compliance with all Schedule 1 parameters; risk assessment and sampling plan accepted by the relevant water undertaker or Drinking Water Inspectorate (DWI) where the unit supplies a regulated supply.",
+            "ownerRole": "Process lead",
+            "gapAction": "Commission accredited laboratory to define a parametric testing protocol against SI 2016/614 Schedule 1 and design sampling ports into the permeate outlet manifold."
+          },
+          {
+            "code": "BS 6920",
+            "name": "Suitability of non-metallic products for use in contact with water intended for human consumption — Methods of test",
+            "summary": "UK standard for assessing whether non-metallic materials in contact with potable water are safe; used by water fittings approval schemes.",
+            "status": "not-started",
+            "applicability": "UK designated standard — All non-metallic potable-contact components (UPVC/HDPE piping, FRP remineralisation vessel, cartridge housings, seals, dosing tubing) on the permeate and post-treatment side; demonstrates compliance with Water Supply (Water Fittings) Regulations 1999 and Water Supply (Water Quality) Regulations 2016.",
+            "designImpact": "Every non-metallic material on the permeate-contact side must be sourced from suppliers holding BS 6920 approval (WRAS-listed or equivalent); FRP remineralisation vessel and all LP permeate pipework must be specified from WRAS-approved product lists.",
+            "evidenceRequired": "WRAS approval certificates or BS 6920 test reports for each non-metallic potable-contact component; supplier declarations of conformity referencing BS 6920.",
+            "ownerRole": "Process lead",
+            "gapAction": "Audit the bill of materials for all permeate-contact non-metallic items and cross-reference each against the WRAS Approved Products Guide; flag any gaps for re-specification."
+          },
+          {
+            "code": "NSF/ANSI 61",
+            "name": "Drinking Water System Components — Health Effects",
+            "summary": "US/international standard for health-effects testing of materials and products in contact with drinking water; widely adopted as a proxy for potable-contact safety where BS 6920 equivalence is claimed.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Potable-contact materials (membranes, pressure vessels, dosing components, permeate pipework); report specifies NSF/ANSI 61 compliance for all potable-contact items. UK statutory compliance is via BS 6920/WRAS; NSF/ANSI 61 certification from suppliers is an acceptable supporting artefact but does not substitute for BS 6920 approval in UK regulatory submissions.",
+            "designImpact": "Specify membranes, FRP vessels, and dosing components from NSF/ANSI 61-certified suppliers; cross-check each against BS 6920/WRAS approval to confirm UK acceptability.",
+            "evidenceRequired": "NSF/ANSI 61 certificates from component suppliers; WRAS or BS 6920 approval where UK statutory compliance is required.",
+            "ownerRole": "Process lead",
+            "gapAction": "Request NSF/ANSI 61 certificates from all potable-contact component suppliers and map each to its BS 6920/WRAS equivalent for UK compliance file."
+          },
+          {
+            "code": "NSF/ANSI 372",
+            "name": "Drinking Water System Components — Lead Content",
+            "summary": "US standard defining 'lead-free' (<0.25% weighted average lead content) for potable-water-contact components.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Permeate-side fittings, valves, and connections; report mandates NSF/ANSI 372 'lead-free' compliance. UK statutory equivalent is the Water Supply (Water Fittings) Regulations 1999 Schedule 2 prohibition on lead-containing fittings in contact with water for human consumption.",
+            "designImpact": "All brass or metallic fittings on the permeate side must be specified as lead-free; supplier datasheets must confirm NSF/ANSI 372 or equivalent UK Water Fittings Regulations compliance.",
+            "evidenceRequired": "NSF/ANSI 372 certificates or equivalent supplier declarations of lead-free conformity for all permeate-side metallic fittings.",
+            "ownerRole": "Process lead",
+            "gapAction": "Specify all permeate-side metallic fittings as lead-free and obtain NSF/ANSI 372 or WRAS-equivalent declarations from suppliers before BOM freeze."
+          },
+          {
+            "code": "Pressure Systems Safety Regulations 2000",
+            "name": "Pressure Systems Safety Regulations 2000 (SI 2000/128) — PSSR",
+            "summary": "UK statutory instrument governing the safe design, installation, operation, and maintenance of pressure systems; applies to systems with stored energy above threshold pressures.",
+            "status": "not-started",
+            "applicability": "UK statutory — HP piping loop (55–70 bar operating pressure), RO pressure vessels (rated 69–83 bar), ERD pressure exchanger, and high-pressure pump casing; all constitute a pressure system under PSSR 2000 once installed and operated on site in the UK.",
+            "designImpact": "A written scheme of examination must be prepared by a competent person before the system is operated; HP components must be designed with pressure relief, isolation, and safe-depressurisation provisions; duplex 2205 HP piping must be designed to 1.5× working pressure with documented pressure-test records.",
+            "evidenceRequired": "Written scheme of examination prepared by a competent person (typically an insurance engineer or chartered mechanical engineer); pressure-test certificates for HP piping and vessels; CE/UKCA pressure equipment conformity documentation for each pressure component.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Engage a PSSR-competent person (insurance engineer) to scope the written scheme of examination during detailed design; ensure HP piping design package includes pressure-test protocol and relief-valve sizing calculations."
+          },
+          {
+            "code": "Pressure Equipment (Safety) Regulations 2016",
+            "name": "Pressure Equipment (Safety) Regulations 2016 (SI 2016/1105) — PESR",
+            "summary": "UK statutory instrument implementing PED for pressure equipment placed on the UK market; requires conformity assessment and UKCA marking for pressure equipment above threshold pressures.",
+            "status": "not-started",
+            "applicability": "UK statutory — RO pressure vessels (FRP, rated 69–83 bar), HP pump casing, ERD pressure exchanger, and HP piping assemblies placed on the UK market; all are pressure equipment under PESR 2016 and require conformity assessment proportionate to category (likely Category III or IV for vessels at these pressures).",
+            "designImpact": "Each pressure vessel and HP assembly must undergo conformity assessment by a UK Approved Body (or Notified Body for CE-marked equipment accepted under UK transitional arrangements); design must include pressure relief, material traceability, and permanent marking per PESR Schedule 3.",
+            "evidenceRequired": "UKCA Declaration of Conformity and technical file for each pressure vessel and HP assembly; UK Approved Body assessment certificate; pressure-test records; material certificates to EN 10204 3.1 or 3.2.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Identify a UK Approved Body for PESR conformity assessment of RO vessels and HP assemblies; confirm whether FRP vessel suppliers hold existing CE/UKCA pressure equipment certification that can be accepted."
+          },
+          {
+            "code": "Electrical Equipment (Safety) Regulations 2016",
+            "name": "Electrical Equipment (Safety) Regulations 2016 (SI 2016/1101)",
+            "summary": "UK statutory instrument requiring electrical equipment operating between 50–1000 V AC to be safe and UKCA-marked before being placed on the UK market.",
+            "status": "not-started",
+            "applicability": "UK statutory — Complete electrical installation within the container including HP pump motor (45–75 kW, 380–460 V 3-phase), VFD, motor starters, control panel (IP65), and all LV distribution; applies to the assembled unit placed on the UK market.",
+            "designImpact": "Electrical panel, VFD, and motor must be sourced from suppliers with CE/UKCA declarations; the assembled electrical system must be designed to a recognised LV standard (BS EN 61439 for switchgear assemblies, BS EN 60034 for motors); isolation and emergency-stop provisions must be incorporated.",
+            "evidenceRequired": "UKCA or CE Declarations of Conformity for panel, VFD, and motor; BS EN 61439 type-test or design-verification report for the assembled panel; UKCA marking on the complete unit.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Confirm panel builder holds BS EN 61439 design-verification documentation and prepare UKCA technical file for the assembled electrical system."
+          },
+          {
+            "code": "BS 7671",
+            "name": "Requirements for Electrical Installations (IET Wiring Regulations, 18th Edition)",
+            "summary": "UK wiring regulations for fixed electrical installations; de facto enforcement standard for the Electricity at Work Regulations 1989.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Internal fixed LV wiring within the container (3-phase distribution, motor circuits, control wiring, lighting, socket outlets); demonstrates compliance with the Electricity at Work Regulations 1989 (EAWR) for the fixed installation.",
+            "designImpact": "All internal wiring must comply with BS 7671 Part 7 (special locations — containers may be treated as restricted conductive locations given metallic shell); earthing, bonding, overcurrent protection, and isolation must be designed per BS 7671; RCD protection required on socket-outlet circuits.",
+            "evidenceRequired": "Electrical Installation Certificate (EIC) signed by a qualified person, with schedule of inspections and test results (insulation resistance, earth continuity, RCD trip times).",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Engage a BS 7671-qualified electrical engineer to design the internal distribution and produce the EIC after installation and testing."
+          },
+          {
+            "code": "Electricity at Work Regulations 1989",
+            "name": "Electricity at Work Regulations 1989 (SI 1989/635) — EAWR",
+            "summary": "UK statutory instrument imposing duties to ensure electrical systems are constructed, maintained, and operated safely in the workplace.",
+            "status": "not-started",
+            "applicability": "UK statutory — All electrical systems within the container during manufacture, commissioning, and operation; applies to the employer/operator and the manufacturer placing the unit into service.",
+            "designImpact": "Electrical systems must be designed so that work can be carried out safely; isolation facilities, locking-off provisions, and safe working procedures must be documented; the HP pump VFD and motor must have clearly labelled isolation points accessible without entering a hazardous zone.",
+            "evidenceRequired": "Documented safe isolation procedure; electrical risk assessment; EIC (see BS 7671 row); operator training records.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Prepare electrical risk assessment and safe isolation procedure as part of the operations and maintenance manual; include lockout/tagout provisions in panel design."
+          },
+          {
+            "code": "EMC Regulations 2016",
+            "name": "Electromagnetic Compatibility Regulations 2016 (SI 2016/1091)",
+            "summary": "UK statutory instrument requiring apparatus to not cause harmful electromagnetic interference and to have adequate immunity.",
+            "status": "not-started",
+            "applicability": "UK statutory — VFD (45–75 kW) driving the HP pump is a significant source of conducted and radiated EMC emissions; the assembled unit with PLC, HMI, and VFD must comply before being placed on the UK market.",
+            "designImpact": "VFD must be specified with integral or external EMC filter to Class C2 or C3 per BS EN 61800-3; screened motor cable required; PLC and HMI must have CE/UKCA EMC declarations; cable routing must segregate power and signal cables.",
+            "evidenceRequired": "CE/UKCA EMC Declarations of Conformity for VFD, PLC, and HMI; EMC filter specification and installation records; UKCA technical file referencing BS EN 61800-3 or BS EN 55011.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Specify VFD with C2/C3 EMC filter and screened motor cable; obtain EMC declarations from VFD and PLC suppliers and include in UKCA technical file."
+          },
+          {
+            "code": "Supply of Machinery (Safety) Regulations 2008",
+            "name": "Supply of Machinery (Safety) Regulations 2008 (SI 2008/1597)",
+            "summary": "UK statutory instrument implementing the Machinery Directive for machinery placed on the UK market; requires conformity assessment, technical file, and UKCA marking.",
+            "status": "not-started",
+            "applicability": "UK statutory — The complete assembled unit constitutes machinery (HP pump, motor, VFD, automated control system with moving parts and automated functions); must be UKCA-marked as a complete machine or as an assembly of partly completed machinery.",
+            "designImpact": "Risk assessment per BS EN ISO 12100 required; guarding of rotating parts (pump coupling, motor fan); emergency-stop provision; CE marking of sub-assemblies (pump, motor) must be verified; technical file must cover the integrated system.",
+            "evidenceRequired": "UKCA Declaration of Conformity for the complete unit; technical file including risk assessment (BS EN ISO 12100), circuit diagrams, and instructions for use in English; CE/UKCA declarations for pump and motor sub-assemblies.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Commission a machinery risk assessment per BS EN ISO 12100 covering the HP pump, motor, and automated control system; prepare UKCA technical file and Declaration of Conformity for the complete unit."
+          },
+          {
+            "code": "BS EN ISO 12100",
+            "name": "Safety of machinery — General principles for design — Risk assessment and risk reduction",
+            "summary": "Harmonised standard providing the methodology for machinery risk assessment and risk reduction; supports compliance with the Supply of Machinery (Safety) Regulations 2008.",
+            "status": "not-started",
+            "applicability": "UK designated standard — HP pump, motor coupling, and automated PLC-controlled process; demonstrates compliance with the Supply of Machinery (Safety) Regulations 2008 for the integrated machine.",
+            "designImpact": "Systematic hazard identification and risk reduction required for rotating machinery (pump, motor), high-pressure fluid release, chemical dosing (antiscalant, hypochlorite), and automated start/stop sequences; guarding and interlocks must be specified from the risk assessment output.",
+            "evidenceRequired": "Documented risk assessment report referencing BS EN ISO 12100; list of significant hazards and risk-reduction measures implemented; included in UKCA technical file.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Initiate BS EN ISO 12100 risk assessment at concept design stage; assign mechanical lead to document hazards and risk-reduction measures before detailed design freeze."
+          },
+          {
+            "code": "Health and Safety at Work etc. Act 1974",
+            "name": "Health and Safety at Work etc. Act 1974 — HSWA",
+            "summary": "Primary UK health and safety legislation imposing duties on manufacturers and employers to ensure plant and systems of work are safe.",
+            "status": "not-started",
+            "applicability": "UK statutory — Manufacture, commissioning, and operation of the unit; Section 6 imposes duties on the designer/manufacturer to ensure the unit is safe when used as intended; Section 2 applies to the operator's employees working on or near the unit.",
+            "designImpact": "Safe access for maintenance (600–800 mm aisle, membrane extraction clearance), chemical handling provisions for hypochlorite and antiscalant dosing, and HVAC for operator comfort in the enclosed container must all be addressed in the design; operations and maintenance manual must include safe working procedures.",
+            "evidenceRequired": "Health and safety file / operations and maintenance manual; COSHH assessment for chemicals used (hypochlorite, antiscalant, sodium bisulphite); risk assessment for confined-space entry if applicable.",
+            "ownerRole": "Founder",
+            "gapAction": "Prepare COSHH assessments for all process chemicals and include safe-access provisions (aisle width, lighting, ventilation) in the design specification; commission a confined-space risk assessment for the container interior."
+          },
+          {
+            "code": "Carriage of Dangerous Goods and Use of Transportable Pressure Equipment Regulations 2009",
+            "name": "Carriage of Dangerous Goods and Use of Transportable Pressure Equipment Regulations 2009 (SI 2009/1348) — CDG/ADR",
+            "summary": "UK statutory instrument implementing ADR for road transport of dangerous goods; applies to sodium hypochlorite and antiscalant chemicals transported with or in the unit.",
+            "status": "not-started",
+            "applicability": "UK statutory — Road transport of sodium hypochlorite (UN 1791, Class 8) and antiscalant/sodium bisulphite chemicals on the flatbed lorry delivery; if day tanks are pre-filled for rapid deployment, CDG/ADR classification and packaging requirements apply.",
+            "designImpact": "Day tanks for hypochlorite and antiscalant must be designed for transport (secure mounting, spill containment, venting); if quantities exceed ADR exemption thresholds, the lorry must carry ADR documentation and the driver must hold an ADR certificate; design should consider whether tanks are shipped empty and filled on site to simplify transport compliance.",
+            "evidenceRequired": "ADR dangerous goods transport document; assessment of whether chemical quantities exceed limited-quantity exemptions; driver ADR certificate if applicable.",
+            "ownerRole": "Founder",
+            "gapAction": "Determine whether day tanks will be shipped full or empty; if full, calculate ADR classification and quantity thresholds and prepare transport documentation; consider designing tanks to be filled on site to avoid ADR obligations."
+          },
+          {
+            "code": "Construction (Design and Management) Regulations 2015",
+            "name": "Construction (Design and Management) Regulations 2015 (SI 2015/51) — CDM",
+            "summary": "UK statutory instrument imposing duties on designers and principal contractors for health and safety during construction and installation projects.",
+            "status": "not-started",
+            "applicability": "UK statutory — Installation of the unit on a UK construction site or permanent coastal/island site; CDM 2015 applies where the installation constitutes a construction project (foundation pad, pipe connections, electrical connection to site supply); the manufacturer as designer has duties under Regulation 9.",
+            "designImpact": "Designer must provide pre-construction information including significant hazards (HP pressure system, chemical storage, heavy lift for container placement); design must facilitate safe installation (lifting points, isolation provisions, access for commissioning).",
+            "evidenceRequired": "Pre-construction information pack including designer's risk register; health and safety file handed to the client on completion of installation.",
+            "ownerRole": "Founder",
+            "gapAction": "Prepare a designer's CDM risk register covering container placement (crane lift), HP pressure-test on site, electrical connection, and chemical commissioning; include in the installation manual."
+          },
+          {
+            "code": "ISO 1496-1",
+            "name": "Series 1 freight containers — Specification and testing — Part 1: General cargo containers for general purposes",
+            "summary": "ISO structural standard for freight containers; the CSC plate issued under this standard is voided once the container shell is structurally modified.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Container shell structural integrity; the original CSC plate is voided once penetrations (feed/brine/permeate ports, HVAC louvres, access doors in side walls) and internal skid reinforcements are added. Re-certification via alternative structural analysis is required; ISO 1496-1 no longer applies to the modified shell.",
+            "designImpact": "Original CSC plate must be removed or marked void after modification; structural integrity of the modified shell must be demonstrated by finite element analysis to EN 1993 or equivalent, or by inspection and certification by a recognised classification society; lifting points and stacking loads must be re-verified after modification.",
+            "evidenceRequired": "Finite element analysis report or classification-society structural certificate for the modified container; revised lifting and stacking load calculations; documentation that original CSC plate has been voided.",
+            "ownerRole": "Mechanical lead",
+            "gapAction": "Commission structural FEA of the modified container (with all penetrations and internal skid loads) and engage a classification society or structural engineer to certify the modified shell before first deployment."
+          },
+          {
+            "code": "UKCA Marking Obligations",
+            "name": "UK Conformity Assessed (UKCA) Marking — Product Safety and Metrology etc. (Amendment) Regulations 2024",
+            "summary": "Umbrella UK conformity marking scheme replacing CE marking for products placed on the GB market; required for the complete assembled unit.",
+            "status": "not-started",
+            "applicability": "UK statutory — The complete containerised SWRO unit placed on the GB market; UKCA marking is required under the umbrella scheme, with underlying conformity demonstrated against the Electrical Equipment (Safety) Regulations 2016, EMC Regulations 2016, Supply of Machinery (Safety) Regulations 2008, and PESR 2016.",
+            "designImpact": "A single UKCA Declaration of Conformity referencing all applicable regulations must be prepared; technical file must be compiled and retained for 10 years; UKCA mark must be affixed to the unit before supply.",
+            "evidenceRequired": "UKCA Declaration of Conformity; technical file (risk assessments, test reports, drawings, instructions for use in English); UKCA mark affixed to the unit.",
+            "ownerRole": "Founder",
+            "gapAction": "Appoint a product compliance manager to compile the UKCA technical file, coordinate declarations from sub-system suppliers, and prepare the overarching Declaration of Conformity before first unit is placed on the GB market."
+          },
+          {
+            "code": "WHO Guidelines for Drinking-water Quality",
+            "name": "WHO Guidelines for Drinking-water Quality, 4th Edition (2017)",
+            "summary": "International reference framework for drinking-water quality parameters; adopted as the basis for UK Water Supply (Water Quality) Regulations 2016 parametric values.",
+            "status": "not-started",
+            "applicability": "Voluntary reference — Permeate quality targets (TDS <500 mg/L, microbiological, chemical parameters); the UK statutory obligation is SI 2016/614, but WHO guidelines are the reference framework used by humanitarian procurement agencies (UNHCR, ICRC, DFID successors) who are a primary customer segment.",
+            "designImpact": "Post-treatment design must achieve WHO guideline values for all relevant parameters, not just TDS; boron removal (a known SWRO challenge) and bromide/bromate formation from chlorination must be assessed against WHO limits.",
+            "evidenceRequired": "Water quality test report against WHO guideline values; included in product technical datasheet for humanitarian procurement tenders.",
+            "ownerRole": "Process lead",
+            "gapAction": "Map WHO guideline values for all relevant parameters (including boron, bromate, nitrate) against the post-treatment design and identify any parameters requiring additional treatment steps."
+          },
+          {
+            "code": "BS EN 61439-1",
+            "name": "Low-voltage switchgear and controlgear assemblies — Part 1: General rules",
+            "summary": "Harmonised standard for the design and verification of low-voltage switchgear and controlgear assemblies; applies to the control and power distribution panel.",
+            "status": "not-started",
+            "applicability": "UK designated standard — Electrical control panel (PLC, HMI, motor starters, VFD, distribution) rated for 380–460 V 3-phase supply; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 for the assembled panel.",
+            "designImpact": "Panel builder must perform design verification (routine tests or type tests) per BS EN 61439-1/-2; panel must be rated for the prospective short-circuit current at the point of connection; IP65 enclosure rating must be verified by test or design.",
+            "evidenceRequired": "BS EN 61439 design-verification report or type-test certificate from panel builder; routine test records for the specific panel build; Declaration of Conformity referencing BS EN 61439.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Specify BS EN 61439 design-verification as a contractual requirement in the panel-builder purchase order; obtain design-verification report before panel is shipped."
+          },
+          {
+            "code": "BS EN IEC 62368-1",
+            "name": "Audio/video, information and communication technology equipment — Part 1: Safety requirements",
+            "summary": "Harmonised safety standard for IT and communication technology equipment; applies to the PLC and HMI if classified as ITE.",
+            "status": "not-started",
+            "applicability": "UK designated standard — PLC and HMI within the control panel; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 for ITE sub-components; supplier CE/UKCA declarations should reference this standard.",
+            "designImpact": "PLC and HMI must be sourced from suppliers with CE/UKCA declarations referencing BS EN IEC 62368-1 or BS EN 61010-1 (industrial control equipment); installation within the panel must maintain the rated protection.",
+            "evidenceRequired": "CE/UKCA Declarations of Conformity from PLC and HMI suppliers referencing BS EN IEC 62368-1 or BS EN 61010-1.",
+            "ownerRole": "Electrical lead",
+            "gapAction": "Request CE/UKCA declarations referencing the applicable LV safety standard from PLC and HMI suppliers at component selection stage."
+          }
+        ],
+        "count": 20,
+        "extractedFresh": true
+      },
+      "diagnostics": []
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 0,
+      "dimensions": {
+        "matrix_not_bibliography": 0,
+        "statutory_vs_reference_distinguished": 0,
+        "uk_specific_correctness": 0,
+        "applicability_specificity": 0,
+        "evidence_required_actionable": 0,
+        "coverage": 0,
+        "owner_role_specific": 0
+      },
+      "summary": "The regulatory output is empty, so it provides no project-mapped compliance matrix, UK statutory distinction, evidence plan, ownership, or coverage of obvious obligations.",
+      "nextFix": "Require the engine to return a populated UK-specific compliance matrix with rows for each applicable regulation/standard, including applicability to the container farm, statutory/reference status, design impact, required evidence artefact, owner role, and gap action.",
+      "costPence": 42
+    },
+    {
+      "inputId": "sentinel",
+      "score": 7.714285714285714,
+      "dimensions": {
+        "matrix_not_bibliography": 9,
+        "statutory_vs_reference_distinguished": 8,
+        "uk_specific_correctness": 7,
+        "applicability_specificity": 9,
+        "evidence_required_actionable": 8,
+        "coverage": 5,
+        "owner_role_specific": 8
+      },
+      "summary": "Strong project-mapped matrix with good applicability and evidence fields, but coverage is incomplete for a UK connected battery-powered assistive/medical product and a few regulatory claims are overstated or not quite UK-process accurate.",
+      "nextFix": "Add an explicit UK coverage checklist for this product class: UK MDR/GSPR boundary, RED, EMC, Electrical Equipment Safety or IEC 62368-1 as applicable, RoHS, REACH, WEEE, Batteries and Accumulators/UN 38.3/IEC 62133-2, PSTI, UK GDPR/PECR for location and health data, charger/BS 1363 or external PSU evidence, and assistive walking-aid standards such as BS EN ISO 11334/EN 12182, while marking each as statutory, designated standard, or non-statutory reference.",
+      "costPence": 159
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 6.857142857142857,
+      "dimensions": {
+        "matrix_not_bibliography": 8,
+        "statutory_vs_reference_distinguished": 7,
+        "uk_specific_correctness": 7,
+        "applicability_specificity": 8,
+        "evidence_required_actionable": 8,
+        "coverage": 4,
+        "owner_role_specific": 6
+      },
+      "summary": "Strong project-mapped entries for UKCA electrical/radio/EMC safety, but the matrix is materially incomplete for a connected outdoor battery product and contains some UK conformity terminology/necessity issues.",
+      "nextFix": "Add a mandatory coverage pass for this exact product class: Li-ion/LiFePO4 battery transport and safety including UN 38.3, charger/PSU and battery evidence, RoHS, WEEE, UK Batteries Regulations, REACH, packaging EPR, PSTI cybersecurity, GDPR/PECR/privacy for camera/microphone/cloud features, and outdoor ingress/environmental test standards clearly separated from statutory obligations.",
+      "costPence": 135
+    },
+    {
+      "inputId": "bess",
+      "score": 6.428571428571429,
+      "dimensions": {
+        "matrix_not_bibliography": 8,
+        "statutory_vs_reference_distinguished": 5,
+        "uk_specific_correctness": 6,
+        "applicability_specificity": 8,
+        "evidence_required_actionable": 8,
+        "coverage": 3,
+        "owner_role_specific": 7
+      },
+      "summary": "Good matrix structure with project-specific applicability and actionable evidence, but UK legal nuance is shaky and the visible coverage misses several major BESS-specific requirements such as G99, ESQCR, UN 38.3/ADR, fire/NFCC, planning/CDM, and battery/environmental obligations.",
+      "nextFix": "Prompt the engine to build a UK BESS compliance matrix in tiers: statutory UK obligations, grid-connection requirements, transport/shipping, fire/planning/site safety, product conformity/UKCA, and non-statutory insurer/NFCC/reference standards, explicitly flagging whether each item is law, designated standard, grid-code requirement, or guidance.",
+      "costPence": 130
+    },
+    {
+      "inputId": "desal",
+      "score": 6,
+      "dimensions": {
+        "matrix_not_bibliography": 9,
+        "statutory_vs_reference_distinguished": 6,
+        "uk_specific_correctness": 5,
+        "applicability_specificity": 8,
+        "evidence_required_actionable": 8,
+        "coverage": 4,
+        "owner_role_specific": 2
+      },
+      "summary": "Good matrix structure with project-specific impacts and evidence, but UK legal applicability is uneven and major product, electrical, machinery, pressure-equipment, water-supply, and environmental-permitting regimes are missing or under-specified.",
+      "nextFix": "Prompt the engine to build a UK-first compliance matrix by lifecycle area—potable water supply, pressure equipment, electrical/UKCA machinery, container installation, chemicals, environmental abstraction/discharge, transport/lifting—and require each row to classify the item as UK statutory, approved code/designated standard, or voluntary reference, with a named accountable engineering role.",
+      "costPence": 135
+    }
+  ],
+  "aggregateScore": 5.4,
+  "deltaSincePrior": 4.228571428571429,
+  "totalCostPence": 4327,
+  "completedAt": "2026-04-26T07:25:25.907Z"
+}

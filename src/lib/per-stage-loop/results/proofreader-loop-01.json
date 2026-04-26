@@ -1,0 +1,1704 @@
+{
+  "stage": "proofreader",
+  "loop": 1,
+  "engineCommit": "e6a71d08",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 1,
+      "costPence": 0,
+      "output": {
+        "reviewCount": 8,
+        "moduleCount": 9,
+        "reviewedCount": 8,
+        "coverageRatio": 0.8888888888888888,
+        "deterministic": {
+          "coverage_per_module": 8.88888888888889,
+          "severity_distribution_realism": 8.686440677966102,
+          "boilerplate_repetition": 0
+        },
+        "severityCounts": {
+          "critical": 18,
+          "warning": 25,
+          "info": 16
+        },
+        "catchphraseCounts": {
+          "Run The Algorithm": 5,
+          "First article in 72 hours": 5,
+          "Don't buy the machine shop": 4
+        },
+        "sample": [
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "This module has two safety-critical issues and one capacity issue that must be resolved before tooling or supplier selection. The carbon-dioxide dosing architecture can create a lethal atmosphere from a single solenoid failure, and the cooling capacity is undersized against the calculated peak load. Production is where the margin lives or dies — and this design has no margin on either.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Safety — Carbon-dioxide asphyxiation risk",
+                "message": "Two 47-litre industrial bottles contain ~68 kg of liquid carbon dioxide, which expands to ~34.6 m³ of gas. The container's free internal volume is roughly 50 m³ once racks and equipment are installed. A single stuck-open brass solenoid (a known failure mode you've already listed) releases gas at up ",
+                "suggestion": "Three layers of defence, all required: (1) a normally-closed pneumatic excess-flow valve at each bottle regulator that mechanically limits flow to maximum dosing rate (typically 5–10 L/min); (2) an independent hardware carbon-dioxide watchdog on a second sensor that cuts power to the solenoid at >20"
+              },
+              {
+                "severity": "critical",
+                "category": "Capacity — Cooling undersized vs. calculated peak load",
+                "message": "Estimated peak thermal load is ~15.4 kilowatts (lighting heat ~9 kW, transpiration latent ~4.7 kW, auxiliaries ~1.2 kW, envelope ~0.5 kW). The specified 10–14 kilowatt unit is **9% short at the top of the range and 35% short at the bottom**. Under a hot United Kingdom summer day with the condenser o",
+                "suggestion": "Move to **2 × 8–10 kilowatt units** in N+1 parallel. Total capacity 16–20 kilowatts (correct margin), one unit can fail and the surviving unit holds the canopy below stress thresholds long enough for service. This also halves the cost of any single spare and makes road-shipping easier — neither unit"
+              },
+              {
+                "severity": "warning",
+                "category": "Material — Condensate to nutrient reservoir without polishing",
+                "message": "Evaporator coil condensate carries volatile organic compounds released by the canopy plus airborne microbial load, then sits in a stainless drip tray. Returning it directly to the nutrient reservoir is the kind of \"closes the loop on paper\" decision that creates a Pythium or Fusarium outbreak across",
+                "suggestion": "Add an inline ultraviolet-C polishing step (40 millijoules per square centimetre dose) between the condensate pump discharge and the reservoir top-up port. Adds ~£200 in hardware and removes a single-point biological failure mode for the entire farm. If we fix this one thing, three downstream proble"
+              },
+              {
+                "severity": "warning",
+                "category": "Process — Stainless drip tray bend radii",
+                "message": "Stainless 304 needs minimum bend radius of **2× material thickness** per the sheet metal database, versus 1× for mild steel. If the drip tray is being drawn or formed with sharp corners for a cleanable surface, you'll get cracking on the brake or springback that breaks the watertight seal under the ",
+                "suggestion": "Specify 1.2 millimetre 304 with 2.4 millimetre minimum internal bend radius. Use a single-piece laser-cut and folded tray with welded corners and a continuous 5 millimetre fillet weld, then passivate. Tolerance for fit under the coil: ±0.5 millimetres is enough — don't over-specify."
+              },
+              {
+                "severity": "warning",
+                "category": "Architecture — Single air-handling unit creates total-loss failure mode",
+                "message": "Same point as capacity, called out separately because it's an architectural decision: any single failure (refrigerant leak, scroll compressor, condensate pump cascading) takes down the entire farm. A prototype is not a product.",
+                "suggestion": "Twin units, dual condensate pumps with independent floats, redundant temperature/humidity sensors voting 2-of-3."
+              },
+              {
+                "severity": "info",
+                "category": "Tolerances — Fabric sock duct specification",
+                "message": "±10 millimetres on diameter and ±50 millimetres on length is plenty for a perforated polyester sock at 11 metres long. Don't let anyone tighten this. The acoustic and flow performance is set by perforation pattern, not duct diameter precision.",
+                "suggestion": ""
+              }
+            ],
+            "recommendations": [
+              "**Redesign the carbon-dioxide safety architecture this week.** Mechanical excess-flow valve + independent hardware watchdog + door interlock + bulkhead bottles in vestibule. This is non-negotiable. Get Leo (legal) to confirm Health and Safety Executive workplace exposure limits and BS EN 378 / BS EN",
+              "**Move to 2 × 8–10 kilowatt twin air-handling units, parallel, N+1.** Re-quote with at least three suppliers — Daikin, Mitsubishi Electric, and a UK-specialist like Airedale. Never single-source the refrigeration unit.",
+              "**Add ultraviolet-C polishing on the condensate return loop.** Off-the-shelf inline unit, ~£200, removes a farm-wide biocontamination vector.",
+              "**Specify the drip tray as 1.2 millimetre 304 stainless, laser-cut, folded with 2.4 millimetre internal radii, fully welded and passivated.** Tolerance ±0.5 millimetres on outer envelope. Standard sheet metal shop work, 3-week production lead time per the database.",
+              "**Buy the carbon-dioxide manifold as a certified assembly, don't build it.** Run The Algorithm on that part before we talk tooling — question the requirement first. The requirement is \"deliver dosed, regulated, safety-interlocked carbon dioxide\" not \"design our own gas manifold.\"",
+              "**Re-issue the design brief with Target process, Target material, Tolerance target, and Quantity target filled in.** All four fields are blank. I can't quote tooling or suppliers against a blank brief — what does the process look like on paper versus what actually happens?"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: stainless 304",
+                "result": "## Stainless Steel 304\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 8000 kg/m³ |\n| Yield Strength | 215 MPa |\n| Ultimate Tensile Strength | 50"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"carbon dioxide enrichment indoor agriculture safety\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"F-Gas refrigerant R454B installation\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"HVAC ductwork ISO sheet metal\"."
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "run_calculation",
+                "description": "run_calculation call",
+                "result": "\nResult: {\n  \"totalCO2_kg\": 68,\n  \"releasedGas_m3\": 34.612,\n  \"worstCaseConc_pct\": \"40.9\",\n  \"setpoint_pct\": 0.12,\n  \"IDLH_pct\": 4,\n  \"fatal_pct\": 10,\n  \"verdict\": \"Single stuck-open solenoid can prod"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The bill of materials is buildable and the cost envelope is healthy (≈6% of the 150,000-pound capital target), but the design brief is missing target process, target material, tolerance target, and quantity target — and the certification path is undefined. Three issues will bite at first article if not closed.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Compliance / Certification path undefined",
+                "message": "This panel will be placed on the United Kingdom market as part of machinery. That triggers UK Conformity Assessed (UKCA) marking, which means BS EN 60204-1 (safety of machinery — electrical equipment), BS EN 61439-1/-2 (low-voltage switchgear assemblies), and an EMC declaration. The carbon-dioxide d",
+                "suggestion": "Decide now: (a) hardwired independent carbon-dioxide gas-detection trip with a safety relay — cheap, defensible, performance level \"c\" achievable without a software safety case; or (b) full safety-integrity-level rated programmable logic controller path — adds £4–8k and 6+ weeks. Pick (a) unless ins"
+              },
+              {
+                "severity": "critical",
+                "category": "Cabinet ingress-protection rating mismatch",
+                "message": "IP54 is dust-protected and splash-resistant. This cabinet sits inside a service vestibule that is humid (the canopy runs 70–85% relative humidity) and within metres of a recirculating nutrient reservoir. Condensation inside an IP54 enclosure is the single most common control-panel failure I see in h",
+                "suggestion": "Specify IP55 minimum, fit an anti-condensation heater (30W, thermostat-controlled, £60), and add a hygrostat-controlled vent. Keep the human-machine-interface touchscreen IP65-rated where it penetrates the door."
+              },
+              {
+                "severity": "warning",
+                "category": "Single-source on cellular uplink",
+                "message": "Dual-SIM in one router is dual-carrier, not dual-hardware. If the SCALANCE router fails, you lose remote visibility entirely — and the listed failure mode \"cellular uplink outage … causing loss of remote visibility and alarm propagation\" confirms you know this. Never single-source anything critical.",
+                "suggestion": "Either (a) accept the risk with a documented 4-hour swap-out spares policy and on-site SIM-card hot-swap procedure, or (b) add a low-cost LTE backup modem on a separate carrier with independent message-queuing-telemetry-transport publish. Option (a) is honest for first 50 units; option (b) for fleet"
+              },
+              {
+                "severity": "warning",
+                "category": "Sensor-node mechanical design is undefined",
+                "message": "Twenty distributed nodes, each combining temperature/relative-humidity, carbon-dioxide non-dispersive infrared, vapour-pressure-deficit probe, and water-level/leak inputs — but there is no enclosure specified, no mounting method, no cable-gland strategy, no ingress-protection rating. At twenty per c",
+                "suggestion": "Define the node now. My recommendation: a single injection-moulded ASA enclosure (ultraviolet-stable, food-safe-compatible) with a printed-circuit-board carrying the Sensirion SHT35, a Senseair S8 socket, RS-485 transceiver, and screw terminals. Tooling £8–15k, unit cost £12–18 at 1,000 nodes. Below"
+              },
+              {
+                "severity": "warning",
+                "category": "RS-485 Modbus through corrugated steel + 85% relative humidity",
+                "message": "The open question in the brief is correct to flag this. Wired RS-485 on shielded twisted-pair will work — but only if termination, biasing, and grounding are done correctly at every node. That's an operator-skill failure mode, not a process failure mode, and it doesn't scale.",
+                "suggestion": "Specify Belden 3105A or equivalent, 120-ohm termination resistors at both physical ends only, single-point shield ground at the cabinet, and a daisy-chain topology with no spurs. Document this in a wiring standard and pre-make node-to-node cable assemblies with moulded connectors. That removes the o"
+              },
+              {
+                "severity": "info",
+                "category": "Idiot index — sensor nodes",
+                "message": "Raw electronics cost per node ≈ £40–55. Finished, tested, mounted node ≈ £95 in my estimate. Idiot index ≈ 2. That's healthy. The cabinet itself: raw enclosure £180, finished panel ~£9,400 across all components — but components dominate, not the steel. Idiot index on the enclosure itself ≈ 50, which",
+                "suggestion": ""
+              }
+            ],
+            "recommendations": [
+              "**Lock the safety architecture this week.** Hardwired carbon-dioxide gas-detection trip with a Pilz or equivalent safety relay, independent of the programmable logic controller. Owner: lead controls engineer. Deadline: before panel-builder quote.",
+              "**Upgrade the cabinet specification to IP55 with anti-condensation heater and hygrostat vent.** Cost impact: ≈£120 per container. Negligible against the warranty risk.",
+              "**Issue a controls-module specification package to three United Kingdom panel builders** (suggest: Boulting, Technical Control Systems, and one regional shop) for fixed-price wired-and-tested quotes. First article in 72 hours or we're not trying hard enough — a good panel shop will have a quote back",
+              "**Define the sensor-node enclosure as a first-class deliverable.** Either commit to off-the-shelf junction boxes for the first 50 containers, or invest in injection-mould tooling once quantity target exceeds 500 units. Don't tool blind.",
+              "**Specify the RS-485 wiring standard as a controlled document.** Pre-terminated cable assemblies, moulded connectors, single grounding point. This is a poka-yoke move — make it impossible to wire wrong.",
+              "**Write a UK Conformity Assessed (UKCA) compliance plan** covering BS EN 60204-1, BS EN 61439-1/-2, electromagnetic compatibility (EMC), and BS EN ISO 13849-1 for the carbon-dioxide interlock. Owner: chief technology officer with a contract compliance consultant. Budget £4–6k for testing on first ar"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"control panel enclosure ingress protection IP rating\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"industrial control panel wiring low voltage\"."
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: steel sheet powder coated",
+                "result": "Material \"steel sheet powder coated\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"machinery safety functional safety\"."
+              },
+              {
+                "tool": "run_calculation",
+                "description": "run_calculation call",
+                "result": "Subtotal £: 8150\nWith 15% panel-builder margin £: 9373\n% of 150k capital target: 6.2%\nSensor nodes alone £: 1900 ( 20 % of module)\n\nResult: {\n  \"subtotal\": 8150,\n  \"total\": 9373,\n  \"pctOfCapTarget\": \""
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The rack is **buildable** with off-the-shelf processes and standard suppliers, but there is one critical structural issue (channel sag) and three manufacturability problems that will bite during assembly and at scale if not fixed before tooling commits.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Structural — Channel sag eliminates drainage gradient if channels are end-supported only",
+                "message": "A 2.2 m polypropylene Nutrient Film Technique channel, simply supported only at the ends, deflects approximately **40 mm** under loaded conditions (water film + 14 mature plants + self-weight ≈ 28.5 N/m). The designed gravity fall is **33 mm** over 2.2 m. The channel will sag *more than the fall*, c",
+                "suggestion": "Either (a) make the polypropylene tier shelf a **continuous supporting surface** for each channel along its full length (drops sag to effectively zero — this is how every commercial Nutrient Film Technique system I've seen handles it), or (b) add an intermediate support rib at mid-span which cuts de"
+              },
+              {
+                "severity": "critical",
+                "category": "Material-process — Galvanic corrosion at aluminium-to-stainless-steel interfaces in a wet, ionic environment",
+                "message": "You've specified anodised 6061-T6 aluminium frame with stainless steel 304 cross-bracing, M16 stainless levelling studs, and stainless fasteners — all in constant contact with nutrient solution splash containing dissolved salts (electrical conductivity 1.8–2.5 mS/cm). Anodising helps, but it is a br",
+                "suggestion": "Three options ranked by cost: (1) **Nylon shoulder washers + EPDM gaskets** at every aluminium-to-stainless interface — costs pennies, breaks the galvanic circuit. (2) Switch cross-bracing to **anodised 6061-T6 to match the frame** — eliminates dissimilar metals entirely, slightly lower strength but"
+              },
+              {
+                "severity": "warning",
+                "category": "Process — Polypropylene channels at 11.5 m / 2.2 m length will warp and bow off the extrusion line",
+                "message": "Polypropylene has the highest coefficient of thermal expansion of any common engineering thermoplastic (100 µm/m·K — about 4× aluminium) and notoriously poor dimensional stability post-extrusion. A 2.2 m polypropylene profile cooled non-uniformly will exit the line with 3–8 mm of bow and twist. Comb",
+                "suggestion": "Specify **post-extrusion straightening** (cold-pull or fixture-cool) on the channel drawing, with a straightness tolerance of ±2 mm over 2.2 m. Standard plastic extrusion tolerance per the database is ±0.25 mm on cross-section but straightness is *not* standard — it's an explicit add. Talk to Chase "
+              },
+              {
+                "severity": "warning",
+                "category": "Tolerance stack — Lighting rail snap-channels under tier shelves require dimensional control across three suppliers",
+                "message": "The integrated lighting rail snap-channels mount to the underside of each tier shelf and receive Light-Emitting Diode bars from a different module (Lighting Array). You haven't specified the snap-fit tolerance, but commercial Light-Emitting Diode bar housings typically require a slot width of 10–15 ",
+                "suggestion": "Pull the Light-Emitting Diode bar dimensional drawing from the Lighting Array module before finalising the rail extrusion die. Specify the rail slot at **nominal Light-Emitting Diode bar width + 0.4 mm with ±0.15 mm tolerance** and use a foam strip backer to take up tolerance. **Run The Algorithm on"
+              },
+              {
+                "severity": "info",
+                "category": "Part count — Bill of materials has at least 4 different aluminium extrusion profiles in one rack",
+                "message": "Frame (45×45 slot), bracing (304 stainless tube), channel (custom polypropylene), drain trough (custom polypropylene), lighting rail (custom aluminium snap). That is four custom profiles + standard slot profile = five extrusion line setups, four custom dies. Each die is £2k–8k tooling, 6-week lead t",
+                "suggestion": "Standardise. The drain trough and the channel could be the **same polypropylene extrusion** with different cut lengths and end caps. The lighting rail could be a **standard 20×20 slot profile from the same supplier as the frame**. Target: two custom dies, not four. Saves ~£12k in tooling and removes"
+              },
+              {
+                "severity": "info",
+                "category": "Shipping load case not analysed — and you've named it as a failure mode",
+                "message": "\"Rack rocking or fastener loosening under road-transport vibration\" is on your failure mode list, but I see no reference to a shipping load case in the spec. Road-transport vertical accelerations typically peak at 2g, lateral at 0.8g. A 700 kg rack at 2g vertical is 14 kN through the levelling feet ",
+                "suggestion": "Either (a) ship knocked-down (your open question #3 — answer: **yes, ship knocked-down**, see assembly notes below), or (b) specify a removable shipping brace kit that bolts the rack to the container floor rails and removes after delivery. Door-aperture installation is the other reason knocked-down "
+              }
+            ],
+            "recommendations": [
+              "**Resolve the channel support architecture this week.** Continuous-shelf support is the right answer. Update the tier shelf drawing to be a continuous polypropylene sheet with channel-locating ribs, not a frame-only support. *Owner: Jian (engineering decision) → Fang (manufacturability sign-off). De",
+              "**Add a Galvanic Isolation Detail to the assembly drawing set.** Nylon shoulder washers + EPDM gaskets at every aluminium-to-stainless interface. This is a £0.30/joint cost, not a redesign. *Owner: Jian. Deadline: with next drawing release.*",
+              "**Buy commercial Nutrient Film Technique channels instead of custom-extruding them.** Run a request-for-quote with three United Kingdom horticultural suppliers (CropKing UK, FlexiChannel, Hydrogarden) for 2.2 m × 100 mm × 50 mm food-grade polypropylene Nutrient Film Technique channel with 50 mm net ",
+              "**Standardise to two custom extrusion dies maximum.** Combine drain trough and channel into one profile; use standard slot profiles for lighting rails. *Owner: Jian + Fang joint review. Deadline: before tooling commit.*",
+              "**Specify post-extrusion straightening on any custom polypropylene profile** with ±2 mm over 2.2 m straightness callout. *Owner: Fang. Deadline: with extrusion drawing release.*",
+              "**Pull the Light-Emitting Diode bar dimensional drawing from the Lighting Array module owner before finalising lighting rail geometry.** *Owner: Fang → Lighting module owner. Deadline: this week.*"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: Aluminum 6063-T6",
+                "result": "Material \"Aluminum 6063-T6\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: St"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: polypropylene",
+                "result": "## Polypropylene (PP)\n\n**Category:** polymer\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 905 kg/m³ |\n| Yield Strength | 35 MPa |\n| Ultimate Tensile Strength | 40 "
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: stainless 304",
+                "result": "## Stainless Steel 304\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 8000 kg/m³ |\n| Yield Strength | 215 MPa |\n| Ultimate Tensile Strength | 50"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: aluminum extrusion",
+                "result": "Process \"aluminum extrusion\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: plastic extrusion",
+                "result": "## Metal / Plastic Extrusion\n\n**Category:** formative\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 1mm |\n| Max wall thickness | 25mm |\n| Min feature size | 0"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: al-6061-t6",
+                "result": "## Aluminum 6061-T6\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 2700 kg/m³ |\n| Yield Strength | 276 MPa |\n| Ultimate Tensile Strength | 310 M"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The architecture is sound and the bar-of-materials is well-priced, but the driver cabinet thermal management, single-vendor risk on fixtures, and a quiet contradiction between connected load and the 250 kilowatt-hours per day energy budget all need to be closed before tooling or ordering long-lead drivers.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Energy budget contradiction",
+                "message": "Connected lighting load is **38.4 kilowatts** (eighty drivers × 480 watts), but the module description states the array is \"approximately 10 kilowatts\". A 16-hour photoperiod at 38.4 kilowatts is 614 kilowatt-hours/day — the entire daily allowance is 250. At 10 kilowatts of actual lighting draw, you",
+                "suggestion": "**Run The Algorithm on this before anything else — question the requirement first.** Reconcile: 160 bars × ~118 watts each ≈ 18.9 kilowatts connected → 38–40 drivers at 480 watts (one per four bars, or 240-watt drivers one-per-two-bars). Get this number locked before Chase places any driver order at"
+              },
+              {
+                "severity": "critical",
+                "category": "Driver cabinet thermal headroom",
+                "message": "At the stated 3 kilowatts of driver heat in a 600×800×2000 millimetre IP54 cabinet, you need **~630 cubic metres/hour (~370 cubic feet/minute) of forced exhaust** to hold a 15°C rise above a 30°C plantroom ambient. A single thermostatic exhaust fan is a single point of failure for eighty drivers. Fa",
+                "suggestion": "Two fans in parallel (each sized for 100% duty), thermostat with high-temperature alarm to the programmable logic controller, and a dust-filtered intake louvre. Add a cabinet over-temperature interlock that drops dimming to 60% before drivers self-protect — graceful degradation beats blackout."
+              },
+              {
+                "severity": "critical",
+                "category": "Single-source on fixtures",
+                "message": "\"Fluence VYPR 3p or Valoya BX120 class\" is two named vendors with non-interchangeable mounting, optics, and digital addressable lighting interface addressing. At 160 bars per container the fixture spend is £29,000–£40,000 — this is the largest single line on the bill of materials. Never single-sourc",
+                "suggestion": "Specify a **generic interface** — 1,160 millimetre length, M8 suspension at fixed centres, IP65, 0–10 volt **and** digital addressable lighting interface compliant, photosynthetic photon flux ≥ 320 micromole per second, efficacy ≥ 2.7 micromole per joule, IEC 62471 photobiological. Then qualify thre"
+              },
+              {
+                "severity": "warning",
+                "category": "Mixing dimming protocols",
+                "message": "The bill of materials lists \"0–10 volt **and** digital addressable lighting interface dimmable\" as if both are needed. Pick one. Digital addressable lighting interface gives per-fixture addressing for daily light integral zones; 0–10 volt is rack-level only and cheaper. Specifying both adds bus cont",
+                "suggestion": "Decision needed from controls (Max). Recommend **digital addressable lighting interface only** for production — per-tier dimming pays for itself in propagation versus mature-canopy stages. Carry 0–10 volt as a fallback only if the digital addressable lighting interface gateway slips."
+              },
+              {
+                "severity": "warning",
+                "category": "Ingress protection mismatch creates a maintenance trap",
+                "message": "Fixtures are IP65 (washdown rated), but the wieland connectors are IP67 and the cabinet is IP54. The system is only as sealed as its weakest link — IP54 means dust-protected and splash-resistant, which is fine for the service end, but if nutrient mist migrates down the aisle the cabinet becomes the ",
+                "suggestion": "Confirm cabinet location is upstream of any nutrient-mist zone, or upgrade cabinet to IP55 with a slight-positive-pressure intake fan. Document the IP boundary clearly on the layout drawing."
+              },
+              {
+                "severity": "warning",
+                "category": "Photosynthetic photon flux maintenance unspecified",
+                "message": "The open question on photosynthetic photon flux maintenance curve is a yield-cliff risk. Light-emitting diode bars typically maintain 90% photosynthetic photon flux at 36,000 hours (~6 years at 16-hour photoperiod), but cheap fixtures hit 80% at 18,000 hours. At 80% photosynthetic photon flux your d",
+                "suggestion": "Require L90/B10 at 36,000 hours minimum in the fixture spec, with manufacturer warranty backing it. Add a photosynthetic photon flux sensor (LI-COR or Apogee, one per rack) to the sensor mesh — Chase needs to know about this."
+              }
+            ],
+            "recommendations": [
+              "**Resolve the wattage contradiction this week.** Lighting connected load drives daily energy, climate cooling capacity, and three-phase distribution sizing. This is on the critical path for the entire container's energy budget. Owner: Max + Jian. Deadline: before any driver purchase order.",
+              "**Write a generic fixture specification** independent of Fluence or Valoya. Qualify three suppliers against it. Owner: Fang + Chase. Deadline: 2 weeks. This unlocks dual-sourcing and removes the largest supply risk in the module.",
+              "**Redundant cabinet cooling.** Two fans, high-temp alarm, graceful dimming derate. Owner: Fang. Deadline: with cabinet detail design.",
+              "**Lock dimming protocol to digital addressable lighting interface only.** Owner: Max. Deadline: this sprint — controls hardware selection depends on it.",
+              "**Specify L90 at 36,000 hours minimum** in the fixture procurement spec, plus a canopy photosynthetic photon flux sensor for closed-loop verification. Owner: Fang + Jian.",
+              "**First article test plan:** Mount one bar on a representative rail section, drive it from a production-spec driver, hold it at 40°C ambient for 168 hours, and measure photosynthetic photon flux delta and case temperature. **First article in 72 hours or we're not trying hard enough** — Fluence and V"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: Aluminum 6063-T5",
+                "result": "Material \"Aluminum 6063-T5\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: St"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: extrusion",
+                "result": "## Metal / Plastic Extrusion\n\n**Category:** formative\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 1mm |\n| Max wall thickness | 25mm |\n| Min feature size | 0"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"IP65 enclosure ingress protection\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"horticultural lighting photobiological safety\"."
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: al-6061-t6",
+                "result": "## Aluminum 6061-T6\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 2700 kg/m³ |\n| Yield Strength | 276 MPa |\n| Ultimate Tensile Strength | 310 M"
+              },
+              {
+                "tool": "calculate_thermal",
+                "description": "Thermal analysis: 3000W, al-6061-t6 material",
+                "result": "**Thermal Analysis — Error**\n\nModal API error (404): {\"detail\":\"Not Found\"}"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The architecture is sound and largely standards-driven, but the aluminium Z-purlin substructure is a thermal-bridging time bomb that will cause condensation, mould, and ingress-protection failures within the first winter. Fix that one detail and three downstream failure modes on your own list disappear.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Thermal bridging — Aluminium Z-purlin substructure",
+                "message": "Calculated effective wall U-value rises from 0.22 W/m²·K (foam-only) to ~4.95 W/m²·K once aluminium purlins penetrate the foam — a ~2,150% penalty on heat loss through the bridge area. More importantly, the interior surface temperature at the bridge drops to roughly −1.9°C against an external −2°C w",
+                "suggestion": "Replace aluminium Z-purlins with thermally-broken purlins or a non-metallic substructure. Three viable options: (a) glass-fibre-reinforced polymer (pultruded fibreglass) Z-purlins — thermal conductivity ~0.3 W/m·K, roughly 700× lower than aluminium; (b) timber-composite battens with stainless mechan"
+              },
+              {
+                "severity": "critical",
+                "category": "Single-source risk on the container shell",
+                "message": "A new-build International Organisation for Standardisation 1AAA 40-foot High-Cube on a 10-week lead time is exposed to Chinese new-build pricing swings (United Kingdom landed price has moved between £2,800 and £6,500 in the last three years). You list this as an open question — it should be a sourci",
+                "suggestion": "Dual-path Chase on this. Spec the design to fit either a one-trip used 40-foot High-Cube **or** a new-build, with a documented inspection acceptance standard (Institute of International Container Lessors criteria + your own cleanliness and dent limits). Never single-source the chassis your entire pr"
+              },
+              {
+                "severity": "warning",
+                "category": "Thermoplastic polyolefin bund membrane chemical compatibility — unverified",
+                "message": "Your own open question. Diluted hydroponic nutrient (pH 5.5–6.5, electrical conductivity 1.5–2.5 mS/cm) is benign, but periodic sanitation with peracetic acid (typical 0.1–0.3% working strength) and sodium hypochlorite (200–500 ppm) over a 10-year service life is the failure case. Thermoplastic poly",
+                "suggestion": "Get a written chemical compatibility statement from the membrane manufacturer (Sika Sarnafil, Protan, Firestone Ultraply) covering peracetic acid at your concentration. If they won't write it, switch to a flexible polypropylene or glass-reinforced polyester laminate bund — both have stronger oxidise"
+              },
+              {
+                "severity": "warning",
+                "category": "Polyurethane foam fire rating vs insurer requirement — unverified",
+                "message": "Sprayed closed-cell polyurethane is reachable to Euroclass B-s2,d0 with the right formulation, but unattended industrial occupancies running mains three-phase loads typically attract insurer requirements above the Building Regulations minimum. Fire load includes the fibre-reinforced plastic lining a",
+                "suggestion": "Get the insurer's written fire-rating requirement **before** specifying foam. If they ask for a 30-minute integrity rating you'll need either an intumescent topcoat (cost +£800–£1,500 per container) or a switch to mineral-wool or phenolic foam panels. This is a procurement-blocker risk on the critic"
+              },
+              {
+                "severity": "warning",
+                "category": "Penetration glands at IP65 — gasket lifecycle",
+                "message": "Ethylene propylene diene monomer gaskets are correct for ozone and ultraviolet, but compression set under continuous load over 5–10 years means gland seal can drop below IP65 — your own Failure Mode #4. Pest entry through degraded condenser-line glands is the most common ingress failure on container",
+                "suggestion": "Specify glands to International Electrotechnical Commission 60529 IP66 (not IP65) so you have a margin against gasket ageing. Add a planned replacement at 5-year service interval to the operations manual. Use cable-gland brands with documented compression-set data (Roxtec, Hawke)."
+              },
+              {
+                "severity": "info",
+                "category": "Idiot index — shell module",
+                "message": "Raw material content is roughly: container shell ~4 tonnes mild/Corten steel at ~£1.50/kg = £6,000; foam ~£800; fibre-reinforced plastic lining ~£600; bund membrane + plywood ~£700; Unistrut + fasteners ~£500. Total raw material ~£8,600. If the finished installed-shell cost lands at £18–25k the idio",
+                "suggestion": ""
+              }
+            ],
+            "recommendations": [
+              "**Kill the aluminium thermal bridge in week 1.** Switch to pultruded fibreglass Z-purlins or specify Armatherm thermal breaks at every corrugation contact. Owner: Jian (engineering) + Fang (manufacturing). By: end of week 1. This single change eliminates condensation risk, foam-delamination risk, an",
+              "**Resolve the three open questions before tooling/procurement, not after.** Run them in parallel:",
+              "**Specify International Electrotechnical Commission 60529 IP66 on all penetration glands**, not IP65. One step up costs ~£3 per gland and removes a known 5-year failure mode.",
+              "**Document the shell as a Bill of Materials with three sourcing tiers** (preferred, secondary, emergency) so you are never single-sourced on the chassis. Hand to Chase.",
+              "**First-article plan:** First container shell built and cold-room tested at 0°C ambient with thermal imaging on every interior wall to validate the no-bridge claim. Pass criterion: no internal surface below 16°C anywhere. First article in 72 hours of receiving the substructure parts or we're not try",
+              "**ASSEMBLY: Sequence — first.** This is the foundation module. Nothing assembles until the shell is closed, foamed, lined, and bunded. The build order inside the container is: shell → substructure → foam → lining → bund → Unistrut rails → penetration glands → leak test → only then start admitting ra"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: corten weathering steel",
+                "result": "Material \"corten weathering steel\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: polyurethane foam closed cell",
+                "result": "Material \"polyurethane foam closed cell\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\ns"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: marine plywood",
+                "result": "Material \"marine plywood\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Stee"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "**Design Standards — Error**\n\nCannot coerce the result to a single JSON object"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"EN 60529 IP65 ingress protection\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"food contact hygiene FRP wall lining\"."
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The architecture is sound and the parts are largely off-the-shelf, but the 600 L flat-walled reservoir as drawn fails long-term creep stress, the design brief is empty (process, material, tolerance, quantity all blank), and there are two single points of failure that will kill a week of unattended operation.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Reservoir wall — long-term creep failure",
+                "message": "A 1200×800×800 mm flat-walled HDPE tank with 12 mm wall under 800 mm of water head sees ~17 MPa peak bending stress on the long flat panel. HDPE short-term yield is 26 MPa (safety factor 1.5 — already marginal), but the 50-year creep allowable is ~6 MPa. Safety factor against creep is **0.4**. The w",
+                "suggestion": "Either dual lamps in series with auto-failover, OR pair with a 1 µm absolute filter as a mechanical pathogen barrier so a lamp-out condition degrades gracefully for 48 hours until service."
+              },
+              {
+                "severity": "critical",
+                "category": "Single-point failure — UV steriliser",
+                "message": "One 40 W lamp inline. Lamp failure = pathogen breakthrough = whole-container Pythium event = four tonnes of crop at risk. Telemetry tells you it failed; it doesn't save the crop. *Suggestion:* Either dual lamps in series with auto-failover, OR pair with a 1 µm absolute filter as a mechanical pathoge",
+                "suggestion": "Anti-siphon loops on every dosing line, mounted **above** the reservoir maximum fill line, plus a check valve. Non-negotiable."
+              },
+              {
+                "severity": "critical",
+                "category": "Single-point failure — dosing siphon risk",
+                "message": "Peristaltic pumps are positive-displacement when running but a ruptured Santoprene tube will siphon concentrated pH-down (typically nitric or phosphoric acid) into the reservoir. One event, six thousand plants burned. *Suggestion:* Anti-siphon loops on every dosing line, mounted **above** the reserv",
+                "suggestion": ""
+              },
+              {
+                "severity": "warning",
+                "category": "Empty design brief",
+                "message": "Use case, target process, target material, tolerance, quantity all blank. You cannot do real Design For Manufacturing without these. What does the process look like on paper versus what actually happens? Right now it doesn't even exist on paper.",
+                "suggestion": "Specify duty/standby with automatic changeover on flow-switch or pressure-switch trip. The £400 second pump protects ~£3,000 of crop per failure event."
+              },
+              {
+                "severity": "warning",
+                "category": "Duty/standby pump question still open",
+                "message": "The brief flags this. For weekly unattended operation with a four-tonne-a-year crop, this isn't optional. A single-pump-with-spare strategy means a Tuesday pump failure browns out the racks until Saturday. *Suggestion:* Specify duty/standby with automatic changeover on flow-switch or pressure-switch",
+                "suggestion": ""
+              },
+              {
+                "severity": "warning",
+                "category": "HDPE bonding / fitting seal risk",
+                "message": "HDPE is \"extremely difficult to bond/glue\" per the material database. All bulkhead fittings must be **mechanical compression with EPDM gaskets**, never solvent-welded or adhesive. Confirm Water Regulations Advisory Scheme-approved bulkheads use mechanical seals.",
+                "suggestion": ""
+              }
+            ],
+            "recommendations": [
+              "**Re-specify the reservoir as cylindrical rotomoulded HDPE, 600 L, with integral lifting points and a moulded-in bund lip.** Run the structural numbers again on the cylindrical geometry — hoop stress on a 700 mm diameter tank with 8 mm wall is roughly 0.3 MPa, comfortably below long-term creep allow",
+              "**Add anti-siphon loops to all six dosing lines.** Mount dosing pumps above the reservoir high-water mark. Add inline check valves rated for the chemistry (Viton for acids, EPDM for nutrients).",
+              "**Specify duty/standby circulation pumps with automatic changeover.** Single-source nothing critical — and the circulation pump is the most critical part on this module.",
+              "**Add a 1 µm absolute polish filter immediately downstream of the UV steriliser** as a mechanical pathogen barrier. Lamp telemetry alone is not protection.",
+              "**Fill out the design brief.** Target process for tanks: **rotational moulding** (right for this volume and geometry, food-grade HDPE compatible, integral features, no draft-angle penalty). Target quantity: state it — 50 systems/year reads very differently from 500. Target tolerance: **ISO 2768-m** ",
+              "**Sourcing strategy — go contract manufacturer, not in-house.** Don't buy the machine shop. Find a better contract manufacturer and design a cleaner part. Rotomoulded tanks are a mature UK supply base (Kingspan, Tuffa, Enduramaxx, Forbes). Hand the cylindrical drawing to two of them in parallel and "
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: HDPE",
+                "result": "## HDPE (High-Density Polyethylene)\n\n**Category:** polymer\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 950 kg/m³ |\n| Yield Strength | 26 MPa |\n| Ultimate Tensile "
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: polypropylene",
+                "result": "## Polypropylene (PP)\n\n**Category:** polymer\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 905 kg/m³ |\n| Yield Strength | 35 MPa |\n| Ultimate Tensile Strength | 40 "
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: rotational-molding",
+                "result": "Process \"rotational-molding\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"potable water fittings WRAS\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"food contact materials plastic\"."
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: injection-molding",
+                "result": "## Injection Molding\n\n**Category:** formative\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 1mm |\n| Max wall thickness | 4mm |\n| Min feature size | 0.5mm |\n| "
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "reviewCount": 3,
+        "moduleCount": 7,
+        "reviewedCount": 3,
+        "coverageRatio": 0.42857142857142855,
+        "deterministic": {
+          "coverage_per_module": 4.285714285714286,
+          "severity_distribution_realism": 0,
+          "boilerplate_repetition": 10
+        },
+        "severityCounts": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "catchphraseCounts": {
+          "Run The Algorithm": 0,
+          "First article in 72 hours": 1,
+          "Don't buy the machine shop": 0
+        },
+        "sample": [
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The handle concept is manufacturable at prototype scale today, but contains five issues that will cause consistent production failures or cost overruns at volume if not resolved now — before tooling and before the electronics integration is locked. The bond-line strategy and wood species selection are the most urgent. Nothing here is fatal, but several decisions need to be made explicitly rather t",
+            "issues": [],
+            "recommendations": [
+              "**Resolve the construction method first** — single billet with end-cap access versus two bonded halves. This decision unblocks process selection, fixture design, cavity layout, and joint detail simultaneously. *If we fix this one thing, three downstream problems disappear.* Target: design decision w",
+              "**Specify 5-axis CNC machining explicitly.** 3-axis cannot produce a clean compound-curved profile on a premium product without witness lines. Identify a UK wood/composite machining specialist — instrument makers, prosthetics shops, and premium furniture contract manufacturers all run 5-axis on hard",
+              "**Switch to resin-stabilised wood blanks.** Source stabilised ash or walnut from a supplier such as Turners Retreat, Exotic Hardwoods UK, or equivalent. Specify moisture content at delivery (10–12%). This single change reduces the bond-line risk, the dimensional stability risk, and the finish adhesi",
+              "**Specify acoustic membranes, not steel mesh.** Gore Protective Vents EM series or equivalent. Specify IP54 as a minimum for the assembled handle. Add this to the bill of materials now — it is a patient-safety-adjacent component, not a nice-to-have.",
+              "**Lock the wood finish specification before electronics calibration.** Oil-based finish preferred (tung oil, Danish oil, hardwax oil). Document the finish type, number of coats, and application method in the manufacturing specification. No finish changes after sensor calibration without full re-vali",
+              "**Design and specify the brass insert joint now.** M8 or M10 threaded brass insert, press-fit and bonded, with a defined assembly torque. Make the cavity serviceable for printed circuit board rework — this is a real-world requirement, not a theoretical one. Handle returns will happen."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: ash wood",
+                "result": "Material \"ash wood\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: walnut wood",
+                "result": "Material \"walnut wood\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: cnc-3-axis",
+                "result": "Process \"cnc-3-axis\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbinder"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: cnc-5-axis",
+                "result": "Process \"cnc-5-axis\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbinder"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: cnc-3axis",
+                "result": "## CNC Milling (3-Axis)\n\n**Category:** subtractive\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | No limitmm |\n| Min feature siz"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: cnc-5axis",
+                "result": "## CNC Milling (5-Axis)\n\n**Category:** subtractive\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | No limitmm |\n| Min feature siz"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The lower carbon-fibre shaft is structurally sound in concept and the right material for the weight target — but the module has **four specific manufacturability risks** that will cause problems at production volume if not resolved before tooling is committed. None are fatal; all are fixable at the design stage. The most serious is the telescoping joint tolerance stack, which has not been specifie",
+            "issues": [],
+            "recommendations": [
+              "**Specify the telescoping interface as an ISO 286 clearance fit immediately.** Target 0.2–0.4 mm clearance per side. This is the single dimension that determines whether Sentinel feels like a premium product or a £40 stick from a mobility catalogue. If we fix this one thing, fit, rattle, and user co",
+              "**Write a tube specification document before any supplier conversations.** Outer diameter, wall thickness, layup, fibre volume fraction, outer diameter tolerance, surface finish. Chase cannot qualify a supplier without it. I can produce a draft tube specification document — want me to do that?",
+              "**Design the pin-clip hole drilling process as a controlled operation with a written work instruction.** Backing plug, diamond tooling, feed rate limit, delamination inspection criterion. Don't leave this to the contract manufacturer's discretion.",
+              "**Resolve the signal wire routing before first article.** The wire loop geometry, minimum bend radius, strain-relief grommet locations, and wire specification (strand count, gauge, insulation type) must all be on the assembly drawing. This is a first-article blocker.",
+              "**Dual-source the pin-clip mechanism.** Specify 10,000-cycle fatigue life at rated load. Require test certificates from both suppliers before production approval.",
+              "**ASSEMBLY: Sequence — middle stage.** The lower shaft assembly sits between the ferrule assembly (which must be complete first, with the pressure sensor wire terminated and tested) and the upper shaft assembly (which receives the wire pass-through). Assembly sequence: ferrule → lower shaft → wire r"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: carbon fibre composite tube",
+                "result": "Material \"carbon fibre composite tube\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nste"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: CNC machining",
+                "result": "Process \"CNC machining\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbin"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found for domain \"general_engineering\"."
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: cf-woven-3k",
+                "result": "## Carbon Fiber Woven 3K (CFRP Fabric)\n\n**Category:** composite\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 1550 kg/m³ |\n| Yield Strength | N/A (brittle) MPa |\n| "
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: cf-unidirectional",
+                "result": "## Carbon Fiber Unidirectional (CFRP UD)\n\n**Category:** composite\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 1600 kg/m³ |\n| Yield Strength | N/A (brittle) MPa |\n"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: cnc-3axis",
+                "result": "## CNC Milling (3-Axis)\n\n**Category:** subtractive\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | No limitmm |\n| Min feature siz"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The tube geometry and structural concept are sound, but four manufacturing and physics risks need resolution before tooling is committed — two of them (the aluminium-to-carbon thermal mismatch at the bonded sleeve, and the carbon-fibre Faraday shielding of the inductive charging coil) are serious enough to drive a redesign if not addressed now. The radio-frequency window strategy is correct in pri",
+            "issues": [],
+            "recommendations": [
+              "**Redesign the inductive charging section as a glass-fibre reinforced polymer tube** — extend the non-conductive section to cover the full receiver coil length plus 15 mm margin each side. Confirm the exact coil axial position on the electronics printed circuit board layout before freezing tube geom",
+              "**Replace the aluminium reinforcement sleeve with a carbon-fibre reinforced polymer over-wrap** — co-cured or secondary bonded with a toughened adhesive film. Engage Jian to size the over-wrap ply count against the cantilever and pin-clip load cases. If aluminium is retained for wear reasons, use a ",
+              "**Simplify the radio-frequency window from co-bond to step-joint** — manufacture the upper 80–100 mm as a discrete glass-fibre reinforced polymer tube, secondary bond to the carbon tube with a machined step. Keeps cure processes independent, makes the joint inspectable, reduces first-article risk si",
+              "**Set nominal wall thickness at 1.5 mm**, with 1.0 mm as minimum reject threshold. Specify diamond tooling for all machining and grinding operations.",
+              "**Specify mandrel type, internal diameter tolerance (±0.1 mm), and internal surface finish (Ra ≤ 3.2 µm)** in the drawing package before supplier RFQ goes out.",
+              "**Specify the lacquer system explicitly** — two-component polyurethane, UV-stabilised, minimum 60 µm dry film thickness. Require ISO 2409 adhesion and ISO 4892-2 UV weathering as qualification gates."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: carbon fibre composite",
+                "result": "Material \"carbon fibre composite\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-41"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: glass fibre reinforced polymer",
+                "result": "Material \"glass fibre reinforced polymer\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\n"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: aluminium 6061-T6",
+                "result": "Material \"aluminium 6061-T6\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: S"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: filament winding",
+                "result": "Process \"filament winding\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\n"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: autoclave composite",
+                "result": "Process \"autoclave composite\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJ"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: cf-woven-3k",
+                "result": "## Carbon Fiber Woven 3K (CFRP Fabric)\n\n**Category:** composite\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 1550 kg/m³ |\n| Yield Strength | N/A (brittle) MPa |\n| "
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostics": [
+        "no issues across reviews"
+      ]
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "reviewCount": 11,
+        "moduleCount": 7,
+        "reviewedCount": 7,
+        "coverageRatio": 1,
+        "deterministic": {
+          "coverage_per_module": 10,
+          "severity_distribution_realism": 8.669354838709678,
+          "boilerplate_repetition": 0
+        },
+        "severityCounts": {
+          "critical": 9,
+          "warning": 16,
+          "info": 6
+        },
+        "catchphraseCounts": {
+          "Run The Algorithm": 7,
+          "First article in 72 hours": 10,
+          "Don't buy the machine shop": 2
+        },
+        "sample": [
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The shell is buildable in both variants, but the design carries four serious manufacturability risks that will bite in production: a galvanic-corrosion path that's already a known failure mode but not designed out, a die-cast electronics tray that's specified prematurely for the volume, a two-halves-and-kiln-fused ceramic process that has a hidden 15–25% scrap rate, and a deep-drawn 304 stainless ",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Material-process mismatch — die-cast aluminium electronics tray",
+                "message": "Die casting requires a minimum economical batch of 1,000 units, tooling £10k–£150k (database confirmed), and 8-week prototype lead time. You're at prototype/early production volume with no tool yet. Worse — die casting is inherently porous (database flag: \"not suitable for pressure-tight application",
+                "suggestion": "Run The Algorithm on this part — question the requirement first. The tray exists to mount three boards with standoffs. Replace it with: (a) a CNC-machined or laser-cut-and-folded aluminium 5052 plate with PEM standoffs at 1k–5k units, or (b) glass-filled nylon (PA6-GF30) injection-moulded tray at 10"
+              },
+              {
+                "severity": "critical",
+                "category": "Galvanic corrosion at steel-to-aluminium tray interface",
+                "message": "Already in your failure modes list, mitigation is \"isolation washers during assembly.\" That's an operator-skill dependency, not a process control. In a humid sealed cavity over 5 years, one missed washer = field failure and warranty claim.",
+                "suggestion": "Design out the galvanic couple entirely — switch the tray to glass-filled nylon (per above) or to the same 304 stainless as the shell. Poka-yoke beats inspection every time."
+              },
+              {
+                "severity": "warning",
+                "category": "Ceramic two-halves slip-cast and kiln-fused construction",
+                "message": "Slip casting two halves and fusing them in a single firing is a known high-scrap geometry. Differential shrinkage at the join, glaze pooling at the seam, and frost-induced crazing (already flagged in your failure modes) typically yield 75–85% first-pass at a competent UK pottery, dropping further wi",
+                "suggestion": "Two options: (1) single-piece slip cast with a removable plaster core, opening only at the base — eliminates the fused seam entirely; (2) accept the seam but specify the join as a horizontal band that becomes a design feature, glazed separately. Get three pottery samples in 6 weeks before committing"
+              },
+              {
+                "severity": "warning",
+                "category": "Deep-drawn 1.5 mm grade 304 — bend radius and springback",
+                "message": "Database (sheet metal): minimum bend radius for stainless is 2× material thickness = 3 mm minimum internal radius. Grade 304 work-hardens significantly during draw — your spec says \"deep-drawn upper and lower shells with seam-welded join,\" which means you need annealing between draw stages or you'll",
+                "suggestion": "Confirm with three sheet-metal contract manufacturers that this geometry is single-stage drawable, or commit to a multi-stage draw with intermediate annealing (adds £4–£8/unit). Alternative — switch to grade 430 ferritic stainless for the body (cheaper, more formable, magnetic which doesn't matter h"
+              },
+              {
+                "severity": "warning",
+                "category": "EPDM gasket compression set over 5 years",
+                "message": "Already in your failure modes. Shore-A 60 EPDM at 25% compression typically holds IP54 for 3–5 years in UK conditions, then degrades. You're targeting 5-year aesthetic life — the gasket is the critical-path consumable.",
+                "suggestion": "Specify a peroxide-cured EPDM (better compression-set performance than sulphur-cured) at Shore-A 50–55, and design the gasket groove for 15–20% compression rather than 25%. Make the gasket field-replaceable from the base — it's a £0.40 part that protects £155 of bill of materials."
+              },
+              {
+                "severity": "warning",
+                "category": "Powder coat chip-through at edges",
+                "message": "Database confirms powder coating works on stainless, but chip-through at deep-drawn edges and fastener heads (your own flagged failure mode) is endemic. 80–100 µm is the right thickness, but edge coverage on sharp deep-drawn lips is typically 50–60% of nominal.",
+                "suggestion": "Specify a minimum 0.8 mm edge radius on all visible edges before coating (geometry change, free), and a two-coat system: zinc-rich primer (15 µm) + polyester topcoat (80 µm). Adds £1.50–£2.50/unit, takes failure mode from 2–3 years to 7+ years. Specify ASTM B117 salt spray testing — 500 hours minimu"
+              }
+            ],
+            "recommendations": [
+              "**Kill the die-cast aluminium electronics tray.** Replace with CNC or folded grade 5052 aluminium plate up to 5k units (£8–£12/unit, no tooling), or glass-filled nylon injection moulded above 10k units. Removes one critical and one warning issue.",
+              "**Resolve the antenna window question now: pick the non-metallic crown cap.** It eliminates bonded-window failure modes and simplifies the steel body to a single deep-drawn shape.",
+              "**Get three first articles in parallel** — one steel from a UK deep-draw shop, one ceramic from a UK studio pottery (single-piece slip cast), one ceramic from a multi-piece slip cast — pick the fastest path to a stable process. Target 6–8 weeks to qualified samples.",
+              "**Specify the gasket groove for 15–20% compression and peroxide-cured EPDM**, with field-replaceable design from the base.",
+              "**Add a 0.8 mm minimum edge radius callout** before powder coat, plus zinc-rich primer specification.",
+              "**Run salt spray (ASTM B117, 500 hours) and freeze-thaw (50 cycles, –10°C ↔ +20°C in water) tests** on first articles — both required before tooling commitment."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: stainless 304",
+                "result": "## Stainless Steel 304\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 8000 kg/m³ |\n| Yield Strength | 215 MPa |\n| Ultimate Tensile Strength | 50"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: stoneware ceramic",
+                "result": "Material \"stoneware ceramic\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: S"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: EPDM",
+                "result": "Material \"EPDM\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140 (Al"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: deep drawing",
+                "result": "Process \"deep drawing\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbind"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: slip casting",
+                "result": "Process \"slip casting\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbind"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: powder coating",
+                "result": "Process \"powder coating\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbi"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The pack architecture is sound and the chemistry choice is correct, but the energy budget has thin margin for worst-case UK December, the moisture strategy is undefined, and several manufacturing-critical decisions (cell sourcing, low-temperature charge strategy, spot-weld qualification) are still open. None are unfixable — but they need to close before tooling, not after.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Energy sizing margin",
+                "message": "At 2-series-1-parallel and 19.2–21.8 watt-hours total (15.4–17.4 watt-hours usable at 80 percent depth of discharge), autonomy is roughly 6–7 days idle, 4.4–5.0 days active. UK December routinely delivers 5–7 consecutive sub-1-kilowatt-hour-per-square-metre days. **You're sized to the average, not t",
+                "suggestion": "Move to 2-series-3-parallel (60+ watt-hours nominal) as the baseline. Cell cost delta is ~£8–12 at the bill of materials. Budget headroom comes from ceramic-versus-steel body trade, not from undersizing the battery. Run The Algorithm on that part before we talk tooling — question the requirement fir"
+              },
+              {
+                "severity": "critical",
+                "category": "Low-temperature charging strategy undefined",
+                "message": "Lithium iron phosphate cannot be charged below 0 °C without lithium plating and permanent capacity loss. UK garden mounting will see -5 to -10 °C overnight in January. You've listed this as an open question — it must close before you commit to the battery management system part number.",
+                "suggestion": "Two valid paths: (a) charge lockout below 0 °C using the negative-temperature-coefficient thermistor — simple, free, costs you ~30 days of winter charging ability; (b) self-heating film (~0.5 watts at ~5 °C threshold) drawing from the battery itself to warm cells before charge enable. Path (b) adds "
+              },
+              {
+                "severity": "warning",
+                "category": "Spot-weld qualification is a production-floor risk",
+                "message": "Nickel-plated steel strips spot-welded to cell terminals at 5 amps continuous is standard practice — but weld quality is operator-and-machine dependent. What does the process look like on paper versus what actually happens? On paper: two pulses, consistent nugget. In practice: weld pull-strength var",
+                "suggestion": "Specify pull-test sampling at the contract manufacturer — minimum 4 kilograms-force per tab, 100 percent visual inspection for burn-through, destructive pull test on 1-in-100. Require Cp/Cpk ≥ 1.33 on weld pull strength as part of process qualification. This goes in the contract manufacturer agreeme"
+              },
+              {
+                "severity": "warning",
+                "category": "Moisture ingress is listed as a failure mode but no countermeasure specified",
+                "message": "A garden-mounted product over 5 years will see condensation cycles inside the body cavity. Nickel interconnects corrode. Battery management system board pads corrode. The pack itself needs to be a sealed sub-assembly, not just rely on the body shell.",
+                "suggestion": "Conformal coat the battery management system board (acrylic or parylene — parylene is better, ~£0.50 per board at volume). Pot the cell-to-board solder joints. Specify the pack as Ingress Protection rating IP54 minimum at the sub-assembly level, even though the body is rated higher. Defence in depth"
+              },
+              {
+                "severity": "warning",
+                "category": "Cell sourcing is single-source risk by default",
+                "message": "Listing \"EVE or A123\" is fine for the data sheet, but in production you'll commit to one. Branded cells (EVE, A123) are £2.50–4 per cell at volume; unbranded Asian cells are £1–1.80. The temptation will be real. Don't single-source anything critical. The day your only supplier fails, your company fa",
+                "suggestion": "Qualify two cell suppliers from day one. Both must pass UN 38.3 in your pack configuration — and any cell change requires UN 38.3 retest (~£8k–15k, 6–8 weeks). Build that retest cost into your reserve. Pick branded for the launch run; pre-qualify a backup before you need it."
+              },
+              {
+                "severity": "warning",
+                "category": "M3 stainless steel mounting bosses into ABS carrier",
+                "message": "Threading stainless directly into ABS works once or twice, then strips. ABS at -10 °C also gets brittle. For a serviceable pack (which you'll want for warranty replacement), this is a problem.",
+                "suggestion": "Heat-set brass threaded inserts (Tappex, Ensat M3) into the ABS carrier. Adds £0.08 per insert, ~3 seconds of insertion time. Reusable, doesn't strip, doesn't crack the boss in cold weather. Or switch the carrier to polycarbonate — yield strength 62 megapascals versus 43 megapascals for ABS, holds t"
+              }
+            ],
+            "recommendations": [
+              "**Resize to 2-series-3-parallel (60 watt-hours nominal).** Re-validate against a 7-day December overcast worst case. Owner: Jian (energy budget) + you. Deadline: before any cell purchase commitment.",
+              "**Close the low-temperature charging question this week.** Recommend self-heating film with charge enable above 5 °C. Owner: electronics lead. Deadline: 5 working days — this gates the battery management system part selection.",
+              "**Write the cell qualification plan.** Two sources (one branded primary, one branded backup), UN 38.3 budget for both, IEC 62133-2 / BS EN 62133 conformity for the United Kingdom Conformity Assessed mark, and the test schedule. Owner: Chase + you. Deadline: 3 weeks.",
+              "**Specify the pack as a sealed, conformal-coated sub-assembly with Ingress Protection rating IP54 minimum.** Pot solder joints, parylene-coat the battery management system board. Owner: you, in the contract manufacturer specification. Deadline: with first article drawing release.",
+              "**Replace direct-thread M3 in ABS with heat-set brass inserts; or switch carrier to polycarbonate and consolidate the two moulded parts into one.** My preference: consolidate to polycarbonate. Owner: Jian on design, you on cost validation. Deadline: 2 weeks.",
+              "**Write the spot-weld qualification protocol now, not at first article.** Pull-test acceptance criteria, sampling plan, Cp/Cpk targets, equipment requirements (capacitor-discharge welder, not benchtop transformer welder). Goes into the contract manufacturer statement of work. Owner: you. Deadline: w"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: polycarbonate",
+                "result": "## Polycarbonate (PC)\n\n**Category:** polymer\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 1200 kg/m³ |\n| Yield Strength | 62 MPa |\n| Ultimate Tensile Strength | 66"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: ABS",
+                "result": "## ABS (Acrylonitrile Butadiene Styrene)\n\n**Category:** polymer\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 1040 kg/m³ |\n| Yield Strength | 43 MPa |\n| Ultimate Te"
+              },
+              {
+                "tool": "calculate_fastener",
+                "description": "Fastener analysis: M3 8.8",
+                "result": "**Fastener Analysis — Error**\n\nModal API error (404): {\"detail\":\"Not Found\"}"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"battery management safety IEC 62133\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"lithium battery transport UN 38.3\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"IP rating ingress protection outdoor enclosure\"."
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The board is buildable with standard printed-circuit-board fabrication and surface-mount-technology assembly — no exotic processes — but two of the four declared failure modes are confirmed by calculation, and the Specify card is missing target process, material, and tolerance fields that production needs locked before tooling.",
+            "issues": [],
+            "recommendations": [
+              "**Re-architect the thermal path to dump heat to the outside skin of the shell, not into the cavity.** Owner: electrical and thermal engineering. By: end of week 2. This is the single highest-impact change.",
+              "**Switch to industrial pseudo-single-level-cell embedded MultiMediaCard or move ring-buffer writes to volatile memory.** Owner: firmware lead and bill-of-materials owner. By: end of week 2.",
+              "**Lock the Specify card fields** — process (printed-circuit-board fabrication + surface-mount-technology assembly to IPC-A-600/610 Class 2), substrate (flame-retardant-4, high-glass-transition), critical tolerance (±10 % impedance on Camera Serial Interface 2 pairs only), volume (declare phase-one q",
+              "**Specify 6-layer printed-circuit-board with ground-plane shielding under Camera Serial Interface 2.** Owner: printed-circuit-board layout. Cost adder: roughly £1–2 per board at production volume. Cheap insurance.",
+              "**Run a thermal first article in 72 hours.** Take a development board, mount it in a representative shell, sit it in direct sun on a hot day, run sustained inference, log junction temperature. **First article in 72 hours or we're not trying hard enough.** This validates or kills my calculation befor",
+              "**Dual-source the embedded MultiMediaCard from day one.** Swissbit and Apacer both have drop-in industrial pseudo-single-level-cell parts. Never single-source flash — the 2021–22 shortage taught that lesson at full price."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: pcb-fabrication",
+                "result": "Process \"pcb-fabrication\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nb"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: Aluminum 6061-T6",
+                "result": "## Aluminum 6061-T6\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 2700 kg/m³ |\n| Yield Strength | 276 MPa |\n| Ultimate Tensile Strength | 310 M"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: FR4",
+                "result": "Material \"FR4\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140 (All"
+              },
+              {
+                "tool": "calculate_thermal",
+                "description": "Thermal analysis: 3W, Aluminum 6061-T6 material",
+                "result": "**Thermal Analysis — Error**\n\nModal API error (404): {\"detail\":\"Not Found\"}"
+              },
+              {
+                "tool": "calculate_thermal",
+                "description": "Thermal analysis: 3W, al-6061-t6 material",
+                "result": "**Thermal Analysis — Error**\n\nModal API error (404): {\"detail\":\"Not Found\"}"
+              },
+              {
+                "tool": "calculate_thermal",
+                "description": "Thermal analysis: 5W, al-6061-t6 material",
+                "result": "**Thermal Analysis — Error**\n\nModal API error (404): {\"detail\":\"Not Found\"}"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The board is electrically buildable using a standard six-layer printed-circuit-board contract manufacturer, but the thermal design as specified will cook the neural processing unit on a hot day inside a sealed ceramic enclosure — and the storage architecture as drawn is fine on wear-out but wrong on serviceability. Fix these two things at the specification stage, before the printed-circuit-board l",
+            "issues": [],
+            "recommendations": [
+              "**Lock the thermal architecture before the printed-circuit-board layout.** Decide this week: bonded thermal path to chassis (yes/no), Gore-Tex vent (yes/no), ceramic-as-outer-shell-only (yes/no). The board layout depends on where the system-on-chip thermal pad lands.",
+              "**Re-specify storage as eMMC-OS + user-replaceable microSD.** Net effect: longer field life, serviceable warranty, happier users, no cost increase (microSD socket is ~£0.40).",
+              "**Build the printed-circuit-board fabrication package with explicit impedance, coating keep-out, and test-coupon callouts.** This is the difference between a clean first-article build and three weeks of back-and-forth with the contract manufacturer.",
+              "**Plan first article in three weeks at two contract assemblers in parallel** — do not single-source the board build. *Never single-source anything critical.* See table below.",
+              "**Build a thermal-soak test rig for first article validation.** 40 °C chamber, 1.5-watt sustained load, four-hour soak, junction-temperature telemetry logged. Pass criterion: junction stays below 80 °C. *First article in 72 hours of board arrival or we're not trying hard enough.*",
+              "**ASSEMBLY: Sequence — late.** Compute module is one of the last subassemblies installed. Body, power subsystem, and antennas mount first; compute drops in with pre-routed cabling and a single board-to-board connector + thermal pad to chassis."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: pcb-assembly",
+                "result": "Process \"pcb-assembly\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbind"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: conformal-coating",
+                "result": "Process \"conformal-coating\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: FR-4",
+                "result": "Material \"FR-4\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140 (Al"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"PCB assembly IPC\"."
+              },
+              {
+                "tool": "run_calculation",
+                "description": "run_calculation call",
+                "result": "Total lifetime write budget: 75.0 TB\n\nResult: [\n  {\n    \"scenario\": \"Light (30 min/day capture)\",\n    \"daily_write_GB\": 1.38,\n    \"lifetime_years\": 152.6\n  },\n  {\n    \"scenario\": \"Typical (60 min/day "
+              },
+              {
+                "tool": "calculate_thermal",
+                "description": "Thermal analysis: 1.5W, alumina-al2o3 material",
+                "result": "**Thermal Analysis — Error**\n\nModal API error (404): {\"detail\":\"Not Found\"}"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The 200 × 200 millimetre panel is undersized by roughly 2.5× for a United Kingdom December energy budget. Ship this as drawn and Hedgerow will brown-out across the country every January — silently, en masse, in the gardens of your highest-value early customers. This is fixable, but it has to be fixed before any tooling, encapsulation, or body-shell crown geometry is locked.",
+            "issues": [],
+            "recommendations": [
+              "**Lock the daily energy budget this week** — owner: Max (chief technology officer) with the compute and connectivity leads. Output: watt-hours per day at typical and worst-case duty cycles. Without this, no other decision on this module is real.",
+              "**Re-spec the panel to ~390 × 390 millimetre active area / ~28 watt peak** as the working assumption pending the budget. Update the body-shell crown geometry in parallel — flag this to the body-shell module owner today.",
+              "**Reframe the product line: solar-plus-mains-trickle as standard, pure-solar as premium tier with a garden-aspect compatibility check.** This is a marketing and sales decision as much as engineering — loop in Mia.",
+              "**Hardware-enforce the sub-zero charge inhibit** with a thermistor-gated charge enable line, independent of firmware.",
+              "**Qualify a second-source maximum power point tracking integrated circuit at schematic stage.** Analog Devices LTC4015 or Monolithic Power Systems MP2762. Footprint-tolerant layout.",
+              "**Eliminate the inline panel connector.** Sealed gland, panel-cable-board as a single field-replaceable assembly."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: Aluminum 6061-T6",
+                "result": "## Aluminum 6061-T6\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 2700 kg/m³ |\n| Yield Strength | 276 MPa |\n| Ultimate Tensile Strength | 310 M"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: ETFE",
+                "result": "Material \"ETFE\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140 (Al"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: FR4",
+                "result": "Material \"FR4\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140 (All"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"IP67 ingress protection enclosure\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"lithium battery charging temperature\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"photovoltaic module qualification\"."
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The radios themselves are sensible commodity choices with carried Conformité Européenne and United Kingdom Conformity Assessed approvals — the printed-circuit assembly is straightforward. The manufacturability risk is **not on this daughter board**; it's at the interface between this module and the steel body. A metal enclosure plus a powder coat of uncontrolled thickness over the antenna aperture",
+            "issues": [],
+            "recommendations": [
+              "**Lock antenna placement in mechanical computer-aided design before body tooling commitment.** Owner: Jian + Fang joint. Deadline: 2 weeks. Deliverable: Antenna keep-out drawing with all three (or two) antennas shown at 1:1 scale, ≥86 mm separation verified, radome apertures dimensioned.",
+              "**Decide LoRa launch-versus-defer this sprint.** Owner: Max (architecture call). Deadline: 1 week. My recommendation: defer. Saves £4–6 on bill-of-materials, removes one antenna isolation problem, removes one radome aperture from body tool, simplifies certification.",
+              "**Specify radome aperture masking on the powder coat process.** Owner: Fang + Chase. Deadline: with body supplier shortlist. Add to powder coat work instruction. Validate with two coated bodies, return loss measurement at 2.4 gigahertz, 5 gigahertz and 868 megahertz.",
+              "**Define cellular duty-cycle budget as a hard requirement.** Owner: Jian. Deadline: before printed-circuit assembly first article. Number the worst-case daily cellular energy in milliwatt-hours; deliver to power management subsystem owner.",
+              "**Pilot run plan: 20 printed-circuit assembly units in 4 weeks, 100 units in 8 weeks.** First article on the populated daughter board in 72 hours of gerber release — if the assembly house can't, find one that can. First article in 72 hours or we're not trying hard enough.",
+              "**Dual-source the cellular module from day one.** Quectel BG95-M3 and u-blox SARA-R510M8S are not pin-compatible but can share a mezzanine connector design. Never single-source anything critical — the day Quectel allocates supply to a bigger customer, your feeder goes silent."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: FR4",
+                "result": "Material \"FR4\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140 (All"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: pcb-assembly",
+                "result": "Process \"pcb-assembly\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbind"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"RED radio equipment directive CE UKCA\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"IPC PCB assembly class\"."
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet-metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: injection-molding",
+                "result": "## Injection Molding\n\n**Category:** formative\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 1mm |\n| Max wall thickness | 4mm |\n| Min feature size | 0.5mm |\n| "
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "bess",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "reviewCount": 8,
+        "moduleCount": 8,
+        "reviewedCount": 8,
+        "coverageRatio": 1,
+        "deterministic": {
+          "coverage_per_module": 10,
+          "severity_distribution_realism": 8.108108108108109,
+          "boilerplate_repetition": 0
+        },
+        "severityCounts": {
+          "critical": 13,
+          "warning": 17,
+          "info": 7
+        },
+        "catchphraseCounts": {
+          "Run The Algorithm": 6,
+          "First article in 72 hours": 5,
+          "Don't buy the machine shop": 2
+        },
+        "sample": [
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "This module is fundamentally a **specify-and-integrate** problem, not a **fabricate** problem — every major component is a certified off-the-shelf assembly. The manufacturability risks are: (1) suppression agent quantity appears massively oversized versus container free volume, (2) deflagration vent area lacks NFPA 68 calculation backing, (3) pipework and bracketry need DFM discipline before the c",
+            "issues": [],
+            "recommendations": [
+              "**Resolve the cylinder sizing error this week.** Get the suppression supplier to produce a hydraulic calculation against the actual net free volume of this container with racks installed. Update the brief.",
+              "**Block UL 9540A test data as the gate for vent and detector orders.** No vent panels, no detector layout, no nozzle placement until that report is in hand. This is your critical path item.",
+              "**Pre-qualify a second source for every brand-specified component.** Equivalency letters on file before the insurer underwrites the project.",
+              "**Require stamped deliverables from the suppression contractor:** hydraulic calculation, pipe support drawings with reaction loads, BS 7273-1 commissioning certificate, and mixed-listing acceptance letter. Don't accept \"trust us, we do this all the time.\"",
+              "**Engage the National Fire Chiefs Council and the local fire and rescue service early** — your open question about whether gaseous suppression alone is acceptable needs a written answer before tooling commits anywhere else in the system. *If we fix this one thing, three downstream problems disappear",
+              "**ASSEMBLY: Sequence — install LATE.** Detection wiring loom and pipework go in after battery racks, conversion system, and cooling skid are placed and anchored. Suppression cylinders and final agent charging happen at end of factory build, before transport — but cylinders ship empty if road-transpo"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: stainless steel 304",
+                "result": "## Stainless Steel 304\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 8000 kg/m³ |\n| Yield Strength | 215 MPa |\n| Ultimate Tensile Strength | 50"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"NFPA 855 battery energy storage fire\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"EN 54 fire detection control panel\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"NFPA 68 deflagration venting\"."
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "run_calculation",
+                "description": "run_calculation call",
+                "result": "\nResult: {\n  \"grossContainerVolume_m3\": \"76.3\",\n  \"netFreeVolume_m3\": \"45.8\",\n  \"agentMassRequired_kg\": \"26.0\",\n  \"agentVolumeAsLiquid_L\": \"16.2\",\n  \"cylinderCapacityAtFillDensity_kg\": \"403.2\",\n  \"mar"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "A standard ISO 1496-1 40-foot High Cube is the right call structurally and logistically, but every modification you make to it (vent panels, gland plate, fire lining, foundation anchors) breaks the certified container's integrity in ways the contract manufacturer must own end-to-end — and that supplier selection is your biggest manufacturability risk, not the steel itself.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Material specification — corten vs marine paint system conflict",
+                "message": "Corten (weathering steel, ASTM A588/A242) is designed to develop a stable rust patina as its corrosion protection. You've then specified ISO 12944 C5-M paint at 240 µm dry film thickness over the top. That's contradictory — you're either using corten as a self-protecting steel (paint-free) or you're",
+                "suggestion": "Drop \"corten weathering steel\" from the spec language. Specify \"Corten-A or equivalent shipping container steel per ISO 1496-1, painted to ISO 12944 C5-M.\" Removes a supplier confusion point. Idiot index check: raw steel is roughly £0.80/kg, finished painted container panel is ~£3-4/kg — index ~4-5,"
+              },
+              {
+                "severity": "critical",
+                "category": "Modification sequence destroys ISO 1496-1 certification",
+                "message": "The moment you cut four 1,200×800 mm vent holes in the roof, a 600×400 mm gland plate in the bulkhead, and a personnel door in the side panel, you've invalidated the container's CSC (Convention for Safe Containers) plate and the ISO 1496-1 racking/stacking ratings — unless the modifications are done",
+                "suggestion": "Pick a contract manufacturer that does this routinely (UK options: Cleveland Containers, S Jones, Container Conversions Ltd; or buy from a BESS-specialist enclosure builder like Spinetic/Strongbox/G&M Radiator). Specify \"modifications shall not reduce ISO 1496-1 racking, stacking, or lifting test ra"
+              },
+              {
+                "severity": "critical",
+                "category": "Roof vent panel installation will leak — and roof is now a structural element",
+                "message": "Four 1,200×800 mm openings on a high-cube roof remove ~3.8 m² of skin and require welded steel frames with reinforcing purlins. That same roof is now also carrying the liquid cooling skid (point loads from the chiller). Combined cut-out + point load + weather-sealed hinged panels is the single highe",
+                "suggestion": "Treat the roof as its own engineered weldment, not a \"modified container roof.\" Require the supplier to submit a stamped structural calc covering: (a) chiller dead + dynamic load, (b) vent panel reaction loads at 50 mbar opening pressure (~5 kN per panel based on 0.96 m² area), (c) snow load per BS "
+              },
+              {
+                "severity": "warning",
+                "category": "Tolerance specification missing — and the integrator needs it",
+                "message": "No tolerance target listed in the brief. The internal clear dimensions after 50 mm insulation + 1.5 mm steel inner skin are what your battery rack and PCS designers actually live or die on. ISO 1496-1 allows ±10 mm on external length and ±5 mm on width. Inner skin installation typically adds another",
+                "suggestion": "Specify internal clear dimensions to ±10 mm bilateral (achievable with sheet metal per the process database, ±0.1 mm standard tolerance × scaled up for assembly stack). Anything tighter is over-tolerancing for an enclosure. Hold tighter tolerance (±2 mm) only at the rack mounting rails and the gland"
+              },
+              {
+                "severity": "warning",
+                "category": "Foundation anchor pattern not coordinated with corner casting geometry",
+                "message": "You've specified 8× M30 chemical anchors, but ISO 1161 corner castings have specific bolt-hole patterns and the chemical anchor route is unusual — most permanent BESS installations use cast-in J-bolts or anchor plates *welded* to the corner castings, with chemical anchors as a retrofit option. Ancho",
+                "suggestion": "Confirm with the civil engineer whether anchors are pre-cast into the pad or post-installed. If post-installed, the corner casting has no through-hole for an M30 — you anchor through a separate baseplate welded to the bottom rail adjacent to the casting. Specify that interface explicitly."
+              },
+              {
+                "severity": "warning",
+                "category": "Fire-rated lining — 60-minute rating depends on installation, not material",
+                "message": "EN 1363-1 fire ratings are tested as complete assemblies. You can buy Class A1 rock wool all day; what matters is the *system* (substrate + insulation + facing + fixing centres + joint detail) has a tested rating. A generic 50 mm rock wool with galvanised facing isn't automatically 60-minute rated.",
+                "suggestion": "Specify a named tested system (e.g., Rockwool Conlit, Promat Promatect-H, or equivalent with EN 1363-1 test certificate). Don't let the supplier substitute \"equivalent mineral wool\" without the test report. This is exactly where Failure Mode #3 (delamination at <60 min) comes from."
+              }
+            ],
+            "recommendations": [
+              "**Run The Algorithm on the spec before going to suppliers.** Step 1, question every requirement: do you actually need corten, or do you need \"container-grade painted steel\"? Do you need 60-minute fire rating, or does the AHJ accept 30-minute with separation distance? These two questions alone could ",
+              "**Pick a single contract manufacturer for the complete modified enclosure** — shell + lining + vent panels + gland plate + paint, delivered as one assembly with stamped structural calcs and EN 1363-1 system test certificates. Do not split shell from modifications across two suppliers. Failure Mode"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: corten weathering steel",
+                "result": "Material \"corten weathering steel\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: mineral wool",
+                "result": "Material \"mineral wool\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel "
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "**Design Standards — Error**\n\nCannot coerce the result to a single JSON object"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "**Design Standards — Error**\n\nCannot coerce the result to a single JSON object"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"deflagration vent NFPA 68 EN 14797\"."
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The skid is fundamentally a **buy, not build** subsystem — and that's the right call — but the specification reads like a custom-engineered piece, the roof-mount loading is unresolved, and several interface details will bite you in commissioning if not locked down before the chiller order goes out.",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Mounting / structural interface",
+                "message": "Estimated skid mass is **~1,440 kg over a 2.4 × 1.2 m footprint** (≈500 kg/m²). A standard ISO 1496-1 container roof is qualified to **300 kg over a 600 × 300 mm patch** — it is not a structural deck. Roof-mounting a 1.4-tonne dynamic load (compressor vibration, wind, snow) without a purpose-built l",
+                "suggestion": "Default to **end-wall mounting on a cantilevered structural frame welded to the corner posts**, or specify a container variant with a reinforced roof rated for the actual point loads. Get this confirmed by the container fabricator in writing before you cut any steel. This is one of your open questio"
+              },
+              {
+                "severity": "critical",
+                "category": "Single-source named parts",
+                "message": "You've named Stulz, Pfannenberg, Grundfos, and Stäubli as the basis of design. Stäubli RBE-08 quick-connects in particular are a **single-vendor, long-lead item** (12–20 weeks from Switzerland) that gates your 16-week module lead time.",
+                "suggestion": "Qualify a second source for every named component before tooling the manifold. CEJN, Walther, and Parker all make equivalent dry-break couplings — pick one as a drop-in alternate and dimension the manifold ports to accept either. Never single-source anything critical. The day your only supplier fail"
+              },
+              {
+                "severity": "warning",
+                "category": "\"Build vs buy\" boundary is fuzzy",
+                "message": "The bill of materials reads as if you're integrating compressors, condensers, pumps, expansion tank, and controls yourself. That's a packaged chiller — Stulz, Pfannenberg, Trane, and a dozen others sell exactly this duty class as a **CE-marked, Pressure Equipment Directive-certified, factory-tested ",
+                "suggestion": "Specify the chiller as a **single packaged purchase** with documented conformity. Your scope reduces to: the secondary glycol loop inside the container, the manifold to the racks, the cold-plate interface, and the controls handshake. **The factory is the product — even when the factory isn't yours. "
+              },
+              {
+                "severity": "warning",
+                "category": "Coolant chemistry vs material set",
+                "message": "30% propylene glycol with deionised water in 316L stainless with EPDM seals and bronze pump impellers is conventional — but **deionised water is aggressive to bronze** over time (galvanic and ion-stripping effects). Inhibitor package in Dynalene HC-30 handles it, but only if topped up correctly duri",
+                "suggestion": "Lock down a **service procedure for inhibitor monitoring** (annual sample, conductivity + pH + reserve alkalinity) and bake it into the operations and maintenance manual. Specify the test kit as a deliverable."
+              },
+              {
+                "severity": "warning",
+                "category": "Freeze risk on standby",
+                "message": "UK winter standby with a depleted glycol charge is on your failure-modes list. 30% propylene glycol gives burst protection to roughly **−13 °C** — fine for most of the UK, marginal for Scotland and elevated sites in a hard winter. Dilution from a top-up event with plain water can lift that threshold",
+                "suggestion": "Specify **40% propylene glycol** as the production charge (burst protection to ≈−21 °C, freeze point ≈−20 °C) — minor 3–4% capacity penalty, large robustness gain. Add a **low-concentration alarm via refractometer or conductivity** at the expansion tank."
+              },
+              {
+                "severity": "warning",
+                "category": "Acoustic limit risk",
+                "message": "<70 dBA at 1 m is a chiller-class spec. UK planning night-time limits at the **site boundary** can be 40–45 dBA. After 10 m of distance falloff and any reflections, 70 dBA at 1 m comes in around 50 dBA at boundary — still potentially non-compliant.",
+                "suggestion": "Make this a **site-by-site engineering check**, not a product-level guarantee. Offer an acoustic hood option (typical −8 to −12 dBA) as a configured upgrade. Flag it in the sales-engineering checklist."
+              }
+            ],
+            "recommendations": [
+              "**Lock the build-vs-buy line this week.** Specify the chiller as a packaged Pressure Equipment Directive-certified unit from a named tier-1 supplier (Stulz, Pfannenberg, or equivalent). Your scope = secondary loop + manifold + interfaces. Do not reinvent a chiller.",
+              "**Resolve roof vs end-wall mount within 2 weeks.** Get the container fabricator to confirm in writing whether the chosen variant supports a 1.4-tonne packaged unit on the roof, or specify end-wall mount on a corner-post-tied frame as the default. Do not let this drift to week 14.",
+              "**Dual-source every named component.** Build a parts table with primary + alternate part numbers for compressor, pumps, quick-disconnects, expansion tank, sensors. Drop-in compatible at the manifold.",
+              "**Step the glycol concentration to 40%.** Update the bill of materials, datasheet, and fill procedure. Add a refractometer check to the commissioning protocol.",
+              "**Convert the manifold from welded 316L to grooved/coupled construction** unless there's a specific reason welds are mandatory. Idiot index drops, lead time drops, dual-source becomes trivial.",
+              "**Acoustic upgrade as a configured option,** not a base spec. Site-survey-driven."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: stainless 316L",
+                "result": "Material \"stainless 316L\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Stee"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: EPDM",
+                "result": "Material \"EPDM\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 4140 (Al"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"IP55 ingress protection enclosure\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"pressure equipment piping\"."
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: ss-316",
+                "result": "## Stainless Steel 316\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 8000 kg/m³ |\n| Yield Strength | 205 MPa |\n| Ultimate Tensile Strength | 51"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "Two hard blockers in the specification before we even get to manufacturability: the cell arithmetic doesn't deliver 3.5 megawatt-hours, and the loaded container exceeds United Kingdom flatbed payload limits. Both must be resolved before any tooling, supplier qualification, or first article work begins.",
+            "issues": [],
+            "recommendations": [
+              "**Before any tooling: resolve the energy arithmetic.** Decide: 3.5 megawatt-hours nameplate or usable? Adjust series count or rack count to match. *Owner: Max. Deadline: this week.*",
+              "**Before any tooling: resolve the transport mass overrun.** This is a system-level decision, not a manufacturing one. *Owner: Max + Chase. Deadline: two weeks.*",
+              "**Qualify two cell suppliers in parallel** with non-binding quotes and sample cells for first-article module testing. *Owner: Chase. Deadline: four weeks.*",
+              "**Replace welded rack frame with bolted sheet-steel construction.** Saves 2–3 weeks of lead time, eliminates post-weld stress relief, gets flatness for free. *Owner: Jian for design; Fang for supplier scoping. Deadline: design change in two weeks.*",
+              "**Consolidate inter-module busbars into one laminated assembly per rack.** Reduces part count by roughly 18×, cuts assembly time by an estimated 40 percent on this sub-assembly, removes 18 torque-check operations per rack. *Owner: Jian + Fang. Deadline: three weeks.*",
+              "**Plan two Underwriters Laboratories 9540A test rounds in the schedule** with £40k–£80k allocated. Don't lock the propagation barrier material until after round one. *Owner: Fang + compliance lead. Deadline: feed into project plan now.*"
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: Aluminum 6061-T6",
+                "result": "## Aluminum 6061-T6\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 2700 kg/m³ |\n| Yield Strength | 276 MPa |\n| Ultimate Tensile Strength | 310 M"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: copper c11000",
+                "result": "Material \"copper c11000\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: steel s275",
+                "result": "Material \"steel s275\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140: Steel 41"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet-metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: cnc-3-axis",
+                "result": "Process \"cnc-3-axis\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbinder"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "**Design Standards — Error**\n\nCannot coerce the result to a single JSON object"
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The integration hardware is straightforward sheet metal and machined aluminium — buildable in the United Kingdom with standard contract manufacturers. But the cold plate thermal architecture as currently specified does not close, the manufacturing package itself is empty (no process, material, tolerance, or quantity), and the open question on single 1.5 megawatt versus parallel 750 kilowatt drives",
+            "issues": [
+              {
+                "severity": "critical",
+                "category": "Specification gap",
+                "message": "Target process, target material, tolerance target, and quantity target are all blank. We cannot release this for manufacturing quotation. A contract manufacturer needs these four values minimum to price and schedule.",
+                "suggestion": "Decompose the skid into its sub-assemblies (frame, cabinet, manifold, busbar, harness) and specify process/material/tolerance for each. I can produce this decomposition — see recommendations."
+              },
+              {
+                "severity": "critical",
+                "category": "Thermal architecture does not close on the numbers given",
+                "message": "A 1.5 megawatt silicon carbide inverter at ~98.5% efficiency dumps **~22.5 kilowatts** of heat into the coolant. Spread across ~12 power modules, that's **~1.875 kilowatts per module**. With typical silicon carbide thermal resistances (junction-to-case 0.05, case-to-sink 0.02, sink-to-fluid 0.03 kel",
+                "suggestion": "Lock the inverter vendor first. Their datasheet defines the cold plate interface, coolant flow rate, and inlet temperature. Our manifold then becomes a plumbing problem, not a thermal design problem."
+              },
+              {
+                "severity": "critical",
+                "category": "Single 1.5 megawatt versus 2× 750 kilowatt is a manufacturing decision, not just an electrical one",
+                "message": "This drives skid footprint, cabinet sheet metal layout, busbar lengths, cold plate manifold routing, and floor anchor pattern. If you change this after drawings release, you redo everything. The 20-week lead time assumes a frozen layout.",
+                "suggestion": "Close this open question before week zero of the manufacturing schedule. Two 750 kilowatt units gives N+1 redundancy, easier service (one swappable inverter, not a forklift job), and parts that fit a standard sheet metal envelope. My bias: **two parallel 750 kilowatt units**, unless the vendor prici"
+              },
+              {
+                "severity": "warning",
+                "category": "400 volt versus 690 volt output is a busbar and contactor sizing decision",
+                "message": "At 400 volts, you need a 2500 ampere alternating current contactor and 2500 ampere busbar — that's heavy copper, large lugs, expensive. At 690 volts, the same power flows at ~1450 amperes — significantly smaller and cheaper switchgear. The trade-off is the external transformer.",
+                "suggestion": "This is Jian and Chase territory more than mine, but from a manufacturing cost angle, 690 volts gives you ~40% less copper in the alternating current side. Worth £3–8k per skid in busbar and contactor savings."
+              },
+              {
+                "severity": "warning",
+                "category": "Steel skid frame idiot index is acceptable but not great",
+                "message": "Raw structural steel for a ~400 kilogram skid is ~£480; a fabricated, drilled, painted skid from a United Kingdom contract fabricator runs ~£8,500. Idiot index ~18 — yellow zone. That's typical for low-volume welded fabrications, but if we move to a bolted, laser-cut and folded steel skid (sheet met",
+                "suggestion": "Specify the skid as **laser-cut, folded, bolted steel sheet metal sub-frame** instead of welded fabrication. Sheet metal process (verified above): ±0.1 millimetre standard tolerance, 3-week production lead time, £50–2000 setup cost. Compatible with M16 anchor pattern via clinch nuts or weld nuts."
+              },
+              {
+                "severity": "warning",
+                "category": "Liquid cooling leak failure mode is a manufacturing/assembly issue, not just a design one",
+                "message": "\"Quick-disconnect couplings\" are the single most common leak source in liquid-cooled power electronics. Every coupling is a tolerance stack and a torque-sensitive seal. If we fix this one thing, three downstream problems disappear: fewer leaks, faster commissioning, lower warranty cost.",
+                "suggestion": "Minimise the number of couplings inside the cabinet. Specify Stäubli or CPC dripless couplings (verified zero-spill on disconnect). Pressure-test every manifold to 1.5× operating pressure for 30 minutes before final assembly. No exceptions."
+              }
+            ],
+            "recommendations": [
+              "**Close the inverter vendor selection this week.** Sungrow PowerTitan versus Wärtsilä Quantum versus equivalent. Their datasheet defines our cold plate interface, our manifold sizing, and our cabinet envelope. Without this, every downstream drawing is speculation. Run The Algorithm on that part befo",
+              "**Default to specifying-in a vendor inverter block, not designing one.** At this volume (tens per year, scaling to low hundreds), there is no economic case to design a 1.5 megawatt grid-forming inverter. Don't buy the machine shop. Find a better contract manufacturer and design a cleaner integration",
+              "**Decompose the module into a buildable Bill of Materials with process and material per item.** I'll do this — see deliverable below.",
+              "**Lock the single-vs-parallel topology decision before week zero.** My recommendation: 2× 750 kilowatt parallel. Better serviceability, smaller individual parts, N+1 redundancy.",
+              "**Specify cold plate manifold to vendor-defined flow and inlet temperature.** Do not design our own thermal solution.",
+              "**Switch the skid frame from welded fabrication to laser-cut/folded/bolted sheet metal.** Drops idiot index from ~18 to ~10, lead time from 5–6 weeks to 3 weeks."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: Aluminum 6061-T6",
+                "result": "## Aluminum 6061-T6\n\n**Category:** metal\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 2700 kg/m³ |\n| Yield Strength | 276 MPa |\n| Ultimate Tensile Strength | 310 M"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: cnc-3-axis",
+                "result": "Process \"cnc-3-axis\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbinder"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet-metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"harmonic distortion IEEE 519 G5/5\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"G99 grid code inverter protection\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"IP54 enclosure ingress protection\"."
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The architecture is sound and standards-aligned, but the manufacturability risks are concentrated in connector reliability, harness build quality, and the ±2 millivolt accuracy claim — none of which are solved by the printed circuit board design alone. Production is where the margin lives or dies, and for a battery management system that means the harness shop and the printed circuit board assembl",
+            "issues": [],
+            "recommendations": [
+              "**Lock the connector strategy this week.** Pick the connector family for module-to-module isoSPI, write the crimp specification, and put 100% pull-test and continuity-test into the harness contract. This is the single biggest lever on field reliability for this module. If we fix this one thing, thre",
+              "**Re-state the cell voltage accuracy specification** as worst-case-over-life (±3 millivolt), keep ±2 millivolt as a typical figure for marketing only, and never let the typical figure into a compliance document.",
+              "**Run The Algorithm on the cell monitoring unit board before tape-out.** Step 1: question the requirement — do we really need 16-channel boards with 8 thermistors, or does 12 cells per module change the architecture? Step 2: delete — can we eliminate the daughter card or any connector? Step 3: simpl",
+              "**Dual-source the cell monitoring integrated circuit at the layout stage.** Footprint compatibility for both Analog Devices ADBMS6830 and Texas Instruments BQ79616. Decide before printed circuit board layout is frozen.",
+              "**Specify conformal coating on cell monitoring unit boards** to IPC-CC-830, with proper masking. Add it to the printed circuit board assembly statement of work now, not after the first field failure.",
+              "**First article in 72 hours or we're not trying hard enough** — once the cell monitoring integrated circuit is selected, get a 5-board pilot run to characterise accuracy across temperature before committing to the full production order."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: pcb-assembly",
+                "result": "Process \"pcb-assembly\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF)\nbind"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"printed circuit board assembly conformal coating IPC\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"lithium battery management system safety IEC 62619\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"functional safety automotive electronics ISO 26262 IEC 61508\"."
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet-metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"enclosure ingress protection IP rating electrical equipment\"."
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 1,
+      "engineCommit": "e6a71d08",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "reviewCount": 2,
+        "moduleCount": 9,
+        "reviewedCount": 2,
+        "coverageRatio": 0.2222222222222222,
+        "deterministic": {
+          "coverage_per_module": 2.2222222222222223,
+          "severity_distribution_realism": 0,
+          "boilerplate_repetition": 10
+        },
+        "severityCounts": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "catchphraseCounts": {
+          "Run The Algorithm": 0,
+          "First article in 72 hours": 0,
+          "Don't buy the machine shop": 0
+        },
+        "sample": [
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The pre-treatment module is structurally sound and the material-process choices are broadly correct for a seawater duty at 2–4 bar. However, four issues will cause real problems on the production floor or in the field if not resolved before fabrication drawings are released: an unspecified tolerance regime across the entire module, a single-source chemical dosing architecture, a known-critical O-r",
+            "issues": [],
+            "recommendations": [
+              "**Release a general tolerance drawing immediately.** Adopt ISO 2768-m for all fabricated metalwork, ISO 13920 Class B for pipe spool face-to-face dimensions, and ±3mm explicit positional tolerance on all fibreglass reinforced plastic vessel nozzles. This single drawing prevents the majority of fit-u",
+              "**Add the oxidation-reduction potential sensor tapping to the pipework isometric now.** DN15 half-inch BSP socket-weld boss, 316L stainless steel, 10 pipe diameters downstream of bisulphite quill. Wire to high-pressure pump interlock in the motor control centre. This is a 2-hour addition to the isom",
+              "**Upgrade to duty/standby dosing pumps for both antiscalant and bisulphite streams.** Budget approximately £1,200–£2,400 additional hardware cost. The alternative is a £20,000 membrane replacement event with a three-week lead time at a disaster-relief site.",
+              "**Resolve the pipework material — evaluate polypropylene random copolymer PN20 butt-fusion welded against unplasticised polyvinyl chloride PN16 solvent-welded.** Polypropylene random copolymer wins on impact resistance and cold-temperature performance. Decision needed before pipework procurement — t",
+              "**Specify the dosing day tanks explicitly** — cross-linked polyethylene or linear low-density polyethylene with UV stabiliser, 100-litre minimum, with a pre-fabricated 316L stainless steel drip tray to Control of Substances Hazardous to Health / site insurance requirements.",
+              "**Confirm fibreglass reinforced plastic vessel nozzle specification with the vessel supplier before purchase order.** Get their standard nozzle construction (laminated overlay vs. bolted insert), confirm alignment with BS 4994 or ASME RTP-1, and specify nozzle reinforcement pad width ≥2× nozzle OD. "
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: fibreglass reinforced plastic",
+                "result": "Material \"fibreglass reinforced plastic\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\ns"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: 316L stainless steel",
+                "result": "Material \"316L stainless steel\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: unplasticised polyvinyl chloride",
+                "result": "Material \"unplasticised polyvinyl chloride\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: polyethylene",
+                "result": "## PETG (Polyethylene Terephthalate Glycol)\n\n**Category:** polymer\n\n### Mechanical Properties\n\n| Property | Value |\n|----------|-------|\n| Density | 1270 kg/m³ |\n| Yield Strength | 50 MPa |\n| Ultimate"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"flanged pipe connections seawater\"."
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found for domain \"general_engineering\"."
+              }
+            ]
+          },
+          {
+            "specialistName": "Fang",
+            "verdict": "warn",
+            "summary": "The structural concept is sound and buildable, but three issues — galvanic coupling between the carbon steel container floor and the 316L stainless steel skid, the headroom question for vertical vessels in a standard-height container, and the under-specified wall penetration and skid fastening details — must be resolved before fabrication drawings are signed off. None of these are design killers, ",
+            "issues": [],
+            "recommendations": [
+              "**Procure a High Cube (1EEE) container immediately.** This is on the critical path. Ten-week lead time means the procurement decision needs to happen this week, not after the headroom question is \"resolved\" by further analysis. The headroom margin in a standard container (35 mm) is not viable.",
+              "**Close the skid material question: specify 316L stainless steel.** Document the decision, quantify the cost delta (estimate £4,000–8,000 over galvanised), and protect it from value-engineering pressure during procurement. In coastal desalination service, this is not a luxury — it is the correct eng",
+              "**Design and specify galvanic isolation at every skid-to-container contact point** before fabrication drawings are issued. Neoprene pads, HDPE isolating washers, and insulating bolt sleeves. Test to >1 MΩ after assembly. This is a £300 fix now or a structural inspection programme forever.",
+              "**Issue a penetration schedule within two weeks.** Assign a single owner. Include: position (from datum), elevation, pipe outer diameter, flange standard (suggest ANSI 150 lb raised face or DIN PN16 — pick one and hold it across the system), and gasket specification. The container fabricator cannot ",
+              "**Specify anti-vibration mounts under the high pressure pump and energy recovery device.** Wire-rope isolators or natural rubber mounts sized for the equipment mass. Add diagonal bracing to those skid bays. Specify Nordlock washers on M12+ fasteners throughout.",
+              "**Specify 2.0 mm as the minimum container wall thickness** and add a mandatory coating inspection schedule (every 5 years) to the maintenance documentation. Do not rely on the 1.6 mm minimum for 20-year coastal service."
+            ],
+            "calculations": [
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: Cor-Ten weathering steel",
+                "result": "Material \"Cor-Ten weathering steel\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: 316L stainless steel",
+                "result": "Material \"316L stainless steel\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)\nsteel-4140"
+              },
+              {
+                "tool": "lookup_material",
+                "description": "Material lookup: hot-dip galvanised carbon steel",
+                "result": "Material \"hot-dip galvanised carbon steel\" not found.\n\nAvailable materials:\nal-6061-t6: Aluminum 6061-T6\nal-7075-t6: Aluminum 7075-T6\nal-5052-h32: Aluminum 5052-H32\nsteel-1018: Steel 1018 (Low Carbon)"
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: sheet metal",
+                "result": "## Sheet Metal / Brake Forming\n\n**Category:** cutting\n\n### Capabilities\n\n| Constraint | Value |\n|------------|-------|\n| Min wall thickness | 0.5mm |\n| Max wall thickness | 6mm |\n| Min feature size | "
+              },
+              {
+                "tool": "lookup_process",
+                "description": "Process lookup: structural welding",
+                "result": "Process \"structural welding\" not found.\n\nAvailable processes:\nfdm: FDM 3D Printing\nsla: SLA / Resin 3D Printing\nsls: SLS Powder Bed Fusion\ndmls: DMLS / SLM Metal 3D Printing\nmjf: Multi Jet Fusion (MJF"
+              },
+              {
+                "tool": "lookup_design_standard",
+                "description": "lookup_design_standard call",
+                "result": "No standards found matching \"ISO 668 shipping container dimensions\"."
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostics": [
+        "no issues across reviews"
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 7.595888261142498,
+      "dimensions": {
+        "coverage_per_module": 8.88888888888889,
+        "severity_distribution_realism": 8.686440677966102,
+        "boilerplate_repetition": 0,
+        "recommendations_actionable": 9,
+        "calculations_grounded": 9,
+        "unique_engineering_value": 10
+      },
+      "summary": "Highly specific, standards-referenced recommendations with physically grounded calculations and deep project-specific insights",
+      "nextFix": null,
+      "costPence": 7
+    },
+    {
+      "inputId": "sentinel",
+      "score": 5.8809523809523805,
+      "dimensions": {
+        "coverage_per_module": 4.285714285714286,
+        "severity_distribution_realism": 0,
+        "boilerplate_repetition": 10,
+        "recommendations_actionable": 9,
+        "calculations_grounded": 4,
+        "unique_engineering_value": 8
+      },
+      "summary": "Recommendations are highly specific and project-focused, but calculations lack real-world data integration",
+      "nextFix": "Improve calculations_grounded by requiring explicit material property references (e.g., ash wood's modulus of rupture, carbon fiber layup tensile strength) and physical calculations (e.g., stress analysis, weight budget allocation)",
+      "costPence": 8
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 7.611559139784947,
+      "dimensions": {
+        "coverage_per_module": 10,
+        "severity_distribution_realism": 8.669354838709678,
+        "boilerplate_repetition": 0,
+        "recommendations_actionable": 10,
+        "calculations_grounded": 7,
+        "unique_engineering_value": 10
+      },
+      "summary": "Highly actionable recommendations with project-specific DFM insights, but calculations incomplete",
+      "nextFix": "Ensure material property lookups are complete and validated against physical databases",
+      "costPence": 8
+    },
+    {
+      "inputId": "bess",
+      "score": 7.351351351351352,
+      "dimensions": {
+        "coverage_per_module": 10,
+        "severity_distribution_realism": 8.108108108108109,
+        "boilerplate_repetition": 0,
+        "recommendations_actionable": 9,
+        "calculations_grounded": 8,
+        "unique_engineering_value": 9
+      },
+      "summary": "Highly specific recommendations with real-world standards and processes, grounded calculations with minor gaps, and multiple project-specific engineering insights.",
+      "nextFix": "Improve design standard lookup accuracy by specifying exact standard titles (e.g., 'NFPA 855' → 'NFPA 855-2023 Standard for Fire Protection for Energy Storage Systems') to ensure calculations_grounded score reaches full potential.",
+      "costPence": 8
+    },
+    {
+      "inputId": "desal",
+      "score": 5.37037037037037,
+      "dimensions": {
+        "coverage_per_module": 2.2222222222222223,
+        "severity_distribution_realism": 0,
+        "boilerplate_repetition": 10,
+        "recommendations_actionable": 9,
+        "calculations_grounded": 2,
+        "unique_engineering_value": 9
+      },
+      "summary": "Actionable recommendations and project-specific insights, but calculations lack valid material data and standards",
+      "nextFix": "Ensure material and standard lookup tools contain valid marine/construction industry references (e.g., 316L stainless steel, ASME RTP-1, ISO 13920)",
+      "costPence": 9
+    }
+  ],
+  "aggregateScore": 6.76202430072031,
+  "deltaSincePrior": null,
+  "totalCostPence": 40,
+  "completedAt": "2026-04-26T09:23:04.092Z"
+}

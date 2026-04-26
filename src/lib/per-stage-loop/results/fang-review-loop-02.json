@@ -1,0 +1,533 @@
+{
+  "stage": "fang-review",
+  "loop": 2,
+  "engineCommit": "2036985e",
+  "inputs": 5,
+  "outputs": [
+    {
+      "inputId": "vertfarm",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "riskCount": 37,
+        "moduleCount": 9,
+        "severityDist": {
+          "2": 3,
+          "3": 15,
+          "4": 13,
+          "5": 6
+        },
+        "likelihoodDist": {
+          "2": 17,
+          "3": 18,
+          "4": 2
+        },
+        "residualSeverityDist": {
+          "2": 17,
+          "3": 14,
+          "4": 5,
+          "5": 1
+        },
+        "ownerFilled": 37,
+        "mitigationFilled": 37,
+        "sample": [
+          {
+            "id": "RM-1",
+            "cause": "Poor hot-air weld quality at coved wall-to-floor transition, mechanical damage during installation of grow racks, or chemical attack from sanitiser",
+            "owner": "Mechanical lead",
+            "hazard": "Bund membrane weld failure allowing nutrient solution to escape to subfloor",
+            "severity": 4,
+            "likelihood": 2,
+            "mitigation": "Specify 100% vacuum-box weld testing of all bund seams at commissioning, install redundant conductive leak-detection tape under the membrane, and require quarterly visual bund inspection in service manual",
+            "consequence": "Up to 600 litres of nutrient solution leak to the marine plywood and steel cross-members, causing hidden corrosion, biological contamination, and eventual structural compromise of the container floor",
+            "existingControls": "Coved 150 mm upstand membrane, leak-detection sensor in low point of bund reporting via controls and Internet-of-Things gateway, captive bund sized to full reservoir volume",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-2",
+            "cause": "Aluminium Z-purlins and steel corner-post fixings penetrate the polyurethane foam layer, creating cold spots below dewpoint at high internal relative humidity",
+            "owner": "Mechanical lead",
+            "hazard": "Thermal bridging at structural fixings causing internal condensation and mould",
+            "severity": 3,
+            "likelihood": 3,
+            "mitigation": "Add thermal break pads (polyamide or high-density polyethylene) at every steel-to-steel fixing penetration and verify with thermographic survey during factory acceptance test",
+            "consequence": "Persistent condensation behind fibre-reinforced plastic lining promotes mould growth, fails United Kingdom Regulation (European Community) 852/2004 food hygiene audit, and degrades insulation effectiveness",
+            "existingControls": "Closed-cell foam sprayed continuously over purlins, fibre-reinforced plastic lining sealed with silicone, climate control unit holds relative humidity 65-75%",
+            "residualSeverity": 2,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-3",
+            "cause": "Substrate contamination at spray application, thermal cycling between United Kingdom winter and internal grow-room temperatures, or substandard foam chemistry",
+            "owner": "Mechanical lead",
+            "hazard": "Polyurethane foam delamination or long-term shrinkage creating uninsulated voids",
+            "severity": 3,
+            "likelihood": 2,
+            "mitigation": "Require pull-off adhesion testing on witness panels at factory, specify minimum 35 kilograms per cubic metre core density, and include energy-trend alerting in farm-management dashboard to detect insulation degradation early",
+            "consequence": "Effective wall U-value drifts upward over 5-10 years, heating, ventilation and air-conditioning load increases, daily energy consumption exceeds 250 kilowatt-hours per day target, and operating economics break",
+            "existingControls": "Specification of closed-cell foam to BS 5241, qualified spray-applicator subcontractor, energy metering telemetry from power distribution flags drift",
+            "residualSeverity": 2,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-4",
+            "cause": "Ultraviolet exposure, thermal cycling, or vibration during road transport degrading ethylene propylene diene monomer gaskets at cable, drain, and condenser-line glands",
+            "owner": "Mechanical lead",
+            "hazard": "Penetration gland degradation compromising ingress protection and allowing pest entry",
+            "severity": 3,
+            "likelihood": 2,
+            "mitigation": "Specify ethylene propylene diene monomer gaskets with verified 10-year ultraviolet rating, fit external drip-shields over all roof penetrations, and add gland-integrity check to commissioning and annual service checklist",
+            "consequence": "Loss of EN 60529 ingress protection rating, ingress of rodents or insects compromising food safety and hygiene certification, water ingress damaging electrical distribution",
+            "existingControls": "IP65-rated gland selection, stainless cover plates, annual planned-maintenance inspection in service manual",
+            "residualSeverity": 2,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-1",
+            "cause": "Polypropylene creep under sustained load and warm humid environment, or insufficient mid-span support spacing",
+            "owner": "Mechanical lead",
+            "hazard": "Channel sag or warping causing nutrient solution pooling and uneven flow",
+            "severity": 3,
+            "likelihood": 3,
+            "mitigation": "Specify glass-filled polypropylene channels for tiers carrying heaviest crops and add a creep-deflection acceptance test at six-month and twelve-month service intervals",
+            "consequence": "Localised root anoxia, dead plant sites, reduced yield, and unscheduled rack downtime for channel replacement",
+            "existingControls": "Mid-span support every 1.0 metre, 1.5 percent fall designed in, food-grade polypropylene rated for sustained 40 degrees Celsius",
+            "residualSeverity": 2,
+            "residualLikelihood": 2
+          },
+          {
+            "id": "RM-2",
+            "cause": "Dissimilar-metal contact wetted by nutrient solution splash and high relative humidity",
+            "owner": "Mechanical lead",
+            "hazard": "Galvanic corrosion at aluminium frame to stainless fastener interfaces",
+            "severity": 3,
+            "likelihood": 3,
+            "mitigation": "Insert nylon or ethylene propylene diene monomer isolating washers at every aluminium-stainless interface and require an annual torque-check service procedure documented in the operations manual",
+            "consequence": "Loss of fastener pre-load, frame loosening, potential rack instability and channel misalignment",
+            "existingControls": "Anodised aluminium extrusions and stainless 304 fasteners specified",
+            "residualSeverity": 2,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-3",
+            "cause": "Resonant excitation during flatbed haulage on a partially loaded container with no internal damping",
+            "owner": "Mechanical lead",
+            "hazard": "Rack rocking or fastener loosening under road-transport vibration",
+            "severity": 3,
+            "likelihood": 3,
+            "mitigation": "Add nylon-insert lock nuts on all primary structural fasteners and require a documented post-delivery torque and alignment check before first water-fill",
+            "consequence": "Channel misalignment, opened leak paths at drain manifolds, and commissioning delays at customer site",
+            "existingControls": "Cross-bracing diagonals, rear tie-bars, and bolted connections to floor rails and ceiling Unistrut",
+            "residualSeverity": 2,
+            "residualLikelihood": 2
+          },
+          {
+            "id": "RM-4",
+            "cause": "Accumulated root mass and microbial biofilm at drain transitions over multiple grow cycles between deep cleans",
+            "owner": "Mechanical lead",
+            "hazard": "Biofilm and root-mat blockage of drain manifolds causing tier overflow",
+            "severity": 3,
+            "likelihood": 4,
+            "mitigation": "Specify clear inspection sections at each tier drain transition and require a weekly visual check plus a quarterly chemical clean-in-place procedure in the operations schedule",
+            "consequence": "Tier overflow, nutrient solution spill into the container shell bund, lost crop, and unscheduled deep-clean downtime",
+            "existingControls": "Sloped drain troughs, 32 mm push-fit drain returns at door end, ultraviolet steriliser in nutrient system, and shell bund containment",
+            "residualSeverity": 2,
+            "residualLikelihood": 2
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "sentinel",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "riskCount": 0,
+        "moduleCount": 7,
+        "severityDist": {},
+        "likelihoodDist": {},
+        "residualSeverityDist": {},
+        "ownerFilled": 0,
+        "mitigationFilled": 0,
+        "sample": []
+      },
+      "diagnostics": [
+        "no risks declared"
+      ]
+    },
+    {
+      "inputId": "hedgerow",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "riskCount": 28,
+        "moduleCount": 7,
+        "severityDist": {
+          "2": 2,
+          "3": 12,
+          "4": 13,
+          "5": 1
+        },
+        "likelihoodDist": {
+          "2": 9,
+          "3": 17,
+          "4": 2
+        },
+        "residualSeverityDist": {
+          "2": 15,
+          "3": 10,
+          "4": 3
+        },
+        "ownerFilled": 28,
+        "mitigationFilled": 28,
+        "sample": [
+          {
+            "id": "RM-1",
+            "cause": "Inadequate gasket compression, fastener over-torque cracking ceramic, or aperture seal degradation under ultraviolet and thermal cycling",
+            "owner": "Mechanical lead",
+            "hazard": "Water ingress through body seams or apertures wetting internal electronics",
+            "severity": 4,
+            "likelihood": 3,
+            "mitigation": "Specify and verify ingress protection rating IP54 minimum on body and IP65 on apertures by EN 60529 spray and immersion testing on first-article and pre-production samples; add conformal coating on internal printed circuit board assemblies as second line of defence",
+            "consequence": "Short-circuit of compute or power electronics, premature field failure, warranty returns and reputational damage in premium segment",
+            "existingControls": "EN 60529 ingress protection rating IP54/IP65 design intent, ethylene propylene diene monomer sealing washers, drainage paths on sensor apertures",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-2",
+            "cause": "Water absorption into glaze micro-cracks or unglazed regions, expansion on freezing, stress concentration at mounting bosses",
+            "owner": "Mechanical lead",
+            "hazard": "Frost-cracking of ceramic body during United Kingdom winter freeze-thaw cycles",
+            "severity": 4,
+            "likelihood": 3,
+            "mitigation": "Run accelerated freeze-thaw test (100 cycles per EN ISO 10545-12) on first-article ceramic bodies; isolate mounting bosses with elastomeric bushings to remove stress concentrations; pre-qualify ceramic supplier with material certificates",
+            "consequence": "Visible cracking or full body fracture in field, unit must be replaced under warranty, potential safety hazard if unit falls",
+            "existingControls": "Specification of frost-resistant stoneware with water absorption <0.5 per cent per EN ISO 10545-3, glaze coverage on all external surfaces",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-3",
+            "cause": "Inadequate substrate pre-treatment, edge coverage thin spots, ultraviolet chalking, or salt aerosol exposure in coastal gardens",
+            "owner": "Mechanical lead",
+            "hazard": "Powder coat delamination and substrate corrosion on steel variant",
+            "severity": 3,
+            "likelihood": 3,
+            "mitigation": "Specify minimum 720-hour neutral salt spray test per ISO 9227 on coated samples; require zinc-rich primer plus topcoat (two-coat system) for coastal-grade variant; add edge-radius minimum 1 mm to all formed edges to ensure powder coverage",
+            "consequence": "Visible rust streaks within two to three years, undermining the 'beautiful in year five' brand promise; structural weakening at fastener points",
+            "existingControls": "Zinc-phosphate pre-treatment specification, polyester powder coat per BS EN 13438, A4 marine-grade stainless fasteners",
+            "residualSeverity": 2,
+            "residualLikelihood": 2
+          },
+          {
+            "id": "RM-4",
+            "cause": "Steel body acting as Faraday cage, radome aperture undersized for 868 megahertz long-range radio band, or aluminium sub-frame routed too close to antenna feed",
+            "owner": "Electrical lead",
+            "hazard": "Radio frequency attenuation or antenna detuning by chassis geometry",
+            "severity": 4,
+            "likelihood": 3,
+            "mitigation": "Run electromagnetic simulation of chassis with antenna placements during industrial design freeze; conduct over-the-air radiated performance testing (total radiated power and total isotropic sensitivity) on first prototype; specify minimum 90 mm radome aperture and 30 mm keep-out from sub-frame to antenna",
+            "consequence": "Wi-Fi range collapse, long-range mesh unusable between feeders, cellular variant fails to register on network — product non-functional in core use case",
+            "existingControls": "Non-metallic radome aperture in design intent, lambda/4 antenna spacing target (~86 mm at 868 megahertz), pre-certified radio modules",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-1",
+            "cause": "Solar panel undersized relative to actual neural processing unit and radio duty cycle, combined with several consecutive days of sub-200 watt-hours-per-square-metre irradiance",
+            "owner": "Electrical lead",
+            "hazard": "Battery undervoltage lockout during prolonged overcast period leaves feeder offline mid-winter",
+            "severity": 4,
+            "likelihood": 3,
+            "mitigation": "Build energy-budget simulation against 10-year United Kingdom Meteorological Office irradiance data for worst-case sites (Glasgow, Manchester) and size panel and battery for 14-day autonomy at 25 per cent duty cycle; implement low-power graceful-degradation mode that disables neural processing unit and falls back to motion-only logging below 30 per cent state-of-charge",
+            "consequence": "Feeder powers down for days or weeks, missing peak winter bird-activity content, customer perceives product as broken, return rate spikes",
+            "existingControls": "Brief specifies oversized solar panel; lithium iron phosphate battery management system reports state-of-charge to compute module",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-2",
+            "cause": "Negative temperature coefficient thermistor failure or firmware bug allowing charge current below 0 degrees Celsius cell temperature",
+            "owner": "Battery safety lead",
+            "hazard": "Lithium iron phosphate cell damage from sub-zero charging",
+            "severity": 5,
+            "likelihood": 2,
+            "mitigation": "Hardware-enforced charge inhibit using a dedicated negative temperature coefficient thermistor wired into the charge controller enable pin (not firmware-only); independent firmware temperature check as second layer; environmental chamber qualification at -10 degrees Celsius per IEC 62619",
+            "consequence": "Lithium plating on anode, capacity loss, internal short circuit risk, potential thermal event — major safety and warranty exposure under IEC 62619 and battery transport regulations",
+            "existingControls": "Battery management system integrated circuits include temperature monitoring; lithium iron phosphate is the safest commodity chemistry available",
+            "residualSeverity": 4,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-3",
+            "cause": "Ultraviolet exposure, freeze-thaw cycling, and bird droppings degrading ethylene-vinyl-acetate or ethylene tetrafluoroethylene laminate",
+            "owner": "Mechanical lead",
+            "hazard": "Solar panel output degradation after 3-5 years from encapsulant ageing",
+            "severity": 3,
+            "likelihood": 3,
+            "mitigation": "Specify panels from suppliers with published 25-year power warranty and ultraviolet-A/B accelerated ageing test data; design panel to be field-replaceable as a service part rather than bonded to body",
+            "consequence": "Watt-peak drops below threshold required for winter operation; product fails the 'beautiful and functional in year five' brand promise",
+            "existingControls": "Specification calls for ethylene tetrafluoroethylene laminate (more ultraviolet-stable than ethylene-vinyl-acetate); oversized panel provides margin",
+            "residualSeverity": 2,
+            "residualLikelihood": 2
+          },
+          {
+            "id": "RM-4",
+            "cause": "Nearby lightning strike inducing voltage transient on solar panel cabling, exceeding charge controller absolute maximum input rating",
+            "owner": "Electrical lead",
+            "hazard": "Lightning-induced surge damages charge controller and downstream electronics",
+            "severity": 4,
+            "likelihood": 2,
+            "mitigation": "Add transient voltage suppressor diode and gas-discharge tube on solar input; route solar cable internally with a small ferrite bead; specification compliance to EN 61000-4-5 surge immunity at 1 kilovolt line-to-ground",
+            "consequence": "Single-event total product failure requiring full replacement; not covered by typical home insurance for individual feeder",
+            "existingControls": "None at present in baseline architecture",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "bess",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "riskCount": 32,
+        "moduleCount": 8,
+        "severityDist": {
+          "2": 1,
+          "3": 6,
+          "4": 14,
+          "5": 11
+        },
+        "likelihoodDist": {
+          "2": 20,
+          "3": 12
+        },
+        "residualSeverityDist": {
+          "2": 8,
+          "3": 14,
+          "4": 8,
+          "5": 2
+        },
+        "ownerFilled": 32,
+        "mitigationFilled": 32,
+        "sample": [
+          {
+            "id": "RM-1",
+            "cause": "Vent panel hinge corrosion seizure, paint over-coating during refurbishment, or incorrect set-pressure specification relative to actual cell off-gas reactivity",
+            "owner": "Battery safety lead",
+            "hazard": "Deflagration vent panels fail to open at design pressure during thermal runaway, causing shell rupture and fire propagation",
+            "severity": 5,
+            "likelihood": 2,
+            "mitigation": "Specify vent panels with stainless steel hinges and corrosion-protected set mechanism; size vent area per UL 9540A-validated off-gas reactivity data from chosen cell; mandate annual functional inspection in operations and maintenance manual",
+            "consequence": "Container shell ruptures explosively, ejecting debris and burning electrolyte up to tens of metres; potential fatality of nearby personnel and total loss of adjacent assets; site insurance claim and regulatory shutdown of fleet",
+            "existingControls": "Four NFPA 68 / EN 14797 certified vent panels at 50 mbar, tethered, with annual inspection requirement; off-gas detection in fire safety system triggers pre-emptive shutdown",
+            "residualSeverity": 4,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-2",
+            "cause": "Long-term degradation of polyurethane sealant at dissimilar-metal interfaces, mechanical abrasion at gland plate edges, paint damage during transport and installation",
+            "owner": "Mechanical lead",
+            "hazard": "Corrosion perforation at sealant joints, roof penetrations, and gland plate, allowing water ingress onto live electrical equipment",
+            "severity": 4,
+            "likelihood": 3,
+            "mitigation": "Specify EN 60529 IP66 rating at all penetrations; use EPDM gasket plus secondary silicone bead at gland plate; include 5-year sealant re-inspection and re-application in scheduled maintenance; route condensate drains externally",
+            "consequence": "Water ingress causes insulation breakdown on direct current busbars or alternating current cabling, leading to ground fault, equipment damage, or arc fault fire; system unavailability and warranty claim",
+            "existingControls": "ISO 12944 C5-M paint system (240 µm dry film thickness), EN 60529 IP55 door and gland plate seals, weathering steel base material",
+            "residualSeverity": 3,
+            "residualLikelihood": 2
+          },
+          {
+            "id": "RM-3",
+            "cause": "Mineral wool insulation degradation from coolant leak prior to event, mechanical damage during installation or maintenance, or actual fire load exceeding EN 1363-1 standard test curve",
+            "owner": "Battery safety lead",
+            "hazard": "Fire-rated internal lining fails earlier than 60-minute rating under real thermal runaway fire, breaching fire boundary",
+            "severity": 5,
+            "likelihood": 2,
+            "mitigation": "Commission UL 9540A unit-level fire test on production-representative assembly; specify lining manufacturer with documented post-coolant-exposure fire performance data; install protective steel kick plate at floor level to prevent mechanical damage during racking",
+            "consequence": "External container surface temperature exceeds threshold for ignition of adjacent assets within National Fire Chiefs Council 3 m separation distance; emergency services unable to safely approach; potential site-wide fire spread",
+            "existingControls": "EN 13501-1 Class A1 non-combustible mineral wool 50 mm with galvanised steel inner skin facing, EN 1363-1 60-minute rated assembly, fire detection system with early off-gas warning",
+            "residualSeverity": 4,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-4",
+            "cause": "Under-specified chemical anchor depth for actual concrete pad strength, weld defect at corner casting to underframe interface, or transport tie-down impact loads exceeding casting fatigue limit",
+            "owner": "Mechanical lead",
+            "hazard": "Foundation anchor pull-out or corner casting weld failure under wind, seismic, or transport shock loads",
+            "severity": 4,
+            "likelihood": 2,
+            "mitigation": "Site structural engineer to verify anchor specification against local wind and seismic loads per Eurocode; magnetic particle inspection of all corner casting welds as factory acceptance test; specify transport tie-down points and approved lashing pattern in shipping procedure",
+            "consequence": "Container shifts on pad during storm or transport incident, shearing alternating current tie-in cables and coolant lines; arc flash, coolant spill, and possible cascading thermal event; commissioning delay and site re-work",
+            "existingControls": "ISO 1161 corner castings rated for 30,480 kg stacking, M30 grade 8.8 chemical anchors with 200 mm embedment, ISO 1496-1 structural compliance of welded frame",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-1",
+            "cause": "Internal cell defect, overcharge from battery management system fault, mechanical damage during transport, or sustained over-temperature from cooling failure",
+            "owner": "Battery safety lead",
+            "hazard": "Single-cell thermal runaway propagating to adjacent cells and modules, releasing flammable off-gas and igniting a container fire",
+            "severity": 5,
+            "likelihood": 2,
+            "mitigation": "Specify grade A cells with full traceability and matrix testing to UL 9540A at unit and installation level; require module-level off-gas detection with battery management system trip threshold below thermal-runaway onset",
+            "consequence": "Catastrophic loss of container, possible deflagration event, multi-million-pound site damage, injury or death to nearby personnel, regulatory shutdown of fleet",
+            "existingControls": "Lithium iron phosphate chemistry (lower runaway risk than nickel-manganese-cobalt), per-cell voltage and temperature monitoring by battery management system, module-level fuses, mica propagation barriers, gas detection feeding the fire detection and suppression system, deflagration vent panel in container roof",
+            "residualSeverity": 4,
+            "residualLikelihood": 1
+          },
+          {
+            "id": "RM-2",
+            "cause": "Vibration-induced loosening of dripless couplings, gasket degradation from glycol contamination, or freeze damage during winter shutdown",
+            "owner": "Mechanical lead",
+            "hazard": "Coolant leak from cold-plate fitting or hose causing internal flooding and direct-current short-circuit",
+            "severity": 4,
+            "likelihood": 3,
+            "mitigation": "Add redundant leak-detection ribbon at base of every rack with automatic coolant-loop isolation valves; pressure-test entire loop to 1.5 times working pressure during factory acceptance test",
+            "consequence": "Isolation fault, ground fault current, possible arc event, full system trip, and extended downtime for rack drying or replacement",
+            "existingControls": "Dripless quick-disconnect couplings, drip trays with leak-detection sensors reporting to controls and supervisory cabinet, isolation monitoring by battery management system",
+            "residualSeverity": 3,
+            "residualLikelihood": 2
+          },
+          {
+            "id": "RM-3",
+            "cause": "Non-uniform cooling between modules at rack ends versus middle, weak passive balancing current, or inconsistent cell matching at factory",
+            "owner": "Electrical lead",
+            "hazard": "Cell imbalance and accelerated capacity fade leading to premature end-of-life",
+            "severity": 3,
+            "likelihood": 3,
+            "mitigation": "Specify active balancing at module level (minimum 2 ampere balance current) and computational fluid dynamics validation of coolant manifold flow uniformity to within 5 percent rack-to-rack",
+            "consequence": "State-of-health falls below 70 percent before contractual cycle count, triggering warranty replacement at substantial cost and potential customer churn",
+            "existingControls": "Battery management system passive balancing during charge phase, factory cell-grading procedure, cold-plate flow balancing manifold",
+            "residualSeverity": 2,
+            "residualLikelihood": 2
+          },
+          {
+            "id": "RM-4",
+            "cause": "Thermal cycling, transport vibration over United Kingdom road network, or under-torqued connections at factory",
+            "owner": "Mechanical lead",
+            "hazard": "Busbar or terminal-bolt loosening causing localised resistive heating and possible arc-flash",
+            "severity": 4,
+            "likelihood": 2,
+            "mitigation": "Add fibre-optic temperature monitoring on critical busbar joints feeding battery management system trip logic, and require post-transport torque audit before commissioning",
+            "consequence": "Hot spot ignition source, module-level fire, and direct-current arc that may breach module casing and trigger thermal runaway",
+            "existingControls": "Calibrated torque assembly with witness-marking, Belleville washers on busbar bolts, infrared inspection during commissioning",
+            "residualSeverity": 3,
+            "residualLikelihood": 1
+          }
+        ]
+      },
+      "diagnostics": []
+    },
+    {
+      "inputId": "desal",
+      "loop": 2,
+      "engineCommit": "2036985e",
+      "elapsedMs": 0,
+      "costPence": 0,
+      "output": {
+        "riskCount": 0,
+        "moduleCount": 9,
+        "severityDist": {},
+        "likelihoodDist": {},
+        "residualSeverityDist": {},
+        "ownerFilled": 0,
+        "mitigationFilled": 0,
+        "sample": []
+      },
+      "diagnostics": [
+        "no risks declared"
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "inputId": "vertfarm",
+      "score": 3.6,
+      "dimensions": {
+        "severity_distribution_realism": 4,
+        "residual_realism": 2,
+        "mitigation_specificity": 7,
+        "owner_role_specific": 3,
+        "coverage_of_programme_risks": 2
+      },
+      "summary": "Register shows competent mechanical-engineering detail but is heavily skewed to S3 structural/envelope risks, residuals collapse uniformly to S2L1/S3L1 suggesting systematic post-mitigation optimism, ownership is almost entirely one role, and programme/commercial/regulatory risks are essentially absent from the visible sample.",
+      "nextFix": "Force coverage of non-engineering risks first: add explicit rows for capital cost overrun vs £150k target, single-source LED/HVAC supplier failure, UK food-business-operator registration and Environment Agency nutrient-discharge consent denial, and launch-window slip; then re-score residuals independently using a defined RPN threshold rather than letting the author self-assess to 'low'.",
+      "costPence": 105
+    },
+    {
+      "inputId": "sentinel",
+      "score": 0,
+      "dimensions": {
+        "severity_distribution_realism": 0,
+        "residual_realism": 0,
+        "mitigation_specificity": 0,
+        "owner_role_specific": 0,
+        "coverage_of_programme_risks": 0
+      },
+      "summary": "Register is entirely empty — zero rows submitted, so no quality can be assessed on any dimension.",
+      "nextFix": "Populate the register with at minimum 15–20 rows covering hardware, software, regulatory, supply-chain, and programme risks before re-scoring; an empty register scores zero by definition on all five dimensions.",
+      "costPence": 79
+    },
+    {
+      "inputId": "hedgerow",
+      "score": 5,
+      "dimensions": {
+        "severity_distribution_realism": 5,
+        "residual_realism": 4,
+        "mitigation_specificity": 8,
+        "owner_role_specific": 6,
+        "coverage_of_programme_risks": 2
+      },
+      "summary": "Technically detailed mitigations with good standard references, but the visible sample is severity-4-heavy with residuals collapsing uniformly to S3L1/S2L2, and the register appears almost entirely hardware-engineering focused with no visible programme, commercial, or regulatory risks.",
+      "nextFix": "Add at minimum six programme-level rows covering: single-source ceramic/optics supplier failure, UK PSTI/radio type-approval delay blocking launch, cost-overrun at NPI gate, key-person dependency on ML engineer, retail launch-window slip, and WEEE/RoHS compliance — then re-score severity across all 28 rows to force a genuine spread from 1 to 5.",
+      "costPence": 108
+    },
+    {
+      "inputId": "bess",
+      "score": 6.2,
+      "dimensions": {
+        "severity_distribution_realism": 6,
+        "residual_realism": 7,
+        "mitigation_specificity": 8,
+        "owner_role_specific": 7,
+        "coverage_of_programme_risks": 3
+      },
+      "summary": "Strong technical/safety FMEA with specific mitigations and credible residuals, but the visible sample is almost entirely hardware hazards with severity 4-5 clustering and near-zero programme, commercial, or regulatory risks represented.",
+      "nextFix": "Add at least 6 programme-level rows covering: single-cell-supplier qualification failure delaying ship date, G99 DNO application refusal or delay beyond launch window, installed capital cost overrun past £180k threshold, key-person dependency on battery safety lead, UL 9540A test failure requiring redesign, and commissioning overrun past two-day window — then re-check severity distribution pulls the mean below 4.",
+      "costPence": 99
+    },
+    {
+      "inputId": "desal",
+      "score": 0,
+      "dimensions": {
+        "severity_distribution_realism": 0,
+        "residual_realism": 0,
+        "mitigation_specificity": 0,
+        "owner_role_specific": 0,
+        "coverage_of_programme_risks": 0
+      },
+      "summary": "Register is entirely empty — zero rows submitted, making all quality dimensions unscorable and the document unfit for any gate, budget, or insurer purpose.",
+      "nextFix": "Populate the register with at minimum 15–20 rows covering membrane fouling/failure, energy-recovery device cavitation, pre-treatment chemical dosing failure, pressure-vessel hydrostatic integrity, containerised electrical installation (IEC 60364-7-717), cost overrun vs £350k cap, single-source RO membrane supplier risk, regulatory approval (DWI/WHO potable water standards), genset compatibility and load-shedding, logistics/customs delay past disaster-relief deployment window, and site seawater quality variability — then resubmit for scoring.",
+      "costPence": 93
+    }
+  ],
+  "aggregateScore": 2.96,
+  "deltaSincePrior": -0.16000000000000014,
+  "totalCostPence": 484,
+  "completedAt": "2026-04-26T09:52:20.227Z"
+}
