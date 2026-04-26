@@ -642,8 +642,20 @@ export async function expandBomParts(
       return { success: false, error: "No skeleton parts to expand", expansions: {} }
     }
 
+    // Loop 6 P2 (council unanimous, three different framings, same root): the
+    // BOM expansion must receive the brief's cost ceiling so the model can
+    // apply downward architecture pressure when its line-item subtotal is
+    // about to exceed the ceiling. Loop 5 verified that without explicit
+    // budget pressure, the engine produces £80 LTE modules on a £5 Wi-Fi/BLE
+    // budget and £508k PCS lines on a £180k system ceiling — the cost
+    // ceiling exists in the brief but doesn't propagate into BOM decisions.
+    const costCeilingHint =
+      typeof designBrief?.constraints?.unitCostCeilingGbp === "number" &&
+      designBrief.constraints.unitCostCeilingGbp > 0
+        ? `\n\nBUDGET CONSTRAINT (Loop 6 P2): the founder's stated unit cost ceiling is £${designBrief.constraints.unitCostCeilingGbp.toLocaleString("en-GB")}. Your BOM expansion's per-part cost roll-up must respect this ceiling. If the architecture you're expanding cannot fit within the ceiling, prefer COTS commodity components over bespoke high-spec components — for example a £3 ESP32 over a £60 LTE module when the brief says "Wi-Fi/BLE for £5", or a £15 commodity 12 MP MIPI camera over a £120 industrial machine-vision sensor when the brief says "12 MP camera". When you choose a higher-cost option that violates an obvious budget allocation, the costJustification field MUST explicitly justify why the cheaper alternative cannot meet a stated requirement. Plain over-spec without justification is forbidden — the cost waterfall is what gates the design.`
+        : ""
     const briefContext = designBrief
-      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}`
       : ""
 
     // Include module context for material/process reasoning
@@ -978,8 +990,20 @@ export async function generateBomFromModules(
     // ── Phase 2: Batched expansion ──
     // Build shared prompt context once (catalogue fetch is expensive and
     // deterministic across batches).
+    // Loop 6 P2 (council unanimous, three different framings, same root): the
+    // BOM expansion must receive the brief's cost ceiling so the model can
+    // apply downward architecture pressure when its line-item subtotal is
+    // about to exceed the ceiling. Loop 5 verified that without explicit
+    // budget pressure, the engine produces £80 LTE modules on a £5 Wi-Fi/BLE
+    // budget and £508k PCS lines on a £180k system ceiling — the cost
+    // ceiling exists in the brief but doesn't propagate into BOM decisions.
+    const costCeilingHint =
+      typeof designBrief?.constraints?.unitCostCeilingGbp === "number" &&
+      designBrief.constraints.unitCostCeilingGbp > 0
+        ? `\n\nBUDGET CONSTRAINT (Loop 6 P2): the founder's stated unit cost ceiling is £${designBrief.constraints.unitCostCeilingGbp.toLocaleString("en-GB")}. Your BOM expansion's per-part cost roll-up must respect this ceiling. If the architecture you're expanding cannot fit within the ceiling, prefer COTS commodity components over bespoke high-spec components — for example a £3 ESP32 over a £60 LTE module when the brief says "Wi-Fi/BLE for £5", or a £15 commodity 12 MP MIPI camera over a £120 industrial machine-vision sensor when the brief says "12 MP camera". When you choose a higher-cost option that violates an obvious budget allocation, the costJustification field MUST explicitly justify why the cheaper alternative cannot meet a stated requirement. Plain over-spec without justification is forbidden — the cost waterfall is what gates the design.`
+        : ""
     const briefContext = designBrief
-      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}`
       : ""
 
     const moduleContext = modules.map((m) => {
