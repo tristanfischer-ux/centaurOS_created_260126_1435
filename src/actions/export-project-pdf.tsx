@@ -3373,8 +3373,12 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
 
             {/* 4. BOM master — with per-row supplier candidates inline.
                  suppliersByPart is computed from data.suppliers'
-                 matchedPartNumbers (added 2026-04-25 NIGHT). */}
-            <BomMasterPage
+                 matchedPartNumbers (added 2026-04-25 NIGHT).
+                 2026-04-26 BISECT: env flag PDF_SKIP_BOM=1 hides this
+                 section to test the Yoga sentinel hypothesis. Council
+                 ranked BomMasterPage as the #1 likely culprit (highest
+                 cell count + most recently mutated by autopilot). */}
+            {process.env.PDF_SKIP_BOM !== "1" && <BomMasterPage
                 parts={data.parts}
                 sources={data.sources}
                 verdict={data.feasibilityVerdict}
@@ -3403,7 +3407,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                     }
                     return map
                 })()}
-            />
+            />}
 
             {/* 5. Cost */}
             <CostPage data={data} />
