@@ -861,6 +861,52 @@ async function callExtractionWithPrompts(
     systemPrompt: string,
     userPrompt: string,
 ): Promise<ExtractionResult> {
+    // Loop 8 cost cut (2026-04-26 — Tristan flagged "very, very, very
+    // expensive"): default to DeepSeek V4-Pro via OpenRouter (~10× cheaper
+    // than claude-sonnet-4-6 for structured-JSON extraction).
+    // Override to direct Anthropic by setting CHASE_EXTRACTION_VIA=anthropic.
+    //
+    // V4-Pro is documented safe for STRUCTURED reasoning ONLY (per memory
+    // `v4_flash_production_gotchas.md` + `forgeos_specialist_model_swap_findings_20260425.md`).
+    // The Chase extraction is structured JSON output, so it lands cleanly.
+    // V4-Pro reasoning routes through OpenRouter using max_tokens 16384 to
+    // accommodate the reasoning trace + JSON output budget.
+    const route = process.env.CHASE_EXTRACTION_VIA ?? "openrouter"
+    if (route === "openrouter") {
+        const { callOpenRouter } = await import("@/lib/ai/openrouter")
+        const result = await callOpenRouter({
+            model: "deepseek/deepseek-v4-pro",
+            system: systemPrompt,
+            prompt: userPrompt,
+            maxTokens: 16384,
+            temperature: 0.1,
+            timeoutMs: 240_000,
+        })
+        if (!result.ok) {
+            console.warn(
+                `[run-chase-research] OpenRouter V4-Pro failed (${result.error}); report still saved`,
+            )
+            return { ok: false, brief: null, tokensIn: 0, tokensOut: 0 }
+        }
+        const parsed = tryParseBriefJson(result.text)
+        if (!parsed) {
+            console.warn(
+                "[run-chase-research] V4-Pro returned non-JSON; report still saved",
+            )
+            return {
+                ok: false,
+                brief: null,
+                tokensIn: result.inputTokens,
+                tokensOut: result.outputTokens,
+            }
+        }
+        return {
+            ok: true,
+            brief: parsed,
+            tokensIn: result.inputTokens,
+            tokensOut: result.outputTokens,
+        }
+    }
     try {
         // Loop 7+ fix (2026-04-26 NIGHT): bumped 4096 → 8192. The Loop 7
         // few-shot example block (UK-BESS regulatory matrix, ~3000 chars

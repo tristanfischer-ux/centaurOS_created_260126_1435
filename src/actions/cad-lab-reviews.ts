@@ -253,6 +253,60 @@ ${reviewContext}${assemblyNotesInstructions}`
             input_schema: t.parameters,
         }))
 
+        // Loop 8 cost cut (2026-04-26 — Tristan flagged "very, very, very
+        // expensive"): when FANG_REVIEW_VIA=openrouter, bypass the
+        // Anthropic SDK + tool-use loop entirely and call OpenRouter once
+        // with qwen/qwen3-235b-a22b. The agents-surface vp-engineering
+        // already routes here per benchmark
+        // (forgeos_specialist_model_swap_findings_20260425 memory:
+        // "Qwen 3 235B = best Fang ever measured"). Tools are dropped on
+        // this path — Qwen produces the structured review text directly
+        // and the downstream parseReviewFromMarkdown extracts what we
+        // need. Per-call cost ≈ £0.04 vs ≈ £0.10 on Sonnet vs ≈ £0.50 on
+        // the original Opus. Default route stays "anthropic" until this
+        // is verified end-to-end on a single project.
+        const reviewRoute = process.env.FANG_REVIEW_VIA ?? "anthropic"
+        const calculationsPerformedOR: ReviewCalculation[] = []
+        if (reviewRoute === "openrouter") {
+            const { callOpenRouter } = await import("@/lib/ai/openrouter")
+            const userMsg = `Review the module "${targetModule.name}" and provide your structured assessment in the markdown format described above. Engineering claims should be grounded in your domain expertise — show your work in calculations sections.`
+            const or = await callOpenRouter({
+                model: process.env.FANG_REVIEW_MODEL ?? "qwen/qwen3-235b-a22b",
+                system: systemPrompt,
+                prompt: userMsg,
+                maxTokens: MAX_TOKENS,
+                temperature: 0.2,
+                timeoutMs: 240_000,
+            })
+            if (!or.ok) {
+                return {
+                    error: `OpenRouter Fang review failed: ${or.error}`,
+                }
+            }
+            const reviewOR = parseReviewFromMarkdown(
+                or.text,
+                req.specialistId,
+                specialist.name,
+                calculationsPerformedOR,
+                Date.now() - startTime,
+            )
+            try {
+                const { error: rpcError } = await supabase.rpc("upsert_cad_lab_review", {
+                    p_project_id: req.projectId,
+                    p_foundry_id: foundryId,
+                    p_module_id: req.moduleId,
+                    p_specialist_id: req.specialistId,
+                    p_review: reviewOR as unknown as Json,
+                })
+                if (rpcError) {
+                    console.error("[CAD-REVIEWS] Failed to save OR review:", rpcError)
+                }
+            } catch (err) {
+                console.error("[CAD-REVIEWS] Failed to save OR review:", err)
+            }
+            return { review: reviewOR }
+        }
+
         // ── Call Anthropic with tool loop ──
         const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
         if (!apiKey) {
