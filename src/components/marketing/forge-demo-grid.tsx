@@ -23,7 +23,8 @@
 import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-import { AnimatedSection, AnimatedCard } from '@/components/marketing/animations'
+import { motion } from 'framer-motion'
+import { AnimatedSection, AnimatedCard, staggerContainer } from '@/components/marketing/animations'
 
 interface ForgeDemo {
   /** Slug used for asset filenames and the card key. */
@@ -171,13 +172,19 @@ export function ForgeDemoGrid() {
           </p>
         </AnimatedSection>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7">
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-60px" }}
+          variants={staggerContainer}
+        >
           {DEMOS.map((demo) => (
             <AnimatedCard key={demo.slug}>
               <DemoCard demo={demo} />
             </AnimatedCard>
           ))}
-        </div>
+        </motion.div>
 
         <AnimatedSection delay={0.2} className="mt-8 sm:mt-10">
           <p className="text-muted-foreground text-xs sm:text-sm text-center max-w-3xl mx-auto leading-relaxed">
