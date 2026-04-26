@@ -771,11 +771,28 @@ export async function matchCadLabModuleSuppliers(
   // pages on the same domain — the embedding similarity then ranks them
   // alongside actual suppliers. See NON_SUPPLIER_URL_PATH_PATTERNS for the
   // full list and the comment block above isNonSupplierUrl().
-  const listings = (rawListings ?? []).filter((l) => !isNonSupplierUrl(l.website_url))
+  //
+  // Loop 8 G3 (2026-04-26): also drop listings whose TITLE looks like a
+  // product page ("FR4 Sheet Manufacturer", "Liquid Cooling Unit for
+  // Battery Energy Storage System Rack"), news headline ("Tower makes
+  // Ramon rad-hard processor"), academic-paper title, or marketing
+  // tagline ("Unleash Precision with RS485 Soil EC and pH Sensor"). The
+  // shape filter for names lives in src/lib/supplier-verification.ts;
+  // applying it here means hallucinated rows never enter the shortlist
+  // (vs the render-layer filter shipped in 290454be which only stops
+  // them appearing in the PDF).
+  const { looksLikeHallucinatedSupplierName: nameCheck } = await import(
+    "@/lib/supplier-verification"
+  )
+  const listings = (rawListings ?? []).filter((l) => {
+    if (isNonSupplierUrl(l.website_url)) return false
+    if (typeof l.title === "string" && nameCheck(l.title).bad) return false
+    return true
+  })
   const droppedNonSupplierCount = (rawListings?.length ?? 0) - listings.length
   if (droppedNonSupplierCount > 0) {
     console.info(
-      `[CadLabMatch] Dropped ${droppedNonSupplierCount} non-supplier URLs from candidate set (blogs/news/research/edu)`,
+      `[CadLabMatch] Dropped ${droppedNonSupplierCount} non-supplier candidates (URL shape OR product-title name pattern)`,
     )
   }
 
