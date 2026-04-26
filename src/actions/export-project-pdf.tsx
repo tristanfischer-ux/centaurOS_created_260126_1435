@@ -3407,10 +3407,13 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 })()}
             />}
 
-            {/* PDF_BISECT_MINIMAL=1 also stops Cost / Risks / Suppliers /
-             *  EngineReview / AuditLog so the only sections that render
-             *  in MINIMAL mode are Cover, TOC, Brief + Regulatory. */}
-            {process.env.PDF_BISECT_MINIMAL !== "1" && <CostPage data={data} />}
+            {/* 2026-04-26 BISECT (final ring). Each post-BOM section now
+             *  has its own SKIP flag so we can exclude one at a time. The
+             *  bug is in one of {Cost, Suppliers, EngineReview, AuditLog}
+             *  per the bisect time-signature. PDF_BISECT_MINIMAL forces
+             *  everything off; per-section SKIP flags exclude one cleanly
+             *  while keeping all other sections in. */}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_COST !== "1" && <CostPage data={data} />}
 
             {process.env.PDF_BISECT_MINIMAL !== "1" && data.reconciliation && data.reconciliation.findings.length > 0 && (
                 <ReconciliationPage reconciliation={data.reconciliation} />
@@ -3418,7 +3421,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
 
             {(process.env.PDF_BISECT_MINIMAL !== "1" || process.env.PDF_INCLUDE_RISKS === "1") && <RisksPage modules={data.modules} />}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_SUPPLIERS !== "1" && (
                 <SuppliersPage
                     suppliers={data.suppliers}
                     sources={data.sources}
@@ -3426,11 +3429,11 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 />
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && data.proofreadFindings && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_ENGINE !== "1" && data.proofreadFindings && (
                 <EngineReviewPage findings={data.proofreadFindings} />
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && data.auditLog.length > 0 && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_AUDIT !== "1" && data.auditLog.length > 0 && (
                 <AuditLogPage rows={data.auditLog} />
             )}
         </Document>
