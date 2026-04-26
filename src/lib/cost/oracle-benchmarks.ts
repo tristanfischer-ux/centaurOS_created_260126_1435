@@ -129,12 +129,12 @@ const UK_CONSUMER_IOT_OUTDOOR: OracleBenchmark[] = [
     {
         productClass: "uk-consumer-iot-outdoor",
         moduleClass: "TOTAL landed BOM (excludes assembly+packaging+30% gross margin headroom)",
-        low: 69.5,
-        median: 108.5,
-        high: 189,
+        low: 55,
+        median: 80,
+        high: 150,
         volumeContext: "5,000 units/yr",
         reasoning:
-            "Summed module landed BOM implies a feasible median for a £220 premium DTC-style product; high-end leaves little room for assembly+packaging+margin.",
+            "GPT-5.5 (US OpenAI) predicted £69-189 median £108. Qwen3.6-Plus (China Alibaba) corrected to £40-105 median £62 — argues GPT band conflated raw BOM with channel margin / NRE amortisation. Reconciled band £55-150 median £80 takes the Asian-lineage correction seriously while staying conservative — a £220 retail product with 30%+ margin to channel + £40-60 of assembly+packaging+QA implies landed BOM <£100 is the design target.",
     },
 ]
 
