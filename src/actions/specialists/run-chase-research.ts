@@ -811,11 +811,20 @@ ${trimmedReport}
 Output JSON only.`
 
     try {
+        // Loop 7+ fix (2026-04-26 NIGHT): bumped 4096 → 8192. The Loop 7
+        // few-shot example block (UK-BESS regulatory matrix, ~3000 chars
+        // with 8 standards × 9 fields each) inflates Sonnet's response
+        // past 4096 tokens, truncating mid-JSON. Empirical evidence:
+        // Hedgerow Loop 7 regen produced research.designBrief WITHOUT
+        // mission / targetCustomers / whyNow / constraints / regulatory
+        // — only the legacy fields from the older codepath survived.
+        // Verdict came back GREEN against a £1,392 BOM despite founder's
+        // £155 target because constraints.unitCostCeilingGbp was null.
         const { text, tokensIn, tokensOut } = await callClaude(
             systemPrompt,
             userPrompt,
             "claude-sonnet-4-6",
-            4096,
+            8192,
             120_000,
             1, // maxRetries — fail fast; extraction is a nice-to-have
         )
