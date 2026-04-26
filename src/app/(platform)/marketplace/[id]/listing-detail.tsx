@@ -555,6 +555,9 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
 function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
     type Item = { label: string; value: React.ReactNode }
 
+    // Parse attributes JSONB so we can surface fields stored there
+    const attrs = safeParseAttributes(listing.attributes)
+
     const arrChips = (arr: unknown): React.ReactNode | null => {
         if (!Array.isArray(arr) || arr.length === 0) return null
         return (
@@ -578,6 +581,10 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
     const bool = (v: unknown, label: string): React.ReactNode | null => {
         if (v == null) return null
         return v ? <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">✓ {label}</span> : null
+    }
+    const longText = (v: unknown): React.ReactNode | null => {
+        if (v == null || v === '' || v === false) return null
+        return <p className="text-sm leading-relaxed text-foreground">{String(v)}</p>
     }
 
     // ── Capability profile ───────────────────────────────────────────────
@@ -615,6 +622,22 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
     const moq = text((listing as unknown as { minimum_order?: string }).minimum_order)
     if (moq) capability.push({ label: 'Minimum order', value: moq })
 
+    // attributes.capability_summary — long text (11,342 rows)
+    const capSummary = longText(attrs.capability_summary)
+    if (capSummary) capability.push({ label: 'Capability summary', value: capSummary })
+
+    // attributes.competitive_positioning — long text (11,342 rows)
+    const compPos = longText(attrs.competitive_positioning)
+    if (compPos) capability.push({ label: 'Competitive positioning', value: compPos })
+
+    // attributes.marketplace_tags — array (11,342 rows)
+    const mktTags = arrChips(attrs.marketplace_tags)
+    if (mktTags) capability.push({ label: 'Tags', value: mktTags })
+
+    // attributes.company_type — text (6,181 rows)
+    const companyType = text(attrs.company_type)
+    if (companyType) capability.push({ label: 'Company type', value: companyType })
+
     // ── Compliance & sustainability ──────────────────────────────────────
     const compliance: Item[] = []
     const certs = arrChips(listing.certifications)
@@ -637,16 +660,60 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
     const securityClr = arrChips((listing as unknown as { security_clearances?: unknown }).security_clearances)
     if (securityClr) compliance.push({ label: 'Security clearances', value: securityClr })
 
+    // attributes.ch_company_status — e.g. "active" (5,680 rows)
+    const chStatus = attrs.ch_company_status
+    if (chStatus) {
+        const statusStr = String(chStatus)
+        const variant = statusStr === 'active' ? 'bg-success/10 text-success' : statusStr === 'dissolved' ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
+        compliance.push({
+            label: 'Companies House status',
+            value: <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${variant}`}>{statusStr}</span>,
+        })
+    }
+
     // ── Company snapshot ──────────────────────────────────────────────────
     const company: Item[] = []
+    // founded_year (top-level column) — with fallback to attributes.year_founded (5,071 rows)
     const founded = (listing as unknown as { founded_year?: number }).founded_year
+        ?? (typeof attrs.year_founded === 'number' ? attrs.year_founded : null)
     if (typeof founded === 'number') company.push({ label: 'Founded', value: <span className="text-sm font-semibold">{founded} <span className="text-xs text-muted-foreground font-normal">({new Date().getFullYear() - founded} years)</span></span> })
     const employees = (listing as unknown as { employee_count_exact?: number }).employee_count_exact
     if (typeof employees === 'number') company.push({ label: 'Employees', value: <span className="text-sm">{employees.toLocaleString()}</span> })
     const size = text((listing as unknown as { company_size?: string }).company_size)
+        ?? text(attrs.ch_company_size)
     if (size && employees == null) company.push({ label: 'Company size', value: size })
     const finHealth = text((listing as unknown as { financial_health?: string }).financial_health)
     if (finHealth) company.push({ label: 'Financial health', value: finHealth })
+
+    // attributes.financial_signals — can be string or object (4,837 rows)
+    const finSig = attrs.financial_signals
+    if (finSig != null && finSig !== '') {
+        if (typeof finSig === 'string') {
+            company.push({ label: 'Financial signals', value: longText(finSig) })
+        } else if (typeof finSig === 'object' && !Array.isArray(finSig)) {
+            const entries = Object.entries(finSig as Record<string, unknown>).filter(([, v]) => v != null && v !== '')
+            if (entries.length > 0) {
+                company.push({
+                    label: 'Financial signals',
+                    value: (
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-0">
+                            {entries.map(([k, v]) => (
+                                <div key={k} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                                    <span className="text-sm text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
+                                    <span className="text-sm font-medium text-foreground">{String(v)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ),
+                })
+            }
+        }
+    }
+
+    // attributes.ch_company_type — e.g. "ltd" (5,503 rows)
+    const chType = text(attrs.ch_company_type)
+    if (chType) company.push({ label: 'Companies House type', value: chType })
+
     const country = text((listing as unknown as { country?: string }).country)
     if (country) company.push({ label: 'Country', value: country })
     const address = text((listing as unknown as { address?: string }).address)
@@ -663,6 +730,32 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
         label: 'LinkedIn',
         value: <a href={linkedin} target="_blank" rel="noopener noreferrer" className="text-international-orange hover:underline text-sm inline-flex items-center gap-1">View profile <ExternalLink className="h-3 w-3" /></a>,
     })
+
+    // attributes.social_media — object keyed by platform name (2,377 rows)
+    const socialMedia = attrs.social_media
+    if (socialMedia != null && typeof socialMedia === 'object' && !Array.isArray(socialMedia)) {
+        const socialEntries = Object.entries(socialMedia as Record<string, unknown>)
+            .filter(([, url]) => url && typeof url === 'string')
+        if (socialEntries.length > 0) {
+            company.push({
+                label: 'Social media',
+                value: (
+                    <div className="flex flex-wrap gap-2">
+                        {socialEntries.map(([platform, url]) => {
+                            const safeUrl = /^https?:\/\//i.test(String(url)) ? String(url) : `https://${url}`
+                            return (
+                                <a key={platform} href={safeUrl} target="_blank" rel="noopener noreferrer"
+                                    className="text-international-orange hover:underline text-sm inline-flex items-center gap-1 capitalize">
+                                    {platform} <ExternalLink className="h-3 w-3" />
+                                </a>
+                            )
+                        })}
+                    </div>
+                ),
+            })
+        }
+    }
+
     const keyPeople = (listing as unknown as { key_people?: unknown[] }).key_people
     if (Array.isArray(keyPeople) && keyPeople.length > 0) {
         company.push({
@@ -689,6 +782,17 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
 
     // ── Trust & data quality ──────────────────────────────────────────────
     const trust: Item[] = []
+
+    // attributes.nightshift_score — internal Forge supplier score (15,559 rows)
+    const nightshiftScore = attrs.nightshift_score
+    if (typeof nightshiftScore === 'number') {
+        const colour = nightshiftScore >= 70 ? 'text-success' : nightshiftScore >= 40 ? 'text-warning' : 'text-destructive'
+        trust.push({
+            label: 'Forge supplier score',
+            value: <span className={cn('text-sm font-semibold tabular-nums', colour)}>{nightshiftScore}</span>,
+        })
+    }
+
     const dqs = (listing as unknown as { data_quality_score?: number }).data_quality_score
     if (typeof dqs === 'number') {
         const colour = dqs >= 80 ? 'text-success' : dqs >= 50 ? 'text-warning' : 'text-destructive'

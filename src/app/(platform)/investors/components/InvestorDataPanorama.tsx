@@ -14,7 +14,7 @@ import React from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { formatFundSize } from '@/lib/format'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Mail } from 'lucide-react'
 import type { InvestorFirm } from '@/actions/investors'
 
 interface Props {
@@ -92,19 +92,39 @@ export function InvestorDataPanorama({ firm }: Props) {
     )
   }
 
+  // Long-text helper — renders as a paragraph block rather than an inline span
+  const longTxt = (v: unknown): React.ReactNode | null => {
+    if (v == null || v === '') return null
+    return <p className="text-sm leading-relaxed text-foreground">{String(v)}</p>
+  }
+
+  // mailto link helper
+  const mailLink = (email: unknown): React.ReactNode | null => {
+    if (!email || typeof email !== 'string') return null
+    return (
+      <a
+        href={`mailto:${email}`}
+        className="text-international-orange hover:underline text-sm inline-flex items-center gap-1"
+      >
+        <Mail className="h-3 w-3" />
+        {email}
+      </a>
+    )
+  }
+
   // ── Investment thesis ───────────────────────────────────────────────────────
   const thesis: Item[] = []
 
-  const thesisText = txt(attrs.investment_thesis)
+  const thesisText = longTxt(attrs.investment_thesis)
   if (thesisText) thesis.push({ label: 'Investment thesis', value: thesisText })
 
-  const patternText = txt(attrs.investment_pattern)
+  const patternText = longTxt(attrs.investment_pattern)
   if (patternText) thesis.push({ label: 'Investment pattern', value: patternText })
 
-  const idealText = txt(attrs.ideal_company_profile)
+  const idealText = longTxt(attrs.ideal_company_profile)
   if (idealText) thesis.push({ label: 'Ideal company profile', value: idealText })
 
-  const valueAddText = txt(attrs.value_add)
+  const valueAddText = longTxt(attrs.value_add)
   if (valueAddText) thesis.push({ label: 'Value-add', value: valueAddText })
 
   const sectorsChips = arrChips(attrs.sectors)
@@ -118,6 +138,16 @@ export function InvestorDataPanorama({ firm }: Props) {
 
   // ── Fund profile ────────────────────────────────────────────────────────────
   const fund: Item[] = []
+
+  // attributes.aum_gbp — assets under management (44 rows) — render prominently
+  const aumGbp = (attrs as unknown as Record<string, unknown>).aum_gbp
+  if (typeof aumGbp === 'number') {
+    const aumLabel = formatFundSize(aumGbp) ?? `£${aumGbp.toLocaleString()}`
+    fund.push({
+      label: 'Assets under management',
+      value: <span className="text-base font-bold text-foreground">{aumLabel}</span>,
+    })
+  }
 
   const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
   if (fundSizeLabel)
@@ -145,38 +175,101 @@ export function InvestorDataPanorama({ firm }: Props) {
   const firmTypeText = txt(attrs.firm_type)
   if (firmTypeText) fund.push({ label: 'Firm type', value: firmTypeText })
 
+  // attributes.fund_tier — e.g. "Tier 1" (40 rows) — render as a badge
+  const fundTier = (attrs as unknown as Record<string, unknown>).fund_tier
+  if (fundTier) {
+    fund.push({
+      label: 'Fund tier',
+      value: (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-foreground border border-border font-medium">
+          {String(fundTier)}
+        </span>
+      ),
+    })
+  }
+
+  // attributes.founding_year (44 rows)
+  const foundingYear = (attrs as unknown as Record<string, unknown>).founding_year
+  if (typeof foundingYear === 'number') {
+    fund.push({
+      label: 'Founded',
+      value: <span className="text-sm font-semibold text-foreground">{foundingYear} <span className="text-xs text-muted-foreground font-normal">({new Date().getFullYear() - foundingYear} years)</span></span>,
+    })
+  }
+
+  // attributes.last_fund_close_date (40 rows)
+  const lastFundClose = (attrs as unknown as Record<string, unknown>).last_fund_close_date
+  if (lastFundClose && typeof lastFundClose === 'string') {
+    const d = new Date(lastFundClose)
+    if (!isNaN(d.getTime())) {
+      fund.push({
+        label: 'Last fund close',
+        value: <span className="text-sm text-foreground">{d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</span>,
+      })
+    } else {
+      // Store as plain string if not a parseable date
+      const lt = txt(lastFundClose)
+      if (lt) fund.push({ label: 'Last fund close', value: lt })
+    }
+  }
+
   const activeBadge = bool(attrs.is_active_deploying, 'Actively deploying')
   if (activeBadge) fund.push({ label: 'Deployment status', value: activeBadge })
   else if (attrs.is_active_deploying === false)
     fund.push({ label: 'Deployment status', value: <span className="text-sm text-muted-foreground">Not currently active</span> })
 
-  const fundHistoryText = txt(
+  const fundHistoryText = longTxt(
     typeof attrs.fund_history === 'string' ? attrs.fund_history : null
   )
   if (fundHistoryText) fund.push({ label: 'Fund history', value: fundHistoryText })
 
-  const fundPerfText = txt(
+  const fundPerfText = longTxt(
     typeof attrs.fund_performance === 'string' ? attrs.fund_performance : null
   )
   if (fundPerfText) fund.push({ label: 'Fund performance', value: fundPerfText })
 
-  const exitsText = txt(typeof attrs.exits === 'string' ? attrs.exits : null)
+  const exitsText = longTxt(typeof attrs.exits === 'string' ? attrs.exits : null)
   if (exitsText) fund.push({ label: 'Notable exits', value: exitsText })
 
-  const recentDealsText = txt(attrs.recent_deals_summary)
+  const recentDealsText = longTxt(attrs.recent_deals_summary)
   if (recentDealsText) fund.push({ label: 'Recent deals', value: recentDealsText })
 
   // ── Team & access ───────────────────────────────────────────────────────────
   const team: Item[] = []
 
-  const teamExpertiseText = txt(attrs.team_expertise)
+  const teamExpertiseText = longTxt(attrs.team_expertise)
   if (teamExpertiseText) team.push({ label: 'Team expertise', value: teamExpertiseText })
 
-  const connectionText = txt(attrs.connection_brief)
+  const connectionText = longTxt(attrs.connection_brief)
   if (connectionText) team.push({ label: 'Connection brief', value: connectionText })
 
-  const locationText = txt(attrs.hq_city ?? attrs.location)
+  // Build location from hq_city + hq_country (or fall back to location)
+  const hqCountry = (attrs as unknown as Record<string, unknown>).hq_country
+  const hqCity = attrs.hq_city ?? attrs.location
+  const locationDisplay = hqCity && hqCountry
+    ? `${hqCity}, ${hqCountry}`
+    : hqCity ?? (hqCountry ? String(hqCountry) : null)
+  const locationText = txt(locationDisplay)
   if (locationText) team.push({ label: 'Location', value: locationText })
+
+  // attributes.incorporation_date (502 rows)
+  const incDate = (attrs as unknown as Record<string, unknown>).incorporation_date
+  if (incDate && typeof incDate === 'string') {
+    const d = new Date(incDate)
+    const year = !isNaN(d.getTime()) ? d.getFullYear() : parseInt(incDate, 10)
+    if (!isNaN(year)) {
+      team.push({ label: 'Established', value: <span className="text-sm text-foreground">{year}</span> })
+    }
+  }
+
+  // attributes.registered_address (502 rows)
+  const regAddress = txt((attrs as unknown as Record<string, unknown>).registered_address)
+  if (regAddress) team.push({ label: 'Registered address', value: regAddress })
+
+  // attributes.notable_portfolio — array of companies (46 rows) — render as chips
+  const notablePortfolio = (attrs as unknown as Record<string, unknown>).notable_portfolio
+  const notableChips = arrChips(notablePortfolio, 15)
+  if (notableChips) team.push({ label: 'Notable portfolio', value: notableChips })
 
   const websiteLink = link(attrs.website_url, 'Visit website')
   if (websiteLink) team.push({ label: 'Website', value: websiteLink })
@@ -195,6 +288,43 @@ export function InvestorDataPanorama({ firm }: Props) {
 
   // ── Trust & data quality ────────────────────────────────────────────────────
   const trust: Item[] = []
+
+  // Fields not in the typed interface — stored as freeform JSONB
+  const extraAttrs = attrs as unknown as Record<string, unknown>
+
+  // attributes.bvca_member — boolean (542 rows) — render as chip when true
+  const bvcaBadge = bool(extraAttrs.bvca_member, 'BVCA member')
+  if (bvcaBadge) trust.push({ label: 'Industry membership', value: bvcaBadge })
+
+  // attributes.member_type — text (502 rows)
+  const memberType = txt(extraAttrs.member_type)
+  if (memberType) trust.push({ label: 'Member type', value: memberType })
+
+  // attributes.companies_house_number — link to Companies House (502 rows)
+  const chNumber = extraAttrs.companies_house_number
+  if (chNumber && typeof chNumber === 'string') {
+    trust.push({
+      label: 'Companies House',
+      value: (
+        <a
+          href={`https://find-and-update.company-information.service.gov.uk/company/${chNumber}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-international-orange hover:underline text-sm inline-flex items-center gap-1"
+        >
+          {chNumber} <ExternalLink className="h-3 w-3" />
+        </a>
+      ),
+    })
+  }
+
+  // attributes.outreach_status — text (542 rows)
+  const outreachStatus = txt(extraAttrs.outreach_status)
+  if (outreachStatus) trust.push({ label: 'Outreach status', value: outreachStatus })
+
+  // attributes.contact_email — mailto link (26 rows)
+  const contactEmailLink = mailLink(extraAttrs.contact_email ?? attrs.contact_email)
+  if (contactEmailLink) trust.push({ label: 'Contact email', value: contactEmailLink })
 
   // data_quality_score: stored 0-100 on investor records (same as supplier)
   const dqs = attrs.data_quality_score
@@ -221,9 +351,6 @@ export function InvestorDataPanorama({ firm }: Props) {
     })
   }
 
-  // Fields not in the typed interface — stored as freeform JSONB
-  const extraAttrs = attrs as unknown as Record<string, unknown>
-
   const confidenceTier = txt(extraAttrs.confidence_tier)
   if (confidenceTier) trust.push({ label: 'Confidence tier', value: confidenceTier })
 
@@ -235,6 +362,38 @@ export function InvestorDataPanorama({ firm }: Props) {
 
   const urlVerifiedBadge = bool(extraAttrs.url_verified, 'URL verified')
   if (urlVerifiedBadge) trust.push({ label: 'URL verification', value: urlVerifiedBadge })
+
+  // attributes.last_verified — date (590 rows)
+  const lastVerified = extraAttrs.last_verified ?? attrs.last_verified
+  if (lastVerified && typeof lastVerified === 'string') {
+    const d = new Date(lastVerified)
+    if (!isNaN(d.getTime())) {
+      trust.push({
+        label: 'Last verified',
+        value: (
+          <span className="text-sm text-muted-foreground">
+            {d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+        ),
+      })
+    }
+  }
+
+  // attributes.last_enriched — date (12 rows)
+  const lastEnriched = extraAttrs.last_enriched
+  if (lastEnriched && typeof lastEnriched === 'string') {
+    const d = new Date(lastEnriched)
+    if (!isNaN(d.getTime())) {
+      trust.push({
+        label: 'Last enriched',
+        value: (
+          <span className="text-sm text-muted-foreground">
+            {d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+        ),
+      })
+    }
+  }
 
   if (attrs.last_synced) {
     const d = new Date(attrs.last_synced)
