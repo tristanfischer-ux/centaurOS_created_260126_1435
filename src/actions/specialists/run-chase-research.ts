@@ -748,14 +748,28 @@ JSON shape:
 Rules:
 - Ground every field in the report. If the report doesn't mention a constraint, use null — do NOT invent numbers or dates.
 - "regulatory" must be a project-specific compliance matrix, NOT a list of well-known standards. Each row needs applicability + designImpact + evidenceRequired + ownerRole + gapAction filled out. Generic standard descriptions without project-mapped obligations are a regression — every row must connect a clause to a design decision.
-- For UK projects, distinguish what is statutory from what is reference:
-  - STATUTORY in the United Kingdom: BS 7671 (IET wiring regulations) for AC side; UKCA marking; Low Voltage, Electromagnetic Compatibility, and Machinery directives where applicable; Electricity Safety Quality and Continuity Regulations interfaces; CDM Regulations for installation phase.
-  - REFERENCE / INSURANCE / NFCC: NFPA 855, UL 9540, UL 9540A — these are NOT UK statutory law. They are referenced by insurers, the National Fire Chiefs Council, and Authorities Having Jurisdiction. Mark these clearly in "applicability" so the founder doesn't treat them as legal requirements.
-  - UK / EU EQUIVALENTS: BS EN IEC 62933-5-2 is the UK/EU peer of NFPA 855 for electrical energy storage system safety. BS EN 15004-1 is the UK fixed-gaseous-suppression standard (peer of NFPA 2001). BS EN IEC 62619 / 63056 cover lithium cell + system safety.
-  - TRANSPORT: UN 38.3 + ADR/Carriage of Dangerous Goods Regulations apply to lithium battery shipment with batteries installed.
-  - ISO 1496-1 / ISO 1161 (freight container structural standards) apply ONLY if the container is unmodified. Once vents, doors, or rack reinforcements are added, the container loses CSC certification — call this out explicitly when relevant.
-- Do NOT cite a US-only standard as if it were UK statutory law. Do NOT cite a freight-container structural standard for a heavily modified container without flagging the certification consequence.
-- Standards-body codes pass through verbatim — UL, IEC, ISO, NFPA, BS, EN. Do NOT invent expansions ("United Laboratories" is a hallucination, the correct full name is "Underwriters Laboratories" — but the code "UL" stays as-is in copy).
+- "applicability" MUST start with one of these regime tags, followed by " — " and the project-specific scope text:
+  - "UK statutory" — Acts, Regulations, or statutory instruments that legally apply (UKCA marking, BS 7671, ESQCR, EAWR, Electrical Equipment Safety Regs, Supply of Machinery Safety Regs, EMC Regs, RED, RoHS, WEEE, PSTI, PESR, CDM, GPSR, HSWA, Food Safety Act, MHRA Class designation, Ofcom radio, etc.).
+  - "UK designated standard" — BS/EN/IEC/ISO standards that PROVE compliance with the underlying statutory regime. The standard is designated, not the law itself; reference the statute it serves.
+  - "UK approved code" — codes of practice an enforcing body endorses (HSE Approved Codes of Practice, IET Code of Practice, ENA Engineering Recommendations like G99/G100).
+  - "Voluntary reference" — international peers an insurer/AHJ/NFCC may cite (NFPA, UL, ASTM) but not UK law.
+  - "Insurer best-practice" — guidance the founder's commercial insurer will likely require even though it isn't statutory.
+- Do NOT label a BS/IEC harmonised standard as "UK statutory". The regulation is statutory; the standard demonstrates compliance. BS EN IEC 62619 is "UK designated standard"; the Electrical Equipment (Safety) Regulations 2016 it serves is "UK statutory".
+- Coverage check before you finalise — for any UK hardware project that could plausibly fall under a regime, include at least one row from each applicable regime. Do not skip a regime just because the report didn't mention it; the founder needs the matrix complete:
+  - Always relevant to almost any UK product: UKCA marking obligations (the umbrella scheme), GPSR (consumer-facing), HSWA (workplace duty), CDM (if construction/install on UK sites).
+  - Electrical product (mains): Electrical Equipment (Safety) Regs 2016 + EMC Regs 2016 + BS 7671 + EAWR. Add LV designated standards (BS EN 60335 for appliances, BS EN 61010 for lab/industrial, BS EN 60950/62368 for IT).
+  - Connected / IoT consumer (Wi-Fi, Bluetooth, cellular, sensors with apps): RED 2017, PSTI Act 2022, RoHS 2012, WEEE 2013. Cellular: Ofcom + GSMA SGP.02 if eSIM.
+  - Battery-bearing: UN 38.3 + ADR + Batteries Regulations 2008/EU Batteries Regulation. Lithium specifically: BS EN IEC 62133 (consumer) or BS EN IEC 62619/63056 (industrial/grid).
+  - Grid-connected energy storage: ESQCR + ENA G99 (>16 A) or G100 (export-limited). NFPA 855 / UL 9540 are voluntary-reference only.
+  - Pressure systems (water, hydraulic, refrigerant): PESR 2016 (manufactured) + PSSR 2000 (installed in service).
+  - Machinery (moving parts, automated function): Supply of Machinery (Safety) Regs 2008 + BS EN ISO 12100 + BS EN ISO 13849.
+  - Food production / contact / vertical farms: Food Safety Act 1990 + Reg (EC) 852/2004 + BS EN 1672 (food machinery hygiene). Cleaning chemicals: BPR (UK) and HSE registration.
+  - Medical devices: UK MDR 2002 + BS EN ISO 13485 + BS EN ISO 14971 + MHRA registration. Medical electrical: BS EN 60601-1 family. Software: BS EN 62304.
+  - Water treatment / desalination producing potable water: WSR Regulation 4 (UK Drinking Water Regulations 2016) + BS 6920 (non-metallic) + WHO Drinking Water Guidelines (reference).
+  - Optical / radiation: BS EN 62471 (LED photobiological), BS EN ISO 15004-2 (ophthalmic if relevant).
+- ISO 1496-1 / ISO 1161 (freight container structural standards) apply ONLY if the container is unmodified. Once vents, doors, or rack reinforcements are added, the container loses CSC certification — flag the consequence in applicability.
+- Do NOT cite a US-only standard (NFPA, UL, ASTM, IEEE-only) as UK statutory. Always pair with the UK statutory peer that actually applies.
+- Standards-body codes pass through verbatim — UL, IEC, ISO, NFPA, BS, EN. Do NOT invent expansions ("United Laboratories" is a hallucination; "Underwriters Laboratories" is the correct full name; but the code "UL" stays as-is).
 - British English ("programme" not "program"). First-person voice not required here — this is extraction, not narrative.
 - Do NOT use the words "AI", "smart", or "intelligent" in the values. This lands in-product.
 - Output must parse as JSON.
@@ -767,7 +781,7 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
     "code": "ENA G99",
     "name": "Requirements for Connection of Generation Equipment in Parallel with Public Distribution Networks above 16A",
     "summary": "Mandatory UK grid code for behind-the-meter storage connecting in parallel with the distribution network; requires grid-forming capability and compliance with ESQCR.",
-    "applicability": "Grid connection point >16A — Statutory",
+    "applicability": "UK approved code — Grid connection point >16 A behind-the-meter; ENA G99 is the Engineering Recommendation enforced by every DNO, sitting under ESQCR.",
     "designImpact": "Inverter must support grid-forming mode, islanding detection, and specified frequency/voltage ride-through parameters.",
     "evidenceRequired": "G99 commissioning test record signed by host DNO, generation connection agreement.",
     "status": "not-started",
@@ -778,7 +792,7 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
     "code": "BS EN IEC 62933-5-2",
     "name": "Electrical energy storage (EES) systems — Part 5-2: Safety requirements for grid-integrated EES systems",
     "summary": "UKCA harmonised standard for stationary battery energy storage safety; replaces US UL 9540 for UK market access.",
-    "applicability": "Complete BESS enclosure and integration — Statutory",
+    "applicability": "UK designated standard — Complete BESS enclosure + integration; demonstrates compliance with the Electrical Equipment (Safety) Regulations 2016 + UKCA marking under the Low Voltage scheme.",
     "designImpact": "System must pass specified fire propagation, thermal runaway, and containment tests; dictates ventilation, fire detection/suppression integration.",
     "evidenceRequired": "Test report from UKAS-accredited lab demonstrating compliance with BS EN IEC 62933-5-2.",
     "status": "not-started",
@@ -789,7 +803,7 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
     "code": "BS 7671",
     "name": "Requirements for Electrical Installations (IET Wiring Regulations)",
     "summary": "UK wiring regulations for the fixed installation within the BESS container.",
-    "applicability": "Internal LV wiring and protection — Statutory",
+    "applicability": "UK statutory — Internal low-voltage wiring + protection inside the container; BS 7671 IET Wiring Regulations are the de facto enforcement of the Electricity at Work Regulations 1989 (EAWR) for fixed installations.",
     "designImpact": "Design must comply with shock protection, earthing, overcurrent protection, and isolation requirements; may require RCD protection on auxiliary circuits.",
     "evidenceRequired": "Electrical installation certificate (EIC) signed by a competent person, plus schedule of inspections and test results.",
     "status": "not-started",
@@ -800,7 +814,7 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
     "code": "UN 38.3",
     "name": "UN Manual of Tests and Criteria, Part III, sub-section 38.3 — Lithium metal and lithium ion batteries",
     "summary": "Mandatory transport safety tests for lithium cells and batteries; required before shipping battery modules.",
-    "applicability": "Battery cells/modules during transport — Statutory",
+    "applicability": "UK statutory — Battery cells/modules during transport (road/sea/air); UN 38.3 + ADR / Carriage of Dangerous Goods Regulations 2009 + IATA DGR for air freight.",
     "designImpact": "Cells must pass altitude simulation, thermal cycling, vibration, shock, overcharge, and forced discharge tests.",
     "evidenceRequired": "UN 38.3 test summary report from cell supplier or accredited lab; ADR dangerous goods note for road transport.",
     "status": "not-started",
@@ -811,7 +825,7 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
     "code": "NFPA 855",
     "name": "Standard for the Installation of Stationary Energy Storage Systems",
     "summary": "US reference standard often cited by UK insurers and NFCC guidance; not statutory in the UK.",
-    "applicability": "Fire safety design — Reference (NFCC/insurer guidance, non-statutory)",
+    "applicability": "Voluntary reference — Fire safety design; NFCC Grid Scale BESS Operational Guidance + insurer underwriting reference, NOT UK statute. UK statutory peer for system-level fire safety is BS EN IEC 62933-5-2.",
     "designImpact": "Spacing, fire suppression density, smoke control, and explosion prevention concepts can inform design but UK compliance is via BS EN IEC 62933-5-2.",
     "evidenceRequired": "Not mandated; insurer may request alignment report or justification.",
     "status": "not-started",
@@ -822,7 +836,7 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
     "code": "ISO 1496-1",
     "name": "Series 1 freight containers — Specification and testing — Part 1: General cargo containers for general purposes",
     "summary": "Container structural certification under CSC; becomes invalid once container shell is structurally modified (vents, large openings, internal reinforcements).",
-    "applicability": "Shipping container enclosure — Not applicable (structurally modified)",
+    "applicability": "Voluntary reference — Shipping container enclosure; the original CSC plate is voided once the shell is structurally modified (vents, large openings, bracing). Re-certification path is alternative structural compliance, not ISO 1496-1.",
     "designImpact": "Original CSC plate voided; design must rely on alternative structural certification (FEA to EN 1993 or new classification-society inspection).",
     "evidenceRequired": "Finite element analysis report or new structural certification under a recognised classification society.",
     "status": "not-started",
