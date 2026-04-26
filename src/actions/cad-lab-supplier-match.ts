@@ -758,9 +758,32 @@ export async function matchCadLabModuleSuppliers(
   // Observed in 2026-04-23 BESS PDF where 11/11 "suppliers" were funds.
   // Filter category to Products/Services at the candidate-fetch step so
   // Finance/People/AI rows never enter the scoring loop.
+  // Loop 8 supplier-field-coverage audit (Tristan-flagged 2026-04-26):
+  // previously we read 26 of marketplace_listings' ~50 columns. Adding
+  // the high-impact missing fields:
+  //   products             — what they actually make (top semantic signal)
+  //   production_capacity  — scale fit for high-volume projects
+  //   quality_systems      — supplier's QMS narrative
+  //   iso_14001 / ecovadis_score / carbon_disclosed / recycled_content_percent
+  //                        — sustainability credentials
+  //   enrichment_quality   — pre-computed confidence multiplier
+  //   address              — full street, beyond country+city
+  //   contact_phone / contact_linkedin / contact_title — outreach beyond email
+  //   key_people           — named contacts
+  //   average_rating / review_count — marketplace-side quality signal
   const { data: rawListings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, country_iso, city, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, data_quality_score")
+    .select(
+      "id, title, description, attributes, is_verified, subcategory, category, " +
+        "process_capabilities, certifications, materials, industries, key_equipment, " +
+        "specialties, country, country_iso, city, address, employee_count_exact, founded_year, " +
+        "lead_time, minimum_order, export_controls, security_clearances, " +
+        "website_url, contact_email, contact_name, contact_title, contact_phone, contact_linkedin, " +
+        "data_quality_score, " +
+        "products, production_capacity, quality_systems, key_people, " +
+        "iso_14001, ecovadis_score, carbon_disclosed, recycled_content_percent, " +
+        "enrichment_quality, average_rating, review_count",
+    )
     .in("id", [...candidateIds])
     .in("category", ["Products", "Services"])
 
@@ -832,6 +855,11 @@ export async function matchCadLabModuleSuppliers(
       const industriesList = pickArray(listing.industries, "industries")
       const keyEquipmentList = pickArray(listing.key_equipment, "key_equipment")
       const specialtiesList = pickArray(listing.specialties, "specialties")
+      // Loop 8 (Tristan-flagged 2026-04-26): pull `products` into the
+      // semantic-match text. Was previously read at all — now becomes
+      // a top-tier signal alongside specialties + key_equipment because
+      // it's literally what the supplier makes.
+      const productsList = pickArray(listing.products, "products")
 
       const enrichmentParts = [
         ...certsList,
@@ -839,8 +867,13 @@ export async function matchCadLabModuleSuppliers(
         ...industriesList,
         ...keyEquipmentList,
         ...specialtiesList,
+        ...productsList,
       ].join(" ")
-      const listingText = `${listing.title || ""} ${listing.description || ""} ${listing.subcategory || ""} ${enrichmentParts}`.toLowerCase()
+      // Quality narrative + production-capacity context — when present,
+      // they materially help the keyword scorer match scale-relevant
+      // terms ("ISO 9001 manufacturing", "10,000+ units/month").
+      const qualityNarrative = `${listing.quality_systems ?? ""} ${listing.production_capacity ?? ""}`.trim()
+      const listingText = `${listing.title || ""} ${listing.description || ""} ${listing.subcategory || ""} ${enrichmentParts} ${qualityNarrative}`.toLowerCase()
 
       // Merge top-level + attrs-fallback into attrs so scoreStructuredMatch sees them
       const attrs: Record<string, unknown> = {
