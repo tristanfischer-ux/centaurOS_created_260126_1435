@@ -3290,11 +3290,14 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 <EngineReviewPage findings={data.proofreadFindings} />
             )}
 
-            {/* 8. Audit log — V1 CUT (2026-04-24): autopilot isn't writing
-                audit_log rows, section always renders "No audit events
-                recorded". Remove from PDF until audit writes are wired.
+            {/* 8. Audit log — Loop 7 critique A3 fix (2026-04-26):
+                audit_log table isn't yet wired by the autopilot, but
+                pipeline_runs IS populated end-to-end. Render the merged
+                view so the founder gets the audit trail they were
+                promised in the TOC. Skip when there's nothing to show. */}
+            {data.auditLog.length > 0 && (
                 <AuditLogPage rows={data.auditLog} />
-            */}
+            )}
         </Document>
     )
 }
@@ -3887,19 +3890,56 @@ async function exportProjectPdfInternal(
             bomProvider: "Anthropic",
         }
 
-        // Audit log rows.
-        const { data: auditRowsRaw } = await admin
-            .from("audit_log")
-            .select("action, section, created_at, metadata")
-            .eq("entity_id", projectId)
-            .order("created_at", { ascending: true })
+        // Audit log rows. The dedicated audit_log table isn't yet
+        // populated by the autopilot pipeline (V1 cut), so fall back
+        // to pipeline_runs which IS populated end-to-end. Loop 7
+        // critique A3: founders saw "08. Project audit log" in the TOC
+        // but the section was empty — fix is to read pipeline_runs and
+        // present it as the audit trail.
+        const [{ data: auditRowsRaw }, { data: pipelineRowsRaw }] = await Promise.all([
+            admin
+                .from("audit_log")
+                .select("action, section, created_at, metadata")
+                .eq("entity_id", projectId)
+                .order("created_at", { ascending: true }),
+            admin
+                .from("pipeline_runs")
+                .select(
+                    "specialist_id, stage, status, started_at, finished_at, error_code, error_message, model_id, cost_gbp_pence",
+                )
+                .eq("project_id", projectId)
+                .order("started_at", { ascending: true })
+                .limit(150),
+        ])
 
-        const auditLog: AuditRowPdf[] = (auditRowsRaw ?? []).map((r) => ({
-            action: String(r.action ?? ""),
-            section: typeof r.section === "string" ? r.section : null,
-            createdAtIso: String(r.created_at ?? ""),
-            metadataSummary: summariseMetadata(r.metadata),
-        }))
+        const auditLog: AuditRowPdf[] = []
+        for (const r of auditRowsRaw ?? []) {
+            auditLog.push({
+                action: String(r.action ?? ""),
+                section: typeof r.section === "string" ? r.section : null,
+                createdAtIso: String(r.created_at ?? ""),
+                metadataSummary: summariseMetadata(r.metadata),
+            })
+        }
+        for (const r of pipelineRowsRaw ?? []) {
+            const status = String(r.status ?? "")
+            const action = `${r.specialist_id}.${r.stage}${status === "done" ? "" : ` · ${status}`}`
+            const meta: string[] = []
+            if (r.model_id) meta.push(String(r.model_id))
+            if (typeof r.cost_gbp_pence === "number") meta.push(`${r.cost_gbp_pence}p`)
+            if (r.error_code) meta.push(String(r.error_code))
+            if (r.error_message) meta.push(String(r.error_message).slice(0, 80))
+            auditLog.push({
+                action,
+                section: typeof r.specialist_id === "string" ? r.specialist_id : null,
+                createdAtIso: String(r.started_at ?? r.finished_at ?? ""),
+                metadataSummary: meta.join(" · "),
+            })
+        }
+        // Sort merged log chronologically.
+        auditLog.sort((a, b) =>
+            (a.createdAtIso ?? "").localeCompare(b.createdAtIso ?? ""),
+        )
 
         // Totals.
         const keyPartCount = modules.reduce((acc, m) => acc + m.keyParts.length, 0)
