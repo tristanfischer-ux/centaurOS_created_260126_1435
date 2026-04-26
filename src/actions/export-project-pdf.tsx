@@ -3339,7 +3339,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
              *  they do, the bug is in Feasibility / Sizing / Modules /
              *  BOM / Cost / Risks / Suppliers / EngineReview / AuditLog.
              *  Each section can then be re-enabled independently. */}
-            {process.env.PDF_BISECT_MINIMAL !== "1" && data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_FEASIBILITY !== "1" && data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
                 <FeasibilityExceptionPage verdict={data.feasibilityVerdict} />
             )}
 
