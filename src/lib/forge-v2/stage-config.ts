@@ -183,8 +183,16 @@ export function isAutopilotStepName(s: string): s is AutopilotStepName {
 
 /** A 'running' tracking row older than this is treated as orphaned —
  *  most likely a Vercel container that got SIGKILLed mid-call. The cron
- *  marks it failed (STALE_ABANDONED) and refires next tick. */
-export const STALE_RUNNING_MS = 5 * 60 * 1000
+ *  marks it failed (STALE_ABANDONED) and refires next tick.
+ *
+ *  Loop 8 (2026-04-26): Fang fanout with CONCURRENCY=2 across 9 modules
+ *  takes 4-7 min wall-clock. The 5-min threshold was triggering
+ *  fire_after_stale while the lambda was still legitimately running,
+ *  causing duplicate fang lambdas to overlap on the same project (per
+ *  memory `forgeos_dual_trigger_race_creates_duplicate_side_effects`).
+ *  Bump to 9 min so a full 9-module fang fanout has headroom.
+ */
+export const STALE_RUNNING_MS = 9 * 60 * 1000
 
 /** Time the cron's fire-fetch waits before aborting. The receiving
  *  Lambda continues running for its full 300s budget after the abort —
