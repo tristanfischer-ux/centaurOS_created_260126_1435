@@ -3833,6 +3833,7 @@ export type Database = {
           foundry_id: string
           granted_to: string
           id: string
+          metadata: Json | null
           reason: string
         }
         Insert: {
@@ -3844,6 +3845,7 @@ export type Database = {
           foundry_id: string
           granted_to: string
           id?: string
+          metadata?: Json | null
           reason: string
         }
         Update: {
@@ -3855,6 +3857,7 @@ export type Database = {
           foundry_id?: string
           granted_to?: string
           id?: string
+          metadata?: Json | null
           reason?: string
         }
         Relationships: [
@@ -4728,6 +4731,7 @@ export type Database = {
           status: string
           subject: string
           system_illustration_url: string | null
+          target_launch_date: string | null
           target_unit_cost_gbp: number | null
           thumbnail_svg: string | null
           unified_code: string | null
@@ -4791,6 +4795,7 @@ export type Database = {
           status?: string
           subject: string
           system_illustration_url?: string | null
+          target_launch_date?: string | null
           target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
@@ -4854,6 +4859,7 @@ export type Database = {
           status?: string
           subject?: string
           system_illustration_url?: string | null
+          target_launch_date?: string | null
           target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
@@ -6095,6 +6101,53 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decisions: {
+        Row: {
+          author_user_id: string | null
+          created_at: string
+          decided_at: string
+          foundry_id: string
+          id: string
+          rationale: string | null
+          related_objective_ids: Json | null
+          related_task_ids: Json | null
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          author_user_id?: string | null
+          created_at?: string
+          decided_at?: string
+          foundry_id: string
+          id?: string
+          rationale?: string | null
+          related_objective_ids?: Json | null
+          related_task_ids?: Json | null
+          summary: string
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string | null
+          created_at?: string
+          decided_at?: string
+          foundry_id?: string
+          id?: string
+          rationale?: string | null
+          related_objective_ids?: Json | null
+          related_task_ids?: Json | null
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decisions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]
@@ -11485,6 +11538,116 @@ export type Database = {
           },
         ]
       }
+      llm_concurrency_permits: {
+        Row: {
+          expires_at: string
+          id: number
+          model: string
+          provider: string
+          released_at: string | null
+          taken_at: string
+        }
+        Insert: {
+          expires_at: string
+          id?: number
+          model: string
+          provider: string
+          released_at?: string | null
+          taken_at?: string
+        }
+        Update: {
+          expires_at?: string
+          id?: number
+          model?: string
+          provider?: string
+          released_at?: string | null
+          taken_at?: string
+        }
+        Relationships: []
+      }
+      llm_permit_caps: {
+        Row: {
+          max_concurrent: number
+          model: string
+          notes: string | null
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          max_concurrent: number
+          model: string
+          notes?: string | null
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          max_concurrent?: number
+          model?: string
+          notes?: string | null
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      llm_usage: {
+        Row: {
+          action: string
+          anon_id: string | null
+          cost_usd: number
+          created_at: string
+          error_message: string | null
+          foundry_id: string | null
+          id: string
+          ip_address: unknown
+          model_used: string
+          specialist_id: string | null
+          status: string
+          tokens_in: number
+          tokens_out: number
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          anon_id?: string | null
+          cost_usd: number
+          created_at?: string
+          error_message?: string | null
+          foundry_id?: string | null
+          id?: string
+          ip_address?: unknown
+          model_used: string
+          specialist_id?: string | null
+          status?: string
+          tokens_in: number
+          tokens_out: number
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          anon_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          error_message?: string | null
+          foundry_id?: string | null
+          id?: string
+          ip_address?: unknown
+          model_used?: string
+          specialist_id?: string | null
+          status?: string
+          tokens_in?: number
+          tokens_out?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_usage_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lois: {
         Row: {
           buyer_company: string | null
@@ -12397,6 +12560,130 @@ export type Database = {
           yield_strength_mpa?: number | null
         }
         Relationships: []
+      }
+      meeting_entries: {
+        Row: {
+          arrival_ms: number | null
+          content: string
+          council_position: string | null
+          created_at: string
+          id: string
+          role: string
+          round_number: number
+          specialist_id: string | null
+          specialist_name: string | null
+          thread_id: string
+        }
+        Insert: {
+          arrival_ms?: number | null
+          content: string
+          council_position?: string | null
+          created_at?: string
+          id?: string
+          role?: string
+          round_number?: number
+          specialist_id?: string | null
+          specialist_name?: string | null
+          thread_id: string
+        }
+        Update: {
+          arrival_ms?: number | null
+          content?: string
+          council_position?: string | null
+          created_at?: string
+          id?: string
+          role?: string
+          round_number?: number
+          specialist_id?: string | null
+          specialist_name?: string | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_entries_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_threads: {
+        Row: {
+          artifact_id: string | null
+          author_user_id: string
+          branched_from_entry_id: string | null
+          citations: Json | null
+          council_tier: string
+          created_at: string
+          foundry_id: string
+          id: string
+          outputs: Json | null
+          parent_thread_id: string | null
+          specialist_ids: string[]
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          artifact_id?: string | null
+          author_user_id: string
+          branched_from_entry_id?: string | null
+          citations?: Json | null
+          council_tier?: string
+          created_at?: string
+          foundry_id: string
+          id?: string
+          outputs?: Json | null
+          parent_thread_id?: string | null
+          specialist_ids?: string[]
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          artifact_id?: string | null
+          author_user_id?: string
+          branched_from_entry_id?: string | null
+          citations?: Json | null
+          council_tier?: string
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          outputs?: Json | null
+          parent_thread_id?: string | null
+          specialist_ids?: string[]
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_threads_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "agent_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_threads_branched_from_entry_id_fkey"
+            columns: ["branched_from_entry_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_threads_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_threads_parent_thread_id_fkey"
+            columns: ["parent_thread_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_threads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       message_reactions: {
         Row: {
@@ -15249,6 +15536,7 @@ export type Database = {
           foundry_id: string
           id: string
           input_ref: Json | null
+          input_ref_module_id: string
           input_tokens: number | null
           model_id: string | null
           model_provider: string | null
@@ -15272,6 +15560,7 @@ export type Database = {
           foundry_id: string
           id?: string
           input_ref?: Json | null
+          input_ref_module_id?: string
           input_tokens?: number | null
           model_id?: string | null
           model_provider?: string | null
@@ -15295,6 +15584,7 @@ export type Database = {
           foundry_id?: string
           id?: string
           input_ref?: Json | null
+          input_ref_module_id?: string
           input_tokens?: number | null
           model_id?: string | null
           model_provider?: string | null
@@ -15653,6 +15943,50 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "component_geometry_types"
             referencedColumns: ["slug"]
+          },
+        ]
+      }
+      plan_history: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          after_data: Json | null
+          before_data: Json | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          foundry_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_history_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -16296,6 +16630,41 @@ export type Database = {
         }
         Relationships: []
       }
+      procurement_diary_entries: {
+        Row: {
+          author_user_id: string
+          created_at: string
+          entry: string
+          id: string
+          occurred_at: string
+          project_id: string
+        }
+        Insert: {
+          author_user_id: string
+          created_at?: string
+          entry: string
+          id?: string
+          occurred_at?: string
+          project_id: string
+        }
+        Update: {
+          author_user_id?: string
+          created_at?: string
+          entry?: string
+          id?: string
+          occurred_at?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_diary_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_iterations: {
         Row: {
           changes_made: Json | null
@@ -16555,10 +16924,14 @@ export type Database = {
           capacity_score: number | null
           created_at: string | null
           deactivated_at: string | null
+          early_access_until: string | null
+          early_access_user_number: number | null
           email: string
           executive_onboarding_completed: boolean | null
           expertise_areas: string[] | null
           feature_flags: Json
+          forge_ambassador_count: number
+          forge_ambassador_since: string | null
           founding_member_number: number | null
           foundry_id: string
           full_name: string | null
@@ -16574,6 +16947,8 @@ export type Database = {
           onboarding_data: Json
           paired_ai_id: string | null
           phone_number: string | null
+          plan_streak_updated_at: string | null
+          plan_streak_weeks: number
           preferred_currency: string | null
           primary_function_id: string | null
           professional_background: Json | null
@@ -16601,10 +16976,14 @@ export type Database = {
           capacity_score?: number | null
           created_at?: string | null
           deactivated_at?: string | null
+          early_access_until?: string | null
+          early_access_user_number?: number | null
           email: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
           feature_flags?: Json
+          forge_ambassador_count?: number
+          forge_ambassador_since?: string | null
           founding_member_number?: number | null
           foundry_id: string
           full_name?: string | null
@@ -16620,6 +16999,8 @@ export type Database = {
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
+          plan_streak_updated_at?: string | null
+          plan_streak_weeks?: number
           preferred_currency?: string | null
           primary_function_id?: string | null
           professional_background?: Json | null
@@ -16647,10 +17028,14 @@ export type Database = {
           capacity_score?: number | null
           created_at?: string | null
           deactivated_at?: string | null
+          early_access_until?: string | null
+          early_access_user_number?: number | null
           email?: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
           feature_flags?: Json
+          forge_ambassador_count?: number
+          forge_ambassador_since?: string | null
           founding_member_number?: number | null
           foundry_id?: string
           full_name?: string | null
@@ -16666,6 +17051,8 @@ export type Database = {
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
+          plan_streak_updated_at?: string | null
+          plan_streak_weeks?: number
           preferred_currency?: string | null
           primary_function_id?: string | null
           professional_background?: Json | null
@@ -16884,6 +17271,120 @@ export type Database = {
             columns: ["assigned_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_supplier_shortlists: {
+        Row: {
+          added_by_user_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["supplier_shortlist_status"]
+          supplier_id: string
+          supplier_name: string
+          updated_at: string
+        }
+        Insert: {
+          added_by_user_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id: string
+          status?: Database["public"]["Enums"]["supplier_shortlist_status"]
+          supplier_id: string
+          supplier_name: string
+          updated_at?: string
+        }
+        Update: {
+          added_by_user_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["supplier_shortlist_status"]
+          supplier_id?: string
+          supplier_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_supplier_shortlists_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_technique_annotations: {
+        Row: {
+          author_user_id: string
+          created_at: string
+          id: string
+          note: string
+          project_technique_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_user_id: string
+          created_at?: string
+          id?: string
+          note: string
+          project_technique_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          project_technique_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_technique_annotations_project_technique_id_fkey"
+            columns: ["project_technique_id"]
+            isOneToOne: false
+            referencedRelation: "project_techniques"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_techniques: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          saved_by_user_id: string
+          technique_id: string
+          technique_title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          saved_by_user_id: string
+          technique_id: string
+          technique_title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          saved_by_user_id?: string
+          technique_id?: string
+          technique_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_techniques_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -18107,6 +18608,71 @@ export type Database = {
           {
             foreignKeyName: "referral_rewards_pending_referrer_user_id_fkey"
             columns: ["referrer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_signups: {
+        Row: {
+          converted_to_paid_at: string | null
+          created_at: string
+          early_access_signup_credited: boolean
+          id: string
+          invitee_user_id: string
+          inviter_user_id: string
+          paid_tier: string | null
+          signup_at: string
+          status: string
+        }
+        Insert: {
+          converted_to_paid_at?: string | null
+          created_at?: string
+          early_access_signup_credited?: boolean
+          id?: string
+          invitee_user_id: string
+          inviter_user_id: string
+          paid_tier?: string | null
+          signup_at?: string
+          status?: string
+        }
+        Update: {
+          converted_to_paid_at?: string | null
+          created_at?: string
+          early_access_signup_credited?: boolean
+          id?: string
+          invitee_user_id?: string
+          inviter_user_id?: string
+          paid_tier?: string | null
+          signup_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_signups_invitee_user_id_fkey"
+            columns: ["invitee_user_id"]
+            isOneToOne: true
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "referral_signups_invitee_user_id_fkey"
+            columns: ["invitee_user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_signups_inviter_user_id_fkey"
+            columns: ["inviter_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "referral_signups_inviter_user_id_fkey"
+            columns: ["inviter_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -19671,6 +20237,33 @@ export type Database = {
           },
         ]
       }
+      signup_setup_errors: {
+        Row: {
+          auth_user_id: string | null
+          id: string
+          occurred_at: string
+          reason: string
+          support_context: Json
+          user_message: string
+        }
+        Insert: {
+          auth_user_id?: string | null
+          id?: string
+          occurred_at?: string
+          reason: string
+          support_context?: Json
+          user_message: string
+        }
+        Update: {
+          auth_user_id?: string | null
+          id?: string
+          occurred_at?: string
+          reason?: string
+          support_context?: Json
+          user_message?: string
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           analytics_config: Json
@@ -20976,6 +21569,115 @@ export type Database = {
           },
         ]
       }
+      supplier_match_cache: {
+        Row: {
+          cost_pence: number
+          created_at: string
+          id: string
+          input_tokens: number
+          model_used: string
+          output_tokens: number
+          project_context_hash: string
+          project_id: string
+          questions_to_ask: Json
+          source_citations: Json
+          supplier_id: string
+          why_relevant: string
+        }
+        Insert: {
+          cost_pence?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model_used: string
+          output_tokens?: number
+          project_context_hash: string
+          project_id: string
+          questions_to_ask: Json
+          source_citations: Json
+          supplier_id: string
+          why_relevant: string
+        }
+        Update: {
+          cost_pence?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model_used?: string
+          output_tokens?: number
+          project_context_hash?: string
+          project_id?: string
+          questions_to_ask?: Json
+          source_citations?: Json
+          supplier_id?: string
+          why_relevant?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_match_cache_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_quotes: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          currency: string
+          id: string
+          lead_time_days: number | null
+          notes: string | null
+          project_id: string
+          quote_amount_pence: number | null
+          received_at: string | null
+          supplier_id: string
+          terms: string | null
+          valid_until: string | null
+          volume: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          currency?: string
+          id?: string
+          lead_time_days?: number | null
+          notes?: string | null
+          project_id: string
+          quote_amount_pence?: number | null
+          received_at?: string | null
+          supplier_id: string
+          terms?: string | null
+          valid_until?: string | null
+          volume?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          currency?: string
+          id?: string
+          lead_time_days?: number | null
+          notes?: string | null
+          project_id?: string
+          quote_amount_pence?: number | null
+          received_at?: string | null
+          supplier_id?: string
+          terms?: string | null
+          valid_until?: string | null
+          volume?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_ratings: {
         Row: {
           commercial_fairness: number | null
@@ -22134,6 +22836,79 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      technique_answers: {
+        Row: {
+          answer: string
+          author_user_id: string | null
+          created_at: string
+          id: string
+          question_id: string
+          specialist_id: string | null
+        }
+        Insert: {
+          answer: string
+          author_user_id?: string | null
+          created_at?: string
+          id?: string
+          question_id: string
+          specialist_id?: string | null
+        }
+        Update: {
+          answer?: string
+          author_user_id?: string | null
+          created_at?: string
+          id?: string
+          question_id?: string
+          specialist_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technique_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "technique_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technique_questions: {
+        Row: {
+          asker_user_id: string
+          created_at: string
+          id: string
+          project_id: string | null
+          question: string
+          status: Database["public"]["Enums"]["technique_question_status"]
+          technique_id: string
+        }
+        Insert: {
+          asker_user_id: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          question: string
+          status?: Database["public"]["Enums"]["technique_question_status"]
+          technique_id: string
+        }
+        Update: {
+          asker_user_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          question?: string
+          status?: Database["public"]["Enums"]["technique_question_status"]
+          technique_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technique_questions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       telegram_decisions: {
         Row: {
@@ -23874,6 +24649,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      acquire_llm_permit: {
+        Args: { p_model: string; p_provider: string; p_ttl_seconds?: number }
+        Returns: number
+      }
       acquire_memory_processing_lock: {
         Args: { p_thread_id: string }
         Returns: boolean
@@ -24045,6 +24824,7 @@ export type Database = {
         }
         Returns: number
       }
+      compute_plan_streak: { Args: { p_foundry_id: string }; Returns: number }
       consume_bonus_credit: { Args: { p_foundry_id: string }; Returns: boolean }
       consume_bonus_feature_credit: {
         Args: { p_feature: string; p_foundry_id: string }
@@ -24319,6 +25099,10 @@ export type Database = {
         }[]
       }
       get_active_foundry_id: { Args: { p_user_id: string }; Returns: string }
+      get_active_paid_referral_count: {
+        Args: { p_inviter_user_id: string }
+        Returns: number
+      }
       get_agent_unread_count: { Args: { p_agent_id: string }; Returns: number }
       get_ai_usage_current_month: {
         Args: { p_foundry_id: string }
@@ -24581,6 +25365,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_early_access_cohort_count: { Args: never; Returns: number }
+      get_early_access_profile: {
+        Args: { p_user_id: string }
+        Returns: {
+          early_access_until: string
+          early_access_user_number: number
+        }[]
+      }
       get_escrow_balance_atomic: {
         Args: { p_order_id: string }
         Returns: {
@@ -24612,6 +25404,10 @@ export type Database = {
           is_valid: boolean
           role: Database["public"]["Enums"]["member_role"]
         }[]
+      }
+      get_inviter_monthly_referral_credits: {
+        Args: { p_user_id: string }
+        Returns: number
       }
       get_listing_executives: {
         Args: { p_listing_id: string }
@@ -24856,6 +25652,14 @@ export type Database = {
         Returns: Json
       }
       gettransactionid: { Args: never; Returns: unknown }
+      grant_referral_credits_on_paid_conversion: {
+        Args: { p_invitee_user_id: string; p_paid_tier: string }
+        Returns: Json
+      }
+      grant_referral_credits_on_signup_if_inviter_early_access: {
+        Args: { p_invitee_user_id: string; p_inviter_user_id: string }
+        Returns: Json
+      }
       has_foundry_admin_access: {
         Args: { target_foundry_id: string; user_id: string }
         Returns: boolean
@@ -24932,6 +25736,7 @@ export type Database = {
         Args: { conv_id: string }
         Returns: boolean
       }
+      is_early_access_active: { Args: { p_user_id: string }; Returns: boolean }
       is_foundry_admin: {
         Args: { p_foundry_id: string; p_user_id: string }
         Returns: boolean
@@ -25357,6 +26162,7 @@ export type Database = {
       refresh_platform_stats: { Args: never; Returns: undefined }
       refresh_provider_stats: { Args: never; Returns: undefined }
       refresh_search_ranking: { Args: never; Returns: undefined }
+      release_llm_permit: { Args: { p_permit_id: number }; Returns: undefined }
       remove_listing_executive: {
         Args: { p_exec_id: string }
         Returns: boolean
@@ -26136,6 +26942,10 @@ export type Database = {
         Args: { p_company_profile: Json; p_foundry_id: string }
         Returns: Json
       }
+      update_forge_ambassador_status: {
+        Args: { p_inviter_user_id: string }
+        Returns: undefined
+      }
       update_foundry_purpose: {
         Args: { p_foundry_id: string; p_purpose_data: Json }
         Returns: Json
@@ -26472,6 +27282,13 @@ export type Database = {
         | "cancelled"
       rfq_type: "commodity" | "custom" | "service"
       risk_level: "Low" | "Medium" | "High"
+      supplier_shortlist_status:
+        | "researching"
+        | "contacted"
+        | "quoting"
+        | "negotiating"
+        | "selected"
+        | "rejected"
       supplier_tier: "verified_partner" | "approved" | "pending" | "suspended"
       task_status:
         | "Pending"
@@ -26482,6 +27299,7 @@ export type Database = {
         | "Completed"
         | "Pending_Peer_Review"
         | "Pending_Executive_Approval"
+      technique_question_status: "queued" | "answered" | "closed"
       verification_tier: "unverified" | "claimed" | "verified"
       working_style: "proactive" | "responsive" | "blended"
     }
@@ -26837,6 +27655,14 @@ export const Constants = {
       ],
       rfq_type: ["commodity", "custom", "service"],
       risk_level: ["Low", "Medium", "High"],
+      supplier_shortlist_status: [
+        "researching",
+        "contacted",
+        "quoting",
+        "negotiating",
+        "selected",
+        "rejected",
+      ],
       supplier_tier: ["verified_partner", "approved", "pending", "suspended"],
       task_status: [
         "Pending",
@@ -26848,6 +27674,7 @@ export const Constants = {
         "Pending_Peer_Review",
         "Pending_Executive_Approval",
       ],
+      technique_question_status: ["queued", "answered", "closed"],
       verification_tier: ["unverified", "claimed", "verified"],
       working_style: ["proactive", "responsive", "blended"],
     },

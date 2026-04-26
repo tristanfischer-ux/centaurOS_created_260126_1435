@@ -321,7 +321,10 @@ export function InvestorBrowser({
         if (result.firms.length > 0) {
           const ids = result.firms.map(f => f.id)
           computeMatchScores(ids)
-            .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+            .then(scores => setMatchScores(prev => ({
+              ...prev,
+              ...Object.fromEntries(Object.entries(scores).map(([k, v]) => [k, v.score])),
+            })))
             .catch(() => { /* non-critical */ })
           getContactCounts(ids)
             .then(counts => setContactCounts(prev => ({ ...prev, ...counts })))
@@ -393,7 +396,10 @@ export function InvestorBrowser({
       // Compute match scores for new firms
       if (newFirmIds.length > 0) {
         computeMatchScores(newFirmIds)
-          .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+          .then(scores => setMatchScores(prev => ({
+            ...prev,
+            ...Object.fromEntries(Object.entries(scores).map(([k, v]) => [k, v.score])),
+          })))
           .catch(() => { /* non-critical */ })
       }
     } catch (err) {

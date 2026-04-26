@@ -131,7 +131,7 @@ export function IntegrationsView(): React.ReactElement {
     return (
         <div className="oin2">
             <div className="oin2-skip-wrap">
-                <Link href="/today" className="oin2-skip-link">
+                <Link href="/investors" className="oin2-skip-link">
                     Skip all →
                 </Link>
             </div>
@@ -211,7 +211,7 @@ export function IntegrationsView(): React.ReactElement {
                 <Link href="/welcome" className="oin2-btn-back">
                     ← Back
                 </Link>
-                <Link href="/today" className="oin2-btn-next">
+                <Link href="/investors" className="oin2-btn-next">
                     Skip for now →
                 </Link>
             </div>

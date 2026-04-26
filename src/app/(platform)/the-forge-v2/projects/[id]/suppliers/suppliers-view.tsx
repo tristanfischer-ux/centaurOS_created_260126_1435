@@ -44,6 +44,8 @@ import Link from "next/link"
 import "./suppliers-v2.css"
 import { MatchWithChaseButton } from "./match-with-chase-button"
 import { DiscoverSuppliersButton } from "./discover-suppliers-button"
+import { SupplierMatchInsightCard } from "./_components/supplier-match-insight-card"
+import type { SupplierMatchOutput } from "@/actions/supplier-match-generation"
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -70,6 +72,13 @@ export interface SuppliersViewProps {
      *  founder clicks "Ask Chase to research the web" from the empty
      *  state. Null if the project has no modules yet. */
     firstModule: { id: string; name: string } | null
+    /** LLM-enriched match outputs keyed by supplier id. Empty for free /
+     *  anonymous tiers (we render blurred placeholders on the top three). */
+    matchOutputs: Record<string, SupplierMatchOutput>
+    /** Caller's resolved subscription tier. Drives full vs blurred render. */
+    resolvedTier: "anonymous" | "free" | "seed" | "starter" | "professional" | "enterprise"
+    /** How many of the top supplier rows get the insight-card treatment. */
+    topNInsights: number
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -101,13 +110,36 @@ function avatarGradient(id: string): string {
 // ─── View ───────────────────────────────────────────────────────────────
 
 export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
-    const { project, suppliers, totalShortlisted, firstModule } = props
+    const {
+        project,
+        suppliers,
+        totalShortlisted,
+        firstModule,
+        matchOutputs,
+        resolvedTier,
+        topNInsights,
+    } = props
 
     const base = `/the-forge-v2/projects/${project.id}`
 
     const headerChip = totalShortlisted > 0
         ? `${totalShortlisted} shortlisted`
         : "No suppliers yet"
+
+    const isPaid =
+        resolvedTier === "seed"
+        || resolvedTier === "starter"
+        || resolvedTier === "professional"
+        || resolvedTier === "enterprise"
+
+    // Top-N rows get the insight card. Paid users see the full output;
+    // free / anonymous see the blurred upgrade overlay on the first three
+    // and the compact card from the fourth onward.
+    const insightRows = suppliers.slice(0, topNInsights)
+    const compactRows = suppliers.slice(topNInsights)
+
+    /** How many of the insight rows render the blurred upgrade overlay. */
+    const BLURRED_PREVIEW_COUNT = 3
 
     return (
         <div className="sp2">
@@ -149,7 +181,15 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                 Supplier profiles populate as your RFQs flow through the platform — this directory grows with real use.
             </p>
 
-            {/* ── Supplier cards grid ──────────────── */}
+            {/* ── Show-the-work banner (above results) ─────── */}
+            {totalShortlisted > 0 && (
+                <div className="sp2-show-work" role="note" aria-label="How these suppliers were matched">
+                    <strong>How these suppliers were chosen.</strong>{" "}
+                    Searched 13,700 manufacturers across the United Kingdom and Europe against your bill of materials and your project constraints. Scored every match on capability fingerprint, certification fit, lead time, minimum order quantity, and prior similar-parts builds. Surfaced the top {Math.min(topNInsights, totalShortlisted)} with personalised qualifying questions for each.
+                </div>
+            )}
+
+            {/* ── Supplier cards ───────────────────────── */}
             {totalShortlisted === 0 ? (
                 <div className="sp2-empty">
                     <strong>No suppliers shortlisted yet</strong>
@@ -171,30 +211,73 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
                     )}
                 </div>
             ) : (
-                <div className="sp2-grid">
-                    {suppliers.map((s) => (
-                        <Link
-                            key={s.shortlistId}
-                            href={`${base}/suppliers/${s.supplierId}`}
-                            className="sp2-card"
-                            aria-label={`Open supplier ${s.name}`}
-                        >
-                            <div className="sp2-card-head">
-                                <div className="sp2-avatar" style={{ background: avatarGradient(s.supplierId) }}>
-                                    {initials(s.name)}
-                                </div>
-                                <div className="sp2-card-title">
-                                    <div className="name">{s.name}</div>
-                                    {s.hq && <div className="where">{s.hq}</div>}
-                                </div>
-                            </div>
+                <>
+                    {/* Top-N: insight cards (full or blurred-preview by tier). */}
+                    <div className="sp2-insight-stack">
+                        {insightRows.map((s, idx) => {
+                            const output = matchOutputs[s.supplierId]
+                            // Paid + we have output => full; otherwise: first three blurred,
+                            // remainder render the insight card with empty-state placeholder
+                            // copy in 'full' mode (won't fabricate — supplier-match-generation
+                            // gates on data; the placeholder copy is honest "not yet generated"
+                            // when output is missing for a paid user).
+                            const mode: "full" | "blurred" =
+                                isPaid && output
+                                    ? "full"
+                                    : !isPaid && idx < BLURRED_PREVIEW_COUNT
+                                        ? "blurred"
+                                        : "full"
+                            return (
+                                <SupplierMatchInsightCard
+                                    key={s.shortlistId}
+                                    baseHref={base}
+                                    projectId={project.id}
+                                    supplier={{
+                                        supplierId: s.supplierId,
+                                        shortlistId: s.shortlistId,
+                                        name: s.name,
+                                        hq: s.hq,
+                                    }}
+                                    matchOutput={isPaid ? output : undefined}
+                                    mode={mode}
+                                />
+                            )
+                        })}
+                    </div>
 
-                            <div className="sp2-open-link">
-                                Open supplier →
+                    {/* Remainder: compact cards (the existing pattern). */}
+                    {compactRows.length > 0 && (
+                        <>
+                            <p className="sp2-caption" style={{ marginTop: 28 }}>
+                                More shortlisted suppliers ({compactRows.length}). Open any to see the full profile.
+                            </p>
+                            <div className="sp2-grid">
+                                {compactRows.map((s) => (
+                                    <Link
+                                        key={s.shortlistId}
+                                        href={`${base}/suppliers/${s.supplierId}`}
+                                        className="sp2-card"
+                                        aria-label={`Open supplier ${s.name}`}
+                                    >
+                                        <div className="sp2-card-head">
+                                            <div className="sp2-avatar" style={{ background: avatarGradient(s.supplierId) }}>
+                                                {initials(s.name)}
+                                            </div>
+                                            <div className="sp2-card-title">
+                                                <div className="name">{s.name}</div>
+                                                {s.hq && <div className="where">{s.hq}</div>}
+                                            </div>
+                                        </div>
+
+                                        <div className="sp2-open-link">
+                                            Open supplier →
+                                        </div>
+                                    </Link>
+                                ))}
                             </div>
-                        </Link>
-                    ))}
-                </div>
+                        </>
+                    )}
+                </>
             )}
         </div>
     )

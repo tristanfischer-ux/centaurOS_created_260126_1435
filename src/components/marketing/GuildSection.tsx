@@ -110,7 +110,7 @@ export function GuildSection() {
             <div className="flex flex-col sm:flex-row gap-3 mt-6 sm:mt-8">
               <motion.div whileHover={buttonHover} whileTap={buttonTap}>
                 <Link
-                  href="/join?role=apprentice"
+                  href="/signup?role=apprentice"
                   className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
                 >
                   Join as Apprentice
@@ -118,7 +118,7 @@ export function GuildSection() {
                 </Link>
               </motion.div>
               <Link
-                href="/join?role=executive"
+                href="/signup?role=executive"
                 className="inline-flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground text-xs font-mono tracking-wider uppercase transition-colors min-h-[48px]"
               >
                 Become a Mentor

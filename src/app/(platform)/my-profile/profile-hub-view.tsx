@@ -16,10 +16,6 @@ import { toast } from 'sonner'
 import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
 import { switchFoundry } from '@/actions/foundry-switching'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-
 import type { ProfileHubData } from '@/actions/profile-hub'
 
 interface FoundryInfo {
@@ -103,19 +99,6 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
     })
   }
 
-  // ── AI Briefing ──────────────────────────────────────────────────────────
-  const briefingContext = useMemo(() => {
-    const hasMarketplaceBio = !!data.providerProfile?.headline
-    return `Role: ${profile?.role ?? 'Member'}, Tasks this week: ${enrichment?.completedThisWeek ?? 0}, Tasks last week: ${enrichment?.completedLastWeek ?? 0}, Foundries: ${foundries.length}, Has marketplace bio: ${hasMarketplaceBio ? 'yes' : 'no'}`
-  }, [profile?.role, enrichment, foundries.length, data.providerProfile?.headline])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('chief-of-staff', briefingContext, 'success'),
-    'success',
-    !!profile,
-    'briefing-profile',
-  )
-
   // Determine if user is an Apprentice (can access marketplace even without provider profile)
   const isApprentice = profile?.role === 'Apprentice'
   const showMarketplaceTab = isProvider || isApprentice
@@ -142,18 +125,6 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
           Manage your presence on the platform
         </p>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={briefing.narrative}
-        fallbackMessage="Your profile follows you everywhere on the platform — team pages, marketplace, specialist conversations. Spend five minutes filling it in properly now and never think about it again. If your headline still says 'Founder' with no detail, fix that first — it's the first thing people read."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'My Profile', description: 'Cal on profile.', metadata: {} }}
-        storageKey="my-profile"
-      />
 
       {/* Hero Card */}
       <HeroCard

@@ -18,7 +18,7 @@ export const welcomeNavItem: SidebarNavItem = {
   name: 'Welcome',
   href: '/welcome',
   icon: Compass,
-  tooltip: 'A tour of ForgeOS from Tristan — the sections, the specialists, and where to start',
+  tooltip: 'A tour of Fractional Forge from Tristan — the sections, the specialists, and where to start',
 }
 
 export const todayNavItem: SidebarNavItem = {

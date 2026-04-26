@@ -1,6 +1,5 @@
 import {
   Store,
-  UserSearch,
 } from 'lucide-react'
 import type { SidebarNavItem } from './types'
 
@@ -13,12 +12,11 @@ import type { SidebarNavItem } from './types'
  * marketplace).
  *
  * Hidden during pivot focus (2026-04-24): Guild, Apprenticeship, Quotes, Orders.
+ * Recruits removed 2026-04-25 — page pulled from V1 scope.
  */
 
-export const marketplacePeopleNavigation: SidebarNavItem[] = [
-  { name: 'Recruits', href: '/recruits', icon: UserSearch, tooltip: 'Find expert talent — fractional executives, specialists, and consultants' },
-]
+export const marketplacePeopleNavigation: SidebarNavItem[] = []
 
 export const marketplaceSuppliesNavigation: SidebarNavItem[] = [
-  { name: 'Marketplace', href: '/marketplace', icon: Store, tooltip: 'Find experts, suppliers, products, and services' },
+  { name: 'Suppliers', href: '/marketplace', icon: Store, tooltip: 'Find suppliers and manufacturers' },
 ]

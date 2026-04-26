@@ -74,11 +74,14 @@ export function InvestorPreviewSection() {
         </AnimatedSection>
 
         <AnimatedSection className="text-center">
+          {/* RED-TEAM-PIVOT-PLAN Tier 2 step 13: anonymous-first CTA. The
+            * em dash in the old label is replaced with a comma per the
+            * project copy rules. */}
           <Link
-            href="/join"
+            href="/investors"
             className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white font-bold px-8 py-3.5 rounded-lg transition-colors text-sm sm:text-base"
           >
-            Get Started Free — See All Investors
+            See investors who would back you
             <ArrowRight className="h-4 w-4" />
           </Link>
           <p className="text-xs text-muted-foreground mt-3">

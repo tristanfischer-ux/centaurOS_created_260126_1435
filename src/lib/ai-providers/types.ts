@@ -57,6 +57,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         models: [
             { id: "gpt-5.4", name: "GPT-5.4", modality: "text", description: "Latest — 26% fewer hallucinations, 400K context", maxTokens: 400000, default: true },
             { id: "gpt-4.1", name: "GPT-4.1", modality: "text", description: "Improved coding and instruction following", maxTokens: 128000 },
+            { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", modality: "text", description: "Fast, cost-efficient GPT-4.1 — strong instruction following, lower latency", maxTokens: 128000 },
             { id: "o3", name: "o3", modality: "text", description: "Advanced reasoning model", maxTokens: 200000 },
             { id: "gpt-image-1", name: "GPT Image 1", modality: "image", description: "Image generation with text rendering", default: true },
             { id: "gpt-4o-mini-tts", name: "GPT TTS", modality: "audio", description: "Text to speech — 13 voices, low error rate", default: true },
@@ -76,6 +77,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
             { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", modality: "text", description: "Recommended — best balance of cost and quality", maxTokens: 1000000, default: true },
             { id: "claude-opus-4-7", name: "Claude Opus 4.6", modality: "text", description: "Most intelligent — best for strategy, analysis, and complex reasoning", maxTokens: 1000000 },
             { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", modality: "text", description: "Fastest with near-frontier intelligence", maxTokens: 200000 },
+            { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (2025-10-01)", modality: "text", description: "Pinned snapshot — fastest with near-frontier intelligence", maxTokens: 200000 },
         ],
     },
     google: {
@@ -261,6 +263,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         bgColor: "bg-sky-50",
         models: [
             { id: "Qwen/Qwen3.5-397B-A17B", name: "Qwen 3.5 (397B MoE)", modality: "text", description: "Frontier MoE — 397B total, 17B active per token", maxTokens: 8192, default: true },
+            { id: "deepseek-ai/DeepSeek-V4-Pro", name: "DeepSeek V4 Pro", modality: "text", description: "1.6T MoE (49B active) — hybrid attention, 1M context, three reasoning modes", maxTokens: 32768 },
         ],
     },
     deepseek: {

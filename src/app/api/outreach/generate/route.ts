@@ -14,6 +14,7 @@ import { aiGuard } from "@/lib/ai/guard"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { buildOutreachPrompt, parseSequenceResponse } from "@/lib/outreach/prompt-builder"
 import type { Campaign, Contact, OutreachKBEntry } from "@/types/outreach"
+import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 
 export const maxDuration = 120
 
@@ -94,12 +95,16 @@ export async function POST(request: Request) {
     const readable = new ReadableStream({
         async start(controller) {
             let fullOutput = ""
+            let tokensIn = 0
+            let tokensOut = 0
+            const outreachModel = "claude-sonnet-4-6"
             const heartbeatInterval = setInterval(() => {
                 try { controller.enqueue(encoder.encode(": keepalive\n\n")) } catch { /* stream closed */ }
             }, 15_000)
 
+            let response: Response
             try {
-                const response = await fetch("https://api.anthropic.com/v1/messages", {
+                response = await fetch("https://api.anthropic.com/v1/messages", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -107,7 +112,7 @@ export async function POST(request: Request) {
                         "anthropic-version": "2023-06-01",
                     },
                     body: JSON.stringify({
-                        model: "claude-sonnet-4-6",
+                        model: outreachModel,
                         max_tokens: 4096,
                         stream: true,
                         system: systemPrompt,
@@ -115,9 +120,42 @@ export async function POST(request: Request) {
                     }),
                     signal: AbortSignal.timeout(120_000),
                 })
+            } catch (err) {
+                void logLlmUsage({
+                    action: 'outreach_generate',
+                    modelUsed: outreachModel,
+                    tokensIn: 0,
+                    tokensOut: 0,
+                    status: 'error',
+                    errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+                    foundryId,
+                    userId: user.id,
+                })
+                clearInterval(heartbeatInterval)
+                try {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Email generation failed. Please try again." })}\n\n`))
+                    controller.close()
+                } catch { /* already closed */ }
+                return
+            }
 
+            try {
                 if (!response.ok || !response.body) {
                     const errText = await response.text()
+                    const errStatus: 'rate_limited' | 'timeout' | 'error' =
+                        response.status === 429 || response.status === 529 ? 'rate_limited' :
+                        response.status === 408 || response.status === 504 ? 'timeout' :
+                        'error'
+                    void logLlmUsage({
+                        action: 'outreach_generate',
+                        modelUsed: outreachModel,
+                        tokensIn: 0,
+                        tokensOut: 0,
+                        status: errStatus,
+                        errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+                        foundryId,
+                        userId: user.id,
+                    })
                     console.error("[Outreach SSE] API error:", { status: response.status, body: errText.slice(0, 500) })
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Email generation failed. Please try again." })}\n\n`))
                     controller.close()
@@ -151,12 +189,28 @@ export async function POST(request: Request) {
                                 controller.enqueue(encoder.encode(
                                     `data: ${JSON.stringify({ text: event.delta.text })}\n\n`
                                 ))
+                            } else if (event.type === "message_start" && event.message?.usage) {
+                                tokensIn = event.message.usage.input_tokens ?? tokensIn
+                                tokensOut = event.message.usage.output_tokens ?? tokensOut
+                            } else if (event.type === "message_delta" && event.usage) {
+                                if (typeof event.usage.input_tokens === 'number') tokensIn = event.usage.input_tokens
+                                if (typeof event.usage.output_tokens === 'number') tokensOut = event.usage.output_tokens
                             }
                         } catch {
                             // Skip non-JSON lines
                         }
                     }
                 }
+
+                void logLlmUsage({
+                    action: 'outreach_generate',
+                    modelUsed: outreachModel,
+                    tokensIn,
+                    tokensOut,
+                    status: 'success',
+                    foundryId,
+                    userId: user.id,
+                })
 
                 // 7. Parse and save to DB
                 clearInterval(heartbeatInterval)
@@ -215,6 +269,16 @@ export async function POST(request: Request) {
 
             } catch (err) {
                 clearInterval(heartbeatInterval)
+                void logLlmUsage({
+                    action: 'outreach_generate',
+                    modelUsed: outreachModel,
+                    tokensIn,
+                    tokensOut,
+                    status: 'error',
+                    errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+                    foundryId,
+                    userId: user.id,
+                })
                 console.error("[Outreach SSE] Stream error:", err)
                 try {
                     controller.enqueue(encoder.encode(

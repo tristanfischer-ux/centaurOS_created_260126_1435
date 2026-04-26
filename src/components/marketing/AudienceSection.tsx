@@ -37,7 +37,7 @@ const AUDIENCES = [
     description:
       "Move from idea to validated prototype in 12 weeks. Access expert teams, AI-enabled execution, and manufacturing capacity without the overhead of full-time hires or factory leases.",
     cta: "Start Building",
-    href: "/join?role=founder",
+    href: "/signup?role=founder",
     highlight: true,
   },
   {
@@ -48,7 +48,7 @@ const AUDIENCES = [
     description:
       "Whether you're looking for a change from corporate life or want to have a more interesting career than any single company could offer — deploy your skills across multiple ventures and mentor the next generation.",
     cta: "Join as Expert",
-    href: "/join?role=executive",
+    href: "/signup?role=executive",
     highlight: false,
   },
   {
@@ -59,7 +59,7 @@ const AUDIENCES = [
     description:
       "Skip the unpaid internship loop. Work alongside experienced executives on live hardware projects, build a portfolio that matters, and get paid while you learn the skills that actually get you hired.",
     cta: "Start Apprenticeship",
-    href: "/join?role=apprentice",
+    href: "/signup?role=apprentice",
     highlight: false,
   },
   // ── Bottom row: the ecosystem enablers ──
@@ -71,7 +71,7 @@ const AUDIENCES = [
     description:
       "Your portfolio companies can spread capital across more experiments with faster feedback loops. Lower burn rates mean longer runways and more shots on goal — without sacrificing execution quality.",
     cta: "Partner With Us",
-    href: "/join",
+    href: "/signup",
     highlight: false,
   },
   {
@@ -82,7 +82,7 @@ const AUDIENCES = [
     description:
       "Empower professors and student spin-outs to bring ideas to life. No need for full-scale commercial infrastructure — ForgeOS provides the team, the tools, and the factory access.",
     cta: "Explore for Universities",
-    href: "/join",
+    href: "/signup",
     highlight: false,
   },
   {
@@ -93,7 +93,7 @@ const AUDIENCES = [
     description:
       "List your available capacity on the marketplace. Put your in-house experts on the platform as fractional executives. Every company they advise is a potential manufacturing order for your factory.",
     cta: "List Your Factory",
-    href: "/join?role=executive",
+    href: "/signup?role=executive",
     highlight: false,
   },
 ] as const

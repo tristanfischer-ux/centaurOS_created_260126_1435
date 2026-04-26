@@ -96,7 +96,7 @@ export function DirectoryFooter() {
                             </li>
                             <li>
                                 <Link
-                                    href="/join?role=founder"
+                                    href="/signup?role=founder"
                                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                                 >
                                     Post a Role

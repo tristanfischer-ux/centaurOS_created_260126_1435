@@ -40,6 +40,7 @@ import { MatchScoreBadge } from './MatchScoreBadge'
 import { MatchPillarBars } from './MatchPillarBars'
 import { LockedSection } from './LockedSection'
 import { addToShortlist, removeFromShortlist } from '@/actions/investors'
+import { normaliseFirmTypeLabel } from '@/lib/investors/firm-type-labels'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -259,7 +260,7 @@ function MatchRow({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-foreground">{match.investor.name}</span>
             <Badge variant="secondary" className="text-xs">
-              {match.investor.type}
+              {normaliseFirmTypeLabel(match.investor.type)}
             </Badge>
           </div>
 

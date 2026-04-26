@@ -3,12 +3,47 @@
  * and demo data. Used by both email/password signup and OAuth callback.
  *
  * @module setup-new-user
+ *
+ * ─── State matrix for each code path ────────────────────────────────────────
+ *
+ * PATH A — Happy path (new founder with company / new executive / supplier)
+ *   auth_user: EXISTS  profile: CREATED  foundry: CREATED  membership: CREATED
+ *   User CAN: log in and use the product immediately
+ *   User SEES: /welcome tour
+ *   Returns: { ok: true, redirect: '/welcome', isNewUser: true }
+ *
+ * PATH B — Idempotency guard (profile already exists, duplicate call)
+ *   auth_user: EXISTS  profile: EXISTS  foundry: EXISTS  membership: EXISTS
+ *   User CAN: log in and use the product — they already have a full account
+ *   User SEES: /investors (their existing landing)
+ *   Returns: { ok: true, redirect: '/investors', isNewUser: false }
+ *
+ * PATH C — Foundry creation failed after 2 slug attempts (RLS denied or DB error)
+ *   auth_user: EXISTS  profile: NOT YET  foundry: MISSING  membership: MISSING
+ *   User CAN: contact support; their auth account exists but is unusable
+ *   User SEES: /auth/setup-error with "We hit a snag setting up your foundry"
+ *   Returns: { ok: false, reason: 'foundry_creation_failed' | 'foundry_slug_collision' | 'rls_denied' }
+ *
+ * PATH D — Profile creation failed after foundry was created
+ *   auth_user: EXISTS  profile: MISSING  foundry: CREATED (then deleted)  membership: MISSING
+ *   User CAN: contact support; auth account exists, orphaned foundry cleaned up
+ *   User SEES: /auth/setup-error with "We hit a snag creating your profile"
+ *   Returns: { ok: false, reason: 'profile_creation_failed' }
+ *
+ * PATH E — Unknown / unexpected error
+ *   state unknown — may be partial
+ *   User CAN: contact support with error_id
+ *   User SEES: /auth/setup-error with generic message + error_id
+ *   Returns: { ok: false, reason: 'unknown' }
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/types/database.types";
 import { embedMarketplaceListing } from "@/lib/search/semantic-search";
 import { scheduleOnboardingDrip } from "@/actions/onboarding-drip";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
 
@@ -27,6 +62,31 @@ export interface SetupNewUserParams {
   referralCode?: string | null;
 }
 
+/**
+ * Discriminated union returned by setupNewUser.
+ *
+ * ok: true  — setup completed; redirect the user to `redirect`
+ * ok: false — setup failed; show the user the `userMessage` and log `supportContext`
+ */
+export type SetupResult =
+  | { ok: true; redirect: string; isNewUser: boolean }
+  | {
+      ok: false;
+      reason:
+        | "auth_user_missing"
+        | "profile_creation_failed"
+        | "foundry_creation_failed"
+        | "foundry_slug_collision"
+        | "rls_denied"
+        | "unknown";
+      userMessage: string;
+      /** Logged to signup_setup_errors.support_context for debugging */
+      supportContext: Record<string, unknown>;
+      /** Short ID the founder can include in a support email */
+      errorId: string;
+    };
+
+/** @deprecated Use SetupResult instead. Kept for callers that haven't migrated. */
 export interface SetupNewUserResult {
   foundryId: string;
   redirectPath: string;
@@ -53,12 +113,56 @@ function generateSlug(name: string): string {
   return slug || "foundry";
 }
 
+/** Generate a short random ID suitable for inclusion in support emails */
+function generateErrorId(): string {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+/**
+ * Detect whether a Supabase error is likely an RLS denial (code 42501)
+ * or a unique-constraint violation (code 23505 — slug collision).
+ */
+function classifyFoundryError(
+  error: { code?: string; message?: string } | null
+): "foundry_slug_collision" | "rls_denied" | "foundry_creation_failed" {
+  if (!error) return "foundry_creation_failed";
+  if (error.code === "23505") return "foundry_slug_collision";
+  if (error.code === "42501" || error.message?.toLowerCase().includes("rls")) return "rls_denied";
+  return "foundry_creation_failed";
+}
+
+/**
+ * Persist an error row to signup_setup_errors so Tristan can debug
+ * incidents by querying the table. Uses the admin client to bypass RLS.
+ * Non-throwing — we never want logging to crash the caller.
+ */
+async function persistSetupError(params: {
+  authUserId: string | null;
+  reason: string;
+  userMessage: string;
+  supportContext: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    await admin.from("signup_setup_errors").insert({
+      auth_user_id: params.authUserId || null,
+      reason: params.reason,
+      user_message: params.userMessage,
+      support_context: params.supportContext as Json,
+    });
+  } catch (e) {
+    // Non-fatal — logging failure must not block the error response
+    console.warn("[setupNewUser] Failed to persist error row:", e);
+  }
+}
+
 /**
  * Sets up a new user's profile, foundry, memberships, and demo data.
  * Handles Founder (own foundry), Supplier (forge-suppliers), and
  * Executive/Apprentice (personal sandbox foundry) paths.
  *
- * @returns foundryId and redirectPath for the new user
+ * @returns SetupResult — discriminated union. ok: true = success + redirect.
+ *   ok: false = structured error with userMessage + errorId for support.
  */
 export async function setupNewUser({
   supabase,
@@ -72,7 +176,18 @@ export async function setupNewUser({
   businessName,
   businessType,
   referralCode,
-}: SetupNewUserParams): Promise<SetupNewUserResult> {
+}: SetupNewUserParams): Promise<SetupResult> {
+  // INTENT: foundry bootstrap (insert with owner_id=NULL, then UPDATE to set
+  // owner) cannot pass the foundries INSERT RLS policies, which require
+  // owner_id = auth.uid() at the point of insert. We have to break the
+  // circular FK (profiles.foundry_id → foundries.id ←→ foundries.owner_id
+  // → profiles.id) somehow, so the bootstrap is run with the service-role
+  // admin client. The auth user has already been verified above
+  // (signUpInitiate created the auth row), so using admin here for the
+  // setup-once writes is intentional and safe — RLS still applies to
+  // every other surface in the app.
+  const adminFoundries = createAdminClient();
+
   // SECURITY: Idempotency guard — if profile already exists, this is a duplicate
   // call (e.g., signup race condition, double-click). Return early to prevent
   // duplicate foundry/membership creation.
@@ -85,9 +200,14 @@ export async function setupNewUser({
   if (existingProfile) {
     console.warn("[setupNewUser] Profile already exists for user, skipping:", userId);
     return {
-      foundryId: existingProfile.foundry_id || "forge-guild",
-      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
-      redirectPath: "/today",
+      ok: true,
+      isNewUser: false,
+      // DECISION 2026-04-25 (RED-TEAM-PIVOT-PLAN Tier 2 step 17):
+      // Idempotency path (profile already exists — repeat signup call) lands
+      // on /investors directly, skipping the welcome tour the user already saw.
+      // New users (PATH A below) go to /welcome first; the welcome page's
+      // "skip" handler then routes to /investors per the same spec step.
+      redirect: "/investors",
     };
   }
 
@@ -104,11 +224,11 @@ export async function setupNewUser({
 
   for (const sharedId of neededFoundries) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: exists } = await (supabase as any).from("foundries").select("id").eq("id", sharedId).single();
+    const { data: exists } = await (adminFoundries as any).from("foundries").select("id").eq("id", sharedId).single();
     if (!exists) {
       console.error(`[setupNewUser] Shared foundry "${sharedId}" missing. Creating.`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: sharedErr } = await (supabase as any).from("foundries").insert({
+      const { error: sharedErr } = await (adminFoundries as any).from("foundries").insert({
         id: sharedId,
         name: sharedId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
         slug: sharedId,
@@ -131,9 +251,10 @@ export async function setupNewUser({
     const baseSlug = generateSlug(companyName);
     const uniqueSlug = `${baseSlug}-${userId.slice(0, 6)}`;
 
-    // Step 1: Create foundry with NULL owner (no profile FK dependency)
+    // Step 1: Create foundry with NULL owner (no profile FK dependency).
+    // Admin client — see top-of-function comment about RLS bootstrap.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let { data: foundry, error: foundryError } = await (supabase as any)
+    let { data: foundry, error: foundryError } = await (adminFoundries as any)
       .from("foundries")
       .insert({
         id: uniqueSlug,
@@ -150,7 +271,7 @@ export async function setupNewUser({
       // Retry with more unique slug (likely slug collision)
       const retrySlug = `${baseSlug}-${Date.now().toString(36)}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const retry = await (supabase as any)
+      const retry = await (adminFoundries as any)
         .from("foundries")
         .insert({
           id: retrySlug,
@@ -168,12 +289,37 @@ export async function setupNewUser({
 
     if (foundryError || !foundry) {
       console.error("[setupNewUser] Foundry creation failed after retry:", foundryError);
-      foundryId = "forge-guild";
-    } else {
-      foundryId = foundry.id;
+      const reason = classifyFoundryError(foundryError);
+      const errorId = generateErrorId();
+      const userMessage =
+        reason === "foundry_slug_collision"
+          ? "We had trouble creating a unique workspace for your company. Please reload the page and try again. If it keeps happening, email tristan.fischer@gmail.com with this code: " + errorId
+          : reason === "rls_denied"
+          ? "We were not able to create your workspace due to a permissions issue. Please reload the page and try again. If it keeps happening, email tristan.fischer@gmail.com with this code: " + errorId
+          : "We hit a snag setting up your foundry. Please reload the page and try again. If it keeps happening, email tristan.fischer@gmail.com with this code: " + errorId;
+
+      await persistSetupError({
+        authUserId: userId,
+        reason,
+        userMessage,
+        supportContext: {
+          userId,
+          email,
+          role,
+          companyName,
+          error: foundryError?.message,
+          code: foundryError?.code,
+          timestamp: new Date().toISOString(),
+          errorId,
+        },
+      });
+
+      return { ok: false, reason, userMessage, supportContext: { userId, email, role }, errorId };
     }
 
-    // Step 2: Create profile pointing to the real foundry (or forge-guild fallback)
+    foundryId = foundry.id;
+
+    // Step 2: Create profile pointing to the real foundry
     const { error: profileError } = await supabase.from("profiles").insert({
       id: userId,
       email,
@@ -188,16 +334,43 @@ export async function setupNewUser({
       console.error("[setupNewUser] Founder profile creation failed:", profileError.message);
       // INTENT: Clean up orphaned foundry — it has NULL owner and no profile pointing to it.
       // Without this, retries create additional orphans via slug collision → retry slug.
-      if (foundryId !== "forge-guild") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries table type constraints require cast
-        await (supabase as any).from("foundries").delete().eq("id", foundryId);
-      }
-      return { foundryId: "forge-guild", redirectPath: "/today" };
+      // Admin client because the user has no profile yet, and the DELETE RLS
+      // policy requires owner_id = auth.uid() — but we set owner_id to null.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries table type constraints require cast
+      await (adminFoundries as any).from("foundries").delete().eq("id", foundryId);
+
+      const errorId = generateErrorId();
+      const reason = "profile_creation_failed" as const;
+      const userMessage =
+        "We hit a snag creating your profile. Your account exists but your workspace was not set up correctly. Please reload and try again. If it keeps happening, email tristan.fischer@gmail.com with this code: " + errorId;
+
+      await persistSetupError({
+        authUserId: userId,
+        reason,
+        userMessage,
+        supportContext: {
+          userId,
+          email,
+          role,
+          foundryId,
+          error: profileError.message,
+          code: profileError.code,
+          timestamp: new Date().toISOString(),
+          errorId,
+        },
+      });
+
+      return { ok: false, reason, userMessage, supportContext: { userId, email, role, foundryId }, errorId };
     }
 
-    // Step 3: Set the foundry owner now that profile exists
+    // Step 3: Set the foundry owner now that profile exists.
+    // Admin client because the foundries UPDATE RLS policy requires
+    // owner_id = auth.uid() in BOTH using and with_check, and the row
+    // currently has owner_id = null (so the user can't see it via RLS,
+    // let alone update it). Setting the owner is a one-shot bootstrap.
     if (foundryId !== "forge-guild") {
-      const { error: ownerError } = await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: ownerError } = await (adminFoundries as any).from("foundries").update({ owner_id: userId }).eq("id", foundryId);
       if (ownerError) {
         // Non-fatal: foundry works without owner (membership-based access).
         // But founder can't manage foundry settings. Repair RPC can fix.
@@ -221,8 +394,9 @@ export async function setupNewUser({
     const firstName = fullName.split(" ")[0] || "My";
     const sandboxSlug = `sandbox-${userId.slice(0, 8)}`;
 
+    // Admin client — see top-of-function comment about RLS bootstrap.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let { data: sandboxFoundry, error: sandboxError } = await (supabase as any)
+    let { data: sandboxFoundry, error: sandboxError } = await (adminFoundries as any)
       .from("foundries")
       .insert({
         id: sandboxSlug,
@@ -238,7 +412,7 @@ export async function setupNewUser({
       // Retry with more unique slug (unlikely collision but safety net)
       const retrySlug = `sandbox-${Date.now().toString(36)}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const retry = await (supabase as any)
+      const retry = await (adminFoundries as any)
         .from("foundries")
         .insert({
           id: retrySlug,
@@ -254,15 +428,31 @@ export async function setupNewUser({
     }
 
     if (sandboxError || !sandboxFoundry) {
-      // FALLBACK: forge-guild is a last-resort safety net. The intended path is
-      // always a personal sandbox. This only fires if both insert attempts fail
-      // (e.g., transient DB error). The user lands in a shared workspace but
-      // can create their own company later from the sidebar.
       console.error("[setupNewUser] Sandbox foundry creation failed after retry:", sandboxError);
-      foundryId = "forge-guild";
-    } else {
-      foundryId = sandboxFoundry.id;
+      const reason = classifyFoundryError(sandboxError);
+      const errorId = generateErrorId();
+      const userMessage =
+        "We hit a snag setting up your workspace. Please reload the page and try again. If it keeps happening, email tristan.fischer@gmail.com with this code: " + errorId;
+
+      await persistSetupError({
+        authUserId: userId,
+        reason,
+        userMessage,
+        supportContext: {
+          userId,
+          email,
+          role,
+          error: sandboxError?.message,
+          code: sandboxError?.code,
+          timestamp: new Date().toISOString(),
+          errorId,
+        },
+      });
+
+      return { ok: false, reason, userMessage, supportContext: { userId, email, role }, errorId };
     }
+
+    foundryId = sandboxFoundry.id;
   }
 
   // --- Create profile for non-founders AND founders without company (OAuth edge case) ---
@@ -284,13 +474,36 @@ export async function setupNewUser({
 
     if (profileError) {
       console.error("[setupNewUser] Profile creation failed:", profileError.message);
-      // DECISION 2026-04-16: founder-first. Everyone lands on /today.
-      return { foundryId, redirectPath: "/today" };
+      const errorId = generateErrorId();
+      const reason = "profile_creation_failed" as const;
+      const userMessage =
+        "We hit a snag creating your profile. Please reload the page and try again. If it keeps happening, email tristan.fischer@gmail.com with this code: " + errorId;
+
+      await persistSetupError({
+        authUserId: userId,
+        reason,
+        userMessage,
+        supportContext: {
+          userId,
+          email,
+          role,
+          foundryId,
+          error: profileError.message,
+          code: profileError.code,
+          timestamp: new Date().toISOString(),
+          errorId,
+        },
+      });
+
+      return { ok: false, reason, userMessage, supportContext: { userId, email, role, foundryId }, errorId };
     }
 
-    // Set owner on sandbox foundries (same circular FK pattern as founders)
+    // Set owner on sandbox foundries (same circular FK pattern as founders).
+    // Admin client because the foundry currently has owner_id = null and the
+    // UPDATE RLS policy requires owner_id = auth.uid() to find the row.
     if (foundryId.startsWith("sandbox-")) {
-      const { error: ownerError } = await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: ownerError } = await (adminFoundries as any).from("foundries").update({ owner_id: userId }).eq("id", foundryId);
       if (ownerError) {
         console.error("[setupNewUser] Failed to set sandbox owner:", ownerError.message);
       }
@@ -443,5 +656,5 @@ export async function setupNewUser({
   // this file keep returning "/today" so only first-time signups hit the tour.
   // Supplier / fractional-executive are opt-in flags handled during
   // onboarding, not routing paths.
-  return { foundryId, redirectPath: "/welcome" };
+  return { ok: true, redirect: "/welcome", isNewUser: true };
 }

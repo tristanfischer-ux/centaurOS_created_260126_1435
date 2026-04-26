@@ -11,7 +11,7 @@ import { MarketingFooter } from '@/components/marketing/marketing-footer'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'Privacy Policy for the ForgeOS platform by Fractional Forge.',
+  description: 'Privacy Policy for Fractional Forge.',
 }
 
 export default function PrivacyPage() {

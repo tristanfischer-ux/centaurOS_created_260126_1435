@@ -310,7 +310,7 @@ export default function CaseStudyPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/join"
+                href="/signup"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
                 Get Started Free

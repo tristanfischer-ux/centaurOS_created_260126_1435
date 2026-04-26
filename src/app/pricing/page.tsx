@@ -13,7 +13,7 @@ import { PricingContent } from './pricing-content'
 
 export const metadata: Metadata = {
   title: 'Pricing',
-  description: 'Simple, transparent pricing for every stage of your business. Start free, upgrade as you grow.',
+  description: 'Free / £20 Starter / £10 per 100 investor leads / £149 Pro. Simple public pricing for the smart-product wave. Start free, upgrade when you need more.',
 }
 
 export default function PricingPage() {

@@ -2,8 +2,10 @@
  * @file Sample Engineering Package Page
  *
  * @description Public marketing page showcasing a real ForgeOS engineering
- * package output. Uses the Agricultural IoT Irrigation System case study
- * to demonstrate platform value to non-logged-in visitors.
+ * package output. Uses the smart-irrigation case study (a sensor- and
+ * connectivity-equipped product, exactly the kind of smart-product wave
+ * the Forge is built for) to demonstrate platform value to non-logged-in
+ * visitors.
  *
  * Server component — exports metadata for SEO.
  */
@@ -30,11 +32,11 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer"
 export const metadata: Metadata = {
   title: "Sample Engineering Package",
   description:
-    "See what ForgeOS generates from a product description. Explore a complete engineering package for an Agricultural IoT Irrigation System — created in 3 hours.",
+    "See what the Forge produces from a paragraph of plain English. A complete engineering package for a smart agricultural irrigation system — modules, a bill of materials, design-for-manufacturing analysis, and matched UK suppliers.",
   openGraph: {
-    title: "Sample Engineering Package — Agricultural IoT Irrigation System",
+    title: "Sample Engineering Package — Smart Agricultural Irrigation System",
     description:
-      "Product architecture, bill of materials, DFM analysis, competitive benchmarking, and matched suppliers — all generated from a plain-English product description.",
+      "Product architecture, bill of materials, design-for-manufacturing analysis, competitive benchmarking, and matched suppliers — all generated from a paragraph of plain English.",
     type: "website",
     url: "https://fractionalforge.app/sample-package",
     siteName: "ForgeOS by Fractional Forge",
@@ -98,7 +100,7 @@ const DFM_RECOMMENDATIONS = [
   {
     title: "Standard Enclosures Over Custom Tooling",
     description:
-      "Off-the-shelf IP65 enclosures eliminate $15,000+ in injection mould tooling costs for initial production runs.",
+      "Off-the-shelf weather-resistant enclosures (rated to Ingress Protection 65) eliminate $15,000+ in injection mould tooling costs for initial production runs.",
   },
   {
     title: "Field-Repairable Design",
@@ -115,6 +117,8 @@ interface Competitor {
   highlight?: boolean
 }
 
+// "iot" column captures whether the product has internet-of-things connectivity
+// (sensors plus remote data link). Header label kept short for table layout.
 const COMPETITORS: readonly Competitor[] = [
   {
     name: "SunCulture RainMaker2",
@@ -135,28 +139,28 @@ const COMPETITORS: readonly Competitor[] = [
     positioning: "Budget",
   },
   {
-    name: "This Product (ForgeOS Output)",
+    name: "This Product (Forge output)",
     price: "$95-100",
-    iot: "Full 2G/NB-IoT",
-    positioning: "Smart + Affordable",
+    iot: "Full 2G and narrowband cellular",
+    positioning: "Smart and affordable",
     highlight: true,
   },
 ]
 
 const CERTIFICATIONS = [
-  "CE marking for electronic components",
-  "IP65 ingress protection testing",
-  "FCC / local telecom approval for 2G modules",
+  "Conformité Européenne (CE) marking for electronic components",
+  "Ingress Protection rating 65 testing for water and dust resistance",
+  "Federal Communications Commission and local telecom approval for 2G mobile modules",
   "Solar panel efficiency certification",
-  "RoHS compliance for EU export",
+  "Restriction of Hazardous Substances (RoHS) compliance for European Union export",
 ] as const
 
 const ARCHITECTURE_SPECS = [
   { label: "Form Factor", value: "300mm x 200mm x 100mm control unit + wireless sensor nodes" },
-  { label: "Housing", value: "UV-resistant polycarbonate, standard enclosures" },
+  { label: "Housing", value: "Ultraviolet-resistant polycarbonate, standard enclosures" },
   { label: "Water-Contact Parts", value: "Stainless steel and brass" },
   { label: "Total Components", value: "Under 50 parts" },
-  { label: "Connectivity", value: "Dual 2G / NB-IoT with SMS fallback" },
+  { label: "Connectivity", value: "Dual 2G mobile and narrowband cellular with short-message fallback" },
   { label: "Power", value: "Solar-powered with 7-day battery backup" },
 ] as const
 
@@ -176,12 +180,13 @@ export default function SamplePackagePage() {
                 Sample Package
               </Badge>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                Agricultural IoT Irrigation System
+                Smart agricultural irrigation system
               </h1>
               <p className="max-w-2xl text-lg sm:text-xl text-muted-foreground leading-relaxed">
-                See what ForgeOS generates from a product description. This
-                complete engineering package was created in 3 hours from a
-                plain-English brief.
+                Sensors, edge compute, and remote connectivity in an everyday
+                irrigation controller — the smart-product wave at work. This
+                complete engineering package was generated from a paragraph of
+                plain English. Twenty-minute first pass, hours of detail after.
               </p>
             </div>
 
@@ -217,15 +222,15 @@ export default function SamplePackagePage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="mb-4 text-sm text-muted-foreground">
-                  The founder entered this plain-English description into
-                  ForgeOS:
+                  The founder entered this plain-English description into the
+                  Forge:
                 </p>
                 <ul className="space-y-2">
                   {[
                     "Solar-powered with 7-day battery backup",
-                    "SMS / 2G connectivity for remote monitoring",
+                    "Short-message and 2G mobile connectivity for remote monitoring",
                     "Soil moisture sensors with 50m wireless range",
-                    "IP65 weather-resistant housing",
+                    "Weather-resistant housing rated to Ingress Protection 65",
                     "Target cost: under $100 at 10,000 units",
                   ].map((item) => (
                     <li
@@ -268,16 +273,16 @@ export default function SamplePackagePage() {
             </div>
           </section>
 
-          {/* ── Bill of Materials ─────────────────────────────────── */}
+          {/* ── Bill of materials ─────────────────────────────────── */}
           <section className="space-y-6">
             <SectionHeader
               icon={Box}
               label="Section 2"
-              title="Bill of Materials Preview"
+              title="Bill of materials preview"
             />
             <p className="text-muted-foreground">
-              Cost modelling at three production volumes. Full BOM includes 47
-              line items — here are the key components.
+              Cost modelling at three production volumes. The full bill of
+              materials includes 47 line items — here are the key components.
             </p>
             <Card>
               <CardContent className="pt-0 pb-0 overflow-x-auto">
@@ -332,15 +337,15 @@ export default function SamplePackagePage() {
             </p>
           </section>
 
-          {/* ── DFM Analysis ──────────────────────────────────────── */}
+          {/* ── Design-for-manufacturing analysis ─────────────────── */}
           <section className="space-y-6">
             <SectionHeader
               icon={Zap}
               label="Section 3"
-              title="DFM Analysis Highlights"
+              title="Design-for-manufacturing highlights"
             />
             <p className="text-muted-foreground">
-              Design-for-manufacture recommendations that reduce cost and
+              Design-for-manufacturing recommendations that reduce cost and
               improve producibility.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -381,7 +386,7 @@ export default function SamplePackagePage() {
                         Price
                       </th>
                       <th className="py-3 pr-4 font-semibold text-foreground hidden sm:table-cell">
-                        IoT
+                        Connectivity
                       </th>
                       <th className="py-3 font-semibold text-foreground">
                         Positioning
@@ -475,15 +480,16 @@ export default function SamplePackagePage() {
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Filtered from ForgeOS&apos;s marketplace of 13,700+ verified
                   suppliers by injection moulding capability, electronics
-                  assembly, and IP-rated enclosure production. Request quotes
-                  from multiple suppliers simultaneously through the platform.
+                  assembly, and ingress-protected (weatherproof) enclosure
+                  production. Request quotes from multiple suppliers
+                  simultaneously through the platform.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   {[
                     "Injection Moulding",
                     "Electronics Assembly",
-                    "IP-Rated Enclosures",
-                    "PCB Fabrication",
+                    "Weatherproof Enclosures",
+                    "Printed Circuit Board Fabrication",
                     "Solar Panel Integration",
                   ].map((cap) => (
                     <Badge key={cap} variant="outline" size="sm">
@@ -522,11 +528,11 @@ export default function SamplePackagePage() {
                   <ul className="space-y-2 text-sm text-foreground">
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      3 hours
+                      Twenty-minute first pass, hours of detail after
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      $49/month subscription
+                      Free to start, £20/month for the Starter tier
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
@@ -548,14 +554,15 @@ export default function SamplePackagePage() {
               Generate your own engineering package
             </h2>
             <p className="mx-auto max-w-lg text-muted-foreground">
-              Describe your hardware product in plain English. ForgeOS handles
-              the engineering package, supplier matching, and cost modelling.
+              Type a paragraph. The Forge breaks it into modules, suggests a
+              bill of materials, and matches every part to UK and European
+              manufacturers. Twenty-minute first pass, hours of detail after.
             </p>
             <Link
-              href="/join?role=founder"
+              href="/signup?role=founder"
               className="inline-flex items-center gap-2 rounded-lg bg-international-orange px-8 py-3.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Generate your own engineering package
+              Start free, generate your package
               <ArrowRight className="h-4 w-4" />
             </Link>
             <p className="text-xs text-muted-foreground">

@@ -35,9 +35,6 @@ import { getProducts } from "@/actions/products"
 import { PageTour } from "@/components/guidance/page-tour"
 import { RecentProjectsGrid } from "./recent-projects-grid"
 import { ForgeScreenContext } from "./forge-screen-context"
-import { ForgeCtoBanner } from "./forge-cto-banner"
-// DECISION: ForgeAdvisorInsights removed — ForgeCtoBanner provides Max's guidance
-
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
 // ─── Stage Display Config ───────────────────────────────────────────
@@ -132,7 +129,6 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
         hasInProgressProject={!!inProgressProject}
       />
       <PageHeader />
-      <ForgeCtoBanner projects={projects} />
 
       {hasLoadError && (
         <div className="rounded-lg border border-status-warning bg-status-warning-light/20 p-4 text-sm text-foreground">

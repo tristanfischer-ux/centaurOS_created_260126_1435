@@ -13,7 +13,6 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { typography } from '@/lib/design-system'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { HardDrive, FileText, Calendar, Mail } from 'lucide-react'
 import { DriveTab } from './tabs/drive-tab'
 import { DocsTab } from './tabs/docs-tab'
@@ -69,18 +68,6 @@ export function GoogleAppsView({ googleEmail, features }: GoogleAppsViewProps) {
                     </p>
                 </div>
             </div>
-
-            <SpecialistBriefingHero
-                specialistId="chief-of-staff"
-                specialistName="Cal"
-                specialistTitle="Chief of Staff"
-                narrative={null}
-                fallbackMessage="Connect Google once and stop switching tabs. Your calendar, docs, and email flow into ForgeOS — find that doc someone mentioned in yesterday's meeting without leaving this window. Hit 'Connect Google Account' and it takes 30 seconds."
-                isLoading={false}
-                severity="success"
-                context={{ type: 'general', title: 'Google Apps', description: 'Cal on Google integration.', metadata: {} }}
-                storageKey="google-apps"
-            />
 
             {/* Tabbed Layout */}
             <Tabs value={activeTab} onValueChange={handleTabChange}>

@@ -7,7 +7,7 @@
  * and empty state. Entry point to the outreach workflow.
  */
 
-import { useState, useEffect, useCallback, useTransition, useMemo } from 'react'
+import { useState, useEffect, useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Plus, Users, Mail, Megaphone, Database, LayoutDashboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,9 +19,6 @@ import { CreateCampaignDialog } from './create-campaign-dialog'
 import { OutreachDashboard } from './outreach-dashboard'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { typography } from '@/lib/design-system'
 import type { Campaign } from '@/types/outreach'
 
@@ -83,19 +80,6 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
     const totalContacts = campaigns.reduce((sum, c) => sum + (c.contact_count || 0), 0)
     const totalSequenced = campaigns.reduce((sum, c) => sum + (c.sequenced_count || 0), 0)
 
-    // ── AI Briefing ──────────────────────────────────────────────────────
-    const briefingContext = useMemo(() => {
-        const activeCampaigns = campaigns.filter(c => c.status === 'active').length
-        return `Campaigns: ${campaigns.length} (${activeCampaigns} active), Total contacts: ${totalContacts}, Sequenced: ${totalSequenced}`
-    }, [campaigns, totalContacts, totalSequenced])
-
-    const briefing = usePageBriefing(
-        () => generatePageBriefing('sales-lead', briefingContext, 'success'),
-        'success',
-        !isLoading,
-        'briefing-outreach',
-    )
-
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -150,19 +134,6 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
                     Campaigns
                 </button>
             </div>
-
-            {/* Sal's briefing */}
-            <SpecialistBriefingHero
-                specialistId="sales-lead"
-                specialistName="Sal"
-                specialistTitle="Sales Lead"
-                narrative={briefing.narrative}
-                fallbackMessage="Sal here. Cold outreach works when it's targeted, timed, and relentless in follow-up. I manage your prospect lists, sequence your emails, and track who opened what. Add your first 10 prospects and let's build a sequence — most deals close on the 4th touch, not the 1st."
-                isLoading={briefing.isLoading}
-                severity={briefing.severity}
-                context={{ type: 'general', title: 'Outreach', description: 'Campaign management and outreach', metadata: {} }}
-                storageKey="outreach"
-            />
 
             {/* Dashboard tab */}
             {activeTab === 'dashboard' && (

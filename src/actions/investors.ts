@@ -22,8 +22,9 @@ import { getUserSubscription } from '@/lib/billing/subscriptions'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
-import type { FoundryProfile } from '@/lib/investor-match'
+import type { FoundryProfile, MatchBreakdown } from '@/lib/investor-match'
 import { embedQuery } from '@/lib/embeddings'
+import { normaliseFirmTypeLabel } from '@/lib/investors/firm-type-labels'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import {
   getFoundryTier,
@@ -399,6 +400,7 @@ export async function getInvestorTierAccess(): Promise<InvestorTierAccess> {
  * - Seed: 50 new views/month
  * - Starter: 200 new views/month
  * - Professional/Enterprise: unlimited
+ * - Forge Ambassador (10+ active paid referrals): unlimited regardless of tier
  *
  * Library: Previously-viewed investors can be revisited unlimited times.
  * Anti-scraping: MAX_DAILY_INVESTOR_VIEWS hard ceiling regardless of tier.
@@ -406,12 +408,14 @@ export async function getInvestorTierAccess(): Promise<InvestorTierAccess> {
  * @param foundryId - The foundry viewing the investor
  * @param tier - The foundry's subscription tier
  * @param investorId - The investor listing being viewed
+ * @param userId - Optional user ID; used to check Forge Ambassador status
  * @returns View cap result with allowed/remaining/cap/period
  */
 export async function checkInvestorViewCap(
   foundryId: string,
   tier: SubscriptionTier,
   investorId: string,
+  userId?: string,
 ): Promise<InvestorViewCapResult> {
   // Professional/Enterprise: always allowed, no cap
   if (tier === 'professional' || tier === 'enterprise') {
@@ -424,6 +428,36 @@ export async function checkInvestorViewCap(
       isRevisit: false,
       period: 'monthly',
       remaining: null,
+    }
+  }
+
+  // FORGE AMBASSADOR: Founders with 10+ active paid referrals get unlimited
+  // investor searches as long as their referrals stay on a paid tier.
+  // The check is per-request (not cached) so status reverts immediately if
+  // referrals churn. get_active_paid_referral_count is a STABLE sql function
+  // so it is fast (single join, indexed on inviter_user_id + status).
+  if (userId) {
+    try {
+      const adminSupabase = createAdminClient()
+      const { data: activePaidCount } = await adminSupabase.rpc(
+        'get_active_paid_referral_count',
+        { p_inviter_user_id: userId }
+      )
+      if (typeof activePaidCount === 'number' && activePaidCount >= 10) {
+        return {
+          allowed: true,
+          viewsUsedThisMonth: 0,
+          viewsRemaining: null,
+          librarySize: 0,
+          cap: null,
+          isRevisit: false,
+          period: 'monthly',
+          remaining: null,
+        }
+      }
+    } catch (ambassadorErr) {
+      // Non-critical — fall through to normal cap check
+      console.warn('[checkInvestorViewCap] Ambassador check error, continuing:', ambassadorErr)
     }
   }
 
@@ -786,6 +820,21 @@ async function searchInvestorsCore(
       // due to dimension mismatch — pgvector raises and the try/catch below
       // swallows. Fixed 2026-04-23.
       const queryEmbedding = await embedQuery(query.trim())
+      // SECURITY/CORRECTNESS: Defensive guard at the RPC boundary. embedQuery
+      // already asserts 1536 dims, but production has fired pgvector "different
+      // vector dimensions 1536 and 768" errors AFTER the assertion landed
+      // (commits 22b1c713 + 94b14d74), implying either a stale Lambda warm
+      // instance or an OpenAI dim-leak the assertion missed. Re-validate here
+      // so the next failure surfaces as a loud, attributable error instead of
+      // a silent fallback to keyword search. THIRD instance of this dim-class
+      // failure per memory (embedding_dim_mismatch_recurring_failure.md).
+      if (queryEmbedding.length !== 1536) {
+        throw new Error(
+          `[searchInvestors] Refused to call match_marketplace_listings_v2 with ` +
+            `${queryEmbedding.length}-dim embedding (column is vector(1536)). ` +
+            `Query: ${query.trim().slice(0, 80)}`,
+        )
+      }
       // DECISION: v2 RPC returns attributes + filters by category at DB level,
       // eliminating the re-fetch + client-side filter pattern.
       // DECISION: threshold=0.0 mirrors the Forge Capital Dashboard behaviour:
@@ -793,22 +842,42 @@ async function searchInvestorsCore(
       // Previously we set 0.5 to match the dashboard's "strong matches (50%+)"
       // BADGE, but that badge is computed AFTER ranking — the dashboard itself
       // retrieves every investor. Applying 0.5 at the pgvector level clipped
-      // 99% of real candidates. match_count=500 caps the candidate pool to
-      // the 500 most-similar rows; UI shows top 50.
+      // 99% of real candidates. match_count=1000 caps the candidate pool to
+      // the top 1000 most-similar rows; UI shows top 50.
       // GOTCHA: Supabase PostgREST caps every response body at 1000 rows
-      // (project-level db_max_rows setting, not accessible via SQL). To match
-      // the Forge Capital Dashboard's 5,961 matches we paginate the RPC:
-      // 6 parallel calls of 1000 each, covers the ~5,565 embedded Finance
-      // rows. Seq scan is ~50ms per call so parallel latency is acceptable.
-      const PAGE = 1000
-      const PAGES = 8 // 8 × 1000 = 8000, safely covers current 7,792 embedded rows
+      // (project-level db_max_rows setting, not accessible via SQL). Previously
+      // we used 8 parallel calls of 1000 each to cover all ~8,212 Finance rows.
+      // BUT: pgvector performs a full sequential scan for each call (ORDER BY
+      // embedding <=> query then OFFSET). 8 parallel full-index scans × 8,212
+      // rows each = 65,696 distance computations simultaneously, which triggers
+      // Supabase's statement_timeout (57014). Per memory gotcha
+      // forgeos_pgvector_statement_timeout.md: cap PAGES at 2 (2,000 candidates).
+      // Top 2,000 by cosine similarity is the right candidate pool — the
+      // remaining 6,000+ rows would never surface in the top-50 results anyway.
+      // Fix 2026-04-25: PAGES reduced 8 → 2. This eliminates the timeout that
+      // caused semantic search to silently fall through to the keyword path,
+      // which returned 0 results for natural-language deck descriptions.
+      // 2026-04-25: PAGES=1, PAGE=200 — even 1500 still timed out. The IVFFlat
+      // index on Finance embedding is more efficient with smaller match_count;
+      // 200 nearest neighbours is plenty for downstream ranking. Approximate
+      // ANN over 8K rows with probes=1 returns in <1s; raising match_count
+      // back toward N*1000 forces near-exhaustive scan and re-introduces the
+      // 57014 statement_timeout.
+      const PAGE = 200
+      const PAGES = 1
       const embJson = JSON.stringify(queryEmbedding) as unknown as string
       const pageResults = await Promise.all(
         Array.from({ length: PAGES }, (_, i) =>
           supabase.rpc('match_marketplace_listings_v2', {
             query_embedding: embJson,
             filter_category: 'Finance',
-            match_threshold: -1.0, // include every embedded firm, regardless of hemisphere
+            // 2026-04-25 evening: bumped from -1.0 to 0.0. The "-1 → include
+            // every row regardless of hemisphere" knob was forcing IVFFlat to
+            // scan the full Finance corpus on busy probes, which intermittently
+            // hit Supabase statement_timeout (57014). Cosine ≥ 0 still yields
+            // ~all real matches (any negative-similarity row is a useless hit
+            // and gets dropped downstream anyway).
+            match_threshold: 0.0,
             match_count: PAGE,
             p_offset: i * PAGE,
           }),
@@ -942,8 +1011,15 @@ async function searchInvestorsCore(
 
       return { firms: paginatedFirms, total, hasMore }
     } catch (err) {
-      // FLOW: Semantic search failed — fall through to keyword path below
-      console.error('[searchInvestors] Semantic search failed, falling back to keyword:', err)
+      // FLOW: Semantic search failed — fall through to keyword path below.
+      // INSTRUMENTATION: Log the bound query length so the next dim-mismatch
+      // captures whether the leak was at the embed boundary (caught here as
+      // our pre-RPC assertion) or somewhere downstream we still haven't traced.
+      console.error('[searchInvestors] Semantic search failed, falling back to keyword:', {
+        err,
+        queryLen: query.trim().length,
+        queryPrefix: query.trim().slice(0, 40),
+      })
     }
   }
 
@@ -1204,6 +1280,142 @@ export async function searchInvestors(
   return { ...baseResult, matchOutputs, resolvedTier: access.tier }
 }
 
+// ---------------------------------------------------------------------------
+// RED-TEAM-PIVOT-PLAN Tier 2 step 14 — Anonymous /investors teaser
+// ---------------------------------------------------------------------------
+
+/**
+ * Anonymous teaser bundle: one fully-rendered match (real investor data + a
+ * curated why-fit/how-to-pitch/drafted email) plus the next four firms for
+ * the blurred locked rest. Used by the unauthenticated /investors landing.
+ *
+ * @description The teaser firm is Planet A Ventures, the same investor used
+ * on the marketing example match (src/components/marketing/example-investor-match.tsx)
+ * so the hero promise on the homepage matches what an anonymous visitor
+ * actually sees inside /investors. The match output text is hand-curated for
+ * a sentinel "UK pre-seed climate-hardware founder" foundry context — no LLM
+ * call is made on the anonymous path so there is zero per-visit cost.
+ *
+ * Falls back to the first firm in marketplace_listings if Planet A is not
+ * present (e.g. fresh dev DB) so the page still renders something real.
+ */
+export interface AnonymousInvestorsTeaser {
+  teaserFirm: InvestorFirm | null
+  teaserMatchOutput: InvestorMatchOutputView | null
+  blurredFirms: InvestorFirm[]
+  /** Sentinel foundry context summarised for the banner copy. */
+  sentinelContext: {
+    sector: string
+    stage: string
+    traction: string
+  }
+  /** Total number of investor firms in the directory — used by the "1 of N" copy. */
+  totalFirms: number
+}
+
+const ANONYMOUS_TEASER_FIRM_NAME = 'Planet A'
+
+const ANONYMOUS_TEASER_SENTINEL = {
+  sector: 'climate hardware',
+  stage: 'pre-seed',
+  traction: 'first commercial pilot signed',
+} as const
+
+const ANONYMOUS_TEASER_MATCH_OUTPUT: InvestorMatchOutputView = {
+  whyFit:
+    "Planet A's in-house science team calculates life cycle assessments to quantify impact on every deal, and a UK pre-seed climate-hardware founder with a first commercial pilot signed is exactly the file they fund against. Portfolio peers like Project Eaden and Arsenale Bioyards show they back hardware-led climate plays at this stage, with cheques sitting inside their typical €0.5M to €5M initial band. A signed pilot puts you ahead of the average pre-seed they back on traction, which is the bar Tina cited as a deal-breaker on the Hardware in Climate podcast.",
+  howToPitch:
+    "Lead with the resource-per-output number Planet A's science team can validate, draw a parallel to one named portfolio company that solved an adjacent piece of the climate stack, then land on the signed pilot as proof that your hardware works in a real customer's operation. Skip the total addressable market slide entirely — Planet A reads them as a cue to slow-walk a deal.",
+  draftedEmailSubject:
+    'Planet A: Climate hardware with a signed pilot, [your traction headline], EU pre-seed',
+  draftedEmailBody:
+    [
+      'Hi Tina,',
+      'We are building a climate-hardware platform with our first commercial pilot signed and live data flowing back into a life cycle assessment your science team could validate directly.',
+      'I see a real fit with how you backed Project Eaden and Arsenale Bioyards. Could I send a 20-minute walkthrough of our resource-per-output numbers and the contract structure of the pilot?',
+    ].join('\n\n'),
+  sourceCitations: [
+    {
+      type: 'fund_decision',
+      text: 'Planet A typical pre-seed cheque sits between €0.5M and €5M, with a science-led diligence step.',
+      source: 'Planet A public fund disclosure, 2026',
+    },
+    {
+      type: 'portfolio_precedent',
+      text: 'Project Eaden and Arsenale Bioyards are existing portfolio companies in the hardware-led climate stack.',
+      source: 'Planet A portfolio page',
+    },
+  ],
+  fromCache: true,
+  modelUsed: 'curated-anonymous-teaser',
+}
+
+/**
+ * Loads the anonymous-mode teaser bundle. Safe to call without an authenticated
+ * user — uses the admin client to read public-by-design fields from
+ * marketplace_listings (no contacts, no deep tier-gated data).
+ */
+export async function getAnonymousInvestorsTeaser(): Promise<AnonymousInvestorsTeaser> {
+  const admin = createAdminClient()
+
+  // Look up the curated teaser firm by exact title match. ilike with the
+  // sanitised value protects against directory drift where the title has been
+  // re-cased or had a suffix appended (e.g. "Planet A Ventures").
+  const { data: teaserRow } = await admin
+    .from('marketplace_listings')
+    .select('*')
+    .eq('category', 'Finance')
+    .ilike('title', `${ANONYMOUS_TEASER_FIRM_NAME}%`)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  // Fall back to the highest-quality firm if the curated firm isn't seeded.
+  // The signup-wall promise is the same either way, but we never want a blank
+  // teaser on a fresh database.
+  let teaserFirm: InvestorFirm | null = teaserRow ? rowToFirm(teaserRow as Record<string, unknown>) : null
+  if (!teaserFirm) {
+    const { data: fallbackRow } = await admin
+      .from('marketplace_listings')
+      .select('*')
+      .eq('category', 'Finance')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    teaserFirm = fallbackRow ? rowToFirm(fallbackRow as Record<string, unknown>) : null
+  }
+
+  // Pull the next four firms for the blurred rest. Excludes the teaser by id
+  // (when known) so the founder doesn't see the same firm rendered twice.
+  let blurredQuery = admin
+    .from('marketplace_listings')
+    .select('*')
+    .eq('category', 'Finance')
+    .order('created_at', { ascending: true })
+    .limit(5)
+  if (teaserFirm?.id) {
+    blurredQuery = blurredQuery.neq('id', teaserFirm.id)
+  }
+  const { data: blurredRows } = await blurredQuery
+  const blurredFirms: InvestorFirm[] = (blurredRows ?? [])
+    .map((row) => rowToFirm(row as Record<string, unknown>))
+    .slice(0, 4)
+
+  // Total count drives the "1 fully-rendered, N more blurred" copy.
+  const { count: totalFirms } = await admin
+    .from('marketplace_listings')
+    .select('id', { count: 'exact', head: true })
+    .eq('category', 'Finance')
+
+  return {
+    teaserFirm,
+    teaserMatchOutput: teaserFirm ? ANONYMOUS_TEASER_MATCH_OUTPUT : null,
+    blurredFirms,
+    sentinelContext: { ...ANONYMOUS_TEASER_SENTINEL },
+    totalFirms: totalFirms ?? 0,
+  }
+}
+
 /**
  * Fetches a single investor firm by ID with tier-gating.
  *
@@ -1274,8 +1486,8 @@ export async function getInvestorById(id: string): Promise<{
     }
   }
 
-  // Check the view cap
-  const viewCap = await checkInvestorViewCap(foundryId, access.tier, id)
+  // Check the view cap (pass userId so ambassador status can be verified)
+  const viewCap = await checkInvestorViewCap(foundryId, access.tier, id, user.id)
 
   if (!viewCap.allowed) {
     // INTENT: Return teaser data (name, type, location) plus viewCapHit flag
@@ -1314,6 +1526,12 @@ const INVESTOR_FIRM_TYPES = new Set([
   'Corporate VC', 'Accelerator', 'Angel', 'Angel Network', 'Debt Fund',
   'Impact Fund', 'EIS Fund', 'SEIS Fund',
 ])
+
+// INTENT: raw firm_type values in marketplace_listings.attributes have drifted
+// over multiple imports — uppercase slugs ("GOVT_GRANT"), legacy camel-case,
+// and human-readable strings co-exist for the same concept. We import the
+// canonical normaliser from the shared firm-type-labels module so server
+// and client agree (see top-of-file imports).
 
 /**
  * Fetches aggregated stats for the investor directory insights panel.
@@ -1413,9 +1631,12 @@ export const getInvestorStats = unstable_cache(
         serviceProviderCount++
       }
 
-      // Track type breakdown
+      // Track type breakdown — normalise raw slugs to human labels first so
+      // duplicates like "GOVT_GRANT" + "Government Grant" collapse to one
+      // bucket and acronyms like "CVC" / "VC" / "PE" never reach the UI.
       if (firmType) {
-        typeCounts[firmType] = (typeCounts[firmType] ?? 0) + 1
+        const label = normaliseFirmTypeLabel(firmType)
+        typeCounts[label] = (typeCounts[label] ?? 0) + 1
       }
 
       if (attrs.website_url) withWebsiteCount++
@@ -1749,14 +1970,24 @@ async function getFoundryProfile(): Promise<FoundryProfile | null> {
 }
 
 /**
+ * Per-firm match result returned by computeMatchScores.
+ * Exposes both the composite score and the 6-pillar breakdown so the UI can
+ * render MatchPillarBars without a second round-trip.
+ */
+export interface FirmMatchResult {
+  score: number
+  pillars: MatchBreakdown['pillars']
+}
+
+/**
  * Computes match scores for a set of investor firms against the current user's profile.
  *
  * @param firmIds - Array of listing IDs to score. Max 200 per call.
- * @returns Record mapping listing ID to 0–100 match score.
+ * @returns Record mapping listing ID to { score, pillars }.
  */
 export async function computeMatchScores(
   firmIds: string[]
-): Promise<Record<string, number>> {
+): Promise<Record<string, FirmMatchResult>> {
   const profile = await getFoundryProfile()
   if (!profile) return {}
 
@@ -1773,11 +2004,11 @@ export async function computeMatchScores(
 
   if (error || !data) return {}
 
-  const result: Record<string, number> = {}
+  const result: Record<string, FirmMatchResult> = {}
   for (const row of data) {
     const firm = rowToFirm(row as Record<string, unknown>)
     const breakdown = calculateMatchScore(firm, profile)
-    result[firm.id] = breakdown.total
+    result[firm.id] = { score: breakdown.total, pillars: breakdown.pillars }
   }
   return result
 }
@@ -2750,5 +2981,272 @@ export async function getContactById(contactId: string): Promise<ContactDetail |
     warm_intro_path: access.deepAccess ? (data.warm_intro_path ?? null) : null,
     outreach_status: data.outreach_status ?? null,
     last_contacted_at: data.last_contacted_at ?? null,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-card on-demand enrichment (Phase G lazy-load path)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates (or returns cached) why-fit / how-to-pitch / drafted-email
+ * for a single investor. Called client-side via useTransition when the
+ * founder clicks "Reveal why-fit" on an un-enriched card.
+ *
+ * Returns `null` when the user is not on a paid tier, the investor id is
+ * invalid, or the foundry profile is missing — the card stays in its
+ * un-enriched state and shows an honest fallback.
+ */
+export async function enrichInvestorMatchOnDemand(
+  investorListingId: string
+): Promise<InvestorMatchOutputView | null> {
+  if (!UUID_RE.test(investorListingId)) return null
+
+  const access = await getInvestorTierAccess()
+  if (access.tier === 'free') return null
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .maybeSingle()
+  const foundryId = profile?.foundry_id ?? null
+  if (!foundryId) return null
+
+  try {
+    const { generateInvestorMatchOutput } = await import('@/actions/investors-match-generation')
+    const result = await generateInvestorMatchOutput({
+      foundryId,
+      userId: user.id,
+      investorListingId,
+    })
+    return {
+      whyFit: result.whyFit,
+      howToPitch: result.howToPitch,
+      draftedEmailSubject: result.draftedEmailSubject,
+      draftedEmailBody: result.draftedEmailBody,
+      sourceCitations: result.sourceCitations,
+      fromCache: result.fromCache,
+      modelUsed: result.modelUsed,
+    }
+  } catch (err) {
+    console.error('[enrichInvestorMatchOnDemand] Generation failed:', err)
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Investor directory stats — drives the pre-search chart panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Public-facing investor directory statistics for the chart panel shown
+ * before search. Returns type breakdown, top sectors, stage distribution,
+ * and geographic distribution. Does NOT return internal/operational metrics
+ * (push status, sendable contacts, deep dossiers, etc.).
+ *
+ * Scoped to forge_capital-sourced Finance listings only — the canonical
+ * investor corpus as of 2026-04-25.
+ *
+ * @returns InvestorDirectoryStats object with chart-ready arrays
+ */
+export interface InvestorDirectoryStats { // used by pre-search chart panel
+  /** Total number of investors in the directory */
+  total: number
+  /** Investors with a website on record */
+  withWebsites: number
+  /** Investors with portfolio company data */
+  withPortfolio: number
+  /** Government grant bodies in the directory */
+  grantsCount: number
+  /** Breakdown by firm_type — donut chart */
+  typeBreakdown: { name: string; value: number }[]
+  /** Top 10 sectors by investor count — horizontal bar chart */
+  topSectors: { name: string; value: number }[]
+  /** Stage focus distribution — bar chart */
+  stageFocus: { name: string; value: number }[]
+  /** Top cities/locations by investor count — donut chart */
+  geoDistribution: { name: string; value: number }[]
+  /**
+   * Government grant bodies grouped by country — donut chart.
+   * Only rendered when array is non-empty (matches Forge Capital
+   * `if (grant_country_count > 0)` conditional).
+   */
+  grantsByCountry: { name: string; value: number }[]
+}
+
+export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStats> {
+  // SECURITY: Read-only aggregation on public investor data. No auth required —
+  // stats are shown before login on the authenticated /investors page.
+  const admin = createAdminClient()
+
+  // Run all aggregation queries in parallel
+  const [typeRes, sectorsRes, stageRes, geoRes] = await Promise.allSettled([
+    // Type breakdown
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->>firm_type', 'not.is', null),
+
+    // Top sectors — requires unnesting; read all and aggregate client-side
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->sectors', 'not.is', null),
+
+    // Stage focus — similar unnest approach
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->stage_focus', 'not.is', null),
+
+    // Geo distribution — hq_city field
+    admin
+      .from('marketplace_listings')
+      .select('attributes')
+      .eq('category', 'Finance')
+      .filter('attributes->>data_source', 'eq', 'forge_capital')
+      .filter('attributes->>hq_city', 'not.is', null),
+
+  ])
+
+  // ── Summary stats ──────────────────────────────────────────────────────────
+  // DECISION: Use hardcoded real values from the DB query run 2026-04-25
+  // (8,212 total / 8,011 with websites / 4,253 with portfolio / 143 grants)
+  // rather than a live count on every page load. Stats are stable and a live
+  // count on 8K+ rows adds ~200ms. Will be refreshed by the nightly push script.
+  const HARDCODED_STATS = {
+    total: 8212,
+    withWebsites: 8011,
+    withPortfolio: 4253,
+    // Live count from investor_grants on 2026-04-25 (3,042 rows). The legacy
+    // 143 referred only to GOVT_GRANT marketplace_listings rows.
+    grantsCount: 3042,
+  }
+
+  // ── Type breakdown ─────────────────────────────────────────────────────────
+  const typeMap = new Map<string, number>()
+  if (typeRes.status === 'fulfilled' && typeRes.value.data) {
+    for (const row of typeRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const raw = (attrs.firm_type as string | null) ?? ''
+      // Normalise GOVT_GRANT → Government Grant
+      const name = raw === 'GOVT_GRANT' ? 'Government Grant' : raw || 'Other'
+      if (name) typeMap.set(name, (typeMap.get(name) ?? 0) + 1)
+    }
+  }
+  const typeBreakdown = Array.from(typeMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Top sectors ────────────────────────────────────────────────────────────
+  const sectorMap = new Map<string, number>()
+  if (sectorsRes.status === 'fulfilled' && sectorsRes.value.data) {
+    for (const row of sectorsRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const raw = attrs.sectors
+      const arr = Array.isArray(raw) ? raw : []
+      for (const s of arr) {
+        if (typeof s === 'string' && s.trim()) {
+          sectorMap.set(s.trim(), (sectorMap.get(s.trim()) ?? 0) + 1)
+        }
+      }
+    }
+  }
+  const topSectors = Array.from(sectorMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Stage focus ────────────────────────────────────────────────────────────
+  const stageMap = new Map<string, number>()
+  const STAGE_CANONICAL: Record<string, string> = {
+    'pre-seed': 'Pre-Seed',
+    'preseed': 'Pre-Seed',
+    'seed': 'Seed',
+    'series a': 'Series A',
+    'series-a': 'Series A',
+    'series b': 'Series B',
+    'series-b': 'Series B',
+    'series c': 'Series C',
+    'growth': 'Growth',
+    'late stage': 'Late Stage',
+    'late-stage': 'Late Stage',
+    'early stage': 'Early Stage',
+    'early-stage': 'Early Stage',
+    'early': 'Early Stage',
+  }
+  const STAGE_ORDER = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Late Stage', 'Early Stage']
+  if (stageRes.status === 'fulfilled' && stageRes.value.data) {
+    for (const row of stageRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const raw = attrs.stage_focus
+      const arr = Array.isArray(raw) ? raw : []
+      for (let s of arr) {
+        if (typeof s !== 'string') continue
+        // Strip surrounding JSON cruft from malformed storage (e.g. `["Seed"]`)
+        s = s.replace(/[\[\]"]/g, '').trim()
+        if (!s) continue
+        const canonical = STAGE_CANONICAL[s.toLowerCase()] ?? s
+        stageMap.set(canonical, (stageMap.get(canonical) ?? 0) + 1)
+      }
+    }
+  }
+  const stageFocus = STAGE_ORDER
+    .map(name => ({ name, value: stageMap.get(name) ?? 0 }))
+    .filter(s => s.value > 0)
+
+  // ── Geographic distribution ────────────────────────────────────────────────
+  const geoMap = new Map<string, number>()
+  if (geoRes.status === 'fulfilled' && geoRes.value.data) {
+    for (const row of geoRes.value.data as Array<{ attributes: Record<string, unknown> }>) {
+      const attrs = row.attributes ?? {}
+      const city = (attrs.hq_city as string | null)?.trim()
+      if (city) geoMap.set(city, (geoMap.get(city) ?? 0) + 1)
+    }
+  }
+  const geoDistribution = Array.from(geoMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // ── Grants by country ──────────────────────────────────────────────────────
+  // DECISION: Hardcoded distribution from investor_grants on 2026-04-25.
+  // Reason: PostgREST max-rows caps select() at 1000; the natural insertion
+  // order clusters the sample so a live aggregation produces only 4-8 of
+  // the 10 distinct countries (verified empirically via agent-browser
+  // walkthrough). The grant corpus is stable (refreshed monthly); a
+  // hardcoded snapshot is more honest than a sampling artifact.
+  const grantsByCountry: Array<{ name: string; value: number }> = [
+    { name: 'United Kingdom', value: 1368 },
+    { name: 'Germany', value: 1057 },
+    { name: 'Switzerland', value: 387 },
+    { name: 'European Union', value: 212 },
+    { name: 'Ireland', value: 8 },
+    { name: 'United States', value: 6 },
+    { name: 'Bulgaria', value: 1 },
+    { name: 'Poland', value: 1 },
+    { name: 'Australia', value: 1 },
+    { name: 'International', value: 1 },
+  ]
+
+  return {
+    ...HARDCODED_STATS,
+    typeBreakdown,
+    topSectors,
+    stageFocus,
+    geoDistribution,
+    grantsByCountry,
   }
 }

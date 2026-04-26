@@ -8,7 +8,8 @@ const PUBLIC_ROUTES = [
     '/login',
     '/auth',
     '/auth/callback',  // Email verification callback
-    '/join',
+    '/signup',  // Canonical signup URL (industry convention)
+    '/join',  // Legacy alias — redirects to /signup
     '/invite',
     '/experts',  // Public expert directory (SEO)
     '/expert',   // Individual expert profiles (SEO)
@@ -31,6 +32,17 @@ const PUBLIC_ROUTES = [
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
 ]
 
+// RED-TEAM-PIVOT-PLAN Tier 2 step 14: anonymous /investors landing. The
+// page itself lives in (public-investors)/investors/page.tsx with its own
+// layout that does not enforce auth, so middleware doesn't strictly need to
+// know about /investors — but we mark it here too as a defence-in-depth
+// guard. If a future refactor accidentally moves /investors back under the
+// (platform) group, this check prevents the middleware-level login redirect
+// from kicking in. Exact-match only — `/investors/[id]/*` stays gated.
+// Kept separate from PUBLIC_ROUTES because that list permits nested-path
+// matching, which we explicitly do not want for /investors.
+const ANONYMOUS_INVESTORS_PATH = '/investors'
+
 // Routes that require company admin (Executive/Founder) role
 // Note: Platform ops (/ops/*) is handled separately via subdomain isolation
 const COMPANY_ADMIN_ROUTES = [
@@ -44,7 +56,7 @@ export async function updateSession(request: NextRequest) {
     if (!url || !key) {
         throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required')
     }
-    
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -104,8 +116,15 @@ export async function updateSession(request: NextRequest) {
         return false
     })
 
+    // FLOW: /investors is publicly accessible at the EXACT path only — the
+    // page itself renders an anonymous teaser variant when there's no user.
+    // /investors/[id] is intentionally NOT included so deep dives stay gated.
+    const isAnonymousInvestorsLanding =
+        pathname === ANONYMOUS_INVESTORS_PATH ||
+        pathname === `${ANONYMOUS_INVESTORS_PATH}/`
+
     // ── Unauthenticated users ──────────────────────────────────────────
-    if (!user && !isPublicRoute) {
+    if (!user && !isPublicRoute && !isAnonymousInvestorsLanding) {
         // Stay on the CURRENT host for the login bounce. Previously this
         // redirected to NEXT_PUBLIC_APP_DOMAIN (hardcoded
         // https://fractionalforge.app) which broke preview deploys:

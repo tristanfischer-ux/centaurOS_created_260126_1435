@@ -550,3 +550,28 @@
   margin-bottom: 6px;
 }
 .sp2-empty p { margin: 4px 0 0; max-width: 420px; margin-left: auto; margin-right: auto; line-height: 1.55; }
+
+/* Show-the-work banner — sits above the supplier insight stack */
+.sp2-show-work {
+  background: var(--sp-surface-soft);
+  border: 1px solid var(--sp-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sp-fg-muted);
+  max-width: 920px;
+  margin: 0 0 18px;
+}
+.sp2-show-work strong {
+  color: var(--sp-fg);
+  font-weight: 600;
+}
+
+/* Insight-card stack — vertical list of LLM-enriched supplier matches */
+.sp2-insight-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 8px;
+}

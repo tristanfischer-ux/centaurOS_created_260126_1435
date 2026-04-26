@@ -35,7 +35,7 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
     title: "Welcome, Founder.",
     subtitle: "Your command center is being prepared.",
     description:
-      "Check your email to verify your account. Once verified, you'll have immediate access to ForgeOS.",
+      "Check your email to verify your account. Once verified, you'll have immediate access to Fractional Forge.",
     nextStep: "Verify your email → Access your dashboard → Start building",
     ctaText: "Go to Login",
     ctaLink: "/login",
@@ -144,10 +144,10 @@ const SESSION_POLL_INTERVAL = 3000
  * @returns The redirect path
  */
 function getPostSignupRedirect(_role: string): string {
-  // DECISION 2026-04-16: founder-first architecture — every new user lands on /today,
-  // regardless of the role they signed up with. Supplier / fractional-executive are
-  // opt-in flags on top of the founder workspace, not distinct routing paths.
-  return "/today"
+  // DECISION 2026-04-25: /today removed — redirect post-signup to /investors,
+  // the killer-feature default per the pivot. /welcome is shown first via
+  // setupNewUser redirect; this is the fallback after welcome dismissal.
+  return "/investors"
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────

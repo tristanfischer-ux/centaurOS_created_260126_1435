@@ -11,7 +11,7 @@ import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getSpecialistById } from '@/lib/agents/specialists-config'
-import type { HandoffTrailEntry } from '@/contexts/advisor-panel-context'
+import type { HandoffTrailEntry } from '@/lib/agents/specialist-handoff-types'
 
 interface HandoffBreadcrumbProps {
     /** The handoff trail (oldest first, current last) */

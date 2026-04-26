@@ -3,14 +3,12 @@
 /**
  * @file floating-specialist-fab.tsx
  *
- * @description Global floating action button that shows the most relevant
- * AI specialist for the current page. On desktop (lg+), toggles the
- * persistent advisor panel. On mobile, opens the dialog modal.
+ * @description Global floating action button that surfaces the most relevant
+ * specialist for the current page. Click opens BriefSpecialistDialog as a
+ * centered modal on every viewport (desktop sidebar was removed Phase E).
  *
  * @related
  * - Route mapping: src/lib/route-specialist-map.ts
- * - AdvisorPanel: src/components/specialists/advisor-panel.tsx
- * - AdvisorPanelProvider: src/contexts/advisor-panel-context.tsx
  * - BriefSpecialistDialog: src/app/(platform)/agents/brief-specialist-dialog.tsx
  * - Screen context: src/contexts/screen-context.tsx
  */
@@ -24,40 +22,24 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
 import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { useScreenContext } from "@/contexts/screen-context"
-import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { getSpecialistForRoute } from "@/lib/route-specialist-map"
 import { serializeContext } from "./types"
 import type { Specialist } from "@/lib/agents/specialists-config"
 
-/** Handoff state when switching specialists from within the mobile dialog */
+/** Handoff state when switching specialists from within the dialog */
 interface HandoffState {
   context: string | null
   referredBy: string | null
 }
 
-/** Check if viewport is desktop (lg breakpoint = 1024px) */
-function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(false)
-  useEffect(() => {
-    const mql = window.matchMedia("(min-width: 1024px)")
-    setIsDesktop(mql.matches)
-    const handler = (e: MediaQueryListEvent): void => setIsDesktop(e.matches)
-    mql.addEventListener("change", handler)
-    return () => mql.removeEventListener("change", handler)
-  }, [])
-  return isDesktop
-}
-
 export function FloatingSpecialistFAB(): React.ReactElement | null {
   const pathname = usePathname()
   const { screenContext } = useScreenContext()
-  const advisorPanel = useAdvisorPanel()
-  const isDesktop = useIsDesktop()
 
-  // Mobile-only state: dialog for small screens
-  const [mobileDialogOpen, setMobileDialogOpen] = useState(false)
-  const [mobileActiveSpecialist, setMobileActiveSpecialist] = useState<Specialist | null>(null)
-  const [mobileHandoff, setMobileHandoff] = useState<HandoffState>({ context: null, referredBy: null })
+  // Dialog state — used on every viewport now that the desktop sidebar is gone
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [activeSpecialist, setActiveSpecialist] = useState<Specialist | null>(null)
+  const [handoff, setHandoff] = useState<HandoffState>({ context: null, referredBy: null })
 
   const [mounted, setMounted] = useState(false)
   const [hasUnreadInsights, setHasUnreadInsights] = useState(false)
@@ -116,17 +98,10 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
   /** Standard click: open specialist for general conversation */
   const handleClick = useCallback(() => {
     setHasUnreadInsights(false)
-
-    if (isDesktop) {
-      // Desktop: toggle the persistent panel
-      advisorPanel.togglePanel(specialistId)
-    } else {
-      // Mobile: open the dialog modal
-      setMobileHandoff({ context: null, referredBy: null })
-      setMobileActiveSpecialist(specialist ?? null)
-      setMobileDialogOpen(true)
-    }
-  }, [isDesktop, advisorPanel, specialistId, specialist])
+    setHandoff({ context: null, referredBy: null })
+    setActiveSpecialist(specialist ?? null)
+    setDialogOpen(true)
+  }, [specialist])
 
   /** "Guide me" click: open specialist in page guidance mode */
   const handleGuideMeClick = useCallback((e: React.MouseEvent) => {
@@ -135,32 +110,25 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
 
     const guidanceContext = `__GUIDE_MODE__\nThe user clicked "Guide me through this page". Walk them through what they can do on the ${screenContext.pageTitle} page. Use the page knowledge to give a friendly, step-by-step orientation. Start with the most important action, cover 2-3 more, then ask what they'd like to try first.`
 
-    if (isDesktop) {
-      advisorPanel.openPanel(specialistId, {
-        handoffContext: guidanceContext,
-        contextLabel: `Guide: ${screenContext.pageTitle}`,
-      })
-    } else {
-      setMobileHandoff({ context: guidanceContext, referredBy: null })
-      setMobileActiveSpecialist(specialist ?? null)
-      setMobileDialogOpen(true)
-    }
-  }, [isDesktop, advisorPanel, specialistId, specialist, screenContext.pageTitle])
+    setHandoff({ context: guidanceContext, referredBy: null })
+    setActiveSpecialist(specialist ?? null)
+    setDialogOpen(true)
+  }, [specialist, screenContext.pageTitle])
 
-  const handleMobileSwitchSpecialist = useCallback(
+  const handleSwitchSpecialist = useCallback(
     (newId: string, handoffCtx?: string) => {
       const spec = getSpecialistById(newId)
       if (spec) {
-        const fromName = mobileActiveSpecialist?.name ?? null
-        setMobileHandoff({
+        const fromName = activeSpecialist?.name ?? null
+        setHandoff({
           context: handoffCtx ?? null,
           referredBy: handoffCtx ? fromName : null,
         })
-        setMobileActiveSpecialist(spec)
-        setMobileDialogOpen(true)
+        setActiveSpecialist(spec)
+        setDialogOpen(true)
       }
     },
-    [mobileActiveSpecialist?.name],
+    [activeSpecialist?.name],
   )
 
   // Hide on /agents — the specialists hub doesn't need a redundant FAB
@@ -171,15 +139,13 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
     return null
   }
 
-  const isPanelOpen = isDesktop && advisorPanel.isOpen
-
   return (
     <>
       <div
         className={cn(
           "fixed z-[200] transition-all duration-200 ease-out",
           "bottom-24 right-4 sm:bottom-6 sm:right-6",
-          mounted && !isPanelOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
+          mounted ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
         )}
       >
         <Tooltip>
@@ -193,8 +159,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
                 "bg-background border shadow-lg",
                 "hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "transition-transform duration-200",
-                isPanelOpen && "ring-2 ring-international-orange ring-offset-2",
-                hasUnreadInsights && !isPanelOpen && "ring-2 ring-international-orange/50 ring-offset-1",
+                hasUnreadInsights && "ring-2 ring-international-orange/50 ring-offset-1",
               )}
             >
               {specialist.avatarImage ? (
@@ -212,7 +177,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
                 <MessageSquare className="h-5 w-5 text-muted-foreground" />
               )}
               {/* Proactive insight indicator */}
-              {hasUnreadInsights && !isPanelOpen && (
+              {hasUnreadInsights && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-international-orange shadow-sm">
                   <Sparkles className="h-2.5 w-2.5 text-white animate-pulse" />
                 </span>
@@ -222,9 +187,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
           <TooltipContent side="left">
             {hasUnreadInsights
               ? `${specialist.name} has something to share`
-              : isPanelOpen
-                ? `Close ${specialist.name}`
-                : `Ask ${specialist.name} — ${specialist.title}`
+              : `Ask ${specialist.name} — ${specialist.title}`
             }
           </TooltipContent>
         </Tooltip>
@@ -254,15 +217,15 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
         )}
       </div>
 
-      {/* Mobile-only: Dialog fallback for small screens */}
-      {mobileActiveSpecialist && !isDesktop ? (
+      {/* Centered modal — replaces the deleted right-hand sidebar */}
+      {activeSpecialist ? (
         <BriefSpecialistDialog
-          specialist={mobileActiveSpecialist}
-          open={mobileDialogOpen}
-          onOpenChange={setMobileDialogOpen}
-          onSwitchSpecialist={handleMobileSwitchSpecialist}
-          handoffContext={mobileHandoff.context ?? entityContext}
-          referredBy={mobileHandoff.referredBy}
+          specialist={activeSpecialist}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSwitchSpecialist={handleSwitchSpecialist}
+          handoffContext={handoff.context ?? entityContext}
+          referredBy={handoff.referredBy}
           contextLabel={screenContext.pageTitle}
         />
       ) : null}

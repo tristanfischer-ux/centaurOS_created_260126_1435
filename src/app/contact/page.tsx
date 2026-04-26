@@ -59,7 +59,7 @@ export default function ContactPage() {
                   </div>
                   <CardTitle className="text-lg">General Enquiries</CardTitle>
                   <CardDescription>
-                    Questions about ForgeOS or Fractional Forge
+                    Questions about Fractional Forge
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -80,12 +80,12 @@ export default function ContactPage() {
                   </div>
                   <CardTitle className="text-lg">Book a Demo</CardTitle>
                   <CardDescription>
-                    See ForgeOS in action — pick a time that works for you
+                    See Fractional Forge in action — pick a time that works for you
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <a
-                    href="mailto:hello@fractionalforge.app?subject=ForgeOS%20Demo%20Request"
+                    href="mailto:hello@fractionalforge.app?subject=Fractional%20Forge%20Demo%20Request"
                     className="text-sm font-medium text-international-orange hover:underline transition-colors"
                   >
                     Email us to schedule a demo

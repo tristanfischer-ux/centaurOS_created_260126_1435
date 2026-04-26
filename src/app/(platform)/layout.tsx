@@ -19,13 +19,11 @@ import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider";
 import { MainContentArea } from "@/components/MainContentArea";
 import { ScreenContextProvider } from "@/contexts/screen-context";
-import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
 import { BackgroundOpsProvider } from "@/contexts/background-ops-context"
 import { CadLabProvider } from "@/app/(platform)/the-forge/cad-lab/cad-lab-context";
 
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { BrowseContextProvider } from "@/contexts/browse-context";
-import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
@@ -36,6 +34,7 @@ import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
 import { getFeatureFlag } from "@/lib/features/flags";
 import { FLAG_NEW_FORGE_EXPERIENCE } from "@/lib/features/keys";
+import { getForgeAmbassadorStatus } from "@/actions/referrals";
 
 // DECISION: Vercel Pro caps at 300s. Server actions (research, decomposition,
 // image generation) called from platform pages need up to 240s per invocation.
@@ -120,6 +119,17 @@ export default async function PlatformLayout({
     // Reuses the Supabase client already fetched above — no extra round-trip.
     const newForgeExperienceEnabled = await getFeatureFlag(supabase, user.id, FLAG_NEW_FORGE_EXPERIENCE)
 
+    // FORGE AMBASSADOR: fetch in parallel with the flag above, non-blocking.
+    // Passes the result to Sidebar so the badge can appear in the footer
+    // without a client-side fetch. Fails open (false) if the RPC errors.
+    const ambassadorResult = await getForgeAmbassadorStatus().catch(() => null)
+    const isForgeAmbassador = ambassadorResult && 'isAmbassador' in ambassadorResult
+      ? ambassadorResult.isAmbassador
+      : false
+    const ambassadorSince = ambassadorResult && 'since' in ambassadorResult
+      ? ambassadorResult.since
+      : null
+
     return (
         <PostHogProvider>
         <TooltipProvider>
@@ -127,7 +137,6 @@ export default async function PlatformLayout({
                 <ZoomProvider>
                   <BackgroundOpsProvider>
                   <CadLabProvider>
-                  <AdvisorPanelProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
                     <div className="flex h-screen overflow-hidden gap-0">
@@ -135,7 +144,7 @@ export default async function PlatformLayout({
                         <KeyboardShortcutsDialog />
                         <KeyboardShortcuts />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} isForgeAmbassador={isForgeAmbassador} ambassadorSince={ambassadorSince} />
                         <MainContentArea>
                             <ActiveTimerBar />
                             <main className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-24 sm:pb-8">
@@ -152,9 +161,6 @@ export default async function PlatformLayout({
                                 )}
                             </main>
                         </MainContentArea>
-                        <Suspense fallback={null}>
-                            <AdvisorPanel />
-                        </Suspense>
                         <MobileNav foundryName={foundryName} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} />
                         <Suspense fallback={null}>
                             <FloatingSpecialistFAB />
@@ -182,7 +188,6 @@ export default async function PlatformLayout({
                     </div>
                   </ScreenContextProvider>
                   </BrowseContextProvider>
-                  </AdvisorPanelProvider>
                   </CadLabProvider>
                   </BackgroundOpsProvider>
                 </ZoomProvider>

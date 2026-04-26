@@ -1432,7 +1432,7 @@ export async function generateModuleImage(
       : buildModulePrompt(module, brief, visualStyle)
   const prompt = stylePreamble ? stylePreamble + rawPrompt : rawPrompt
 
-  let imageData = await callImageWithFallback(prompt, {
+  const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
     referenceBase64,
     referenceMimeType,

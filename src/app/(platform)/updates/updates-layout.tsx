@@ -20,9 +20,6 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { cn } from '@/lib/utils'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -69,19 +66,6 @@ export function UpdatesLayout({
   bannerSlot,
   members = [],
 }: UpdatesLayoutProps) {
-  // ── Briefing ────────────────────────────────────────────────────────────
-  const briefingContext = useMemo(() =>
-    `Activity items: ${initialItems.length}, Team members: ${members.length}`,
-    [initialItems.length, members.length]
-  )
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('chief-of-staff', briefingContext, 'success'),
-    'success',
-    true,
-    'briefing-updates',
-  )
-
   // ── View state ──────────────────────────────────────────────────────────
   const [activeView, setActiveView] = useState<CommsView>('activity')
 
@@ -507,20 +491,6 @@ export function UpdatesLayout({
           />
         </div>
 
-        <div className="px-4 sm:px-6 lg:px-8 pt-4 shrink-0">
-          <SpecialistBriefingHero
-            specialistId="chief-of-staff"
-            specialistName="Cal"
-            specialistTitle="Chief of Staff"
-            narrative={briefing.narrative}
-            fallbackMessage="While you were away, things moved. I've sorted by what needs you versus what's just context — the items at the top are the ones someone's waiting on. Scan for anything flagged, respond to those first, and you're caught up in under two minutes."
-            isLoading={briefing.isLoading}
-            severity={briefing.severity}
-            context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
-            storageKey="comms"
-          />
-        </div>
-
         {TabBar}
 
         {bannerSlot && activeView === 'activity' && (
@@ -560,20 +530,6 @@ export function UpdatesLayout({
             objectivesWithUpdates={objectivesWithUpdates}
             onMarkAllRead={handleMarkAllRead}
             isMarkingRead={isMarkingRead}
-          />
-        </div>
-
-        <div className="px-4 sm:px-6 pt-4 shrink-0">
-          <SpecialistBriefingHero
-            specialistId="chief-of-staff"
-            specialistName="Cal"
-            specialistTitle="Chief of Staff"
-            narrative={briefing.narrative}
-            fallbackMessage="While you were away, things moved. I've sorted by what needs you versus what's just context — the items at the top are the ones someone's waiting on. Scan for anything flagged, respond to those first, and you're caught up in under two minutes."
-            isLoading={briefing.isLoading}
-            severity={briefing.severity}
-            context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
-            storageKey="comms"
           />
         </div>
 
@@ -646,20 +602,6 @@ export function UpdatesLayout({
               objectivesWithUpdates={objectivesWithUpdates}
               onMarkAllRead={handleMarkAllRead}
               isMarkingRead={isMarkingRead}
-            />
-          </div>
-
-          <div className="px-4 pt-3 shrink-0">
-            <SpecialistBriefingHero
-              specialistId="chief-of-staff"
-              specialistName="Cal"
-              specialistTitle="Chief of Staff"
-              narrative={briefing.narrative}
-              fallbackMessage="While you were away, things moved. I've sorted by what needs you versus what's just context — the items at the top are the ones someone's waiting on. Scan for anything flagged, respond to those first, and you're caught up in under two minutes."
-              isLoading={briefing.isLoading}
-              severity={briefing.severity}
-              context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
-              storageKey="comms"
             />
           </div>
 

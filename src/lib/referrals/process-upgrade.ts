@@ -23,22 +23,35 @@ const UPGRADE_REWARDS: Record<
 > = {
   seed: { tasks: 15, investorViews: 3 },
   starter: { tasks: 25, investorViews: 5 },
+  // Starter (£20) sits between Seed and the legacy Startup Team in reward
+  // size — it bundles fewer AI tasks than Startup Team but lands the new
+  // entry-tier cohort. Pegged to seed rewards as a conservative starting
+  // point; revisit when v2 cohort data is in.
+  starter_v2: { tasks: 15, investorViews: 3 },
   professional: { tasks: 40, investorViews: 10 },
   enterprise: { tasks: 75, investorViews: 30 },
 }
 
 /**
- * Grant a referral upgrade reward (with 30-day vesting).
+ * Grant a referral upgrade reward.
  *
  * Called from handleSubscriptionEvent() when a `customer.subscription.created` event fires.
- * Does NOT grant credits immediately — inserts into `referral_rewards_pending` instead.
  *
- * @param userId - The user who just subscribed (the referee)
+ * Two grant mechanisms run in parallel:
+ *
+ *   1. Immediate investor-search credits via `grant_referral_credits_on_paid_conversion` RPC.
+ *      Fires for both UUID-format refs (from the in-app upsells CTA) and legacy-code refs.
+ *      Inviter: +100 investor searches (capped at 500/month).
+ *      Invitee: +50 investor searches as a welcome bonus.
+ *
+ *   2. Vested AI-task credits via `referral_rewards_pending` (30-day vesting).
+ *      Only fires for legacy 7-char-code referrals (where `profiles.referred_by` is set).
+ *
+ * @param userId - The user who just subscribed (the invitee)
  * @param tier - The subscription tier they upgraded to
  *
  * @security Uses admin client — this is a system operation triggered by Stripe webhook.
- * No user session available. Cross-foundry lookup is intentional (referrer and referee
- * may be in different foundries).
+ * No user session available. Cross-foundry lookup is intentional.
  */
 export async function grantReferralUpgradeReward(
   userId: string,
@@ -56,6 +69,59 @@ export async function grantReferralUpgradeReward(
   try {
     const admin = createAdminClient()
 
+    // FLOW: Immediate investor-search credit grant for UUID-format referrals.
+    // Fires for any paid conversion where a referral_signups row exists for the
+    // invitee (recorded during signup via the in-app upsells CTA).
+    // The function is idempotent — safe to call even if no referral_signups row exists.
+    try {
+      const { data: conversionResult, error: conversionError } = await admin.rpc(
+        'grant_referral_credits_on_paid_conversion',
+        { p_invitee_user_id: userId, p_paid_tier: tier }
+      )
+      if (conversionError) {
+        console.error('[Referral] grant_referral_credits_on_paid_conversion error:', conversionError.message)
+      } else {
+        const result = conversionResult as { status: string; inviter_capped?: boolean; inviter_user_id?: string } | null
+        console.info('[Referral] grant_referral_credits_on_paid_conversion:', {
+          userId,
+          tier,
+          status: result?.status,
+          inviterCapped: result?.inviter_capped,
+        })
+
+        // FLOW: Forge Ambassador lane (Tier 5 step 23).
+        // On a successful conversion, refresh the inviter's ambassador status cache
+        // so forge_ambassador_since is set when they first cross 10 active paid referrals.
+        // We look up the inviter from referral_signups directly (the SQL function does
+        // the join). Fire-and-forget: ambassador cache failures must never fail the webhook.
+        if (result?.status === 'ok' || result?.status === 'already_converted') {
+          try {
+            const { data: signupRow } = await admin
+              .from('referral_signups')
+              .select('inviter_user_id')
+              .eq('invitee_user_id', userId)
+              .maybeSingle()
+
+            if (signupRow?.inviter_user_id) {
+              await admin.rpc('update_forge_ambassador_status', {
+                p_inviter_user_id: signupRow.inviter_user_id,
+              })
+              console.info('[Referral] update_forge_ambassador_status called for inviter:', signupRow.inviter_user_id)
+            }
+          } catch (ambassadorErr) {
+            console.warn('[Referral] update_forge_ambassador_status failed (non-blocking):', ambassadorErr)
+          }
+        }
+      }
+    } catch (conversionErr) {
+      // Non-blocking — investor-search grants must not fail the subscription webhook
+      console.error('[Referral] grant_referral_credits_on_paid_conversion threw:', conversionErr)
+    }
+
+    // FLOW: Vested AI-task credit grant for legacy 7-char-code referrals.
+    // Only fires when profiles.referred_by is set (7-char-code path sets this;
+    // UUID-format path does not — it uses referral_signups instead).
+
     // Look up the subscribing user's referrer
     const { data: profile, error: profileError } = await admin
       .from('profiles')
@@ -64,7 +130,7 @@ export async function grantReferralUpgradeReward(
       .single()
 
     if (profileError || !profile?.referred_by) {
-      // No referrer — nothing to do (most users won't have one)
+      // No legacy referrer — nothing more to do
       return
     }
 

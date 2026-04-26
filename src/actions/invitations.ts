@@ -600,7 +600,7 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
   }
   
   revalidatePath('/', 'layout')
-  redirect('/join/success?type=invitation')
+  redirect('/signup/success?type=invitation')
 }
 
 /**

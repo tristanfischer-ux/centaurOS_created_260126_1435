@@ -7,7 +7,7 @@
  * and prevents localhost URLs from leaking into production.
  *
  * Architecture: Single-domain setup on fractionalforge.app.
- * Marketing (/, /join/*) and app (/dashboard, /tasks, etc.) share one domain.
+ * Marketing (/, /signup/*) and app (/dashboard, /tasks, etc.) share one domain.
  * The ops dashboard lives on ops.fractionalforge.app.
  *
  * Env vars used:

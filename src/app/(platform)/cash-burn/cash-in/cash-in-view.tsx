@@ -9,8 +9,6 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap, Banknote, Loader2, Upload, Package } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -24,7 +22,6 @@ import { ImportDialog } from '../components/ImportDialog'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { generateCashInGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
@@ -159,34 +156,6 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
       }
     })
   }, [cashInGrid])
-
-  // ── AI Briefing ──────────────────────────────────────────────────────────
-  const briefingContext = useMemo(() => {
-    const revenueItems = items.filter(i => i.sourceType === 'revenue')
-    const nonRevenueTotal = items.filter(i => i.sourceType !== 'revenue').reduce((s, i) => s + i.weeklyAmount, 0)
-    const revenueTotal = revenueItems.reduce((s, i) => s + i.weeklyAmount, 0)
-    const sourceTypes = new Set(items.map(i => i.sourceType)).size
-    return `Weekly total: £${weeklyTotal / 100}, Revenue: £${revenueTotal / 100}, Non-revenue: £${nonRevenueTotal / 100}, Source types: ${sourceTypes}`
-  }, [weeklyTotal, items])
-
-  // INTENT: Empty revenue is a starting point, not a problem. Only escalate
-  // severity to 'warning' when there's a genuine exposure signal — e.g. a
-  // single dominant source. Empty-as-warning fed failure framing into the AI
-  // briefing on the Products page too; same pattern here.
-  const briefingSeverity = useMemo(() => {
-    const revenueItems = items.filter(i => i.sourceType === 'revenue')
-    if (revenueItems.length === 0) return 'success' as const
-    // Single source covering 100% of revenue = real concentration risk worth flagging.
-    if (revenueItems.length === 1 && items.length > 1) return 'warning' as const
-    return 'success' as const
-  }, [items])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('finance-lead', briefingContext, briefingSeverity),
-    briefingSeverity,
-    items.length > 0,
-    'briefing-cash-in',
-  )
 
   const saveOpeningBalance = useCallback(async () => {
     if (!scenarioId) return
@@ -367,18 +336,6 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
           <Badge variant="secondary" size="sm">{formatCurrency(monthlyTotal)}/mo</Badge>
         </div>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="finance-lead"
-        specialistName="Finn"
-        specialistTitle="Finance"
-        narrative={briefing.narrative}
-        fallbackMessage="Revenue isn't one number — it's streams, and some are more reliable than others. I break down every inflow: recurring revenue, grants, one-off wins, funding. You'll see your income mix and spot dangerous over-reliance on any single source. Add your revenue streams and I'll show you where you're exposed."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Cash In', description: 'Finn on cash in.', metadata: {} }}
-        storageKey="cash-in"
-      />
 
       {error && (
         <Alert variant="destructive">

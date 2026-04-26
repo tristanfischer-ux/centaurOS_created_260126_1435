@@ -8,8 +8,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import Link from 'next/link'
 import { BarChart3, TrendingDown, TrendingUp, Package, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -20,7 +18,6 @@ import { IncomeStatementTable } from '@/components/cash-burn/income-statement-ta
 import { BalanceSheetTable } from '@/components/cash-burn/balance-sheet-table'
 import { WaterfallChart } from '@/components/cash-burn/waterfall-chart'
 import { HorizontalBar } from '@/components/cash-burn/horizontal-bar'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Badge } from '@/components/ui/badge'
 import { buildIncomeStatement, buildBalanceSheet } from '@/lib/cash-burn/pnl-builder'
 import { getProducts } from '@/actions/products'
@@ -75,23 +72,6 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
       { period: 'Total', revenue: 0, cogs: 0, grossProfit: 0, opex: 0, rnd: 0, ebitda: 0 }
     )
   }, [incomeStatementRows])
-
-  // ── AI Briefing ──────────────────────────────────────────────────────────
-  const briefingContext = useMemo(() => {
-    const grossMarginPct = totals.revenue > 0 ? Math.round((totals.grossProfit / totals.revenue) * 100) : 0
-    return `Revenue: £${totals.revenue / 100}, COGS: £${totals.cogs / 100}, Gross margin: ${grossMarginPct}%, EBITDA: £${totals.ebitda / 100}`
-  }, [totals])
-
-  const briefingSeverity = useMemo(() => {
-    return totals.ebitda < 0 ? 'error' as const : 'success' as const
-  }, [totals.ebitda])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('finance-lead', briefingContext, briefingSeverity),
-    briefingSeverity,
-    cashOut.length > 0 || cashIn.length > 0,
-    'briefing-pnl',
-  )
 
   // Balance sheet at selected week
   const balanceSheetDate = useMemo(() => {
@@ -197,18 +177,6 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
           </p>
         </div>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="finance-lead"
-        specialistName="Finn"
-        specialistTitle="Finance"
-        narrative={briefing.narrative}
-        fallbackMessage="This is your projected P&L — not last quarter's history, but next quarter's trajectory. I pull live data into income statement and margin analysis so you see where profit actually comes from. If your gross margin is below 60%, click into the cost breakdown — there's always something hiding in there."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'P&L', description: 'Finn on P&L.', metadata: {} }}
-        storageKey="pnl"
-      />
 
       {/* Unclassified-cost warning — items without a pnlCategory are silently
           excluded from the income statement, which can understate costs.

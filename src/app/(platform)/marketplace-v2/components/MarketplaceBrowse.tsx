@@ -31,9 +31,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PageTour } from '@/components/guidance/page-tour'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { ProcessDiscoveryGrid } from '@/components/marketplace/process-discovery-grid'
 import type { ProcessGroup } from '@/actions/marketplace-process-discovery'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
@@ -120,15 +117,6 @@ export function MarketplaceBrowse({
     const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
-
-    // Live AI briefing
-    const briefingContext = `Listings: ${initialListings.length}, Saved: ${initialSavedIds.length}, Category: ${state.activeCategory}`
-    const briefing = usePageBriefing(
-        () => generatePageBriefing('vp-supply-chain', briefingContext, 'success'),
-        'success',
-        !hideSpecialistBriefing && initialListings.length > 0,
-        'briefing-marketplace',
-    )
 
     // Shared compare selection state (lifted from MarketplaceListingGrid)
     const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
@@ -356,21 +344,6 @@ export function MarketplaceBrowse({
                         </p>
                     </div>
                 </div>
-            )}
-
-            {/* Chase (Supply Chain) briefing — hidden when parent page has its own specialist */}
-            {!hideSpecialistBriefing && (
-                <SpecialistBriefingHero
-                    specialistId="vp-supply-chain"
-                    specialistName="Chase"
-                    specialistTitle="Supply Chain"
-                    narrative={briefing.narrative}
-                    fallbackMessage="Find suppliers, services, and tools for your hardware venture. I'll help you compare options and match suppliers to your technical requirements."
-                    isLoading={briefing.isLoading}
-                    severity={briefing.severity}
-                    context={{ type: 'general', title: 'Marketplace', description: 'Chase on marketplace.', metadata: {} }}
-                    storageKey="marketplace"
-                />
             )}
 
             {/* Tab navigation — WAI-ARIA tablist with arrow-key navigation */}

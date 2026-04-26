@@ -13,10 +13,8 @@ import {
   ChevronRight, ChevronDown, Flag, AlertTriangle, Plus, Waypoints, MessageSquare,
 } from 'lucide-react'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
-import type { SpecialistContext } from '@/components/specialists/types'
-import { generateObjectivesBriefing, type SpecialistBriefingResult } from '@/actions/specialist-page-insights'
+
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import {
@@ -187,11 +185,6 @@ export function ObjectivesBoard({
     return { total, onTrack, atRisk, offTrack, completed }
   }, [objectives])
 
-  // ── Sage's objectives briefing ──────────────────────────────────
-  const [sageBriefing, setSageBriefing] = useState<SpecialistBriefingResult>({ narrative: null, severity: 'success' })
-  const [isSageLoading, setIsSageLoading] = useState(false)
-  const sageFetched = useRef(false)
-
   const totalOverdueTasks = useMemo(
     () => objectives.reduce((sum, o) => sum + o.overdueTasks, 0),
     [objectives],
@@ -206,54 +199,6 @@ export function ObjectivesBoard({
       : 0,
     [objectives],
   )
-
-  // Local fallback insight
-  const sageFallback = "Your strategy means nothing without objectives that have teeth. I've laid out three views — Board for the big picture, Tree to see how everything connects, Timeline to spot bottlenecks before they bite. Pick your first strategic pillar and let's break it into objectives that actually move."
-
-  const sageSeverity = useMemo((): 'success' | 'warning' | 'error' => {
-    if (stats.offTrack > 0) return 'error'
-    if (stats.atRisk > 0 || totalOverdueTasks > 3) return 'warning'
-    return 'success'
-  }, [stats, totalOverdueTasks])
-
-  useEffect(() => {
-    if (sageFetched.current || objectives.length === 0) return
-    sageFetched.current = true
-    setIsSageLoading(true)
-
-    generateObjectivesBriefing({
-      totalObjectives: stats.total,
-      atRiskCount: stats.atRisk,
-      offTrackCount: stats.offTrack,
-      completedCount: stats.completed,
-      overdueTaskCount: totalOverdueTasks,
-      unlinkedCount,
-      avgProgress,
-      pillarCount: strategicObjectives.length,
-    }).then((result) => {
-      // GOTCHA: withAuth may return { error: string } instead of the expected shape.
-      // Only update briefing if result has the correct properties and no error.
-      if (result && 'severity' in result && !('error' in result)) {
-        setSageBriefing(result)
-      }
-    }).catch(() => { /* Non-critical — local fallback remains */ })
-      .finally(() => setIsSageLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const sageContext: SpecialistContext = useMemo(() => ({
-    type: 'objective' as const,
-    title: 'Objectives Overview',
-    description: 'Sage is reviewing the health of your objectives.',
-    metadata: {
-      objectives: objectives.map(o => ({
-        title: o.title,
-        health: o.health,
-        progress: o.progress ?? undefined,
-      })),
-      notes: sageBriefing.narrative ?? sageFallback,
-    },
-  }), [objectives, sageBriefing, sageFallback])
 
   // Register screen context so specialists know what the user is viewing
   useRegisterScreenContext(useMemo(() => ({
@@ -514,20 +459,6 @@ export function ObjectivesBoard({
           </div>
         </div>
       </div>
-
-      {/* Sage's Objectives Briefing */}
-      <SpecialistBriefingHero
-        specialistId="strategist"
-        specialistName="Sage"
-        specialistTitle="Strategy"
-        narrative={sageBriefing.narrative}
-        fallbackMessage={sageFallback}
-        isLoading={isSageLoading}
-        loadingMessage="Reviewing your objectives..."
-        severity={sageSeverity}
-        context={sageContext}
-        storageKey="objectives"
-      />
 
       {/* Team Pulse */}
       <TeamPulseDashboard />

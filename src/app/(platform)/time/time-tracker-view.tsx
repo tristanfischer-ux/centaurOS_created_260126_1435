@@ -16,9 +16,7 @@
 'use client'
 
 import * as React from 'react'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
+
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { WeeklyTimesheetGrid } from '@/components/time/weekly-timesheet-grid'
@@ -157,24 +155,6 @@ export function TimeTrackerView({
   const summary = React.useMemo(() => buildSummary(weekStart, entries), [weekStart, entries])
 
   // ── AI Briefing ──────────────────────────────────────────────────────────
-  const briefingContext = React.useMemo(() => {
-    const totalHours = (summary.totalMinutes / 60).toFixed(1)
-    const uniqueProjects = new Set(entries.map(e => e.financeProjectId).filter(Boolean)).size
-    const daysWithEntries = new Set(entries.map(e => e.entryDate)).size
-    return `Hours this week: ${totalHours}, Entries: ${entries.length}, Projects: ${uniqueProjects}, Days with entries: ${daysWithEntries}/5`
-  }, [summary.totalMinutes, entries])
-
-  const briefingSeverity = React.useMemo(() => {
-    return summary.totalMinutes === 0 ? 'warning' as const : 'success' as const
-  }, [summary.totalMinutes])
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('chief-of-staff', briefingContext, briefingSeverity),
-    briefingSeverity,
-    true,
-    'briefing-time',
-  )
-
   const handleStartTimer = React.useCallback(async () => {
     setTimerStarting(true)
     try {
@@ -347,18 +327,6 @@ export function TimeTrackerView({
           )}
         </div>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={briefing.narrative}
-        fallbackMessage="Track where your hours actually go — not where you think they go. Weekly view, project allocation, billable vs. non-billable. Most founders discover 40% of their time is on work they should've delegated last month. Log this week and see what the data says."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Time Tracking', description: 'Cal on time tracking.', metadata: {} }}
-        storageKey="time"
-      />
 
       {/* Error banner (H-1 fix) */}
       {error && (

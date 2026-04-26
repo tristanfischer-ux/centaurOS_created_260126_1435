@@ -28,8 +28,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
-
 const section = getSectionById("marketplace")
 
 /** Category quick-link definitions */
@@ -148,21 +146,6 @@ export function MarketplaceSectionIntro(): React.ReactElement | null {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
-
-            {/* Chase's coaching tip */}
-            <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <SpecialistBriefingHero
-                    specialistId="vp-supply-chain"
-                    specialistName="Chase"
-                    specialistTitle="Supply Chain"
-                    narrative={null}
-                    fallbackMessage="Find suppliers, hire talent, or discover playbooks. I'll help you compare options and match suppliers to your technical requirements."
-                    isLoading={false}
-                    severity="success"
-                    context={{ type: 'general', title: 'Marketplace', description: 'Chase on the marketplace.', metadata: {} }}
-                    storageKey="marketplace-intro"
-                />
             </div>
 
             {/* Category Quick-Links */}

@@ -71,21 +71,32 @@ export function usePageBriefing(
   enabled: boolean,
   cacheKey?: string,
 ): UsePageBriefingResult {
-  // Check cache on init
-  const [initialCache] = useState(() => {
-    if (cacheKey && enabled) return getCached(cacheKey)
-    return null
-  })
-
-  const [narrative, setNarrative] = useState<string | null>(initialCache?.narrative ?? null)
-  const [severity, setSeverity] = useState<BriefingSeverity>(initialCache?.severity ?? defaultSeverity)
-  const [isLoading, setIsLoading] = useState(enabled && !initialCache)
+  // INTENT: server and first-client render must match (hydration). Reading
+  // localStorage during useState init runs on the client only, so the cached
+  // narrative would replace the server-rendered fallback before hydration
+  // completed and produce a mismatch (server: "Thirteen specialists..." vs
+  // client: "This is a clean slate..."). Always start from null + the
+  // fallback, then read the cache (or fetch) inside useEffect.
+  const [narrative, setNarrative] = useState<string | null>(null)
+  const [severity, setSeverity] = useState<BriefingSeverity>(defaultSeverity)
+  const [isLoading, setIsLoading] = useState(enabled)
   const fetched = useRef(false)
 
   useEffect(() => {
     if (!enabled) return
     if (fetched.current) return
     fetched.current = true
+
+    // Hydrate from localStorage cache after mount (avoids hydration mismatch).
+    if (cacheKey) {
+      const cached = getCached(cacheKey)
+      if (cached) {
+        setNarrative(cached.narrative)
+        setSeverity(cached.severity)
+        setIsLoading(false)
+        return
+      }
+    }
 
     fetchFn()
       .then((result) => {

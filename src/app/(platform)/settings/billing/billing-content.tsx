@@ -37,6 +37,10 @@ import { cn } from '@/lib/utils'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/plans'
 import type { MonthlyUsage } from '@/lib/ai/usage-tracking'
+import {
+  ForgeAmbassadorBadge,
+  ForgeAmbassadorMilestoneToast,
+} from '@/components/referrals/ForgeAmbassadorBadge'
 
 interface BillingContentProps {
   userId: string
@@ -51,6 +55,10 @@ interface BillingContentProps {
   hasStripeCustomer: boolean
   /** When true, upgrade buttons use test-activate instead of Stripe checkout */
   isTestMode?: boolean
+  /** Whether the user currently has Forge Ambassador status (10+ active paid referrals) */
+  isForgeAmbassador?: boolean
+  /** ISO timestamp when they first crossed the 10-referral threshold; triggers milestone toast */
+  ambassadorSince?: string | null
 }
 
 /**
@@ -67,6 +75,8 @@ export function BillingContent({
   aiUsage,
   hasStripeCustomer,
   isTestMode = false,
+  isForgeAmbassador = false,
+  ambassadorSince = null,
 }: BillingContentProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -152,10 +162,16 @@ export function BillingContent({
     }
   }
 
-  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => p.tier !== 'enterprise')
+  // Hide enterprise (contact-sales tier) and legacy plans (existing subscribers
+  // continue to resolve against legacy entries but new upgrades route through
+  // the public catalogue only — see plans.ts `legacy` flag).
+  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => p.tier !== 'enterprise' && !p.legacy)
 
   return (
     <div className="space-y-8 max-w-5xl">
+      {/* Forge Ambassador milestone toast — fires once per session on first crossing */}
+      <ForgeAmbassadorMilestoneToast since={ambassadorSince ?? null} />
+
       {/* Success / Canceled alerts */}
       {isSuccess && (
         <Alert>
@@ -206,7 +222,7 @@ export function BillingContent({
                   {subscription?.cancel_at_period_end
                     ? 'Cancels at end of period'
                     : currentTier === 'free'
-                      ? 'Free tier — upgrade for more smart assists and features'
+                      ? 'Free tier — upgrade for more specialist tasks and features'
                       : `Renews ${subscription?.current_period_end
                           ? new Date(subscription.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
                           : 'monthly'
@@ -215,14 +231,19 @@ export function BillingContent({
                 </p>
               </div>
             </div>
-            <Badge
-              variant={currentTier === 'free' ? 'secondary' : 'default'}
-              className={cn(
-                currentTier !== 'free' && 'bg-international-orange text-white'
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge
+                variant={currentTier === 'free' ? 'secondary' : 'default'}
+                className={cn(
+                  currentTier !== 'free' && 'bg-international-orange text-white'
+                )}
+              >
+                {currentPlan.name}
+              </Badge>
+              {isForgeAmbassador && (
+                <ForgeAmbassadorBadge />
               )}
-            >
-              {currentPlan.name}
-            </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -261,18 +282,18 @@ export function BillingContent({
             </div>
             <div>
               <CardTitle className="text-base sm:text-lg flex items-center gap-1.5">
-                Smart Assists This Month
+                Specialist Tasks This Month
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help shrink-0" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[280px]">
-                    <p className="text-sm">Each specialist chat message, CAD Lab generation, voice-to-task, comparison, or investor match counts as one smart assist.</p>
+                    <p className="text-sm">Each specialist chat message, CAD Lab generation, voice-to-task, comparison, or investor match counts as one specialist task.</p>
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                {aiUsage.totalAiTasks} of {aiLimit} smart assists used
+                {aiUsage.totalAiTasks} of {aiLimit} specialist tasks used
               </p>
             </div>
           </div>
@@ -301,7 +322,7 @@ export function BillingContent({
               <p className="text-sm text-status-warning flex items-center gap-1.5">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {aiUsagePercent >= 100
-                  ? 'Limit reached — upgrade for more smart assists'
+                  ? 'Limit reached — upgrade for more specialist tasks'
                   : 'Approaching limit — consider upgrading'
                 }
               </p>
@@ -314,7 +335,7 @@ export function BillingContent({
               <p className="text-2xl font-semibold text-foreground">
                 {aiUsage.totalAiTasks}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">AI Tasks</p>
+              <p className="text-xs text-muted-foreground mt-1">Specialist Tasks</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <p className="text-2xl font-semibold text-foreground">
@@ -440,7 +461,7 @@ export function BillingContent({
                 <div>
                   <p className="font-semibold text-foreground">Enterprise</p>
                   <p className="text-sm text-muted-foreground">
-                    Unlimited smart assists, SSO, dedicated support, custom integrations
+                    Unlimited specialist tasks, SSO, dedicated support, custom integrations
                   </p>
                 </div>
               </div>
@@ -459,12 +480,16 @@ export function BillingContent({
  * Get numeric order of a tier for comparison.
  */
 function getPlanOrder(tier: SubscriptionTier): number {
+  // Legacy tiers (`seed`, `starter`) are slotted in below `starter_v2` so
+  // a £49/mo Startup Team subscriber is correctly recognised as "above"
+  // the new £20 Starter when the upgrade UI compares orders.
   const order: Record<SubscriptionTier, number> = {
     free: 0,
     seed: 1,
-    starter: 2,
-    professional: 3,
-    enterprise: 4,
+    starter_v2: 2,
+    starter: 3,
+    professional: 4,
+    enterprise: 5,
   }
   return order[tier]
 }

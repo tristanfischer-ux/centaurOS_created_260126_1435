@@ -61,7 +61,7 @@ export function StartForgeBox(): React.ReactElement {
                 return
             }
 
-            toast.success("The Forge is building your plan — this takes about 20 minutes.")
+            toast.success("The Forge is building your plan — twenty minutes for the first pass, hours of detail after.")
             router.push(`/the-forge-v2/projects/${created.projectId}`)
         })
     }
@@ -85,7 +85,7 @@ export function StartForgeBox(): React.ReactElement {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">
-                    The Forge drafts a full plan — brief, modules, bill of materials, cost, risks, suppliers — in about 20 minutes. You review everything before anything locks.
+                    The Forge drafts a full plan — brief, modules, bill of materials, cost, risks, suppliers. Twenty minutes for the first pass, hours of detail after. You review everything before anything locks.
                 </p>
                 <Button
                     onClick={handleSubmit}

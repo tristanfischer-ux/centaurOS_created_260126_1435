@@ -87,7 +87,7 @@ export function MarketingNav() {
                             Sign In
                         </Button>
                     </Link>
-                    <Link href="/join">
+                    <Link href="/signup">
                         <Button size="sm" className="gap-1.5">
                             Get Started
                             <ArrowRight className="h-3.5 w-3.5" />
@@ -122,7 +122,7 @@ export function MarketingNav() {
                     <div className="border-t bg-background shadow-lg md:hidden">
                         <div className="flex flex-col gap-1 px-4 py-4 sm:px-6">
                             <Link
-                                href="/join"
+                                href="/signup"
                                 className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-xs font-mono font-bold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-international-orange-hover"
                                 onClick={() => setMobileMenuOpen(false)}
                             >

@@ -51,7 +51,7 @@ export function ApproveView(props: ApproveViewProps): React.ReactElement {
 
     const workspaceHref = `/the-forge-v2/projects/${project.id}`
     const briefHref = `/the-forge-v2/projects/${project.id}/brief`
-    const todayHref = "/today"
+    const todayHref = "/investors"
 
     const copy = approvalCopy(type, project)
 

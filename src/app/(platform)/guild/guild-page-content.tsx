@@ -25,9 +25,6 @@ import { getMyAssignments } from "@/actions/project-assignments"
 import { getGuildEvents, getEventRSVPStatuses, getGuildEventsSummary, type GuildEvent } from "@/actions/guild-events"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 
 // ==========================================
 // TYPES
@@ -87,18 +84,6 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
     const [createEventOpen, setCreateEventOpen] = useState(false)
     const [activeTab, setActiveTab] = useState<string>(isManager ? "pool" : "assignments")
     const tabsRef = useRef<HTMLDivElement>(null)
-
-    // Live AI briefing
-    const apprenticeCount = members.filter(m => m.role === 'Apprentice').length
-    const executiveCount = members.filter(m => m.role === 'Executive').length
-    const founderCount = members.filter(m => m.role === 'Founder').length
-    const briefingContext = `Members: ${members.length} (${apprenticeCount} apprentices, ${executiveCount} executives, ${founderCount} founders)`
-    const briefing = usePageBriefing(
-        () => generatePageBriefing('hiring-team', briefingContext, 'success'),
-        'success',
-        members.length > 0,
-        'briefing-guild',
-    )
 
     const loadData = async (): Promise<void> => {
         setLoading(true)
@@ -259,18 +244,6 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                     )}
                 </div>
 
-                <SpecialistBriefingHero
-                    specialistId="hiring-team"
-                    specialistName="Harper"
-                    specialistTitle="Hiring"
-                    narrative={briefing.narrative}
-                    fallbackMessage="The Guild connects apprentices with mentors and companies. Build your network to find and develop talent for your team."
-                    isLoading={briefing.isLoading}
-                    severity={briefing.severity}
-                    context={{ type: 'general', title: 'Guild', description: 'Harper on guild.', metadata: {} }}
-                    storageKey="guild"
-                />
-
                 {/* Events-first layout */}
                 {loading ? (
                     <Card className="border">
@@ -347,18 +320,6 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                         </p>
                     </div>
                 </div>
-
-                <SpecialistBriefingHero
-                    specialistId="hiring-team"
-                    specialistName="Harper"
-                    specialistTitle="Hiring"
-                    narrative={briefing.narrative}
-                    fallbackMessage="The Guild connects apprentices with mentors and companies. Build your network to find and develop talent for your team."
-                    isLoading={briefing.isLoading}
-                    severity={briefing.severity}
-                    context={{ type: 'general', title: 'Guild', description: 'Harper on guild.', metadata: {} }}
-                    storageKey="guild"
-                />
 
                 {/* Events-first layout */}
                 {loading ? (

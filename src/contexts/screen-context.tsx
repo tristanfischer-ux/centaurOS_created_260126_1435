@@ -81,10 +81,6 @@ interface ScreenContextValue {
 
 /** Maps route patterns to human-readable page titles and summaries */
 const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
-  "/today": {
-    title: "Today (Daily Briefing)",
-    summary: "The user is viewing their daily briefing — focus tasks, blockers, pending approvals, and team activity.",
-  },
   "/strategy": {
     title: "Strategy Dashboard",
     summary: "The user is viewing the company strategy — strategic pillars, health indicators, and progress across the organization.",
@@ -177,10 +173,6 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
   "/apprenticeship": {
     title: "Apprenticeship",
     summary: "The user is on the apprenticeship dashboard — training progress and OTJT.",
-  },
-  "/recruits": {
-    title: "People Marketplace",
-    summary: "The user is browsing the people marketplace — finding talent and recommendations.",
   },
   "/marketplace-orders": {
     title: "Orders",

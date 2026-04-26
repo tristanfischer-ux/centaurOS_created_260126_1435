@@ -38,12 +38,11 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 
-import { welcomeNavItem, todayNavItem, meNavigation } from "@/components/sidebar/data/me"
+import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
-import { planNavigation } from "@/components/sidebar/data/plan"
 import { moneyLegacyNavigation } from "@/components/sidebar/data/money"
 import { getWorkshopNavigation } from "@/components/sidebar/data/workshop"
-import { marketplacePeopleNavigation, marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
+import { marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
 import type { SidebarNavItem } from "@/components/sidebar/data/types"
 
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -68,6 +67,10 @@ import { getMyReferralInfo } from "@/actions/referrals"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 import { getUnreadAlertCount } from "@/actions/match-alerts"
 import { toast } from "sonner"
+import {
+    ForgeAmbassadorBadge,
+    ForgeAmbassadorMilestoneToast,
+} from "@/components/referrals/ForgeAmbassadorBadge"
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -99,6 +102,18 @@ interface SidebarProps {
      * /the-forge-v2 (PR #2+ surface). Default false preserves current behaviour.
      */
     newForgeExperienceEnabled?: boolean
+    /**
+     * Whether the user currently has Forge Ambassador status (10+ active paid
+     * referrals). When true, a "Forge Ambassador" badge appears in the footer
+     * and they have unlimited investor searches.
+     */
+    isForgeAmbassador?: boolean
+    /**
+     * ISO timestamp when the user first crossed the 10-referral threshold.
+     * Passed to ForgeAmbassadorMilestoneToast so it fires only on the
+     * first sign-in after the milestone.
+     */
+    ambassadorSince?: string | null
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -208,6 +223,8 @@ export function Sidebar({
     onboardingData,
     isSupplier,
     newForgeExperienceEnabled = false,
+    isForgeAmbassador = false,
+    ambassadorSince = null,
 }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
@@ -223,7 +240,6 @@ export function Sidebar({
     // RSC payload is in the client cache before the click fires.
     React.useEffect(() => {
         const topRoutes = [
-            "/today",
             "/new-tasks",
             "/new-objectives",
             "/team",
@@ -272,7 +288,7 @@ export function Sidebar({
                 toast.error("Could not load your referral link.")
                 return
             }
-            const url = `${window.location.origin}/join?ref=${info.referralCode}`
+            const url = `${window.location.origin}/signup?ref=${info.referralCode}`
             await navigator.clipboard.writeText(url)
             toast.success("Referral link copied to clipboard!")
             await updateOnboardingData({ checklist_friend_invited: true })
@@ -292,14 +308,14 @@ export function Sidebar({
             {/* ─── Brand row ─────────────────────────────────── */}
             <div className="px-3 pt-4 pb-1 flex items-center gap-2">
                 <Link
-                    href="/today"
+                    href="/investors"
                     className="group flex items-center gap-2 font-display text-[15px] font-bold tracking-tight text-foreground hover:text-international-orange transition-colors"
                 >
                     <span
                         className="h-[7px] w-[7px] rounded-full bg-international-orange shadow-[0_0_8px_rgba(255,69,0,0.6)] animate-pulse"
                         aria-hidden="true"
                     />
-                    ForgeOS
+                    Fractional Forge
                 </Link>
                 <div className="ml-auto flex items-center gap-0.5">
                     <Tooltip delayDuration={200}>
@@ -347,7 +363,6 @@ export function Sidebar({
                 <Collapsible open={openSections.me}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
                         <NavLink item={welcomeNavItem} pathname={pathname} />
-                        <NavLink item={todayNavItem} pathname={pathname} />
                         {meNavigation.map((item) => (
                             <NavLink
                                 key={item.name}
@@ -383,85 +398,21 @@ export function Sidebar({
                     </>
                 )}
 
-                {/* PLAN */}
+                {/* Wave 7 sidebar trim (2026-04-25): four primary surfaces only —
+                    Brainstorming, The Forge, Investors, Suppliers. No section
+                    headers / collapsibles for the primary nav. */}
                 <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Plan"
-                    introRoute="/plan"
-                    hasNew={badges.plan}
-                    isOpen={openSections.plan}
-                    onToggle={() => toggleSection("plan")}
-                />
-                <Collapsible open={openSections.plan}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {planNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* CASH BURN (Money legacy — Phase 4 will re-scope per SHARED-SIDEBAR) */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Cash Burn"
-                    introRoute="/cash-burn"
-                    isOpen={openSections.cashBurn}
-                    onToggle={() => toggleSection("cashBurn")}
-                />
-                <Collapsible open={openSections.cashBurn}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {moneyLegacyNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* WORKSHOP */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Workshop"
-                    introRoute="/workshop"
-                    hasNew={badges.workshop}
-                    isOpen={openSections.workshop}
-                    onToggle={() => toggleSection("workshop")}
-                />
-                <Collapsible open={openSections.workshop}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {workshopNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* MARKETPLACE — People + Supplies sub-groups */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Marketplace"
-                    introRoute="/marketplace-hub"
-                    hasNew={badges.marketplace}
-                    isOpen={openSections.marketplace}
-                    onToggle={() => toggleSection("marketplace")}
-                />
-                <Collapsible open={openSections.marketplace}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        <div className="px-3 pt-1 pb-0.5">
-                            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                                People
-                            </p>
-                        </div>
-                        {marketplacePeopleNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                        <div className="px-3 pt-2 pb-0.5">
-                            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                                Supplies
-                            </p>
-                        </div>
-                        {marketplaceSuppliesNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
+                <div className="space-y-0.5">
+                    {workshopNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                    {moneyLegacyNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                    {marketplaceSuppliesNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                </div>
             </nav>
 
             {/* ─── Getting Started — gated on onboarding_data presence ── */}
@@ -528,12 +479,35 @@ export function Sidebar({
                     </form>
                 </div>
 
+                {/* Forge Ambassador badge — visible when user has 10+ active paid referrals */}
+                {isForgeAmbassador && (
+                    <div className="px-1">
+                        <ForgeAmbassadorBadge className="text-[9px]" />
+                    </div>
+                )}
+
                 {/* Status bars: Time (this week) + Credits. Per CLAUDE.md no-AI-emphasis
                     rule, the in-product label stays "Credits", not "AI Credits". */}
                 <div className="space-y-1">
                     <TimeWeekBarLoader />
                     <AICreditsBarLoader />
                 </div>
+
+                {/* Milestone toast — fires once per session when ambassador threshold is crossed */}
+                <ForgeAmbassadorMilestoneToast since={ambassadorSince} />
+
+                {/* TODO Tier 5 step 22 (RED-TEAM-PIVOT-PLAN): usage counter +
+                 * invite-friend CTA in sidebar footer. Render a running
+                 * counter "X/Y searches this month, invite a friend, +100
+                 * free" against the user's current month's usage from
+                 * llm_usage / user_subscriptions. CTA URL pattern is
+                 * `${APP_DOMAIN}/signup?ref=<user.id>` (centralised in
+                 * src/lib/domains.ts). Conversion-engine wiring lands in
+                 * the same step — credits the inviter +100 leads when the
+                 * referee subscribes to Starter. Free-tier accounts cap at
+                 * +500 inviter searches per month. The investors empty-out
+                 * upsell (LimitReachedUpsell) and the post-meeting upsell
+                 * (PostMeetingUpsell) already produce the same URL shape. */}
             </div>
 
             <FeedbackDialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />

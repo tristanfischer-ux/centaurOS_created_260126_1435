@@ -197,7 +197,7 @@ export function ComposeView(props: ComposeViewProps): React.ReactElement {
         <div className="cm2">
             {/* ── Breadcrumb ─────────────────────────────────────────── */}
             <nav className="cm2-breadcrumb" aria-label="Breadcrumb">
-                <Link href="/today">Today</Link>
+                <Link href="/investors">Today</Link>
                 <span className="sep">›</span>
                 <Link href="/the-forge-v2/compose">Comms</Link>
                 <span className="sep">›</span>

@@ -21,9 +21,9 @@ import { createClient } from "@/lib/supabase/server"
 import { WelcomeView } from "./welcome-view"
 
 export const metadata: Metadata = {
-    title: "Welcome to ForgeOS",
+    title: "Welcome to Fractional Forge",
     description:
-        "A tour of ForgeOS from Tristan Fischer, Founder of Fractional Forge — the operating system for hardware startups.",
+        "A welcome from Tristan Fischer, Founder of Fractional Forge — Brainstorming, the Forge, Investors, and Suppliers for hardware startups.",
 }
 
 export default async function WelcomePage(): Promise<React.ReactNode> {

@@ -8,7 +8,6 @@ import { UserAvatar } from '@/components/ui/user-avatar'
 import { SignOutCard } from './sign-out-card'
 import { RestartSetupWizardCard } from '@/components/onboarding/restart-setup-wizard-card'
 import { ClearDemoDataButton } from '@/components/settings/clear-demo-data-button'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import {
     User,
     ArrowRight,
@@ -46,18 +45,6 @@ export default async function SettingsPage() {
 
     return (
         <div className="space-y-6 max-w-3xl">
-            <SpecialistBriefingHero
-                specialistId="chief-of-staff"
-                specialistName="Cal"
-                specialistTitle="Chief of Staff"
-                narrative={null}
-                fallbackMessage="Two things to do here and then leave: connect your integrations (Google, Slack — unlocks half the automation) and turn off notification types you don't care about. Everything else can wait. If you've already done both, you're set."
-                isLoading={false}
-                severity="success"
-                context={{ type: 'general', title: 'Settings', description: 'Cal on settings.', metadata: {} }}
-                storageKey="settings"
-            />
-
             {/* Profile summary card */}
             <Card>
                 <CardContent className="pt-6">

@@ -26,14 +26,26 @@ import { Button } from '@/components/ui/button'
 import { ArrowRight, Copy, Check, Users } from 'lucide-react'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 
-/** Maps current tier to the next tier name and price */
+/**
+ * Maps current tier to the next tier name and price.
+ *
+ * Free → Starter (the new £20 tier) is the canonical first upgrade path.
+ * Legacy `seed` and `starter` tiers retain their original progression
+ * targets — existing subscribers stay on those tiers and any prompt they
+ * see should match what they signed up to.
+ */
 const TIER_PROGRESSION: Record<
   SubscriptionTier,
   { nextTierName: string; price: string; href: string }
 > = {
   free: {
-    nextTierName: 'Seed',
-    price: '£19/mo',
+    nextTierName: 'Starter',
+    price: '£20/mo',
+    href: '/settings/billing',
+  },
+  starter_v2: {
+    nextTierName: 'Pro',
+    price: '£149/mo',
     href: '/settings/billing',
   },
   seed: {
@@ -42,7 +54,7 @@ const TIER_PROGRESSION: Record<
     href: '/settings/billing',
   },
   starter: {
-    nextTierName: 'Professional',
+    nextTierName: 'Pro',
     price: '£149/mo',
     href: '/settings/billing',
   },
@@ -88,7 +100,7 @@ export function UpgradePrompt({
 
   function handleCopyReferral() {
     if (!referralCode) return
-    const referralUrl = `${window.location.origin}/join?ref=${referralCode}`
+    const referralUrl = `${window.location.origin}/signup?ref=${referralCode}`
     navigator.clipboard.writeText(referralUrl).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)

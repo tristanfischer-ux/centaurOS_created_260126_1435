@@ -8,13 +8,78 @@
  *
  * Server-side billing logic that needs Supabase / Stripe lives in
  * `subscriptions.ts` and re-exports these types for convenience.
+ *
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │ 2026-04-25 — PRICING RESTRUCTURE (locked)                               │
+ * ├─────────────────────────────────────────────────────────────────────────┤
+ * │ Killed: Explorer £2 / 50 brainstorms entry tier (loss-making at full    │
+ * │   use). Existing free-tier users keep the original Explorer limits      │
+ * │   under tier=`free` so they are NOT price-shocked. New marketing copy   │
+ * │   reframes `free` as the new "Free" tier (1 brainstorm/mo + 5 lifetime  │
+ * │   saved searches); enforcement of the tighter freemium gate is wired    │
+ * │   in a follow-up commit.                                                │
+ * │                                                                         │
+ * │ Added: `starter_v2` tier — £20/mo, 100 investor leads/mo with full      │
+ * │   why-fit + how-to-pitch + drafted-email, 10 brainstorming sessions/mo. │
+ * │   This is the new entry point that replaces Explorer £2.                │
+ * │                                                                         │
+ * │ Added: INVESTOR_SEARCH_ADDON — £10 per 100 extra investor searches,     │
+ * │   one-click upsell from inside /investors. Cash-cow SKU. Wiring to      │
+ * │   Stripe metered billing is TODO; data structure here so the UI can     │
+ * │   render the upsell card and Tristan can create the Stripe price ID.    │
+ * │                                                                         │
+ * │ Legacy: `seed` (£19) and existing `starter` (Startup Team £49) are      │
+ * │   marked legacy=true. Hidden from the public pricing page and from the  │
+ * │   billing-settings upgrade UI. Existing subscribers continue resolving  │
+ * │   against these entries until they upgrade or churn.                    │
+ * │                                                                         │
+ * │ Pending audit: `professional` (£149) and `enterprise` (£499) keep       │
+ * │   their numbers and limits — pricing review happens in a separate       │
+ * │   pass. Council labels updated: Pro → "Deep Council", Enterprise →      │
+ * │   "Strategy Council" (depth-of-context, not depth-of-reasoning).        │
+ * └─────────────────────────────────────────────────────────────────────────┘
  */
 
 // ==========================================
 // SUBSCRIPTION TYPES
 // ==========================================
 
-export type SubscriptionTier = 'free' | 'seed' | 'starter' | 'professional' | 'enterprise'
+export type SubscriptionTier =
+  | 'free'
+  | 'seed' // legacy — kept for existing £19/mo subscribers
+  | 'starter' // legacy — Startup Team £49, kept for existing subscribers
+  | 'starter_v2' // NEW 2026-04-25 — Starter £20/mo, the new entry tier
+  | 'professional'
+  | 'enterprise'
+
+/**
+ * Virtual tier sentinel used by limit-check logic to signal "this free-tier
+ * user is currently in their early-access window and should be treated as
+ * starter_v2 for the purposes of limit enforcement".
+ *
+ * This is NOT a Stripe product and NOT stored in user_subscriptions.tier.
+ * It is returned by getEffectiveTier() when profiles.early_access_until > now().
+ * All downstream code that reads tier should use getEffectiveTier(), not the
+ * raw DB tier, so that early-access users transparently receive Starter limits.
+ */
+export type EffectiveTier = SubscriptionTier | 'early_access'
+
+/**
+ * Starter-level limits used for both starter_v2 subscribers and early-access
+ * free users. Centralised here so the two code paths stay in sync.
+ *
+ * Do NOT export this as a plan entry — it is intentionally absent from
+ * SUBSCRIPTION_PLANS so it never appears in pricing catalogues.
+ */
+export const EARLY_ACCESS_LIMITS = {
+  investorLeadsPerMonth: 100,
+  brainstormSessionsPerMonth: 50, // loosened 2026-04-25 to match Starter; viral-first directive
+  savedSearchesLifetime: null, // no lifetime cap during early access
+  maxAiTasksPerMonth: 200,
+  maxComputeBudgetUsd: 18,
+  investorDeepAccess: true,
+  investorIntelligenceAccess: true,
+} as const
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'incomplete'
 
 export interface SubscriptionPlan {
@@ -26,6 +91,22 @@ export interface SubscriptionPlan {
   priceMonthlyGBP: number // in pence
   priceAnnualGBP: number // in pence (annual price, usually discounted)
   features: string[]
+  /**
+   * Hides the plan from public-facing surfaces (the /pricing page and
+   * the in-app billing-settings upgrade catalogue) while keeping the
+   * entry resolvable for limit-checking on existing subscribers.
+   *
+   * Set to `true` for tiers that have been retired but where existing
+   * subscribers must continue to be honoured at their original limits
+   * until they upgrade or churn (no price-shock migration).
+   */
+  legacy?: boolean
+  /**
+   * Highlights the plan in the public catalogue (the "Recommended" pill on
+   * the homepage tier card and the comparison table column). Only one
+   * public plan should set this to `true` at a time.
+   */
+  featured?: boolean
   limits: {
     maxOrders?: number
     maxTeamMembers?: number
@@ -56,6 +137,32 @@ export interface SubscriptionPlan {
      * model usage from exceeding tier revenue.
      */
     maxComputeBudgetUsd: number
+    /**
+     * Investor leads (full why-fit + how-to-pitch + drafted-email) the
+     * subscriber can pull per month under this tier's allowance. Once
+     * exhausted, the user buys top-ups via INVESTOR_SEARCH_ADDON.
+     *
+     * 2026-04-25: introduced as part of the pricing restructure. Until
+     * the freemium-gate enforcement lands, this is display-only on the
+     * pricing page; existing limit-check logic still uses
+     * MONTHLY_INVESTOR_VIEW_CAPS in src/lib/ai/limit-check.ts.
+     *
+     * `null` = unlimited.
+     */
+    investorLeadsPerMonth: number | null
+    /**
+     * Brainstorming sessions per month bundled with this tier.
+     * 2026-04-25: introduced as part of the pricing restructure.
+     * `null` = unlimited.
+     */
+    brainstormSessionsPerMonth: number | null
+    /**
+     * Lifetime cap on saved investor searches under this tier
+     * (only meaningful for the new freemium "Free" tier — hard cap
+     * across the lifetime of the account, not per month).
+     * `null` = no lifetime cap.
+     */
+    savedSearchesLifetime: number | null
   }
   stripePriceIdMonthly?: string
   stripePriceIdAnnual?: string
@@ -115,20 +222,30 @@ export const ENTERPRISE_OVERAGE_CONFIG = {
 // ==========================================
 
 export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
+  // ────────────────────────────────────────────────────────────────────────
+  // FREE — post-signup freemium tier (was "Explorer", reframed 2026-04-25)
+  //
+  // The runtime limit fields below are deliberately kept at the OLD Explorer
+  // numbers (50 AI tasks, etc.) so existing free-tier accounts don't get
+  // downgraded the moment this ships. The UI advertises the new freemium
+  // policy (1 brainstorm/mo + 5 lifetime saved searches) via
+  // `brainstormSessionsPerMonth` / `savedSearchesLifetime`. Enforcement of
+  // the tighter freemium gate is wired in a follow-up commit.
+  // ────────────────────────────────────────────────────────────────────────
   free: {
     tier: 'free',
-    name: 'Explorer',
-    description: 'Get started with ForgeOS',
-    bestFor: 'Explore ForgeOS with a 14-day full-access trial. Get your first engineering assessment free.',
+    name: 'Free',
+    description: 'Try ForgeOS without a credit card',
+    bestFor:
+      'Sandbox the platform and tease the workflow. 5 brainstorms a month and a lifetime cap of 5 saved investor searches, perfect for a single founder kicking the tyres.',
     priceMonthlyGBP: 0,
     priceAnnualGBP: 0,
     features: [
-      '50 AI tasks per month',
-      'All 13 AI specialists',
-      '15 investor profiles per month',
-      'Partner names, titles & LinkedIn',
-      'Marketplace browse + orders',
-      'Email support',
+      '5 brainstorming sessions per month',
+      '5 saved investor searches (lifetime)',
+      'All 13 specialists in read-only sandbox',
+      'Marketplace browse',
+      'Upgrade to Starter for full investor leads',
     ],
     limits: {
       maxOrders: undefined, // unlimited — we earn commission on every order
@@ -142,22 +259,32 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       avatarMinutesPerMonth: 0,
       investorDetailAccess: true,
       investorContactsVisible: true, // names, titles, LinkedIn — on all tiers
-      investorDeepAccess: false, // verified emails — Seed+ only
+      investorDeepAccess: false, // verified emails — paid tiers only
       investorIntelligenceAccess: false,
       maxStorageMB: 500,
       maxComputeBudgetUsd: 9,
+      investorLeadsPerMonth: 0, // browse-only on Free; full leads start on Starter
+      brainstormSessionsPerMonth: 5, // loosened 2026-04-25 from 1 to 5; viral-first directive
+      savedSearchesLifetime: 5,
     },
   },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // SEED — LEGACY (£19/mo). Hidden from public catalogue 2026-04-25.
+  // Retained so existing £19/mo subscribers continue to resolve against the
+  // same limits until they upgrade or churn.
+  // ────────────────────────────────────────────────────────────────────────
   seed: {
     tier: 'seed',
     name: 'Seed',
-    description: 'For solo founders getting serious',
+    description: 'For solo founders getting serious (legacy plan)',
     bestFor: 'More AI power and investor access. The serious starting point for solo founders.',
     priceMonthlyGBP: 1900, // £19/month
     priceAnnualGBP: 18240, // £182.40/year (save 20%)
+    legacy: true,
     features: [
       '250 AI tasks per month',
-      'All 13 AI specialists',
+      'All 13 specialists',
       '50 investor profiles per month',
       'Verified investor emails',
       'Marketplace browse + orders',
@@ -175,26 +302,37 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       avatarMinutesPerMonth: 0,
       investorDetailAccess: true,
       investorContactsVisible: true,
-      investorDeepAccess: true, // verified emails — Seed+ only
+      investorDeepAccess: true, // verified emails
       investorIntelligenceAccess: true,
       maxStorageMB: 2_000,
       maxComputeBudgetUsd: 20,
+      investorLeadsPerMonth: 50,
+      brainstormSessionsPerMonth: null, // legacy — not metered, falls back to maxAiTasksPerMonth
+      savedSearchesLifetime: null,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_SEED_MONTHLY?.trim(),
     stripePriceIdAnnual: process.env.STRIPE_PRICE_SEED_ANNUAL?.trim(),
   },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // STARTER — LEGACY (£49/mo Startup Team). Hidden from public catalogue
+  // 2026-04-25. The new entry-tier "Starter" is `starter_v2` below.
+  // Retained so existing £49/mo subscribers continue to resolve against
+  // the same limits until they upgrade or churn.
+  // ────────────────────────────────────────────────────────────────────────
   starter: {
     tier: 'starter',
     name: 'Startup Team',
-    description: 'For growing businesses',
+    description: 'For growing businesses (legacy plan)',
     bestFor: 'Go from idea to first purchase order. Full supplier matching, team workspace, and 0% fee on your first 3 orders.',
     priceMonthlyGBP: 4900, // £49/month
     priceAnnualGBP: 47000, // £470/year (save ~20%)
+    legacy: true,
     features: [
       '750 AI tasks per month',
       '150 investor profiles per month',
       'Full marketplace + supplier matching',
-      'AI comparison assistant',
+      'Comparison assistant',
       'Pay-as-you-go beyond limits',
       'Email support',
     ],
@@ -214,21 +352,88 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorIntelligenceAccess: true,
       maxStorageMB: 10_000,
       maxComputeBudgetUsd: 50,
+      investorLeadsPerMonth: 150,
+      brainstormSessionsPerMonth: null,
+      savedSearchesLifetime: null,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY?.trim(),
     stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL?.trim(),
   },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // STARTER (V2) — NEW entry-tier 2026-04-25. £20/mo.
+  //
+  // 100 investor leads per month with the full why-fit + how-to-pitch +
+  // drafted-email payload. 10 brainstorming sessions per month. Replaces
+  // the killed Explorer £2 entry tier. Top up beyond 100 leads via the
+  // £10-per-100 INVESTOR_SEARCH_ADDON one-click upsell.
+  //
+  // Stripe price ID lives in env. Tristan must create the products in the
+  // Stripe dashboard before the new tier can charge — see
+  // BILLING-RECONCILE-IMPLEMENTATION.md for the exact dashboard steps.
+  // ────────────────────────────────────────────────────────────────────────
+  starter_v2: {
+    tier: 'starter_v2',
+    name: 'Starter',
+    description: 'The new entry tier for hardware founders',
+    bestFor:
+      '100 investor leads a month with full why-fit + how-to-pitch + drafted-email, plus 50 brainstorming sessions. Top up with £10 per 100 extra leads when you need more.',
+    priceMonthlyGBP: 2000, // £20/month
+    priceAnnualGBP: 19200, // £192/year (save 20%)
+    legacy: false,
+    featured: true,
+    features: [
+      '100 investor leads per month',
+      'Full why-fit + how-to-pitch + drafted-email',
+      '50 brainstorming sessions per month',
+      'All 13 specialists',
+      'Marketplace browse + orders',
+      '£10 per 100 extra investor leads',
+      'Email support',
+    ],
+    limits: {
+      maxOrders: undefined,
+      maxTeamMembers: undefined,
+      maxRetainers: 0,
+      maxAiTasksPerMonth: 200,
+      apiAccess: false,
+      dedicatedAccount: false,
+      maxConversationMode: 'text',
+      voiceMinutesPerMonth: 0,
+      avatarMinutesPerMonth: 0,
+      investorDetailAccess: true,
+      investorContactsVisible: true,
+      investorDeepAccess: true, // verified emails included on Starter+
+      investorIntelligenceAccess: true,
+      maxStorageMB: 2_000,
+      maxComputeBudgetUsd: 18,
+      investorLeadsPerMonth: 100,
+      brainstormSessionsPerMonth: 50, // loosened 2026-04-25 from 10 to 50; viral-first directive
+      savedSearchesLifetime: null,
+    },
+    stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_V2_MONTHLY?.trim(),
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_V2_ANNUAL?.trim(),
+  },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // PROFESSIONAL — Pro tier (pricing PENDING AUDIT 2026-04-25).
+  // Numbers and limits unchanged in this restructure. Council label
+  // updated to "Deep Council" (depth-of-reasoning, extended thinking).
+  // ────────────────────────────────────────────────────────────────────────
   professional: {
     tier: 'professional',
-    name: 'Professional',
+    name: 'Pro',
     description: 'For established companies',
-    bestFor: 'Scale multiple product programs with unlimited orders, priority supplier matching, and reduced 5% marketplace fees.',
-    priceMonthlyGBP: 14900, // £149/month
+    bestFor:
+      'Scale multiple product programmes with unlimited orders, priority supplier matching, the Deep Council with extended thinking, and reduced 5% marketplace fees.',
+    priceMonthlyGBP: 14900, // £149/month — PENDING AUDIT
     priceAnnualGBP: 142800, // £1,428/year (save ~20%)
     features: [
       '2,500 AI tasks per month',
-      'Unlimited investor profiles',
+      'Unlimited investor leads',
+      'Deep Council with extended thinking',
       'Fund performance + hardware fit scores',
+      'Dual-side data (founders + investors)',
       'Reduced 5% marketplace fee',
       'API access',
     ],
@@ -248,21 +453,34 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorIntelligenceAccess: true,
       maxStorageMB: 50_000,
       maxComputeBudgetUsd: 100,
+      investorLeadsPerMonth: null, // unlimited
+      brainstormSessionsPerMonth: null, // unlimited (within compute budget)
+      savedSearchesLifetime: null,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY?.trim(),
     stripePriceIdAnnual: process.env.STRIPE_PRICE_PROFESSIONAL_ANNUAL?.trim(),
   },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // ENTERPRISE — Strategy Council tier (pricing PENDING AUDIT 2026-04-25).
+  // Numbers and limits unchanged in this restructure. Council label
+  // updated to "Strategy Council" (depth-of-context: custom specialists +
+  // RAG over the foundry's own data, audit/SSO/SLA).
+  // ────────────────────────────────────────────────────────────────────────
   enterprise: {
     tier: 'enterprise',
     name: 'Enterprise',
-    description: 'For large organizations',
-    bestFor: 'Built for large teams with complex needs: automation, branding, and dedicated support.',
-    priceMonthlyGBP: 49900, // £499/month
+    description: 'For large organisations',
+    bestFor:
+      'The Strategy Council on top of your own data: custom specialists, RAG over your foundry data, audit/SSO/SLA. Built for large teams with complex needs.',
+    priceMonthlyGBP: 49900, // £499/month — PENDING AUDIT
     priceAnnualGBP: 478800, // £4,788/year (save ~20%)
     features: [
-      'Everything in Professional',
-      'Unlimited AI tasks',
-      'Unlimited team members',
+      'Everything in Pro',
+      'Unlimited brainstorming sessions',
+      'Strategy Council with custom specialists',
+      'RAG over your foundry data',
+      'Audit log, SSO, SLA',
       'Dedicated account manager',
       'Custom onboarding',
     ],
@@ -281,8 +499,85 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorDeepAccess: true,
       investorIntelligenceAccess: true,
       maxComputeBudgetUsd: 400,
+      investorLeadsPerMonth: null, // unlimited
+      brainstormSessionsPerMonth: null, // unlimited
+      savedSearchesLifetime: null,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY?.trim(),
     stripePriceIdAnnual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL?.trim(),
   },
+}
+
+// ==========================================
+// INVESTOR SEARCH ADD-ON
+// ==========================================
+
+/**
+ * Investor Search Add-On — £10 per 100 extra investor searches.
+ *
+ * One-click upsell from inside `/investors` when a Starter (or Pro on a
+ * heavy month, future) subscriber exhausts their bundled
+ * investorLeadsPerMonth allowance.
+ *
+ * 2026-04-25: data-only entry — Stripe wiring is TODO. Tristan creates the
+ * Stripe price ID in the dashboard (see BILLING-RECONCILE-IMPLEMENTATION.md).
+ * Two implementation paths:
+ *
+ *   (a) Stripe metered billing — report 1 unit per 100-search bundle via
+ *       meter events at the moment of purchase. Cleanest UX (frictionless
+ *       in-app one-click) and matches the existing
+ *       ENTERPRISE_OVERAGE_CONFIG meter pattern in this file.
+ *
+ *   (b) One-shot Checkout Session for £10 — adds 100 to the user's
+ *       monthly cap until the next renewal. Simpler to wire if metered
+ *       billing is too heavyweight to set up for a first cut.
+ *
+ * Recommendation: ship (b) first behind a feature flag so the upsell card
+ * works end-to-end, then migrate to (a) when usage justifies the meter.
+ */
+export const INVESTOR_SEARCH_ADDON = {
+  /** Stable id used by clients to reference this add-on */
+  id: 'investor_search_addon_100',
+  /** Human-readable label for the upsell card */
+  label: 'Investor Search Add-On',
+  /** One-line marketing pitch shown beneath the price */
+  description:
+    'Extra 100 investor leads with the same why-fit + drafted email output. One click, no resubscription.',
+  /** Price in pence */
+  priceGBP: 1000,
+  /** Number of extra investor searches added per purchase */
+  leads: 100,
+  /** Alias for clarity at call sites that already use `searchesPerPurchase` semantics */
+  searchesPerPurchase: 100,
+  /** Stripe price ID — created by Tristan in the dashboard, wired via env */
+  stripePriceId: process.env.STRIPE_PRICE_INVESTOR_SEARCH_ADDON?.trim(),
+  /**
+   * Stripe Billing Meter event name (only used by implementation path (a) —
+   * metered billing). For path (b) — one-shot Checkout Session — this is
+   * unused.
+   */
+  stripeMeterEventName: 'investor_search_addon',
+} as const
+
+// ==========================================
+// PUBLIC PLANS HELPER
+// ==========================================
+
+/**
+ * Returns the public-tier list, in display order, for the public-facing
+ * pricing catalogue (homepage and `/pricing`). Filters out tiers flagged
+ * `legacy: true` so retired plans no longer appear in the catalogue while
+ * remaining resolvable for existing subscribers.
+ *
+ * Display order is the canonical entry-to-enterprise progression:
+ * Free → Starter (v2) → Pro → Enterprise. Enterprise is included by default
+ * because some surfaces (the dedicated `/pricing` page) want to show all
+ * four tiers; surfaces that prefer a teaser-only view (the homepage) can
+ * filter Enterprise out at the call site if needed.
+ */
+export function getPublicPlans(): SubscriptionPlan[] {
+  const order: SubscriptionTier[] = ['free', 'starter_v2', 'professional', 'enterprise']
+  return order
+    .map((tier) => SUBSCRIPTION_PLANS[tier])
+    .filter((plan) => !plan.legacy)
 }

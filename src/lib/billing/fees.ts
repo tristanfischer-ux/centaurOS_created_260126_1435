@@ -24,6 +24,7 @@ const TIER_FEE_PERCENT: Record<SubscriptionTier, number> = {
   free: 10,
   seed: 10,
   starter: 10,
+  starter_v2: 10, // Starter (£20) — same 10% post-intro fee as other entry tiers
   professional: 5,
   enterprise: 5, // Enterprise may be overridden by DB config
 }

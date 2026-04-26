@@ -179,17 +179,45 @@ export async function sendToSpecialist(
 
     const supabase = createAdminClient()
 
-    // Determine provider and model from specialist config
-    const providerId: AIProviderId = specialist.modelTier === 'claude' ? 'anthropic' : 'minimax'
-    const modelId = specialist.modelTier === 'claude' ? 'claude-opus-4-7' : 'MiniMax-M2.7'
+    // Determine provider and model from specialist config.
+    //
+    // GOTCHA: This map MUST mirror the primary entries of FALLBACK_CHAINS in
+    // src/app/api/agents/execute/route.ts. The previous binary toggle
+    // (`claude` ? anthropic : minimax) silently misrouted every non-Claude
+    // specialist to MiniMax, regardless of their assigned tier. If you add a
+    // new tier to specialists-config.ts, add it here AND in FALLBACK_CHAINS.
+    type SpecialistModelTier = typeof specialist.modelTier
+    const PRIMARY_TARGETS: Record<SpecialistModelTier, { providerId: AIProviderId; modelId: string }> = {
+        claude: { providerId: 'anthropic', modelId: 'claude-opus-4-7' },
+        sonnet: { providerId: 'anthropic', modelId: 'claude-sonnet-4-6' },
+        deepseek: { providerId: 'deepseek', modelId: 'deepseek-chat' },
+        google: { providerId: 'google', modelId: 'gemini-3.1-pro-preview' },
+        openai: { providerId: 'openai', modelId: 'gpt-5.4' },
+        qwen: { providerId: 'qwen', modelId: 'qwen3.5-plus' },
+        'qwen-local': { providerId: 'qwen-local', modelId: 'qwen3:30b-a3b' },
+        minimax: { providerId: 'minimax', modelId: 'MiniMax-M2.7' },
+        // Benchmark-validated swaps 2026-04-25 — must mirror primaries in failover.ts.
+        haiku: { providerId: 'anthropic', modelId: 'claude-haiku-4-5-20251001' },
+        'gpt-mini': { providerId: 'openai', modelId: 'gpt-4.1-mini' },
+        'qwen-235b': { providerId: 'qwen', modelId: 'qwen3-235b-a22b' },
+        'deepseek-v4-pro': { providerId: 'together', modelId: 'deepseek-ai/DeepSeek-V4-Pro' },
+    }
+    const primary = PRIMARY_TARGETS[specialist.modelTier]
+    const providerId: AIProviderId = primary.providerId
+    const modelId = primary.modelId
 
-    // Resolve API key from environment
+    // Resolve API key from environment. Mirrors resolveApiKeyForProvider() in
+    // src/app/api/agents/execute/route.ts — every provider that any tier can
+    // resolve to MUST have an entry here.
     const envMap: Partial<Record<AIProviderId, string>> = {
         anthropic: process.env.ANTHROPIC_API_KEY?.trim() ?? '',
+        deepseek: process.env.DEEPSEEK_API_KEY?.trim() ?? '',
+        google: process.env.GOOGLE_AI_API_KEY?.trim() ?? '',
+        openai: process.env.OPENAI_API_KEY?.trim() ?? '',
         qwen: process.env.DASHSCOPE_API_KEY?.trim() ?? '',
         'qwen-local': 'ollama',
         minimax: process.env.MINIMAX_API_KEY?.trim() ?? '',
-        openai: process.env.OPENAI_API_KEY?.trim() ?? '',
+        together: process.env.TOGETHER_API_KEY?.trim() ?? '',
     }
     const apiKey = envMap[providerId]
     if (!apiKey) {

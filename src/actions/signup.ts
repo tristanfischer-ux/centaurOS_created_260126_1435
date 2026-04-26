@@ -33,8 +33,13 @@ export type SignupState = {
 };
 
 /**
- * Security: Validate password strength
- * Requires: min 8 chars, at least one uppercase, one lowercase, one number
+ * Security: Validate password length only.
+ *
+ * @description Stripe, Linear, Notion and Figma all dropped character-class
+ * complexity rules years ago — they make passwords harder to remember without
+ * meaningfully reducing brute-force risk. Length plus a common-password
+ * blocklist is the modern baseline. Min 8 chars, max 128, reject obvious
+ * dictionary entries.
  */
 function validatePassword(password: string): { valid: boolean; error?: string } {
   if (!password || password.length < 8) {
@@ -44,16 +49,9 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
   if (password.length > 128) {
     return { valid: false, error: "Password must be 128 characters or fewer" };
   }
-  if (!/[A-Z]/.test(password)) {
-    return { valid: false, error: "Password must contain at least one uppercase letter" };
-  }
-  if (!/[a-z]/.test(password)) {
-    return { valid: false, error: "Password must contain at least one lowercase letter" };
-  }
-  if (!/[0-9]/.test(password)) {
-    return { valid: false, error: "Password must contain at least one number" };
-  }
-  // Check for common weak passwords
+  // Reject obvious dictionary passwords. Length + this blocklist is the
+  // modern baseline; character-class rules (uppercase/number/symbol) were
+  // removed 2026-04-25 because they hurt usability without raising entropy.
   const commonPasswords = ["password", "12345678", "qwerty123", "letmein123"];
   if (commonPasswords.some(common => password.toLowerCase().includes(common))) {
     return { valid: false, error: "Password is too common. Please choose a stronger password." };
@@ -132,6 +130,15 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const supabase = await createClient();
 
   const password = formData.get("password") as string;
+  // DECISION 2026-04-25: dropped Confirm Password. Industry leaders (Stripe,
+  // Linear, Notion, Figma) all removed it — it adds friction without cutting
+  // typo errors. If a user mistypes, the next sign-in attempt fails fast and
+  // the password reset flow recovers without losing any data. We still accept
+  // the field if the legacy supplier form submits it, for a graceful rollover.
+  const passwordConfirm = formData.get("password_confirm") as string | null;
+  if (passwordConfirm !== null && passwordConfirm.length > 0 && passwordConfirm !== password) {
+    return errorWithValues("Passwords do not match");
+  }
   const intent = formData.get("intent") as string | null;
   const listingId = formData.get("listing_id") as string | null;
 
@@ -148,7 +155,13 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   // SECURITY: Strip HTML tags and control characters — React auto-escapes on render,
   // and Supabase parameterized queries prevent SQL injection. escapeHtml() was removed
   // because it double-encodes (O'Brien → O&#x27;Brien in DB → literal entity in React).
-  const fullName = rawFullName ? rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : "";
+  // DECISION 2026-04-25: full name is optional. When omitted, fall back to the
+  // email local-part so downstream code (welcome emails, profile cards, foundry
+  // titles) always has something to render. Users can update their display name
+  // later in the profile-completion modal.
+  const sanitizedRawName = rawFullName ? rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : "";
+  const emailLocalPart = (rawEmail || "").split("@")[0]?.trim().slice(0, 100) ?? "";
+  const fullName = sanitizedRawName || emailLocalPart;
   const companyName = rawCompanyName ? rawCompanyName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : null;
   const businessName = rawBusinessName ? rawBusinessName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : null;
 
@@ -157,8 +170,12 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const industry = rawIndustry ? rawIndustry.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null;
   const stage = rawStage ? rawStage.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null;
 
-  if (!fullName || !role) {
-    return errorWithValues("All fields are required");
+  // DECISION 2026-04-25: full name is optional on signup. Email + password
+  // are the only required fields. Founders and suppliers still need a
+  // company/business name (checked further down). Empty full name flows
+  // through to setupNewUser which falls back to the email local-part.
+  if (!role) {
+    return errorWithValues("Signup role is required");
   }
 
   // SECURITY: Validate role against allowlist to prevent arbitrary role injection
@@ -259,7 +276,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const referralCode = cookieStore.get('forge_ref')?.value || null;
 
   // 2. Set up profile, foundry, memberships, demo data via shared helper
-  await setupNewUser({
+  const setupResult = await setupNewUser({
     supabase,
     userId,
     email,
@@ -272,6 +289,17 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     businessType,
     referralCode,
   });
+
+  // INTENT: If setup failed, redirect to the error page so the founder
+  // sees a clear explanation + support options instead of a blank screen.
+  // The auth user already exists at this point, so we do NOT delete it —
+  // the founder can retry (setupNewUser is idempotent on profile absence).
+  if (!setupResult.ok) {
+    console.error("[Signup] setupNewUser failed:", setupResult.reason, setupResult.errorId);
+    const errorParams = new URLSearchParams({ reason: setupResult.reason });
+    if (setupResult.errorId) errorParams.set("error_id", setupResult.errorId);
+    redirect(`/auth/setup-error?${errorParams.toString()}`);
+  }
 
   // 3. Store booking intent if present
   if (intent && listingId) {
@@ -325,10 +353,20 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     redirect(redirectTo);
   }
 
+  // RED-TEAM-PIVOT-PLAN Tier 2 step 17: visitors who arrived from the
+  // anonymous /investors landing skip the welcome tour and continue
+  // directly inside /investors so the journey they started is unbroken.
+  // The `from` field is set by the signup form when a `from` query param
+  // (currently `investors-anonymous`) was on the URL.
+  const from = (formData.get("from") as string)?.trim() || null;
+  if (from === "investors-anonymous") {
+    redirect("/investors");
+  }
+
   // DECISION 2026-04-17: new email/password signups land on /welcome — the
   // guided tour from Tristan. The Welcome page's CTA marks onboarding_data
-  // and routes to /today. Supplier flag is handled during onboarding, not
-  // routing. Mirrors the OAuth path (setup-new-user.ts returns /welcome).
+  // and routes to the post-welcome destination (now /investors per Tier 2
+  // step 17). Supplier flag is handled during onboarding, not routing.
   redirect("/welcome");
 }
 
@@ -342,7 +380,7 @@ export async function submitApplication(formData: FormData) {
   const clientIP = getClientIP(headersList);
   const rateLimitResult = await rateLimit("signup", clientIP);
   if (!rateLimitResult.success) {
-    return redirect("/join?error=Too+many+attempts.+Please+try+again+later.");
+    return redirect("/signup?error=Too+many+attempts.+Please+try+again+later.");
   }
 
   const supabase = await createClient();
@@ -356,17 +394,17 @@ export async function submitApplication(formData: FormData) {
   // SECURITY: Validate role against allowlist to prevent path traversal in redirect
   const validAppRoles: ApplicationRole[] = ["vc", "factory", "university", "network"];
   if (!role || !validAppRoles.includes(role)) {
-    return redirect("/join?error=Invalid+role");
+    return redirect("/signup?error=Invalid+role");
   }
 
   if (!rawEmail || !rawFullName) {
-    return redirect(`/join/${role}?error=All+fields+are+required`);
+    return redirect(`/signup/${role}?error=All+fields+are+required`);
   }
 
   // SECURITY: Sanitize all inputs
   const email = sanitizeEmail(rawEmail);
   if (!email) {
-    return redirect(`/join/${role}?error=Invalid+email+address`);
+    return redirect(`/signup/${role}?error=Invalid+email+address`);
   }
   const fullName = rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '');
 
@@ -415,10 +453,10 @@ export async function submitApplication(formData: FormData) {
   if (error) {
     console.error("Application submission error:", error);
     return redirect(
-      `/join/${role}?error=${encodeURIComponent("Failed to submit application. Please try again.")}`
+      `/signup/${role}?error=${encodeURIComponent("Failed to submit application. Please try again.")}`
     );
   }
 
   // Redirect to success page
-  redirect(`/join/success?type=application&role=${role}`);
+  redirect(`/signup/success?type=application&role=${role}`);
 }

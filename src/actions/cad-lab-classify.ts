@@ -13,6 +13,7 @@
 
 import { classifyPart, KNOWN_PROCESSES, KNOWN_MATERIALS } from "@/lib/part-classification"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -72,7 +73,7 @@ function fuzzyMatchKnown(value: string, knownValues: readonly string[], fallback
 export async function classifyPartsAi(
   parts: PartToClassify[],
 ): Promise<ClassifySuccess | ClassifyError> {
-  return withAIGate('cad_lab_classify', async () => {
+  return withAIGate('cad_lab_classify', async ({ user, foundryId }) => {
   const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (!apiKey) {
     return { success: false, error: "DEEPSEEK_API_KEY not configured" }
@@ -114,28 +115,68 @@ CRITICAL: Return ONLY valid JSON array, no markdown fences.
 
 ${JSON.stringify(partsInput, null, 2)}`
 
+  const cadClassifyModel = "deepseek-chat"
   try {
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        max_tokens: 4096,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    })
+    let response: Response
+    try {
+      response = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: cadClassifyModel,
+          max_tokens: 4096,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+      })
+    } catch (err) {
+      void logLlmUsage({
+        action: 'cad_lab_classify',
+        modelUsed: cadClassifyModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+        foundryId,
+        userId: user.id,
+      })
+      throw err
+    }
 
     if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      const status: 'rate_limited' | 'timeout' | 'error' =
+        response.status === 429 || response.status === 529 ? 'rate_limited' :
+        response.status === 408 || response.status === 504 ? 'timeout' :
+        'error'
+      void logLlmUsage({
+        action: 'cad_lab_classify',
+        modelUsed: cadClassifyModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status,
+        errorMessage: `${response.status}: ${errText.slice(0, 200)}`,
+        foundryId,
+        userId: user.id,
+      })
       return { success: false, error: `DeepSeek API error: ${response.status}` }
     }
 
     const responseData = await response.json()
+    void logLlmUsage({
+      action: 'cad_lab_classify',
+      modelUsed: cadClassifyModel,
+      tokensIn: responseData.usage?.prompt_tokens ?? 0,
+      tokensOut: responseData.usage?.completion_tokens ?? 0,
+      status: 'success',
+      foundryId,
+      userId: user.id,
+    })
     const text: string = responseData.choices?.[0]?.message?.content ?? ""
     if (!text) {
       return { success: false, error: "Empty response from DeepSeek" }

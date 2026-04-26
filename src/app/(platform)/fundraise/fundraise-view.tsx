@@ -19,9 +19,6 @@ import {
   Heart, Users, Phone, MessageSquare, CheckCircle2, XCircle,
   AlertTriangle, StickyNote, Calendar, Mail, Package,
 } from 'lucide-react'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { getProductsWithFundability } from '@/actions/products'
 import { LIFECYCLE_LABELS } from '@/types/product'
 import type { FundabilityScore, ProductLifecycle } from '@/types/product'
@@ -169,39 +166,6 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
     })
   }, [])
 
-  // Live AI briefing — always enabled so Fiona offers real advice
-  const briefingContext = (() => {
-    const parts: string[] = []
-    if (stats && stats.totalTracked > 0) {
-      parts.push(`Total investors tracked: ${stats.totalTracked}`)
-      parts.push(`Pipeline: ${Object.entries(stats.pipelineCounts).map(([k, v]) => `${k}: ${v}`).join(', ')}`)
-      if (stats.coverageGaps.length > 0) parts.push(`Coverage gaps: ${stats.coverageGaps.join(', ')}`)
-      if (stats.recentNotes.length > 0) parts.push(`Recent activity: ${stats.recentNotes.length} notes in last 7 days`)
-    } else {
-      parts.push('No investors tracked yet — pipeline is empty')
-      parts.push('User needs guidance on how to start their fundraising process')
-    }
-    if (scoredProducts && scoredProducts.length > 0) {
-      const best = scoredProducts.reduce((a, b) => b.fundability_score.overall > a.fundability_score.overall ? b : a)
-      parts.push(`Best product fundability: ${best.fundability_score.overall}/100 (${best.fundability_score.investor_appetite} appetite)`)
-    } else {
-      parts.push('No products scored for fundability yet')
-    }
-    return parts.join('. ')
-  })()
-
-  const briefingSeverity = (() => {
-    if (!stats || stats.totalTracked === 0) return 'warning' as const
-    return 'success' as const
-  })()
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('fundraising-advisor', briefingContext, briefingSeverity),
-    briefingSeverity,
-    true, // Always fetch — Fiona should always offer advice
-    'briefing-fundraise',
-  )
-
   if (!stats || stats.totalTracked === 0) {
     return (
       <div className="space-y-6">
@@ -215,18 +179,6 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
             Your fundraising pipeline — track outreach, manage meetings, and close your round. <Link href="/investors" className="text-international-orange hover:underline">Browse investors</Link> to discover who to approach.
           </p>
         </div>
-
-        <SpecialistBriefingHero
-          specialistId="fundraising-advisor"
-          specialistName="Fiona"
-          specialistTitle="Fundraising"
-          narrative={briefing.narrative}
-          fallbackMessage="Every investor relationship is a deal — and deals need a pipeline. Research, Contacted, Meeting, Due Diligence, Won, Lost. Drag cards across stages and I'll track velocity, spot stalls, and tell you when to follow up or walk away. Add your first prospect to get the pipeline moving."
-          isLoading={briefing.isLoading}
-          severity={briefing.severity}
-          context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
-          storageKey="fundraise"
-        />
 
         <ProductReadinessCard products={scoredProducts} />
 
@@ -272,18 +224,6 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
           Your fundraising pipeline — track outreach, manage meetings, and close your round. <Link href="/investors" className="text-international-orange hover:underline">Browse investors</Link> to discover who to approach.
         </p>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="fundraising-advisor"
-        specialistName="Fiona"
-        specialistTitle="Fundraising"
-        narrative={briefing.narrative}
-        fallbackMessage="Your fundraising command centre. I track pipeline velocity, flag stalled conversations, and time your follow-ups. Drag cards across stages — every day a warm lead sits in 'Contacted' without a meeting, it's cooling."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
-        storageKey="fundraise"
-      />
 
       <ProductReadinessCard products={scoredProducts} />
 

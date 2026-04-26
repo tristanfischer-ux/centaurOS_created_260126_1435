@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit"
+import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 
 interface ProviderStatus {
   provider: string
@@ -37,22 +38,40 @@ export async function GET(request: NextRequest) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (anthropicKey) {
     const start = Date.now()
+    const anthropicModel = "claude-haiku-4-5-20251001"
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
+        body: JSON.stringify({ model: anthropicModel, max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
         signal: AbortSignal.timeout(timeout),
       })
       const data = await res.json()
+      const ok = !!data.content
+      void logLlmUsage({
+        action: 'health_check_anthropic',
+        modelUsed: anthropicModel,
+        tokensIn: data.usage?.input_tokens ?? 0,
+        tokensOut: data.usage?.output_tokens ?? 0,
+        status: ok ? 'success' : 'error',
+        errorMessage: ok ? undefined : (data.error?.message ?? 'unknown error').slice(0, 200),
+      })
       results.push({
         provider: "Anthropic",
         model: "claude-haiku-4-5",
-        status: data.content ? "ok" : "error",
+        status: ok ? "ok" : "error",
         responseMs: Date.now() - start,
         ...(data.error && { error: data.error.message?.slice(0, 100) }),
       })
     } catch (err) {
+      void logLlmUsage({
+        action: 'health_check_anthropic',
+        modelUsed: anthropicModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      })
       results.push({ provider: "Anthropic", model: "claude-haiku-4-5", status: "error", responseMs: Date.now() - start, error: err instanceof Error ? err.message.slice(0, 100) : "Unknown" })
     }
   } else {
@@ -63,22 +82,40 @@ export async function GET(request: NextRequest) {
   const openaiKey = process.env.OPENAI_API_KEY?.trim()
   if (openaiKey) {
     const start = Date.now()
+    const openaiModel = "gpt-4.1-nano"
     try {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
-        body: JSON.stringify({ model: "gpt-4.1-nano", max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
+        body: JSON.stringify({ model: openaiModel, max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
         signal: AbortSignal.timeout(timeout),
       })
       const data = await res.json()
+      const ok = !!data.choices
+      void logLlmUsage({
+        action: 'health_check_openai',
+        modelUsed: openaiModel,
+        tokensIn: data.usage?.prompt_tokens ?? 0,
+        tokensOut: data.usage?.completion_tokens ?? 0,
+        status: ok ? 'success' : 'error',
+        errorMessage: ok ? undefined : (data.error?.message ?? 'unknown error').slice(0, 200),
+      })
       results.push({
         provider: "OpenAI",
         model: "gpt-4.1-nano",
-        status: data.choices ? "ok" : "error",
+        status: ok ? "ok" : "error",
         responseMs: Date.now() - start,
         ...(data.error && { error: data.error.message?.slice(0, 100) }),
       })
     } catch (err) {
+      void logLlmUsage({
+        action: 'health_check_openai',
+        modelUsed: openaiModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      })
       results.push({ provider: "OpenAI", model: "gpt-4.1-nano", status: "error", responseMs: Date.now() - start, error: err instanceof Error ? err.message.slice(0, 100) : "Unknown" })
     }
   } else {
@@ -89,22 +126,40 @@ export async function GET(request: NextRequest) {
   const googleKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (googleKey) {
     const start = Date.now()
+    const geminiModel = "gemini-3.1-flash-lite-preview"
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${googleKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${googleKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: "1" }] }], generationConfig: { maxOutputTokens: 5 } }),
         signal: AbortSignal.timeout(timeout),
       })
       const data = await res.json()
+      const ok = !!data.candidates
+      void logLlmUsage({
+        action: 'health_check_gemini',
+        modelUsed: geminiModel,
+        tokensIn: data.usageMetadata?.promptTokenCount ?? 0,
+        tokensOut: data.usageMetadata?.candidatesTokenCount ?? 0,
+        status: ok ? 'success' : 'error',
+        errorMessage: ok ? undefined : (data.error?.message ?? 'unknown error').slice(0, 200),
+      })
       results.push({
         provider: "Google",
         model: "gemini-3.1-flash-lite",
-        status: data.candidates ? "ok" : "error",
+        status: ok ? "ok" : "error",
         responseMs: Date.now() - start,
         ...(data.error && { error: data.error.message?.slice(0, 100) }),
       })
     } catch (err) {
+      void logLlmUsage({
+        action: 'health_check_gemini',
+        modelUsed: geminiModel,
+        tokensIn: 0,
+        tokensOut: 0,
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      })
       results.push({ provider: "Google", model: "gemini-3.1-flash-lite", status: "error", responseMs: Date.now() - start, error: err instanceof Error ? err.message.slice(0, 100) : "Unknown" })
     }
   } else {

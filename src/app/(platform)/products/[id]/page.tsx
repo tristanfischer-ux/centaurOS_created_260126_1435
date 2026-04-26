@@ -30,7 +30,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   if (!user) redirect('/login')
 
   const foundryId = await getFoundryIdCached()
-  if (!foundryId) redirect('/today')
+  if (!foundryId) redirect('/investors')
 
   const { id } = await params
   const result = await getProduct(id)

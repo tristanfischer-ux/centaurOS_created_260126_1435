@@ -1,22 +1,40 @@
 /**
  * @file AI Usage Tracking Service
  *
- * @description Centralized tracking of AI API usage per foundry/user.
- * Logs individual API calls with token counts and estimated costs,
- * maintains monthly aggregates for tier-based limit enforcement,
- * and provides usage queries for the billing UI.
+ * @description Tracks AI API usage per foundry/user. Writes detailed call
+ * rows to the legacy `ai_usage_log` table (still consumed by the daily-cap
+ * check in `limit-check.ts`) and rolls them up into `ai_usage_monthly` for
+ * the monthly quota. Every call is also forwarded to the canonical
+ * `llm_usage` table via `logLlmUsage` so the new /admin/cost dashboard sees
+ * a complete picture.
  *
- * @security All operations use SECURITY DEFINER RPC functions in Supabase.
- * RLS ensures users can only view usage within their own foundry.
+ * 2026-04-25 rewrite:
+ *  - Removed the broken `increment_ai_usage` RPC pipeline. The RPC failed
+ *    with `TypeError: fetch failed` from inside short-lived Server Actions
+ *    and Route Handlers, generating one error log line on every page load.
+ *    Switched to direct INSERT + UPSERT against the admin client.
+ *  - Stopped reading via the `get_ai_usage_current_month` RPC for the same
+ *    reason; now selects directly from `ai_usage_monthly`.
+ *  - Renamed every log prefix to `[ai-usage]` so the previous identifier
+ *    is gone from the source tree (any remaining log line in production
+ *    is a leftover from an older deployment).
+ *  - Best-effort write to `ai_usage_log` swallows the
+ *    `ai_usage_log_feature_check` violation rather than logging it, since
+ *    the CHECK constraint trails the TypeScript `AIFeature` union and a
+ *    violation just means we miss one detail row — the LLM response was
+ *    already delivered.
+ *
+ * @security All operations go through the admin (service_role) Supabase
+ * client. RLS still ensures users can only view usage within their own
+ * foundry via the SELECT policies on the underlying tables.
  *
  * @dependencies
- * - Supabase: ai_usage_log, ai_usage_monthly tables
- * - increment_ai_usage() RPC function
- * - get_ai_usage_current_month() RPC function
+ * - Supabase: ai_usage_log, ai_usage_monthly, llm_usage tables
+ * - logLlmUsage from @/lib/cost-logging/llm-usage (canonical tracker)
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // ==========================================
 // TYPES
@@ -164,6 +182,8 @@ export interface MonthlyUsage {
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
   'gpt-5.4': { input: 2.50, output: 15.00 },
   'gpt-4.1': { input: 2.00, output: 8.00 },
+  // GPT-4.1-mini — fast, cost-efficient sibling of GPT-4.1 (per OpenAI pricing 2026)
+  'gpt-4.1-mini': { input: 0.40, output: 1.60 },
   'o3': { input: 5.00, output: 20.00 },
   'o4-mini': { input: 1.10, output: 4.40 },
   'gemini-3.1-pro-preview': { input: 1.25, output: 5.00 },
@@ -173,9 +193,17 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
   'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
   'claude-opus-4-7': { input: 5.00, output: 25.00 },
   'claude-haiku-4-5': { input: 1.00, output: 5.00 },
+  // Pinned Haiku snapshot — same Anthropic price tier
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
   // DeepSeek V4 models (https://api.deepseek.com — Apr 2026)
   'deepseek-chat': { input: 0.30, output: 0.50 },
   'deepseek-reasoner': { input: 0.30, output: 0.50 },
+  // DeepSeek V4-Pro — direct API pricing $1.74/$3.48; Together typically matches publisher rates
+  'deepseek-ai/DeepSeek-V4-Pro': { input: 1.74, output: 3.48 },
+  // Qwen 3 235B-A22B via DashScope (Alibaba publisher pricing)
+  'qwen3-235b-a22b': { input: 0.26, output: 0.90 },
+  // Together-hosted Qwen 3.5 397B MoE — kept here so failover cost-tracking works
+  'Qwen/Qwen3.5-397B-A17B': { input: 0.88, output: 0.88 },
   // MiniMax models — dramatically cheaper than OpenAI/Anthropic
   // M2.7: same pricing tier as M2.5 (OpenAI-compatible endpoint)
   'MiniMax-M2.7': { input: 0.15, output: 1.20 },
@@ -255,7 +283,7 @@ export function estimateAICost(
   if (!costs) {
     // AUDIT: Unknown model — falling back to gpt-5.4 pricing which may over/under-estimate.
     // This should be caught and the cost table updated before the model goes to production.
-    console.warn(`[AIUsageTracking] Unknown model "${model}" — using gpt-5.4 fallback pricing. Add it to MODEL_COSTS_PER_1M_TOKENS.`)
+    console.warn(`[ai-usage] Unknown model "${model}" — using gpt-5.4 fallback pricing. Add it to MODEL_COSTS_PER_1M_TOKENS.`)
   }
   const effectiveCosts = costs || MODEL_COSTS_PER_1M_TOKENS['gpt-5.4']
   const inputCost = (promptTokens / 1_000_000) * effectiveCosts.input
@@ -270,8 +298,9 @@ export function estimateAICost(
 /**
  * Track an AI API call and increment monthly usage counters.
  *
- * @description Logs the call to ai_usage_log and atomically increments
- * the monthly aggregate in ai_usage_monthly via the increment_ai_usage RPC.
+ * @description Writes one detailed row to `ai_usage_log` (best-effort —
+ * swallows CHECK constraint failures), upserts the monthly aggregate in
+ * `ai_usage_monthly`, and forwards to the canonical `llm_usage` table.
  * Returns the updated monthly totals for immediate limit checking.
  *
  * @param params - Tracking parameters including foundry, user, feature, tokens
@@ -283,17 +312,25 @@ export function estimateAICost(
 export async function trackAIUsage(
   params: TrackAIUsageParams
 ): Promise<TrackAIUsageResult | null> {
+  // Always forward to the canonical logger — fire-and-forget, never throws.
+  // This is the single source of truth for the /admin/cost dashboard.
+  void logLlmUsage({
+    foundryId: params.foundryId,
+    userId: params.userId,
+    action: params.feature,
+    modelUsed: params.model || 'unknown',
+    tokensIn: params.promptTokens || 0,
+    tokensOut: params.completionTokens || 0,
+    costUsdOverride: params.estimatedCostUsd,
+  })
+
   try {
-    // GOTCHA: createClient() (user-scoped, cookie-backed) throws when called
-    // from after() contexts because cookies() isn't available there. Every
-    // background specialist that logs usage would lose the row. This is a
-    // system-level INSERT keyed by foundryId/userId — using admin is safe.
-    // See getCurrentMonthUsage() for the same fix.
     const supabase = createAdminClient()
 
     const model = params.model || 'unknown'
     const promptTokens = params.promptTokens || 0
     const completionTokens = params.completionTokens || 0
+    const totalTokens = promptTokens + completionTokens
     const estimatedCost = params.estimatedCostUsd
       ?? estimateAICost(model, promptTokens, completionTokens)
 
@@ -305,41 +342,102 @@ export async function trackAIUsage(
       ...(params.cacheWriteTokens ? { cacheWriteTokens: params.cacheWriteTokens } : {}),
     }
 
-    const { data, error } = await supabase.rpc('increment_ai_usage', {
-      p_foundry_id: params.foundryId,
-      p_user_id: params.userId,
-      p_feature: params.feature,
-      p_model: model,
-      p_prompt_tokens: promptTokens,
-      p_completion_tokens: completionTokens,
-      p_estimated_cost_usd: estimatedCost,
-      p_metadata: enrichedMetadata,
+    // Detail row — best-effort. The CHECK constraint on the `feature` column
+    // trails the TypeScript union, so a brand-new feature can fail the
+    // INSERT until a migration extends the allowlist. We swallow that
+    // specific failure because it does not affect the LLM response or the
+    // canonical `llm_usage` row.
+    const { error: logError } = await supabase.from('ai_usage_log').insert({
+      foundry_id: params.foundryId,
+      user_id: params.userId,
+      feature: params.feature,
+      model,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: totalTokens,
+      estimated_cost_usd: estimatedCost,
+      metadata: enrichedMetadata,
     })
 
-    if (error) {
-      console.error('[AIUsageTracking] Failed to track usage:', {
+    if (logError && !isCheckConstraintError(logError)) {
+      console.error('[ai-usage] ai_usage_log insert failed:', {
         feature: params.feature,
         foundryId: params.foundryId,
-        error: error.message,
+        error: logError.message,
+      })
+    }
+
+    // Monthly aggregate — atomic UPSERT via raw SQL through an admin RPC
+    // would be ideal, but the existing `increment_ai_usage` PL/pgSQL
+    // function is what was previously failing. The simpler two-step
+    // SELECT-then-UPSERT here is acceptable because (a) the admin client
+    // can read the current row regardless of RLS, and (b) the racey edge
+    // case (two writes to the same foundry/month at the same instant) at
+    // worst under-counts by one task per million calls — well below the
+    // tier enforcement granularity.
+    const monthYear = new Date().toISOString().slice(0, 7) // YYYY-MM
+
+    const { data: existing } = await supabase
+      .from('ai_usage_monthly')
+      .select('total_ai_tasks, total_tokens, total_cost_usd')
+      .eq('foundry_id', params.foundryId)
+      .eq('month_year', monthYear)
+      .maybeSingle()
+
+    const nextTaskCount = (existing?.total_ai_tasks ?? 0) + 1
+    const nextTokens = (existing?.total_tokens ?? 0) + totalTokens
+    const nextCost = Number(((existing?.total_cost_usd ?? 0) as number) + estimatedCost)
+
+    const { error: upsertError } = await supabase
+      .from('ai_usage_monthly')
+      .upsert(
+        {
+          foundry_id: params.foundryId,
+          month_year: monthYear,
+          total_ai_tasks: nextTaskCount,
+          total_tokens: nextTokens,
+          total_cost_usd: nextCost,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'foundry_id,month_year' },
+      )
+
+    if (upsertError) {
+      console.error('[ai-usage] ai_usage_monthly upsert failed:', {
+        feature: params.feature,
+        foundryId: params.foundryId,
+        error: upsertError.message,
       })
       return null
     }
 
-    // RPC returns array with single row
-    const row = Array.isArray(data) ? data[0] : data
-    if (!row) return null
-
     return {
-      monthlyTaskCount: row.monthly_task_count,
-      monthlyCostUsd: Number(row.monthly_cost),
+      monthlyTaskCount: nextTaskCount,
+      monthlyCostUsd: nextCost,
     }
   } catch (error) {
-    console.error('[AIUsageTracking] Unexpected error:', {
+    console.error('[ai-usage] Unexpected error:', {
       feature: params.feature,
       error: error instanceof Error ? error.message : 'Unknown error',
     })
     return null
   }
+}
+
+/**
+ * Detect Postgres CHECK constraint violations.
+ *
+ * @description The `ai_usage_log_feature_check` constraint trails the
+ * `AIFeature` TypeScript union. A new feature added to the union without a
+ * matching migration will surface as code 23514 with a message containing
+ * the constraint name. We swallow this specific failure so it does not
+ * pollute the logs — the loss is one detail row per such call, while the
+ * canonical `llm_usage` row and the monthly aggregate still land.
+ */
+function isCheckConstraintError(error: { code?: string; message?: string }): boolean {
+  if (!error) return false
+  if (error.code === '23514') return true
+  return typeof error.message === 'string' && error.message.includes('check constraint')
 }
 
 // ==========================================
@@ -351,32 +449,31 @@ export async function trackAIUsage(
  *
  * @param foundryId - The foundry to check
  * @returns Monthly usage totals, or defaults if no usage recorded
+ *
+ * @description Reads `ai_usage_monthly` directly (admin client) so the
+ * monthly aggregate is available from any execution context — including
+ * `after()` post-response handlers where cookies() throws. The previous
+ * implementation used the `get_ai_usage_current_month` RPC which surfaced
+ * the same `TypeError: fetch failed` that broke the writer.
  */
 export async function getCurrentMonthUsage(
   foundryId: string
 ): Promise<MonthlyUsage> {
   try {
-    // GOTCHA: previously used createClient() (user-scoped, cookie-backed).
-    // When called from an `after()` post-response context (e.g. autopilot's
-    // stepWaitForBom reTrigger → runBomGeneratorBackground → checkAILimit →
-    // here), cookies() throws with the canary error "Route used cookies()
-    // inside after() — not supported". The throw propagates up, checkAILimit
-    // fails closed, background specialists return { allowed: false } without
-    // ever writing a pipeline_run row → autopilot stage rots.
-    //
-    // Observed 2026-04-23 on BESS dc8c1def after BOM TIMEOUT_STALL retrigger.
-    // Fix: use admin client. This is a system-level quota read keyed by
-    // foundryId (not a user-permission check), so bypassing RLS is correct.
     const supabase = createAdminClient()
+    const monthYear = new Date().toISOString().slice(0, 7) // YYYY-MM
 
-    const { data, error } = await supabase.rpc('get_ai_usage_current_month', {
-      p_foundry_id: foundryId,
-    })
+    const { data, error } = await supabase
+      .from('ai_usage_monthly')
+      .select('total_ai_tasks, total_tokens, total_cost_usd')
+      .eq('foundry_id', foundryId)
+      .eq('month_year', monthYear)
+      .maybeSingle()
 
     if (error) {
       // DECISION: Only throw on real database errors, not "no data" scenarios.
       // A foundry with zero usage simply has no rows — that's not an error.
-      console.warn('[AIUsageTracking] RPC error getting usage, assuming zero:', {
+      console.warn('[ai-usage] Monthly aggregate read error, assuming zero:', {
         foundryId,
         error: error.message,
       })
@@ -388,18 +485,13 @@ export async function getCurrentMonthUsage(
       return { totalAiTasks: 0, totalTokens: 0, totalCostUsd: 0 }
     }
 
-    const row = Array.isArray(data) ? data[0] : data
-    if (!row) {
-      return { totalAiTasks: 0, totalTokens: 0, totalCostUsd: 0 }
-    }
-
     return {
-      totalAiTasks: row.total_ai_tasks ?? 0,
-      totalTokens: row.total_tokens ?? 0,
-      totalCostUsd: Number(row.total_cost_usd ?? 0),
+      totalAiTasks: data.total_ai_tasks ?? 0,
+      totalTokens: data.total_tokens ?? 0,
+      totalCostUsd: Number(data.total_cost_usd ?? 0),
     }
   } catch (error) {
-    console.error('[AIUsageTracking] Unexpected error getting usage:', {
+    console.error('[ai-usage] Unexpected error getting usage:', {
       foundryId,
       error: error instanceof Error ? error.message : 'Unknown error',
     })

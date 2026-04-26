@@ -60,6 +60,7 @@ import { getTechniqueById } from '@/lib/manufacturing-techniques'
 import { getTechniqueEnrichment } from '@/actions/manufacturing-techniques'
 import type { TechniqueEnrichment } from '@/types/manufacturing-techniques'
 import { CATEGORY_ICONS, CATEGORY_COLORS } from './technique-card'
+import { TechniqueQASection } from './technique-qa-section'
 
 // ---------------------------------------------------------------------------
 // Cost display
@@ -563,6 +564,14 @@ export function TechniqueDetailDialog({
                 </div>
               </div>
             )}
+
+            {/* Q&A feed */}
+            <div className="pt-2 border-t border-muted">
+              <TechniqueQASection
+                techniqueId={technique.id}
+                techniqueName={technique.name}
+              />
+            </div>
 
           </div>
         </ScrollArea>

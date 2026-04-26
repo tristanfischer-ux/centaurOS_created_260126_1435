@@ -38,6 +38,15 @@ const nextConfig: NextConfig = {
     return [
       { source: '/supplier-portal', destination: '/supplier', permanent: true },
       { source: '/supplier-portal/:path*', destination: '/supplier/:path*', permanent: true },
+      // /recruits removed 2026-04-25 — redirect to /agents so existing
+      // bookmarks and in-app links don't 404
+      { source: '/recruits', destination: '/agents', permanent: false },
+      { source: '/recruits/:path*', destination: '/agents', permanent: false },
+      // /today removed 2026-04-25 — redirect to /investors (killer-feature default)
+      { source: '/today', destination: '/investors', permanent: false },
+      // /plan removed 2026-04-25 — Brainstorming (/agents) is the closest analogue
+      { source: '/plan', destination: '/agents', permanent: false },
+      { source: '/plan/:path*', destination: '/agents', permanent: false },
     ]
   },
 

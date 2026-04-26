@@ -53,21 +53,43 @@ import {
     Hammer,
     Building2,
     ArrowRight,
+    Copy,
+    Mail,
+    Check,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
 import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "@/lib/agents/specialists-config"
 import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix"
+import { getPrimaryTargetForTier } from "@/lib/agents/failover"
+import { getEffectiveModelTier } from "@/lib/agents/tier-aware-models"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { MeetingOutputs } from "./meeting-outputs"
 import { HuddleReport } from "./huddle-report"
 import { createArtifact } from "@/actions/agent-artifacts"
+import { createMeetingThread } from "@/actions/meeting-threads"
 import { parseProposedActions, stripProposedActionsBlock } from "@/lib/agents/message-parsers"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "@/lib/agents/specialists-config"
 import type { ProposedAction } from "@/lib/agents/message-parsers"
+import type { SubscriptionTier } from "@/lib/billing/plans"
+import { SUBSCRIPTION_PLANS } from "@/lib/billing/plans"
+import { APP_DOMAIN } from "@/lib/domains"
+import { toast } from "sonner"
+import Link from "next/link"
+import {
+    type CouncilTier,
+    COUNCIL_TIER_META,
+    getCouncilSpecialists,
+    getCouncilPosition,
+    COUNCIL_POSITION_LABELS,
+    MODEL_TIER_LATENCY_WEIGHT,
+    classifyTopic,
+    canAccessCouncilTier,
+    getCouncilUpgradeCopy,
+} from "@/lib/agents/council"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,6 +101,16 @@ interface MeetingEntry {
     content: string
     /** Parsed PROPOSED_ACTIONS from specialist response; rendered as interactive approval cards. */
     proposals?: ProposedAction[]
+    /**
+     * Council position label for this entry — shown as a pill above the
+     * response card in the streaming UI.
+     */
+    councilPosition?: import("@/lib/agents/council").CouncilPosition
+    /**
+     * Wall-clock time in milliseconds from meeting start when this
+     * response completed (used for the arrival timer pill).
+     */
+    arrivalMs?: number
 }
 
 /** The phases of a conversation-led meeting */
@@ -133,6 +165,21 @@ interface TeamMeetingDialogProps {
     onOpenChange: (open: boolean) => void
     /** When provided, auto-selects participants and pre-fills topic */
     preset?: MeetingPreset
+    /**
+     * Authenticated user id, used by the post-meeting upsell to build the
+     * referral URL `${APP_DOMAIN}/signup?ref=<user_id>`. Optional so the
+     * dialog still renders cleanly when the parent has not loaded it yet.
+     */
+    userId?: string
+    /**
+     * Subscription tier of the current user, used to decide which post-
+     * meeting upsell variant to show. Free hits the hard upsell after 1
+     * brainstorm; Starter+ users get the softer top-up nudge once they
+     * pass 80% of the bundled allowance.
+     */
+    userTier?: SubscriptionTier
+    /** Brainstorm sessions the user has consumed this calendar month. */
+    brainstormsUsedThisMonth?: number
 }
 
 // ─── Meeting Topic Suggestions ────────────────────────────────────────────────
@@ -187,6 +234,14 @@ const COMBINATION_SUGGESTIONS: Record<string, string[]> = {
     "fundraising-advisor,legal-counsel": [
         "What should we know about term sheets and investor agreements?",
         "How do we protect our interests during fundraising?",
+    ],
+    // Deep-tech / regulated-product founders: pair Leo with Sage to map a
+    // de-risking sequence the seed round can underwrite. Picks the most
+    // actionable of the three candidate prompts — once founders see how
+    // the milestones nest, the regulatory-pathway and prototype questions
+    // tend to fall out of the conversation naturally.
+    "legal-counsel,strategist": [
+        "How do we sequence the technical milestones so each one de-risks the next round?",
     ],
     "finance-lead,hiring-team": [
         "Can we afford to hire right now? What's the cost per new hire?",
@@ -772,6 +827,9 @@ export function TeamMeetingDialog({
     open,
     onOpenChange,
     preset,
+    userId,
+    userTier,
+    brainstormsUsedThisMonth,
 }: TeamMeetingDialogProps) {
     const router = useRouter()
     // ─── State ────────────────────────────────────────────────────────────
@@ -790,14 +848,22 @@ export function TeamMeetingDialog({
     const [showThoughtsInput, setShowThoughtsInput] = useState(false)
     const [meetingOutputs, setMeetingOutputs] = useState<MeetingOutputData | null>(null)
     const [isAutoSaved, setIsAutoSaved] = useState(false)
+    /** The persisted meeting_threads id — set after wrap-up saves */
+    const [meetingThreadId, setMeetingThreadId] = useState<string | null>(null)
     const [isGeneratingOutputs, setIsGeneratingOutputs] = useState(false)
     const [showReportDialog, setShowReportDialog] = useState(false)
     const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
     const [wantsToSpeak, setWantsToSpeak] = useState<Set<string>>(new Set())
     const [debateCancelRequested, setDebateCancelRequested] = useState(false)
+    /** Which Council tier the user has selected in the setup phase */
+    const [councilTier, setCouncilTier] = useState<CouncilTier>("quick")
+    /** When set, the upgrade modal is shown for this Council tier */
+    const [showCouncilUpgradeFor, setShowCouncilUpgradeFor] = useState<CouncilTier | null>(null)
 
     const scrollRef = useRef<HTMLDivElement>(null)
     const debateCancelRef = useRef(false)
+    /** Epoch ms when the meeting was started — used for arrival timers */
+    const meetingStartMsRef = useRef<number>(0)
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
     const topicSpeechRecognition = useSpeechRecognition({
@@ -841,11 +907,14 @@ export function TeamMeetingDialog({
                 setUserThoughts("")
                 setShowThoughtsInput(false)
                 setMeetingOutputs(null)
+                setMeetingThreadId(null)
                 setIsGeneratingOutputs(false)
                 setExpandedEntries(new Set())
                 setWantsToSpeak(new Set())
                 setDebateCancelRequested(false)
                 debateCancelRef.current = false
+                setCouncilTier("quick")
+                setShowCouncilUpgradeFor(null)
             }, 300)
             return () => clearTimeout(timer)
         }
@@ -860,6 +929,23 @@ export function TeamMeetingDialog({
             setTopic(preset.topic)
         }
     }, [open, preset, phase])
+
+    // INTENT: When the Council tier changes and a topic has been entered,
+    // auto-select the matching specialist set. The user can still override
+    // by clicking the specialist grid directly ("customise").
+    useEffect(() => {
+        if (phase !== "setup") return
+        if (councilTier === "strategy") return
+        if (!topic.trim()) return
+        const topicClass = classifyTopic(topic)
+        const specialists = getCouncilSpecialists(councilTier, topicClass)
+        if (specialists.length > 0) {
+            setSelectedIds(new Set(specialists.map((s) => s.id)))
+        }
+    // Intentionally limited deps: only re-run when councilTier changes mid-setup.
+    // Topic changes do NOT re-fire so manual customisation isn't clobbered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [councilTier, phase])
 
     // Auto-scroll during streaming
     useEffect(() => {
@@ -923,6 +1009,22 @@ export function TeamMeetingDialog({
             const controller = new AbortController()
             const fetchTimeout = setTimeout(() => controller.abort(), 60_000)
 
+            // FLOW: read primary target per specialist's modelTier (NOT hardcoded
+            // claude-opus-4-7). Fixes the 02:55:12 P0 where every specialist was
+            // routed to Anthropic Opus and an Anthropic 529 OVERLOADED took out
+            // brainstorming entirely. Server still receives modelTier and builds
+            // the full FALLBACK_CHAINS[tier] cascade.
+            //
+            // Tier-aware override (2026-04-25): free / anonymous users always get
+            // the cheap-class model (Haiku) regardless of the specialist's natural
+            // modelTier. Paid tiers (starter_v2 and above) keep the benchmark-
+            // validated per-specialist mapping unchanged.
+            const effectiveTier = getEffectiveModelTier(
+                specialist.modelTier,
+                userTier ?? "free",
+                councilTier,
+            )
+            const target = getPrimaryTargetForTier(effectiveTier)
             let res: Response
             try {
                 res = await fetch("/api/agents/execute", {
@@ -932,9 +1034,9 @@ export function TeamMeetingDialog({
                     body: JSON.stringify({
                         prompt,
                         input,
-                        providerId: "anthropic",
-                        modelId: "claude-opus-4-7",
-                        modelTier: "claude",
+                        providerId: target.providerId,
+                        modelId: target.modelId,
+                        modelTier: target.modelTier,
                         modality: "text",
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
@@ -1009,7 +1111,10 @@ export function TeamMeetingDialog({
 
             return fullResponse || "No response received."
         },
-        [readWithTimeout]
+        // userTier + councilTier are included so that if the user's tier
+        // changes mid-session (edge case) the next dispatch picks up the
+        // correct model class immediately.
+        [readWithTimeout, userTier, councilTier]
     )
 
     // Use a ref to track entries for TTS playback
@@ -1090,13 +1195,15 @@ export function TeamMeetingDialog({
             } catch (err) {
                 const message = err instanceof Error ? err.message : "Unknown error"
                 console.error(`[TeamMeeting] ${specialist.name} failed:`, message)
-                setError(`${specialist.name} encountered an error: ${message}`)
+                // In-character empty state — keeps the meeting feeling like a meeting,
+                // not a stack trace. Retry CTA stays visible elsewhere in the UI.
+                setError(`${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.`)
 
                 const errorEntry: MeetingEntry = {
                     specialistId: specialist.id,
                     specialistName: getSpecialistDisplayName(specialist),
                     round,
-                    content: `*[Error: Could not generate response]*`,
+                    content: `*${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.*`,
                 }
                 setEntries((prev) => [...prev, errorEntry])
             }
@@ -1109,10 +1216,116 @@ export function TeamMeetingDialog({
         [selectedSpecialists, topic, executeSpecialist]
     )
 
+    // ─── Run Council: staggered dispatch in latency order ────────────────
+
+    /**
+     * Run a full Council session in latency-ascending stagger order.
+     *
+     * Fires each specialist 500ms apart so the slowest models don't all
+     * start simultaneously and saturate token rate limits. Each specialist
+     * streams in independently — the UI updates as each one finishes.
+     *
+     * Attaches a `councilPosition` and `arrivalMs` to every entry so the
+     * streaming UI can show the position pill and arrival timer.
+     *
+     * @param orderedSpecialists - Specialists in latency-ascending order
+     * @param threads            - Thread ID map (pre-initialised)
+     */
+    const runCouncilMeeting = useCallback(
+        async (orderedSpecialists: Specialist[], threads: Record<string, string>) => {
+            meetingStartMsRef.current = Date.now()
+            const total = orderedSpecialists.length
+
+            for (let dispatchIdx = 0; dispatchIdx < total; dispatchIdx++) {
+                const specialist = orderedSpecialists[dispatchIdx]
+                const position = getCouncilPosition(dispatchIdx, total)
+
+                // 500ms stagger between dispatches (except the first)
+                if (dispatchIdx > 0) {
+                    await new Promise((r) => setTimeout(r, 500))
+                }
+
+                setPhase("in-progress")
+                setError(null)
+                setIsStreaming(true)
+                setCurrentSpecialistIdx(dispatchIdx)
+                setStreamingContent("")
+
+                try {
+                    // Build the prompt using the standard round-based logic:
+                    // dispatcher index 0 → round 0 entries present → "Quick take"
+                    // dispatcher index 1 → round 1 → "On reflection"
+                    // dispatcher index 2+ → round 2+ → "Thinking about this further"
+                    const currentEntries = entriesRef.current
+                    const prompt = buildMeetingPrompt(
+                        specialist,
+                        topic,
+                        currentEntries,
+                        currentEntries.length === 0 ? 1 : currentEntries.length + 1,
+                    )
+
+                    const dynamicsBlock = compileInterSpecialistDynamics(
+                        specialist.id,
+                        orderedSpecialists.map((s) => s.id),
+                        topic,
+                    )
+
+                    const response = await executeSpecialist(
+                        specialist,
+                        threads[specialist.id],
+                        prompt,
+                        topic,
+                        `\n\n## Council Context\nThis is a ${total}-specialist Council on: "${topic}". Your position in the staircase: ${COUNCIL_POSITION_LABELS[position]}.${dynamicsBlock ? `\n\n${dynamicsBlock}` : ""}`
+                    )
+
+                    const arrivalMs = Date.now() - meetingStartMsRef.current
+                    const proposals = parseProposedActions(response)
+                    const entry: MeetingEntry = {
+                        specialistId: specialist.id,
+                        specialistName: getSpecialistDisplayName(specialist),
+                        round: dispatchIdx + 1,
+                        content: stripProposedActionsBlock(response),
+                        proposals: proposals.length > 0 ? proposals : undefined,
+                        councilPosition: position,
+                        arrivalMs,
+                    }
+
+                    setEntries((prev) => [...prev, entry])
+
+                    // Compute "wants to speak" after each response
+                    const remainingIds = orderedSpecialists.map((s) => s.id)
+                    const wants = getWantsToSpeak(response, remainingIds, specialist.id)
+                    setWantsToSpeak(wants)
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : "Unknown error"
+                    console.error(`[Council] ${specialist.name} failed:`, message)
+                    setError(`${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.`)
+
+                    const errorEntry: MeetingEntry = {
+                        specialistId: specialist.id,
+                        specialistName: getSpecialistDisplayName(specialist),
+                        round: dispatchIdx + 1,
+                        content: `*${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.*`,
+                        councilPosition: position,
+                    }
+                    setEntries((prev) => [...prev, errorEntry])
+                }
+
+                setIsStreaming(false)
+                setStreamingContent("")
+            }
+
+            setCurrentRound(total)
+            setPhase("awaiting-input")
+        },
+        [topic, executeSpecialist]
+    )
+
     // ─── Start Meeting ────────────────────────────────────────────────────
 
     /**
      * Initialize threads and run only the FIRST specialist.
+     * When a Council tier is selected, auto-select and stagger all specialists.
      */
     const handleStartMeeting = useCallback(async () => {
         if (selectedIds.size < 2) {
@@ -1138,6 +1351,19 @@ export function TeamMeetingDialog({
                 return
             }
 
+            // Council mode: run all specialists in latency-ascending order with 500ms stagger
+            if (councilTier !== "quick" || selectedSpecialists.length > 2) {
+                // Sort the already-selected specialists by latency weight for dispatch order
+                const sortedForDispatch = [...selectedSpecialists].sort(
+                    (a, b) =>
+                        (MODEL_TIER_LATENCY_WEIGHT[a.modelTier] ?? 3) -
+                        (MODEL_TIER_LATENCY_WEIGHT[b.modelTier] ?? 3)
+                )
+                setIsStarting(false)
+                await runCouncilMeeting(sortedForDispatch, threads)
+                return
+            }
+
             await runSingleSpecialist(0, 1, threads)
         } catch (err) {
             const message = err instanceof Error ? err.message : "Unknown error"
@@ -1146,7 +1372,7 @@ export function TeamMeetingDialog({
         } finally {
             setIsStarting(false)
         }
-    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, selectedSpecialists])
+    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, selectedSpecialists, councilTier, runCouncilMeeting])
 
     // ─── Ask a Specific Specialist ────────────────────────────────────────
 
@@ -1244,7 +1470,7 @@ export function TeamMeetingDialog({
                         specialistId: specialist.id,
                         specialistName: getSpecialistDisplayName(specialist),
                         round: roundCounter,
-                        content: `*[Error: Could not generate response]*`,
+                        content: `*${specialist.name} stepped out for a moment — give it 30 seconds and try the round again.*`,
                     }
                     debateAccumulator.push(errorEntry)
                     setEntries((prev) => [...prev, errorEntry])
@@ -1289,15 +1515,20 @@ export function TeamMeetingDialog({
         const fullTranscript = `Meeting Topic: "${topic}"\nAttendees: ${attendees}\nRounds: ${currentRound}\n\n${transcript}`
 
         try {
+            // Wrap-up stays on the claude tier deliberately — synthesis benefits
+            // from Opus and the wrap-up cost is one call per meeting, not per
+            // turn. Piping through getPrimaryTargetForTier keeps client/server
+            // routing consistent with the per-specialist call site above.
+            const wrapUpTarget = getPrimaryTargetForTier("claude")
             const res = await fetch("/api/agents/execute", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     prompt: WRAP_UP_PROMPT,
                     input: fullTranscript,
-                    providerId: "anthropic",
-                    modelId: "claude-opus-4-7",
-                    modelTier: "claude",
+                    providerId: wrapUpTarget.providerId,
+                    modelId: wrapUpTarget.modelId,
+                    modelTier: wrapUpTarget.modelTier,
                     modality: "text",
                 }),
             })
@@ -1413,6 +1644,36 @@ export function TeamMeetingDialog({
 
                 if (!saveResult.error) {
                     setIsAutoSaved(true)
+
+                    // INTENT: Also persist a structured meeting_thread so the
+                    // session gets a permanent /agents/m/<id> URL the founder
+                    // can return to, share, or branch from.
+                    const artifactId = (saveResult.data as { id?: string } | null)?.id
+                    const threadEntries = entries.map((e) => ({
+                        specialistId: e.specialistId,
+                        specialistName: e.specialistName,
+                        councilPosition: e.councilPosition,
+                        arrivalMs: e.arrivalMs,
+                        roundNumber: e.round,
+                        content: e.content,
+                        role: "specialist" as const,
+                    }))
+
+                    createMeetingThread({
+                        topic,
+                        councilTier,
+                        specialistIds: [...selectedIds],
+                        outputs: parsed as unknown as Record<string, unknown>,
+                        artifactId,
+                        entries: threadEntries,
+                    }).then(({ threadId, error: threadErr }) => {
+                        if (threadErr) {
+                            console.error("[TeamMeeting] Failed to create meeting_thread:", threadErr)
+                        } else if (threadId) {
+                            setMeetingThreadId(threadId)
+                        }
+                    }).catch(() => {})
+
                     // INTENT: Feed meeting insights into Knowledge Vault.
                     import("@/actions/knowledge").then(({ extractKnowledgeFromText }) => {
                         extractKnowledgeFromText(notesMarkdown, `Meeting: ${topic.slice(0, 60)}`).catch(() => {})
@@ -1430,7 +1691,7 @@ export function TeamMeetingDialog({
         } finally {
             setIsGeneratingOutputs(false)
         }
-    }, [selectedSpecialists, entries, topic, currentRound])
+    }, [selectedSpecialists, entries, topic, currentRound, councilTier, selectedIds])
 
     // ─── Toggle Entry Expansion ───────────────────────────────────────────
     const toggleEntry = useCallback((idx: number) => {
@@ -1447,12 +1708,27 @@ export function TeamMeetingDialog({
 
     /**
      * Extract a short preview from a response (first 1-2 sentences).
+     *
+     * Specialist responses include markdown ladder phrases like
+     * `**Quick take —**` and inline emphasis. The preview is rendered as
+     * plain text in a collapsed row, so we strip the markdown markers
+     * before truncating — otherwise the user sees literal asterisks.
      */
     function getPreview(content: string): string {
+        // INTENT: strip the markdown the message body uses so the
+        // collapsed-row preview reads as plain prose. We only strip
+        // emphasis markers (** __ *), not destructive transforms like
+        // headings — those would change the sentence structure.
+        const stripped = content
+            .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
+            .replace(/__([^_]+)__/g, '$1') // alt-bold
+            .replace(/\*([^*]+)\*/g, '$1') // italic
+            .replace(/_([^_]+)_/g, '$1') // alt-italic
+            .replace(/`([^`]+)`/g, '$1') // inline code
         // Split on sentence boundaries, take first 2
-        const sentences = content.split(/(?<=[.!?])\s+/)
+        const sentences = stripped.split(/(?<=[.!?])\s+/)
         const preview = sentences.slice(0, 2).join(" ")
-        if (preview.length < content.length) {
+        if (preview.length < stripped.length) {
             return preview.length > 200 ? preview.slice(0, 200) + "..." : preview + "..."
         }
         return preview
@@ -1508,11 +1784,102 @@ export function TeamMeetingDialog({
                 {/* ── Phase 1: Setup ───────────────────────────────────────── */}
                 {phase === "setup" && (
                     <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
-                        {/* Specialist Picker */}
+
+                        {/* Council Tier Picker */}
                         <div className="space-y-3">
                             <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                                Who should attend? (pick 2 or more)
+                                Pick the Council depth
                             </Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {COUNCIL_TIER_META.map((meta) => {
+                                    const hasAccess = canAccessCouncilTier(userTier, meta.tier)
+                                    const isSelected = councilTier === meta.tier
+
+                                    return (
+                                        <button
+                                            key={meta.tier}
+                                            type="button"
+                                            onClick={() => {
+                                                if (!hasAccess) {
+                                                    if (!meta.isComingSoon) {
+                                                        setShowCouncilUpgradeFor(meta.tier)
+                                                    }
+                                                    return
+                                                }
+                                                setCouncilTier(meta.tier)
+                                                // Auto-select the specialists for this tier when topic is available
+                                                if (topic.trim() && meta.tier !== "strategy") {
+                                                    const topicClass = classifyTopic(topic)
+                                                    const specialists = getCouncilSpecialists(meta.tier, topicClass)
+                                                    setSelectedIds(new Set(specialists.map((s) => s.id)))
+                                                }
+                                            }}
+                                            className={cn(
+                                                "flex flex-col items-start p-3 rounded-lg border text-left transition-all relative",
+                                                isSelected && hasAccess
+                                                    ? "border-international-orange bg-international-orange/5 ring-1 ring-international-orange/20"
+                                                    : !hasAccess
+                                                    ? "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
+                                                    : "border-muted hover:border-muted-foreground/30 bg-background",
+                                            )}
+                                        >
+                                            <div className="flex items-center justify-between w-full mb-1">
+                                                <span className={cn(
+                                                    "text-sm font-semibold",
+                                                    isSelected && hasAccess ? "text-international-orange" : "text-foreground"
+                                                )}>
+                                                    {meta.label}
+                                                </span>
+                                                {!hasAccess && !meta.isComingSoon && (
+                                                    <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground bg-muted rounded px-1 py-0.5">
+                                                        upgrade
+                                                    </span>
+                                                )}
+                                                {meta.isComingSoon && (
+                                                    <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground bg-muted rounded px-1 py-0.5">
+                                                        soon
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                {meta.description}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                                                {meta.latencyDescription}
+                                            </span>
+                                            {!hasAccess && !meta.isComingSoon && (
+                                                <span className="text-[10px] text-international-orange/70 mt-1">
+                                                    {meta.pricingHint}
+                                                </span>
+                                            )}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Specialist Picker — shown as a "customise" section */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                                    {councilTier !== "strategy" && selectedIds.size > 0
+                                        ? "Customise the lineup"
+                                        : "Who should attend? (pick 2 or more)"}
+                                </Label>
+                                {councilTier !== "strategy" && topic.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const topicClass = classifyTopic(topic)
+                                            const specialists = getCouncilSpecialists(councilTier, topicClass)
+                                            setSelectedIds(new Set(specialists.map((s) => s.id)))
+                                        }}
+                                        className="text-[10px] text-international-orange hover:underline"
+                                    >
+                                        Reset to {COUNCIL_TIER_META.find((m) => m.tier === councilTier)?.label} defaults
+                                    </button>
+                                )}
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 {SPECIALISTS.map((s) => {
                                     const isSelected = selectedIds.has(s.id)
@@ -1798,7 +2165,22 @@ export function TeamMeetingDialog({
 
                         {/* Currently streaming specialist */}
                         {currentSpecialist && (
-                            <div className="space-y-2">
+                            <div
+                                className="space-y-2 animate-in fade-in duration-400"
+                                style={{ animationTimingFunction: "ease-out" }}
+                            >
+                                {/* Council position pill */}
+                                {(() => {
+                                    const position = getCouncilPosition(currentSpecialistIdx, selectedSpecialists.length)
+                                    const label = COUNCIL_POSITION_LABELS[position]
+                                    return (
+                                        <div className="ml-9 mb-1">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-international-orange/80 bg-international-orange/8 px-2 py-0.5 rounded-full border border-international-orange/15">
+                                                {label}
+                                            </span>
+                                        </div>
+                                    )
+                                })()}
                                 <div className="flex items-center gap-2">
                                     <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
                                         {currentSpecialist.avatarImage ? (
@@ -1858,7 +2240,7 @@ export function TeamMeetingDialog({
                                             onClick={() => toggleEntry(i)}
                                             className={cn(
                                                 "flex items-start gap-2 w-full text-left py-2 px-3 rounded-lg transition-colors",
-"hover:bg-muted/30"
+                                                "hover:bg-muted/30"
                                             )}
                                         >
                                             <div className="relative h-6 w-6 rounded-full overflow-hidden bg-muted flex-shrink-0 mt-0.5">
@@ -1881,7 +2263,18 @@ export function TeamMeetingDialog({
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-semibold text-foreground">
                                                         {entry.specialistName}
-                                                    </span>                                                    {isExpanded ? (
+                                                    </span>
+                                                    {entry.councilPosition && (
+                                                        <span className="text-[9px] font-mono uppercase tracking-wider text-international-orange/70 bg-international-orange/8 px-1.5 py-0.5 rounded-full border border-international-orange/10">
+                                                            {COUNCIL_POSITION_LABELS[entry.councilPosition]}
+                                                        </span>
+                                                    )}
+                                                    {entry.arrivalMs !== undefined && (
+                                                        <span className="text-[9px] text-muted-foreground">
+                                                            {(entry.arrivalMs / 1000).toFixed(1)}s
+                                                        </span>
+                                                    )}
+                                                    {isExpanded ? (
                                                         <ChevronUp className="h-3 w-3 text-muted-foreground ml-auto" />
                                                     ) : (
                                                         <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto" />
@@ -1920,7 +2313,23 @@ export function TeamMeetingDialog({
                                 const lastEntry = entries[entries.length - 1]
                                 const specialist = getSpecialistById(lastEntry.specialistId)
                                 return (
-                                    <div className="space-y-2">
+                                    <div
+                                        className="space-y-2 animate-in fade-in duration-400"
+                                        style={{ animationTimingFunction: "ease-out" }}
+                                    >
+                                        {/* Council position pill + arrival timer */}
+                                        {lastEntry.councilPosition && (
+                                            <div className="ml-9 mb-1 flex items-center gap-2">
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-international-orange/80 bg-international-orange/8 px-2 py-0.5 rounded-full border border-international-orange/15">
+                                                    {COUNCIL_POSITION_LABELS[lastEntry.councilPosition]}
+                                                </span>
+                                                {lastEntry.arrivalMs !== undefined && (
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {(lastEntry.arrivalMs / 1000).toFixed(1)}s
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         <div className="flex items-center gap-2">
                                             <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
                                                 {specialist?.avatarImage ? (
@@ -1943,10 +2352,11 @@ export function TeamMeetingDialog({
                                             </span>
                                             <Badge variant="secondary" className="text-[10px]">
                                                 Round {lastEntry.round}
-                                            </Badge>                                        </div>
+                                            </Badge>
+                                        </div>
                                         <div className={cn(
                                             "ml-9 rounded-lg border p-4",
-"border-muted bg-muted/30"
+                                            "border-muted bg-muted/30"
                                         )}>
                                             <Markdown content={lastEntry.content} className="text-sm" />
                                         </div>
@@ -2227,6 +2637,47 @@ export function TeamMeetingDialog({
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Tier-aware upsell — renders below the What-next CTAs only
+                                 * when the user has used >= 80% of their bundled brainstorm
+                                 * allowance for the month. Free hits this on session 1 of 1;
+                                 * Starter+ surfaces the £10 top-up / Pro upgrade language. */}
+                                <PostMeetingUpsell
+                                    userId={userId}
+                                    tier={userTier ?? 'free'}
+                                    used={
+                                        typeof brainstormsUsedThisMonth === 'number'
+                                            ? brainstormsUsedThisMonth + 1
+                                            : 1
+                                    }
+                                    cap={
+                                        SUBSCRIPTION_PLANS[userTier ?? 'free']?.limits
+                                            .brainstormSessionsPerMonth ?? null
+                                    }
+                                />
+
+                                {/* Persistent URL nudge — shown once the thread has been saved */}
+                                {meetingThreadId && (
+                                    <div className="px-6 pb-6">
+                                        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                                            <p className="text-xs text-muted-foreground">
+                                                This meeting has a permanent link you can return to, share, or branch from.
+                                            </p>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="flex-shrink-0 gap-1.5 text-xs"
+                                                onClick={() => {
+                                                    router.push(`/agents/m/${meetingThreadId}`)
+                                                    onOpenChange(false)
+                                                }}
+                                            >
+                                                View meeting
+                                                <ArrowRight className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         ) : error ? (
                             <div className="space-y-4 py-8">
@@ -2357,6 +2808,204 @@ export function TeamMeetingDialog({
                 attendees={selectedSpecialists.map((s) => s.name)}
             />
         )}
+
+        {/* Council tier upgrade modal */}
+        {showCouncilUpgradeFor && (
+            <CouncilUpgradeModal
+                tier={showCouncilUpgradeFor}
+                onClose={() => setShowCouncilUpgradeFor(null)}
+            />
+        )}
         </>
+    )
+}
+
+// ─── Council Upgrade Modal ────────────────────────────────────────────────
+
+interface CouncilUpgradeModalProps {
+    tier: CouncilTier
+    onClose: () => void
+}
+
+/**
+ * Upgrade modal shown when a user clicks a Council tier they cannot access.
+ * Voice rules: lead with the option, not the failure. British spelling.
+ * No em dashes. No model names in copy.
+ */
+function CouncilUpgradeModal({ tier, onClose }: CouncilUpgradeModalProps) {
+    const copy = getCouncilUpgradeCopy(tier)
+
+    return (
+        <Dialog open onOpenChange={onClose}>
+            <DialogContent size="sm">
+                <DialogHeader>
+                    <DialogTitle className="font-display flex items-center gap-2">
+                        <Users className="h-5 w-5 text-international-orange" />
+                        {copy.headline}
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="py-2 space-y-4">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        {copy.body}
+                    </p>
+                    <div className="rounded-lg border border-international-orange/20 bg-international-orange/[0.04] px-4 py-3">
+                        <p className="text-xs text-muted-foreground">{copy.pricingHint}</p>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="secondary" onClick={onClose}>
+                        Stay on Quick Council
+                    </Button>
+                    <Button
+                        asChild
+                        className="bg-international-orange hover:bg-international-orange-hover text-white"
+                    >
+                        <Link href="/settings/billing">
+                            Upgrade to {copy.planName}
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                        </Link>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+// ─── Post-meeting upsell ──────────────────────────────────────────────────
+
+interface PostMeetingUpsellProps {
+    /** Authenticated user id, used to build the referral URL. Optional. */
+    userId?: string
+    /** Subscription tier of the current user. */
+    tier: SubscriptionTier
+    /** Brainstorm sessions consumed this calendar month (including this one). */
+    used: number
+    /** Bundled allowance for this tier. `null` = unlimited (no upsell). */
+    cap: number | null
+}
+
+/**
+ * Tier-aware upsell rendered below the existing "What next?" CTA bar at
+ * the end of every brainstorm. Shown only when the user is at >= 80% of
+ * their bundled brainstorm allowance — earlier than that and the upsell
+ * is noise.
+ *
+ * Voice rules: lead with the option, never the failure. "Cancel anytime,
+ * no contract" reassurance line. Referral URL pattern is
+ * `${APP_DOMAIN}/signup?ref=<user_id>` so the conversion engine in
+ * Tier 5 step 22 can credit the inviter without any URL-shape migration.
+ */
+function PostMeetingUpsell({ userId, tier, used, cap }: PostMeetingUpsellProps) {
+    const [copied, setCopied] = useState(false)
+
+    if (cap === null) return null
+    if (cap <= 0) return null
+    if (used / cap < 0.8) return null
+
+    const referralUrl = userId ? `${APP_DOMAIN}/signup?ref=${userId}` : null
+    const isFree = tier === 'free'
+    const remaining = Math.max(0, cap - used)
+
+    // Resolve Starter v2 / Pro copy from the live plan data so a price
+    // change in plans.ts ripples through here without manual edits.
+    const starter = SUBSCRIPTION_PLANS['starter_v2']
+    const pro = SUBSCRIPTION_PLANS['professional']
+    const starterPrice = starter ? `£${(starter.priceMonthlyGBP / 100).toFixed(0)}` : '£20'
+    const starterBrainstorms = starter?.limits.brainstormSessionsPerMonth ?? 50
+    const starterLeads = starter?.limits.investorLeadsPerMonth ?? 100
+    const proPrice = pro ? `£${(pro.priceMonthlyGBP / 100).toFixed(0)}` : '£149'
+
+    const usageLine = isFree
+        ? `You've used ${used} of ${cap} brainstorms this month.`
+        : `${used} of ${cap} brainstorms used this month, ${remaining} remaining.`
+
+    const offerLine = isFree
+        ? `Upgrade to Starter, ${starterPrice}/month for ${starterBrainstorms} brainstorms, ${starterLeads} investor leads, and a drafted email for each match.`
+        : `Top up with the £10 add-on for 100 extra investor leads, or upgrade to Pro (${proPrice}/month) for unlimited brainstorming.`
+
+    const handleCopy = async () => {
+        if (!referralUrl) return
+        try {
+            await navigator.clipboard.writeText(referralUrl)
+            setCopied(true)
+            toast.success('Invite link copied. Paste it anywhere.')
+            setTimeout(() => setCopied(false), 2400)
+        } catch {
+            toast.error('Could not copy link. Long-press the link to copy manually.')
+        }
+    }
+
+    const handleEmailShare = () => {
+        if (!referralUrl) return
+        const subject = encodeURIComponent('ForgeOS, the brainstorming room I\'ve been using')
+        const body = encodeURIComponent(
+            [
+                'Hey,',
+                '',
+                'I\'ve been running brainstorms with the ForgeOS specialist team. Sharing my invite link below in case it\'s useful.',
+                '',
+                referralUrl,
+                '',
+                'Tristan',
+            ].join('\n'),
+        )
+        window.location.href = `mailto:?subject=${subject}&body=${body}`
+    }
+
+    return (
+        <div className="px-6 pb-4">
+            <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <div>
+                    <p className="text-sm font-semibold text-foreground">{usageLine}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                        {offerLine}
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm" className="gap-2">
+                        <Link href={isFree ? '/pricing?plan=starter_v2' : '/pricing'}>
+                            {isFree ? `Start Starter, ${starterPrice}/month` : 'See plans'}
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
+                    </Button>
+                    {referralUrl && (
+                        <>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleCopy}
+                                className="gap-2"
+                            >
+                                {copied ? (
+                                    <>
+                                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Copied
+                                    </>
+                                ) : (
+                                    <>
+                                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Copy invite link
+                                    </>
+                                )}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleEmailShare}
+                                className="gap-2"
+                            >
+                                <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                                Send via email
+                            </Button>
+                        </>
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    {isFree
+                        ? 'Or invite a friend who pays for Starter, you get +100 investor searches free this month. Cancel anytime, no contract.'
+                        : 'Invite a friend who pays for Starter, you get +100 investor searches free this month.'}
+                </p>
+            </div>
+        </div>
     )
 }

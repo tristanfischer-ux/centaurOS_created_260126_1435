@@ -32,8 +32,10 @@ export function MarketingFooter() {
                             </span>
                         </Link>
                         <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-                            Expert teams, AI-enabled execution, and manufacturing
-                            capacity — without owning a factory.
+                            Build the smart version of everyday products —
+                            specialist support across thirteen disciplines, a
+                            UK and European manufacturing network, and the
+                            investors who fund hardware, all in one place.
                         </p>
                     </div>
 
@@ -61,7 +63,7 @@ export function MarketingFooter() {
                             </li>
                             <li>
                                 <Link
-                                    href="/join"
+                                    href="/signup"
                                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                                 >
                                     Get Started

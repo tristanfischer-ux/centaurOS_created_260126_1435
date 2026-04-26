@@ -36,7 +36,7 @@ export default async function TimePage() {
   if (!user) redirect('/login')
 
   const foundryId = await getFoundryIdCached()
-  if (!foundryId) redirect('/today')
+  if (!foundryId) redirect('/investors')
 
   const weekStart = getCurrentMondayUTC()
   const weekEnd = (() => {

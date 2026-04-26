@@ -18,7 +18,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +34,8 @@ import {
   Lock,
   Quote,
   ExternalLink,
+  Loader2,
+  Sparkles,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -62,6 +64,12 @@ interface Props {
   /** Click target — open detail page or run a side action. */
   onSave?: () => void
   isSaved?: boolean
+  /**
+   * Called when the founder clicks "Reveal why-fit" on a paid card that has
+   * no matchOutput yet. Parent updates the matchOutputs map and re-renders
+   * this card with the enriched output. Only passed on mode='full'.
+   */
+  onRevealWhyFit?: () => Promise<void>
 }
 
 // ---------------------------------------------------------------------------
@@ -117,13 +125,22 @@ export function InvestorMatchInsightCard({
   mode,
   onSave,
   isSaved,
+  onRevealWhyFit,
 }: Props) {
   const [emailOpen, setEmailOpen] = useState(false)
   const [copiedSubject, setCopiedSubject] = useState(false)
   const [copiedBody, setCopiedBody] = useState(false)
+  const [isRevealing, startReveal] = useTransition()
 
   const isBlurred = mode === 'blurred'
   const showInsights = !!matchOutput && !isBlurred
+  // Paid card with no enrichment yet — show the "Reveal why-fit" CTA.
+  const canReveal = mode === 'full' && !matchOutput && !!onRevealWhyFit
+
+  function handleReveal() {
+    if (!onRevealWhyFit) return
+    startReveal(() => onRevealWhyFit())
+  }
 
   async function copyText(value: string, which: 'subject' | 'body') {
     try {
@@ -218,7 +235,40 @@ export function InvestorMatchInsightCard({
       </CardHeader>
 
       <CardContent className="space-y-4 pb-4">
+        {/* LAZY-LOAD: paid card with no enrichment yet — show Reveal CTA */}
+        {canReveal && (
+          <div className="flex flex-col items-center justify-center py-6 text-center rounded-lg bg-muted/30 border border-dashed border-border">
+            <div className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-international-orange/10 mb-3">
+              <Sparkles className="h-5 w-5 text-international-orange" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">See why this investor fits</p>
+            <p className="text-xs text-muted-foreground mb-4 max-w-xs">
+              We analyse their fund decisions, partner statements, and portfolio precedents against your profile.
+            </p>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleReveal}
+              disabled={isRevealing}
+              className="gap-2"
+            >
+              {isRevealing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Analysing fit
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Reveal why-fit
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         {/* WHY YOU SHOULD INTEREST THEM */}
+        {!canReveal && (
         <section className={cn(isBlurred && 'select-none')}>
           <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
             Why you should interest them
@@ -234,8 +284,10 @@ export function InvestorMatchInsightCard({
               : 'Conviction has led 4 of the last 6 UK food-tech Series A rounds in the £4-6M band. Your traction matches the operational maturity bar Tina cited as a deal-breaker on the Hardware in Climate podcast.'}
           </p>
         </section>
+        )}
 
         {/* HOW TO PITCH THIS TO THEM */}
+        {!canReveal && (
         <section className={cn(isBlurred && 'select-none')}>
           <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
             How to pitch this to them
@@ -251,6 +303,7 @@ export function InvestorMatchInsightCard({
               : 'Open with unit economics — Conviction\'s last 3 deals anchored on cost-per-output, not top-line growth. Skip the TAM slide. Lead with your strongest contract.'}
           </p>
         </section>
+        )}
 
         {/* Citations */}
         {showInsights && matchOutput!.sourceCitations.length > 0 && (

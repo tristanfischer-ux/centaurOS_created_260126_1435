@@ -96,8 +96,8 @@ export interface Specialist {
     thinkingIndicator: string
     /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
     thinkingPhases: [string, string, string]
-    /** AI model tier: "claude" for Opus, "sonnet" for Sonnet 4.6, "deepseek" for DeepSeek V4, "google" for Gemini 3.1 Pro, "openai" for GPT-5.4, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
-    modelTier: "claude" | "sonnet" | "deepseek" | "google" | "openai" | "qwen" | "qwen-local" | "minimax"
+    /** AI model tier: "claude" for Opus, "sonnet" for Sonnet 4.6, "deepseek" for DeepSeek V4, "google" for Gemini 3.1 Pro, "openai" for GPT-5.4, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch, "haiku" for Claude Haiku 4.5, "gpt-mini" for GPT-4.1-mini, "qwen-235b" for Qwen 3 235B-A22B, "deepseek-v4-pro" for DeepSeek V4-Pro reasoning via Together */
+    modelTier: "claude" | "sonnet" | "deepseek" | "google" | "openai" | "qwen" | "qwen-local" | "minimax" | "haiku" | "gpt-mini" | "qwen-235b" | "deepseek-v4-pro"
     /** Enable speculative dual-stream: fast model responds instantly while deep model works in parallel.
      *  Default: true for claude-tier (high latency), false for already-fast tiers. */
     speculativeEnabled?: boolean
@@ -549,7 +549,7 @@ export const SPECIALISTS: Specialist[] = [
             "Checking yields and tolerances...",
             "Path from prototype to volume is clear — writing it up.",
         ],
-        modelTier: "deepseek", // Switched from sonnet to deepseek (V4) — benchmarked 2026-04-07, composite improved +0.14
+        modelTier: "qwen-235b", // Switched from deepseek (V4) to Qwen 3 235B — benchmark validated 2026-04-25, composite delta >= -0.2, voice >= 4.0
         speculativeEnabled: true,
     },
     {
@@ -870,7 +870,7 @@ export const SPECIALISTS: Specialist[] = [
             "Connecting creative to conversion...",
             "Strategy and tactics aligned — here it comes.",
         ],
-        modelTier: "google",
+        modelTier: "haiku", // Switched to Claude Haiku 4.5 — benchmark validated 2026-04-25, composite delta >= -0.2, voice >= 4.0
         speculativeEnabled: true,
     },
     {
@@ -982,7 +982,7 @@ export const SPECIALISTS: Specialist[] = [
             "Building the playbook...",
             "Scripts and numbers ready — let's close this.",
         ],
-        modelTier: "openai",
+        modelTier: "gpt-mini", // Switched to GPT-4.1-mini — benchmark validated 2026-04-25, composite delta >= -0.2, voice >= 4.0
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1207,7 +1207,7 @@ export const SPECIALISTS: Specialist[] = [
             "Stress-testing assumptions...",
             "Building your financial picture.",
         ],
-        modelTier: "deepseek",
+        modelTier: "deepseek-v4-pro", // Switched from deepseek (V4) to V4-Pro reasoning via Together — benchmark validated 2026-04-25, composite delta >= -0.2, voice >= 4.0
         speculativeEnabled: true,
     },
     {
@@ -1316,7 +1316,7 @@ export const SPECIALISTS: Specialist[] = [
             "Pressure-testing the weak spots...",
             "The story is coming together — almost there.",
         ],
-        modelTier: "openai",
+        modelTier: "claude", // Switched to Claude Opus 4.7 — benchmark validated 2026-04-25, composite delta >= -0.2, voice >= 4.0
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════

@@ -55,11 +55,36 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { loadCadLabProject } from "@/actions/cad-lab-projects"
+import { generateSupplierMatchOutputs } from "@/actions/supplier-match-generation"
+import type { SupplierMatchOutput } from "@/actions/supplier-match-generation"
+import { getUserSubscription } from "@/lib/billing/subscriptions"
 import { createClient } from "@/lib/supabase/server"
 
 import { SuppliersView, type SuppliersSupplierRow, type SuppliersViewProps } from "./suppliers-view"
 
 export const dynamic = "force-dynamic"
+
+/**
+ * Top-N supplier results that get the LLM-enriched insight card. Mirrors the
+ * Phase G investor cap (12). Anything beyond this falls back to the compact
+ * card. This bound is what keeps per-page cost predictable: with caching, the
+ * worst case on a fresh project is 12 Sonnet calls (~£0.15 - £0.25 total).
+ */
+const TOP_N_SUPPLIER_INSIGHTS = 12
+
+/**
+ * Tiers that see the full why-relevant + three-questions output. Free and
+ * anonymous see the blurred upgrade overlay on top three; the rest of the
+ * grid renders the compact card with no overlay.
+ */
+const PAID_TIERS = new Set<string>([
+    "seed",
+    "starter",
+    "professional",
+    "enterprise",
+])
+
+type ResolvedTier = "anonymous" | "free" | "seed" | "starter" | "professional" | "enterprise"
 
 export async function generateMetadata(
     { params }: { params: Promise<{ id: string }> },
@@ -107,6 +132,32 @@ export default async function ForgeV2SuppliersPage({
             ? { id: modules[0].id, name: modules[0].name }
             : null
 
+    // ── Resolve tier + enrich top-N supplier rows with the why-relevant +
+    // three-questions output. Free / anonymous tiers skip enrichment and
+    // see the blurred upgrade overlay on the first three cards instead;
+    // the rest of the grid renders the compact card with no overlay.
+    const { resolvedTier, userId } = await resolveTier()
+    let matchOutputs: Record<string, SupplierMatchOutput> = {}
+    const isPaid = PAID_TIERS.has(resolvedTier)
+    if (isPaid && userId && shortlistRows.length > 0) {
+        const enrichIds = shortlistRows
+            .slice(0, TOP_N_SUPPLIER_INSIGHTS)
+            .map((r) => r.supplierId)
+        try {
+            matchOutputs = await generateSupplierMatchOutputs({
+                projectId: id,
+                userId,
+                supplierIds: enrichIds,
+                maxParallel: 8,
+            })
+        } catch (err) {
+            // FLOW: Enrichment failure must never break the page itself.
+            // Log and fall back to compact-card-only.
+            console.error("[SUPPLIERS-PAGE] Match enrichment failed:", err)
+            matchOutputs = {}
+        }
+    }
+
     const viewProps: SuppliersViewProps = {
         project: {
             id: project.id,
@@ -115,9 +166,37 @@ export default async function ForgeV2SuppliersPage({
         suppliers: shortlistRows,
         totalShortlisted: shortlistRows.length,
         firstModule,
+        matchOutputs,
+        resolvedTier,
+        topNInsights: TOP_N_SUPPLIER_INSIGHTS,
     }
 
     return <SuppliersView {...viewProps} />
+}
+
+// ─── Tier resolver ─────────────────────────────────────────────────────
+
+/**
+ * Resolve the caller's subscription tier. The auth path of this page is
+ * already gated by `loadCadLabProject` (anonymous users get notFound), so
+ * "anonymous" is only reachable here as a defensive fallback.
+ */
+async function resolveTier(): Promise<{
+    resolvedTier: ResolvedTier
+    userId: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { resolvedTier: "anonymous", userId: null }
+        const { subscription } = await getUserSubscription(user.id)
+        const isActive = subscription?.status === "active" || subscription?.status === "trialing"
+        const tier = (subscription && isActive) ? subscription.tier : "free"
+        return { resolvedTier: tier as ResolvedTier, userId: user.id }
+    } catch (err) {
+        console.error("[SUPPLIERS-PAGE] Tier resolution failed:", err)
+        return { resolvedTier: "free", userId: null }
+    }
 }
 
 // ─── Data loaders ──────────────────────────────────────────────────────

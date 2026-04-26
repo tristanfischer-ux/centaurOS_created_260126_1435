@@ -144,10 +144,10 @@ export async function login(formData: FormData) {
 
         // Single foundry or active foundry set - go to Today page
         if (foundryCount >= 1) {
-            redirect('/today')
+            redirect('/investors')
         }
     }
 
     // Default: users without foundry memberships
-    redirect('/today')
+    redirect('/investors')
 }

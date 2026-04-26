@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation'
 import { getUserSubscription, SUBSCRIPTION_PLANS } from '@/lib/billing/subscriptions'
 import type { SubscriptionTier } from '@/lib/billing/subscriptions'
 import { getCurrentMonthUsage } from '@/lib/ai/usage-tracking'
+import { getForgeAmbassadorStatus } from '@/actions/referrals'
 import { BillingContent } from './billing-content'
 
 export default async function BillingPage() {
@@ -47,6 +48,15 @@ export default async function BillingPage() {
   // Test mode: Stripe products not configured yet
   const isTestMode = !process.env.STRIPE_PRICE_STARTER_MONTHLY
 
+  // FORGE AMBASSADOR: fetch live status (Tier 5 step 23)
+  const ambassadorResult = await getForgeAmbassadorStatus()
+  const isForgeAmbassador = 'isAmbassador' in ambassadorResult
+    ? ambassadorResult.isAmbassador
+    : false
+  const ambassadorSince = 'since' in ambassadorResult
+    ? ambassadorResult.since
+    : null
+
   // Map subscription to the shape expected by BillingContent
   const subscriptionInfo = subscription
     ? {
@@ -65,6 +75,8 @@ export default async function BillingPage() {
       aiUsage={aiUsage}
       hasStripeCustomer={hasStripeCustomer}
       isTestMode={isTestMode}
+      isForgeAmbassador={isForgeAmbassador}
+      ambassadorSince={ambassadorSince}
     />
   )
 }

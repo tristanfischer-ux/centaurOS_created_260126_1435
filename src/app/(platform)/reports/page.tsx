@@ -23,9 +23,6 @@
  */
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { useSearchParams } from 'next/navigation'
 
 import {
@@ -253,13 +250,6 @@ export default function ReportsPage(): React.JSX.Element {
   const defaultDateRange = getDateRangeFromPreset(defaultTemplate.defaultDateRange)
   const defaultSections = new Set(
     defaultTemplate.defaultSections.filter(s => s.enabled).map(s => s.type)
-  )
-
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('chief-of-staff', 'Reports page. The user generates polished reports from live data for their team, board, or investors.', 'success'),
-    'success',
-    true,
-    'briefing-reports',
   )
 
   const reportRef = useRef<HTMLDivElement>(null)
@@ -970,18 +960,6 @@ export default function ReportsPage(): React.JSX.Element {
           </p>
         </div>
       </div>
-
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={briefing.narrative}
-        fallbackMessage="The difference between a founder who gets funded and one who doesn't is often the quality of the document they put in front of investors. Pick a template, point it at your live data, and you'll have a board-ready deliverable in minutes — not the two days it usually takes. Start with whatever your next meeting needs."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Reports', description: 'Cal on reports.', metadata: {} }}
-        storageKey="reports"
-      />
 
       {/* Change 6: Tab Separation */}
       <div role="tablist" aria-label="Report type" className="flex items-center gap-1 rounded-xl border border-border bg-muted/30 p-1">

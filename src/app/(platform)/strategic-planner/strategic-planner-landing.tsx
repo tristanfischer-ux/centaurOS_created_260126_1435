@@ -17,9 +17,7 @@ import {
   Target,
 } from "lucide-react"
 
-import { usePageBriefing } from "@/hooks/use-page-briefing"
-import { generatePageBriefing } from "@/actions/specialist-page-insights"
-import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -53,15 +51,6 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
   const avgProgress = goals.length > 0
     ? Math.round(goals.reduce((sum, g) => sum + (g.progress ?? 0), 0) / goals.length)
     : 0
-  const briefingSeverity = atRiskGoals > 0 ? 'warning' as const : 'success' as const
-  const briefingContext = `Goals: ${goals.length}, Completed: ${completedGoals}, At risk: ${atRiskGoals}, Avg progress: ${avgProgress}%`
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('strategist', briefingContext, briefingSeverity),
-    briefingSeverity,
-    goals.length > 0,
-    'briefing-planner',
-  )
-
   return (
     <div>
       {/* Page Header */}
@@ -82,19 +71,6 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
           </Button>
         </Link>
       </div>
-
-      {/* Sage's briefing */}
-      <SpecialistBriefingHero
-        specialistId="strategist"
-        specialistName="Sage"
-        specialistTitle="Strategist"
-        narrative={briefing.narrative}
-        fallbackMessage="Strategy fails when everything is 'priority one.' The canvas shows you where goals depend on each other and — more importantly — where you're trying to do three things at once with the resources for one. Drag your goals onto the timeline and I'll show you where the collisions are."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Strategic Planner', description: 'Strategic goals and milestone tracking', metadata: {} }}
-        storageKey="strategic-planner"
-      />
 
       {goals.length === 0 ? (
         <EmptyState

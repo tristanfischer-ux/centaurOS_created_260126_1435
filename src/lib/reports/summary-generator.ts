@@ -7,6 +7,7 @@
 
 import OpenAI from 'openai'
 import { DailyPulseData, UserRole, Insight } from './types'
+import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 
 // Initialize OpenAI client (lazy)
 let openaiClient: OpenAI | null = null
@@ -70,20 +71,41 @@ Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anyw
             pendingApprovals: data.pending_approvals.length,
             topInsights: insights.slice(0, 2).map(i => ({ type: i.type, title: i.title }))
         }
-        
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-5.4',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { 
-                    role: 'user', 
-                    content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`
-                }
-            ],
-            max_tokens: 200,
-            temperature: 0.7
+        const summaryModel = 'gpt-5.4'
+        let completion
+        try {
+            completion = await openai.chat.completions.create({
+                model: summaryModel,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    {
+                        role: 'user',
+                        content: `Generate a daily summary for ${userName}. Here's the data:\n${JSON.stringify(dataContext, null, 2)}`,
+                    },
+                ],
+                max_tokens: 200,
+                temperature: 0.7,
+            })
+        } catch (err) {
+            void logLlmUsage({
+                action: 'report_summary',
+                modelUsed: summaryModel,
+                tokensIn: 0,
+                tokensOut: 0,
+                status: 'error',
+                errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+            })
+            throw err
+        }
+
+        void logLlmUsage({
+            action: 'report_summary',
+            modelUsed: summaryModel,
+            tokensIn: completion.usage?.prompt_tokens ?? 0,
+            tokensOut: completion.usage?.completion_tokens ?? 0,
+            status: 'success',
         })
-        
+
         return completion.choices[0]?.message?.content || generateTemplateSummary(context)
     } catch (error) {
         console.error('Failed to generate summary with OpenAI:', error)

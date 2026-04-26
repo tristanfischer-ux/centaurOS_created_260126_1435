@@ -24,8 +24,10 @@ import { InvestorSearchHero } from './InvestorSearchHero'
 import { DashboardMatchCards } from './DashboardMatchCards'
 import { SearchPromptGrid } from './SearchPromptGrid'
 import { InvestorMatchInsightCard } from './InvestorMatchInsightCard'
+import { LimitReachedUpsell, ApproachingLimitBanner } from './LimitReachedUpsell'
 import {
   searchInvestors,
+  enrichInvestorMatchOnDemand,
   addToShortlist,
   removeFromShortlist,
   type InvestorFirm,
@@ -33,6 +35,7 @@ import {
   type InvestorTierAccess,
   type InvestorMatchOutputView,
 } from '@/actions/investors'
+import { APP_DOMAIN } from '@/lib/domains'
 
 type ResolvedTier = 'free' | 'seed' | 'starter' | 'professional' | 'enterprise' | 'anonymous'
 
@@ -49,6 +52,29 @@ interface InvestorSearchHeroClientProps {
   initialMatchOutputs?: Record<string, InvestorMatchOutputView>
   /** Resolved tier from the initial search — drives the blur/teaser logic. */
   resolvedTier?: ResolvedTier
+  /**
+   * Authenticated user id, used by the limit-reached upsell to build the
+   * `${APP_DOMAIN}/signup?ref=<user_id>` referral URL. Optional so the
+   * component is safe in anonymous render paths.
+   */
+  userId?: string
+  /**
+   * Snapshot of the user's investor monthly view cap, used to render the
+   * limit-reached upsell when free-tier users have exhausted their allowance
+   * and the soft-state >=80% banner before that.
+   */
+  viewCapSnapshot?: {
+    cap: number | null
+    viewsUsedThisMonth: number
+    viewsRemaining: number | null
+  }
+  /**
+   * When true the user is within their early-access free month.
+   * Passes through to LimitReachedUpsell and ApproachingLimitBanner so they
+   * show the invite-a-friend framing instead of the paid-conversion upsell.
+   * Resolved server-side via getEarlyAccessProfile() in the page loader.
+   */
+  isEarlyAccess?: boolean
 }
 
 const PAID_TIERS = new Set(['seed', 'starter', 'professional', 'enterprise'])
@@ -63,6 +89,9 @@ export function InvestorSearchHeroClient({
   initialMatchOutputs,
   resolvedTier = 'free',
   companyContext,
+  userId,
+  viewCapSnapshot,
+  isEarlyAccess = false,
 }: InvestorSearchHeroClientProps) {
   const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
   const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores ?? {})
@@ -96,11 +125,13 @@ export function InvestorSearchHeroClient({
     setHasSearched(true)
     startTransition(async () => {
       try {
+        // PERF: skip server-side LLM enrichment — cards load why-fit on click.
         const result = await searchInvestors({
           query: trimmed,
           sortBy: 'name',
           page: 1,
           pageSize: 50,
+          skipMatchEnrichment: true,
         })
         setFirms(result.firms)
         setMatchOutputs(result.matchOutputs ?? {})
@@ -207,9 +238,44 @@ export function InvestorSearchHeroClient({
     }
   }, [shortlistIds])
 
+  // Per-card on-demand enrichment. Called when the founder clicks "Reveal
+  // why-fit" on a card that has no matchOutput yet. Updates the matchOutputs
+  // map for that card only — no re-render of the full list.
+  const handleRevealWhyFit = useCallback(async (firmId: string) => {
+    if (matchOutputs[firmId]) return // already enriched — idempotent guard
+    try {
+      const output = await enrichInvestorMatchOnDemand(firmId)
+      if (output) {
+        setMatchOutputs((prev) => ({ ...prev, [firmId]: output }))
+      } else {
+        toast.error('Could not load the insight — please try again.')
+      }
+    } catch {
+      toast.error('Could not load the insight — please try again.')
+    }
+  }, [matchOutputs])
+
   const showInsightCards = firms.length > 0 && (hasSearched || initialFirms.length > 0)
   const isPaid = PAID_TIERS.has(tier)
   const isAnonymous = tier === 'anonymous'
+  const isFreeSignedIn = tier === 'free'
+
+  // FLOW: Limit-reached and approaching-limit derivations.
+  // Only the new freemium "Free" tier gets the upsell + soft banner — paid
+  // and anonymous tiers route through the existing surfaces. We drive both
+  // states off the monthly investor-view cap (the canonical limit-check in
+  // src/lib/ai/limit-check.ts). When the parallel "free freemium gate"
+  // commit lands (1 brainstorm + 5 lifetime saved searches), the same
+  // component can be re-fed off `savedSearchesLifetime` by switching the
+  // `limit` prop to `saved_searches`.
+  const cap = viewCapSnapshot?.cap ?? null
+  const usedThisMonth = viewCapSnapshot?.viewsUsedThisMonth ?? 0
+  const isFreeAtLimit =
+    isFreeSignedIn && cap !== null && cap > 0 && usedThisMonth >= cap
+  const freeUsagePct =
+    isFreeSignedIn && cap !== null && cap > 0 ? usedThisMonth / cap : 0
+  const isFreeApproaching =
+    isFreeSignedIn && cap !== null && cap > 0 && freeUsagePct >= 0.8 && !isFreeAtLimit
 
   // Anonymous teaser: render first card fully (server provides the teaser
   // output), the rest blurred. Free signed-in: all blurred.
@@ -225,6 +291,20 @@ export function InvestorSearchHeroClient({
 
   return (
     <div className="space-y-8">
+      {/* Soft >=80% banner: above the search box so the founder sees it
+       * BEFORE typing their next query, not as a wall after the fact.
+       * Only renders for signed-in free users; paid users have separate
+       * surfaces (existing /investors top-of-page banner). */}
+      {isFreeApproaching && (
+        <ApproachingLimitBanner
+          limit="monthly_searches"
+          currentCount={usedThisMonth}
+          limitMax={cap as number}
+          isEarlyAccess={isEarlyAccess}
+          referralUrl={isEarlyAccess && userId ? `${APP_DOMAIN}/signup?ref=${userId}` : undefined}
+        />
+      )}
+
       <InvestorSearchHero
         onSearch={runSearch}
         onCancel={handleCancel}
@@ -274,6 +354,7 @@ export function InvestorSearchHeroClient({
                 mode={mode}
                 onSave={() => handleSave(firm)}
                 isSaved={!!shortlistIds[firm.id]}
+                onRevealWhyFit={mode === 'full' ? () => handleRevealWhyFit(firm.id) : undefined}
               />
             )
           })}
@@ -293,8 +374,21 @@ export function InvestorSearchHeroClient({
         />
       )}
 
-      {!showInsightCards && hasSearched && <EmptyMatchState />}
-      {!showInsightCards && !hasSearched && firms.length === 0 && <EmptyMatchState />}
+      {/* Limit-reached state: free user has exhausted their monthly views.
+       * Show the upsell instead of (or alongside) the empty-match state so
+       * the next action is upgrade/invite, not a dead end. */}
+      {isFreeAtLimit && !showInsightCards && (
+        <LimitReachedUpsell
+          userId={userId}
+          limit="monthly_searches"
+          currentCount={usedThisMonth}
+          limitMax={cap as number}
+          isEarlyAccess={isEarlyAccess}
+        />
+      )}
+
+      {!showInsightCards && hasSearched && !isFreeAtLimit && <EmptyMatchState />}
+      {!showInsightCards && !hasSearched && firms.length === 0 && !isFreeAtLimit && <EmptyMatchState />}
     </div>
   )
 }
