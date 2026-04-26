@@ -3850,14 +3850,51 @@ async function exportProjectPdfInternal(
         }))
 
         // Cost aggregates.
-        const perModuleCost = modules.map((m) => ({
-            moduleName: m.name,
-            totalGbp:
+        //
+        // L9-P1 (2026-04-26): BOM master is the canonical source of truth for
+        // unit cost. Two parallel cost pipelines existed:
+        //   (1) Finn's per-module `ai_cost_estimates[m.id].totalPerUnit` —
+        //       coarse, ~5 cost lines per module, often misses major parts.
+        //   (2) BOM generator's `parts` table — granular, 10-20 rows per
+        //       module, includes assembly-level make-cost lines.
+        //
+        // Loop 9 PDFs showed cover-vs-BOM disagreeing 7-13×: Desal cover
+        // £50,920 vs BOM £646,679 (the BOM was inside the council
+        // £473k-£719k benchmark band). Vertfarm/HAPS had inverse direction.
+        //
+        // Fix: cover unit cost + per-module roll-up now derive from the
+        // parts table. Cover, BOM master, and reconciliation gate all read
+        // from the same source. Module pages still show Finn's per-row
+        // breakdown for narrative; the per-module *total* uses parts.
+        const partsCostByModule = new Map<string, number>()
+        for (const p of parts) {
+            if (typeof p.estimatedUnitCostGbp !== "number") continue
+            const modKey =
+                typeof p.sourceModuleName === "string" ? p.sourceModuleName : "_orphan"
+            partsCostByModule.set(
+                modKey,
+                (partsCostByModule.get(modKey) ?? 0) + p.estimatedUnitCostGbp,
+            )
+        }
+        const perModuleCost = modules.map((m) => {
+            const partsTotal = partsCostByModule.get(m.name)
+            const finnTotal =
                 m.cost && typeof m.cost.totalPerUnit === "number"
                     ? (m.cost.totalPerUnit as number)
-                    : null,
-        }))
-        const unitTotalGbp = perModuleCost.reduce((acc, c) => acc + (c.totalGbp ?? 0), 0)
+                    : null
+            // Prefer parts-table roll-up; fall back to Finn estimate only if
+            // the BOM has no rows for this module (which is itself a bug
+            // worth flagging, but better than rendering null).
+            return {
+                moduleName: m.name,
+                totalGbp: typeof partsTotal === "number" ? partsTotal : finnTotal,
+            }
+        })
+        const unitTotalGbp = parts.reduce(
+            (acc, p) =>
+                acc + (typeof p.estimatedUnitCostGbp === "number" ? p.estimatedUnitCostGbp : 0),
+            0,
+        )
 
         // Suppliers shortlist — join to global directory for HQ.
         const { data: shortlistRows } = await admin
@@ -4171,9 +4208,9 @@ async function exportProjectPdfInternal(
             parts,
             cost: {
                 perModule: perModuleCost,
-                unitTotalGbp: perModuleCost.some((c) => c.totalGbp != null)
-                    ? unitTotalGbp
-                    : null,
+                // L9-P1: unitTotalGbp now sourced from parts table (BOM
+                // master). Render null only when BOM is genuinely empty.
+                unitTotalGbp: parts.length > 0 ? unitTotalGbp : null,
                 ceilingGbp:
                     typeof designBrief?.constraints?.unitCostCeilingGbp === "number"
                         ? designBrief!.constraints!.unitCostCeilingGbp
@@ -4209,9 +4246,19 @@ async function exportProjectPdfInternal(
                     const { reconcileNumerics } = await import(
                         "@/lib/cad-lab-numerical-reconciliation"
                     )
+                    // L9-P1: pass Finn's coarse per-module estimates here
+                    // (NOT the post-fix perModuleCost which now reads from
+                    // BOM). Reconciliation compares Finn vs BOM — that's
+                    // the load-bearing signal. If we passed BOM-by-module
+                    // here, R1 ("module-page cost total disagrees with BOM
+                    // master") would compare BOM-by-module vs BOM-total
+                    // and never fire.
                     const moduleCostsForReconciliation = modules.map((m) => ({
                         moduleName: m.name,
-                        totalGbp: perModuleCost.find((c) => c.moduleName === m.name)?.totalGbp ?? null,
+                        totalGbp:
+                            m.cost && typeof m.cost.totalPerUnit === "number"
+                                ? (m.cost.totalPerUnit as number)
+                                : null,
                         massKg: m.massKg ?? null,
                     }))
                     // PartRow doesn't carry a quantity field today —
@@ -4236,9 +4283,13 @@ async function exportProjectPdfInternal(
                     return reconcileNumerics({
                         moduleCosts: moduleCostsForReconciliation,
                         bomTotalGbp: bomTotalGbp > 0 ? bomTotalGbp : null,
-                        waterfallTotalGbp: perModuleCost.some((c) => c.totalGbp != null)
-                            ? unitTotalGbp
-                            : null,
+                        // L9-P1: waterfallTotalGbp == bomTotalGbp now (cover
+                        // reads from parts table). R2 banner ("BOM vs cost
+                        // waterfall") naturally never fires — they share
+                        // the same source. R1 (Finn-by-module vs BOM)
+                        // still fires when Finn's coarse estimates miss
+                        // detail in the parts table.
+                        waterfallTotalGbp: bomTotalGbp > 0 ? bomTotalGbp : null,
                         declaredTotalMassKg: declaredTotalMassKg > 0 ? declaredTotalMassKg : null,
                         bomTotalMassKg: bomTotalMassKg > 0 ? bomTotalMassKg : null,
                     })
