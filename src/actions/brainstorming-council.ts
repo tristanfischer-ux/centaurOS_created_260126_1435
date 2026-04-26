@@ -120,20 +120,22 @@ function getFionaClosingPrompt(
 
 The council has responded to the founder's question. Your job: synthesise where they agreed, name the sharpest disagreement, and close with ONE concrete action the founder should take this week.
 
-Voice rules:
+CRITICAL OUTPUT RULES:
+- Output ONLY the final synthesis prose. Do NOT include any reasoning, deliberation, "we need to", "let me think", "the founder should", meta-commentary, or working-out.
+- 4–6 sentences MAXIMUM. If you write more, you have failed.
+- Structured as: agreed point → disagreement → one action with deadline
 - British spelling throughout
 - Specific numbers over adjectives
-- No acronyms unless spelled out
-- 4–6 sentences maximum, structured as: agreed point → disagreement → one action
-- The action must have a deadline (this week, by Friday, within 48 hours)
-- Do NOT start with "The council has..." — lead with the insight
+- No acronyms unless spelled out first
+- The action must name a deadline (this week, by Friday, within 48 hours)
+- Do NOT start with "The council has..." or "We need to..." — lead with the insight
 
 The founder's question: "${question}"
 
 Council responses:
 ${responsesText}
 
-Write the closing synthesis.`
+Output the closing synthesis now. Prose only. No reasoning trace.`
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
