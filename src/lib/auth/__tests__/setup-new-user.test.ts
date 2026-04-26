@@ -33,28 +33,60 @@ afterAll(() => {
 // ─── Mock the admin client used by persistSetupError ────────────────────────
 // persistSetupError imports createAdminClient — mock it so tests don't hit Supabase.
 // The shared-foundry existence check (`from('foundries').select('id').eq('id', X).single()`)
-// also reuses this client, so the mock must expose a fully-chainable PostgREST-shaped builder.
+// AND the foundry creation path (`from('foundries').insert(...).select('id').single()`)
+// both reuse this client, so the mock must expose a fully-chainable PostgREST-shaped
+// builder AND let tests override per-case (failure-path tests inject errors into
+// foundry insert).
+//
+// adminMockState is a module-scoped object the tests reach into to:
+// - inspect every insert call (insertedData mirror for the admin client)
+// - override the result of `from('foundries').insert(...).select('id').single()`
+//   per-test (success | RLS denial | slug collision | unknown error)
+type AdminInsertOverride = (data: unknown) => Promise<{ data: unknown; error: unknown }>
+const adminMockState: {
+  insertedData: Array<{ table: string } & Record<string, unknown>>
+  foundryInsertOverride: AdminInsertOverride | null
+} = {
+  insertedData: [],
+  foundryInsertOverride: null,
+}
 jest.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => {
-    // PostgREST builders are both chainable AND thenable — `.insert(x)` can be
-    // awaited directly OR continued via `.select('id').single()`. Use a thenable
-    // chain so both call shapes resolve to {data, error}.
-    const makeChain = () => {
+    const makeChain = (table: string) => {
+      let lastInsertData: unknown = null
       const chain: Record<string, unknown> = {}
       Object.assign(chain, {
         select: jest.fn(() => chain),
-        insert: jest.fn(() => chain),
+        insert: jest.fn((data: unknown) => {
+          lastInsertData = data
+          // Mirror to insertedData so tests that look there for the admin
+          // client's foundry insert (sandbox-foundry test) find it.
+          if (data && typeof data === 'object') {
+            adminMockState.insertedData.push({ table, ...(data as Record<string, unknown>) })
+          }
+          return chain
+        }),
         update: jest.fn(() => chain),
         upsert: jest.fn(() => chain),
         delete: jest.fn(() => chain),
         eq: jest.fn(() => chain),
-        single: jest.fn().mockResolvedValue({ data: { id: 'shared' }, error: null }),
+        // single() resolves the chain. For the foundries table specifically,
+        // route through the per-test override if one is set so failure-path
+        // tests can simulate RLS denial / slug collision / unknown error.
+        single: jest.fn().mockImplementation(async () => {
+          if (table === 'foundries' && adminMockState.foundryInsertOverride && lastInsertData !== null) {
+            return adminMockState.foundryInsertOverride(lastInsertData)
+          }
+          // Default: shared-foundry-exists check returns the row so production
+          // code skips the create-shared-foundry branch.
+          return { data: { id: 'shared' }, error: null }
+        }),
         maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
         then: (resolve: (v: unknown) => unknown) => resolve({ data: null, error: null }),
       })
       return chain
     }
-    return { from: jest.fn(() => makeChain()) }
+    return { from: jest.fn((table: string) => makeChain(table)) }
   },
 }))
 
@@ -141,6 +173,11 @@ describe('setupNewUser', () => {
 
   beforeEach(() => {
     mock = createMockSupabase()
+
+    // Reset module-scoped admin client state — failure-path tests set
+    // adminMockState.foundryInsertOverride; default is null (success).
+    adminMockState.insertedData = []
+    adminMockState.foundryInsertOverride = null
 
     // Default: no existing profile (new user)
     mock.getChain('profiles').single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
@@ -364,8 +401,10 @@ describe('setupNewUser', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error('expected ok: true')
-    // Should NOT be forge-guild
-    const foundryInsert = insertedData.find(d => d.table === 'foundries' && (d.id as string)?.startsWith('sandbox-'))
+    // Should NOT be forge-guild. The foundry insert goes through the
+    // adminFoundries client (createAdminClient) so check adminMockState.
+    const allInserts = [...insertedData, ...adminMockState.insertedData]
+    const foundryInsert = allInserts.find(d => d.table === 'foundries' && (d.id as string)?.startsWith('sandbox-'))
     expect(foundryInsert).toBeDefined()
     expect(foundryInsert?.is_sandbox).toBe(true)
     expect(foundryInsert?.name).toBe("Jane's Company")
@@ -483,27 +522,22 @@ describe('setupNewUser', () => {
     /**
      * Helper: wire up a mock that makes foundry creation fail with the given error
      * (both the first attempt and the retry).
+     *
+     * Note: production code does foundry insert via `adminFoundries` (the
+     * createAdminClient mock at module-scope), NOT via the `supabase` client
+     * the test passes. So failure injection happens through
+     * adminMockState.foundryInsertOverride.
      */
     function mockWithFoundryError(error: { code?: string; message: string }) {
+      adminMockState.foundryInsertOverride = async () => ({ data: null, error })
+
+      // Still configure mock.from for profile-idempotency-check and any
+      // non-foundry tables the action may touch.
       mock.from.mockImplementation((table: string) => {
         const chain = createMockChain()
-
         if (table === 'profiles') {
-          // Idempotency check: no existing profile
           chain.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
         }
-
-        if (table === 'foundries') {
-          // Shared foundry check: exists
-          chain.single.mockResolvedValue({ data: { id: 'forge-guild' }, error: null })
-          // Both insert attempts fail
-          chain.insert.mockReturnValue({
-            select: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({ data: null, error }),
-            }),
-          })
-        }
-
         return chain
       })
     }
