@@ -3430,9 +3430,22 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 />
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_ENGINE !== "1" && data.proofreadFindings && (
-                <EngineReviewPage findings={data.proofreadFindings} />
-            )}
+            {/* EngineReviewPage intentionally not rendered — Tristan-directed
+             *  2026-04-26 NIGHT (architecture decision Option α): a self-
+             *  review appendix that surfaces issues without fixing them
+             *  undermines confidence in the rest of the pack. The new
+             *  architecture is per-stage review-and-revise: each pipeline
+             *  stage's reviewer findings drive a fix pass on the section
+             *  itself before the section is finalised. The customer reads
+             *  the post-revise output only.
+             *
+             *  See ~/Downloads/forge-demos/PER-STAGE-REVIEW-REVISE-ARCHITECTURE.md
+             *  for the 11-stage retrofit plan. Risks register is the first
+             *  stage retrofit (this commit). EngineReviewPage code is kept
+             *  for now so retrofitted stages can still surface OPEN
+             *  QUESTIONS that couldn't be auto-resolved — but the page
+             *  itself doesn't render until that mechanism is wired.
+             */}
 
             {/* AuditLog page intentionally omitted from the customer-
              *  facing PDF — Tristan-flagged 2026-04-26 NIGHT: "the project
