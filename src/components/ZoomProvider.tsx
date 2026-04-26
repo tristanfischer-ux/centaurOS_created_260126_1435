@@ -69,7 +69,7 @@ export function MobileZoomControl() {
     }
 
     return (
-        <div className="fixed top-3 left-3 z-[60] sm:hidden pt-safe pl-safe" style={style}>
+        <div className="fixed top-3 left-3 z-[60] hidden md:flex pt-safe pl-safe" style={style}>
             <ZoomControl onZoomChange={setZoom} />
         </div>
     )
