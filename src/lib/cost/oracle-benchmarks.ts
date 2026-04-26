@@ -328,11 +328,223 @@ const UK_VERTICAL_FARM_CONTAINER: OracleBenchmark[] = [
     },
 ]
 
+/** UK 40ft containerised seawater reverse-osmosis desalination, 500 m³/day,
+ *  3.5 kWh/m³ specific energy. Source: Loop 8 council priors. */
+const UK_DESAL_CONTAINER: OracleBenchmark[] = [
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "Container + Skid Structure (40ft, modified, FRP-lined)",
+        low: 30_000,
+        median: 45_000,
+        high: 70_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Modified 40ft container with corrosion-resistant FRP/SS lining for seawater service, foundation skid, anchor points; standard mod scope.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "Pre-treatment (multi-media filter + cartridge + dosing)",
+        low: 15_000,
+        median: 25_000,
+        high: 40_000,
+        volumeContext: "single unit",
+        reasoning:
+            "MMF tank, 1µm cartridge filters, antiscalant + chlorine + sulphuric acid dosing skid for 500 m³/day SWRO feed.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "High-Pressure Pump + Energy Recovery Device (PX or DWEER)",
+        low: 60_000,
+        median: 95_000,
+        high: 150_000,
+        volumeContext: "single unit",
+        reasoning:
+            "HP pump (~75 kW for 500 m³/day at 60-65 bar) + ERD (Energy Recovery Inc PX-Q260 or equivalent); ~50% of capex efficiency story.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "First Pass SWRO Train (membrane vessels, racks, manifolds)",
+        low: 35_000,
+        median: 55_000,
+        high: 90_000,
+        volumeContext: "single unit",
+        reasoning:
+            "FilmTec / Hydranautics 8-inch SW elements, FRP pressure vessels, SS316 manifolds; ~60-80 elements for 500 m³/day @ 50% recovery.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "Second Pass BWRO Train (boron polish or remineralisation feed)",
+        low: 12_000,
+        median: 20_000,
+        high: 35_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Smaller BWRO stage typically £12-35k; sometimes elided where boron spec is relaxed.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "Post-treatment (remineralisation, chlorination)",
+        low: 8_000,
+        median: 14_000,
+        high: 22_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Calcite contactor, CO2 dosing, hypochlorite final dose, polishing filter; standard package.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "Clean-In-Place (CIP) System",
+        low: 6_000,
+        median: 10_000,
+        high: 16_000,
+        volumeContext: "single unit",
+        reasoning:
+            "CIP tank + heater + dosing pumps for membrane cleaning every 1-3 months.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "Motor Control Centre + 3-phase distribution (200-300A)",
+        low: 15_000,
+        median: 25_000,
+        high: 40_000,
+        volumeContext: "single unit",
+        reasoning:
+            "MCC for ~150kW connected load (HP pump + ancillaries), VFDs on HP pump and feed pump, soft-start contactors.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "PLC + Instrumentation Cabinet (SCADA-ready)",
+        low: 12_000,
+        median: 20_000,
+        high: 35_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Siemens/Allen-Bradley PLC + HMI + flow/pressure/conductivity instruments + ATI/ATP sensors + comms gateway.",
+    },
+    {
+        productClass: "uk-desal-containerised",
+        moduleClass: "TOTAL installed UK delivery + commissioning",
+        low: 280_000,
+        median: 410_000,
+        high: 620_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Aligned with £80-130k per 100 m³/day for UK-delivered containerised SWRO; 500 m³/day plant £400-650k typical including transport+SAT+commissioning. £350k brief ceiling sits at the LOW end of the range — feasible but tight.",
+    },
+]
+
+/** UK premium connected mobility aid (£300-500 retail), 5,000 units/yr.
+ *  Source: Loop 8 council priors. */
+const UK_CONNECTED_MOBILITY_AID: OracleBenchmark[] = [
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "Hardwood handle assembly (machined+finished)",
+        low: 12,
+        median: 20,
+        high: 35,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "Ash/walnut blank, CNC profiled, sanded, oiled or lacquered; small-batch UK woodturning shop; quality grading drives range.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "Carbon-fibre shaft + adjustment mechanism",
+        low: 15,
+        median: 25,
+        high: 40,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "CF tube (rolled, ~25mm OD), telescoping clamp, locking pin; CF tube cost dominates.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "Rubber + tungsten-carbide ferrule",
+        low: 4,
+        median: 7,
+        high: 12,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "WC tip insert, NBR rubber boot, machined alloy housing; commodity walking-aid component.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "Cellular IoT module — Nordic nRF9160 + LTE-M antenna + SIM",
+        low: 18,
+        median: 28,
+        high: 45,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "nRF9160-based cellular module with eSIM is the dominant cost driver; £20-40 typical at this volume.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "9-axis IMU + grip cap-touch + pressure sensors",
+        low: 4,
+        median: 7,
+        high: 12,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "BMI270/MPU-9250 IMU (~£3) + cap-touch IC + 1-2 small pressure sensors; commodity MEMS.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "Battery + inductive charging receiver",
+        low: 10,
+        median: 17,
+        high: 28,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "Single 18650 LFP cell or pouch, BMS, Qi/PMA receiver coil + IC, current sensing; tightly packaged.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "Speaker + microphone + haptic motor",
+        low: 4,
+        median: 7,
+        high: 11,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "Small mylar speaker + MEMS mic + LRA haptic; commodity audio/feedback components.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "PCB + SMT assembly + conformal coating",
+        low: 8,
+        median: 14,
+        high: 25,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "4-6 layer PCB, SMT assembly + conformal coating for ingress protection; UK contract manufacturer pricing.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "Inductive charging stand (counterpart product)",
+        low: 6,
+        median: 10,
+        high: 18,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "Cradle moulded ABS, Qi transmitter coil + IC, USB-C input, weighted base; secondary product.",
+    },
+    {
+        productClass: "uk-connected-mobility-aid",
+        moduleClass: "TOTAL landed BOM",
+        low: 81,
+        median: 135,
+        high: 226,
+        volumeContext: "5,000 units/yr",
+        reasoning:
+            "For a £325 retail product, a £130-150 landed BOM leaves room for 30-40% channel margin + £30-50 assembly+packaging+QA. £155 brief target sits within reach but only with tight cellular module sourcing.",
+    },
+]
+
 /** Master registry — keyed by productClass slug. */
 export const ORACLE_BENCHMARKS_BY_PRODUCT_CLASS: Record<string, OracleBenchmark[]> = {
     "uk-consumer-iot-outdoor": UK_CONSUMER_IOT_OUTDOOR,
     "uk-bess-containerised": UK_BESS_3MWH,
     "uk-vertical-farm-container": UK_VERTICAL_FARM_CONTAINER,
+    "uk-desal-containerised": UK_DESAL_CONTAINER,
+    "uk-connected-mobility-aid": UK_CONNECTED_MOBILITY_AID,
 }
 
 /** Heuristic match — given a brief subject string, pick the most likely
@@ -360,6 +572,20 @@ export function detectProductClass(briefSubject: string): string | null {
         )
     ) {
         return "uk-consumer-iot-outdoor"
+    }
+    if (
+        /\b(desalination|reverse osmosis|swro|seawater.{0,15}reverse|membrane.{0,10}filt|potable water from seawater)\b/.test(
+            s,
+        )
+    ) {
+        return "uk-desal-containerised"
+    }
+    if (
+        /\b(walking stick|walking aid|mobility aid|fall.{0,10}detect|gait.{0,10}analy|sentinel|nordic.{0,10}nrf9160|cellular.{0,10}walking|inductive.{0,10}charg.{0,15}stand)\b/.test(
+            s,
+        )
+    ) {
+        return "uk-connected-mobility-aid"
     }
     return null
 }
