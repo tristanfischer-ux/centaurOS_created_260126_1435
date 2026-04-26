@@ -967,6 +967,38 @@ function MatchCard({
         })}
       </div>
 
+      {/* ── Match reason caption — top 2 pillars + optional weakness ── */}
+      {pillars && (() => {
+        const PILLAR_LABELS: Record<keyof FirmMatchResult['pillars'], string> = {
+          thesis:     'thesis fit',
+          stage:      'stage fit',
+          geo:        'geography',
+          cheque:     'cheque size',
+          activity:   'recent activity',
+          confidence: 'data confidence',
+        }
+        type PillarKey = keyof FirmMatchResult['pillars']
+        const entries = (Object.keys(pillars) as PillarKey[])
+          .map((k) => ({ key: k, label: PILLAR_LABELS[k], value: pillars[k] }))
+          .sort((a, b) => b.value - a.value)
+
+        const top1 = entries[0]
+        const top2 = entries[1]
+        const bottom = entries[entries.length - 1]
+
+        if (!top1 || !top2) return null
+
+        const weaknessPart = bottom && bottom.value < 40 && bottom.key !== top1.key && bottom.key !== top2.key
+          ? `; weaker on ${bottom.label} (${bottom.value}%)`
+          : ''
+
+        return (
+          <p className="text-[11px] text-muted-foreground mb-2 leading-snug">
+            Match reason: strong on {top1.label} ({top1.value}%) and {top2.label} ({top2.value}%){weaknessPart}.
+          </p>
+        )
+      })()}
+
       {/* ── Thesis paragraph — 260 chars max ── */}
       {thesis && (
         <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">

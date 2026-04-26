@@ -415,6 +415,14 @@ export function SupplierMatchCard({ listing, rank, searchQuery }: SupplierMatchC
             )}
             <span>{listing.title}</span>
             {supplierType && <SupplierTypeChip type={supplierType} />}
+            {listing.is_verified === true && (
+              <span
+                className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-success/30 bg-success/10 text-success"
+                style={{ lineHeight: 1.4 }}
+              >
+                ✓ Verified by Forge
+              </span>
+            )}
           </div>
           {metaLine && (
             <div style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))', lineHeight: 1.4 }}>
