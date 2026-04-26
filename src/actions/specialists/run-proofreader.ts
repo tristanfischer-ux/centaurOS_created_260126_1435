@@ -147,10 +147,11 @@ export async function runProofreaderBackground(
         "\"severity\": \"cosmetic|content|blocker\", \"location\": \"where in the report (e.g. 'Module 3, Container Enclosure, KEY PARTS')\", " +
         "\"issue\": \"what is wrong\", \"suggested_fix\": \"what it should say or what to do\", " +
         "\"confidence\": \"high|medium|low\" } ] }\n\n" +
-        "SEVERITY RULES:\n" +
-        " - blocker: founder cannot use this report; sized for wrong target, fabricated standard, brief contradiction\n" +
-        " - content: wrong but not blocking (incorrect citation, low-confidence supplier listed without caveat)\n" +
-        " - cosmetic: typo, formatting, label mismatch\n\n" +
+        "SEVERITY RULES (calibration is mandatory — Loop 8 council scored this dim 3.48/10 for severity-imbalance, with EVERY finding tagged 'blocker' even when it's a minor wording inconsistency):\n" +
+        " - blocker: founder genuinely cannot use this report. Examples: design sized for wrong target (3.5 MWh emitted as 1.5 MWh), fabricated standard cited as statutory law, internal contradiction that invalidates downstream cost/supplier work, physically impossible numerical claim (1,050 kg of LFP cells claimed to store 3.5 MWh).\n" +
+        " - content: wrong but the founder can still act. Examples: incorrect supplier industry tag (auto Tier-1 listed for vert farm), low-confidence supplier rendered without caveat, citation that exists but is mis-categorised, cost band off by 30-50%.\n" +
+        " - cosmetic: typo, formatting, label mismatch, wording inconsistency between two sections that say the same thing differently ('5 TOPS' vs '~5 TOPS'), title-case vs sentence-case, redundant clause.\n\n" +
+        "NEVER tag as 'blocker': minor wording inconsistencies, sentence-vs-title-case, '~5 TOPS' vs '5 TOPS', whether a list ends in a full stop, whether a heading uses ampersand vs 'and'. These are cosmetic. The founder can ship a brochure with these issues and lose nothing.\n\n" +
         "CONFIDENCE RULES:\n" +
         " - high: you can prove it from the structured state alone\n" +
         " - medium: domain knowledge says it's wrong, would need a vendor/standard lookup to confirm\n" +

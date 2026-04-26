@@ -84,8 +84,16 @@ type Severity = "blocker" | "content" | "cosmetic"
 interface ProofreadFinding {
     section?: string | null
     severity?: string | null
+    // Real production data uses `issue` + `suggested_fix`. The interface
+    // also accepts `message` + `suggestion` for back-compat — runOne
+    // prefers the issue/suggested_fix names with message/suggestion as
+    // fallbacks.
     message?: string | null
     suggestion?: string | null
+    issue?: string | null
+    suggested_fix?: string | null
+    location?: string | null
+    confidence?: string | null
 }
 
 interface ProofreadFindingsBlob {
@@ -233,18 +241,25 @@ export const proofreaderSelfReviewAdapter: StageAdapter = {
                 ranAt: input.payload.ranAt ?? null,
                 model: input.payload.model ?? null,
                 runCostPence: input.payload.runCostPence ?? null,
-                sample: findings.slice(0, 12).map((f) => ({
-                    section: f?.section ?? null,
-                    severity: f?.severity ?? null,
-                    message:
-                        typeof f?.message === "string"
-                            ? f.message.slice(0, 600)
-                            : null,
-                    suggestion:
-                        typeof f?.suggestion === "string"
-                            ? f.suggestion.slice(0, 400)
-                            : null,
-                })),
+                sample: findings.slice(0, 12).map((f) => {
+                    // Real production data uses `issue` + `suggested_fix`;
+                    // some legacy rows used `message` + `suggestion`. Read
+                    // both, prefer the production names.
+                    const msg = (f?.issue ?? f?.message) as string | null | undefined
+                    const fix = (f?.suggested_fix ?? f?.suggestion) as
+                        | string
+                        | null
+                        | undefined
+                    return {
+                        section: f?.section ?? null,
+                        severity: f?.severity ?? null,
+                        location: f?.location ?? null,
+                        confidence: f?.confidence ?? null,
+                        message: typeof msg === "string" ? msg.slice(0, 600) : null,
+                        suggestion:
+                            typeof fix === "string" ? fix.slice(0, 400) : null,
+                    }
+                }),
             },
             diagnostics,
         }
