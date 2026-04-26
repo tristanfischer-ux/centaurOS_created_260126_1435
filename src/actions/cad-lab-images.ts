@@ -303,6 +303,40 @@ export async function generateCadLabModuleImagesAction(
     let successCount = 0
     let failedCount = 0
 
+    // Loop 7 critique fix A2: 12 of 24 module hero images were missing
+    // across BESS / Hedgerow / VertFarm v7 PDFs. Cause: this loop catches
+    // and logs individual failures (often transient 429/500 from
+    // gemini-nano-banana under load) but never retries. Add a 2-pass
+    // retry with exponential backoff per failed module, then a final
+    // single-pass cleanup retry across the whole batch's still-failed
+    // set. Keeps the success rate high without explosive concurrency.
+    const generateWithRetry = async (
+      module: CadLabModule,
+    ): Promise<{ url: string; modelUsed: string } | { error: string }> => {
+      const adapted = cadLabModuleToModuleSpec(module)
+      let lastErr = ""
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          return await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64)
+        } catch (err) {
+          lastErr = err instanceof Error ? err.message : String(err)
+          // Don't retry on auth / config errors — those are deterministic
+          // failures and burning tokens won't fix them.
+          if (/api key|unauthori[sz]ed|forbidden|quota exceeded/i.test(lastErr)) {
+            return { error: lastErr }
+          }
+          if (attempt < 3) {
+            const backoffMs = attempt * 5_000 + Math.floor(Math.random() * 2_000)
+            console.warn(
+              `[CAD-LAB-IMAGES] Retry ${attempt}/3 for ${module.name} in ${backoffMs}ms — ${lastErr.slice(0, 120)}`,
+            )
+            await new Promise((r) => setTimeout(r, backoffMs))
+          }
+        }
+      }
+      return { error: lastErr }
+    }
+
     // Process in batches of BATCH_SIZE for controlled concurrency
     for (let i = 0; i < updatedModules.length; i += BATCH_SIZE) {
       const batch = updatedModules.slice(i, i + BATCH_SIZE)
@@ -310,21 +344,20 @@ export async function generateCadLabModuleImagesAction(
       const results = await Promise.allSettled(
         batch.map(async (module, batchIdx) => {
           const globalIdx = i + batchIdx
-          const adapted = cadLabModuleToModuleSpec(module)
 
-          try {
-            const { url, modelUsed } = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64)
+          const result = await generateWithRetry(module)
+          if ("url" in result) {
             updatedModules[globalIdx] = {
               ...module,
-              imageUrl: url,
+              imageUrl: result.url,
               imageStatus: "complete" as const,
-              imageModelUsed: modelUsed,
+              imageModelUsed: result.modelUsed,
             }
             successCount++
-          } catch (err) {
+          } else {
             console.error(
-              `[CAD-LAB-IMAGES] Failed to generate image for ${module.name}:`,
-              err instanceof Error ? err.message : err,
+              `[CAD-LAB-IMAGES] Failed to generate image for ${module.name} after 3 retries:`,
+              result.error,
             )
             updatedModules[globalIdx] = {
               ...module,
