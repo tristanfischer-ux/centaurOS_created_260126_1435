@@ -110,6 +110,67 @@ const COUNCIL_TIERS: TierMeta[] = [
     },
 ]
 
+// ─── Suggestion prompts — common dilemmas hardware founders bring to the council ──
+//
+// Each suggestion pre-fills the question and switches to the tier that suits
+// its depth. Categories cover fundraising, hiring, product, manufacturing,
+// strategy, and operations — the dilemmas Tristan has heard most often from
+// founders during Fractional Forge sessions.
+//
+// Voice rules: specific numbers over adjectives (£50K not "some MRR"),
+// British spelling, no acronyms, no failure-mode framing, no "if you've been
+// stuck" / "we know it's hard" framing — the prompts speak to what to DO,
+// not why the founder has not done it yet.
+
+interface SuggestionPrompt {
+    text: string
+    tier: CouncilTier
+    category: string
+}
+
+const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
+    {
+        text: "Should I hire my first engineer or my first salesperson?",
+        tier: "quick",
+        category: "Hiring",
+    },
+    {
+        text: "Is £50K monthly recurring revenue enough to start a serious raise?",
+        tier: "quick",
+        category: "Fundraising",
+    },
+    {
+        text: "How do I price a hardware product without leaving money on the table?",
+        tier: "full",
+        category: "Pricing",
+    },
+    {
+        text: "What should I cut from the v1 to ship the first commercial pilot in 12 weeks?",
+        tier: "full",
+        category: "Product",
+    },
+    {
+        text: "How do we shorten manufacturing lead time from 14 weeks to 6 weeks?",
+        tier: "deep",
+        category: "Manufacturing",
+    },
+    {
+        text: "What is our defensible moat once Chinese clones arrive in 12 months?",
+        tier: "deep",
+        category: "Strategy",
+    },
+    {
+        text: "Should we raise £5M now or wait six months for stronger metrics?",
+        tier: "strategy",
+        category: "Fundraising",
+    },
+    {
+        text: "Is now the right time to expand from the United Kingdom into the United States?",
+        tier: "strategy",
+        category: "Strategy",
+    },
+]
+
 // ─── Council member subset selection ────────────────────────────────────────
 // Fiona always hosts; the council picks from a preferred ordering by role breadth.
 
@@ -657,6 +718,61 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     margin-top: 6px;
                     line-height: 1.5;
                 }
+                /* ─── Suggestion chips (pre-fill the question) ─── */
+                .bc-suggestions {
+                    margin: 18px 0 22px;
+                }
+                .bc-suggestions-label {
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: var(--bc-fg-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                    margin-bottom: 10px;
+                }
+                .bc-suggestions-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 8px;
+                }
+                .bc-suggestion-chip {
+                    background: var(--bc-surface);
+                    border: 1px solid var(--bc-border);
+                    border-radius: 10px;
+                    padding: 10px 14px;
+                    cursor: pointer;
+                    text-align: left;
+                    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+                    display: flex;
+                    align-items: baseline;
+                    gap: 10px;
+                    font-family: inherit;
+                }
+                .bc-suggestion-chip:hover {
+                    border-color: var(--bc-brand);
+                    box-shadow: var(--bc-shadow-sm);
+                    transform: translateY(-1px);
+                }
+                .bc-suggestion-chip:active {
+                    transform: translateY(0);
+                }
+                .bc-suggestion-cat {
+                    font-size: 9.5px;
+                    font-weight: 700;
+                    color: var(--bc-brand);
+                    text-transform: uppercase;
+                    letter-spacing: 0.06em;
+                    flex-shrink: 0;
+                    padding: 2px 7px;
+                    border-radius: 100px;
+                    background: var(--bc-brand-soft);
+                }
+                .bc-suggestion-text {
+                    font-size: 13px;
+                    color: var(--bc-fg);
+                    line-height: 1.4;
+                    font-weight: 500;
+                }
                 /* ─── Responsive ─── */
                 @media (max-width: 780px) {
                     .bc-page { padding: 18px 16px 60px; }
@@ -664,6 +780,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     .bc-qbar { grid-template-columns: 1fr; gap: 10px; }
                     .bc-council-grid { grid-template-columns: 1fr; }
                     .bc-council-grid.specialists-3 { grid-template-columns: 1fr; }
+                    .bc-suggestions-grid { grid-template-columns: 1fr; }
                 }
             `}</style>
 
@@ -697,6 +814,28 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             </div>
             {/* Active tier hint */}
             <p className="bc-tier-hint">{COUNCIL_TIERS.find(t => t.id === activeTier)?.hint}</p>
+
+            {/* ── Suggestion chips — pre-fill the question + match the tier to the question depth */}
+            <div className="bc-suggestions" aria-label="Suggested questions">
+                <div className="bc-suggestions-label">Try one of these to start</div>
+                <div className="bc-suggestions-grid">
+                    {SUGGESTION_PROMPTS.map((s) => (
+                        <button
+                            key={s.text}
+                            type="button"
+                            className="bc-suggestion-chip"
+                            onClick={() => {
+                                setQuestion(s.text)
+                                setActiveTier(s.tier)
+                                inputRef.current?.focus()
+                            }}
+                        >
+                            <span className="bc-suggestion-cat">{s.category}</span>
+                            <span className="bc-suggestion-text">{s.text}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
 
             {/* ── Question bar ── */}
             <form className="bc-qbar" onSubmit={handleConvene} aria-label="Council question">
