@@ -146,7 +146,13 @@ export const chaseRegulatoryAdapter: StageAdapter = {
                     model: HARNESS_OPENROUTER_MODEL,
                     system: systemPrompt,
                     prompt: userPrompt,
-                    maxTokens: 8192,
+                    // Loop 5 caught the regression: vertfarm hit 0.00/10
+                    // because the expanded UK coverage checklist produced
+                    // a response that exceeded 8192 tokens, truncating
+                    // mid-JSON. Match the engine's 16384 (run-chase-research
+                    // line 836) so the harness measures what production
+                    // emits, not a smaller-budget approximation.
+                    maxTokens: 16384,
                     temperature: 0.1,
                     // Loop 4 (db04b611) expanded the prompt with a UK regime
                     // taxonomy + coverage checklist — Sonnet via OpenRouter
