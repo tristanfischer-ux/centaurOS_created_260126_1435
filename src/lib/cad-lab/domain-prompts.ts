@@ -321,6 +321,21 @@ Output STRICTLY as a JSON object with two keys — "modules" and "connections":
       "whyItMatters": "Why this module is critical to the overall system.",
       "failureModes": ["Failure mode 1", "Failure mode 2"],
       "unknowns": ["Open question 1", "Open question 2"],
+      "riskMatrix": [
+        {
+          "id": "RM-1",
+          "hazard": "specific failure mode (matches one of failureModes; richer context here)",
+          "cause": "what triggers the hazard — root cause",
+          "consequence": "what happens to the system / user / operator if it occurs",
+          "existingControls": "what's already in the design that mitigates this (sensors, fuses, redundancy, etc.)",
+          "severity": 4,
+          "likelihood": 2,
+          "mitigation": "the next concrete action to reduce severity or likelihood",
+          "owner": "Role accountable — Battery safety lead | Electrical lead | Mechanical lead | Controls lead | Founder",
+          "residualSeverity": 3,
+          "residualLikelihood": 1
+        }
+      ],
       "mirrorOf": null
     }
   ],
@@ -332,6 +347,7 @@ Output STRICTLY as a JSON object with two keys — "modules" and "connections":
 RULES:
 - Generate 4-8 modules (more for complex products, fewer for simple ones)
 - Each module MUST have at least 3 keyParts
+- riskMatrix (Loop 5 P5, council unanimous): for EACH failure mode, emit a structured FMEA-style row. severity 1-5 (1=negligible, 3=major operational disruption, 5=catastrophic / safety-critical / total loss). likelihood 1-5 (1=very rare / once in 10 years, 3=plausible / yearly, 5=likely / monthly+). mitigation must be a concrete action, not "review later". owner must be a role, not "TBD". residualSeverity / residualLikelihood = the rating AFTER the mitigation lands. The proofreader council scored an unranked failure-mode list at 3-4/10; a structured FMEA at 8/10. Skipping this field means the founder cannot prioritise risks for an investor or insurer conversation.
 - leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
 - estimatedMassKg: your best estimate of this module's mass in kg, calibrated to the product's size class. A vacuum cleaner motor ≈ 0.3 kg, an industrial pump motor ≈ 25 kg. Be specific to this product.
 - Every module must have at least 1 input and 1 output

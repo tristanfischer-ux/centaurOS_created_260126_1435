@@ -416,6 +416,23 @@ interface ModulePdf {
     keyParts: string[]
     failureModes: string[]
     unknowns: string[]
+    /** Loop 5 P5 (council unanimous): structured FMEA risk matrix. Optional —
+     *  older modules with only failureModes string array still render via the
+     *  fallback path. When present, the renderer prefers this rich shape and
+     *  shows severity × likelihood × owner × mitigation per row. */
+    riskMatrix: Array<{
+        id: string
+        hazard: string
+        cause: string | null
+        consequence: string | null
+        existingControls: string | null
+        severity: number
+        likelihood: number
+        mitigation: string | null
+        owner: string | null
+        residualSeverity: number | null
+        residualLikelihood: number | null
+    }>
     imageUrl: string | null
     diagnostics: Record<string, string> | null
     cost: AiCostEstimate | null
@@ -1625,22 +1642,161 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
     )
 }
 
+function riskRating(severity: number, likelihood: number): {
+    score: number
+    band: "low" | "medium" | "high" | "critical"
+    color: string
+} {
+    const score = severity * likelihood
+    if (score >= 16) return { score, band: "critical", color: "#b91c1c" }
+    if (score >= 9) return { score, band: "high", color: "#b45309" }
+    if (score >= 4) return { score, band: "medium", color: "#a16207" }
+    return { score, band: "low", color: "#15803d" }
+}
+
 function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
+    // Loop 5 P5 (council unanimous): when modules carry the riskMatrix
+    // FMEA shape, render the structured matrix. Otherwise fall back to
+    // the original failureModes/unknowns string-list shape so older
+    // modules still appear without regenerating Max's decomposition.
+    const anyMatrix = modules.some((m) => m.riskMatrix.length > 0)
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>6. Risks register</Text>
-            <Text style={styles.muted}>
-                Every failure mode and open question declared against each module, in one
-                register. Until a dedicated risks store ships with severity + ownership,
-                these rows are the canonical risk inventory.
+            <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
+                {anyMatrix
+                    ? "FMEA-style risk matrix per module — severity × likelihood scored 1–5. Rating bands: low (1–3), medium (4–8), high (9–15), critical (16–25). Residual rating shows the score after the listed mitigation lands."
+                    : "Every failure mode and open question declared against each module, in one register."}
             </Text>
             {modules.map((m) => (
                 <View key={m.id} style={{ marginTop: 10 }} wrap={false}>
                     <Text style={styles.h4}>{m.name}</Text>
-                    {m.failureModes.length === 0 && m.unknowns.length === 0 && (
-                        <Text style={styles.muted}>No risks declared on this module.</Text>
+                    {m.riskMatrix.length === 0 &&
+                        m.failureModes.length === 0 &&
+                        m.unknowns.length === 0 && (
+                            <Text style={styles.muted}>No risks declared on this module.</Text>
+                        )}
+                    {m.riskMatrix.length > 0 && (
+                        <View style={{ marginTop: 4 }}>
+                            <Text style={styles.h5}>
+                                Risk matrix ({m.riskMatrix.length})
+                            </Text>
+                            {m.riskMatrix.map((r, i) => {
+                                const initial = riskRating(r.severity, r.likelihood)
+                                const residual =
+                                    r.residualSeverity != null && r.residualLikelihood != null
+                                        ? riskRating(r.residualSeverity, r.residualLikelihood)
+                                        : null
+                                return (
+                                    <View
+                                        key={r.id || i}
+                                        style={{
+                                            marginBottom: 8,
+                                            paddingLeft: 6,
+                                            borderLeftWidth: 2,
+                                            borderLeftColor: initial.color,
+                                        }}
+                                        wrap={false}
+                                    >
+                                        <View
+                                            style={{
+                                                flexDirection: "row",
+                                                alignItems: "center",
+                                                marginBottom: 1,
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    fontSize: 10,
+                                                    fontWeight: "bold",
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                {r.id}: {r.hazard}
+                                            </Text>
+                                            <Text
+                                                style={{
+                                                    fontSize: 9,
+                                                    color: initial.color,
+                                                    fontWeight: "bold",
+                                                    marginLeft: 6,
+                                                }}
+                                            >
+                                                S{r.severity} × L{r.likelihood} ={" "}
+                                                {initial.score} ({initial.band})
+                                            </Text>
+                                        </View>
+                                        {r.cause && (
+                                            <Text style={{ fontSize: 9, marginBottom: 1 }}>
+                                                <Text style={{ fontWeight: "bold" }}>
+                                                    Cause:{" "}
+                                                </Text>
+                                                {r.cause}
+                                            </Text>
+                                        )}
+                                        {r.consequence && (
+                                            <Text style={{ fontSize: 9, marginBottom: 1 }}>
+                                                <Text style={{ fontWeight: "bold" }}>
+                                                    Consequence:{" "}
+                                                </Text>
+                                                {r.consequence}
+                                            </Text>
+                                        )}
+                                        {r.existingControls && (
+                                            <Text style={{ fontSize: 9, marginBottom: 1 }}>
+                                                <Text style={{ fontWeight: "bold" }}>
+                                                    Existing controls:{" "}
+                                                </Text>
+                                                {r.existingControls}
+                                            </Text>
+                                        )}
+                                        {r.mitigation && (
+                                            <Text style={{ fontSize: 9, marginBottom: 1 }}>
+                                                <Text style={{ fontWeight: "bold" }}>
+                                                    Mitigation:{" "}
+                                                </Text>
+                                                {r.mitigation}
+                                            </Text>
+                                        )}
+                                        <View
+                                            style={{
+                                                flexDirection: "row",
+                                                marginTop: 1,
+                                            }}
+                                        >
+                                            {r.owner && (
+                                                <Text
+                                                    style={{
+                                                        fontSize: 9,
+                                                        color: MUTED,
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    Owner: {r.owner}
+                                                </Text>
+                                            )}
+                                            {residual && (
+                                                <Text
+                                                    style={{
+                                                        fontSize: 9,
+                                                        color: residual.color,
+                                                        marginLeft: 6,
+                                                    }}
+                                                >
+                                                    Residual: S{r.residualSeverity} × L
+                                                    {r.residualLikelihood} ={" "}
+                                                    {residual.score} ({residual.band})
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                )
+                            })}
+                        </View>
                     )}
-                    {m.failureModes.length > 0 && (
+                    {/* Fallback: render the legacy failureModes string list ONLY
+                     *  when the module has no structured riskMatrix yet. */}
+                    {m.riskMatrix.length === 0 && m.failureModes.length > 0 && (
                         <View style={{ marginTop: 4 }}>
                             <Text style={styles.h5}>
                                 Known failure modes ({m.failureModes.length})
@@ -3107,6 +3263,48 @@ async function exportProjectPdfInternal(
                 keyParts: Array.isArray(m.keyParts) ? m.keyParts : [],
                 failureModes: Array.isArray(m.failureModes) ? m.failureModes : [],
                 unknowns: Array.isArray(m.unknowns) ? m.unknowns : [],
+                riskMatrix: (() => {
+                    const raw = (m as { riskMatrix?: unknown }).riskMatrix
+                    if (!Array.isArray(raw)) return []
+                    type Row = ModulePdf["riskMatrix"][number]
+                    const out: Row[] = []
+                    for (const r of raw) {
+                        if (!r || typeof r !== "object") continue
+                        const rr = r as Record<string, unknown>
+                        if (typeof rr.hazard !== "string" || rr.hazard.length === 0) continue
+                        const sev = typeof rr.severity === "number" ? rr.severity : null
+                        const lik = typeof rr.likelihood === "number" ? rr.likelihood : null
+                        if (sev === null || lik === null) continue
+                        out.push({
+                            id: typeof rr.id === "string" ? rr.id : `RM-${out.length + 1}`,
+                            hazard: rr.hazard,
+                            cause: typeof rr.cause === "string" ? rr.cause : null,
+                            consequence:
+                                typeof rr.consequence === "string" ? rr.consequence : null,
+                            existingControls:
+                                typeof rr.existingControls === "string"
+                                    ? rr.existingControls
+                                    : null,
+                            severity: Math.max(1, Math.min(5, Math.round(sev))),
+                            likelihood: Math.max(1, Math.min(5, Math.round(lik))),
+                            mitigation:
+                                typeof rr.mitigation === "string" ? rr.mitigation : null,
+                            owner: typeof rr.owner === "string" ? rr.owner : null,
+                            residualSeverity:
+                                typeof rr.residualSeverity === "number"
+                                    ? Math.max(1, Math.min(5, Math.round(rr.residualSeverity)))
+                                    : null,
+                            residualLikelihood:
+                                typeof rr.residualLikelihood === "number"
+                                    ? Math.max(
+                                          1,
+                                          Math.min(5, Math.round(rr.residualLikelihood)),
+                                      )
+                                    : null,
+                        })
+                    }
+                    return out
+                })(),
                 imageUrl: typeof m.imageUrl === "string" ? m.imageUrl : null,
                 diagnostics: diag,
                 cost,
