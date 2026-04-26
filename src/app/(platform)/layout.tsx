@@ -27,7 +27,6 @@ import { BrowseContextProvider } from "@/contexts/browse-context";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
-import { MobileDesktopBanner } from "@/components/mobile-desktop-banner";
 import { ActiveTimerBar } from "@/components/time/active-timer-bar";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
@@ -139,7 +138,7 @@ export default async function PlatformLayout({
                   <CadLabProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
-                    <div className="flex h-screen overflow-hidden gap-0">
+                    <div className="flex md:h-screen md:overflow-hidden gap-0">
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <KeyboardShortcuts />
@@ -152,7 +151,6 @@ export default async function PlatformLayout({
                                     <ProfileSetupRequired userRole={profile?.role} />
                                 ) : (
                                     <>
-                                        <MobileDesktopBanner />
                                         <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
                                         <ErrorBoundary>
                                             {children}

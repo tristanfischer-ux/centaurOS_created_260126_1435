@@ -16,7 +16,9 @@ export function MainContentArea({ children, className }: MainContentAreaProps): 
   return (
     <ZoomableContent
       className={cn(
-        "flex-1 min-w-0 overflow-y-auto bg-background",
+        // overflow-y-auto only on md+ — on mobile, body/window is the scroll
+        // container so iOS Safari URL-bar collapse works and window.scrollTo fires.
+        "flex-1 min-w-0 md:overflow-y-auto bg-background",
         className,
       )}
       data-tour-scroll
