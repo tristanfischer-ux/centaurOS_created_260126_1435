@@ -2999,13 +2999,17 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
     const optionalSections: string[] = []
     if (hasSheet) optionalSections.push("Sizing optimisation")
     if (hasPlan) optionalSections.push("Spatial plan")
+    // Loop 7 critique fix A3 (LOOP-7-CRITIQUE.md): the audit log section
+    // is commented out at the render level (V1 cut — autopilot doesn't
+    // write audit_log rows yet) but the TOC entry was still listed,
+    // making every PDF promise "08. Project audit log" then never deliver
+    // the page. Removed from TOC until the section is wired back.
     const fixedSections = [
         "Modules (one page each)",
         "BOM master",
         "Cost waterfall",
         "Risks register",
         "Supplier shortlist",
-        "Project audit log",
     ]
     const allSections = [
         "Brief",
@@ -3861,7 +3865,35 @@ async function exportProjectPdfInternal(
                 partRowCount: parts.length,
                 failureModeCount,
                 unknownCount,
-                regulatoryCount: regulatory.length,
+                // Loop 7 critique fix A4 (LOOP-7-CRITIQUE.md): cover used
+                // to show "Standards 0" when the body quoted 8-16 across
+                // every module's reviews. Aggregate the count across the
+                // structured regulatory[] AND any standard codes parsed
+                // out of module review issue/message text. Counts unique
+                // codes only — duplicate citations of "BS 7671" across
+                // 4 modules don't inflate the number.
+                regulatoryCount: (() => {
+                    const codes = new Set<string>()
+                    for (const r of regulatory) {
+                        if (typeof r?.code === "string" && r.code.trim()) codes.add(r.code.trim().toUpperCase())
+                    }
+                    // Standard-code patterns: BS / BS EN / BS EN IEC / IEC /
+                    // ISO / NFPA / UL / EN / DIN / ASTM / IPC + numeric.
+                    const stdRegex = /\b(BS\s+EN\s+IEC|BS\s+EN|BS\s+ISO|EN\s+IEC|EN\s+ISO|BS|EN|IEC|ISO|NFPA|UL|DIN|ASTM|IPC|UN|UKCA|RED|RoHS|WEEE|PSTI|GPSR|CDM|EAWR|ESQCR)\s*[A-Z]?\d{1,5}(?:-\d+)*(?:[A-Z](?:-\d+)?)?\b/g
+                    for (const m of modules) {
+                        for (const r of m.reviews ?? []) {
+                            const haystack = [
+                                r.summary ?? "",
+                                ...(r.issues ?? []).map((i) => `${i.category} ${i.message} ${i.suggestion ?? ""}`),
+                                ...(r.recommendations ?? []),
+                            ].join(" ")
+                            for (const m of haystack.matchAll(stdRegex)) {
+                                codes.add(m[0].toUpperCase().replace(/\s+/g, " "))
+                            }
+                        }
+                    }
+                    return codes.size
+                })(),
                 supplierCount: suppliers.length,
                 reviewCount,
             },
