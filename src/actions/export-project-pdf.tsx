@@ -1809,13 +1809,11 @@ function BomMasterPage({
                                     : "(make)"
                                 : suppliers.slice(0, 3).join(" · ")
                         return (
-                            <View key={i} style={styles.tableRow} wrap={false}>
+                            <View key={i} style={styles.tableRow}>
                                 <Text style={[styles.tableCell, { width: 60 }]}>{p.partNumber}</Text>
                                 <Text style={[styles.tableCell, { flex: 2.5 }]}>
                                     {p.name}
-                                    {p.description ? (
-                                        <Text style={{ color: MUTED }}>{" — " + p.description}</Text>
-                                    ) : null}
+                                    {p.description ? " — " + p.description : ""}
                                 </Text>
                                 <Text style={[styles.tableCell, { flex: 1.2 }]}>
                                     {p.sourceModuleName ?? "—"}
