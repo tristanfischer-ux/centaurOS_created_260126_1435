@@ -69,6 +69,7 @@ export type AutopilotStage =
     | "matching_suppliers"
     | "running_fang_reviews"
     | "proofreading"    // v1.4 (2026-04-25 NIGHT): Engine self-review before PDF
+    | "writing_executive_summary" // Loop 8 Tier 1: 1-page synthesis renders as page 2 of every PDF
     | "generating_pdf"  // v1.2: final PDF export so founder gets a deliverable
     | "done"
 
@@ -99,6 +100,7 @@ export type AutopilotStepName =
     | "matchSuppliers"
     | "runFangReviews"
     | "runProofreader"
+    | "writeExecutiveSummary"
     | "generatePdf"
 
 export type StartAutopilotResult =
