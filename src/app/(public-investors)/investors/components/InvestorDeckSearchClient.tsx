@@ -793,6 +793,74 @@ function MatchCard({
         </div>
       </div>
 
+      {/* ── Metadata chip row: firm type · stage focus · cheque range · active deploying ── */}
+      {/* PAYWALL: only shown on unlocked cards — mirrors scorecard lock guard. */}
+      {!isLocked && (() => {
+        // Probe cheque_range_gbp shape at runtime (could be null, object {min,max}, or array)
+        const chequeRange = attrs.cheque_range_gbp
+        let chequeChip: string | null = null
+        if (chequeRange && typeof chequeRange === 'object' && !Array.isArray(chequeRange)) {
+          const { min, max } = chequeRange as { min?: number; max?: number }
+          if (min || max) {
+            chequeChip = [
+              min ? `£${fmtCheque(min)}` : null,
+              max ? `£${fmtCheque(max)}` : null,
+            ].filter(Boolean).join(' – ')
+          }
+        } else if (Array.isArray(chequeRange) && chequeRange.length >= 2) {
+          const arr = chequeRange as unknown as [number, number]
+          chequeChip = `£${fmtCheque(arr[0])} – £${fmtCheque(arr[1])}`
+        }
+
+        const stageFocusChips = (attrs.stage_focus ?? []).slice(0, 3)
+        const isActiveDeploying: boolean | null =
+          typeof attrs.is_active_deploying === 'boolean' ? attrs.is_active_deploying : null
+        const firmTypeChip = attrs.firm_type ? normaliseFirmType(attrs.firm_type) : null
+
+        const hasAnyChip = firmTypeChip || stageFocusChips.length > 0 || chequeChip || isActiveDeploying !== null
+        if (!hasAnyChip) return null
+
+        return (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {/* Firm type */}
+            {firmTypeChip && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground font-semibold uppercase tracking-wide">
+                {firmTypeChip}
+              </span>
+            )}
+
+            {/* Stage focus — up to 3 chips */}
+            {stageFocusChips.map((stage) => (
+              <span
+                key={stage}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground uppercase tracking-wide"
+              >
+                {stage}
+              </span>
+            ))}
+
+            {/* Cheque range */}
+            {chequeChip && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground uppercase tracking-wide">
+                {chequeChip}
+              </span>
+            )}
+
+            {/* Active deploying */}
+            {isActiveDeploying === true && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">
+                ✓ Active
+              </span>
+            )}
+            {isActiveDeploying === false && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground italic">
+                Not actively deploying
+              </span>
+            )}
+          </div>
+        )
+      })()}
+
       {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
       {/* Score-na state: shown when pillars are missing (scores still loading or no match yet) */}
       {/* PAYWALL: locked free-tier preview cards must not leak per-pillar scores. */}
