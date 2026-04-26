@@ -3333,16 +3333,17 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 <PdfFooter label="Brief + regulatory" />
             </Page>
 
-            {/* Feasibility exception page (Loop 3 P1, council-unanimous
-             *  2026-04-25 NIGHT). Renders only when the verdict is non-green.
-             *  Sits BEFORE sizing/BOM/cost so the founder sees the gap
-             *  before the polish. */}
-            {data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
+            {/* 2026-04-26 BISECT: PDF_BISECT_MINIMAL=1 stops all
+             *  optional + heavy sections after Brief + Regulatory.
+             *  Establishes whether Cover/TOC/Brief alone render OK; if
+             *  they do, the bug is in Feasibility / Sizing / Modules /
+             *  BOM / Cost / Risks / Suppliers / EngineReview / AuditLog.
+             *  Each section can then be re-enabled independently. */}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
                 <FeasibilityExceptionPage verdict={data.feasibilityVerdict} />
             )}
 
-            {/* 3. Sizing optimisation (P1 — only when dimension_sheet present) */}
-            {hasSheet && sizingSectionNumber != null && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && hasSheet && sizingSectionNumber != null && (
                 <Page size="A4" style={styles.page} wrap>
                     <SizingOptimisationSection
                         sheet={data.dimensionSheet}
@@ -3352,9 +3353,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 </Page>
             )}
 
-            {/* Spatial plan (P2 — only when spatial_plan present; slots
-             *  AFTER sizing and BEFORE modules). */}
-            {hasPlan && planSectionNumber != null && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && hasPlan && planSectionNumber != null && (
                 <Page size="A4" style={styles.page} wrap>
                     <SpatialPlanSection
                         plan={data.spatialPlan}
@@ -3366,8 +3365,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 </Page>
             )}
 
-            {/* 3–5 depending on presence. one page per module */}
-            {data.modules.map((m, i) => (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && data.modules.map((m, i) => (
                 <ModulePage key={m.id} mod={m} index={i} />
             ))}
 
@@ -3409,39 +3407,30 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 })()}
             />}
 
-            {/* 5. Cost */}
-            <CostPage data={data} />
+            {/* PDF_BISECT_MINIMAL=1 also stops Cost / Risks / Suppliers /
+             *  EngineReview / AuditLog so the only sections that render
+             *  in MINIMAL mode are Cover, TOC, Brief + Regulatory. */}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && <CostPage data={data} />}
 
-            {/* 5b. Reconciliation — only render when we have results AND
-                at least one alert (or at least one finding to review). */}
-            {data.reconciliation && data.reconciliation.findings.length > 0 && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && data.reconciliation && data.reconciliation.findings.length > 0 && (
                 <ReconciliationPage reconciliation={data.reconciliation} />
             )}
 
-            {/* 6. Risks register */}
-            <RisksPage modules={data.modules} />
+            {process.env.PDF_BISECT_MINIMAL !== "1" && <RisksPage modules={data.modules} />}
 
-            {/* 7. Suppliers */}
-            <SuppliersPage
-                suppliers={data.suppliers}
-                sources={data.sources}
-                verdict={data.feasibilityVerdict}
-            />
+            {process.env.PDF_BISECT_MINIMAL !== "1" && (
+                <SuppliersPage
+                    suppliers={data.suppliers}
+                    sources={data.sources}
+                    verdict={data.feasibilityVerdict}
+                />
+            )}
 
-            {/* 8. Engine self-review (Phase 1 proofreader, 2026-04-25 NIGHT)
-                — only renders when the proofreader specialist found
-                something. Non-blocking: the PDF always emits; this
-                appendix surfaces caught issues to the founder. */}
-            {data.proofreadFindings && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && data.proofreadFindings && (
                 <EngineReviewPage findings={data.proofreadFindings} />
             )}
 
-            {/* 8. Audit log — Loop 7 critique A3 fix (2026-04-26):
-                audit_log table isn't yet wired by the autopilot, but
-                pipeline_runs IS populated end-to-end. Render the merged
-                view so the founder gets the audit trail they were
-                promised in the TOC. Skip when there's nothing to show. */}
-            {data.auditLog.length > 0 && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && data.auditLog.length > 0 && (
                 <AuditLogPage rows={data.auditLog} />
             )}
         </Document>
