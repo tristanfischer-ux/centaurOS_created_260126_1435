@@ -18,12 +18,26 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { callOpenRouter } from "@/lib/ai/openrouter"
+import {
+    extractDesignBriefFromReport,
+    buildChaseExtractionPrompts,
+    parseChaseExtraction,
+} from "@/actions/specialists/run-chase-research"
 import type {
     StageAdapter,
     StageGoldenInput,
     StageOutput,
     StageScore,
 } from "../types"
+
+// Loop 8 P5 — harness-side OpenRouter route for when the direct Anthropic
+// key is dry. Set CHASE_HARNESS_VIA_OPENROUTER=1 to bypass callClaude and
+// route through OpenRouter (separate credit pool) using the same Sonnet
+// model the engine uses in production.
+const HARNESS_VIA_OPENROUTER =
+    process.env.CHASE_HARNESS_VIA_OPENROUTER === "1"
+const HARNESS_OPENROUTER_MODEL =
+    process.env.CHASE_HARNESS_OPENROUTER_MODEL || "anthropic/claude-sonnet-4-6"
 
 const DEMO_PROJECT_IDS: ReadonlyArray<{ id: string; slug: string }> = [
     { id: "0ab0457a-ab32-4d2a-b1e3-32d8b877222c", slug: "bess" },
@@ -69,12 +83,28 @@ export const chaseRegulatoryAdapter: StageAdapter = {
             const subject = typeof r.subject === "string" ? r.subject : ""
             const slug =
                 DEMO_PROJECT_IDS.find((p) => p.id === r.id)?.slug ?? "unknown"
+            const research = (r.research ?? null) as
+                | Record<string, unknown>
+                | null
+            const report =
+                typeof research?.["report"] === "string"
+                    ? (research["report"] as string)
+                    : ""
             inputs.push({
                 id: slug,
                 label: typeof r.name === "string" ? r.name : slug,
                 payload: {
                     subject: subject.slice(0, 1500),
-                    research: r.research,
+                    report,
+                    persistedRegulatory: Array.isArray(
+                        (research?.["designBrief"] as
+                            | Record<string, unknown>
+                            | null)?.["regulatory"],
+                    )
+                        ? ((research!["designBrief"] as Record<string, unknown>)[
+                              "regulatory"
+                          ] as unknown[])
+                        : [],
                 },
             })
         }
@@ -82,27 +112,125 @@ export const chaseRegulatoryAdapter: StageAdapter = {
     },
 
     async runOne(input): Promise<StageOutput> {
-        // The regulatory output already lives in research.designBrief.regulatory
-        // — we don't re-run Chase here. Re-running Chase to score is the
-        // job of the NEXT iteration after a prompt change. For the
-        // baseline we just read the existing output.
-        const research = (input.payload.research ?? null) as
-            | Record<string, unknown>
-            | null
-        const designBrief = research?.["designBrief"] as
-            | Record<string, unknown>
-            | null
-        const regulatory = Array.isArray(designBrief?.["regulatory"])
-            ? (designBrief!["regulatory"] as unknown[])
-            : []
+        // Per-stage iteration loop (Loop 8 P5): re-extract the regulatory
+        // matrix from the stored research.report using the CURRENT Chase
+        // prompt so prompt edits are scored against fresh output rather
+        // than stale persisted data. Falls back to the persisted array
+        // when the report is missing OR extraction returns nothing — that
+        // way the council still scores the production state for those
+        // demos until they're regenerated end-to-end.
+        const subject =
+            typeof input.payload.subject === "string"
+                ? (input.payload.subject as string)
+                : ""
+        const report =
+            typeof input.payload.report === "string"
+                ? (input.payload.report as string)
+                : ""
+        const persisted =
+            (input.payload.persistedRegulatory as unknown[] | undefined) ?? []
+
+        const t0 = Date.now()
+        let regulatory: unknown[] = persisted
+        let costPence = 0
+        const diagnostics: string[] = []
+        let extractedFresh = false
+        if (report.length > 200) {
+            if (HARNESS_VIA_OPENROUTER) {
+                const { systemPrompt, userPrompt } = buildChaseExtractionPrompts(
+                    subject,
+                    report,
+                    undefined,
+                )
+                const result = await callOpenRouter({
+                    model: HARNESS_OPENROUTER_MODEL,
+                    system: systemPrompt,
+                    prompt: userPrompt,
+                    maxTokens: 8192,
+                    temperature: 0.1,
+                    timeoutMs: 120_000,
+                })
+                if (result.ok) {
+                    const parsed = parseChaseExtraction(result.text)
+                    if (
+                        parsed &&
+                        Array.isArray(parsed.regulatory) &&
+                        parsed.regulatory.length > 0
+                    ) {
+                        regulatory = parsed.regulatory
+                        extractedFresh = true
+                        // Sonnet via OpenRouter ≈ $3/M in, $15/M out.
+                        costPence =
+                            Math.ceil(
+                                ((result.inputTokens / 1_000_000) * 3 +
+                                    (result.outputTokens / 1_000_000) * 15) *
+                                    80 *
+                                    100,
+                            ) || 1
+                    } else {
+                        diagnostics.push(
+                            "OpenRouter extraction parsed empty regulatory; using persisted",
+                        )
+                    }
+                } else {
+                    diagnostics.push(
+                        `OpenRouter extraction failed: ${result.error}`,
+                    )
+                }
+            } else {
+                try {
+                    const result = await extractDesignBriefFromReport(
+                        subject,
+                        report,
+                        undefined,
+                    )
+                    if (
+                        result.ok &&
+                        result.brief &&
+                        Array.isArray(result.brief.regulatory) &&
+                        result.brief.regulatory.length > 0
+                    ) {
+                        regulatory = result.brief.regulatory
+                        extractedFresh = true
+                        costPence =
+                            Math.ceil(
+                                ((result.tokensIn / 1_000_000) * 3 +
+                                    (result.tokensOut / 1_000_000) * 15) *
+                                    80 *
+                                    100,
+                            ) || 1
+                    } else {
+                        diagnostics.push(
+                            "fresh extraction returned empty regulatory; using persisted",
+                        )
+                    }
+                } catch (err) {
+                    diagnostics.push(
+                        `fresh extraction threw: ${err instanceof Error ? err.message : String(err)}`,
+                    )
+                }
+            }
+        } else {
+            diagnostics.push("research.report missing or <200 chars")
+        }
+        if (regulatory.length === 0) {
+            diagnostics.push("no regulatory rows")
+        }
+        if (!extractedFresh) {
+            diagnostics.push("scored persisted output (no fresh extraction)")
+        }
         return {
             inputId: input.id,
             loop: 0,
             engineCommit: "",
-            elapsedMs: 0,
-            costPence: 0,
-            output: { regulatory, count: regulatory.length },
-            diagnostics: regulatory.length === 0 ? ["no regulatory rows"] : [],
+            elapsedMs: Date.now() - t0,
+            costPence,
+            output: {
+                regulatory,
+                count: regulatory.length,
+                extractedFresh,
+            },
+            diagnostics,
         }
     },
 

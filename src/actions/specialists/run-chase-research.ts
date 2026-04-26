@@ -673,11 +673,36 @@ interface ExtractionResult {
  * model misbehaves we return `{ ok: false }` and the caller still saves
  * the raw report (Max can work off report alone).
  */
-async function extractDesignBriefFromReport(
+// Loop 8 P5 (per-stage harness): exported so the per-stage-loop runner can
+// drive a fresh extraction on the current prompt against each demo's stored
+// `research.report`, score the freshly extracted regulatory array, and
+// iterate. Production callers go through runChaseResearchBackground; the
+// harness is the only direct caller. The exported prompt-builder +
+// parser let the harness route through OpenRouter when the direct
+// Anthropic key is dry (different credit pool).
+export async function extractDesignBriefFromReport(
     subject: string,
     report: string,
     priorBrief: CadLabDesignBrief | undefined,
 ): Promise<ExtractionResult> {
+    const { systemPrompt, userPrompt } = buildChaseExtractionPrompts(
+        subject,
+        report,
+        priorBrief,
+    )
+    return await callExtractionWithPrompts(systemPrompt, userPrompt)
+}
+
+/**
+ * Loop 8 P5: split the prompt-builder out so the per-stage harness can
+ * call OpenRouter (separate credit pool) with the same prompt and parse
+ * via tryParseBriefJson. Avoids duplicating the long few-shot block.
+ */
+export function buildChaseExtractionPrompts(
+    subject: string,
+    report: string,
+    priorBrief: CadLabDesignBrief | undefined,
+): { systemPrompt: string; userPrompt: string } {
     // Keep the report preamble bounded — strategic extraction only needs
     // the first chunk of context (which is the synthesis summary in the
     // domain-specific prompts; deeper sections are dimension tables that
@@ -810,6 +835,13 @@ ${trimmedReport}
 
 Output JSON only.`
 
+    return { systemPrompt, userPrompt }
+}
+
+async function callExtractionWithPrompts(
+    systemPrompt: string,
+    userPrompt: string,
+): Promise<ExtractionResult> {
     try {
         // Loop 7+ fix (2026-04-26 NIGHT): bumped 4096 → 8192. The Loop 7
         // few-shot example block (UK-BESS regulatory matrix, ~3000 chars
@@ -844,6 +876,18 @@ Output JSON only.`
         )
         return { ok: false, brief: null, tokensIn: 0, tokensOut: 0 }
     }
+}
+
+/**
+ * Loop 8 P5: harness-only parser export. The harness calls OpenRouter
+ * directly with the same buildChaseExtractionPrompts output and feeds
+ * the response text through this parser to get the same shape as the
+ * production extractor.
+ */
+export function parseChaseExtraction(
+    raw: string,
+): Partial<CadLabDesignBrief> | null {
+    return tryParseBriefJson(raw)
 }
 
 /**
