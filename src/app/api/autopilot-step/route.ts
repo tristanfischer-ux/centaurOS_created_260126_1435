@@ -580,27 +580,73 @@ async function runFangReviewsForAllModules(
         return { ok: false, error: "No modules to review (modules is empty)" }
     }
 
+    // ── Per-module idempotency guard (council-confirmed 2026-04-26 NIGHT) ──
+    // Production credit-burn observed: Sentinel ran 254 fang reviews for 7
+    // modules (36x duplication), Desal 224 for 9 (25x), BESS 87 for 8 (10x).
+    // Cron stale-detector re-fires the autopilot stage every 9 min; this
+    // function used to iterate ALL modules every fire with no dedup against
+    // existing pipeline_runs rows. Each cycle = full re-run = thousands of
+    // £ in Anthropic credits over a few hours.
+    //
+    // Fix per GPT-5.5 council consult: skip modules that already have a
+    // terminal pipeline_runs row (status IN ('done','failed')) OR an
+    // in-flight one (status='running' AND started_at < 15 min ago). Treat
+    // 'failed' as terminal too — otherwise the cron just re-fires failures
+    // forever. The proper fix (unique constraint on
+    // (project_id, module_id, specialist_id)) is a follow-up migration.
+    const { data: existingFangRows } = await admin
+        .from("pipeline_runs")
+        .select("input_ref, status, started_at")
+        .eq("project_id", projectId)
+        .eq("specialist_id", "vp-manufacturing")
+        .eq("stage", "module.review.fang")
+        .order("started_at", { ascending: false })
+    const recentRunningCutoffMs = Date.now() - 15 * 60 * 1000
+    const moduleIdsAlreadyTerminalOrRecent = new Set<string>()
+    for (const row of (existingFangRows ?? []) as Array<{
+        input_ref: { module_id?: string } | null
+        status: string
+        started_at: string | null
+    }>) {
+        const moduleId = row.input_ref?.module_id
+        if (!moduleId) continue
+        if (row.status === "done" || row.status === "failed") {
+            moduleIdsAlreadyTerminalOrRecent.add(moduleId)
+            continue
+        }
+        if (
+            row.status === "running" &&
+            row.started_at &&
+            Date.parse(row.started_at) > recentRunningCutoffMs
+        ) {
+            moduleIdsAlreadyTerminalOrRecent.add(moduleId)
+        }
+    }
+    const modulesToReview = modules.filter(
+        (m) => !moduleIdsAlreadyTerminalOrRecent.has(m.id),
+    )
+    if (modulesToReview.length === 0) {
+        // Every module already has a terminal or recent-running fang row.
+        // Stage is effectively complete — return ok so the autopilot
+        // advances past running_fang_reviews instead of looping forever.
+        console.info(
+            `[autopilot-step:fang-reviews] all ${modules.length} modules already terminal/running — advancing without re-firing`,
+        )
+        return { ok: true }
+    }
+    console.info(
+        `[autopilot-step:fang-reviews] firing ${modulesToReview.length} of ${modules.length} modules (${modules.length - modulesToReview.length} already terminal/running)`,
+    )
+
     const { runFangReviewBackground } = await import(
         "@/actions/specialists/run-fang-review"
     )
 
-    // Parallel fan-out with a bounded concurrency. Loop 8 fix
-    // (Tristan-flagged 2026-04-26): dropped 4 → 2. With 4 projects
-    // parallel-regenerating + 7-9 modules each, CONCURRENCY=4 produced
-    // 16+ in-flight claude-opus-4-7 calls, breaching the org-level
-    // Anthropic rate limit and triggering 429s that cascaded into
-    // terminal "All N Fang reviews failed" — Sentinel + Desal hit
-    // this 6+ times in a single regen loop. CONCURRENCY=2 caps the
-    // multi-project burst at 8, well within headroom.
-    // Signature: runFangReviewBackground(projectId, moduleId, foundryId,
-    //            userId, trigger?). userId is null for system-fired runs
-    //            (autopilot has no user session at this point — column is
-    //            nullable).
     const CONCURRENCY = 2
     const results: Array<PromiseSettledResult<{ ok: boolean; error?: string }>> =
         []
-    for (let i = 0; i < modules.length; i += CONCURRENCY) {
-        const batch = modules.slice(i, i + CONCURRENCY)
+    for (let i = 0; i < modulesToReview.length; i += CONCURRENCY) {
+        const batch = modulesToReview.slice(i, i + CONCURRENCY)
         const settled = await Promise.allSettled(
             batch.map((m) =>
                 runFangReviewBackground(
@@ -618,9 +664,10 @@ async function runFangReviewsForAllModules(
     const failed = results.filter(
         (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
     )
-    if (failed.length === modules.length) {
-        // Every module failed — terminal. Otherwise, accept partial success
-        // (better some Risks/Specialists data than none).
+    if (failed.length === modulesToReview.length && modulesToReview.length === modules.length) {
+        // Every module failed AND nothing was previously terminal — true
+        // catastrophe. If some modules were already terminal, the partial
+        // success is enough to advance.
         return {
             ok: false,
             error: `All ${modules.length} Fang reviews failed`,
