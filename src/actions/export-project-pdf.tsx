@@ -3343,7 +3343,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 <FeasibilityExceptionPage verdict={data.feasibilityVerdict} />
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && hasSheet && sizingSectionNumber != null && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_SIZING !== "1" && hasSheet && sizingSectionNumber != null && (
                 <Page size="A4" style={styles.page} wrap>
                     <SizingOptimisationSection
                         sheet={data.dimensionSheet}
