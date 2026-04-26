@@ -3416,7 +3416,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 <ReconciliationPage reconciliation={data.reconciliation} />
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && <RisksPage modules={data.modules} />}
+            {(process.env.PDF_BISECT_MINIMAL !== "1" || process.env.PDF_INCLUDE_RISKS === "1") && <RisksPage modules={data.modules} />}
 
             {process.env.PDF_BISECT_MINIMAL !== "1" && (
                 <SuppliersPage
