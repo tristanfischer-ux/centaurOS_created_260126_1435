@@ -308,6 +308,7 @@ export function InvestorDeckSearchClient({
       {hasSearched && firms.length > 0 && (
         <ResultsBar
           total={total}
+          visibleCount={visibleFirms.length}
           isPaid={isPaid}
           isFree={isFree}
           freeVisible={FREE_VISIBLE}
@@ -560,6 +561,7 @@ function ProfilePill({ label, value }: { label: string; value: string }) {
 
 function ResultsBar({
   total,
+  visibleCount,
   isPaid,
   isFree,
   freeVisible,
@@ -567,27 +569,38 @@ function ResultsBar({
   isPending,
 }: {
   total: number
+  visibleCount: number
   isPaid: boolean
   isFree: boolean
   freeVisible: number
   lastQuery: string
   isPending: boolean
 }) {
+  // Council audit 2026-04-26: founders flagged "Found 199 matching investors"
+  // as feeling fake/template-driven — every query came back ~200 because the
+  // RPC match_count is capped at 200. Reframed to lead with the visible count
+  // (the actual ranked subset) and demote the wider candidate-pool number to
+  // a secondary caption. Honest about what's shown and what's available.
+  const shownNow = isPending ? '…' : (isFree ? Math.min(freeVisible, total) : visibleCount)
   return (
-    <div className="flex items-center justify-between py-4 mb-0">
-      <div className="text-sm text-foreground">
-        {lastQuery && <span className="text-muted-foreground mr-1">{lastQuery.slice(0, 40)}{lastQuery.length > 40 ? '…' : ''} ·</span>}
-        Found{' '}
-        <strong className="text-international-orange">{isPending ? '…' : `${total} matching investors`}</strong>
-        {isFree && ` · showing ${Math.min(freeVisible, total)} free`}
-        {isPaid && ' · all visible'}
+    <div className="flex flex-col gap-1 py-4 mb-0">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="text-sm text-foreground">
+          {lastQuery && <span className="text-muted-foreground mr-1">{lastQuery.slice(0, 40)}{lastQuery.length > 40 ? '…' : ''} ·</span>}
+          <strong className="text-international-orange">
+            Top {shownNow} most relevant {isFree ? '(free preview)' : 'matches'}
+          </strong>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <FilterChip active>Best match</FilterChip>
+          <FilterChip>VCs only</FilterChip>
+          <FilterChip>+ Grants</FilterChip>
+          <FilterChip>United Kingdom</FilterChip>
+          {isPaid && <FilterChip>⇩ Export</FilterChip>}
+        </div>
       </div>
-      <div className="flex gap-2 flex-wrap">
-        <FilterChip active>Best match</FilterChip>
-        <FilterChip>VCs only</FilterChip>
-        <FilterChip>+ Grants</FilterChip>
-        <FilterChip>United Kingdom</FilterChip>
-        {isPaid && <FilterChip>⇩ Export</FilterChip>}
+      <div className="text-xs text-muted-foreground">
+        Ranked by thesis fit, stage, geography, cheque size, and recent activity. Cards below are the top {shownNow} of {total}+ candidates surfaced from your description.
       </div>
     </div>
   )
