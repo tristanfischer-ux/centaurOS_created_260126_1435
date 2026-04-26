@@ -4331,13 +4331,43 @@ async function exportProjectPdfInternal(
                 sizeBytes: buffer.length,
             }
         } catch (err) {
+            // 2026-04-26 diagnostic: PDF render started failing on engine-
+            // fixes-wip with no Vercel CLI logs. Emit the full Error.stack
+            // + message + name + a JSON-serialised payload so the actual
+            // failure surfaces to whatever log channel IS reachable
+            // (Vercel function logs panel, Supabase log drain if wired,
+            // process.stderr captured by the cron's pipeline_runs row).
+            const errorName = err instanceof Error ? err.name : typeof err
+            const errorMsg = err instanceof Error ? err.message : String(err)
+            const errorStack = err instanceof Error ? err.stack : undefined
+            console.error("[export-project-pdf] render failed —", errorName, ":", errorMsg)
+            if (errorStack) console.error("[export-project-pdf] stack:", errorStack)
             console.error(
-                "[export-project-pdf] render failed:",
-                err instanceof Error ? err.message : err,
+                "[export-project-pdf] diagnostic payload:",
+                JSON.stringify({
+                    name: errorName,
+                    message: errorMsg,
+                    stack: errorStack,
+                    projectName: pdfInput.projectName,
+                    moduleCount: pdfInput.totals.moduleCount,
+                    partCount: pdfInput.totals.partRowCount,
+                    hasReconciliation: pdfInput.reconciliation != null,
+                    hasFeasibility: pdfInput.feasibilityVerdict != null,
+                    hasSpatialPlan: pdfInput.spatialPlan != null,
+                    hasSizingSheet: pdfInput.dimensionSheet != null,
+                }),
             )
+            // Force flush to stderr before Lambda freezes the function. This
+            // matters when the cron's 2-second AbortSignal trims the
+            // response stream — a sub-1s flush window is the Lambda's only
+            // chance to surface stderr to the runtime aggregator.
+            await new Promise((resolve) => setTimeout(resolve, 800))
+            // Surface the error MESSAGE (not the generic placeholder) so
+            // the autopilot tracking row in pipeline_runs holds something
+            // a human / future agent can grep without needing CLI access.
             return {
                 ok: false,
-                error: "Couldn't render PDF — try again in a moment.",
+                error: `Couldn't render PDF: ${errorName}: ${errorMsg.slice(0, 240)}`,
                 errorCode: "RENDER_FAILED",
             }
         }
