@@ -392,26 +392,32 @@ function cleanReviewText(raw: string | null | undefined): string {
 // damaging expansions back to their canonical forms when they appear in
 // review text. Conservative — only collapses where the expansion is
 // adjacent to a number/code that disambiguates the proper-noun reading.
-const ACRONYM_RECOLLAPSE: ReadonlyArray<[RegExp, string]> = [
-    [/\bRandom Access Library (\d{4})\b/g, "RAL $1"],
-    [/\bDeutsches Institut für Normung\b/g, "DIN"],
-    [/\bInternational Organization for Standardization (\d{2,5}(?:-[0-9a-z]+)?)\b/g, "ISO $1"],
-    [/\bInternational Electrotechnical Commission (\d{2,5}(?:-\d+)*)\b/g, "IEC $1"],
-    [/\bBritish Standard (\d{2,5}(?:-\d+)*)\b/g, "BS $1"],
-    [/\bfourth-generation long term evolution\b/gi, "4G LTE"],
-    [/\b(alternating current)\b/g, "AC"],
-    [/\b(direct current)\b/g, "DC"],
-    [/\bReporting of Injuries, Diseases and Dangerous Occurrences Regulations\s*(\d{4})?\b/g, (_m: string, year?: string) => year ? `RIDDOR ${year}` : "RIDDOR 2013"],
+type AcronymRecollapseEntry =
+    | { pattern: RegExp; replacement: string }
+    | { pattern: RegExp; replace: (m: string, ...groups: string[]) => string }
+
+const ACRONYM_RECOLLAPSE: ReadonlyArray<AcronymRecollapseEntry> = [
+    { pattern: /\bRandom Access Library (\d{4})\b/g, replacement: "RAL $1" },
+    { pattern: /\bDeutsches Institut für Normung\b/g, replacement: "DIN" },
+    { pattern: /\bInternational Organization for Standardization (\d{2,5}(?:-[0-9a-z]+)?)\b/g, replacement: "ISO $1" },
+    { pattern: /\bInternational Electrotechnical Commission (\d{2,5}(?:-\d+)*)\b/g, replacement: "IEC $1" },
+    { pattern: /\bBritish Standard (\d{2,5}(?:-\d+)*)\b/g, replacement: "BS $1" },
+    { pattern: /\bfourth-generation long term evolution\b/gi, replacement: "4G LTE" },
+    { pattern: /\b(alternating current)\b/g, replacement: "AC" },
+    { pattern: /\b(direct current)\b/g, replacement: "DC" },
+    {
+        pattern: /\bReporting of Injuries, Diseases and Dangerous Occurrences Regulations\s*(\d{4})?\b/g,
+        replace: (_m, year) => (year ? `RIDDOR ${year}` : "RIDDOR 2013"),
+    },
 ]
 
 function fixAcronymOverreach(raw: string): string {
     let text = raw
-    for (const [pattern, replacement] of ACRONYM_RECOLLAPSE) {
-        if (typeof replacement === "string") {
-            text = text.replace(pattern, replacement)
+    for (const entry of ACRONYM_RECOLLAPSE) {
+        if ("replacement" in entry) {
+            text = text.replace(entry.pattern, entry.replacement)
         } else {
-            // narrowing — TypeScript doesn't infer the function form on the tuple
-            text = text.replace(pattern, replacement as unknown as string)
+            text = text.replace(entry.pattern, entry.replace)
         }
     }
     return text

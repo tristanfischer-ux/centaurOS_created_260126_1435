@@ -771,19 +771,12 @@ export async function matchCadLabModuleSuppliers(
   //   contact_phone / contact_linkedin / contact_title — outreach beyond email
   //   key_people           — named contacts
   //   average_rating / review_count — marketplace-side quality signal
+  // NOTE: keep this select as a SINGLE literal string. Supabase types
+  // parse the literal at compile time; line-broken concatenation falls
+  // back to GenericStringError and every column access TS-fails.
   const { data: rawListings } = await supabase
     .from("marketplace_listings")
-    .select(
-      "id, title, description, attributes, is_verified, subcategory, category, " +
-        "process_capabilities, certifications, materials, industries, key_equipment, " +
-        "specialties, country, country_iso, city, address, employee_count_exact, founded_year, " +
-        "lead_time, minimum_order, export_controls, security_clearances, " +
-        "website_url, contact_email, contact_name, contact_title, contact_phone, contact_linkedin, " +
-        "data_quality_score, " +
-        "products, production_capacity, quality_systems, key_people, " +
-        "iso_14001, ecovadis_score, carbon_disclosed, recycled_content_percent, " +
-        "enrichment_quality, average_rating, review_count",
-    )
+    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, country_iso, city, address, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, contact_title, contact_phone, contact_linkedin, data_quality_score, products, production_capacity, quality_systems, key_people, iso_14001, ecovadis_score, carbon_disclosed, recycled_content_percent, enrichment_quality, average_rating, review_count")
     .in("id", [...candidateIds])
     .in("category", ["Products", "Services"])
 
