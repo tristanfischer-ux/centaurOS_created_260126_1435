@@ -48,6 +48,7 @@ import {
     inferEnvelopeFromBriefText,
     runSizing,
 } from "@/lib/sizing/sizing-engine"
+import { decideAutoAdjustment, type BriefAutoAdjustment } from "@/lib/sizing/auto-adjust"
 import { getRulesByDomain } from "@/lib/sizing/rules/_registry"
 import type { DimensionSheet, Envelope } from "@/lib/sizing/types"
 import type { Database } from "@/types/database.types"
@@ -355,14 +356,51 @@ async function runFangSizingInternal(
     }
 
     try {
-        // 4. Run the solver.
-        const outcome = runSizing({
+        // 4. Run the solver — with auto-adjust loop. When the first pass
+        //    returns infeasible, decideAutoAdjustment picks the smallest-
+        //    delta target adjustment from sheet.recommendations (or from
+        //    sheet.closest_feasible_alternate if populated), persists it
+        //    to the audit trail, and re-runs the solver. Up to 2 retries.
+        //    Tristan-directed 2026-04-26 NIGHT — "if the brief and
+        //    constraints can't coexist, adjust the brief and try again".
+        const briefAutoAdjustments: BriefAutoAdjustment[] =
+            (((project as { research?: { _brief_auto_adjustments?: BriefAutoAdjustment[] } }).research)?._brief_auto_adjustments) ?? []
+        let workingTargets = targets
+        let outcome = runSizing({
             industryDomain,
             domainOverride: overrides?.domainOverride,
             envelope: briefEnvelope,
-            targets,
+            targets: workingTargets,
             modules,
         })
+        const maxAdjustAttempts = 2
+        let adjustAttempt = 0
+        while (
+            outcome.ok &&
+            !outcome.sheet.feasible &&
+            briefAutoAdjustments.length + adjustAttempt < maxAdjustAttempts
+        ) {
+            const decision = await decideAutoAdjustment(
+                outcome.sheet,
+                briefAutoAdjustments,
+            )
+            if (!decision.reRun || !decision.adjustedTarget || !decision.adjustment) {
+                break
+            }
+            briefAutoAdjustments.push(decision.adjustment)
+            workingTargets = decision.adjustedTarget as typeof workingTargets
+            adjustAttempt++
+            console.warn(
+                `[run-fang-sizing] auto-adjust attempt ${adjustAttempt}: ${decision.adjustment.field} ${decision.adjustment.fromValue} → ${decision.adjustment.toValue} (${decision.adjustment.reason})`,
+            )
+            outcome = runSizing({
+                industryDomain,
+                domainOverride: overrides?.domainOverride,
+                envelope: briefEnvelope,
+                targets: workingTargets,
+                modules,
+            })
+        }
 
         if (!outcome.ok) {
             // "skipped" — legitimate outcome, not a failure. Stamp the run as
@@ -426,11 +464,25 @@ async function runFangSizingInternal(
                 : `envelope: ${sheet.envelope.label} (library default)`,
         ]
 
+        // Persist dimension_sheet AND any auto-adjustments applied during
+        // the loop above. The adjustments live in research._brief_auto_adjustments
+        // — read by the cover banner so the founder sees what was relaxed.
+        const projectUpdate: {
+            dimension_sheet: unknown
+            research?: unknown
+        } = {
+            dimension_sheet: sheet as unknown as Database["public"]["Tables"]["cad_lab_projects"]["Row"]["dimension_sheet"],
+        }
+        if (briefAutoAdjustments.length > 0 && adjustAttempt > 0) {
+            const existingResearch = (project as { research?: Record<string, unknown> }).research ?? {}
+            projectUpdate.research = {
+                ...existingResearch,
+                _brief_auto_adjustments: briefAutoAdjustments,
+            }
+        }
         const { error: writeErr } = await admin
             .from("cad_lab_projects")
-            .update({
-                dimension_sheet: sheet as unknown as Database["public"]["Tables"]["cad_lab_projects"]["Row"]["dimension_sheet"],
-            })
+            .update(projectUpdate as Database["public"]["Tables"]["cad_lab_projects"]["Update"])
             .eq("id", projectId)
             .eq("foundry_id", foundryId)
         if (writeErr) {
