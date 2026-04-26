@@ -462,6 +462,38 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
       })
       .join('')
 
+  // Material base-name normalisation — collapse alloy sub-grades into their
+  // base material so the Top Materials chart reads cleanly. Tristan's call
+  // 2026-04-26: legitimate alloy distinctions are interesting at the supplier-
+  // detail level but noise on a 10-bar chart where "Stainless Steel 316L"
+  // and "Stainless Steel 304" both truncate to "Stainless St…" and look
+  // duplicated. Most-specific patterns first; first match wins.
+  const MATERIAL_NORMALIZE: Array<[RegExp, string]> = [
+    // Steel variants (Tristan's direct ask)
+    [/stainless\s*steels?/i, 'Stainless Steel'],   // covers 316L, 304, Duplex, Super Duplex, plural
+    [/mild\s*steel/i,        'Mild Steel'],         // covers Mild Steel S275 etc.
+    [/carbon\s*steel/i,      'Carbon Steel'],
+    [/tool\s*steel/i,        'Tool Steel'],
+    [/alloy\s*steel/i,       'Alloy Steel'],
+    [/spring\s*steel/i,      'Spring Steel'],
+    [/galvani[sz]ed\s*steel/i, 'Galvanised Steel'],
+    [/stainless/i,           'Stainless Steel'],    // bare "stainless" → assume steel
+    // Non-ferrous metals — same dedupe pattern (alloy grade noise)
+    [/^alumin(?:i)?um\b/i,   'Aluminium'],          // "Aluminium 6061-T6" + US "Aluminum"
+    [/^titanium\b/i,         'Titanium'],            // "Titanium Ti-6Al-4V" etc.
+    [/^bronze\b/i,           'Bronze'],
+    [/^brass\b/i,            'Brass'],
+    [/^copper\b/i,           'Copper'],
+    [/^inconel\b/i,          'Inconel'],
+  ]
+  const normaliseMaterial = (raw: string): string => {
+    const trimmed = raw.trim()
+    for (const [pattern, canonical] of MATERIAL_NORMALIZE) {
+      if (pattern.test(trimmed)) return canonical
+    }
+    return titleCase(trimmed)
+  }
+
   // ── Top process capabilities ───────────────────────────────────────────────────
   // GOTCHA: process_capabilities is JSONB array of *objects* with a `process_name`
   // field (not plain strings). Extract the process_name from each element.
@@ -486,7 +518,9 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
     .slice(0, 10)
 
   // ── Top materials ─────────────────────────────────────────────────────────────
-  // materials is JSONB array of strings
+  // materials is JSONB array of strings. Apply alloy-grade normalisation so
+  // sub-grade entries (Stainless Steel 316L, Aluminium 6061-T6, Titanium
+  // Ti-6Al-4V, etc.) collapse into their base material on the chart.
   const matMap = new Map<string, number>()
   if (materialsRes.status === 'fulfilled' && materialsRes.value.data) {
     for (const row of materialsRes.value.data as Array<{ materials: unknown }>) {
@@ -494,7 +528,7 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
       if (!Array.isArray(mats)) continue
       for (const m of mats as unknown[]) {
         if (typeof m === 'string' && m.trim()) {
-          const name = titleCase(m)
+          const name = normaliseMaterial(m)
           matMap.set(name, (matMap.get(name) ?? 0) + 1)
         }
       }
