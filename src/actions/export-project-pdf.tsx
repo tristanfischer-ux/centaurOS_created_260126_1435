@@ -646,6 +646,12 @@ interface PdfInput {
     }
     suppliers: SupplierPdf[]
     auditLog: AuditRowPdf[]
+    /** Loop 8 G1 (QC-GATES.md): deterministic numerical-consistency
+     *  reconciliation. Populated server-side from the same `data` the
+     *  PDF renders so divergences across the 3 parallel cost views and
+     *  2 parallel mass views surface on the cover instead of shipping
+     *  silent. Null when reconciliation hasn't run (back-compat). */
+    reconciliation: import("@/lib/cad-lab-numerical-reconciliation").ReconciliationResult | null
     /** Sizing optimisation + dimension sheet from Fang. When present, renders
      *  a new section 3 ("Sizing optimisation") showing the trial sweep,
      *  winner rationale, top alternatives, and levers. Nullable — projects
@@ -807,6 +813,26 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                     >
                         <Text style={{ color: MUTED, fontSize: 10 }}>
                             No system illustration generated yet. Trigger it from the modules page.
+                        </Text>
+                    </View>
+                )}
+
+                {/* Loop 8 G1 reconciliation banner — surfaces internal
+                    numerical inconsistency the founder needs to see
+                    before they take any single number as load-bearing. */}
+                {data.reconciliation?.coverBanner && (
+                    <View
+                        style={{
+                            marginTop: 14,
+                            padding: 8,
+                            borderRadius: 4,
+                            backgroundColor: "#fee2e2",
+                            borderLeftWidth: 3,
+                            borderLeftColor: "#b91c1c",
+                        }}
+                    >
+                        <Text style={{ fontSize: 10, color: "#7f1d1d", fontWeight: "bold" }}>
+                            {data.reconciliation.coverBanner}
                         </Text>
                     </View>
                 )}
@@ -1692,6 +1718,72 @@ function fmtDateShort(iso: string | null | undefined): string {
 function fmtInt(n: number | null | undefined): string {
     if (typeof n !== "number" || !Number.isFinite(n)) return "—"
     return n.toLocaleString("en-GB")
+}
+
+function ReconciliationPage({
+    reconciliation,
+}: {
+    reconciliation: NonNullable<PdfInput["reconciliation"]>
+}): React.ReactElement {
+    return (
+        <Page size="A4" style={styles.page} wrap>
+            <Text style={styles.h2}>5b. Reconciliation</Text>
+            <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
+                A deterministic numerical-consistency pass runs at the end of the
+                pipeline. It compares the parallel views of cost (per-module total,
+                BOM master, cost waterfall), mass (module-page mass, BOM-row roll-up),
+                cell-energy density (chemistry × declared cell mass vs declared kWh),
+                and lighting wattage (bar/driver count × per-unit watts vs declared
+                connected load). Differences below tolerance ({"±"}5% on cost,
+                {"±"}10% on mass) are dropped silently. Differences above
+                tolerance land here so the founder doesn&apos;t take any single
+                number as load-bearing without seeing the disagreement.
+            </Text>
+            {reconciliation.findings.length === 0 ? (
+                <Text style={{ marginTop: 6 }}>
+                    All reconciliation checks pass within tolerance.
+                </Text>
+            ) : (
+                reconciliation.findings.map((f) => (
+                    <View
+                        key={f.id}
+                        style={{
+                            marginTop: 8,
+                            paddingLeft: 6,
+                            borderLeftWidth: 2,
+                            borderLeftColor:
+                                f.severity === "alert" ? "#b91c1c" : "#a16207",
+                        }}
+                        wrap={false}
+                    >
+                        <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+                            {f.id} · {f.section} — {f.summary}
+                        </Text>
+                        <Text style={{ fontSize: 9, marginTop: 2, color: MUTED }}>
+                            {f.detail.sourceA}: {f.detail.unit === "GBP" ? `£${Math.round(f.detail.valueA).toLocaleString("en-GB")}` : `${Number.isInteger(f.detail.valueA) ? f.detail.valueA.toLocaleString("en-GB") : f.detail.valueA.toFixed(2)} ${f.detail.unit}`}
+                        </Text>
+                        <Text style={{ fontSize: 9, color: MUTED }}>
+                            {f.detail.sourceB}: {f.detail.unit === "GBP" ? `£${Math.round(f.detail.valueB).toLocaleString("en-GB")}` : `${Number.isInteger(f.detail.valueB) ? f.detail.valueB.toLocaleString("en-GB") : f.detail.valueB.toFixed(2)} ${f.detail.unit}`}
+                        </Text>
+                        <Text
+                            style={{
+                                fontSize: 9,
+                                marginTop: 2,
+                                color: f.severity === "alert" ? "#b91c1c" : "#a16207",
+                                fontWeight: "bold",
+                            }}
+                        >
+                            Difference: {f.detail.pctDiff > 0 ? "+" : ""}
+                            {f.detail.pctDiff.toFixed(1)}%
+                        </Text>
+                    </View>
+                ))
+            )}
+            <Text style={styles.footer} fixed>
+                <Text>Reconciliation</Text>
+            </Text>
+        </Page>
+    )
 }
 
 function CostPage({ data }: { data: PdfInput }): React.ReactElement {
@@ -3004,10 +3096,17 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
     // write audit_log rows yet) but the TOC entry was still listed,
     // making every PDF promise "08. Project audit log" then never deliver
     // the page. Removed from TOC until the section is wired back.
+    //
+    // Loop 8 G1: when reconciliation produces findings, list a
+    // "Reconciliation" entry between Cost waterfall and Risks register
+    // so the TOC matches what the body delivers.
+    const reconciliationHasFindings =
+        (data.reconciliation?.findings.length ?? 0) > 0
     const fixedSections = [
         "Modules (one page each)",
         "BOM master",
         "Cost waterfall",
+        ...(reconciliationHasFindings ? ["Reconciliation"] : []),
         "Risks register",
         "Supplier shortlist",
     ]
@@ -3119,6 +3218,12 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
 
             {/* 5. Cost */}
             <CostPage data={data} />
+
+            {/* 5b. Reconciliation — only render when we have results AND
+                at least one alert (or at least one finding to review). */}
+            {data.reconciliation && data.reconciliation.findings.length > 0 && (
+                <ReconciliationPage reconciliation={data.reconciliation} />
+            )}
 
             {/* 6. Risks register */}
             <RisksPage modules={data.modules} />
@@ -3839,6 +3944,56 @@ async function exportProjectPdfInternal(
                         ? designBrief!.constraints!.unitCostCeilingGbp
                         : null,
             },
+            // Loop 8 G1 — numerical reconciliation across module-page,
+            // BOM master, and cost-waterfall views. Mass + cell-energy
+            // checks too. Returns null when nothing diverges; otherwise
+            // populates the cover banner + a Reconciliation page.
+            reconciliation: await (async () => {
+                try {
+                    const { reconcileNumerics } = await import(
+                        "@/lib/cad-lab-numerical-reconciliation"
+                    )
+                    const moduleCostsForReconciliation = modules.map((m) => ({
+                        moduleName: m.name,
+                        totalGbp: perModuleCost.find((c) => c.moduleName === m.name)?.totalGbp ?? null,
+                        massKg: m.massKg ?? null,
+                    }))
+                    // PartRow doesn't carry a quantity field today —
+                    // the BOM master treats every row as 1×. When that
+                    // changes (per Loop 7 critique VertFarm: "Quantities
+                    // are NOT on the BOM"), this sum will pick it up
+                    // automatically once the field is added.
+                    const bomTotalGbp = parts.reduce((acc, p) => {
+                        const cost =
+                            typeof p.estimatedUnitCostGbp === "number"
+                                ? p.estimatedUnitCostGbp
+                                : 0
+                        return acc + cost
+                    }, 0)
+                    const bomTotalMassKg = parts.reduce((acc, p) => {
+                        const mass = typeof p.massKg === "number" ? p.massKg : 0
+                        return acc + mass
+                    }, 0)
+                    const declaredTotalMassKg = modules.reduce((acc, m) => {
+                        return acc + (typeof m.massKg === "number" ? m.massKg : 0)
+                    }, 0)
+                    return reconcileNumerics({
+                        moduleCosts: moduleCostsForReconciliation,
+                        bomTotalGbp: bomTotalGbp > 0 ? bomTotalGbp : null,
+                        waterfallTotalGbp: perModuleCost.some((c) => c.totalGbp != null)
+                            ? unitTotalGbp
+                            : null,
+                        declaredTotalMassKg: declaredTotalMassKg > 0 ? declaredTotalMassKg : null,
+                        bomTotalMassKg: bomTotalMassKg > 0 ? bomTotalMassKg : null,
+                    })
+                } catch (err) {
+                    console.warn(
+                        "[export-pdf] reconciliation pass failed (non-fatal):",
+                        err instanceof Error ? err.message : err,
+                    )
+                    return null
+                }
+            })(),
             suppliers,
             auditLog,
             dimensionSheet: (project.dimension_sheet ?? null) as PdfInput["dimensionSheet"],
