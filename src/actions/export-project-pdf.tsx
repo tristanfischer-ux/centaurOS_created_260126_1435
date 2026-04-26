@@ -4383,11 +4383,16 @@ async function exportProjectPdfInternal(
             // finite number anywhere in the tree is a smoking gun for a
             // Yoga / pdfkit "unsupported number" crash. Logs the path
             // (e.g. cost.unitTotalGbp) so the next failure tells us
-            // exactly which builder line emitted the bad value.
+            // exactly which builder line emitted the bad value. ALSO
+            // attach the findings to the eventual error so they surface
+            // to pipeline_runs.error_message (Vercel CLI logs were
+            // unreachable during the 2026-04-26 debug — surfacing through
+            // Supabase is the reliable path).
             const sus = walkForBadNumbers(pdfInput, "")
             if (sus.length > 0) {
                 console.error("[export-project-pdf] non-finite numbers detected:", JSON.stringify(sus.slice(0, 30)))
             }
+            ;(pdfInput as { _diagnostics?: unknown })._diagnostics = sus.slice(0, 8)
             const instance = pdf(<ForgeProjectPdf data={pdfInput} />)
             const blob = await instance.toBlob()
             const arrayBuffer = await blob.arrayBuffer()
@@ -4435,9 +4440,15 @@ async function exportProjectPdfInternal(
             // Surface the error MESSAGE (not the generic placeholder) so
             // the autopilot tracking row in pipeline_runs holds something
             // a human / future agent can grep without needing CLI access.
+            // Also surface walkForBadNumbers diagnostics to pinpoint the
+            // bad numeric path inside PdfInput (when present).
+            const diagnostics = (pdfInput as { _diagnostics?: Array<{ path: string; value: unknown }> })._diagnostics
+            const diagSnippet = Array.isArray(diagnostics) && diagnostics.length > 0
+                ? ` | DIAG: ${diagnostics.map((d) => `${d.path}=${String(d.value)}`).join("; ").slice(0, 200)}`
+                : " | DIAG: (none — bad number generated INSIDE render, not from PdfInput)"
             return {
                 ok: false,
-                error: `Couldn't render PDF: ${errorName}: ${errorMsg.slice(0, 240)}`,
+                error: `Couldn't render PDF: ${errorName}: ${errorMsg.slice(0, 200)}${diagSnippet}`,
                 errorCode: "RENDER_FAILED",
             }
         }
