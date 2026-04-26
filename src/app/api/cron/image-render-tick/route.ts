@@ -47,10 +47,7 @@ import { NextResponse } from "next/server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyCronSecret } from "@/lib/security/cron-auth"
-import {
-    renderNextModuleStage,
-    type ImageRenderState,
-} from "@/actions/forge-v2-render-all-modules"
+import type { ImageRenderState } from "@/actions/forge-v2-render-all-modules"
 
 export const dynamic = "force-dynamic"
 // Each fired stage runs ONE module render (~30-60s) inside its OWN Vercel
@@ -125,22 +122,58 @@ export async function GET(request: Request): Promise<NextResponse> {
             continue
         }
 
-        // Re-fire the next stage. renderNextModuleStage is idempotent —
-        // it re-reads state and short-circuits if the chain is finished or
-        // someone else picked up the next module. We don't await long
-        // because the fire-and-forget HTTP hop inside the stage gives the
-        // ACTUAL work its own fresh Vercel invocation (300s budget).
+        // Re-fire the next stage via the existing /api/render-stage HTTP
+        // hop — same pattern as autopilot-tick uses for autopilot-step.
+        // CRITICAL: do NOT call renderNextModuleStage directly. That awaits
+        // per-module image gen (~30-60s) and rapidly hits the cron's 60s
+        // lambda budget when 2+ projects are stalled. The HTTP hop POSTs
+        // with 2s abort — the receiving lambda runs renderNextModuleStage
+        // in its own fresh 300s budget.
+        // Verified 2026-04-26 NIGHT: direct-await caused
+        // FUNCTION_INVOCATION_TIMEOUT on every cron tick.
         console.info(
             `[image-render-tick] re-firing stale chain for ${project.id} ` +
                 `(stale ${Math.round(staleMs / 1000)}s, current_id=${state.current_id})`,
         )
-        try {
-            await renderNextModuleStage(project.id)
-        } catch (err) {
+        const renderStageSecret = process.env.FORGE_RENDER_STAGE_SECRET
+        if (!renderStageSecret) {
             console.error(
-                `[image-render-tick] re-fire threw for ${project.id}:`,
-                err instanceof Error ? err.message : err,
+                "[image-render-tick] FORGE_RENDER_STAGE_SECRET not configured — can't fire HTTP hop",
             )
+            details.push({ projectId: project.id, action: "skip_no_current" })
+            skipped++
+            continue
+        }
+        const renderHost =
+            process.env.VERCEL_URL ??
+            process.env.NEXT_PUBLIC_VERCEL_URL ??
+            "fractionalforge.app"
+        const renderProtocol =
+            renderHost.includes("localhost") || renderHost.startsWith("127.")
+                ? "http"
+                : "https"
+        const renderStageUrl = `${renderProtocol}://${renderHost}/api/render-stage`
+        try {
+            await fetch(renderStageUrl, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${renderStageSecret}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ projectId: project.id }),
+                signal: AbortSignal.timeout(2_000),
+            })
+        } catch (err) {
+            // AbortSignal timeout is EXPECTED — the receiving lambda
+            // continues running for its own 300s budget after our
+            // 2s disconnect. Any OTHER error is a real network issue.
+            const errName = err instanceof Error ? err.name : ""
+            if (errName !== "AbortError" && errName !== "TimeoutError") {
+                console.error(
+                    `[image-render-tick] HTTP fire to ${renderStageUrl} failed:`,
+                    err instanceof Error ? err.message : err,
+                )
+            }
         }
         details.push({
             projectId: project.id,
