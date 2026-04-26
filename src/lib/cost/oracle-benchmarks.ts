@@ -590,6 +590,87 @@ export function detectProductClass(briefSubject: string): string | null {
     return null
 }
 
+/**
+ * Loop 8 P3 (cost-realism reframe — Tristan-flagged Loop 7): when the
+ * brief target is wildly off the council-priors industry band for the
+ * product class, the engine reports the gap (e.g. "£501,505 over") but
+ * the founder reads it as "engine is wrong". The actual problem is
+ * the brief target is unrealistic. This helper returns the aggregate
+ * band so the brief page can surface "your £180k target is below the
+ * industry £230k-£800k-£1.2M band" framing on top of the gap number.
+ *
+ * Aggregates the per-module bands into a project-level band:
+ *   low  = sum(b.low)
+ *   median = sum(b.median)
+ *   high = sum(b.high)
+ *
+ * Returns null when no benchmarks match — callers fall back to the
+ * existing "report the gap" behaviour.
+ */
+export interface OracleProjectBand {
+    productClass: string
+    aggregateLowGbp: number
+    aggregateMedianGbp: number
+    aggregateHighGbp: number
+    caption: string
+    /** True when the brief's stated unit-cost ceiling is BELOW the band's low. */
+    targetBelowLow: boolean
+    /** True when the brief's stated unit-cost ceiling is ABOVE the band's high. */
+    targetAboveHigh: boolean
+    /** Multiplier the brief target diverges by (e.g. 0.22 means 22% of low — wildly under). */
+    targetVsLowRatio: number | null
+    targetVsHighRatio: number | null
+}
+
+export function getOracleProjectBand(
+    briefSubject: string,
+    targetCeilingGbp: number | null,
+): OracleProjectBand | null {
+    const cls = detectProductClass(briefSubject)
+    if (!cls) return null
+    const benchmarks = ORACLE_BENCHMARKS_BY_PRODUCT_CLASS[cls]
+    if (!benchmarks || benchmarks.length === 0) return null
+    const aggregateLow = benchmarks.reduce((acc, b) => acc + b.low, 0)
+    const aggregateMedian = benchmarks.reduce((acc, b) => acc + b.median, 0)
+    const aggregateHigh = benchmarks.reduce((acc, b) => acc + b.high, 0)
+    const fmt = (n: number) =>
+        n >= 1_000_000
+            ? `£${(n / 1_000_000).toFixed(1)}M`
+            : n >= 1_000
+                ? `£${Math.round(n / 1000)}k`
+                : `£${n}`
+    const productClassLabel: Record<string, string> = {
+        "uk-bess-containerised": "UK containerised BESS",
+        "uk-vertical-farm-container": "UK container vertical farm",
+        "uk-consumer-iot-outdoor": "UK premium consumer outdoor IoT",
+        "uk-desal-containerised": "UK containerised desalination",
+        "uk-connected-mobility-aid": "UK connected mobility aid",
+    }
+    const label = productClassLabel[cls] ?? cls
+    const caption = `Council benchmark band for ${label}: ${fmt(aggregateLow)} (low) / ${fmt(aggregateMedian)} (median) / ${fmt(aggregateHigh)} (high). Source: Loop 7 frontier-LLM council priors aggregated across module classes.`
+    const targetVsLowRatio =
+        targetCeilingGbp != null && aggregateLow > 0
+            ? targetCeilingGbp / aggregateLow
+            : null
+    const targetVsHighRatio =
+        targetCeilingGbp != null && aggregateHigh > 0
+            ? targetCeilingGbp / aggregateHigh
+            : null
+    return {
+        productClass: cls,
+        aggregateLowGbp: aggregateLow,
+        aggregateMedianGbp: aggregateMedian,
+        aggregateHighGbp: aggregateHigh,
+        caption,
+        targetBelowLow:
+            targetCeilingGbp != null && targetCeilingGbp < aggregateLow,
+        targetAboveHigh:
+            targetCeilingGbp != null && targetCeilingGbp > aggregateHigh,
+        targetVsLowRatio,
+        targetVsHighRatio,
+    }
+}
+
 /** Render an Oracle reference block for injection into a BOM expansion
  *  prompt. Returns "" if no benchmarks exist for the product class. */
 export function renderOracleHint(briefSubject: string): string {

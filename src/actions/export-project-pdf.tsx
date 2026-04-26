@@ -652,6 +652,12 @@ interface PdfInput {
      *  2 parallel mass views surface on the cover instead of shipping
      *  silent. Null when reconciliation hasn't run (back-compat). */
     reconciliation: import("@/lib/cad-lab-numerical-reconciliation").ReconciliationResult | null
+    /** Loop 8 P3 cost-realism reframe — Oracle band for the project
+     *  class (BESS / vert farm / consumer-IoT / desal / mobility-aid).
+     *  When set + brief target falls outside band, the brief page
+     *  shows a yellow callout reframing the cost overrun as "your
+     *  target is below industry-low" instead of "engine over-estimated". */
+    oracleProjectBand: import("@/lib/cost/oracle-benchmarks").OracleProjectBand | null
     /** Sizing optimisation + dimension sheet from Fang. When present, renders
      *  a new section 3 ("Sizing optimisation") showing the trial sweep,
      *  winner rationale, top alternatives, and levers. Nullable — projects
@@ -1249,6 +1255,38 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
                 <View style={styles.row}>
                     <Text style={styles.rowLabel}>Unit cost ceiling</Text>
                     <Text style={styles.rowValue}>{fmtGbp(b.unitCostCeilingGbp)}</Text>
+                </View>
+            )}
+            {/* Loop 8 P3 (Tristan-flagged Loop 7) — when the brief target is
+             *  wildly outside the council-priors industry band for this
+             *  product class, surface that fact RIGHT HERE. The rest of
+             *  the report shows "£501,505 over" and the founder reads
+             *  the engine as wrong; the actual problem is the brief
+             *  target is below the industry floor. */}
+            {data.oracleProjectBand && (data.oracleProjectBand.targetBelowLow || data.oracleProjectBand.targetAboveHigh) && (
+                <View
+                    style={{
+                        marginTop: 8,
+                        padding: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#fef3c7",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#a16207",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#92400e", marginBottom: 2 }}>
+                        {data.oracleProjectBand.targetBelowLow
+                            ? `Brief target is ${data.oracleProjectBand.targetVsLowRatio != null ? `${(data.oracleProjectBand.targetVsLowRatio * 100).toFixed(0)}% of` : "below"} the industry-low benchmark for this product class`
+                            : `Brief target is ${data.oracleProjectBand.targetVsHighRatio != null ? `${(data.oracleProjectBand.targetVsHighRatio).toFixed(1)}× ` : ""}above the industry-high benchmark for this product class`}
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#78350f" }}>
+                        {data.oracleProjectBand.caption}
+                    </Text>
+                    {data.oracleProjectBand.targetBelowLow && (
+                        <Text style={{ fontSize: 9, color: "#78350f", marginTop: 2, fontStyle: "italic" }}>
+                            The cost overrun shown later in this report is the gap between the engine&apos;s estimate and the brief&apos;s target — not an engine error. Either the brief target needs revising upward or the scope needs cutting before this design is feasible at the stated unit cost.
+                        </Text>
+                    )}
                 </View>
             )}
             {b.maxMassKg != null && (
@@ -3944,6 +3982,27 @@ async function exportProjectPdfInternal(
                         ? designBrief!.constraints!.unitCostCeilingGbp
                         : null,
             },
+            // Loop 8 P3 — cost-realism reframe via Oracle benchmark band.
+            oracleProjectBand: await (async () => {
+                try {
+                    const { getOracleProjectBand } = await import(
+                        "@/lib/cost/oracle-benchmarks"
+                    )
+                    const subjectStr =
+                        typeof project.subject === "string" ? project.subject : ""
+                    const ceiling =
+                        typeof designBrief?.constraints?.unitCostCeilingGbp === "number"
+                            ? designBrief!.constraints!.unitCostCeilingGbp
+                            : null
+                    return getOracleProjectBand(subjectStr, ceiling)
+                } catch (err) {
+                    console.warn(
+                        "[export-pdf] oracle band lookup failed (non-fatal):",
+                        err instanceof Error ? err.message : err,
+                    )
+                    return null
+                }
+            })(),
             // Loop 8 G1 — numerical reconciliation across module-page,
             // BOM master, and cost-waterfall views. Mass + cell-energy
             // checks too. Returns null when nothing diverges; otherwise
