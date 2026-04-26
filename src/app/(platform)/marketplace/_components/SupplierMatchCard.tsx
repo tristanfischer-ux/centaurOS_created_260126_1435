@@ -217,7 +217,6 @@ function SupplierTypeChip({ type }: { type: string }) {
         borderRadius: '4px',
         background: 'hsl(var(--muted))',
         color: 'hsl(var(--muted-foreground))',
-        border: '1px solid hsl(var(--border))',
         verticalAlign: 'middle',
         lineHeight: '1.5',
         textTransform: 'capitalize',
@@ -387,20 +386,18 @@ export function SupplierMatchCard({ listing, rank, searchQuery }: SupplierMatchC
       className="group block text-foreground no-underline"
       style={{
         background: 'hsl(var(--card))',
-        border: '1px solid hsl(var(--border))',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
         borderRadius: '12px',
         padding: '14px 16px',
-        transition: 'box-shadow 0.15s ease, border-color 0.15s ease',
+        transition: 'box-shadow 0.15s ease',
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLAnchorElement
-        el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'
-        el.style.borderColor = 'hsl(var(--border-strong, var(--border)))'
+        el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLAnchorElement
-        el.style.boxShadow = 'none'
-        el.style.borderColor = 'hsl(var(--border))'
+        el.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'
       }}
     >
       {/* ── Header row ── */}
