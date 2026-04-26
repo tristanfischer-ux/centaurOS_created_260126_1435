@@ -248,6 +248,11 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                     {category === 'Products' && <ProductsSection attrs={attrs} />}
                     {category === 'Services' && <ServicesSection attrs={attrs} />}
 
+                    {/* Top-level supplier data — surfaces ~20 columns the prior page ignored.
+                        Tristan's call 2026-04-26: "the database on suppliers and investors is enormous,
+                        no point having lots of fields if they're not actually being revealed". */}
+                    {category !== 'People' && <SupplierDataPanorama listing={listing} />}
+
                     {/* Companies House info (directors, PSC, SIC codes) — only for non-People listings */}
                     {category !== 'People' && <CompanyInfoSection attrs={attrs} />}
 
@@ -534,6 +539,216 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                 </section>
             )}
         </div>
+    )
+}
+
+// SupplierDataPanorama — surfaces every populated top-level column on
+// marketplace_listings that the prior page wasn't rendering. Council
+// 2026-04-26 + Tristan's direct ask:
+// "the database on suppliers and investors is enormous, no point having lots
+//  of fields in those databases if all of those fields are not actually being
+//  revealed to the user."
+//
+// Strategy: enumerate every meaningful column, pull it off `listing`,
+// auto-skip when empty, render in a categorised grid (Capability /
+// Compliance & sustainability / Company snapshot / Trust signals).
+function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
+    type Item = { label: string; value: React.ReactNode }
+
+    const arrChips = (arr: unknown): React.ReactNode | null => {
+        if (!Array.isArray(arr) || arr.length === 0) return null
+        return (
+            <div className="flex flex-wrap gap-1.5">
+                {(arr as unknown[]).map((v, i) => {
+                    const text = typeof v === 'string' ? v : (v as { name?: string })?.name ?? JSON.stringify(v)
+                    if (!text) return null
+                    return (
+                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground border border-border">
+                            {text}
+                        </span>
+                    )
+                })}
+            </div>
+        )
+    }
+    const text = (v: unknown): React.ReactNode | null => {
+        if (v == null || v === '' || v === false) return null
+        return <span className="text-sm text-foreground">{String(v)}</span>
+    }
+    const bool = (v: unknown, label: string): React.ReactNode | null => {
+        if (v == null) return null
+        return v ? <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">✓ {label}</span> : null
+    }
+
+    // ── Capability profile ───────────────────────────────────────────────
+    const capability: Item[] = []
+    const industries = arrChips(listing.industries)
+    if (industries) capability.push({ label: 'Industries served', value: industries })
+    const materials = arrChips(listing.materials)
+    if (materials) capability.push({ label: 'Materials handled', value: materials })
+    const specialties = arrChips((listing as unknown as { specialties?: unknown }).specialties)
+    if (specialties) capability.push({ label: 'Specialties', value: specialties })
+    const processCaps = listing.process_capabilities
+    if (Array.isArray(processCaps) && processCaps.length > 0) {
+        capability.push({
+            label: 'Process capabilities',
+            value: (
+                <div className="flex flex-wrap gap-1.5">
+                    {processCaps.map((c, i) => {
+                        const name = typeof c === 'string' ? c : (c as { process_name?: string })?.process_name
+                        return name ? (
+                            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground border border-border">{name}</span>
+                        ) : null
+                    })}
+                </div>
+            ),
+        })
+    }
+    const equipment = arrChips(listing.key_equipment)
+    if (equipment) capability.push({ label: 'Key equipment', value: equipment })
+    const products = arrChips((listing as unknown as { products?: unknown }).products)
+    if (products) capability.push({ label: 'Products', value: products })
+    const leadTime = text((listing as unknown as { lead_time?: string }).lead_time)
+    if (leadTime) capability.push({ label: 'Lead time', value: leadTime })
+    const capacity = text((listing as unknown as { production_capacity?: string }).production_capacity)
+    if (capacity) capability.push({ label: 'Production capacity', value: capacity })
+    const moq = text((listing as unknown as { minimum_order?: string }).minimum_order)
+    if (moq) capability.push({ label: 'Minimum order', value: moq })
+
+    // ── Compliance & sustainability ──────────────────────────────────────
+    const compliance: Item[] = []
+    const certs = arrChips(listing.certifications)
+    if (certs) compliance.push({ label: 'Certifications', value: certs })
+    const isoBadge = bool((listing as unknown as { iso_14001?: boolean }).iso_14001, 'ISO 14001')
+    const carbonBadge = bool((listing as unknown as { carbon_disclosed?: boolean }).carbon_disclosed, 'Carbon disclosed')
+    if (isoBadge || carbonBadge) {
+        compliance.push({ label: 'Sustainability badges', value: <div className="flex gap-2 flex-wrap">{isoBadge}{carbonBadge}</div> })
+    }
+    const ecoVadis = (listing as unknown as { ecovadis_score?: number }).ecovadis_score
+    if (typeof ecoVadis === 'number') compliance.push({ label: 'EcoVadis score', value: <span className="text-sm font-semibold text-foreground">{ecoVadis} / 100</span> })
+    const recycled = (listing as unknown as { recycled_content_percent?: number }).recycled_content_percent
+    if (typeof recycled === 'number') compliance.push({ label: 'Recycled content', value: <span className="text-sm">{recycled}%</span> })
+    const sustainNotes = text((listing as unknown as { sustainability_notes?: string }).sustainability_notes)
+    if (sustainNotes) compliance.push({ label: 'Sustainability notes', value: sustainNotes })
+    const qualitySys = text((listing as unknown as { quality_systems?: string }).quality_systems)
+    if (qualitySys) compliance.push({ label: 'Quality systems', value: qualitySys })
+    const exportCtl = text((listing as unknown as { export_controls?: string }).export_controls)
+    if (exportCtl) compliance.push({ label: 'Export controls', value: exportCtl })
+    const securityClr = arrChips((listing as unknown as { security_clearances?: unknown }).security_clearances)
+    if (securityClr) compliance.push({ label: 'Security clearances', value: securityClr })
+
+    // ── Company snapshot ──────────────────────────────────────────────────
+    const company: Item[] = []
+    const founded = (listing as unknown as { founded_year?: number }).founded_year
+    if (typeof founded === 'number') company.push({ label: 'Founded', value: <span className="text-sm font-semibold">{founded} <span className="text-xs text-muted-foreground font-normal">({new Date().getFullYear() - founded} years)</span></span> })
+    const employees = (listing as unknown as { employee_count_exact?: number }).employee_count_exact
+    if (typeof employees === 'number') company.push({ label: 'Employees', value: <span className="text-sm">{employees.toLocaleString()}</span> })
+    const size = text((listing as unknown as { company_size?: string }).company_size)
+    if (size && employees == null) company.push({ label: 'Company size', value: size })
+    const finHealth = text((listing as unknown as { financial_health?: string }).financial_health)
+    if (finHealth) company.push({ label: 'Financial health', value: finHealth })
+    const country = text((listing as unknown as { country?: string }).country)
+    if (country) company.push({ label: 'Country', value: country })
+    const address = text((listing as unknown as { address?: string }).address)
+    if (address) company.push({ label: 'Address', value: address })
+    const website = (listing as unknown as { website_url?: string }).website_url
+    if (website) company.push({
+        label: 'Website',
+        value: <a href={website} target="_blank" rel="noopener noreferrer" className="text-international-orange hover:underline text-sm inline-flex items-center gap-1">{website.replace(/^https?:\/\//, '')} <ExternalLink className="h-3 w-3" /></a>,
+    })
+    const phone = text((listing as unknown as { contact_phone?: string }).contact_phone)
+    if (phone) company.push({ label: 'Phone', value: phone })
+    const linkedin = (listing as unknown as { contact_linkedin?: string }).contact_linkedin
+    if (linkedin) company.push({
+        label: 'LinkedIn',
+        value: <a href={linkedin} target="_blank" rel="noopener noreferrer" className="text-international-orange hover:underline text-sm inline-flex items-center gap-1">View profile <ExternalLink className="h-3 w-3" /></a>,
+    })
+    const keyPeople = (listing as unknown as { key_people?: unknown[] }).key_people
+    if (Array.isArray(keyPeople) && keyPeople.length > 0) {
+        company.push({
+            label: 'Key people',
+            value: (
+                <div className="space-y-1">
+                    {keyPeople.map((p, i) => {
+                        const person = p as { name?: string; role?: string; title?: string; nationality?: string }
+                        const name = person?.name
+                        const role = person?.role || person?.title
+                        if (!name) return null
+                        return (
+                            <div key={i} className="text-sm">
+                                <strong className="text-foreground">{name}</strong>
+                                {role && <span className="text-muted-foreground"> — {role}</span>}
+                                {person.nationality && <span className="text-xs text-muted-foreground ml-2">{person.nationality}</span>}
+                            </div>
+                        )
+                    })}
+                </div>
+            ),
+        })
+    }
+
+    // ── Trust & data quality ──────────────────────────────────────────────
+    const trust: Item[] = []
+    const dqs = (listing as unknown as { data_quality_score?: number }).data_quality_score
+    if (typeof dqs === 'number') {
+        const colour = dqs >= 80 ? 'text-success' : dqs >= 50 ? 'text-warning' : 'text-destructive'
+        trust.push({ label: 'Data quality score', value: <span className={cn('text-sm font-semibold tabular-nums', colour)}>{dqs} / 100</span> })
+    }
+    const lastEnriched = (listing as unknown as { last_enriched_at?: string }).last_enriched_at
+    if (lastEnriched) {
+        const d = new Date(lastEnriched)
+        if (!isNaN(d.getTime())) {
+            trust.push({ label: 'Last enriched', value: <span className="text-sm text-muted-foreground">{d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span> })
+        }
+    }
+    const enrichSrc = (listing as unknown as { enrichment_sources?: unknown[] }).enrichment_sources
+    if (Array.isArray(enrichSrc) && enrichSrc.length > 0) {
+        const sources = enrichSrc.map((s) => (s as { source?: string })?.source).filter(Boolean)
+        if (sources.length > 0) {
+            trust.push({
+                label: 'Enrichment sources',
+                value: (
+                    <div className="flex flex-wrap gap-1.5">
+                        {sources.map((s, i) => (
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">{s}</span>
+                        ))}
+                    </div>
+                ),
+            })
+        }
+    }
+
+    const sections: Array<{ title: string; items: Item[] }> = [
+        { title: 'Capability profile', items: capability },
+        { title: 'Compliance & sustainability', items: compliance },
+        { title: 'Company snapshot', items: company },
+        { title: 'Trust & data quality', items: trust },
+    ].filter((s) => s.items.length > 0)
+
+    if (sections.length === 0) return null
+
+    return (
+        <Card>
+            <CardHeader>
+                <h3 className="text-base font-semibold">Everything we know about this supplier</h3>
+                <p className="text-xs text-muted-foreground mt-1">All fields populated for this record. Empty fields hidden automatically.</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {sections.map((s) => (
+                    <div key={s.title}>
+                        <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{s.title}</h4>
+                        <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                            {s.items.map((item, i) => (
+                                <div key={i} className="border-l-2 border-border pl-3">
+                                    <dt className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</dt>
+                                    <dd>{item.value}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
     )
 }
 
