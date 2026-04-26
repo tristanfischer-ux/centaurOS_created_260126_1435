@@ -296,7 +296,7 @@ export function AnonymousAgentsClient() {
                     ))}
                 </div>
                 {/* Active tier description */}
-                <p className="text-xs text-muted-foreground leading-relaxed rounded-lg bg-muted/40 border border-border px-3 py-2.5">
+                <p className="text-xs text-muted-foreground leading-relaxed rounded-lg bg-muted/40 px-3 py-2.5">
                     {activeTier.description}
                 </p>
             </section>

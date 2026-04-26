@@ -566,7 +566,7 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
                     const text = typeof v === 'string' ? v : (v as { name?: string })?.name ?? JSON.stringify(v)
                     if (!text) return null
                     return (
-                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground border border-border">
+                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground">
                             {text}
                         </span>
                     )
@@ -604,7 +604,7 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
                     {processCaps.map((c, i) => {
                         const name = typeof c === 'string' ? c : (c as { process_name?: string })?.process_name
                         return name ? (
-                            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground border border-border">{name}</span>
+                            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground">{name}</span>
                         ) : null
                     })}
                 </div>
@@ -1192,7 +1192,7 @@ function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
                 {executives.map((exec) => (
                     <div
                         key={exec.id}
-                        className="rounded-lg border border-border p-4"
+                        className="rounded-lg bg-muted/40 p-4"
                     >
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-foreground">

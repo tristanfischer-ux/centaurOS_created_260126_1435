@@ -50,7 +50,7 @@ class MapErrorBoundary extends Component<{ children: ReactNode }, MapErrorBounda
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-[500px] w-full rounded-xl border border-border flex items-center justify-center">
+        <div className="h-[500px] w-full rounded-xl shadow-sm flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Map failed to load. Try refreshing the page.</p>
         </div>
       )
@@ -180,7 +180,7 @@ export function InvestorMapView({ firms }: InvestorMapViewProps) {
 
   return (
     <MapErrorBoundary>
-      <div className="rounded-xl border border-border overflow-hidden h-[500px]">
+      <div className="rounded-xl shadow-sm overflow-hidden h-[500px]">
         <MapContainer
           center={[54.0, -2.0]}
           zoom={6}

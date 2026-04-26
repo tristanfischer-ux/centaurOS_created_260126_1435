@@ -95,7 +95,7 @@ export function InvestorTableView({
   return (
     <div
       className={cn(
-        'w-full overflow-x-auto rounded-lg border border-border',
+        'w-full overflow-x-auto rounded-lg shadow-sm',
         isPending && 'opacity-60 pointer-events-none',
       )}
     >

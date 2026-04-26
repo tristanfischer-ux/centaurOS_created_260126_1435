@@ -635,7 +635,7 @@ function InvestorIntelSection({ firmId }: { firmId: string }) {
 
   if (!intel) {
     return (
-      <div className="bg-muted/50 rounded-lg p-4 border border-border">
+      <div className="bg-muted/50 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Newspaper className="h-4 w-4 text-muted-foreground" />
@@ -659,7 +659,7 @@ function InvestorIntelSection({ firmId }: { firmId: string }) {
   const daysAgo = Math.floor((Date.now() - new Date(intel.generated_at).getTime()) / (24 * 60 * 60 * 1000))
 
   return (
-    <div className="bg-muted/30 rounded-lg p-4 border border-border space-y-3">
+    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper className="h-4 w-4 text-international-orange" />

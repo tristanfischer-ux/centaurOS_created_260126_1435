@@ -80,7 +80,7 @@ function fmt(n: number): string {
 
 function StatTile({ label, value }: { label: string; value: string | number | null }) {
   return (
-    <div className="bg-card border border-border rounded-xl px-5 py-4 text-center">
+    <div className="bg-card shadow-sm rounded-xl px-5 py-4 text-center">
       <div className="text-2xl font-black text-foreground leading-none mb-1">
         {value == null ? '—' : typeof value === 'number' ? fmt(value) : value}
       </div>
@@ -130,7 +130,7 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Suppliers by Category — donut, 55% cutout, legend right */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Suppliers by Category</h4>
           {stats.categoryBreakdown.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
@@ -174,7 +174,7 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
         </div>
 
         {/* Suppliers by Country — donut, COLORS palette, legend right */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Suppliers by Country</h4>
           {stats.suppliersByCountry.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
@@ -218,7 +218,7 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
         </div>
 
         {/* Top Capabilities — horizontal bar, #4f46e5, borderRadius 4, no legend */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Top Capabilities</h4>
           {stats.topCapabilities.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
@@ -258,7 +258,7 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
         </div>
 
         {/* Top Materials — vertical bar, #0891b2, borderRadius 4, no legend */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Top Materials</h4>
           {stats.topMaterials.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
@@ -562,7 +562,7 @@ export function SupplierSearchPanel({
 
       {/* ── Results list ── */}
       {results.length === 0 && !isPending ? (
-        <div className="rounded-xl border border-border bg-muted/30 py-12 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl bg-muted/30 py-12 text-center text-sm text-muted-foreground">
           <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground/40" />
           <p className="font-medium text-foreground mb-1">No suppliers matched your search</p>
           <p>Try different keywords, or{' '}

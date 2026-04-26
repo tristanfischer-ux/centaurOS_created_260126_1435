@@ -112,17 +112,17 @@ export default async function MarketplacePage() {
 
       {/* ── Context chips ── */}
       <div className="flex flex-wrap gap-2 -mt-2">
-        <span className="inline-flex items-center text-xs text-muted-foreground px-3 py-1.5 rounded-md border border-border bg-card">
+        <span className="inline-flex items-center text-xs text-muted-foreground px-3 py-1.5 rounded-md bg-muted/50">
           {totalCount.toLocaleString()} suppliers in directory
         </span>
         {verifiedCount > 0 && (
-          <span className="inline-flex items-center text-xs text-muted-foreground px-3 py-1.5 rounded-md border border-border bg-card">
+          <span className="inline-flex items-center text-xs text-muted-foreground px-3 py-1.5 rounded-md bg-muted/50">
             {verifiedCount.toLocaleString()} verified
           </span>
         )}
         <Link
           href="/marketplace/quotes"
-          className="inline-flex items-center text-xs font-semibold text-international-orange px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted transition-colors no-underline"
+          className="inline-flex items-center text-xs font-semibold text-international-orange px-3 py-1.5 rounded-md bg-muted/50 hover:bg-muted transition-colors no-underline"
         >
           + Send request for quotation
         </Link>

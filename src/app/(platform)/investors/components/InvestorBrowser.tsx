@@ -554,7 +554,7 @@ export function InvestorBrowser({
         <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto sm:ml-auto">
           {access && <InvestorExportMenu firms={displayFirms} matchScores={matchScores} access={access} />}
           <InvestorSortSelect value={sortBy} onChange={setSortBy} />
-          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+          <div className="flex items-center bg-muted/50 rounded-lg overflow-hidden">
             {([
               { mode: 'grid' as const, icon: LayoutGrid, label: 'Grid view' },
               { mode: 'table' as const, icon: List, label: 'Table view' },

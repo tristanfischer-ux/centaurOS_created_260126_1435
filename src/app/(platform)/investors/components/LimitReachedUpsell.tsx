@@ -201,7 +201,7 @@ export function LimitReachedUpsell({
             </div>
 
             {/* Secondary CTA: Starter after your free month */}
-            <div className="rounded-lg border border-border bg-card p-5 space-y-3 flex flex-col">
+            <div className="rounded-lg shadow-sm bg-card p-5 space-y-3 flex flex-col">
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-foreground">
                   After your free month
@@ -252,7 +252,7 @@ export function LimitReachedUpsell({
 
         <div className="grid gap-4 md:grid-cols-2">
           {/* Option 1: Upgrade to Starter */}
-          <div className="rounded-lg border border-border bg-card p-5 space-y-3 flex flex-col">
+          <div className="rounded-lg shadow-sm bg-card p-5 space-y-3 flex flex-col">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
                 Upgrade to Starter
@@ -276,7 +276,7 @@ export function LimitReachedUpsell({
           </div>
 
           {/* Option 2: Invite a friend */}
-          <div className="rounded-lg border border-border bg-card p-5 space-y-3 flex flex-col">
+          <div className="rounded-lg shadow-sm bg-card p-5 space-y-3 flex flex-col">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
                 Invite a friend who pays for Starter

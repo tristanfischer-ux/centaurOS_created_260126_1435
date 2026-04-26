@@ -316,7 +316,7 @@ function TwoRouteWallCards({ signupHref, onReferClick }: TwoRouteWallCardsProps)
             </div>
 
             {/* Card B: Refer a friend */}
-            <div className="rounded-lg border border-border bg-card p-5 space-y-3 flex flex-col">
+            <div className="rounded-lg shadow-sm bg-card p-5 space-y-3 flex flex-col">
                 <div className="space-y-1.5">
                     <p className="text-sm font-semibold text-foreground">Refer a friend to keep going</p>
                     <p className="text-sm text-muted-foreground leading-relaxed">

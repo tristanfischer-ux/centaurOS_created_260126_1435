@@ -148,7 +148,7 @@ export function InvestorSearchHero({ onSearch, onCancel, isSearching = false }: 
             // as editable chips (ported from Forge-Capital-Dashboard.html:2054-2069),
             // instead of a wall of concatenated raw text which is unreadable.
             <div className="space-y-3">
-              <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+              <div className="rounded-lg bg-muted/40 p-4 space-y-3">
                 {uploadedProfile.description && (
                   <div>
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</p>

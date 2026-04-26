@@ -79,7 +79,7 @@ export function AnonymousInvestorsView({ teaser }: AnonymousInvestorsViewProps) 
 
             {/* Sentinel context banner — makes clear these are illustrative matches
               * drafted against a sample profile, not a real one. */}
-            <section className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-xs sm:text-sm">
+            <section className="rounded-lg bg-muted/40 px-4 py-3 text-xs sm:text-sm">
                 <p className="text-muted-foreground">
                     <span className="font-medium text-foreground">Example profile.</span>{" "}
                     The matches below were drafted for a sample{" "}

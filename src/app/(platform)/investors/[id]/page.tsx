@@ -296,7 +296,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
           </div>
         )}
         {viewCap && !viewCap.isRevisit && viewCap.cap !== null && (
-          <div className="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
             <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-muted-foreground">
               <span className="font-medium text-foreground">

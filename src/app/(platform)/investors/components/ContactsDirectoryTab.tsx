@@ -223,7 +223,7 @@ export function ContactsDirectoryTab(): React.ReactElement {
         </div>
       ) : (
         <>
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-lg shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -447,7 +447,7 @@ function EmailCell({
 
 function ContactsTableSkeleton(): React.ReactElement {
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="rounded-lg shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

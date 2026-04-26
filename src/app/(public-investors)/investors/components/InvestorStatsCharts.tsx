@@ -73,7 +73,7 @@ function fmt(n: number): string {
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-card border border-border rounded-xl px-5 py-4 text-center">
+    <div className="bg-card shadow-sm rounded-xl px-5 py-4 text-center">
       <div className="text-2xl font-black text-foreground leading-none mb-1">
         {typeof value === 'number' ? fmt(value) : value}
       </div>
@@ -107,7 +107,7 @@ export function InvestorStatsCharts({ stats }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Investors by Type — donut, 55% cutout, legend right */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Investors by Type</h4>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
@@ -152,7 +152,7 @@ export function InvestorStatsCharts({ stats }: Props) {
         </div>
 
         {/* Top Sectors — horizontal bar, single colour, borderRadius 4, no legend */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Top Sectors</h4>
           {/* Height grows with item count so all 10 y-axis labels render. */}
           <ResponsiveContainer width="100%" height={Math.max(260, stats.topSectors.length * 26)}>
@@ -192,7 +192,7 @@ export function InvestorStatsCharts({ stats }: Props) {
         </div>
 
         {/* Stage Focus — vertical bar, single colour #0891b2cc, borderRadius 4, no legend */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Stage Focus</h4>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
@@ -230,7 +230,7 @@ export function InvestorStatsCharts({ stats }: Props) {
         {/* Grants by Country — donut, COLORS palette, 55% cutout, legend right */}
         {/* INTENT: Only rendered when grant_country_count > 0 (Forge Capital conditional) */}
         {stats.grantsByCountry.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-5">
+          <div className="bg-card shadow-sm rounded-xl p-5">
             <h4 className="text-sm font-bold text-foreground mb-4">Grants by Country</h4>
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>

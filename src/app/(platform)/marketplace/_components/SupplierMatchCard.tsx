@@ -294,7 +294,7 @@ function WhyFitExpander({
       </button>
 
       {expanded && (
-        <div className="mt-2 rounded-md bg-muted/40 border border-border/60 px-3 py-2 text-xs text-foreground leading-relaxed">
+        <div className="mt-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground leading-relaxed">
           {isPending ? (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />

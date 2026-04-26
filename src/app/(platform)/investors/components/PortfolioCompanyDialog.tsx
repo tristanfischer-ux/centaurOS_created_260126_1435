@@ -94,7 +94,7 @@ export function PortfolioCompanyDialog({ companyName, open, onOpenChange }: Port
             {investors.map((inv, idx) => (
               <div
                 key={`${inv.listing_id}-${idx}`}
-                className="group p-3 rounded-lg border border-border bg-card hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 hover:shadow-md"
+                className="group p-3 rounded-lg shadow-sm bg-card hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0 flex-1">

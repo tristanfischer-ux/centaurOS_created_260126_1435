@@ -80,8 +80,8 @@ function BoardColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          'flex-1 rounded-b-lg border border-border p-2 space-y-2 min-h-[200px] transition-colors',
-          isOver && 'bg-international-orange/5 border-international-orange/30'
+          'flex-1 rounded-b-lg shadow-sm p-2 space-y-2 min-h-[200px] transition-colors',
+          isOver && 'bg-international-orange/5 ring-1 ring-international-orange/30'
         )}
       >
         {children}

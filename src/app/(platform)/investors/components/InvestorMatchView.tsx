@@ -249,7 +249,7 @@ function MatchRow({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="border border-border rounded-lg bg-card p-4 space-y-3"
+      className="shadow-sm rounded-lg bg-card p-4 space-y-3"
     >
       {/* Row header: score + investor name + shortlist */}
       <div className="flex items-start gap-3">
@@ -398,7 +398,7 @@ function MatchRow({
 
           {/* Pro: show email inline; Free/Starter: expand/collapse */}
           {showEmailInline && match.draftEmail && (
-            <div className="border border-border rounded-md bg-muted/50 p-3 space-y-2">
+            <div className="rounded-md bg-muted/50 p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
@@ -852,7 +852,7 @@ export function InvestorMatchView() {
           {/* Placeholder rows rendered blurred behind the overlay */}
           <div className="space-y-3">
             {hiddenMatches.slice(0, 3).map((match) => (
-              <div key={match.investor.id} className="border border-border rounded-lg p-4">
+              <div key={match.investor.id} className="shadow-sm rounded-lg p-4 bg-card">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-muted" />
                   <div className="space-y-1">

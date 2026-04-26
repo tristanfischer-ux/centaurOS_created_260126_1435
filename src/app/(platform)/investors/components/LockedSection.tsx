@@ -85,7 +85,7 @@ export function LockedSection({
 
           {/* Upgrade overlay */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-card border border-border rounded-lg px-6 py-5 text-center shadow-sm max-w-xs">
+            <div className="bg-card rounded-lg px-6 py-5 text-center shadow-sm max-w-xs">
               <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground mb-1">
                 Upgrade to {tierName}

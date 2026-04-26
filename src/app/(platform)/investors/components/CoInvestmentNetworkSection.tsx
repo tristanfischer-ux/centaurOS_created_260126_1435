@@ -71,7 +71,7 @@ export function CoInvestmentNetworkSection({
               <Link
                 key={ci.listingId}
                 href={`/investors/${ci.listingId}`}
-                className="group p-3 rounded-lg border border-border bg-card hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 hover:shadow-md"
+                className="group p-3 rounded-lg shadow-sm bg-card hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 hover:shadow-md"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-9 h-9 rounded-full bg-international-orange/10 flex items-center justify-center mt-0.5">

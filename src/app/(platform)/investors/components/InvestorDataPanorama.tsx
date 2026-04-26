@@ -48,14 +48,14 @@ export function InvestorDataPanorama({ firm }: Props) {
           return (
             <span
               key={i}
-              className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground border border-border"
+              className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground"
             >
               {text}
             </span>
           )
         })}
         {overflow > 0 && (
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
             +{overflow} more
           </span>
         )}
@@ -181,7 +181,7 @@ export function InvestorDataPanorama({ firm }: Props) {
     fund.push({
       label: 'Fund tier',
       value: (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-foreground border border-border font-medium">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-foreground font-medium">
           {String(fundTier)}
         </span>
       ),

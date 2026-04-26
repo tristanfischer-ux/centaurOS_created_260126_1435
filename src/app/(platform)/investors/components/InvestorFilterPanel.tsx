@@ -92,7 +92,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
       </button>
 
       {isOpen && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+        <div className="rounded-xl shadow-sm bg-card p-5 space-y-5">
           {/* Stage multi-select */}
           <div className="space-y-2">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Stage Focus</Label>

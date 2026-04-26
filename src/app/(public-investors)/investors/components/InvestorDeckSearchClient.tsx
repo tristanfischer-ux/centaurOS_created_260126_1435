@@ -390,7 +390,7 @@ function UsageMeter({ used, cap, remaining }: { used: number; cap: number; remai
   const resetLabel = resetDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-5 py-3.5 mb-6">
+    <div className="flex items-center justify-between gap-4 rounded-lg shadow-sm bg-card px-5 py-3.5 mb-6">
       <span className="text-sm text-foreground">
         Usage this month:{' '}
         <strong className="text-international-orange">{used} of {cap} investor views</strong>
@@ -438,7 +438,7 @@ function PastePanel({
   isPaid,
 }: PastePanelProps) {
   return (
-    <div className="bg-card border border-border rounded-xl p-7 mb-7 shadow-sm">
+    <div className="bg-card rounded-xl p-7 mb-7 shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between gap-5 mb-4">
         <div>
@@ -712,7 +712,7 @@ function MatchCard({
       // STRUCTURE: Forge Capital search-result-card (locked variant)
       // 1px border · white bg · 12px radius · 14px padding (p-3.5)
       <div
-        className={`bg-card border border-border rounded-xl p-3.5 mb-2.5 transition-all opacity-80`}
+        className={`bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all opacity-80`}
       >
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -780,7 +780,7 @@ function MatchCard({
   return (
     <Link
       href={`/investors/${firm.id}`}
-      className={`block bg-card border border-border rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:border-border hover:shadow-sm hover:-translate-y-px`}
+      className={`block bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
     >
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -1012,7 +1012,7 @@ function MatchCard({
           {sectors.slice(0, 4).map(s => (
             <span
               key={s}
-              className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground truncate max-w-[120px]"
+              className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground truncate max-w-[120px]"
             >
               {s.length > 16 ? s.slice(0, 15) + '…' : s}
             </span>
@@ -1030,7 +1030,7 @@ function MatchCard({
             {expanded ? '▲ Hide insight' : '▼ Why this investor · How to pitch'}
           </button>
           {expanded && (
-            <div className="mt-3 space-y-3 rounded-lg bg-muted/40 border border-border p-4">
+            <div className="mt-3 space-y-3 rounded-lg bg-muted/40 p-4">
               {isEnriching && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
