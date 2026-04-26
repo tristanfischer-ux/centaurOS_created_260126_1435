@@ -426,6 +426,15 @@ Your task (SKELETON ONLY — no detailed specs):
 4. Mark purchased/COTS parts
 5. Assign part numbers: {MODULE_PREFIX}-{SEQ}, assemblies use -ASY, purchased use -PUR
 
+CRITICAL — MUTUALLY EXCLUSIVE OPTIONS (Loop 5 P2, council-unanimous):
+When the brief or module description gives architectural alternatives ("ceramic OR powder-coated steel body", "single 1500 kW unit OR two 750 kW units in parallel", "NFT OR DWC OR ebb-and-flow"), DO NOT enumerate every alternative as a separate BOM row. The BOM represents ONE buildable configuration, not a catalogue. Pick the lower-risk / lower-cost / more-likely option as the BASELINE and emit it as a single row. List the rejected alternatives in "alternatives" (see schema below) — they are decisions to revisit, not parts to procure. Emitting BS-001 (composite) AND BS-002 (ceramic) AND BS-003 (steel) all as parts on the same BOM is a fundamental accounting error.
+
+CRITICAL — MIRROR / DUPLICATED PARTS:
+When the same physical part appears N times because of a port/starboard or left/right pairing (e.g. "port battery rack" + "starboard battery rack" identical), emit ONE row with quantity=N and a "handedness" note in the name. Do NOT clone the row and double-count its cost. Two identical-mirror-image rows (each at full unit cost) is a known-bad pattern — emit a single row with quantity=2 instead.
+
+CRITICAL — PURCHASED-PART MANUFACTURER PART NUMBERS (Loop 5 P2):
+Every row with isPurchased=true must carry either an MPN candidate ("Texas Instruments BQ40Z80RHBR") or an explicit "placeholder — RFQ pending" marker. Do NOT emit purchased rows with only generic descriptions ("Lithium Iron Phosphate Cell Pack 12.8V") because they look procurement-ready but aren't. If you don't have a credible MPN candidate for a purchased item, set mpn="placeholder — RFQ pending".
+
 Process types: cnc, injection_molding, sheet_metal, 3d_print_fdm, 3d_print_sla, 3d_print_sls, casting, forging, machining, purchased_cots, other
 
 Respond with ONLY valid JSON:
@@ -437,7 +446,10 @@ Respond with ONLY valid JSON:
       "sourceModuleId": "string (module id)",
       "process": "enum value",
       "isPurchased": boolean,
-      "parentPartNumber": "string | null (assembly this belongs to)"
+      "parentPartNumber": "string | null (assembly this belongs to)",
+      "quantity": "number (default 1; use >1 for mirror/handed pairs and N-up assemblies)",
+      "mpn": "string | null (manufacturer part number for purchased items; 'placeholder — RFQ pending' if not yet qualified; null for make parts)",
+      "alternatives": "string[] (rejected architectural alternatives from the brief — names only, not separate parts)"
     }
   ],
   "bomLines": [
@@ -669,6 +681,8 @@ For each part number in the skeleton, provide:
 - envelopeXMm, envelopeYMm, envelopeZMm: bounding envelope in mm (>= 0)
 - estimatedUnitCostGbp: unit cost in GBP (>= 0)
 - aiConfidence: 0-1 confidence in estimates
+- mpn (Loop 5 P2): for purchased/COTS parts, supply the Manufacturer Part Number from the catalogue ABOVE if one matches. If no catalogue match exists, set mpn to "placeholder — RFQ pending". Do NOT make up MPNs that look plausible. Set mpn=null for non-purchased (make) parts.
+- costJustification (Loop 5 P3): when estimatedUnitCostGbp deviates noticeably from typical UK market (e.g. £80 for a Wi-Fi/BLE module is wrong — typical ESP32/nRF52 is £1.50; £508k for a 1.5 MW grid-forming PCS is wrong — typical UK market £105-150k; £49k total for a 6,000-slot containerised vertical farm is too LOW — typical £100-200k), include a one-sentence justification explaining the premium or discount. If the cost is in line with market norms, set costJustification=null. The justification is a forcing function — if you cannot articulate why the number is what it is, the number is probably wrong.
 
 Respond with ONLY valid JSON:
 {
@@ -677,7 +691,8 @@ Respond with ONLY valid JSON:
       "description": "...", "material": "...", "materialSpec": "...",
       "finish": "...", "tolerance": "...", "massKg": 0.0,
       "envelopeXMm": 0, "envelopeYMm": 0, "envelopeZMm": 0,
-      "estimatedUnitCostGbp": 0.0, "aiConfidence": 0.0
+      "estimatedUnitCostGbp": 0.0, "aiConfidence": 0.0,
+      "mpn": "string | null", "costJustification": "string | null"
     }
   }
 }`
@@ -796,6 +811,8 @@ For each part number in the skeleton, provide:
 - envelopeXMm, envelopeYMm, envelopeZMm: bounding envelope in mm (>= 0)
 - estimatedUnitCostGbp: unit cost in GBP (>= 0)
 - aiConfidence: 0-1 confidence in estimates
+- mpn (Loop 5 P2): for purchased/COTS parts, supply the Manufacturer Part Number from the catalogue ABOVE if one matches. If no catalogue match exists, set mpn to "placeholder — RFQ pending". Do NOT make up MPNs that look plausible. Set mpn=null for non-purchased (make) parts.
+- costJustification (Loop 5 P3): when estimatedUnitCostGbp deviates noticeably from typical UK market (e.g. £80 for a Wi-Fi/BLE module is wrong — typical ESP32/nRF52 is £1.50; £508k for a 1.5 MW grid-forming PCS is wrong — typical UK market £105-150k; £49k total for a 6,000-slot containerised vertical farm is too LOW — typical £100-200k), include a one-sentence justification explaining the premium or discount. If the cost is in line with market norms, set costJustification=null. The justification is a forcing function — if you cannot articulate why the number is what it is, the number is probably wrong.
 
 Respond with ONLY valid JSON:
 {
@@ -804,7 +821,8 @@ Respond with ONLY valid JSON:
       "description": "...", "material": "...", "materialSpec": "...",
       "finish": "...", "tolerance": "...", "massKg": 0.0,
       "envelopeXMm": 0, "envelopeYMm": 0, "envelopeZMm": 0,
-      "estimatedUnitCostGbp": 0.0, "aiConfidence": 0.0
+      "estimatedUnitCostGbp": 0.0, "aiConfidence": 0.0,
+      "mpn": "string | null", "costJustification": "string | null"
     }
   }
 }`
