@@ -199,14 +199,39 @@ async function runFangReviewInternal(
             }
         }
 
-        // 2. Fang needs keyParts to DFM-check anything. If the module is still
+        // 2. Fang needs parts to DFM-check anything. If the module is still
         //    at skeleton-only (no BOM yet), route the founder to generate BOM
         //    first rather than silently generating a vacuous review.
+        //
+        // Loop 8 P5 (2026-04-26 NIGHT): same precondition bug as Finn — Max
+        // decomposes without always populating module.keyParts, but BOM is
+        // generated into the parts table. The parts table IS the canonical
+        // BOM data; module.keyParts is a separate per-module hint that's
+        // optional. Bug terminal-failed every Fang fanout for Desal +
+        // Sentinel for hours: each call returned MODULE_NO_PARTS in 0.5 s
+        // before any LLM. Fix: check parts table directly, scoped to the
+        // module if a module_id column exists, otherwise project-level.
         if (!targetModule.keyParts || targetModule.keyParts.length === 0) {
-            return {
-                ok: false,
-                error: "This module has no parts yet — generate BOM first so Fang has something to review.",
-                errorCode: "MODULE_NO_PARTS",
+            const { count: partsCount } = await admin
+                .from("parts")
+                .select("id", { count: "exact", head: true })
+                .eq("cad_lab_project_id", projectId)
+                .eq("module_id", moduleId)
+            if (!partsCount || partsCount === 0) {
+                // Fall back to project-level count — older parts rows may
+                // not carry module_id, but the project should still have
+                // SOME parts before Fang fans out per-module.
+                const { count: projectParts } = await admin
+                    .from("parts")
+                    .select("id", { count: "exact", head: true })
+                    .eq("cad_lab_project_id", projectId)
+                if (!projectParts || projectParts === 0) {
+                    return {
+                        ok: false,
+                        error: "This module has no parts yet — generate BOM first so Fang has something to review.",
+                        errorCode: "MODULE_NO_PARTS",
+                    }
+                }
             }
         }
 
