@@ -2269,7 +2269,16 @@ function SuppliersPage({
                                 {typeof s.matchScore === "number"
                                     ? ` · match score ${s.matchScore.toFixed(1)}/100`
                                     : ""}
-                                {s.rampRole ? ` · ramp role ${s.rampRole}` : ""}
+                                {/* Loop 7 critique A13 honesty pass: when match
+                                 * score is below 60 the supplier is a
+                                 * directory-gap candidate, not a qualified
+                                 * shortlist row. Flag visibly so founder
+                                 * doesn't treat it as a procurement
+                                 * recommendation. (ramp_role suppressed —
+                                 * Loop 7 critique called it a 'dead column'.) */}
+                                {typeof s.matchScore === "number" && s.matchScore < 60
+                                    ? ` · LOW CONFIDENCE — directory gap, manual scout recommended`
+                                    : ""}
                             </Text>
                         )}
                         {s.matchReasons.length > 0 && (
