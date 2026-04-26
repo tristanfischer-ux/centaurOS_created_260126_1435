@@ -80,7 +80,7 @@ export function CookieConsent() {
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
             role="region"
             aria-label="Cookie preferences"
-            className="pointer-events-auto w-full max-w-[360px] rounded-lg border border-border bg-card p-4 shadow-lg"
+            className="pointer-events-auto w-full max-w-[360px] rounded-lg bg-card p-4 shadow-lg"
           >
             <p className="text-xs text-muted-foreground">
               We use cookies to improve your experience.{" "}
@@ -95,7 +95,7 @@ export function CookieConsent() {
             <div className="mt-3 flex items-center justify-end gap-2">
               <button
                 onClick={handleReject}
-                className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                className="inline-flex items-center justify-center rounded-md bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
               >
                 Decline
               </button>
