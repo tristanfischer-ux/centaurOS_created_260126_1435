@@ -2245,10 +2245,24 @@ function SuppliersPage({
     const dirCount = fmtInt(sources.supplierDirectoryCount)
     const listingCount = fmtInt(sources.marketplaceListingCount)
     const isRed = verdict?.status === "red"
+    // L9-P4: cover-count divergence fix. The body filters rows whose name
+    // fails `looksLikeHallucinatedSupplierName` and whose URL fails
+    // `checkSupplierUrlShape`, but the section heading was using raw
+    // `suppliers.length` — so the founder saw "65 suppliers" then opened
+    // the section and got 5 real ones plus 60 disclaimers. Build the
+    // visible list once, use it for both the heading and the map below.
+    const visibleSuppliers = suppliers.filter((s) => {
+        if (looksLikeHallucinatedSupplierName(s.name).bad) return false
+        if (s.websiteUrl) {
+            const urlCheck = checkSupplierUrlShape(s.websiteUrl)
+            if (!urlCheck.ok) return false
+        }
+        return true
+    })
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>
-                7. Supplier {isRed ? "candidates — PROCUREMENT DEFERRED" : "shortlist"} ({suppliers.length})
+                7. Supplier {isRed ? "candidates — PROCUREMENT DEFERRED" : "shortlist"} ({visibleSuppliers.length})
             </Text>
             {isRed && <RedStateBanner verdict={verdict!} sectionKind="suppliers" />}
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
@@ -2272,21 +2286,13 @@ function SuppliersPage({
                 // mystery.
                 return null
             })()}
-            {suppliers.length === 0 && (
+            {visibleSuppliers.length === 0 && (
                 <Text style={styles.muted}>No suppliers shortlisted yet.</Text>
             )}
-            {suppliers.map((s, i) => {
-                // Loop 7 fix A12: hide rows whose name reads as a
-                // product page title, news article, marketing tagline,
-                // or product description (vs an actual company name).
-                // Returns null inside the map keeps the index stable
-                // for keying without breaking React-PDF's render.
-                const nameCheck = looksLikeHallucinatedSupplierName(s.name)
-                const urlCheck = (() => {
-                    if (!s.websiteUrl) return { ok: true, reason: "" }
-                    return checkSupplierUrlShape(s.websiteUrl)
-                })()
-                if (nameCheck.bad || !urlCheck.ok) return null
+            {visibleSuppliers.map((s, i) => {
+                // L9-P4: visibleSuppliers is pre-filtered above for both
+                // hallucinated names and bad URLs — no per-row null
+                // returns needed here.
                 // marketplace_listings titles are often scraped product
                 // descriptions, not company names. Derive the company name
                 // from the domain when available — founders reach out to

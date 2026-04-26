@@ -197,7 +197,13 @@ const BASE_WEIGHTS = {
   quality: 3,
 } as const
 
-const MIN_SCORE_THRESHOLD = 15
+// L9-P4 (2026-04-26): bumped 15 → 30 to align with the PDF render's
+// "BELOW NOISE FLOOR" cliff. Pre-bump, 228 of 617 shortlist rows
+// across the 6 demos were <30 (Hedgerow 88%, Vertfarm 71%) — they were
+// labelled "BELOW NOISE FLOOR" in the PDF but still in the cover-stat
+// count. Founders saw "65 suppliers" then opened the section and got
+// 5 real matches plus 60 disclaimers. Drop them at the source.
+const MIN_SCORE_THRESHOLD = 30
 const MAX_RESULTS = 8
 
 // ─── URL Shape Filter ────────────────────────────────────────────────
@@ -237,6 +243,25 @@ const NON_SUPPLIER_URL_PATH_PATTERNS = [
   "/papers/",
   "/post/",
   "/posts/",
+  // L9-P4 (2026-04-26): marketplace + listicle + product-category gaps.
+  // Caught Takoma listicle, Pumpkinspace store page, Fuspan
+  // product-category, Grelly/eBay item pages, sensorsandtransmitters
+  // guide-suffix slugs, Poeppelmann pharma-vessel deep page.
+  "/store/",
+  "/shop/",
+  "/product-category/",
+  "/product-categories/",
+  "/category/",
+  "/categories/",
+  "/collections/",
+  "/itm/", // eBay-style aggregator item path
+  "-guide-", // article-slug pattern: "co2-fertilisation-guide-to-..."
+  "-guide.",
+  "-guide/",
+  "/top-", // listicle pattern: "/top-10-...-manufacturers-in-uk/"
+  "manufacturers-in-",
+  "best-cnc-",
+  "best-suppliers-",
 ] as const
 
 const NON_SUPPLIER_TLD_PATTERNS = [
@@ -253,6 +278,15 @@ const NON_SUPPLIER_TLD_PATTERNS = [
   "medium.com",
   "substack.com",
   "wordpress.com",
+  // L9-P4: marketplace aggregators that index third-party listings.
+  // Founders need direct supplier homepages, not marketplace stalls.
+  "grelly.",
+  "grelly.uk",
+  "made-in-china.com",
+  "madeinchina.com",
+  "globalsources.com",
+  "indiamart.com",
+  "alibaba.com",
 ] as const
 
 /**
