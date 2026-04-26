@@ -566,7 +566,15 @@ export async function recordFailure(
         )
         return
     }
-    const failed = Array.from(new Set([...current.failed_stages, stageSlug]))
+    // L9-DEFENSIVE (2026-04-26): manual reset SQL frequently omits
+    // `failed_stages` from the rebuilt autopilot_state JSONB, leaving it
+    // null. The spread `[...null, x]` throws "is not iterable" — taking
+    // the cron tick down 500 across all projects, not just the one with
+    // the malformed state. Coalesce to an empty array.
+    const failedPrior = Array.isArray(current.failed_stages)
+        ? current.failed_stages
+        : []
+    const failed = Array.from(new Set([...failedPrior, stageSlug]))
     const next: AutopilotState = {
         ...current,
         stage: stageSlug,
