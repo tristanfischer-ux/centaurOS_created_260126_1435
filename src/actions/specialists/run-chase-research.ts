@@ -461,19 +461,32 @@ async function runChaseResearchInternal(
                     researchResult.designBrief?.complianceNotes ||
                     "",
                 // V2 narrative + structured constraints — Chase fills
-                // these from the extraction. Preserve any founder-set
-                // values so a re-run doesn't overwrite a manual edit.
+                // these from the extraction.
+                //
+                // L9-P2 (2026-04-26): merge precedence flipped from
+                // `prior || fresh` to `fresh || prior` for these
+                // extraction-derived fields. The old order kept stale
+                // legacy-shape `regulatory` (4 columns: code/name/status/
+                // summary) on top of a fresh matrix-shape extraction (9
+                // columns). Founder edits on these narrative fields
+                // happen via the Brief UI, not Chase — there's nothing
+                // to preserve here that justifies starving the renderer
+                // of the freshest schema. constraints is a special case:
+                // founder-typed scalars belong to prior; merge field-by-
+                // field.
                 mission:
-                    priorDesignBrief?.mission || extraction.brief?.mission,
+                    extraction.brief?.mission || priorDesignBrief?.mission,
                 targetCustomers:
-                    priorDesignBrief?.targetCustomers ||
-                    extraction.brief?.targetCustomers,
+                    extraction.brief?.targetCustomers ||
+                    priorDesignBrief?.targetCustomers,
                 whyNow:
-                    priorDesignBrief?.whyNow || extraction.brief?.whyNow,
-                constraints:
-                    priorDesignBrief?.constraints || extraction.brief?.constraints,
+                    extraction.brief?.whyNow || priorDesignBrief?.whyNow,
+                constraints: {
+                    ...(extraction.brief?.constraints ?? {}),
+                    ...(priorDesignBrief?.constraints ?? {}),
+                },
                 regulatory:
-                    priorDesignBrief?.regulatory || extraction.brief?.regulatory,
+                    extraction.brief?.regulatory || priorDesignBrief?.regulatory,
             }
 
             // 7. Persist. saveCadLabResearch expects a CadLabResearchResult —
@@ -899,14 +912,48 @@ async function callExtractionWithPrompts(
         const parsed = tryParseBriefJson(result.text)
         if (!parsed) {
             console.warn(
-                "[run-chase-research] V4-Pro returned non-JSON; report still saved",
+                "[run-chase-research] V4-Pro returned non-JSON; falling back to Sonnet",
             )
-            return {
-                ok: false,
-                brief: null,
-                tokensIn: result.inputTokens,
-                tokensOut: result.outputTokens,
-            }
+            // L9-P2: V4-Pro non-JSON → Sonnet fallback (was: silent fail).
+            // Hedgerow + Vertfarm Briefs both hit this branch and persisted
+            // empty regulatory.
+            return await callExtractionViaAnthropic(
+                systemPrompt,
+                userPrompt,
+                result.inputTokens,
+                result.outputTokens,
+            )
+        }
+        // L9-P2 (2026-04-26): V4-Pro is silently dropping the 5 matrix
+        // columns (applicability / designImpact / evidenceRequired /
+        // ownerRole / gapAction) under reasoning-trace pressure, even when
+        // the prompt + few-shot demand them. Detect bibliography-shape
+        // output and fall back to Sonnet, which preserves matrix shape.
+        // Heuristic: regulatory has rows, but NONE carry any matrix field.
+        const reg = (parsed as { regulatory?: unknown }).regulatory
+        const hasMatrixShape =
+            Array.isArray(reg) &&
+            reg.length > 0 &&
+            reg.some(
+                (r) =>
+                    r &&
+                    typeof r === "object" &&
+                    (typeof (r as Record<string, unknown>).applicability === "string" ||
+                        typeof (r as Record<string, unknown>).designImpact === "string" ||
+                        typeof (r as Record<string, unknown>).evidenceRequired === "string" ||
+                        typeof (r as Record<string, unknown>).ownerRole === "string" ||
+                        typeof (r as Record<string, unknown>).gapAction === "string"),
+            )
+        if (Array.isArray(reg) && reg.length > 0 && !hasMatrixShape) {
+            console.warn(
+                `[run-chase-research] V4-Pro emitted bibliography shape (${reg.length} rows, 0 matrix fields); falling back to Sonnet`,
+            )
+            return await callExtractionViaAnthropic(
+                systemPrompt,
+                userPrompt,
+                result.inputTokens,
+                result.outputTokens,
+            )
         }
         return {
             ok: true,
@@ -915,16 +962,28 @@ async function callExtractionWithPrompts(
             tokensOut: result.outputTokens,
         }
     }
+    return callExtractionViaAnthropic(systemPrompt, userPrompt, 0, 0)
+}
+
+/**
+ * Sonnet-via-Anthropic extraction path. Used either as the primary route
+ * (when CHASE_EXTRACTION_VIA=anthropic) or as a fallback from V4-Pro when
+ * that route returns non-JSON or bibliography-shape regulatory.
+ *
+ * `priorTokensIn` / `priorTokensOut` accumulate the failed V4-Pro call's
+ * token spend so the caller's total remains accurate.
+ */
+async function callExtractionViaAnthropic(
+    systemPrompt: string,
+    userPrompt: string,
+    priorTokensIn: number,
+    priorTokensOut: number,
+): Promise<ExtractionResult> {
     try {
         // Loop 7+ fix (2026-04-26 NIGHT): bumped 4096 → 8192. The Loop 7
         // few-shot example block (UK-BESS regulatory matrix, ~3000 chars
         // with 8 standards × 9 fields each) inflates Sonnet's response
-        // past 4096 tokens, truncating mid-JSON. Empirical evidence:
-        // Hedgerow Loop 7 regen produced research.designBrief WITHOUT
-        // mission / targetCustomers / whyNow / constraints / regulatory
-        // — only the legacy fields from the older codepath survived.
-        // Verdict came back GREEN against a £1,392 BOM despite founder's
-        // £155 target because constraints.unitCostCeilingGbp was null.
+        // past 4096 tokens, truncating mid-JSON.
         const { text, tokensIn, tokensOut } = await callClaude(
             systemPrompt,
             userPrompt,
@@ -933,21 +992,35 @@ async function callExtractionWithPrompts(
             120_000,
             1, // maxRetries — fail fast; extraction is a nice-to-have
         )
-
         const parsed = tryParseBriefJson(text)
         if (!parsed) {
             console.warn(
-                "[run-chase-research] extraction returned non-JSON; report still saved",
+                "[run-chase-research] Sonnet extraction returned non-JSON; report still saved",
             )
-            return { ok: false, brief: null, tokensIn, tokensOut }
+            return {
+                ok: false,
+                brief: null,
+                tokensIn: priorTokensIn + tokensIn,
+                tokensOut: priorTokensOut + tokensOut,
+            }
         }
-        return { ok: true, brief: parsed, tokensIn, tokensOut }
+        return {
+            ok: true,
+            brief: parsed,
+            tokensIn: priorTokensIn + tokensIn,
+            tokensOut: priorTokensOut + tokensOut,
+        }
     } catch (err) {
         console.warn(
-            "[run-chase-research] extraction threw (non-fatal):",
+            "[run-chase-research] Sonnet extraction threw (non-fatal):",
             err instanceof Error ? err.message : err,
         )
-        return { ok: false, brief: null, tokensIn: 0, tokensOut: 0 }
+        return {
+            ok: false,
+            brief: null,
+            tokensIn: priorTokensIn,
+            tokensOut: priorTokensOut,
+        }
     }
 }
 

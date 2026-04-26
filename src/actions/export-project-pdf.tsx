@@ -2054,7 +2054,14 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                     : "Every failure mode and open question declared against each module, in one register."}
             </Text>
             {modules.map((m) => (
-                <View key={m.id} style={{ marginTop: 10 }} wrap={false}>
+                // L9-P5: removed `wrap={false}` here. With it, the entire
+                // per-module risks block (heading + N risk rows) was forced
+                // onto one page; for Vertfarm modules with 4-5 risk rows
+                // each, the block exceeded page height and Yoga either
+                // crushed line-heights (text overlap) or emitted orphan
+                // blank pages. Per-row `wrap={false}` at the inner View is
+                // sufficient to keep individual risks intact.
+                <View key={m.id} style={{ marginTop: 10 }}>
                     <Text style={styles.h4}>{m.name}</Text>
                     {m.riskMatrix.length === 0 &&
                         m.failureModes.length === 0 &&
@@ -2083,10 +2090,24 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                         }}
                                         wrap={false}
                                     >
+                                        {/*
+                                          * L9-P5: when r.hazard wraps to 2-3 lines
+                                          * (any hazard >55 chars triggers it), the
+                                          * old `alignItems: "center"` vertically
+                                          * centred the badge against the title
+                                          * block and ended up beside line 2 of the
+                                          * title — the "crashing into title text"
+                                          * effect on every Hedgerow row. Switch to
+                                          * `flex-start` so badge anchors top-right.
+                                          * Add `flexShrink: 0` to badge so it
+                                          * doesn't compete for width with the
+                                          * wrapping title. `paddingRight: 6` on
+                                          * title preserves a gutter.
+                                          */}
                                         <View
                                             style={{
                                                 flexDirection: "row",
-                                                alignItems: "center",
+                                                alignItems: "flex-start",
                                                 marginBottom: 1,
                                             }}
                                         >
@@ -2095,6 +2116,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                     fontSize: 10,
                                                     fontWeight: "bold",
                                                     flex: 1,
+                                                    paddingRight: 6,
                                                 }}
                                             >
                                                 {r.id}: {r.hazard}
@@ -2105,6 +2127,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                     color: initial.color,
                                                     fontWeight: "bold",
                                                     marginLeft: 6,
+                                                    flexShrink: 0,
                                                 }}
                                             >
                                                 {severityLabel(r.severity)} × {likelihoodLabel(r.likelihood)} —{" "}
