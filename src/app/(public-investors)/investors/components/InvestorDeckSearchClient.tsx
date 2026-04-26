@@ -758,6 +758,25 @@ function MatchCard({
           ) : (
             <div className="text-sm text-muted-foreground">—</div>
           )}
+
+          {/* Hardware fit score badge */}
+          {(() => {
+            const hwScore = (firm.attributes as { hardware_fit_score?: number }).hardware_fit_score ??
+                            (firm as unknown as { hardware_fit_score?: number }).hardware_fit_score
+            if (typeof hwScore === 'number' && hwScore >= 0 && hwScore <= 10) {
+              let badgeColor = 'bg-muted text-muted-foreground'
+              if (hwScore >= 7.0) badgeColor = 'bg-green-100 text-green-700'
+              else if (hwScore >= 4.0) badgeColor = 'bg-amber-100 text-amber-700'
+
+              return (
+                <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full inline-flex items-center ${badgeColor}`}>
+                  Hardware fit {hwScore.toFixed(1)}/10
+                </div>
+              )
+            }
+            return null
+          })()}
+
           {/* Save button — below score, paid only */}
           {onSave && !isLocked && (
             <button
