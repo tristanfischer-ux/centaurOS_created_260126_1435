@@ -268,6 +268,22 @@ const styles = StyleSheet.create({
     },
 })
 
+// Loop 7 critique fix A9: page numbers were absent across the whole PDF.
+// react-pdf supplies pageNumber + totalPages via the render-prop pattern.
+// Wrap each section's footer label + a "Page N of M" right-aligned text.
+function PdfFooter({ label }: { label: string }): React.ReactElement {
+    return (
+        <View style={styles.footer} fixed>
+            <Text>{label}</Text>
+            <Text
+                render={({ pageNumber, totalPages }) =>
+                    `Page ${pageNumber} of ${totalPages}`
+                }
+            />
+        </View>
+    )
+}
+
 // ─── Small formatters ──────────────────────────────────────────────────
 
 function fmtGbp(n: number | null | undefined): string {
@@ -945,9 +961,7 @@ function TocPage({ sections }: { sections: string[] }): React.ReactElement {
                     <Text style={{ flex: 1 }}>{s}</Text>
                 </View>
             ))}
-            <Text style={styles.footer} fixed>
-                <Text>Contents · Rev {/* placeholder filled by outer */}</Text>
-            </Text>
+            <PdfFooter label="Contents" />
         </Page>
     )
 }
@@ -1109,9 +1123,7 @@ function FeasibilityExceptionPage({
                     ))}
                 </View>
             )}
-            <Text style={styles.footer} fixed>
-                <Text>Feasibility exception</Text>
-            </Text>
+            <PdfFooter label="Feasibility exception" />
         </Page>
     )
 }
@@ -1651,9 +1663,7 @@ function ModulePage({
                 </View>
             )}
 
-            <Text style={styles.footer} fixed>
-                <Text>{mod.name} · Module {index + 1}</Text>
-            </Text>
+            <PdfFooter label={`${mod.name} · Module ${index + 1}`} />
         </Page>
     )
 }
@@ -1739,9 +1749,7 @@ function BomMasterPage({
                     })}
                 </View>
             )}
-            <Text style={styles.footer} fixed>
-                <Text>BOM master</Text>
-            </Text>
+            <PdfFooter label="BOM master" />
         </Page>
     )
 }
@@ -1817,9 +1825,7 @@ function ReconciliationPage({
                     </View>
                 ))
             )}
-            <Text style={styles.footer} fixed>
-                <Text>Reconciliation</Text>
-            </Text>
+            <PdfFooter label="Reconciliation" />
         </Page>
     )
 }
@@ -1900,9 +1906,7 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
                     )
                 })}
             </View>
-            <Text style={styles.footer} fixed>
-                <Text>Cost waterfall</Text>
-            </Text>
+            <PdfFooter label="Cost waterfall" />
         </Page>
     )
 }
@@ -2107,9 +2111,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                     )}
                 </View>
             ))}
-            <Text style={styles.footer} fixed>
-                <Text>Risks register</Text>
-            </Text>
+            <PdfFooter label="Risks register" />
         </Page>
     )
 }
@@ -2303,9 +2305,7 @@ function SuppliersPage({
                     </View>
                 )
             })}
-            <Text style={styles.footer} fixed>
-                <Text>Supplier shortlist</Text>
-            </Text>
+            <PdfFooter label="Supplier shortlist" />
         </Page>
     )
 }
@@ -2335,9 +2335,7 @@ function AuditLogPage({ rows }: { rows: AuditRowPdf[] }): React.ReactElement {
                     </Text>
                 </View>
             ))}
-            <Text style={styles.footer} fixed>
-                <Text>Audit log</Text>
-            </Text>
+            <PdfFooter label="Audit log" />
         </Page>
     )
 }
@@ -3191,9 +3189,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             <Page size="A4" style={styles.page} wrap>
                 <BriefSection data={data} />
                 <RegulatorySection items={data.regulatory} />
-                <Text style={styles.footer} fixed>
-                    <Text>Brief + regulatory</Text>
-                </Text>
+                <PdfFooter label="Brief + regulatory" />
             </Page>
 
             {/* Feasibility exception page (Loop 3 P1, council-unanimous
@@ -3211,9 +3207,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                         sheet={data.dimensionSheet}
                         sectionNumber={sizingSectionNumber}
                     />
-                    <Text style={styles.footer} fixed>
-                        <Text>Sizing optimisation</Text>
-                    </Text>
+                    <PdfFooter label="Sizing optimisation" />
                 </Page>
             )}
 
@@ -3227,9 +3221,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                         moduleNameById={moduleNameById}
                         imageDataUri={data.spatialPlanImageDataUri}
                     />
-                    <Text style={styles.footer} fixed>
-                        <Text>Spatial plan</Text>
-                    </Text>
+                    <PdfFooter label="Spatial plan" />
                 </Page>
             )}
 
@@ -3366,9 +3358,7 @@ function EngineReviewPage({
                     findings={cosmetic}
                 />
             )}
-            <Text style={styles.footer} fixed>
-                <Text>Engine self-review</Text>
-            </Text>
+            <PdfFooter label="Engine self-review" />
         </Page>
     )
 }
