@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import { MarketplaceListingDetail } from "./listing-detail"
@@ -9,6 +10,25 @@ import { getReviewsForListing } from "@/actions/marketplace-reviews"
 
 interface PageProps {
     params: Promise<{ id: string }>
+}
+
+// Dynamic page <title> per supplier so browser tabs / bookmarks / SEO snippets
+// reflect the actual supplier instead of the generic site tagline. Council
+// flagged the static tagline as a P1 across multiple loops 2026-04-26.
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+    const { id } = await params
+    const supabase = await createClient()
+    const { data } = await supabase
+        .from('marketplace_listings')
+        .select('title, description')
+        .eq('id', id)
+        .single()
+    if (!data) return { title: 'Supplier not found — Fractional Forge' }
+    const desc = (data.description ?? '').slice(0, 155)
+    return {
+        title: `${data.title} — Fractional Forge`,
+        description: desc || `${data.title} on the Fractional Forge supplier directory.`,
+    }
 }
 
 export default async function MarketplaceListingPage({ params }: PageProps) {

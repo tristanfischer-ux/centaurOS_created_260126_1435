@@ -356,9 +356,13 @@ export function SupplierSearchPanel({
       }
 
       startTransition(async () => {
+        // 50 default — couples with the supplier detail page's max useful
+        // pagination at this point. 24 was too low: founders flagged the
+        // count looking suspiciously identical across very different queries
+        // because the cap was pinning every result set at 24.
         const result = await searchSuppliers({
           query: searchQuery,
-          limit: 24,
+          limit: 50,
         })
 
         // searchSuppliers returns SupplierCard[], but we need MarketplaceListing shape for the card.
