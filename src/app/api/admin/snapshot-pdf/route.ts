@@ -47,11 +47,14 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
 
     const admin = createAdminClient()
 
-    // Pull the latest report-download row for the project.
+    // Pull the latest report-download row for the project. Storage paths
+    // follow the convention `<foundry-slug>/<projectId>/<filename>.pdf`,
+    // so we filter by storage_path containing the project ID rather than
+    // a non-existent project_id column.
     const { data: row, error } = await admin
         .from("report_downloads")
         .select("storage_path, report_name, file_size_bytes, created_at")
-        .eq("project_id", projectId)
+        .like("storage_path", `%/${projectId}/%`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
