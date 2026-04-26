@@ -1,9 +1,9 @@
 "use server"
 
-// Vercel function runtime cap: parallel council can take up to ~100s in
-// worst case (slow specialist + Fiona close). Default 60s server-action
-// budget killed all in-flight fetches → "operation aborted" everywhere.
-export const maxDuration = 180
+// Vercel function runtime cap is set on the hosting page (agents/page.tsx)
+// because "use server" files reject non-async exports — adding
+// `export const maxDuration = 180` here breaks the whole module export.
+// See MEMORY.md: forgeos_use_server_non_async_exports.
 
 /**
  * @file brainstorming-council.ts — Server action for the Brainstorming Council.
@@ -137,36 +137,17 @@ Write the closing synthesis.`
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-export interface SpecialistResponse {
-    id: string
-    name: string
-    title: string
-    modelLabel: string
-    response: string
-}
-
-export interface CouncilResult {
-    ok: true
-    fionaOpening: string
-    specialistResponses: SpecialistResponse[]
-    fionaClosing: string
-}
-
-export interface CouncilError {
-    ok: false
-    error: string
-}
-
-export type ConveneCouncilResult = CouncilResult | CouncilError
-
-// ─── Main action ─────────────────────────────────────────────────────────────
-
-export interface ConveneCouncilInput {
-    question: string
-    tier: string
-    specialists: Array<{ id: string; name: string; title: string; tagline: string }>
-}
+// All type/interface declarations moved to ./brainstorming-council-types.ts.
+// "use server" files can ONLY export async functions — even `export type`
+// re-exports can silently strip ALL exports from the compiled module
+// (Vercel build error 2026-04-26 NIGHT, ~50 min broken builds). Consumers
+// import types DIRECTLY from ./brainstorming-council-types instead.
+import type {
+    SpecialistResponse,
+    CouncilResult,
+    CouncilError,
+    ConveneCouncilInput,
+} from "./brainstorming-council-types"
 
 /**
  * Fire all council LLM calls and return the full session result.

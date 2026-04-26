@@ -49,6 +49,11 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
+// Brainstorming Council convenes 6 OpenRouter LLMs in parallel; the
+// hosted server action can take ~80–120s wall-clock. Default Vercel
+// budget killed all in-flight fetches → "operation aborted" everywhere.
+export const maxDuration = 180
+
 export default async function PublicAgentsPage() {
     const supabaseAuth = await createClient()
     const {
