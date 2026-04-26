@@ -25,6 +25,7 @@
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { withRetry } from '@/lib/retry'
 import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
+import { callOpenRouter } from '@/lib/ai/openrouter'
 
 // ==========================================
 // TYPES
@@ -196,6 +197,58 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
         userId,
         specialistId,
       })
+
+      // Loop 8 P5 (2026-04-26): credit-balance fallback. When the direct
+      // Anthropic key returns 400 + "credit balance is too low", route the
+      // same call through OpenRouter using `anthropic/<modelId>`. Separate
+      // credit pool, same model. Saves the entire engine from wedging when
+      // Tristan's Anthropic balance hits zero. Multimodal calls (image
+      // inputs) are not yet supported by this fallback — they'd need an
+      // OpenRouter multimodal request shape; rare enough to skip for now.
+      const isCreditDry =
+        response.status === 400 &&
+        /credit balance is too low/i.test(errText)
+      if (isCreditDry && !imageBase64 && !renderedSvgBase64 && process.env.OPENROUTER_API_KEY) {
+        console.warn(
+          `[ClaudeClient] Anthropic credit dry — falling back to OpenRouter for model=${modelId}`,
+        )
+        const orModel = `anthropic/${modelId}`
+        const or = await callOpenRouter({
+          model: orModel,
+          system: systemPrompt,
+          prompt: userPrompt,
+          maxTokens,
+          temperature: 0,
+          timeoutMs,
+        })
+        if (or.ok) {
+          void logLlmUsage({
+            action: actionSlug ?? 'claude_central_unknown',
+            modelUsed: orModel,
+            tokensIn: or.inputTokens,
+            tokensOut: or.outputTokens,
+            status: 'success',
+            errorMessage: 'fallback:openrouter:credit_dry',
+            foundryId,
+            userId,
+            specialistId,
+          })
+          return {
+            text: or.text,
+            tokensIn: or.inputTokens,
+            tokensOut: or.outputTokens,
+            truncated: false,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+          }
+        }
+        // OpenRouter also failed — fall through to the original throw so
+        // upstream retry / fail-fast policy applies.
+        console.warn(
+          `[ClaudeClient] OpenRouter fallback also failed: ${or.error}`,
+        )
+      }
+
       throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
     }
 
