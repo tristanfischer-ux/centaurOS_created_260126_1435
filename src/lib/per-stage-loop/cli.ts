@@ -30,10 +30,12 @@ try {
 
 import { runStageLoop } from "./runner"
 import { chaseRegulatoryAdapter } from "./adapters/chase-regulatory"
+import { supplierMatchAdapter } from "./adapters/supplier-match"
 import type { StageAdapter, StageName } from "./types"
 
 const ADAPTERS: Record<string, StageAdapter> = {
     "chase-regulatory": chaseRegulatoryAdapter,
+    "supplier-match": supplierMatchAdapter,
 }
 
 async function main() {
