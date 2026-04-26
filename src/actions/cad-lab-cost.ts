@@ -218,7 +218,11 @@ RULES:
 - Group identical parts: "M6 cap screws (×8)" with combined cost
 - Reference material prices: see VERIFIED MATERIAL PRICES section below (prefer over generic estimates)
 - Confidence: "high" only when parts are standard/well-understood
-- Keep ALL reasoning BRIEF — under 15 words each
+- Reasoning rules — Loop 8 (Tristan-flagged 2026-04-26 — "generic justifications, no £/unit, £/kg, £/hr"):
+  - For parts costing > £100: "reasoning" MUST include the unit-economics derivation. Examples: "1.2 kg × £4.50/kg material + 0.3 hr × £40/hr machining + 25% margin = £104"; "2-stage CNC, est 45 min cycle × £40/hr × volume-2k tier = £180/unit"; "RS Components SKU 250-7320, qty-100 break price £85.40 ex-VAT"; "BOM cost £62 + 35% supplier margin = £85 contract-manufactured price". Show the math.
+  - For parts costing < £100: 1-line market-reference is fine ("RS qty-100 price £18", "Farnell catalogue £4.20").
+  - For "make" labour: labourReasoning MUST include hours × £/hr breakdown ("4.5 hr machining + 1.0 hr setup + 0.5 hr assembly × £40/hr × buffer 1.15 = £276").
+  - Per-module "reasoning" field is the synthesis sentence — covers the cost driver (e.g. "Cost dominated by LFP cell cost (£62/kWh × 280 kWh = £17,360) + thermal interface (£800) + balance-of-rack (£300)").
 - When realWorldContext is provided, ground estimates using: supplierCount as market depth, equipment to determine cost tier, topMaterials for realistic material grades
 
 BUY vs MAKE classification:
