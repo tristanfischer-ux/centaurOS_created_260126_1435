@@ -685,7 +685,7 @@ export async function extractDesignBriefFromReport(
     report: string,
     priorBrief: CadLabDesignBrief | undefined,
 ): Promise<ExtractionResult> {
-    const { systemPrompt, userPrompt } = buildChaseExtractionPrompts(
+    const { systemPrompt, userPrompt } = await buildChaseExtractionPrompts(
         subject,
         report,
         priorBrief,
@@ -697,12 +697,17 @@ export async function extractDesignBriefFromReport(
  * Loop 8 P5: split the prompt-builder out so the per-stage harness can
  * call OpenRouter (separate credit pool) with the same prompt and parse
  * via tryParseBriefJson. Avoids duplicating the long few-shot block.
+ *
+ * Marked async so it can live in this "use server" file — Next.js
+ * forbids non-async exports from server-action modules and surfaces it
+ * as a Server Component build error (see memory
+ * `forgeos_use_server_non_async_exports.md`).
  */
-export function buildChaseExtractionPrompts(
+export async function buildChaseExtractionPrompts(
     subject: string,
     report: string,
     priorBrief: CadLabDesignBrief | undefined,
-): { systemPrompt: string; userPrompt: string } {
+): Promise<{ systemPrompt: string; userPrompt: string }> {
     // Keep the report preamble bounded — strategic extraction only needs
     // the first chunk of context (which is the synthesis summary in the
     // domain-specific prompts; deeper sections are dimension tables that
@@ -882,11 +887,11 @@ async function callExtractionWithPrompts(
  * Loop 8 P5: harness-only parser export. The harness calls OpenRouter
  * directly with the same buildChaseExtractionPrompts output and feeds
  * the response text through this parser to get the same shape as the
- * production extractor.
+ * production extractor. Async to satisfy the "use server" rule.
  */
-export function parseChaseExtraction(
+export async function parseChaseExtraction(
     raw: string,
-): Partial<CadLabDesignBrief> | null {
+): Promise<Partial<CadLabDesignBrief> | null> {
     return tryParseBriefJson(raw)
 }
 

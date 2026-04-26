@@ -137,7 +137,7 @@ export const chaseRegulatoryAdapter: StageAdapter = {
         let extractedFresh = false
         if (report.length > 200) {
             if (HARNESS_VIA_OPENROUTER) {
-                const { systemPrompt, userPrompt } = buildChaseExtractionPrompts(
+                const { systemPrompt, userPrompt } = await buildChaseExtractionPrompts(
                     subject,
                     report,
                     undefined,
@@ -151,7 +151,7 @@ export const chaseRegulatoryAdapter: StageAdapter = {
                     timeoutMs: 120_000,
                 })
                 if (result.ok) {
-                    const parsed = parseChaseExtraction(result.text)
+                    const parsed = await parseChaseExtraction(result.text)
                     if (
                         parsed &&
                         Array.isArray(parsed.regulatory) &&
