@@ -33,7 +33,7 @@ import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
 import { conveneCouncil } from "@/actions/brainstorming-council"
-import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council"
+import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council-types"
 
 // ─── Model tier → human-readable badge label ────────────────────────────────
 
