@@ -245,10 +245,20 @@ async function runFinnCostInternal(
             }
         }
 
-        const hasPartsSeeded = modules.every(
-            (m) => Array.isArray(m.keyParts) && m.keyParts.length > 0,
-        )
-        if (!hasPartsSeeded) {
+        // Loop 7 fix (2026-04-26 NIGHT): the precondition was checking
+        // modules.every(m.keyParts.length > 0) which fails for any project
+        // where Max decomposed without populating keyParts but BOM was
+        // generated downstream into the parts table. The parts table IS
+        // the canonical BOM data — the legacy keyParts array on each
+        // module is a separate per-module hint that's optional. Bug bit
+        // Desal + Sentinel: 9 modules with 0 keyParts but parts table
+        // had 90 + 45 rows respectively; Finn refused to run for hours
+        // until traced. Fix: check parts table directly.
+        const { count: partsCount } = await admin
+            .from("parts")
+            .select("id", { count: "exact", head: true })
+            .eq("cad_lab_project_id", projectId)
+        if (!partsCount || partsCount === 0) {
             return {
                 ok: false,
                 error:
