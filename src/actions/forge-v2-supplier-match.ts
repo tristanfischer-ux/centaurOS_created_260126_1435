@@ -629,9 +629,31 @@ async function matchSuppliersForProjectInternal(
         // HVAC, shipping containers) this will nearly always fire,
         // which is the intent — founders shouldn't have to know to
         // click "research the web" for the directory to catch up.
+        // Loop 7+8 (Tristan-flagged 2026-04-26 NIGHT): the previous
+        // threshold checked TOTAL shortlist size, which fired
+        // discovery only when the whole shortlist was thin. But on
+        // Hedgerow the shortlist had 65 entries while 27/52 BOM rows
+        // (52%) had ZERO supplier candidates. Auto-discovery never
+        // fired despite massive per-part gaps. New trigger: per-part
+        // coverage. If >30% of BOM rows have zero suppliers, fire
+        // discovery to fill the gap. The shortlist-thin trigger stays
+        // as a fallback for projects where matching produces nothing
+        // at all.
         const AUTO_DISCOVERY_THRESHOLD = 3
+        const PER_PART_GAP_THRESHOLD = 0.3
+        const matchedPartNumbers = new Set<string>()
+        for (const { matchedParts } of bySupplier.values()) {
+            for (const p of matchedParts) matchedPartNumbers.add(p.partNumber)
+        }
+        const totalPartCount = purchasedParts.length
+        const partsUncoveredFraction =
+            totalPartCount > 0
+                ? (totalPartCount - matchedPartNumbers.size) / totalPartCount
+                : 0
         const shouldAutoDiscover =
-            suppliersAdded < AUTO_DISCOVERY_THRESHOLD || modulesEmpty > 0
+            suppliersAdded < AUTO_DISCOVERY_THRESHOLD ||
+            modulesEmpty > 0 ||
+            partsUncoveredFraction > PER_PART_GAP_THRESHOLD
         if (shouldAutoDiscover && modules.length > 0) {
             // Identify the first module with zero matches by
             // computing the set of module ids that WERE matched
