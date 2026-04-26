@@ -484,11 +484,11 @@ export function SupplierSearchPanel({
               type="button"
               onClick={() => handleChipClick(chip)}
               className={`
-                text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-150
+                text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-150
                 ${
                   activeChip === chip.label
-                    ? 'bg-international-orange/10 border-international-orange/40 text-international-orange font-bold'
-                    : 'bg-muted border-border text-muted-foreground hover:border-border-strong hover:text-foreground'
+                    ? 'bg-international-orange/10 text-international-orange font-bold ring-1 ring-international-orange/40'
+                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }
               `}
               aria-pressed={activeChip === chip.label}
