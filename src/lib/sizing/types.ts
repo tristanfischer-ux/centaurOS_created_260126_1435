@@ -269,5 +269,20 @@ export interface DimensionSheet {
     iterations: SolverIteration[]
     /** Present when the library ran a grid sweep rather than a single-pass solve. */
     optimisation?: OptimisationResult
+    /** Loop 8 L5-P4 sizing universalisation: when the primary attempt
+     *  is INFEASIBLE, the wrapper runs alternates (smaller targets,
+     *  alternate envelopes) and stores the largest feasible result here.
+     *  PDF render shows ORIGINAL TARGET (INFEASIBLE) + CLOSEST FEASIBLE
+     *  ALTERNATE side-by-side so the founder sees both the brief gap
+     *  and the achievable design. Null when (a) primary was already
+     *  feasible (no need) or (b) no alternate worked either. */
+    closest_feasible_alternate?: {
+        envelope: Envelope
+        target: Record<string, number>
+        floor_budget_m2: number
+        module_dimensions: Record<string, ModuleDimensions>
+        /** Human-readable summary of what changed vs the primary attempt. */
+        delta_from_primary: string
+    } | null
     generated_at: string
 }

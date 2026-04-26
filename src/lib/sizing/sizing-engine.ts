@@ -154,6 +154,87 @@ export function runSizing(input: RunSizingInput): RunSizingOutcome {
         }
     }
 
+    // Loop 8 L5-P4 sizing universalisation: when the primary attempt is
+    // INFEASIBLE, try alternates and pick the largest-target feasible one.
+    // Cheap — each alternate is a deterministic re-run of the same solver
+    // with different inputs (no LLM, no I/O). Stops at the first success
+    // ordered from "least scope cut" to "most scope cut" so the founder
+    // sees the smallest revision that closes the gap.
+    let closestFeasibleAlternate: DimensionSheet["closest_feasible_alternate"] = null
+    if (!solveResult.feasible) {
+        const alternateAttempts: Array<{
+            envelope: Envelope
+            targets: Record<string, number>
+            label: string
+        }> = []
+        // Alternate envelopes the rules library may accept.
+        const altEnvelopes: Array<{ env: Envelope; label: string }> = []
+        if (resolvedEnvelope.kind !== "container_53ft_hc") {
+            altEnvelopes.push({ env: CONTAINER_53FT_HC, label: "53ft high-cube container" })
+        }
+        if (resolvedEnvelope.kind !== "warehouse_bay") {
+            altEnvelopes.push({ env: WAREHOUSE_BAY_100, label: "warehouse bay 100 m²" })
+        }
+        // First: bigger envelope at original targets.
+        for (const { env, label } of altEnvelopes) {
+            alternateAttempts.push({
+                envelope: env,
+                targets: { ...targets },
+                label: `Switch envelope to ${label} at original targets`,
+            })
+        }
+        // Second: original envelope with progressively smaller numeric
+        // targets (90%, 75%, 50%, 33%). All targetSpec entries are
+        // numeric in current rule libraries; if a future library adds a
+        // non-numeric target it would need a TargetFieldSpec.type tag
+        // to skip here.
+        const numericTargetKeys = Object.keys(rules.targetSpec)
+        for (const factor of [0.9, 0.75, 0.5, 0.33]) {
+            const scaled: Record<string, number> = { ...targets }
+            for (const k of numericTargetKeys) {
+                if (typeof scaled[k] === "number") {
+                    scaled[k] = Math.round(scaled[k] * factor)
+                }
+            }
+            alternateAttempts.push({
+                envelope: resolvedEnvelope,
+                targets: scaled,
+                label: `Reduce numeric targets to ${Math.round(factor * 100)}% of brief`,
+            })
+        }
+        for (const attempt of alternateAttempts) {
+            try {
+                const altResult = rules.solve({
+                    envelope: attempt.envelope,
+                    targets: attempt.targets,
+                    modules: modules.map((m) => ({
+                        id: m.id,
+                        name: m.name,
+                        purpose: m.purpose,
+                        keyParts: m.keyParts,
+                    })),
+                })
+                if (altResult.feasible) {
+                    closestFeasibleAlternate = {
+                        envelope: attempt.envelope,
+                        target: attempt.targets,
+                        floor_budget_m2: altResult.floor_budget_m2,
+                        module_dimensions: altResult.slot_dimensions,
+                        delta_from_primary: attempt.label,
+                    }
+                    break
+                }
+            } catch (err) {
+                // Some alternates may throw if they fall outside the rule
+                // library's domain assumptions — skip and try the next.
+                console.warn(
+                    `[sizing] alternate attempt "${attempt.label}" threw, skipping:`,
+                    err instanceof Error ? err.message : err,
+                )
+            }
+        }
+    }
+
     const sheet: DimensionSheet = {
         feasible: solveResult.feasible,
         rules_domain: rules.domain,
@@ -169,6 +250,7 @@ export function runSizing(input: RunSizingInput): RunSizingOutcome {
         notes: solveResult.notes ?? [],
         iterations: solveResult.iterations,
         ...(solveResult.optimisation ? { optimisation: solveResult.optimisation } : {}),
+        closest_feasible_alternate: closestFeasibleAlternate,
         generated_at: new Date().toISOString(),
     }
 

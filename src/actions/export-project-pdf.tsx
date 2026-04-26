@@ -2392,11 +2392,59 @@ function SizingOptimisationSection({
             <View style={{ marginBottom: 10 }}>
                 <Text style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>Envelope</Text>
                 <Text style={{ fontSize: 10, marginBottom: 6 }}>{envelopeLine}</Text>
-                <Text style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>Final config</Text>
+                <Text style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>Original target (from brief)</Text>
                 <Text style={{ fontSize: 11, marginBottom: 6 }}>
                     {Object.entries(sheet.target).map(([k, v]) => `${k}: ${v}`).join(" · ")}{" "}
                     <Text style={{ color: feasibleColor, fontWeight: "bold" }}>[{feasibleLabel}]</Text>
                 </Text>
+                {/* Loop 8 L5-P4 sizing universalisation: when primary is
+                 * infeasible, show the closest feasible alternate the
+                 * solver could find. Founder gets ORIGINAL (INFEASIBLE)
+                 * + CLOSEST FEASIBLE side-by-side so the trade-off is
+                 * visible instead of buried in recommendations. */}
+                {!sheet.feasible && sheet.closest_feasible_alternate && (
+                    <View
+                        style={{
+                            marginTop: 6,
+                            marginBottom: 8,
+                            padding: 8,
+                            borderRadius: 4,
+                            backgroundColor: "#f0fdf4",
+                            borderLeftWidth: 3,
+                            borderLeftColor: "#15803d",
+                        }}
+                    >
+                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#14532d", marginBottom: 2 }}>
+                            Closest feasible alternate the solver found
+                        </Text>
+                        <Text style={{ fontSize: 11, marginBottom: 2 }}>
+                            {Object.entries(sheet.closest_feasible_alternate.target)
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join(" · ")}{" "}
+                            <Text style={{ color: "#0a6a1a", fontWeight: "bold" }}>[FEASIBLE]</Text>
+                        </Text>
+                        <Text style={{ fontSize: 9, color: "#166534", fontStyle: "italic" }}>
+                            {sheet.closest_feasible_alternate.delta_from_primary} · envelope: {sheet.closest_feasible_alternate.envelope.label}
+                        </Text>
+                    </View>
+                )}
+                {!sheet.feasible && !sheet.closest_feasible_alternate && (
+                    <View
+                        style={{
+                            marginTop: 6,
+                            marginBottom: 8,
+                            padding: 8,
+                            borderRadius: 4,
+                            backgroundColor: "#fef3c7",
+                            borderLeftWidth: 3,
+                            borderLeftColor: "#a16207",
+                        }}
+                    >
+                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#78350f" }}>
+                            No feasible alternate found within the solver&apos;s envelope + target sweep. The brief targets and the chosen envelope can&apos;t be reconciled — the recommendations below are manual options.
+                        </Text>
+                    </View>
+                )}
                 {opt?.winner?.rationale && (
                     <Text style={{ fontSize: 10, fontStyle: "italic", color: "#444", marginBottom: 8 }}>
                         {opt.winner.rationale}
