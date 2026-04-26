@@ -209,7 +209,7 @@ Output JSON ONLY:
         const moduleAttribution = (out.hasModuleId / safeTotal) * 10
 
         // Then call the council for the LLM-judged dimensions.
-        let llmDims: Record<string, number> = {}
+        const llmDims: Record<string, number> = {}
         let summary = ""
         let nextFix: string | null = null
         let costPence = 0

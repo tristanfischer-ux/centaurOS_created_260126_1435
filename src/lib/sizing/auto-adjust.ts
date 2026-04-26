@@ -27,7 +27,7 @@
  */
 
 import { callOpenRouter } from "@/lib/ai/openrouter"
-import type { DimensionSheet } from "./types"
+import type { DimensionSheet, Envelope } from "./types"
 
 export interface BriefAutoAdjustment {
     /** ISO timestamp this adjustment was applied. */
@@ -49,6 +49,11 @@ export interface AutoAdjustResult {
     reRun: boolean
     /** When reRun=true, the target dict to use for the next sizing pass. */
     adjustedTarget?: Record<string, number | string>
+    /** When reRun=true AND the adjustment was an envelope swap (e.g.
+     *  closest_feasible_alternate.envelope), the new envelope to feed into
+     *  runSizing. Path B (LLM-parsed text) only emits target adjustments
+     *  today, so this is closest_feasible_alternate-only for now. */
+    adjustedEnvelope?: Envelope
     /** When reRun=false AND terminal=true, the engine should NOT retry — auto-adjust budget exhausted. */
     terminal: boolean
     /** The adjustment record appended to the audit trail (when reRun=true). */
@@ -80,8 +85,9 @@ export async function decideAutoAdjustment(
     if (sheet.closest_feasible_alternate) {
         const alt = sheet.closest_feasible_alternate
         const adjustedTarget = { ...alt.target } as Record<string, number | string>
-        // Find the dimension that changed most. Show the largest delta in
-        // the audit record because that's the dominant constraint relax.
+
+        // Detect what actually changed. The alternate may swap envelope,
+        // targets, or both. The audit trail surfaces the dominant change.
         let dominantField = "target"
         let dominantFrom: number | string = ""
         let dominantTo: number | string = ""
@@ -98,9 +104,28 @@ export async function decideAutoAdjustment(
                 dominantTo = toV
             }
         }
+
+        // Envelope swap: if the alternate's envelope kind differs from the
+        // current sheet's, the dominant change is the envelope, not a
+        // target field. Capture that in the audit record AND propagate
+        // adjustedEnvelope so the caller's next runSizing pass actually
+        // uses the alternate envelope (not just the same targets).
+        let adjustedEnvelope: Envelope | undefined
+        if (
+            alt.envelope &&
+            sheet.envelope &&
+            alt.envelope.kind !== sheet.envelope.kind
+        ) {
+            adjustedEnvelope = alt.envelope as Envelope
+            dominantField = "envelope"
+            dominantFrom = sheet.envelope.label ?? sheet.envelope.kind
+            dominantTo = alt.envelope.label ?? alt.envelope.kind
+        }
+
         return {
             reRun: true,
             adjustedTarget,
+            adjustedEnvelope,
             terminal: false,
             adjustment: {
                 appliedAtIso: new Date().toISOString(),

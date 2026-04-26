@@ -379,7 +379,7 @@ Output JSON ONLY:
         }
 
         // ── LLM-judged dimensions ────────────────────────────────────────
-        let llmDims: Record<string, number> = {}
+        const llmDims: Record<string, number> = {}
         let summary = ""
         let nextFix: string | null = null
         let costPence = 0
