@@ -380,9 +380,29 @@ async function runFangSizingInternal(
             !outcome.sheet.feasible &&
             briefAutoAdjustments.length + adjustAttempt < maxAdjustAttempts
         ) {
+            // L9-P3: pass brief constraints so envelope swaps that
+            // contradict the declared physical form (e.g. swapping
+            // "40ft container" → "warehouse bay") are rejected and the
+            // sizing terminal-fails instead of producing a fake-FEASIBLE
+            // alternate that's a different product.
+            const briefForFormCheck = {
+                physicalForm: [
+                    research?.designBrief?.useCase ?? "",
+                    research?.designBrief?.mission ?? "",
+                ]
+                    .filter((s) => typeof s === "string" && s.length > 0)
+                    .join(" "),
+                transportConstraint: [
+                    research?.designBrief?.complianceNotes ?? "",
+                    research?.designBrief?.useCase ?? "",
+                ]
+                    .filter((s) => typeof s === "string" && s.length > 0)
+                    .join(" "),
+            }
             const decision = await decideAutoAdjustment(
                 outcome.sheet,
                 briefAutoAdjustments,
+                briefForFormCheck,
             )
             if (!decision.reRun || !decision.adjustedTarget || !decision.adjustment) {
                 break

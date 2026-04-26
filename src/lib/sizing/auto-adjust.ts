@@ -63,16 +63,89 @@ export interface AutoAdjustResult {
 const MAX_AUTO_ADJUSTMENTS = 2
 
 /**
+ * L9-P3 (2026-04-26): brief constraints we honour when deciding whether
+ * an envelope swap is acceptable. BESS Loop 9 PDF showed the auto-adjust
+ * accepting `warehouse_bay 100m²` as the "closest feasible alternate"
+ * for a brief that explicitly stated "40ft container, ships complete on
+ * a flatbed lorry". The output was a different product. The auto-adjust
+ * loop must respect the brief's physical form factor — if no in-form
+ * alternate exists, terminal-fail with a hard RED feasibility verdict
+ * instead of papering over with a fake-FEASIBLE label.
+ */
+export interface BriefPhysicalForm {
+    /** Free-text physical form constraint from brief (e.g. "40ft container",
+     *  "trolley", "wall-mounted unit"). */
+    physicalForm?: string | null
+    /** Free-text transport constraint (e.g. "flatbed lorry", "courier").
+     *  Implies envelope class limits. */
+    transportConstraint?: string | null
+}
+
+/**
+ * Map a brief's free-text physical-form description to the set of
+ * Envelope.kind values that are acceptable. Returns null when no
+ * constraint is declared (= any envelope is acceptable). Conservative —
+ * if we can't pattern-match the brief text, we return null (= permissive)
+ * so we never block a legitimate alternate.
+ */
+function envelopeKindsCompatibleWith(
+    form: BriefPhysicalForm | null | undefined,
+): Set<Envelope["kind"]> | null {
+    if (!form) return null
+    const text = `${form.physicalForm ?? ""} ${form.transportConstraint ?? ""}`.toLowerCase()
+    if (!text.trim()) return null
+    // 40ft container family — also accept 53ft HC as a strict size upgrade.
+    if (/\b(40\s*[- ]?ft|40\s*foot|40['']\s*container)/i.test(text)) {
+        return new Set<Envelope["kind"]>([
+            "container_40ft_iso",
+            "container_53ft_hc",
+        ])
+    }
+    if (/\b(20\s*[- ]?ft|20\s*foot|20['']\s*container)/i.test(text)) {
+        return new Set<Envelope["kind"]>([
+            "container_20ft_iso",
+            "container_40ft_iso",
+            "container_53ft_hc",
+        ])
+    }
+    if (/\b(53\s*[- ]?ft|53\s*foot)/i.test(text)) {
+        return new Set<Envelope["kind"]>(["container_53ft_hc"])
+    }
+    // Generic "container" — accept all container kinds, reject warehouse/room.
+    if (/\bcontainer(ised|ized)?\b/i.test(text)) {
+        return new Set<Envelope["kind"]>([
+            "container_20ft_iso",
+            "container_40ft_iso",
+            "container_53ft_hc",
+        ])
+    }
+    if (/\b(cabinet|rack|enclosure)\b/i.test(text)) {
+        return new Set<Envelope["kind"]>(["cabinet"])
+    }
+    if (/\b(trolley|chassis|cart)\b/i.test(text)) {
+        return new Set<Envelope["kind"]>(["chassis"])
+    }
+    // Couldn't pattern-match — be permissive.
+    return null
+}
+
+/**
  * Decide whether to auto-adjust + return the new target dict.
  *
  * @param sheet - the just-computed (infeasible) DimensionSheet
  * @param priorAdjustments - history from project.research._brief_auto_adjustments
+ * @param brief - optional brief constraints. When supplied, an envelope
+ *                swap that violates physicalForm/transportConstraint is
+ *                rejected and the auto-adjust terminal-fails (caller
+ *                must surface the hard infeasibility — better than a
+ *                fake-FEASIBLE alternate that's a different product).
  * @returns an AutoAdjustResult — caller is responsible for persisting the
  *          adjustment record AND re-running sizing if reRun=true
  */
 export async function decideAutoAdjustment(
     sheet: DimensionSheet,
     priorAdjustments: BriefAutoAdjustment[],
+    brief?: BriefPhysicalForm | null,
 ): Promise<AutoAdjustResult> {
     if (sheet.feasible) {
         return { reRun: false, terminal: false }
@@ -116,6 +189,21 @@ export async function decideAutoAdjustment(
             sheet.envelope &&
             alt.envelope.kind !== sheet.envelope.kind
         ) {
+            // L9-P3: reject envelope swaps that violate brief.physicalForm.
+            // BESS Loop 9 PDF showed the solver suggesting `warehouse_bay`
+            // for a brief that said "40ft container" — the result was a
+            // different product, but engine declared FEASIBLE. Better to
+            // terminal-fail and surface the hard infeasibility.
+            const compatibleKinds = envelopeKindsCompatibleWith(brief)
+            if (compatibleKinds && !compatibleKinds.has(alt.envelope.kind)) {
+                console.info(
+                    `[auto-adjust] rejecting envelope swap ` +
+                        `${sheet.envelope.kind} → ${alt.envelope.kind} ` +
+                        `(violates brief physicalForm: "${brief?.physicalForm ?? ""}" / ` +
+                        `transport: "${brief?.transportConstraint ?? ""}")`,
+                )
+                return { reRun: false, terminal: true }
+            }
             adjustedEnvelope = alt.envelope as Envelope
             dominantField = "envelope"
             dominantFrom = sheet.envelope.label ?? sheet.envelope.kind
