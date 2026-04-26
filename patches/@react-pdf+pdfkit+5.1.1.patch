@@ -1,0 +1,23 @@
+diff --git a/node_modules/@react-pdf/pdfkit/lib/pdfkit.js b/node_modules/@react-pdf/pdfkit/lib/pdfkit.js
+index 3619d74..dd3e35a 100644
+--- a/node_modules/@react-pdf/pdfkit/lib/pdfkit.js
++++ b/node_modules/@react-pdf/pdfkit/lib/pdfkit.js
+@@ -269,10 +269,14 @@ class PDFObject {
+     return `${object}`;
+   }
+   static number(n) {
+-    if (n > -1e21 && n < 1e21) {
+-      return Math.round(n * 1e6) / 1e6;
+-    }
+-    throw new Error(`unsupported number: ${n}`);
++    // 2026-04-26 Forge patch (patches/@react-pdf+pdfkit+4.6.0.patch):
++    // Yoga produces out-of-range layout values on certain document
++    // structures. Clamp to ±1e15 so PDF emits with possibly-wrong layout
++    // but no crash.
++    if (!isFinite(n)) n = 0;
++    if (n > 1e15) n = 1e15;
++    else if (n < -1e15) n = -1e15;
++    return Math.round(n * 1e6) / 1e6;
+   }
+ }
+ 

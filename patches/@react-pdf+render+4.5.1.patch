@@ -1,0 +1,23 @@
+diff --git a/node_modules/@react-pdf/render/lib/index.js b/node_modules/@react-pdf/render/lib/index.js
+index 028cf37..cd15743 100644
+--- a/node_modules/@react-pdf/render/lib/index.js
++++ b/node_modules/@react-pdf/render/lib/index.js
+@@ -109,10 +109,14 @@ const encodeGlyphs = (font, glyphs) => {
+ 
+ /* eslint-disable no-return-assign */
+ const number = (n) => {
+-    if (n > -1e21 && n < 1e21) {
+-        return Math.round(n * 1e6) / 1e6;
+-    }
+-    throw new Error(`unsupported number: ${n}`);
++    // 2026-04-26 Forge patch (patches/@react-pdf+render+4.6.1.patch):
++    // Yoga produces out-of-range layout values (e.g. -8.131e+21 sentinel
++    // arithmetic) on specific document structures. Clamp to ±1e15 so the
++    // PDF emits with potentially wrong-sized layout but no crash.
++    if (!isFinite(n)) n = 0;
++    if (n > 1e15) n = 1e15;
++    else if (n < -1e15) n = -1e15;
++    return Math.round(n * 1e6) / 1e6;
+ };
+ const _renderGlyphs = (ctx, encoded, positions, x, y) => {
+     const commands = [];
