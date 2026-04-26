@@ -136,7 +136,7 @@ export function InvestorInsightsPanel({ stats, filteredCount, grantsCount = 0, p
   return (
     <div className="rounded-xl shadow-sm bg-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border/40">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-international-orange" />
           <h2 className="text-sm font-semibold text-foreground">Investor Insights</h2>

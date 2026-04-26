@@ -227,7 +227,7 @@ export function ContactsDirectoryTab(): React.ReactElement {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/50">
+                  <tr className="border-b border-border/40 bg-muted/50">
                     <th className="text-left font-medium text-muted-foreground px-4 py-2.5">Name</th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-2.5">Title</th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-2.5">Firm</th>
@@ -286,7 +286,7 @@ export function ContactsDirectoryTab(): React.ReactElement {
 
 function ContactRow({ contact, onSelect }: { contact: ContactSearchResult; onSelect: (id: string) => void }): React.ReactElement {
   return (
-    <tr className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+    <tr className="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors">
       {/* Name — clickable to open detail dialog */}
       <td className="px-4 py-2.5">
         <button
@@ -451,7 +451,7 @@ function ContactsTableSkeleton(): React.ReactElement {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/50">
+            <tr className="border-b border-border/40 bg-muted/50">
               <th className="text-left font-medium text-muted-foreground px-4 py-2.5">Name</th>
               <th className="text-left font-medium text-muted-foreground px-4 py-2.5">Title</th>
               <th className="text-left font-medium text-muted-foreground px-4 py-2.5">Firm</th>
@@ -463,7 +463,7 @@ function ContactsTableSkeleton(): React.ReactElement {
           </thead>
           <tbody>
             {Array.from({ length: 10 }).map((_, i) => (
-              <tr key={i} className="border-b border-border last:border-0">
+              <tr key={i} className="border-b border-border/40 last:border-0">
                 <td className="px-4 py-2.5"><Skeleton className="h-4 w-32" /></td>
                 <td className="px-4 py-2.5"><Skeleton className="h-4 w-24" /></td>
                 <td className="px-4 py-2.5"><Skeleton className="h-4 w-28" /></td>

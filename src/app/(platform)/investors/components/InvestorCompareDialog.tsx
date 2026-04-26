@@ -92,7 +92,7 @@ export function InvestorCompareDialog({ open, onOpenChange, firms, matchScores }
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border">
+              <tr className="border-b border-border/40">
                 <th className="text-left py-3 pr-4 text-muted-foreground font-medium w-[140px]" />
                 {firms.map(firm => (
                   <th key={firm.id} className="text-left py-3 px-3 font-semibold text-foreground">
@@ -108,7 +108,7 @@ export function InvestorCompareDialog({ open, onOpenChange, firms, matchScores }
             </thead>
             <tbody>
               {/* Match Score row */}
-              <tr className="border-b border-border">
+              <tr className="border-b border-border/40">
                 <td className="py-2.5 pr-4 text-muted-foreground font-medium">Match Score</td>
                 {firms.map(firm => (
                   <td
@@ -124,7 +124,7 @@ export function InvestorCompareDialog({ open, onOpenChange, firms, matchScores }
               </tr>
 
               {ROWS.map(row => (
-                <tr key={row.label} className="border-b border-border">
+                <tr key={row.label} className="border-b border-border/40">
                   <td className="py-2.5 pr-4 text-muted-foreground font-medium">{row.label}</td>
                   {firms.map(firm => {
                     const value = row.getValue(firm)

@@ -101,7 +101,7 @@ export function InvestorTableView({
     >
       <table className="w-full text-sm">
         {/* ---- Sticky header ---- */}
-        <thead className="sticky top-0 z-10 bg-background border-b border-border">
+        <thead className="sticky top-0 z-10 bg-background border-b border-border/40">
           <tr>
             {COLUMN_HEADERS.map((col, i) => (
               <th

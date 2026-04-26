@@ -157,7 +157,7 @@ export function PortfolioDirectoryTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-b border-border/40">
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Company</th>
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Investors</th>
                   <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Sector</th>

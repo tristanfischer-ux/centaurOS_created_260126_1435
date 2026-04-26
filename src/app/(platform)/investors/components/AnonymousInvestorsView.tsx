@@ -39,7 +39,7 @@ export function AnonymousInvestorsView({ teaser }: AnonymousInvestorsViewProps) 
         <div className="space-y-8">
             {/* Header — minimal anonymous shell. No sidebar on this route group
               * so this header doubles as the page identifier and top nav. */}
-            <header className="pb-4 border-b border-border">
+            <header className="pb-4 border-b border-border/40">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Link
                         href="/"

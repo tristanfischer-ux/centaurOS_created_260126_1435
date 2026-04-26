@@ -79,7 +79,7 @@ export function InvestorPageTabs({
       {/* Tab bar — WAI-ARIA tablist, scrollable on mobile, arrow-key navigable */}
       <div className="relative">
         <div
-          className="flex items-center gap-1 border-b border-border overflow-x-auto scrollbar-hide"
+          className="flex items-center gap-1 border-b border-border/40 overflow-x-auto scrollbar-hide"
           role="tablist"
           aria-label="Investor views"
         >

@@ -96,7 +96,7 @@ export default async function MarketplacePage() {
         <span className="text-foreground font-medium">Suppliers</span>
       </nav>
       {/* ── Page header ── */}
-      <div className="pb-4 border-b border-border">
+      <div className="pb-4 border-b border-border/40">
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>Find a supplier</h1>

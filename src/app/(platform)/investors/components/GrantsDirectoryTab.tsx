@@ -534,7 +534,7 @@ export function GrantsDirectoryTab() {
         <div className="overflow-x-auto rounded-lg shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-border/40 bg-muted/50">
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grant Name</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Managing Body</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Country</th>
@@ -550,7 +550,7 @@ export function GrantsDirectoryTab() {
                 <tr
                   key={grant.id}
                   onClick={() => handleRowClick(grant)}
-                  className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                  className="border-b border-border/40 last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                 >
                   {/* Grant Name */}
                   <td className="px-4 py-3">

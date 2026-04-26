@@ -122,7 +122,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                 <span className="text-foreground font-medium truncate max-w-[280px]">{listing.title}</span>
             </nav>
             {/* Header - Matches Strategic Objectives style exactly */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-border">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -698,7 +698,7 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
                     value: (
                         <div className="bg-muted/50 rounded-lg p-3 space-y-0">
                             {entries.map(([k, v]) => (
-                                <div key={k} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                                <div key={k} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
                                     <span className="text-sm text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
                                     <span className="text-sm font-medium text-foreground">{String(v)}</span>
                                 </div>
@@ -876,7 +876,7 @@ function CompanyInfoSection({ attrs }: { attrs: Record<string, any> }) {
                         <CardContent className="pt-4">
                             <div className="space-y-1">
                                 {directors.map((d: { name?: string; appointed_on?: string }, i: number) => (
-                                    <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                    <div key={i} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
                                         <span className="text-sm font-medium text-foreground">{d.name || 'Unknown'}</span>
                                         {d.appointed_on && (
                                             <span className="text-xs text-muted-foreground">
@@ -901,7 +901,7 @@ function CompanyInfoSection({ attrs }: { attrs: Record<string, any> }) {
                         <CardContent className="pt-4">
                             <div className="space-y-1">
                                 {pscs.map((p: { name?: string; natures_of_control?: string[] }, i: number) => (
-                                    <div key={i} className="py-2 border-b border-border last:border-0">
+                                    <div key={i} className="py-2 border-b border-border/40 last:border-0">
                                         <span className="text-sm font-medium text-foreground">{p.name || 'Unknown'}</span>
                                         {p.natures_of_control && p.natures_of_control.length > 0 && (
                                             <div className="flex flex-wrap gap-1 mt-1">
@@ -1013,7 +1013,7 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
                                             : String(item.natures_of_control))
                                         : null
                                 return (
-                                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
                                         <span className="text-sm font-medium text-foreground">{name}</span>
                                         {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
                                     </div>
@@ -1047,7 +1047,7 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
     // Render booleans
     if (typeof value === 'boolean') {
         return (
-            <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+            <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
                 <span className="text-sm text-muted-foreground">{label}</span>
                 <Badge variant={value ? "success" : "secondary"} className="text-xs">
                     {value ? 'Yes' : 'No'}
@@ -1098,7 +1098,7 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
                 <p className="text-sm text-muted-foreground mb-2">{label}</p>
                 <div className="bg-muted/50 rounded-lg p-3 space-y-0">
                     {entries.map(([k, v]) => (
-                        <div key={k} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                        <div key={k} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
                             <span className="text-sm text-muted-foreground">{formatKey(k)}</span>
                             {renderValue(k, v)}
                         </div>
@@ -1113,7 +1113,7 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
     // Render URLs as clickable links
     if (typeof value === 'string' && isURL(value)) {
         return (
-            <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+            <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
                 <span className="text-sm text-muted-foreground">{label}</span>
                 <a
                     href={value}
@@ -1138,7 +1138,7 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
                 year: 'numeric',
             })
             return (
-                <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
                     <span className="text-sm text-muted-foreground">{label}</span>
                     <span className="text-sm font-medium text-foreground">{formatted}</span>
                 </div>
@@ -1148,7 +1148,7 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
 
     // Render strings/numbers
     return (
-        <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+        <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
             <span className="text-sm text-muted-foreground">{label}</span>
             <span className="text-sm font-medium text-foreground">
                 {strValue}

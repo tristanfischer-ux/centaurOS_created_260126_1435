@@ -52,7 +52,7 @@ export function MobileDesktopBanner() {
   if (!visible) return null
 
   return (
-    <div className="sm:hidden flex items-center gap-3 px-4 py-3 mb-4 rounded-lg bg-muted border text-foreground">
+    <div className="sm:hidden flex items-center gap-3 px-4 py-3 mb-4 rounded-lg bg-muted shadow-sm text-foreground">
       <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
       <p className="text-xs leading-relaxed flex-1">
         Fractional Forge works best on desktop. Some features are limited on mobile.

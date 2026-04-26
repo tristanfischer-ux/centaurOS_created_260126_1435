@@ -116,7 +116,7 @@ export function InvestorNoteTimeline({ listingId }: InvestorNoteTimelineProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Add note form */}
-        <div className="space-y-3 pb-4 border-b border-border">
+        <div className="space-y-3 pb-4 border-b border-border/40">
           <div className="flex items-center gap-2">
             <Select value={noteType} onValueChange={setNoteType}>
               <SelectTrigger className="w-[130px] h-8 text-xs">

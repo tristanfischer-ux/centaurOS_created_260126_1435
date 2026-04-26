@@ -88,7 +88,7 @@ function formatDate(dateStr: string | undefined): string | null {
 
 function SectionHeading({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <h3 className={cn("text-sm font-semibold text-international-orange border-b border-border pb-1 mb-2", className)}>
+    <h3 className={cn("text-sm font-semibold text-international-orange border-b border-border/40 pb-1 mb-2", className)}>
       {children}
     </h3>
   )
