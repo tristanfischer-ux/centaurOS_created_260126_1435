@@ -58,10 +58,13 @@ export const sizingAdapter: StageAdapter = {
             )
             .not("dimension_sheet", "is", null)
         if (error) return { ok: false, error: error.message }
-        if (!count || count < 3)
+        // Lower threshold to 1 — sizing is opt-in per-domain; not every
+        // demo project has a dimension_sheet yet, but scoring even one
+        // is useful as a starting baseline.
+        if (!count || count < 1)
             return {
                 ok: false,
-                error: `expected at least 3 demo projects with dimension_sheet, found ${count ?? 0}`,
+                error: `expected at least 1 demo project with dimension_sheet, found ${count ?? 0}`,
             }
         return { ok: true }
     },

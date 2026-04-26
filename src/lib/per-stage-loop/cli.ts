@@ -38,6 +38,9 @@ import { sizingAdapter } from "./adapters/sizing"
 import { briefQualityAdapter } from "./adapters/brief-quality"
 import { fangEngineeringReviewAdapter } from "./adapters/fang-engineering-review"
 import { finnCostAdapter } from "./adapters/finn-cost"
+import { illustrationAdapter } from "./adapters/illustration"
+import { layoutAdapter } from "./adapters/layout"
+import { proofreaderSelfReviewAdapter } from "./adapters/proofreader-self-review"
 import type { StageAdapter, StageName } from "./types"
 
 const ADAPTERS: Record<string, StageAdapter> = {
@@ -50,6 +53,9 @@ const ADAPTERS: Record<string, StageAdapter> = {
     "brief-quality": briefQualityAdapter,
     "fang-engineering-review": fangEngineeringReviewAdapter,
     "finn-cost": finnCostAdapter,
+    illustration: illustrationAdapter,
+    layout: layoutAdapter,
+    "proofreader-self-review": proofreaderSelfReviewAdapter,
 }
 
 async function main() {

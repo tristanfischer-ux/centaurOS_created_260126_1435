@@ -21,7 +21,9 @@ export type StageName =
     | "supplier-match"
     | "fang-review"
     | "proofreader"
+    | "proofreader-self-review"
     | "oracle"
+    | "illustration"
 
 /** Per-stage golden input — one input case from a frozen regression set. */
 export interface StageGoldenInput {

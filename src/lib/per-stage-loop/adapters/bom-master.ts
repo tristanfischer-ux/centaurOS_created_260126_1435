@@ -16,7 +16,7 @@
  * - cost_field_present — % of rows with a non-null estimated unit cost.
  * - mass_field_present — % of rows with a non-null mass.
  * - process_material_named — % of rows with non-null process AND material.
- * - module_attribution — every BOM row should have a source_module_id.
+ * - module_attribution — every BOM row should have a source_source_module_id.
  *   % of rows with valid attribution.
  * - mutex_resolved — Loop 5 P5 shipped a mutex resolver. Score by
  *   absence of obvious-architectural-alternatives-as-rows
@@ -49,7 +49,7 @@ interface PartRow {
     mass_kg: number | null
     estimated_unit_cost_gbp: number | null
     quantity: number | null
-    module_id: string | null
+    source_module_id: string | null
     is_purchased: boolean | null
 }
 
@@ -86,7 +86,7 @@ export const bomMasterAdapter: StageAdapter = {
                     .maybeSingle(),
                 admin
                     .from("parts")
-                    .select("id, part_number, name, process, material, mass_kg, estimated_unit_cost_gbp, module_id, is_purchased")
+                    .select("id, part_number, name, process, material, mass_kg, estimated_unit_cost_gbp, source_module_id, is_purchased")
                     .eq("cad_lab_project_id", id),
             ])
             if (!project) continue
@@ -134,7 +134,7 @@ export const bomMasterAdapter: StageAdapter = {
                 hasMass: fieldFilled("mass_kg"),
                 hasProcess: fieldFilled("process"),
                 hasMaterial: fieldFilled("material"),
-                hasModuleId: fieldFilled("module_id"),
+                hasModuleId: fieldFilled("source_module_id"),
                 samplePartNumbers: parts.slice(0, 12).map((p) => p.part_number),
             },
             diagnostics: parts.length === 0 ? ["no BOM rows"] : [],
@@ -154,7 +154,7 @@ export const bomMasterAdapter: StageAdapter = {
             material: p.material,
             mass_kg: p.mass_kg,
             cost: p.estimated_unit_cost_gbp,
-            module_id: p.module_id,
+            source_module_id: p.source_module_id,
         }))
 
         return `You are scoring a UK hardware engineering project's BOM master output. The BOM is the deterministic part list that drives cost, supplier matching, and procurement.

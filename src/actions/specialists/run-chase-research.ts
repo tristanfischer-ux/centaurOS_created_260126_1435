@@ -774,6 +774,14 @@ Rules:
 - Do NOT use the words "AI", "smart", or "intelligent" in the values. This lands in-product.
 - Output must parse as JSON.
 
+COVERAGE AUDIT (mandatory): before returning, walk down the coverage checklist above and confirm your regulatory[] array contains AT LEAST ONE row for every regime that plausibly applies to this project. The Loop 8 council scored every prior output 3-4/10 on coverage despite the prompt naming the regimes — the model emitted 6-10 rows when 12-20 were warranted. Targets per project class:
+- UK consumer connected IoT (e.g. garden bird feeder, walking aid, weather station): MINIMUM 12 rows. UKCA + RED + EMC Regs 2016 + Electrical Equipment Safety Regs 2016 + RoHS + WEEE + PSTI Act 2022 + GPSR + Battery Regs 2009 + UN 38.3 + IEC 62133 + GDPR/PECR if data; add MHRA if medical, Ofcom for spectrum.
+- UK containerised energy storage (BESS): MINIMUM 14 rows. ESQCR + ENA G99/G100 + BS EN IEC 62933-5-2 + BS EN IEC 62619 + BS EN IEC 63056 + BS 7671 + EAWR + UKCA umbrella + EMC Regs + Supply of Machinery (Safety) Regs + UN 38.3 + ADR + ISO 1496-1 (with CSC consequence) + insurer-reference NFPA 855/UL 9540/UL 9540A.
+- UK container vertical farm (food production): MINIMUM 14 rows. Food Safety Act 1990 + EC 852/2004 + BS EN 1672 + BPR + HSE registration + UKCA + Supply of Machinery (Safety) Regs + Electrical Equipment Safety Regs + EMC + BS 7671 + EAWR + WRAS for water + WRR for abstraction + F-Gas Regs operator duties.
+- UK container desalination (potable water): MINIMUM 12 rows. WSR/Drinking Water Regs 2016 + BS 6920 + UKCA + Supply of Machinery (Safety) Regs + PESR + PSSR + EMC + BS 7671 + EAWR + ISO 1496-1 + Water Resources (Control of Pollution) for brine discharge + insurer-reference WHO Drinking Water Guidelines.
+- UK connected mobility aid / medical device: MINIMUM 12 rows. UK MDR 2002 + BS EN ISO 13485 + BS EN ISO 14971 + MHRA + RED + EMC + Electrical Equipment Safety Regs + RoHS + WEEE + PSTI + UN 38.3 + IEC 62133 + GDPR.
+The checklist is not exhaustive — add product-specific regimes (e.g. children's product safety, EX/ATEX zones for hazardous areas, marine for offshore, automotive UNECE for road vehicles) when applicable. Less than the minimum count above signals to the council that coverage is incomplete and the score drops.
+
 FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 7, V4-Pro generated). The "regulatory" array on a UK 3.5 MWh containerised LFP BESS should look LIKE THIS — one row per standard, every field filled out, statutory vs reference clearly distinguished:
 
 [
