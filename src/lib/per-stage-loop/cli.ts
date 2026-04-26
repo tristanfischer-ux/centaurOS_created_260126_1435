@@ -34,6 +34,10 @@ import { supplierMatchAdapter } from "./adapters/supplier-match"
 import { maxDecomposeAdapter } from "./adapters/max-decompose"
 import { bomMasterAdapter } from "./adapters/bom-master"
 import { risksRegisterAdapter } from "./adapters/risks-register"
+import { sizingAdapter } from "./adapters/sizing"
+import { briefQualityAdapter } from "./adapters/brief-quality"
+import { fangEngineeringReviewAdapter } from "./adapters/fang-engineering-review"
+import { finnCostAdapter } from "./adapters/finn-cost"
 import type { StageAdapter, StageName } from "./types"
 
 const ADAPTERS: Record<string, StageAdapter> = {
@@ -42,6 +46,10 @@ const ADAPTERS: Record<string, StageAdapter> = {
     "max-decompose": maxDecomposeAdapter,
     "bom-expand": bomMasterAdapter,
     "fang-review": risksRegisterAdapter,
+    sizing: sizingAdapter,
+    "brief-quality": briefQualityAdapter,
+    "fang-engineering-review": fangEngineeringReviewAdapter,
+    "finn-cost": finnCostAdapter,
 }
 
 async function main() {
