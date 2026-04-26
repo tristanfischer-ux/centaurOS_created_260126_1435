@@ -23,10 +23,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         .select('title, description')
         .eq('id', id)
         .single()
-    if (!data) return { title: 'Supplier not found — Fractional Forge' }
+    if (!data) return { title: 'Supplier not found' }
     const desc = (data.description ?? '').slice(0, 155)
     return {
-        title: `${data.title} — Fractional Forge`,
+        title: data.title,
         description: desc || `${data.title} on the Fractional Forge supplier directory.`,
     }
 }
