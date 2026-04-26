@@ -148,7 +148,12 @@ export const chaseRegulatoryAdapter: StageAdapter = {
                     prompt: userPrompt,
                     maxTokens: 8192,
                     temperature: 0.1,
-                    timeoutMs: 120_000,
+                    // Loop 4 (db04b611) expanded the prompt with a UK regime
+                    // taxonomy + coverage checklist — Sonnet via OpenRouter
+                    // started timing out at exactly 120 s on every demo
+                    // (vertfarm/sentinel/hedgerow all 120004 ms). Bumping
+                    // to 240 s so the matrix output has time to emit.
+                    timeoutMs: 240_000,
                 })
                 if (result.ok) {
                     const parsed = await parseChaseExtraction(result.text)

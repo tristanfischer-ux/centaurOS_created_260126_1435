@@ -371,7 +371,12 @@ ${dataSummary}`
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-7",
+          // Loop 8 cost cut (2026-04-26): claude-opus-4-7 → claude-sonnet-4-6
+          // for the PDF report synthesis. This runs once per project per
+          // regen × 6 projects. Opus → Sonnet ≈ 5× cheaper without quality
+          // risk on prose synthesis (Sonnet is already used for Chase + Max
+          // research at this fidelity bar).
+          model: "claude-sonnet-4-6",
           max_tokens: 12288,
           temperature: 0.3,
           system: systemPrompt,

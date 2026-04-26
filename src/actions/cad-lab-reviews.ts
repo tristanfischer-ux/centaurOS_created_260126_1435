@@ -50,7 +50,22 @@ import { withLlmPermit } from "@/lib/ai/llm-permit"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const REVIEW_MODEL = "claude-opus-4-7"
+// Loop 8 cost cut (2026-04-26 — Tristan flagged "very, very, very expensive"):
+// Drop fang.review from claude-opus-4-7 → claude-sonnet-4-6.
+//
+// Why this is safe: Sonnet 4.6 is already used for QUICK_VERDICT (line ~417)
+// and for Chase + Max in the autopilot pipeline at this quality bar. Every
+// council benchmark sweep this month (forgeos_specialist_model_swap_findings_20260425
+// memory) cleared Sonnet for fang-class structured DFM review. The agents
+// surface even moved past Sonnet to Qwen 3 235B for vp-engineering, but
+// the Qwen swap inside this file would need an Anthropic-SDK → OpenRouter
+// refactor (tool-use streaming has different API surfaces) so we ship the
+// 5× cost cut today and leave the 25× cut for a follow-up.
+//
+// Per-regen impact: 6 projects × 7-9 modules × per-call cost.
+// Opus 4.7 ≈ £0.50/call → ~£25-30/regen on fang alone.
+// Sonnet 4.6 ≈ £0.10/call → ~£5-6/regen on fang alone.
+const REVIEW_MODEL = "claude-sonnet-4-6"
 const MAX_TOOL_LOOPS = 5
 const MAX_TOKENS = 8192
 
