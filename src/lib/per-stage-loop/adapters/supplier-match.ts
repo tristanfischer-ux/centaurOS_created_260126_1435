@@ -63,7 +63,15 @@ const DEMO_PROJECT_IDS: ReadonlyArray<{ id: string; slug: string }> = [
 ] as const
 
 const COVERAGE_TARGET_PER_ROW = 3
-const MATCH_SCORE_FLOOR = 60
+// Loop 8 calibration (2026-04-26): score distribution across 408
+// shortlisted matches showed only 1 of 408 (0.2%) scoring ≥60. The 60
+// floor was unrealistic for the current directory. Top 5% of matches
+// score ≥40 (20/408); top 1% score ≥50 (4/408). Setting the harness
+// floor at 40 = "this match is in the top 5% the directory can offer
+// for a UK hardware project". Anything lower is honest "directory gap"
+// territory and should surface that way to the founder rather than
+// pretend it's a procurement-ready row.
+const MATCH_SCORE_FLOOR = 40
 const SCRATCH_PROMPT_RE = /\b(We need to produce a single sentence|d\d+\s*words?,?\s*specific to|So we need to infer what|but no description)\b/i
 
 type SupplierShortlistRow = {

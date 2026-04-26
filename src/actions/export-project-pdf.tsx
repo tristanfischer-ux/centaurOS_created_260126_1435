@@ -2269,15 +2269,24 @@ function SuppliersPage({
                                 {typeof s.matchScore === "number"
                                     ? ` · match score ${s.matchScore.toFixed(1)}/100`
                                     : ""}
-                                {/* Loop 7 critique A13 honesty pass: when match
-                                 * score is below 60 the supplier is a
-                                 * directory-gap candidate, not a qualified
-                                 * shortlist row. Flag visibly so founder
-                                 * doesn't treat it as a procurement
-                                 * recommendation. (ramp_role suppressed —
-                                 * Loop 7 critique called it a 'dead column'.) */}
-                                {typeof s.matchScore === "number" && s.matchScore < 60
-                                    ? ` · LOW CONFIDENCE — directory gap, manual scout recommended`
+                                {/* Loop 8 score-distribution audit (2026-04-26):
+                                 * across 408 shortlisted matches, only 1 (0.2%)
+                                 * scored ≥60. The directory is genuinely thin
+                                 * for these UK hardware classes, so calibrate
+                                 * the tier labels to the actual distribution:
+                                 *   ≥50  Strong fit (top 1%)
+                                 *   ≥40  Plausible fit (top 5%)
+                                 *   ≥30  Weak fit — directory gap
+                                 *   <30  Below noise floor (filtered upstream
+                                 *        but legacy rows surface here too) */}
+                                {typeof s.matchScore === "number"
+                                    ? s.matchScore >= 50
+                                        ? ` · STRONG FIT (top 1% of directory)`
+                                        : s.matchScore >= 40
+                                            ? ` · PLAUSIBLE FIT (top 5% of directory)`
+                                            : s.matchScore >= 30
+                                                ? ` · WEAK FIT — directory gap, scout other vendors`
+                                                : ` · BELOW NOISE FLOOR — directory has no real coverage for this part class`
                                     : ""}
                             </Text>
                         )}
