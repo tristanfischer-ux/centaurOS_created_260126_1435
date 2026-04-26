@@ -451,7 +451,22 @@ For the target module, provide detailed engineering information. Output STRICTLY
   "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
   "whyItMatters": "Why this module is critical to the overall system.",
   "failureModes": ["Failure mode 1", "Failure mode 2"],
-  "unknowns": ["Open question 1", "Open question 2"]
+  "unknowns": ["Open question 1", "Open question 2"],
+  "riskMatrix": [
+    {
+      "id": "RM-1",
+      "hazard": "specific failure mode (matches one of failureModes; richer context here)",
+      "cause": "what triggers the hazard — root cause",
+      "consequence": "what happens to the system / user / operator if it occurs",
+      "existingControls": "what's already in the design that mitigates this (sensors, fuses, redundancy, etc.)",
+      "severity": 4,
+      "likelihood": 2,
+      "mitigation": "the next concrete action to reduce severity or likelihood",
+      "owner": "Role accountable — Battery safety lead | Electrical lead | Mechanical lead | Controls lead | Founder",
+      "residualSeverity": 3,
+      "residualLikelihood": 1
+    }
+  ]
 }
 
 RULES:
@@ -461,6 +476,7 @@ RULES:
 - description should cover physical characteristics, operating principle, and material choices
 - failureModes: 2-4 realistic engineering failure modes
 - unknowns: 1-3 open questions that need resolution
+- riskMatrix is REQUIRED (Loop 7 P1, council-unanimous): you MUST emit at least one riskMatrix row PER failureMode entry. Every module's riskMatrix.length MUST equal failureModes.length — same hazards, structured representation. severity 1-5 (1=negligible, 3=major operational disruption, 5=catastrophic / safety-critical / total loss). likelihood 1-5 (1=very rare / once in 10 years, 3=plausible / yearly, 5=likely / monthly+). mitigation must be a concrete action, not "review later". owner must be a role, not "TBD". residualSeverity / residualLikelihood = rating AFTER mitigation lands. The council scored unranked failureModes string lists 3-4/10 and structured FMEA matrices 8/10. Skipping the riskMatrix field means the report fails dimension 8 of the council critique.
 - Use dimensions from the research report — do not invent new ones
 - NO ACRONYMS — every technical/system acronym MUST be written in full on first AND every subsequent mention, in keyParts, description, whyItMatters, failureModes, unknowns. Write "battery management system" not "BMS", "energy management system" not "EMS", "contract manufacturer" not "CM", "design for manufacturing" not "DFM", "bill of materials" not "BOM", "thermal runaway" not "TR", "controlled environment agriculture" not "CEA".
 - STANDARDS BODIES ARE PROPER NOUNS — keep their canonical acronyms intact. Write "UL 9540" not "United Laboratories 9540" (UL = Underwriters Laboratories — do NOT guess at expansions); "IEC 62619" not spelled out; "ISO 1496-1" not spelled out; "NFPA 855" not spelled out; "RED 2014/53/EU" not spelled out; "UKCA" not spelled out; "EN 60529" not spelled out. If unsure of the canonical full name of any standards body or registered scheme, USE THE ACRONYM ONLY — fabricated expansions like "United Laboratories" are factual errors that destroy report credibility. Only technical/system acronyms (BMS, EMS, BOM, etc.) get expanded.
