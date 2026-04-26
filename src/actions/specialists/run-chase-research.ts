@@ -728,7 +728,80 @@ Rules:
 - Standards-body codes pass through verbatim — UL, IEC, ISO, NFPA, BS, EN. Do NOT invent expansions ("United Laboratories" is a hallucination, the correct full name is "Underwriters Laboratories" — but the code "UL" stays as-is in copy).
 - British English ("programme" not "program"). First-person voice not required here — this is extraction, not narrative.
 - Do NOT use the words "AI", "smart", or "intelligent" in the values. This lands in-product.
-- Output must parse as JSON.`
+- Output must parse as JSON.
+
+FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 7, V4-Pro generated). The "regulatory" array on a UK 3.5 MWh containerised LFP BESS should look LIKE THIS — one row per standard, every field filled out, statutory vs reference clearly distinguished:
+
+[
+  {
+    "code": "ENA G99",
+    "name": "Requirements for Connection of Generation Equipment in Parallel with Public Distribution Networks above 16A",
+    "summary": "Mandatory UK grid code for behind-the-meter storage connecting in parallel with the distribution network; requires grid-forming capability and compliance with ESQCR.",
+    "applicability": "Grid connection point >16A — Statutory",
+    "designImpact": "Inverter must support grid-forming mode, islanding detection, and specified frequency/voltage ride-through parameters.",
+    "evidenceRequired": "G99 commissioning test record signed by host DNO, generation connection agreement.",
+    "status": "not-started",
+    "ownerRole": "Electrical Engineer",
+    "gapAction": "Engage Distribution Network Operator to submit G99 application and schedule commissioning witness test."
+  },
+  {
+    "code": "BS EN IEC 62933-5-2",
+    "name": "Electrical energy storage (EES) systems — Part 5-2: Safety requirements for grid-integrated EES systems",
+    "summary": "UKCA harmonised standard for stationary battery energy storage safety; replaces US UL 9540 for UK market access.",
+    "applicability": "Complete BESS enclosure and integration — Statutory",
+    "designImpact": "System must pass specified fire propagation, thermal runaway, and containment tests; dictates ventilation, fire detection/suppression integration.",
+    "evidenceRequired": "Test report from UKAS-accredited lab demonstrating compliance with BS EN IEC 62933-5-2.",
+    "status": "not-started",
+    "ownerRole": "Product Safety Manager",
+    "gapAction": "Identify UKAS-accredited test house and scope testing programme for system-level safety."
+  },
+  {
+    "code": "BS 7671",
+    "name": "Requirements for Electrical Installations (IET Wiring Regulations)",
+    "summary": "UK wiring regulations for the fixed installation within the BESS container.",
+    "applicability": "Internal LV wiring and protection — Statutory",
+    "designImpact": "Design must comply with shock protection, earthing, overcurrent protection, and isolation requirements; may require RCD protection on auxiliary circuits.",
+    "evidenceRequired": "Electrical installation certificate (EIC) signed by a competent person, plus schedule of inspections and test results.",
+    "status": "not-started",
+    "ownerRole": "Electrical Engineer",
+    "gapAction": "Design internal distribution per BS 7671 and engage qualified electrician to produce EIC after installation."
+  },
+  {
+    "code": "UN 38.3",
+    "name": "UN Manual of Tests and Criteria, Part III, sub-section 38.3 — Lithium metal and lithium ion batteries",
+    "summary": "Mandatory transport safety tests for lithium cells and batteries; required before shipping battery modules.",
+    "applicability": "Battery cells/modules during transport — Statutory",
+    "designImpact": "Cells must pass altitude simulation, thermal cycling, vibration, shock, overcharge, and forced discharge tests.",
+    "evidenceRequired": "UN 38.3 test summary report from cell supplier or accredited lab; ADR dangerous goods note for road transport.",
+    "status": "not-started",
+    "ownerRole": "Supply Chain Manager",
+    "gapAction": "Confirm cell supplier has valid UN 38.3 certification, and prepare ADR documentation for road shipment."
+  },
+  {
+    "code": "NFPA 855",
+    "name": "Standard for the Installation of Stationary Energy Storage Systems",
+    "summary": "US reference standard often cited by UK insurers and NFCC guidance; not statutory in the UK.",
+    "applicability": "Fire safety design — Reference (NFCC/insurer guidance, non-statutory)",
+    "designImpact": "Spacing, fire suppression density, smoke control, and explosion prevention concepts can inform design but UK compliance is via BS EN IEC 62933-5-2.",
+    "evidenceRequired": "Not mandated; insurer may request alignment report or justification.",
+    "status": "not-started",
+    "ownerRole": "Product Safety Manager",
+    "gapAction": "Review NFPA 855 recommendations and incorporate where they strengthen the fire safety case; prepare statement for insurer if needed."
+  },
+  {
+    "code": "ISO 1496-1",
+    "name": "Series 1 freight containers — Specification and testing — Part 1: General cargo containers for general purposes",
+    "summary": "Container structural certification under CSC; becomes invalid once container shell is structurally modified (vents, large openings, internal reinforcements).",
+    "applicability": "Shipping container enclosure — Not applicable (structurally modified)",
+    "designImpact": "Original CSC plate voided; design must rely on alternative structural certification (FEA to EN 1993 or new classification-society inspection).",
+    "evidenceRequired": "Finite element analysis report or new structural certification under a recognised classification society.",
+    "status": "not-started",
+    "ownerRole": "Mechanical Design Lead",
+    "gapAction": "Commission structural analysis of modified container per design loads and engage classification society for re-certification."
+  }
+]
+
+Match this STYLE and DEPTH for any project. The fields applicability + designImpact + evidenceRequired + ownerRole + gapAction must be specific to the project's actual configuration — not generic boilerplate. For non-BESS projects the standards differ but the structure stays identical.`
 
     const userPrompt = `Subject: ${subject}
 
