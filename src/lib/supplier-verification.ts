@@ -65,6 +65,72 @@ const URL_SHAPE_REJECTS: ReadonlyArray<{
 ]
 
 /**
+ * Quick supplier-NAME gate — synchronous regex check. Returns true if
+ * the name looks like a product page title, news headline, marketing
+ * tagline, or product description rather than a real company name. Used
+ * at the PDF render layer to suppress hallucinated supplier rows.
+ *
+ * Loop 7 critique evidence (LOOP-7-CRITIQUE.md A12): Hedgerow shipped
+ * "FR4 Sheet Manufacturer", "Liquid Cooling Unit for Battery Energy
+ * Storage System (BESS) Rack", "Atmospheric Pressure Sensor", "Tower
+ * makes Ramon rad-hard processor", "Microchip Radiation Hardened",
+ * "Unleash Precision with RS485 Soil EC and pH Sensor" as supplier
+ * names. None of those are companies.
+ */
+export function looksLikeHallucinatedSupplierName(name: string): {
+    bad: boolean
+    reason: string
+} {
+    if (!name || typeof name !== "string") return { bad: true, reason: "empty name" }
+    const n = name.trim()
+    if (n.length === 0) return { bad: true, reason: "empty name" }
+
+    // Imperative / marketing tagline patterns ("Unleash …", "Discover …",
+    // "Find your …", "Save 30% on …").
+    if (/^(Unleash|Discover|Save|Find|Get|Buy|Shop|Order|Try)\b/i.test(n)) {
+        return { bad: true, reason: "imperative tagline, not a company name" }
+    }
+
+    // Generic product-category strings used as a name. These typically
+    // match the BOM part description verbatim ("FR4 Sheet Manufacturer",
+    // "Atmospheric Pressure Sensor", "DC Distribution Board"). The
+    // hallmark is title-cased common nouns + ending in a category word
+    // with no proper-noun anchor.
+    const productCategoryEnding =
+        /\b(Manufacturer|Supplier|Wholesaler|Distributor|Reseller|Vendor|Sensor|Module|Board|Panel|Controller|Cell|Cable|Connector|Adapter|Switch|Pump|Filter|Fitting|Bracket|Plate|Housing|Enclosure|Antenna|Driver|Inverter|Converter|Rack|Frame|Hardware|Fastener|Coupling|Valve|Gauge|Meter|Cooling Unit|Storage System|Power Supply)\s*$/i
+    const hasProperNounAnchor = /\b(Ltd|Limited|GmbH|SA|SAS|Inc|Corp|LLC|PLC|AG|Co\.|S\.r\.l\.|Pty)\b/i.test(n) ||
+        /\b[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?\s+(?:Industries|Engineering|Systems|Technologies|Components|Manufacturing|Electric|Electronics|Solutions|Sensors|Optics|Materials)\b/.test(n)
+    if (productCategoryEnding.test(n) && !hasProperNounAnchor) {
+        return { bad: true, reason: "name reads as a product category, not a company" }
+    }
+
+    // News-article headline pattern: "<Subject> <verb> <object>", e.g.
+    // "Tower makes Ramon rad-hard processor".
+    if (/^[A-Z][a-z]+\s+(makes|launches|ships|releases|unveils|announces|debuts)\s+/i.test(n)) {
+        return { bad: true, reason: "looks like a news-article headline, not a company name" }
+    }
+
+    // PDF / academic-paper title leakage: "Modelling and Control of
+    // Grid-Following Inverter…" (BESS p.86).
+    if (/^(Modelling|Modeling|Analysis|Design|Control|Investigation|Evaluation|Comparison)\s+(of|and)\b/i.test(n)) {
+        return { bad: true, reason: "looks like an academic paper title, not a company name" }
+    }
+
+    // Embedded product-spec parens: "(BESS) Rack", "(IoT)", "(LFP)" —
+    // companies don't include product specs in their trading name.
+    if (/\b\([A-Z]{2,5}\)\s+[A-Z][a-z]+/.test(n)) {
+        return { bad: true, reason: "name contains product-spec parens, not a company name" }
+    }
+
+    // Description-style: very long names (>60 chars, multiple commas).
+    if (n.length > 60 && (n.match(/,/g) ?? []).length >= 1) {
+        return { bad: true, reason: "name is too long / comma-separated — looks like a description" }
+    }
+
+    return { bad: false, reason: "" }
+}
+
+/**
  * Quick URL-shape gate — runs synchronously, no I/O. Returns the first
  * failure reason if the URL matches any reject pattern.
  */

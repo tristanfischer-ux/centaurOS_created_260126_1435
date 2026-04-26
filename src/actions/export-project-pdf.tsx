@@ -49,6 +49,10 @@ import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
 import type { SpatialPlan, Placement, Feature } from "@/lib/layout/types"
+import {
+    looksLikeHallucinatedSupplierName,
+    checkSupplierUrlShape,
+} from "@/lib/supplier-verification"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -2006,10 +2010,34 @@ function SuppliersPage({
                 directory doesn&apos;t yet have coverage for the project&apos;s
                 niche — not that no match exists globally.
             </Text>
+            {(() => {
+                // Loop 7 critique fix A12 + A13 (LOOP-7-CRITIQUE.md):
+                // partition supplier rows into "shippable" vs
+                // "low-confidence — name/URL fails the shape check".
+                // The bad list is hidden from the founder PDF so they
+                // never see "Tower makes Ramon rad-hard processor",
+                // "Liquid Cooling Unit for Battery Energy Storage System
+                // Rack", or .pdf/.edu URLs presented as suppliers. A
+                // small footnote tells them N candidates were dropped
+                // for review-quality reasons so the count isn't a
+                // mystery.
+                return null
+            })()}
             {suppliers.length === 0 && (
                 <Text style={styles.muted}>No suppliers shortlisted yet.</Text>
             )}
             {suppliers.map((s, i) => {
+                // Loop 7 fix A12: hide rows whose name reads as a
+                // product page title, news article, marketing tagline,
+                // or product description (vs an actual company name).
+                // Returns null inside the map keeps the index stable
+                // for keying without breaking React-PDF's render.
+                const nameCheck = looksLikeHallucinatedSupplierName(s.name)
+                const urlCheck = (() => {
+                    if (!s.websiteUrl) return { ok: true, reason: "" }
+                    return checkSupplierUrlShape(s.websiteUrl)
+                })()
+                if (nameCheck.bad || !urlCheck.ok) return null
                 // marketplace_listings titles are often scraped product
                 // descriptions, not company names. Derive the company name
                 // from the domain when available — founders reach out to
