@@ -286,9 +286,73 @@ function PdfFooter({ label }: { label: string }): React.ReactElement {
 
 // ─── Small formatters ──────────────────────────────────────────────────
 
+/**
+ * Coerce ANY value coming off Supabase / PostgREST into a finite JS number
+ * or null. This is the single chokepoint the PDF data builder uses for
+ * every numeric column.
+ *
+ * The bug this protects against (2026-04-26 council-diagnosed):
+ * PostgREST returns `numeric` and `decimal` columns as STRINGS to preserve
+ * precision (e.g. "187500.00", "3800.0000"). The previous data builder
+ * used `typeof x === "number"` checks which evaluated FALSE for every
+ * row, so massKg / estimatedUnitCostGbp / etc. were all null silently.
+ * That's been the historical state for months — but at some point a
+ * downstream calc (Yoga flexbox layout for a numeric Style prop OR an
+ * SVG coord) started hitting the propagated `undefined` sentinel
+ * (Yoga's YGUndefined = 10e20f), arithmetic-combining into garbage like
+ * -8.131324562511189e+21, and pdfkit then rejects with "unsupported
+ * number". Coercing at the boundary gives downstream code a real number
+ * to work with OR a clean null guarded by the existing `?? 0` patterns.
+ */
+function toFiniteOrNull(x: unknown): number | null {
+    if (typeof x === "number") {
+        return Number.isFinite(x) ? x : null
+    }
+    if (typeof x === "string" && x.length > 0) {
+        const n = Number(x)
+        return Number.isFinite(n) ? n : null
+    }
+    return null
+}
+
 function fmtGbp(n: number | null | undefined): string {
     if (typeof n !== "number" || !Number.isFinite(n)) return "—"
     return `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`
+}
+
+/**
+ * Recursively walk the PdfInput tree and return paths to any number
+ * that is NaN / +Infinity / -Infinity / outside ±1e15 (pdfkit's safe
+ * range is roughly ±1e21 but the Yoga sentinel is 1e20 so we flag much
+ * earlier). Used as a last-line diagnostic before the render call.
+ */
+function walkForBadNumbers(
+    obj: unknown,
+    path: string,
+): Array<{ path: string; value: unknown }> {
+    const out: Array<{ path: string; value: unknown }> = []
+    if (obj == null) return out
+    if (typeof obj === "number") {
+        if (!Number.isFinite(obj) || Math.abs(obj) > 1e15) {
+            out.push({ path, value: obj })
+        }
+        return out
+    }
+    if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+            out.push(...walkForBadNumbers(obj[i], `${path}[${i}]`))
+        }
+        return out
+    }
+    if (typeof obj === "object") {
+        for (const k of Object.keys(obj as Record<string, unknown>)) {
+            // Skip giant string fields (research, subject, executive_summary)
+            // and base64 blobs — they can't be the source of a bad number.
+            if (k === "subject" || k === "executiveSummary" || k.endsWith("Base64") || k.endsWith("DataUri")) continue
+            out.push(...walkForBadNumbers((obj as Record<string, unknown>)[k], `${path}.${k}`))
+        }
+    }
+    return out
 }
 
 function fmtKg(n: number | null | undefined): string {
@@ -3768,11 +3832,8 @@ async function exportProjectPdfInternal(
             materialSpec: typeof p.material_spec === "string" ? p.material_spec : null,
             finish: typeof p.finish === "string" ? p.finish : null,
             tolerance: typeof p.tolerance === "string" ? p.tolerance : null,
-            massKg: typeof p.mass_kg === "number" ? p.mass_kg : null,
-            estimatedUnitCostGbp:
-                typeof p.estimated_unit_cost_gbp === "number"
-                    ? p.estimated_unit_cost_gbp
-                    : null,
+            massKg: toFiniteOrNull(p.mass_kg),
+            estimatedUnitCostGbp: toFiniteOrNull(p.estimated_unit_cost_gbp),
             isPurchased: Boolean(p.is_purchased),
             description: typeof p.description === "string" ? p.description : null,
         }))
@@ -4318,6 +4379,15 @@ async function exportProjectPdfInternal(
         }
 
         try {
+            // Diagnostic walk over pdfInput just before render: any non-
+            // finite number anywhere in the tree is a smoking gun for a
+            // Yoga / pdfkit "unsupported number" crash. Logs the path
+            // (e.g. cost.unitTotalGbp) so the next failure tells us
+            // exactly which builder line emitted the bad value.
+            const sus = walkForBadNumbers(pdfInput, "")
+            if (sus.length > 0) {
+                console.error("[export-project-pdf] non-finite numbers detected:", JSON.stringify(sus.slice(0, 30)))
+            }
             const instance = pdf(<ForgeProjectPdf data={pdfInput} />)
             const blob = await instance.toBlob()
             const arrayBuffer = await blob.arrayBuffer()
