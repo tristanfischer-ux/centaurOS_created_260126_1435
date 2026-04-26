@@ -655,44 +655,98 @@ async function matchSuppliersForProjectInternal(
             modulesEmpty > 0 ||
             partsUncoveredFraction > PER_PART_GAP_THRESHOLD
         if (shouldAutoDiscover && modules.length > 0) {
-            // Identify the first module with zero matches by
-            // computing the set of module ids that WERE matched
-            // across all shortlisted suppliers.
+            // Loop 8 G3 (QC-GATES.md, Tristan: "3 per BOM row"):
+            // previously fired discovery on the FIRST module without a
+            // match. With 5+ uncovered modules (recurring on VertFarm
+            // and Hedgerow per Loop 7 critique), a single discovery run
+            // doesn't fix the gap — next regen would fire on the next
+            // uncovered module, etc. Fire discovery on EVERY uncovered
+            // module up to a per-regen budget so the gap closes in one
+            // pass. Concurrency capped at 2 to keep within the
+            // Anthropic Opus org rate limit (per L8-P9 Fang fanout
+            // memory).
             const matchedModuleIds = new Set<string>()
             for (const { moduleIds } of bySupplier.values()) {
                 for (const mid of moduleIds) matchedModuleIds.add(mid)
             }
-            const moduleWithoutMatch =
-                modules.find((m) => !matchedModuleIds.has(m.id)) ??
-                modules[0]
+            const uncoveredModules = modules.filter(
+                (m) => !matchedModuleIds.has(m.id),
+            )
+            // Per-part coverage map: count suppliers per BOM row.
+            const matchesPerPart = new Map<string, number>()
+            for (const { matchedParts } of bySupplier.values()) {
+                for (const p of matchedParts) {
+                    matchesPerPart.set(
+                        p.partNumber,
+                        (matchesPerPart.get(p.partNumber) ?? 0) + 1,
+                    )
+                }
+            }
+            // Add modules whose parts are individually under-covered
+            // (< 3 candidates) on top of fully-uncovered modules. Use a
+            // Set to dedupe.
+            const TARGET_PER_ROW = 3
+            const undercoveredModuleIds = new Set<string>(
+                uncoveredModules.map((m) => m.id),
+            )
+            for (const part of purchasedParts) {
+                const coverage = matchesPerPart.get(part.partNumber) ?? 0
+                if (coverage < TARGET_PER_ROW && part.sourceModuleId) {
+                    undercoveredModuleIds.add(part.sourceModuleId)
+                }
+            }
+            // Bound the discovery fan-out to keep within budget. 5
+            // modules × Opus per-discovery cost ≈ £1-2 per regen.
+            const DISCOVERY_FANOUT_CAP = 5
+            const targetIds = Array.from(undercoveredModuleIds).slice(
+                0,
+                DISCOVERY_FANOUT_CAP,
+            )
+
             console.info(
                 `[forge-v2-supplier-match] auto-firing gap discovery for ${projectId} ` +
-                    `(${suppliersAdded} suppliers, ${modulesEmpty} empty modules)`,
+                    `(${suppliersAdded} suppliers, ${uncoveredModules.length} fully-uncovered modules, ` +
+                    `${targetIds.length} discovery fires planned)`,
             )
             after(async () => {
                 try {
                     const { discoverSuppliersForGap } = await import(
                         "./forge-v2-supplier-discovery"
                     )
-                    const res = await discoverSuppliersForGap(
-                        projectId,
-                        moduleWithoutMatch.id,
-                        trusted,
-                    )
-                    if (!res.ok) {
-                        console.warn(
-                            `[forge-v2-supplier-match] auto-discovery did not persist: ` +
-                                `${res.error} (${res.errorCode})`,
-                        )
-                    } else {
-                        console.info(
-                            `[forge-v2-supplier-match] auto-discovery added ` +
-                                `${res.job.candidatesPersisted} candidates`,
+                    const DISCOVERY_CONCURRENCY = 2
+                    for (let i = 0; i < targetIds.length; i += DISCOVERY_CONCURRENCY) {
+                        const batch = targetIds.slice(i, i + DISCOVERY_CONCURRENCY)
+                        await Promise.allSettled(
+                            batch.map(async (mid) => {
+                                try {
+                                    const res = await discoverSuppliersForGap(
+                                        projectId,
+                                        mid,
+                                        trusted,
+                                    )
+                                    if (!res.ok) {
+                                        console.warn(
+                                            `[forge-v2-supplier-match] auto-discovery did not persist for module ${mid}: ` +
+                                                `${res.error} (${res.errorCode})`,
+                                        )
+                                    } else {
+                                        console.info(
+                                            `[forge-v2-supplier-match] auto-discovery added ` +
+                                                `${res.job.candidatesPersisted} candidates for module ${mid}`,
+                                        )
+                                    }
+                                } catch (err) {
+                                    console.error(
+                                        `[forge-v2-supplier-match] auto-discovery threw for module ${mid}:`,
+                                        err instanceof Error ? err.message : err,
+                                    )
+                                }
+                            }),
                         )
                     }
                 } catch (err) {
                     console.error(
-                        "[forge-v2-supplier-match] auto-discovery threw:",
+                        "[forge-v2-supplier-match] auto-discovery batch threw:",
                         err instanceof Error ? err.message : err,
                     )
                 }
