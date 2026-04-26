@@ -14,6 +14,20 @@
  * Future stages plug in by adding a StageAdapter to ADAPTERS below.
  */
 
+// Load .env.local for local CLI runs. Vercel/production loads env via the
+// platform; local CLI needs explicit dotenv. Synchronous require keeps it
+// out of top-level-await territory.
+try {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const dotenv = require("dotenv")
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const path = require("path")
+    dotenv.config({ path: path.resolve(process.cwd(), ".env.local") })
+} catch {
+    // dotenv not installed — assume env is already populated
+}
+
 import { runStageLoop } from "./runner"
 import { chaseRegulatoryAdapter } from "./adapters/chase-regulatory"
 import type { StageAdapter, StageName } from "./types"
