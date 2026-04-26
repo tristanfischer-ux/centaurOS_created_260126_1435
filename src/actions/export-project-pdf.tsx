@@ -3365,7 +3365,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 </Page>
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && data.modules.map((m, i) => (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_MODULES !== "1" && data.modules.map((m, i) => (
                 <ModulePage key={m.id} mod={m} index={i} />
             ))}
 
