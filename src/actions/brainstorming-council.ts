@@ -32,12 +32,15 @@ import { callOpenRouter } from "@/lib/ai/openrouter"
 // ─── Council model map — OpenRouter IDs keyed by specialist id ──────────────
 
 const COUNCIL_MODEL_MAP: Record<string, string> = {
-    // Fiona uses Flash for opening + closing — short framing/synthesis prose
-    // doesn't need reasoning, and V4-Pro reasoning often took >30s and
-    // tripped the abort timer. Specialists keep their richer models.
+    // All specialists use V4-Flash or Mistral/Gemini for clean prose output.
+    // V4-Pro is reasoning-mode and leaks chain-of-thought into the visible
+    // response when asked for short prose (verified 2026-04-26: Finn dumped
+    // his entire trace including "I am Finn... Key points I might hit...
+    // Sharpest take..." into the user-facing card). Per cost-discipline
+    // rule: V4-Pro is for STRUCTURED reasoning only, never prose.
     "fundraising-advisor": "deepseek/deepseek-v4-flash",
     "strategist":          "google/gemini-3.1-pro-preview",
-    "finance-lead":        "deepseek/deepseek-v4-pro",
+    "finance-lead":        "deepseek/deepseek-v4-flash",
     "cto":                 "deepseek/deepseek-v4-flash",
     "sales-lead":          "deepseek/deepseek-v4-flash",
     "chief-of-staff":      "mistralai/mistral-large-2407",
@@ -47,7 +50,7 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
     "fundraising-advisor": "DeepSeek V4-Flash",
     "strategist":          "Gemini 3.1 Pro",
-    "finance-lead":        "DeepSeek V4-Pro",
+    "finance-lead":        "DeepSeek V4-Flash",
     "cto":                 "DeepSeek V4-Flash",
     "sales-lead":          "DeepSeek V4-Flash",
     "chief-of-staff":      "Mistral Large",
