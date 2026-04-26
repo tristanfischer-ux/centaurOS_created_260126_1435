@@ -1,5 +1,10 @@
 "use server"
 
+// Vercel function runtime cap: parallel council can take up to ~100s in
+// worst case (slow specialist + Fiona close). Default 60s server-action
+// budget killed all in-flight fetches → "operation aborted" everywhere.
+export const maxDuration = 180
+
 /**
  * @file brainstorming-council.ts — Server action for the Brainstorming Council.
  *
@@ -27,7 +32,10 @@ import { callOpenRouter } from "@/lib/ai/openrouter"
 // ─── Council model map — OpenRouter IDs keyed by specialist id ──────────────
 
 const COUNCIL_MODEL_MAP: Record<string, string> = {
-    "fundraising-advisor": "deepseek/deepseek-v4-pro",   // Fiona — synthesis host
+    // Fiona uses Flash for opening + closing — short framing/synthesis prose
+    // doesn't need reasoning, and V4-Pro reasoning often took >30s and
+    // tripped the abort timer. Specialists keep their richer models.
+    "fundraising-advisor": "deepseek/deepseek-v4-flash",
     "strategist":          "google/gemini-3.1-pro-preview",
     "finance-lead":        "deepseek/deepseek-v4-pro",
     "cto":                 "deepseek/deepseek-v4-flash",
@@ -37,7 +45,7 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
 
 // Model label shown in the response card (matches BrainstormingCouncilView MODEL_TIER_LABELS)
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
-    "fundraising-advisor": "DeepSeek V4-Pro",
+    "fundraising-advisor": "DeepSeek V4-Flash",
     "strategist":          "Gemini 3.1 Pro",
     "finance-lead":        "DeepSeek V4-Pro",
     "cto":                 "DeepSeek V4-Flash",
@@ -186,21 +194,16 @@ export async function conveneCouncil(
     const specialistNames = specialists.map(s => s.name)
 
     // ── Step 1: Fiona opening ──────────────────────────────────────────────
-    const fionaOpeningResult = await callOpenRouter({
+    // Run in parallel with specialists so a slow opening doesn't gate the
+    // whole council. If opening fails we fall back to a generic frame.
+    const fionaOpeningPromise = callOpenRouter({
         model: COUNCIL_MODEL_MAP["fundraising-advisor"],
         system: "You are Fiona, the council host at Fractional Forge. You frame questions and introduce specialists. British English. 3–4 sentences max.",
         prompt: getFionaOpeningPrompt(question, specialistNames),
         maxTokens: 400,
         temperature: 0.7,
-        timeoutMs: 30_000,
+        timeoutMs: 60_000,
     })
-
-    if (!fionaOpeningResult.ok) {
-        return {
-            ok: false,
-            error: `Fiona could not frame the question: ${fionaOpeningResult.error}`,
-        }
-    }
 
     // ── Step 2: All specialists in parallel ───────────────────────────────
     const specialistPromises = specialists.map(async (specialist): Promise<SpecialistResponse | null> => {
@@ -219,7 +222,7 @@ export async function conveneCouncil(
             prompt: question,
             maxTokens: 800,
             temperature: 0.75,
-            timeoutMs: 45_000,
+            timeoutMs: 75_000,
         })
 
         if (!result.ok) {
@@ -242,8 +245,16 @@ export async function conveneCouncil(
         }
     })
 
-    const specialistResults = await Promise.all(specialistPromises)
+    // Await opening + specialists in parallel.
+    const [fionaOpeningResult, specialistResults] = await Promise.all([
+        fionaOpeningPromise,
+        Promise.all(specialistPromises),
+    ])
     const specialistResponses = specialistResults.filter((r): r is SpecialistResponse => r !== null)
+
+    const fionaOpening = fionaOpeningResult.ok
+        ? fionaOpeningResult.text.trim()
+        : `I've put your question to ${specialistNames.length} specialists — ${specialistNames.slice(0, -1).join(", ")}${specialistNames.length > 1 ? " and " : ""}${specialistNames[specialistNames.length - 1]}. They each look at it through their own lens. Read their take, then I'll close with what to do next.`
 
     // ── Step 3: Fiona closing synthesis ───────────────────────────────────
     const successfulResponses = specialistResponses.filter(
@@ -259,7 +270,7 @@ export async function conveneCouncil(
         ),
         maxTokens: 500,
         temperature: 0.65,
-        timeoutMs: 35_000,
+        timeoutMs: 60_000,
     })
 
     const fionaClosing = fionaClosingResult.ok
@@ -268,7 +279,7 @@ export async function conveneCouncil(
 
     return {
         ok: true,
-        fionaOpening: fionaOpeningResult.text.trim(),
+        fionaOpening,
         specialistResponses,
         fionaClosing,
     }
