@@ -32,12 +32,16 @@ import { runStageLoop } from "./runner"
 import { chaseRegulatoryAdapter } from "./adapters/chase-regulatory"
 import { supplierMatchAdapter } from "./adapters/supplier-match"
 import { maxDecomposeAdapter } from "./adapters/max-decompose"
+import { bomMasterAdapter } from "./adapters/bom-master"
+import { risksRegisterAdapter } from "./adapters/risks-register"
 import type { StageAdapter, StageName } from "./types"
 
 const ADAPTERS: Record<string, StageAdapter> = {
     "chase-regulatory": chaseRegulatoryAdapter,
     "supplier-match": supplierMatchAdapter,
     "max-decompose": maxDecomposeAdapter,
+    "bom-expand": bomMasterAdapter,
+    "fang-review": risksRegisterAdapter,
 }
 
 async function main() {
