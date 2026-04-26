@@ -359,10 +359,22 @@ export async function discoverSuppliersForGap(
             return await failJob(msg, "OPUS_THREW")
         }
 
-        const cleaned = rawJson
+        // Loop 7 fix (2026-04-26 NIGHT): all 44 prior discovery jobs
+        // failed with PARSE_FAIL because the parser only stripped markdown
+        // fences. Opus + web_search responses sometimes prepend
+        // "Here are the candidates I found:" before the JSON. Extract the
+        // first {...} block as a fallback before failing.
+        let cleaned = rawJson
             .replace(/^```(?:json)?\s*/i, "")
             .replace(/\s*```\s*$/i, "")
             .trim()
+        if (!cleaned.startsWith("{")) {
+            const firstBrace = cleaned.indexOf("{")
+            const lastBrace = cleaned.lastIndexOf("}")
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+                cleaned = cleaned.slice(firstBrace, lastBrace + 1)
+            }
+        }
 
         let parsed: { candidates?: Array<Partial<CandidateShape>> }
         try {
