@@ -1638,6 +1638,14 @@ export interface BomExpansionSpec {
   envelopeZMm: number
   estimatedUnitCostGbp: number
   aiConfidence: number
+  /** Loop 5 P2 / Loop 6 verification: manufacturer part number for purchased
+   *  COTS items. May be a real MPN candidate or "placeholder — RFQ pending".
+   *  null/undefined for non-purchased rows. */
+  mpn?: string | null
+  /** Loop 5 P3 / Loop 6 verification: one-sentence justification when the
+   *  estimated cost deviates noticeably from typical UK market norms.
+   *  null/undefined when cost is in line with norms. */
+  costJustification?: string | null
 }
 
 /**
@@ -2194,6 +2202,16 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
       isPurchased: s.isPurchased,
       // Skeleton-only rows get aiConfidence=0 so UI can flag "specs pending".
       aiConfidence: exp?.aiConfidence ?? 0,
+      // Loop 5/6 verification: persist MPN + cost justification fields the
+      // expansion specialist now emits. Migration `parts_mpn_and_cost_justification`
+      // added the columns 2026-04-26 NIGHT — without persistence, these
+      // fields were dropped silently and the L5-P2/P3 patches landed in
+      // code but never reached the PDF.
+      mpn: typeof exp?.mpn === "string" && exp.mpn.length > 0 ? truncate(exp.mpn, 200) : null,
+      costJustification:
+        typeof exp?.costJustification === "string" && exp.costJustification.length > 0
+          ? truncate(exp.costJustification, 500)
+          : null,
     }
   })
 
@@ -2272,6 +2290,8 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
     ai_generated: true,
     ai_confidence: p.aiConfidence,
     is_purchased: p.isPurchased,
+    mpn: p.mpn,
+    cost_justification: p.costJustification,
   }))
 
   const { data: insertedParts, error: insertErr } = await admin
