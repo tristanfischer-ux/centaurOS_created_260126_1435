@@ -39,6 +39,8 @@ import {
 import { Search, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SupplierMatchCard } from './SupplierMatchCard'
+import { SupplierExtractedPills, parseSupplierQuery } from './SupplierExtractedPills'
+import type { ExtractedSupplierQuery } from './SupplierExtractedPills'
 import { searchSuppliers } from '@/actions/suppliers'
 import type { SupplierDirectoryStats } from '@/actions/suppliers'
 import type { MarketplaceListing } from '@/actions/marketplace'
@@ -338,6 +340,7 @@ export function SupplierSearchPanel({
   )
   const [displayCount, setDisplayCount] = useState(initialListings.length)
   const [activeQuery, setActiveQuery] = useState<string>('')
+  const [extractedQuery, setExtractedQuery] = useState<ExtractedSupplierQuery | null>(null)
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -352,6 +355,7 @@ export function SupplierSearchPanel({
         setResults(initialListings as (MarketplaceListing & { similarity?: number })[])
         setDisplayCount(initialListings.length)
         setActiveQuery('')
+        setExtractedQuery(null)
         return
       }
 
@@ -399,6 +403,9 @@ export function SupplierSearchPanel({
         setResults(mapped)
         setDisplayCount(mapped.length)
         setActiveQuery(searchQuery)
+        // Parse the query client-side (no LLM call — regex only) and store
+        // for the extracted-pills row rendered between form and count bar.
+        setExtractedQuery(parseSupplierQuery(searchQuery))
       })
     },
     [initialListings]
@@ -509,6 +516,14 @@ export function SupplierSearchPanel({
       {/* ── Pre-search stats charts — visible when no active search (placed UNDER the search bar per Tristan's brief, mirroring Forge Capital) ── */}
       {!isFiltered && (
         <SupplierStatsCharts stats={stats} />
+      )}
+
+      {/* ── Extracted-from-query pill row — visible when a search is active ── */}
+      {isFiltered && extractedQuery !== null && (
+        <SupplierExtractedPills
+          extracted={extractedQuery}
+          onEdit={() => textareaRef.current?.focus()}
+        />
       )}
 
       {/* ── Results count bar ── */}
