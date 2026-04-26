@@ -27,11 +27,13 @@
 
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useTransition } from "react"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
+import { conveneCouncil } from "@/actions/brainstorming-council"
+import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council"
 
 // ─── Model tier → human-readable badge label ────────────────────────────────
 
@@ -227,12 +229,34 @@ interface BrainstormingCouncilViewProps {
     userId: string
 }
 
+// ─── Council session state ───────────────────────────────────────────────────
+
+type SessionPhase = "idle" | "pending" | "done" | "error"
+
+interface CouncilSession {
+    phase: SessionPhase
+    fionaOpening: string
+    specialistResponses: SpecialistResponse[]
+    fionaClosing: string
+    errorMessage: string
+}
+
+const EMPTY_SESSION: CouncilSession = {
+    phase: "idle",
+    fionaOpening: "",
+    specialistResponses: [],
+    fionaClosing: "",
+    errorMessage: "",
+}
+
 export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewProps) {
     const [activeTier, setActiveTier] = useState<CouncilTier>("deep")
     const [question, setQuestion] = useState("")
-    const [submitted, setSubmitted] = useState(false)
+    const [session, setSession] = useState<CouncilSession>(EMPTY_SESSION)
+    const [isPending, startTransition] = useTransition()
     const inputRef = useRef<HTMLInputElement>(null)
 
+    const submitted = session.phase !== "idle"
     const councilMembers = getCouncilMembers(activeTier)
 
     function handleConvene(e: React.FormEvent) {
@@ -241,11 +265,46 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             inputRef.current?.focus()
             return
         }
-        setSubmitted(true)
-        // TODO: wire to saveMeetingThread action from src/actions/meeting-threads.ts
-        // The form action handler should call:
-        //   saveMeetingThread({ topic: question, councilTier: activeTier, specialistIds: [...] })
-        // Once the streaming API is wired, this state drives the council response grid.
+        // Reset to pending before firing
+        setSession({ ...EMPTY_SESSION, phase: "pending" })
+
+        const specialistsForTier = councilMembers.map(s => ({
+            id: s.id,
+            name: s.name,
+            title: s.title,
+            tagline: s.tagline,
+        }))
+
+        startTransition(async () => {
+            const result = await conveneCouncil({
+                question: question.trim(),
+                tier: activeTier,
+                specialists: specialistsForTier,
+            })
+
+            if (!result.ok) {
+                setSession({
+                    phase: "error",
+                    fionaOpening: "",
+                    specialistResponses: [],
+                    fionaClosing: "",
+                    errorMessage: result.error,
+                })
+                return
+            }
+
+            setSession({
+                phase: "done",
+                fionaOpening: result.fionaOpening,
+                specialistResponses: result.specialistResponses,
+                fionaClosing: result.fionaClosing,
+                errorMessage: "",
+            })
+        })
+    }
+
+    function handleReset() {
+        setSession(EMPTY_SESSION)
     }
 
     return (
@@ -852,8 +911,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     aria-label="Your question for the council"
                     autoComplete="off"
                 />
-                <button className="bc-convene" type="submit">
-                    Convene the council &nbsp;&rarr;
+                <button
+                    className="bc-convene"
+                    type="submit"
+                    disabled={isPending}
+                    style={isPending ? { opacity: 0.6, cursor: "wait" } : undefined}
+                >
+                    {isPending ? "Convening…" : "Convene the council  →"}
                 </button>
             </form>
 
@@ -862,12 +926,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             ══════════════════════════════════════════════════════════════ */}
             <div className="bc-section-label">
                 <span className="bc-step">1</span>
-                <h2>{submitted ? "Fiona is framing the question" : "Fiona frames the question"}</h2>
+                <h2>
+                    {session.phase === "idle"
+                        ? "Fiona frames the question"
+                        : session.phase === "pending"
+                        ? "Fiona is framing the question…"
+                        : "Fiona’s framing"}
+                </h2>
                 <span className="bc-rule" />
                 <span className="bc-hint">Host &middot; runs every brainstorm</span>
             </div>
 
-            {!submitted ? (
+            {session.phase === "idle" ? (
                 /* Pre-submission: show Fiona's role / what she does */
                 <div className="bc-fiona-card">
                     <div className="bc-fiona-head">
@@ -881,7 +951,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         </div>
                         <div className="bc-model-badge">
                             <span className="bc-dot" />
-                            Powered by {MODEL_TIER_LABELS[FIONA?.modelTier ?? "claude"] ?? "Claude Opus 4.7"}
+                            DeepSeek V4-Pro
                         </div>
                     </div>
                     <p style={{ fontSize: "14px", lineHeight: "1.7", margin: "0 0 14px", color: "var(--bc-fg)" }}>
@@ -893,7 +963,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 16px", display: "grid", gap: "10px" }}>
                         {[
                             "She frames the question before anyone gives you an answer — so you are not handed five answers to a question that was never quite right.",
-                            "She calls in three to five specialists from different model lineages, in parallel — no single AI perspective dominates.",
+                            "She calls in three to five specialists from different model lineages, in parallel — no single perspective dominates.",
                             "She closes with a synthesis that names the sharpest disagreement and lands a single next action.",
                         ].map((item, i) => (
                             <li
@@ -923,14 +993,50 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         Type your question above and click &ldquo;Convene the council&rdquo; to start.
                     </p>
                 </div>
-            ) : (
-                /* Post-submission loading: Fiona is preparing */
+            ) : session.phase === "pending" ? (
+                /* Loading: calls in flight */
                 <div className="bc-fiona-empty">
                     <div className="bc-stub-avatar">FI</div>
                     <p>
-                        <strong>Fiona is reading your question and assembling the council.</strong><br />
-                        She will name what is worth disagreeing about, then call in three to five
-                        specialists best matched to the question.
+                        <strong>Fiona is reading your question and framing what is worth disagreeing about.</strong><br />
+                        Specialist calls are firing in parallel — this takes 10–20 seconds.
+                    </p>
+                </div>
+            ) : session.phase === "error" ? (
+                /* Error state */
+                <div className="bc-fiona-empty">
+                    <div className="bc-stub-avatar" style={{ background: "#fee2e2", color: "#b91c1c" }}>!</div>
+                    <p>
+                        <strong>The council could not be convened.</strong><br />
+                        {session.errorMessage || "Something went wrong — please try again."}{" "}
+                        <button
+                            type="button"
+                            onClick={handleReset}
+                            style={{ color: "var(--bc-brand)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit" }}
+                        >
+                            Try again
+                        </button>
+                    </p>
+                </div>
+            ) : (
+                /* Done: show Fiona's real opening */
+                <div className="bc-fiona-card">
+                    <div className="bc-fiona-head">
+                        <div className={`bc-sp-avatar bc-av-fiona`}>FI</div>
+                        <div className="bc-who">
+                            <div className="bc-name">
+                                {FIONA?.name ?? "Fiona"}
+                                <span className="bc-role-chip">Host &middot; Fundraising lead</span>
+                            </div>
+                            <div className="bc-role">Fractional Forge &mdash; investor narrative + diligence prep</div>
+                        </div>
+                        <div className="bc-model-badge">
+                            <span className="bc-dot" />
+                            DeepSeek V4-Pro
+                        </div>
+                    </div>
+                    <p style={{ fontSize: "14.5px", lineHeight: "1.75", margin: 0, color: "var(--bc-fg)", whiteSpace: "pre-wrap" }}>
+                        {session.fionaOpening}
                     </p>
                 </div>
             )}
@@ -947,10 +1053,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 </span>
             </div>
 
-            {!submitted ? (
-                /* Pre-submission: show the specialist roster as "reserved" slots with real data */
+            {session.phase === "idle" ? (
+                /* Pre-submission: show the specialist roster with their personas */
                 <div className={`bc-council-grid${councilMembers.length === 3 ? " specialists-3" : ""}`}>
-                    {councilMembers.map((specialist, idx) => {
+                    {councilMembers.map((specialist) => {
                         const lineage = MODEL_TIER_LINEAGE[specialist.modelTier] ?? "deepseek"
                         const modelLabel = MODEL_TIER_LABELS[specialist.modelTier] ?? "model TBD"
                         const avatarClass = getAvatarClass(specialist.id)
@@ -998,25 +1104,79 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         )
                     })}
                 </div>
+            ) : session.phase === "pending" ? (
+                /* Loading: show shimmer placeholders while calls are in flight */
+                <div className={`bc-council-grid${councilMembers.length === 3 ? " specialists-3" : ""}`}>
+                    {councilMembers.map((specialist, idx) => (
+                        <div key={idx} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border)" }}>
+                            <div className={`bc-sp-avatar ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
+                                {specialist.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <h3>{specialist.name}</h3>
+                            <p style={{ fontStyle: "italic" }}>{specialist.thinkingIndicator}</p>
+                        </div>
+                    ))}
+                </div>
+            ) : session.phase === "done" && session.specialistResponses.length > 0 ? (
+                /* Done: real responses rendered */
+                <div className={`bc-council-grid${session.specialistResponses.length === 3 ? " specialists-3" : ""}`}>
+                    {session.specialistResponses.map((resp) => {
+                        const specialist = councilMembers.find(s => s.id === resp.id)
+                        const avatarClass = getAvatarClass(resp.id)
+                        const initials = resp.name.slice(0, 2).toUpperCase()
+                        const sigLabel = getSigCloseLabel(resp.id)
+                        const sigColorMap: Record<string, string> = {
+                            "strategist":     "bc-sig-sage",
+                            "finance-lead":   "bc-sig-finn",
+                            "sales-lead":     "bc-sig-sal",
+                            "cto":            "bc-sig-max",
+                            "chief-of-staff": "bc-sig-cal",
+                        }
+                        const sigColorClass = sigColorMap[resp.id] ?? ""
+                        // Determine lineage from modelLabel
+                        const lineageFromLabel = resp.modelLabel.toLowerCase().includes("gemini") ? "gpt"
+                            : resp.modelLabel.toLowerCase().includes("mistral") ? "mistral"
+                            : resp.modelLabel.toLowerCase().includes("deepseek") ? "deepseek"
+                            : resp.modelLabel.toLowerCase().includes("qwen") ? "qwen"
+                            : "deepseek"
+
+                        return (
+                            <div key={resp.id} className="bc-specialist-card">
+                                <div className="bc-specialist-head">
+                                    <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
+                                    <div className="bc-sp-meta">
+                                        <div className="bc-name-row">
+                                            <span className="bc-sp-name">{resp.name}</span>
+                                        </div>
+                                        <div className="bc-sp-role">{resp.title}</div>
+                                        <div className="bc-lineage">
+                                            <span className={`bc-lineage-chip bc-${lineageFromLabel}`}>
+                                                <span className="bc-swatch" />
+                                                {resp.modelLabel}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
+                                    {resp.response}
+                                </div>
+                                {specialist && (
+                                    <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
+                                        <div className="bc-sig-label">{sigLabel}</div>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
             ) : (
-                /* Post-submission: reserved slots waiting to fill */
+                /* Error or empty — show placeholder grid */
                 <div className={`bc-council-grid${councilMembers.length === 3 ? " specialists-3" : ""}`}>
                     {councilMembers.map((_, idx) => (
                         <div key={idx} className="bc-empty-card">
                             <div className="bc-empty-icon">&middot;</div>
-                            <h3>Slot {idx + 1} reserved</h3>
-                            <p>
-                                {idx === 0
-                                    ? "Fiona will choose this specialist based on what your question needs."
-                                    : idx === 1
-                                    ? "Up to five specialists will respond in parallel."
-                                    : idx === 2
-                                    ? "Each brings a different model and a different angle."
-                                    : idx === 3
-                                    ? "You will see them appear as their responses come in — usually within 12 seconds."
-                                    : "A fifth perspective joins the council on Strategy-tier questions."
-                                }
-                            </p>
+                            <h3>No response</h3>
+                            <p>The council did not return responses. Please try again.</p>
                         </div>
                     ))}
                 </div>
@@ -1032,8 +1192,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 <span className="bc-hint">Host &middot; seals every brainstorm</span>
             </div>
 
-            {!submitted ? (
-                /* Pre-submission: show closing card in colour to convey its importance */
+            {session.phase === "idle" ? (
+                /* Pre-submission: preview the closing card structure */
                 <div className="bc-fiona-card bc-closing">
                     <div className="bc-fiona-head">
                         <div className={`bc-sp-avatar bc-av-fiona`}>FI</div>
@@ -1046,7 +1206,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         </div>
                         <div className="bc-model-badge">
                             <span className="bc-dot" />
-                            Powered by {MODEL_TIER_LABELS[FIONA?.modelTier ?? "claude"] ?? "Claude Opus 4.7"}
+                            DeepSeek V4-Pro
                         </div>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
@@ -1096,17 +1256,55 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         &mdash; Fiona, Fractional Forge fundraising lead. The closing synthesis appears once the council has returned.
                     </p>
                 </div>
-            ) : (
-                /* Post-submission: closing held until council returns */
+            ) : session.phase === "pending" ? (
+                /* Loading: closing held */
                 <div className="bc-closing-held">
                     <div className="bc-label">Closing synthesis &mdash; held</div>
-                    <p>Fiona will close once the council has returned. You can also{" "}
+                    <p>Fiona will close once all specialists have returned.</p>
+                </div>
+            ) : session.phase === "done" && session.fionaClosing ? (
+                /* Done: real Fiona closing */
+                <div className="bc-fiona-card bc-closing">
+                    <div className="bc-fiona-head">
+                        <div className={`bc-sp-avatar bc-av-fiona`}>FI</div>
+                        <div className="bc-who">
+                            <div className="bc-name">
+                                Fiona
+                                <span className="bc-role-chip">Synthesis</span>
+                            </div>
+                            <div className="bc-role">Closing the loop &middot; Fractional Forge fundraising lead</div>
+                        </div>
+                        <div className="bc-model-badge">
+                            <span className="bc-dot" />
+                            DeepSeek V4-Pro
+                        </div>
+                    </div>
+                    <p style={{ fontSize: "14.5px", lineHeight: "1.75", margin: "0 0 18px", color: "var(--bc-fg)", whiteSpace: "pre-wrap" }}>
+                        {session.fionaClosing}
+                    </p>
+                    <p style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed var(--bc-brand-dim)", fontSize: "12.5px", color: "var(--bc-fg-muted)", fontStyle: "italic", margin: 0 }}>
                         <button
                             type="button"
+                            onClick={handleReset}
                             style={{ color: "var(--bc-brand)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit" }}
                         >
-                            close now with {councilMembers.length} of {councilMembers.length} voices
-                        </button>.
+                            Ask a new question
+                        </button>
+                        {" "}to start another brainstorm.
+                    </p>
+                </div>
+            ) : (
+                /* Error or no closing — fallback */
+                <div className="bc-closing-held">
+                    <div className="bc-label">Synthesis unavailable</div>
+                    <p>Fiona&apos;s closing could not be generated.{" "}
+                        <button
+                            type="button"
+                            onClick={handleReset}
+                            style={{ color: "var(--bc-brand)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit" }}
+                        >
+                            Try again
+                        </button>
                     </p>
                 </div>
             )}
