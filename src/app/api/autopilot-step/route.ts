@@ -449,25 +449,6 @@ async function runStep(
             return { ok: true }
         }
 
-        case "writeExecutiveSummary": {
-            // Loop 8 Tier 1 (CONVERGED-DOC-STRUCTURE.md). Synthesises the
-            // 1-page page-2 summary from the complete project state.
-            // Non-blocking — a failure here writes nothing to
-            // `executive_summary` and the PDF render skips the page
-            // gracefully (data.executiveSummary === null branch).
-            const { runExecutiveSummary } = await import(
-                "@/actions/specialists/run-executive-summary"
-            )
-            const result = await runExecutiveSummary(projectId)
-            if (!result.ok) {
-                console.warn(
-                    "[autopilot-step] executive summary failed (non-blocking):",
-                    result.error,
-                )
-            }
-            return { ok: true }
-        }
-
         case "generatePdf": {
             // Brief render-readiness wait — gives per-module renders that
             // were kicked off in `generateIllustration` time to land before

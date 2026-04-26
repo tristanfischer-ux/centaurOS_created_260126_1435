@@ -142,19 +142,9 @@ export const STAGE_CONFIG: Record<
     proofreading: {
         kind: "fire",
         fireStep: "runProofreader",
-        nextStage: "writing_executive_summary",
+        nextStage: "generating_pdf",
         // Single V4-Pro fact-check call; transient OpenRouter 429/5xx
         // covered by 3 retries.
-        maxAttempts: 3,
-    },
-    writing_executive_summary: {
-        kind: "fire",
-        fireStep: "writeExecutiveSummary",
-        nextStage: "generating_pdf",
-        // Loop 8 Tier 1 (CONVERGED-DOC-STRUCTURE.md). Single Sonnet call
-        // ~£0.05/run; transient OpenRouter 429/5xx covered by 3 retries.
-        // Failure is non-blocking inside the route handler — PDF still
-        // emits, just without the page-2 synthesis.
         maxAttempts: 3,
     },
     generating_pdf: {
@@ -181,7 +171,6 @@ export const STEP_TO_STAGE: Record<AutopilotStepName, AutopilotStage> = {
     matchSuppliers: "matching_suppliers",
     runFangReviews: "running_fang_reviews",
     runProofreader: "proofreading",
-    writeExecutiveSummary: "writing_executive_summary",
     generatePdf: "generating_pdf",
 }
 
