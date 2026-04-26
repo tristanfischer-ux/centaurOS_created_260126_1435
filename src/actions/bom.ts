@@ -321,6 +321,12 @@ export interface BomExpansionResult {
     envelopeZMm: number
     estimatedUnitCostGbp: number
     aiConfidence: number
+    /** Loop 7 P1: manufacturer part number for purchased parts.
+     *  Either a real MPN, the literal "placeholder — RFQ pending", or
+     *  null for non-purchased rows. */
+    mpn: string | null
+    /** Loop 7 P1: market-deviation justification or "in line with market". */
+    costJustification: string | null
   }>
 }
 
@@ -752,9 +758,11 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
       return { success: false, error: "No expansions in response", expansions: {} }
     }
 
-    // Validate and sanitize each expansion
+    // Validate and sanitize each expansion (Loop 7 P1: forward mpn + costJustification)
     const expansions: BomExpansionResult["expansions"] = {}
     for (const [partNumber, raw] of Object.entries(parsed.expansions)) {
+      const mpnRaw = typeof raw.mpn === "string" ? raw.mpn.trim() : null
+      const cjRaw = typeof raw.costJustification === "string" ? raw.costJustification.trim() : null
       expansions[partNumber] = {
         description: truncate(String(raw.description ?? ""), 500),
         material: truncate(String(raw.material ?? ""), 200),
@@ -769,6 +777,8 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
         aiConfidence: typeof raw.aiConfidence === "number"
           ? Math.max(0, Math.min(1, raw.aiConfidence))
           : 0.5,
+        mpn: mpnRaw && mpnRaw.length > 0 ? truncate(mpnRaw, 200) : null,
+        costJustification: cjRaw && cjRaw.length > 0 ? truncate(cjRaw, 500) : null,
       }
     }
 
@@ -886,8 +896,13 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
   }
 
   // Validate + sanitize each expansion identically to expandBomParts.
+  // Loop 7 P1: explicitly forward mpn + costJustification — the previous
+  // sanitiser silently stripped them, the SIXTH silent-drop layer caught
+  // by the verification cycle 2026-04-26 NIGHT.
   const expansions: BomExpansionResult["expansions"] = {}
   for (const [partNumber, raw] of Object.entries(parsed.expansions)) {
+    const mpnRaw = typeof raw.mpn === "string" ? raw.mpn.trim() : null
+    const cjRaw = typeof raw.costJustification === "string" ? raw.costJustification.trim() : null
     expansions[partNumber] = {
       description: truncate(String(raw.description ?? ""), 500),
       material: truncate(String(raw.material ?? ""), 200),
@@ -902,6 +917,9 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
       aiConfidence: typeof raw.aiConfidence === "number"
         ? Math.max(0, Math.min(1, raw.aiConfidence))
         : 0.5,
+      mpn: mpnRaw && mpnRaw.length > 0 ? truncate(mpnRaw, 200) : null,
+      costJustification:
+        cjRaw && cjRaw.length > 0 ? truncate(cjRaw, 500) : null,
     }
   }
 

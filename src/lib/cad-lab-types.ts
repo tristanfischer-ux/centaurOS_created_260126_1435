@@ -433,6 +433,24 @@ export interface CadLabModule {
   failureModes: string[]
   /** Open questions to resolve */
   unknowns: string[]
+  /** Loop 5 P5 / Loop 7 P1: structured FMEA-style risk matrix.
+   *  Optional + additive — older modules with only failureModes still
+   *  render via the legacy fallback path in the PDF.
+   *  Sonnet repeatedly drops this field unless every persistence layer
+   *  explicitly forwards it; see forgeos/gotchas Five-Layer Silent Drop. */
+  riskMatrix?: Array<{
+    id: string
+    hazard: string
+    cause?: string
+    consequence?: string
+    existingControls?: string
+    severity: number
+    likelihood: number
+    mitigation?: string
+    owner?: string
+    residualSeverity?: number
+    residualLikelihood?: number
+  }>
 
   // ── Per-module pipeline state ──
 
@@ -577,6 +595,8 @@ export interface ModuleExpansionResult {
     whyItMatters: string
     failureModes: string[]
     unknowns: string[]
+    /** Loop 7 P1: structured FMEA risk matrix forwarded end-to-end. */
+    riskMatrix?: CadLabModule["riskMatrix"]
   }
   /** Tokens used */
   tokensIn: number

@@ -645,6 +645,9 @@ function buildCadLabModule(
               whyItMatters: string
               failureModes: string[]
               unknowns: string[]
+              /** Loop 7 P1: forward riskMatrix end-to-end. The previous
+               *  builder stripped it silently — Five-Layer Silent Drop. */
+              riskMatrix?: CadLabModule["riskMatrix"]
           }
         | undefined,
 ): CadLabModule {
@@ -682,6 +685,9 @@ function buildCadLabModule(
         whyItMatters: expansion.whyItMatters,
         failureModes: expansion.failureModes,
         unknowns: expansion.unknowns,
+        ...(expansion.riskMatrix && expansion.riskMatrix.length > 0
+            ? { riskMatrix: expansion.riskMatrix }
+            : {}),
         status: "pending",
         ...(typeof expansion.estimatedMassKg === "number"
             ? { estimatedMassKg: expansion.estimatedMassKg }

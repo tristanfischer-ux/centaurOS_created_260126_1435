@@ -2259,6 +2259,39 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
       }
     }
 
+    // Loop 7 P1: forward riskMatrix end-to-end. Validate-and-clamp severity
+    // / likelihood to 1-5 ints; require hazard string; otherwise drop the row.
+    type RiskRow = NonNullable<import("@/lib/cad-lab-types").CadLabModule["riskMatrix"]>[number]
+    const riskMatrix: RiskRow[] = []
+    if (Array.isArray(parsed.riskMatrix)) {
+      for (const r of parsed.riskMatrix as Array<Record<string, unknown>>) {
+        if (!r || typeof r !== "object") continue
+        const hazard = typeof r.hazard === "string" ? r.hazard : null
+        const sev = typeof r.severity === "number" ? r.severity : null
+        const lik = typeof r.likelihood === "number" ? r.likelihood : null
+        if (!hazard || sev === null || lik === null) continue
+        riskMatrix.push({
+          id: typeof r.id === "string" ? r.id : `RM-${riskMatrix.length + 1}`,
+          hazard,
+          cause: typeof r.cause === "string" ? r.cause : undefined,
+          consequence: typeof r.consequence === "string" ? r.consequence : undefined,
+          existingControls:
+            typeof r.existingControls === "string" ? r.existingControls : undefined,
+          severity: Math.max(1, Math.min(5, Math.round(sev))),
+          likelihood: Math.max(1, Math.min(5, Math.round(lik))),
+          mitigation: typeof r.mitigation === "string" ? r.mitigation : undefined,
+          owner: typeof r.owner === "string" ? r.owner : undefined,
+          residualSeverity:
+            typeof r.residualSeverity === "number"
+              ? Math.max(1, Math.min(5, Math.round(r.residualSeverity)))
+              : undefined,
+          residualLikelihood:
+            typeof r.residualLikelihood === "number"
+              ? Math.max(1, Math.min(5, Math.round(r.residualLikelihood)))
+              : undefined,
+        })
+      }
+    }
     return {
       success: true,
       moduleId: targetModuleId,
@@ -2271,6 +2304,7 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
         whyItMatters: String(parsed.whyItMatters || ""),
         failureModes: Array.isArray(parsed.failureModes) ? parsed.failureModes.map(String) : [],
         unknowns: Array.isArray(parsed.unknowns) ? parsed.unknowns.map(String) : [],
+        riskMatrix: riskMatrix.length > 0 ? riskMatrix : undefined,
       },
       tokensIn, tokensOut,
     }
