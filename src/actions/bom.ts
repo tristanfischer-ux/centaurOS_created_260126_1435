@@ -56,6 +56,7 @@ import type {
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { fetchCatalogueForPrompt, extractSearchKeywords } from "./component-library"
 import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
+import { renderOracleHint } from "@/lib/cost/oracle-benchmarks"
 import { withLlmPermit } from "@/lib/ai/llm-permit"
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -660,9 +661,21 @@ export async function expandBomParts(
       designBrief.constraints.unitCostCeilingGbp > 0
         ? `\n\nBUDGET CONSTRAINT (Loop 6 P2): the founder's stated unit cost ceiling is £${designBrief.constraints.unitCostCeilingGbp.toLocaleString("en-GB")}. Your BOM expansion's per-part cost roll-up must respect this ceiling. If the architecture you're expanding cannot fit within the ceiling, prefer COTS commodity components over bespoke high-spec components — for example a £3 ESP32 over a £60 LTE module when the brief says "Wi-Fi/BLE for £5", or a £15 commodity 12 MP MIPI camera over a £120 industrial machine-vision sensor when the brief says "12 MP camera". When you choose a higher-cost option that violates an obvious budget allocation, the costJustification field MUST explicitly justify why the cheaper alternative cannot meet a stated requirement. Plain over-spec without justification is forbidden — the cost waterfall is what gates the design.`
         : ""
+    // Loop 7 — Oracle benchmark hint. Derives a subject string from the
+    // brief useCase + first module purpose so the heuristic detector can
+    // match a product class (uk-bess-containerised, etc.) and inject the
+    // council-verified cost benchmarks into the BOM prompt.
+    const oracleSubject = [
+      designBrief?.useCase ?? "",
+      modules[0]?.purpose ?? "",
+      modules.map((m) => m.name).slice(0, 3).join(" "),
+    ]
+      .filter((s) => typeof s === "string" && s.length > 0)
+      .join(" — ")
+    const oracleHint = renderOracleHint(oracleSubject)
     const briefContext = designBrief
-      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}`
-      : ""
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}`
+      : oracleHint
 
     // Include module context for material/process reasoning
     const moduleContext = modules.map((m) => {
@@ -1020,9 +1033,21 @@ export async function generateBomFromModules(
       designBrief.constraints.unitCostCeilingGbp > 0
         ? `\n\nBUDGET CONSTRAINT (Loop 6 P2): the founder's stated unit cost ceiling is £${designBrief.constraints.unitCostCeilingGbp.toLocaleString("en-GB")}. Your BOM expansion's per-part cost roll-up must respect this ceiling. If the architecture you're expanding cannot fit within the ceiling, prefer COTS commodity components over bespoke high-spec components — for example a £3 ESP32 over a £60 LTE module when the brief says "Wi-Fi/BLE for £5", or a £15 commodity 12 MP MIPI camera over a £120 industrial machine-vision sensor when the brief says "12 MP camera". When you choose a higher-cost option that violates an obvious budget allocation, the costJustification field MUST explicitly justify why the cheaper alternative cannot meet a stated requirement. Plain over-spec without justification is forbidden — the cost waterfall is what gates the design.`
         : ""
+    // Loop 7 — Oracle benchmark hint. Derives a subject string from the
+    // brief useCase + first module purpose so the heuristic detector can
+    // match a product class (uk-bess-containerised, etc.) and inject the
+    // council-verified cost benchmarks into the BOM prompt.
+    const oracleSubject = [
+      designBrief?.useCase ?? "",
+      modules[0]?.purpose ?? "",
+      modules.map((m) => m.name).slice(0, 3).join(" "),
+    ]
+      .filter((s) => typeof s === "string" && s.length > 0)
+      .join(" — ")
+    const oracleHint = renderOracleHint(oracleSubject)
     const briefContext = designBrief
-      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}`
-      : ""
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}`
+      : oracleHint
 
     const moduleContext = modules.map((m) => {
       const diagInfo = diagnosticAnswers?.[m.id]
