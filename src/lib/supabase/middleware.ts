@@ -30,6 +30,7 @@ const PUBLIC_ROUTES = [
     '/demo',  // Public demo page
     '/blog',  // Public blog (content group)
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
+    '/api/admin/snapshot-pdf',  // Agent-callable PDF download (CRON_SECRET Bearer at route)
 ]
 
 // RED-TEAM-PIVOT-PLAN Tier 2 step 14: anonymous /investors landing. The
