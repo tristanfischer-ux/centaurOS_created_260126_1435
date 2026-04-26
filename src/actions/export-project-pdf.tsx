@@ -1000,146 +1000,6 @@ function TocPage({ sections }: { sections: string[] }): React.ReactElement {
     )
 }
 
-// Loop 8 (CONVERGED-DOC-STRUCTURE.md Tier 1) — Document control.
-// Industry-standard front-matter for engineering deliverables: rev
-// letter, key timestamps, classification, distribution, revision history.
-// Audience: certification reviewers + investor due-diligence + contract
-// manufacturer audit. Signals professionalism + auditability without
-// adding any new data — every field renders from columns the project
-// already has.
-function DocumentControlPage({
-    data,
-}: {
-    data: PdfInput
-}): React.ReactElement {
-    return (
-        <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>Document control</Text>
-            <Text style={[styles.small, { marginBottom: 14 }]}>
-                Front-matter for the engineering pack. Records what is
-                being released, to whom, under what classification, and at
-                which revision.
-            </Text>
-
-            <View style={{ marginBottom: 14 }}>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Document title</Text>
-                    <Text style={styles.rowValue}>
-                        {data.projectName} — engineering pack
-                    </Text>
-                </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Revision</Text>
-                    <Text style={styles.rowValue}>
-                        Rev {data.designRevisionLetter}
-                    </Text>
-                </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Issuing organisation</Text>
-                    <Text style={styles.rowValue}>
-                        {data.foundryName ?? "—"}
-                    </Text>
-                </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Classification</Text>
-                    <Text style={styles.rowValue}>
-                        Confidential — engineering review pack
-                    </Text>
-                </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Distribution</Text>
-                    <Text style={styles.rowValue}>
-                        Founder · contract manufacturer review · investor
-                        due diligence
-                    </Text>
-                </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Generated</Text>
-                    <Text style={styles.rowValue}>
-                        {fmtDateTime(data.generatedAtIso)} (system)
-                    </Text>
-                </View>
-            </View>
-
-            <Text style={styles.h3}>Key timestamps</Text>
-            <View style={{ marginBottom: 14 }}>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Project created</Text>
-                    <Text style={styles.rowValue}>
-                        {fmtDateTime(data.createdAtIso)}
-                    </Text>
-                </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Brief locked</Text>
-                    <Text style={styles.rowValue}>
-                        {fmtDateTime(data.briefLockedAtIso)}
-                    </Text>
-                </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Shipped to review</Text>
-                    <Text style={styles.rowValue}>
-                        {data.shippedAtIso
-                            ? fmtDateTime(data.shippedAtIso)
-                            : "Not yet shipped"}
-                    </Text>
-                </View>
-            </View>
-
-            <Text style={styles.h3}>Revision history</Text>
-            <View
-                style={{
-                    flexDirection: "row",
-                    borderBottomWidth: 1,
-                    borderBottomColor: BORDER,
-                    paddingBottom: 4,
-                    marginBottom: 4,
-                }}
-            >
-                <Text
-                    style={{ width: 60, fontWeight: "bold", fontSize: 9 }}
-                >
-                    Rev
-                </Text>
-                <Text
-                    style={{ width: 110, fontWeight: "bold", fontSize: 9 }}
-                >
-                    Date
-                </Text>
-                <Text style={{ flex: 1, fontWeight: "bold", fontSize: 9 }}>
-                    Change summary
-                </Text>
-            </View>
-            <View
-                style={{
-                    flexDirection: "row",
-                    paddingTop: 4,
-                    paddingBottom: 4,
-                }}
-            >
-                <Text style={{ width: 60, fontSize: 9 }}>
-                    Rev {data.designRevisionLetter}
-                </Text>
-                <Text style={{ width: 110, fontSize: 9 }}>
-                    {fmtDateTime(data.createdAtIso) ?? "—"}
-                </Text>
-                <Text style={{ flex: 1, fontSize: 9 }}>
-                    First issue. Auto-generated engineering pack from
-                    ForgeOS pipeline (Chase, Max, Fang, BOM, Finn,
-                    suppliers, proofreader).
-                </Text>
-            </View>
-            <Text style={[styles.small, { marginTop: 10 }]}>
-                Subsequent revisions appear here as the design progresses.
-                Each release writes a new row with the rev letter, the
-                date, and a one-line summary of what changed since the
-                previous rev.
-            </Text>
-
-            <PdfFooter label="Document control" />
-        </Page>
-    )
-}
-
 // Loop 8 (CONVERGED-DOC-STRUCTURE.md Tier 1) — Executive Summary.
 // Audience: investors, contract manufacturers, certification reviewers.
 // They read this page first and decide whether to keep going. The
@@ -1151,13 +1011,7 @@ function ExecutiveSummaryPage({
 }: {
     summary: string
 }): React.ReactElement {
-    // Helvetica (react-pdf default) chokes on the unicode chars Sonnet
-    // happily emits — em-dashes, × multiplication, m², °C, en-dashes in
-    // ranges. Without a sanitiser the whole render throws "Couldn't
-    // render PDF" on every project. cleanReviewText already substitutes
-    // ASCII-safe fallbacks for the fang/proofreader pages — same trick
-    // here.
-    const paragraphs = cleanReviewText(summary)
+    const paragraphs = summary
         .split(/\n\s*\n/)
         .map((p) => p.trim())
         .filter((p) => p.length > 0)
@@ -3450,12 +3304,6 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             {data.executiveSummary != null && (
                 <ExecutiveSummaryPage summary={data.executiveSummary} />
             )}
-
-            {/* Document control (Loop 8 — Tier 1). Industry-standard
-             *  front-matter — rev letter, classification, distribution,
-             *  revision history. Always renders; every field comes from
-             *  data the project already has. */}
-            <DocumentControlPage data={data} />
 
             {/* TOC */}
             <TocPage sections={sections} />
