@@ -378,7 +378,30 @@ function cleanReviewText(raw: string | null | undefined): string {
         .replace(/(^|[^\\])\*([^*\n]+)\*/g, "$1$2")
         .replace(/__([^_]+)__/g, "$1")
 
-    // 4. Collapse 3+ blank lines back down to 1 (filter step above can
+    // 4. Loop 7 critique B4 — Helvetica (react-pdf default) doesn't ship
+    //    Greek glyphs, math superscripts, or extended degree symbols.
+    //    BESS p.42/54/69 showed `Ω→@`, `²→@@`, `°→@@@`. Substitute
+    //    ASCII-safe fallbacks before render so the founder doesn't read
+    //    "0.040 @ resistivity" instead of "0.040 Ω resistivity".
+    text = text
+        .replace(/Ω/g, " ohms")
+        .replace(/μΩ/g, " microohms")
+        .replace(/㎡/g, " m^2")
+        .replace(/㎥/g, " m^3")
+        .replace(/m²/g, "m^2")
+        .replace(/m³/g, "m^3")
+        .replace(/cm²/g, "cm^2")
+        .replace(/mm²/g, "mm^2")
+        .replace(/[²]/g, "^2")
+        .replace(/[³]/g, "^3")
+        .replace(/°C/g, "degC")
+        .replace(/°F/g, "degF")
+        .replace(/°/g, " deg")
+        .replace(/μ/g, "u")
+        .replace(/×/g, " x ")
+        .replace(/–|—/g, "-")
+
+    // 5. Collapse 3+ blank lines back down to 1 (filter step above can
     //    leave gaps where a telemetry line was the only content of a
     //    paragraph).
     text = text.replace(/\n{3,}/g, "\n\n").trim()
