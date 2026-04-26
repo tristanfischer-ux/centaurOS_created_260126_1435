@@ -1,8 +1,8 @@
 diff --git a/node_modules/@react-pdf/render/lib/index.js b/node_modules/@react-pdf/render/lib/index.js
-index 028cf37..cd15743 100644
+index 028cf37..75f9d7e 100644
 --- a/node_modules/@react-pdf/render/lib/index.js
 +++ b/node_modules/@react-pdf/render/lib/index.js
-@@ -109,10 +109,14 @@ const encodeGlyphs = (font, glyphs) => {
+@@ -109,10 +109,17 @@ const encodeGlyphs = (font, glyphs) => {
  
  /* eslint-disable no-return-assign */
  const number = (n) => {
@@ -10,13 +10,16 @@ index 028cf37..cd15743 100644
 -        return Math.round(n * 1e6) / 1e6;
 -    }
 -    throw new Error(`unsupported number: ${n}`);
-+    // 2026-04-26 Forge patch (patches/@react-pdf+render+4.6.1.patch):
++    // 2026-04-26 Forge patch (patches/@react-pdf+render+4.5.1.patch):
 +    // Yoga produces out-of-range layout values (e.g. -8.131e+21 sentinel
-+    // arithmetic) on specific document structures. Clamp to ±1e15 so the
-+    // PDF emits with potentially wrong-sized layout but no crash.
++    // arithmetic) on specific document structures. Clamp aggressively to
++    // ±1e7 — PDF coords for A4 max ~842pt so anything >1e7 is sentinel
++    // garbage. First version clamped at ±1e15 which was too generous and
++    // caused visible damage on Risks register (text stacking, line-height
++    // collapse).
 +    if (!isFinite(n)) n = 0;
-+    if (n > 1e15) n = 1e15;
-+    else if (n < -1e15) n = -1e15;
++    if (n > 1e7) n = 1e7;
++    else if (n < -1e7) n = -1e7;
 +    return Math.round(n * 1e6) / 1e6;
  };
  const _renderGlyphs = (ctx, encoded, positions, x, y) => {

@@ -357,7 +357,10 @@ function walkForBadNumbers(
 
 function fmtKg(n: number | null | undefined): string {
     if (typeof n !== "number" || !Number.isFinite(n)) return "—"
-    return `${n.toFixed(2)} kg`
+    // British thousands separator (40000 → "40,000.00 kg") — Tristan-flagged
+    // 2026-04-26 NIGHT: "When you have the max at 40,000 kilos, can you
+    // please make sure you have commas for the numbers?"
+    return `${n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`
 }
 
 function fmtDateTime(iso: string | null | undefined): string {
@@ -3431,9 +3434,11 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 <EngineReviewPage findings={data.proofreadFindings} />
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_AUDIT !== "1" && data.auditLog.length > 0 && (
-                <AuditLogPage rows={data.auditLog} />
-            )}
+            {/* AuditLog page intentionally omitted from the customer-
+             *  facing PDF — Tristan-flagged 2026-04-26 NIGHT: "the project
+             *  audit log I don't think we should be showing the customer".
+             *  The audit data still ships in pipeline_runs for internal
+             *  tooling; only the PDF rendering is suppressed. */}
         </Document>
     )
 }
@@ -3463,7 +3468,6 @@ function EngineReviewPage({
             </Text>
             <Text style={[styles.small, { marginBottom: 10, color: MUTED }]}>
                 Run at {findings.ranAtIso.replace("T", " ").slice(0, 19)} ·
-                model {findings.model} · cost {findings.costPence}p ·
                 {totalCount === 0
                     ? " no findings"
                     : ` ${totalCount} finding${totalCount === 1 ? "" : "s"} (` +

@@ -1,8 +1,8 @@
 diff --git a/node_modules/@react-pdf/pdfkit/lib/pdfkit.js b/node_modules/@react-pdf/pdfkit/lib/pdfkit.js
-index 3619d74..dd3e35a 100644
+index 3619d74..e6084fc 100644
 --- a/node_modules/@react-pdf/pdfkit/lib/pdfkit.js
 +++ b/node_modules/@react-pdf/pdfkit/lib/pdfkit.js
-@@ -269,10 +269,14 @@ class PDFObject {
+@@ -269,10 +269,16 @@ class PDFObject {
      return `${object}`;
    }
    static number(n) {
@@ -10,13 +10,15 @@ index 3619d74..dd3e35a 100644
 -      return Math.round(n * 1e6) / 1e6;
 -    }
 -    throw new Error(`unsupported number: ${n}`);
-+    // 2026-04-26 Forge patch (patches/@react-pdf+pdfkit+4.6.0.patch):
++    // 2026-04-26 Forge patch (patches/@react-pdf+pdfkit+5.1.1.patch):
 +    // Yoga produces out-of-range layout values on certain document
-+    // structures. Clamp to ±1e15 so PDF emits with possibly-wrong layout
-+    // but no crash.
++    // structures. Clamp aggressively to ±1e7 — PDF coords for A4 max ~842pt
++    // so anything >1e7 is sentinel garbage, NOT a legitimate layout value.
++    // First version clamped at ±1e15 which was too generous and caused
++    // visible damage on Risks register (text stacking, line-height collapse).
 +    if (!isFinite(n)) n = 0;
-+    if (n > 1e15) n = 1e15;
-+    else if (n < -1e15) n = -1e15;
++    if (n > 1e7) n = 1e7;
++    else if (n < -1e7) n = -1e7;
 +    return Math.round(n * 1e6) / 1e6;
    }
  }
