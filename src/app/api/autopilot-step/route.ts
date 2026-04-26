@@ -584,15 +584,19 @@ async function runFangReviewsForAllModules(
         "@/actions/specialists/run-fang-review"
     )
 
-    // Parallel fan-out with a bounded concurrency. 4 in flight at a time
-    // matches existing stepRunFangReviews behaviour and keeps Anthropic
-    // rate-limit headroom. Promise.allSettled — one module's failure
-    // shouldn't sink the whole stage.
+    // Parallel fan-out with a bounded concurrency. Loop 8 fix
+    // (Tristan-flagged 2026-04-26): dropped 4 → 2. With 4 projects
+    // parallel-regenerating + 7-9 modules each, CONCURRENCY=4 produced
+    // 16+ in-flight claude-opus-4-7 calls, breaching the org-level
+    // Anthropic rate limit and triggering 429s that cascaded into
+    // terminal "All N Fang reviews failed" — Sentinel + Desal hit
+    // this 6+ times in a single regen loop. CONCURRENCY=2 caps the
+    // multi-project burst at 8, well within headroom.
     // Signature: runFangReviewBackground(projectId, moduleId, foundryId,
     //            userId, trigger?). userId is null for system-fired runs
     //            (autopilot has no user session at this point — column is
     //            nullable).
-    const CONCURRENCY = 4
+    const CONCURRENCY = 2
     const results: Array<PromiseSettledResult<{ ok: boolean; error?: string }>> =
         []
     for (let i = 0; i < modules.length; i += CONCURRENCY) {
