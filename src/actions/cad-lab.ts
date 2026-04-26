@@ -2241,8 +2241,18 @@ Outputs: ${target.outputs.join(", ")}
 
 Provide the detailed engineering specification for this module ONLY. Output ONLY the JSON object.`
 
+    // Loop 7 fix (2026-04-26 NIGHT): bumped 2048 → 6144. The
+    // BASE_MODULE_EXPANSION schema added a structured riskMatrix array
+    // (severity × likelihood × owner × mitigation × residual) which
+    // pushed Sonnet's response past the 2048 cap on Hedgerow + Vert
+    // Farm regens, truncating mid-JSON and producing
+    // EXPAND_ALL_FAILED: "AI returned invalid JSON". Verified the
+    // root cause empirically: pipeline_runs error_message identical
+    // across both projects, started_at clusters around the same
+    // re-fire intervals. 6144 leaves comfortable headroom for the
+    // typical 4-failure-mode + 4-row-riskMatrix expansion JSON.
     const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 2048, 90_000, 2,
+      systemPrompt, userPrompt, modelId, 6144, 90_000, 2,
     )
 
     // Parse expansion JSON
