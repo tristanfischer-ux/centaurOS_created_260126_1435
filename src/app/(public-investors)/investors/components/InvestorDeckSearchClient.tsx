@@ -159,6 +159,7 @@ export function InvestorDeckSearchClient({
   const [hasSearched, setHasSearched] = useState(false)
   const [lastQuery, setLastQuery] = useState('')
   const [extractedProfile, setExtractedProfile] = useState<ExtractedProfile | null>(null)
+  const [searchFailureMessage, setSearchFailureMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -180,6 +181,7 @@ export function InvestorDeckSearchClient({
     }
     setLastQuery(trimmed)
     setHasSearched(true)
+    setSearchFailureMessage(null)
     startTransition(async () => {
       try {
         const result = await searchInvestors({
@@ -194,7 +196,10 @@ export function InvestorDeckSearchClient({
         setMatchOutputs(result.matchOutputs ?? {})
         if (result.resolvedTier) setTier(result.resolvedTier as ResolvedTier)
         setExtractedProfile(extractProfile(trimmed, result.firms))
-        if (result.firms.length === 0) {
+        // Surface engine failures as a visible callout rather than a silent empty state
+        if (result.semanticFailed || result.rateLimited) {
+          setSearchFailureMessage(result.failureMessage ?? 'Search temporarily unavailable — please try again.')
+        } else if (result.firms.length === 0) {
           toast.info('No matching investors found. Try a broader description.')
         }
         // Fire-and-forget: score all returned firms and store { score, pillars }
@@ -364,8 +369,21 @@ export function InvestorDeckSearchClient({
       {/* ── Empty state (before search, no stats available) ──────────────── */}
       {!hasSearched && !investorStats && <EmptyState />}
 
-      {/* ── Empty results (search with 0 results) ────────────────────────── */}
-      {hasSearched && !isPending && firms.length === 0 && (
+      {/* ── Search failure callout (engine error / rate limit) ───────────── */}
+      {hasSearched && !isPending && searchFailureMessage && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-5 mt-6 flex items-start gap-3">
+          <span className="mt-0.5 text-amber-500 shrink-0" aria-hidden>&#9888;</span>
+          <div>
+            <p className="text-sm font-medium text-amber-800">{searchFailureMessage}</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Your query was received — the issue is on our end. Waiting a moment and searching again usually resolves it.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Empty results (search with 0 results, no engine failure) ─────── */}
+      {hasSearched && !isPending && firms.length === 0 && !searchFailureMessage && (
         <div className="rounded-xl border border-dashed border-border bg-muted/30 p-10 text-center mt-6">
           <p className="text-sm font-medium text-foreground">No investors matched that description</p>
           <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">

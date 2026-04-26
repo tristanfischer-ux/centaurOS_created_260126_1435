@@ -179,6 +179,22 @@ export interface InvestorSearchResult {
   matchOutputs?: Record<string, InvestorMatchOutputView>
   /** Tier resolved during the search — used by the UI to decide which CTA to render. */
   resolvedTier?: SubscriptionTier | 'anonymous'
+  /**
+   * True when the semantic search path threw (timeout, 429, dim mismatch, etc.)
+   * and we could NOT fall through to a keyword path that might plausibly match.
+   * Distinguishes "the engine broke" from "genuinely no matches".
+   */
+  semanticFailed?: boolean
+  /**
+   * True when the caller was blocked by the rate limiter (30 req / 60 s).
+   * Client should render a retry-in-a-moment message rather than an empty state.
+   */
+  rateLimited?: boolean
+  /**
+   * Human-readable explanation set alongside semanticFailed / rateLimited.
+   * Suitable for display directly to the user in an amber callout.
+   */
+  failureMessage?: string
 }
 
 /**
@@ -740,6 +756,33 @@ const VALID_FIRM_TYPES = new Set([
 ])
 
 /**
+ * Returns true when a search query looks like a prose deck description rather
+ * than a firm name. Used to decide whether a semantic-search failure should
+ * fall through to ilike (which can match a firm name like "Sequoia") or return
+ * a semanticFailed signal (where ilike against a prose sentence would always
+ * return 0 rows).
+ *
+ * Heuristic (ANY of these triggers prose classification):
+ *   - query length > 30 characters
+ *   - contains 3 or more commas (typical "stage, sector, geo" pattern)
+ *   - contains any of the prose-signal words below (stage labels, pitch verbs, etc.)
+ */
+const PROSE_SIGNAL_WORDS = [
+  'startup', 'raising', 'looking for', 'pre-seed', 'preseed', 'seed stage',
+  'series a', 'series b', 'series c', 'climate tech', 'deep tech', 'hardware',
+  'software', 'fintech', 'healthtech', 'medtech', 'b2b', 'b2c', 'saas',
+  'we are', 'our company', 'we build', 'we have', 'we make', 'based in',
+  'founded', 'revenue', 'traction', 'investors who', 'fund that',
+]
+
+function looksLikeProse(query: string): boolean {
+  const lower = query.toLowerCase()
+  if (query.length > 30) return true
+  if ((query.match(/,/g) ?? []).length >= 3) return true
+  return PROSE_SIGNAL_WORDS.some(word => lower.includes(word))
+}
+
+/**
  * SECURITY: Sanitize a string for use in PostgREST filter expressions.
  * Escapes ilike wildcards (%, _) and strips PostgREST control characters.
  */
@@ -800,7 +843,13 @@ async function searchInvestorsCore(
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
     const rl = await checkRateLimit('investorSearch', user.id, { limit: 30, window: 60000 })
-    if (rl) return { firms: [], total: 0, hasMore: false }
+    if (rl) return {
+      firms: [],
+      total: 0,
+      hasMore: false,
+      rateLimited: true,
+      failureMessage: 'Rate limit reached — wait a few seconds and try again.',
+    }
   }
 
   // ── Semantic search path ──
@@ -1011,15 +1060,32 @@ async function searchInvestorsCore(
 
       return { firms: paginatedFirms, total, hasMore }
     } catch (err) {
-      // FLOW: Semantic search failed — fall through to keyword path below.
+      // FLOW: Semantic search failed.
       // INSTRUMENTATION: Log the bound query length so the next dim-mismatch
       // captures whether the leak was at the embed boundary (caught here as
       // our pre-RPC assertion) or somewhere downstream we still haven't traced.
-      console.error('[searchInvestors] Semantic search failed, falling back to keyword:', {
+      console.error('[searchInvestors] Semantic search failed:', {
         err,
         queryLen: query.trim().length,
         queryPrefix: query.trim().slice(0, 40),
       })
+      // DECISION: If the query looks like a prose deck description (> 30 chars,
+      // contains stage/sector/geo language, etc.), the keyword/ilike fallback
+      // cannot match any firm name and would silently return 0 rows — which the
+      // user cannot distinguish from "no matches". Return a semanticFailed signal
+      // so the client renders an amber "try again" callout instead.
+      // For short, name-like queries ("Sequoia", "Index") we DO fall through to
+      // ilike because it can plausibly match a firm title.
+      if (looksLikeProse(query.trim())) {
+        return {
+          firms: [],
+          total: 0,
+          hasMore: false,
+          semanticFailed: true,
+          failureMessage: 'Investor search is temporarily unavailable. Please try again.',
+        }
+      }
+      // Short / firm-name-like query: fall through to keyword path below.
     }
   }
 
