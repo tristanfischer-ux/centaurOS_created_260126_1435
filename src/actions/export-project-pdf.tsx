@@ -297,6 +297,110 @@ function fmtDuration(seconds: number | null | undefined): string {
     return `${m}m ${s}s`
 }
 
+// Loop 7 critique fixes A1 + A10: strip markdown asterisk bleed AND
+// internal telemetry strings before any reviewer-authored text lands in
+// the founder-visible PDF. Multiple sub-agent critiques flagged the same
+// strings leaking across all three demos (BESS p.55/91, Hedgerow p.63,
+// VertFarm p.42/101). Apply this to every review summary / issue /
+// recommendation / supplier description / supplier certification field.
+//
+// Banned strings: model identifiers, scrape-failure markers, internal
+// schema vocabulary, debug telemetry, and the LLM scratch-prompt patterns
+// that leaked into Hedgerow's HYPERTAC LIMITED supplier description
+// (p.56) — those start with phrases like "We need to produce" or "single
+// sentence d50 words" or end mid-clause with "what supplier brings…".
+const TELEMETRY_LEAK_LINE_PATTERNS: ReadonlyArray<RegExp> = [
+    /^target provenance:.*$/im,
+    /^freshest\b.*$/im,
+    /^Phase \d+ is non-correcting\b.*$/im,
+    /^BOM derived from the module decomposition.*$/im,
+    /^model (google|openai|anthropic|deepseek|mistral)\/.*$/im,
+    /^Run at \d{4}-\d{2}-\d{2}T?\d{2}:\d{2}.*model.*cost \d+p.*$/im,
+    /^MISSING\s*[–\-]\s*Not found on website\s*$/im,
+    /^NOT STATED ON WEBSITE\s*$/im,
+    /^NONE RECORDED.*No certifications found in enrichment data.*$/im,
+    /^ramp role unassigned\s*$/im,
+    /^\[CAD Lab Review\].*$/im,
+    /^\[CAD Lab Review Result\].*$/im,
+]
+
+const SCRATCH_PROMPT_INDICATORS: ReadonlyArray<RegExp> = [
+    /\bWe need to produce a single sentence\b/i,
+    /\bd\d+\s*words?,?\s*specific to the project\b/i,
+    /\bSo we need to infer what\b.*\blikely brings\b/i,
+    /\bThe supplier is .{1,40},\s*but no description\b/i,
+    /\bMatch this STYLE and DEPTH\b/i,
+]
+
+function cleanReviewText(raw: string | null | undefined): string {
+    if (typeof raw !== "string") return ""
+    let text = raw
+
+    // 1. If the text contains an LLM scratch-prompt pattern, swap it for
+    //    a neutral placeholder rather than show the leaked thinking-trace.
+    if (SCRATCH_PROMPT_INDICATORS.some((re) => re.test(text))) {
+        return "Project-specific synthesis pending — directory entry has insufficient public information for the matcher."
+    }
+
+    // 2. Strip whole lines that match any internal-telemetry pattern.
+    text = text
+        .split("\n")
+        .filter((line) => !TELEMETRY_LEAK_LINE_PATTERNS.some((re) => re.test(line)))
+        .join("\n")
+
+    // 3. Strip Markdown bold/italic asterisks. The PDF renderer doesn't
+    //    parse markdown — `**bold**` shows as literal asterisks across
+    //    every Engineering Review block on every demo. Drop the marker
+    //    pairs but keep the inner text.
+    text = text
+        .replace(/\*\*\*(.+?)\*\*\*/g, "$1")
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/(^|[^\\])\*([^*\n]+)\*/g, "$1$2")
+        .replace(/__([^_]+)__/g, "$1")
+
+    // 4. Collapse 3+ blank lines back down to 1 (filter step above can
+    //    leave gaps where a telemetry line was the only content of a
+    //    paragraph).
+    text = text.replace(/\n{3,}/g, "\n\n").trim()
+    return text
+}
+
+// Acronym-expansion-overreach fixer (A6). The global "spell out
+// acronyms" rule is correct for ad copy; in engineering documents it
+// incorrectly expands proper-noun designators (RAL paint codes, DIN
+// rail, RIDDOR regulations, IEC standards). Re-collapse the most
+// damaging expansions back to their canonical forms when they appear in
+// review text. Conservative — only collapses where the expansion is
+// adjacent to a number/code that disambiguates the proper-noun reading.
+const ACRONYM_RECOLLAPSE: ReadonlyArray<[RegExp, string]> = [
+    [/\bRandom Access Library (\d{4})\b/g, "RAL $1"],
+    [/\bDeutsches Institut für Normung\b/g, "DIN"],
+    [/\bInternational Organization for Standardization (\d{2,5}(?:-[0-9a-z]+)?)\b/g, "ISO $1"],
+    [/\bInternational Electrotechnical Commission (\d{2,5}(?:-\d+)*)\b/g, "IEC $1"],
+    [/\bBritish Standard (\d{2,5}(?:-\d+)*)\b/g, "BS $1"],
+    [/\bfourth-generation long term evolution\b/gi, "4G LTE"],
+    [/\b(alternating current)\b/g, "AC"],
+    [/\b(direct current)\b/g, "DC"],
+    [/\bReporting of Injuries, Diseases and Dangerous Occurrences Regulations\s*(\d{4})?\b/g, (_m: string, year?: string) => year ? `RIDDOR ${year}` : "RIDDOR 2013"],
+]
+
+function fixAcronymOverreach(raw: string): string {
+    let text = raw
+    for (const [pattern, replacement] of ACRONYM_RECOLLAPSE) {
+        if (typeof replacement === "string") {
+            text = text.replace(pattern, replacement)
+        } else {
+            // narrowing — TypeScript doesn't infer the function form on the tuple
+            text = text.replace(pattern, replacement as unknown as string)
+        }
+    }
+    return text
+}
+
+function sanitizeReviewText(raw: string | null | undefined): string {
+    return fixAcronymOverreach(cleanReviewText(raw))
+}
+
 // Map a specialist id / display name → "Name (Role — specialist AI)".
 // Tristan's feedback: every time a specialist is named we need to tell
 // the reader both what they do and that they're an AI specialist, so
@@ -744,24 +848,51 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                             <Text style={styles.statValue}>{data.totals.reviewCount}</Text>
                         </View>
                     </View>
-                    <View style={styles.statRow}>
-                        <View style={styles.stat}>
-                            <Text style={styles.statLabel}>Unit cost</Text>
-                            <Text style={styles.statValue}>{fmtGbp(data.cost.unitTotalGbp)}</Text>
-                        </View>
-                        <View style={styles.stat}>
-                            <Text style={styles.statLabel}>Ceiling</Text>
-                            <Text style={styles.statValue}>{fmtGbp(data.cost.ceilingGbp)}</Text>
-                        </View>
-                        <View style={styles.stat}>
-                            <Text style={styles.statLabel}>Headroom</Text>
-                            <Text style={styles.statValue}>
-                                {data.cost.unitTotalGbp != null && data.cost.ceilingGbp != null
-                                    ? fmtGbp(data.cost.ceilingGbp - data.cost.unitTotalGbp)
-                                    : "—"}
-                            </Text>
-                        </View>
-                    </View>
+                    {/* Loop 7 critique fix A5 + Tristan punch list #1 — when
+                     * the project is RED on cost, the cover stat tiles must
+                     * show the comparison clearly. Previously: "Headroom —"
+                     * when ceiling was missing OR when headroom was zero,
+                     * which a founder reads as "no problem". Now: red value
+                     * + sign + "OVER" annotation when headroom is negative,
+                     * "Not declared" instead of "—" when ceiling is missing
+                     * so the gap is named, not hidden. */}
+                    {(() => {
+                        const unit = data.cost.unitTotalGbp
+                        const ceiling = data.cost.ceilingGbp
+                        const headroom =
+                            unit != null && ceiling != null ? ceiling - unit : null
+                        const isOver = headroom != null && headroom < 0
+                        return (
+                            <View style={styles.statRow}>
+                                <View style={styles.stat}>
+                                    <Text style={styles.statLabel}>Unit cost</Text>
+                                    <Text style={styles.statValue}>{fmtGbp(unit)}</Text>
+                                </View>
+                                <View style={styles.stat}>
+                                    <Text style={styles.statLabel}>Ceiling</Text>
+                                    <Text style={styles.statValue}>
+                                        {ceiling != null
+                                            ? fmtGbp(ceiling)
+                                            : "Not declared"}
+                                    </Text>
+                                </View>
+                                <View style={styles.stat}>
+                                    <Text style={styles.statLabel}>Headroom</Text>
+                                    <Text
+                                        style={
+                                            isOver
+                                                ? [styles.statValue, { color: "#B91C1C" }]
+                                                : styles.statValue
+                                        }
+                                    >
+                                        {headroom != null
+                                            ? `${isOver ? "−" : "+"}${fmtGbp(Math.abs(headroom))}${isOver ? " OVER" : ""}`
+                                            : "—"}
+                                    </Text>
+                                </View>
+                            </View>
+                        )
+                    })()}
                 </View>
             </View>
         </Page>
@@ -1405,7 +1536,7 @@ function ModulePage({
                                 {r.verdict ? ` · ${r.verdict}` : ""}
                                 {r.reviewedAtIso ? ` · ${fmtDateTime(r.reviewedAtIso)}` : ""}
                             </Text>
-                            {r.summary && <Text style={{ marginTop: 2 }}>{r.summary}</Text>}
+                            {r.summary && <Text style={{ marginTop: 2 }}>{sanitizeReviewText(r.summary)}</Text>}
                             {r.issues.length > 0 && (
                                 <View style={{ marginTop: 4 }}>
                                     {r.issues.map((iss, j) => (
@@ -1425,10 +1556,10 @@ function ModulePage({
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     {iss.category}:{" "}
                                                 </Text>
-                                                {iss.message}
+                                                {sanitizeReviewText(iss.message)}
                                                 {iss.suggestion ? (
                                                     <Text style={{ fontStyle: "italic" }}>
-                                                        {" "}Suggestion: {iss.suggestion}
+                                                        {" "}Suggestion: {sanitizeReviewText(iss.suggestion)}
                                                     </Text>
                                                 ) : null}
                                             </Text>
@@ -1442,7 +1573,7 @@ function ModulePage({
                                     {r.recommendations.map((rec, j) => (
                                         <View key={j} style={styles.bullet}>
                                             <Text style={styles.bulletDot}>•</Text>
-                                            <Text style={styles.bulletText}>{rec}</Text>
+                                            <Text style={styles.bulletText}>{sanitizeReviewText(rec)}</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -1654,6 +1785,28 @@ function riskRating(severity: number, likelihood: number): {
     return { score, band: "low", color: "#15803d" }
 }
 
+// Loop 7 fix (Tristan-flagged "I'm not quite sure what s5 times l2
+// equals 10 high means"): replace the bare arithmetic with the
+// severity / likelihood label so the founder reads "Major × Possible
+// (medium 10)" instead of "S5 × L2 = 10 (medium)". 1-5 scales follow
+// HSE / IEC 61508 conventions for FMEA.
+function severityLabel(s: number): string {
+    if (s >= 5) return "Catastrophic"
+    if (s === 4) return "Major"
+    if (s === 3) return "Moderate"
+    if (s === 2) return "Minor"
+    if (s <= 1) return "Negligible"
+    return `S${s}`
+}
+function likelihoodLabel(l: number): string {
+    if (l >= 5) return "Frequent"
+    if (l === 4) return "Likely"
+    if (l === 3) return "Possible"
+    if (l === 2) return "Unlikely"
+    if (l <= 1) return "Rare"
+    return `L${l}`
+}
+
 function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
     // Loop 5 P5 (council unanimous): when modules carry the riskMatrix
     // FMEA shape, render the structured matrix. Otherwise fall back to
@@ -1665,7 +1818,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
             <Text style={styles.h2}>6. Risks register</Text>
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
                 {anyMatrix
-                    ? "FMEA-style risk matrix per module — severity × likelihood scored 1–5. Rating bands: low (1–3), medium (4–8), high (9–15), critical (16–25). Residual rating shows the score after the listed mitigation lands."
+                    ? "FMEA-style risk matrix per module. Each row is rated severity (Negligible / Minor / Moderate / Major / Catastrophic) × likelihood (Rare / Unlikely / Possible / Likely / Frequent). Rating bands: low (1–3), medium (4–8), high (9–15), critical (16–25). Residual rating shows the band after the listed mitigation lands."
                     : "Every failure mode and open question declared against each module, in one register."}
             </Text>
             {modules.map((m) => (
@@ -1722,8 +1875,8 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                     marginLeft: 6,
                                                 }}
                                             >
-                                                S{r.severity} × L{r.likelihood} ={" "}
-                                                {initial.score} ({initial.band})
+                                                {severityLabel(r.severity)} × {likelihoodLabel(r.likelihood)} —{" "}
+                                                {initial.band} ({initial.score})
                                             </Text>
                                         </View>
                                         {r.cause && (
@@ -1758,37 +1911,35 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                 {r.mitigation}
                                             </Text>
                                         )}
-                                        <View
-                                            style={{
-                                                flexDirection: "row",
-                                                marginTop: 1,
-                                            }}
-                                        >
-                                            {r.owner && (
-                                                <Text
-                                                    style={{
-                                                        fontSize: 9,
-                                                        color: MUTED,
-                                                        flex: 1,
-                                                    }}
-                                                >
-                                                    Owner: {r.owner}
-                                                </Text>
-                                            )}
-                                            {residual && (
-                                                <Text
-                                                    style={{
-                                                        fontSize: 9,
-                                                        color: residual.color,
-                                                        marginLeft: 6,
-                                                    }}
-                                                >
-                                                    Residual: S{r.residualSeverity} × L
-                                                    {r.residualLikelihood} ={" "}
-                                                    {residual.score} ({residual.band})
-                                                </Text>
-                                            )}
-                                        </View>
+                                        {/* Loop 7 critique fix A8 + Tristan punch list #7/#9 —
+                                         * The Owner row used flex:1 on the Owner side and
+                                         * marginLeft:6 on the Residual side. When residual
+                                         * label was long ("Major × Possible — high (12)") it
+                                         * overlapped Owner because there was no flex-shrink
+                                         * boundary. Stack vertically so they never collide. */}
+                                        {r.owner && (
+                                            <Text
+                                                style={{
+                                                    fontSize: 9,
+                                                    color: MUTED,
+                                                    marginTop: 2,
+                                                }}
+                                            >
+                                                Owner: {r.owner}
+                                            </Text>
+                                        )}
+                                        {residual && (
+                                            <Text
+                                                style={{
+                                                    fontSize: 9,
+                                                    color: residual.color,
+                                                    marginTop: 1,
+                                                }}
+                                            >
+                                                Residual: {severityLabel(r.residualSeverity!)} × {likelihoodLabel(r.residualLikelihood!)} —{" "}
+                                                {residual.band} ({residual.score})
+                                            </Text>
+                                        )}
                                     </View>
                                 )
                             })}
@@ -1880,7 +2031,15 @@ function SuppliersPage({
                 // what THIS supplier brings to THIS project. Falls back
                 // to the supplier's own marketing blurb only when the
                 // synthesis call failed (network/timeout).
-                const offering = (s.projectSynthesis?.trim()) || s.description?.trim() || s.name
+                // Loop 7 critique fix A12: route the synthesis through
+                // sanitizeReviewText so the LLM scratch-prompt leak (the
+                // HYPERTAC LIMITED catastrophe on Hedgerow p.56 — "We need
+                // to produce a single sentence d50 words, specific to the
+                // project... The supplier is HYPERTAC LIMITED, but no
+                // description.") gets replaced with a neutral placeholder
+                // before any founder reads it.
+                const rawOffering = (s.projectSynthesis?.trim()) || s.description?.trim() || s.name
+                const offering = sanitizeReviewText(rawOffering) || rawOffering
                 // Compose a single-line "company facts" row.
                 const facts: string[] = []
                 if (s.hq) facts.push(s.hq)
@@ -1914,11 +2073,24 @@ function SuppliersPage({
                                 {facts.join(" · ")}
                             </Text>
                         )}
-                        {s.certifications && s.certifications.length > 0 && (
-                            <Text style={[styles.small, { marginTop: 2 }]}>
-                                Certifications: {s.certifications.join(", ")}
-                            </Text>
-                        )}
+                        {(() => {
+                            // Loop 7 critique fix A10: filter out scrape-failure
+                            // strings ("MISSING - Not found on website",
+                            // "NOT STATED ON WEBSITE", "NONE RECORDED…")
+                            // before showing the certifications list. Better
+                            // to say nothing than to surface ETL provenance.
+                            const cleaned = (s.certifications ?? []).filter(
+                                (c) =>
+                                    !/^(MISSING\b|NOT STATED\b|NONE RECORDED\b|UNKNOWN\b|N\/A$)/i.test(
+                                        (c ?? "").trim(),
+                                    ),
+                            )
+                            return cleaned.length > 0 ? (
+                                <Text style={[styles.small, { marginTop: 2 }]}>
+                                    Certifications: {cleaned.join(", ")}
+                                </Text>
+                            ) : null
+                        })()}
                         {(s.projectSynthesis || s.description) && (
                             <Text style={[{ fontSize: 9, marginTop: 4 }]}>
                                 {offering}
