@@ -9,6 +9,7 @@
  * Revalidates every 60 seconds (ISR).
  */
 
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -62,6 +63,32 @@ import {
 } from 'lucide-react'
 
 export const revalidate = 60
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+// Dynamic page <title> per investor so browser tabs / bookmarks / SEO snippets
+// reflect the actual investor firm instead of the generic site tagline.
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('marketplace_listings')
+    .select('title, description')
+    .eq('id', id)
+    .single()
+  if (!data) return { title: 'Investor not found — Fractional Forge' }
+  const desc = (data.description ?? '').slice(0, 155)
+  return {
+    title: `${data.title} — Fractional Forge`,
+    description: desc || `${data.title} on the Fractional Forge investor directory.`,
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -191,10 +218,6 @@ function FreeUpgradeOverlay({ firmName, firmType, hqCity }: {
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
-
-interface PageProps {
-  params: Promise<{ id: string }>
-}
 
 export default async function InvestorDetailPage({ params }: PageProps) {
   const { id } = await params
