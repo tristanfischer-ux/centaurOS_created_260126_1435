@@ -35,6 +35,7 @@ import { InvestorNoteTimeline } from '../components/InvestorNoteTimeline'
 import { SimilarInvestorsSection } from '../components/SimilarInvestorsSection'
 import { CoInvestmentNetworkSection } from '../components/CoInvestmentNetworkSection'
 import { InvestorBreadcrumb } from '../components/InvestorBreadcrumb'
+import { InvestorDataPanorama } from '../components/InvestorDataPanorama'
 import { InvestorDetailActions } from '../components/InvestorDetailActions'
 import { ViewCapOverlay } from '../components/ViewCapOverlay'
 import {
@@ -732,6 +733,12 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               factCheckStatus={attrs.fact_check_status}
               hasAccess={access.intelligenceAccess}
             />
+
+            {/* Investor data panorama — surfaces every populated attribute the
+                prior cards don't already show. Tristan's call 2026-04-26:
+                "the database on investors is enormous, no point having lots of
+                fields if they're not being revealed to the user." */}
+            <InvestorDataPanorama firm={firm} />
 
             {/* Notes & Activity (starter+) */}
             {access.detailAccess && <InvestorNoteTimeline listingId={id} />}
