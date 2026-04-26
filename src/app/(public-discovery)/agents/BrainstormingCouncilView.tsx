@@ -130,44 +130,44 @@ interface SuggestionPrompt {
 
 const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
     {
-        text: "Should I hire my first engineer or my first salesperson?",
+        text: "Should I lock in the Tier 1 contract manufacturer now or run a second prototype with the design house?",
         tier: "quick",
-        category: "Hiring",
+        category: "Manufacturing",
     },
     {
-        text: "Is £50K monthly recurring revenue enough to start a serious raise?",
+        text: "Is £50K monthly recurring revenue enough to start a serious Seed raise on a hardware product?",
         tier: "quick",
         category: "Fundraising",
     },
     {
-        text: "How do I price a hardware product without leaving money on the table?",
+        text: "How do I price a hardware product to leave 35% gross margin after first-year freight and warranty?",
         tier: "full",
         category: "Pricing",
     },
     {
-        text: "What should I cut from the v1 to ship the first commercial pilot in 12 weeks?",
+        text: "What design changes can get my Bill of Materials cost down 30% before the second production run?",
         tier: "full",
-        category: "Product",
+        category: "Bill of Materials",
     },
     {
-        text: "How do we shorten manufacturing lead time from 14 weeks to 6 weeks?",
+        text: "How do we shorten manufacturing lead time from 14 weeks to 6 weeks without a second supplier?",
         tier: "deep",
-        category: "Manufacturing",
+        category: "Lead time",
     },
     {
-        text: "What is our defensible moat once Chinese clones arrive in 12 months?",
+        text: "What is our defensible moat once a Shenzhen clone of our product arrives at half our price in 12 months?",
         tier: "deep",
-        category: "Strategy",
+        category: "Defensibility",
     },
     {
-        text: "Should we raise £5M now or wait six months for stronger metrics?",
+        text: "Should we raise £5M now or wait six months until our medical device certification is signed off?",
         tier: "strategy",
         category: "Fundraising",
     },
     {
-        text: "Is now the right time to expand from the United Kingdom into the United States?",
+        text: "Is now the right time to take our hardware product from the United Kingdom into the United States?",
         tier: "strategy",
-        category: "Strategy",
+        category: "Geographic expansion",
     },
 ]
 
