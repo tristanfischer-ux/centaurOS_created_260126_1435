@@ -55,6 +55,7 @@ import {
 } from "@/lib/supplier-verification"
 import { dedupAssemblyRollUp } from "@/lib/bom/assembly-dedup"
 import { checkBomModuleConsistency } from "@/lib/bom/module-consistency"
+import { buildSpendSummary, SPEND_BY_SUPPLIER_CONSTANTS } from "@/lib/bom/spend-by-supplier"
 import {
     anyRiskMatrixIsBoilerplate,
     inferOwnerByDiscipline,
@@ -2481,14 +2482,163 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
     )
 }
 
+function SpendBySupplierTable({
+    parts,
+    visibleSuppliers,
+}: {
+    parts: PartRow[]
+    visibleSuppliers: SupplierPdf[]
+}): React.ReactElement | null {
+    // Build the spend summary against the visible (post-phantom-filter)
+    // shortlist. Helper handles assembly-dedup + score threshold + sole-
+    // source detection internally.
+    const summary = buildSpendSummary(
+        parts.map((p) => ({
+            partNumber: p.partNumber,
+            estimatedUnitCostGbp: p.estimatedUnitCostGbp,
+            sourceModuleName: p.sourceModuleName,
+            name: p.name,
+            massKg: p.massKg,
+        })),
+        visibleSuppliers.map((s) => ({
+            name: s.name,
+            matchedPartNumbers: s.matchedPartNumbers,
+            matchScore: s.matchScore,
+            websiteUrl: s.websiteUrl,
+            hq: s.hq,
+        })),
+    )
+    if (summary.rows.length === 0 && summary.unclaimedPartCount === 0) return null
+    const fmtMoney = (n: number) =>
+        n >= 1_000_000
+            ? `£${(n / 1_000_000).toFixed(1)}M`
+            : n >= 1_000
+                ? `£${(n / 1_000).toFixed(0)}k`
+                : `£${n.toFixed(0)}`
+    return (
+        <View style={{ marginBottom: 16 }}>
+            <Text style={styles.h5}>
+                Spend by supplier — modelled, primary-nominee per part
+            </Text>
+            <Text style={[styles.muted, { fontSize: 8.5, marginBottom: 6 }]}>
+                Modelled spend, NOT a quotation. Each bill-of-materials part is
+                assigned to its highest-scoring matched supplier (score ≥ {SPEND_BY_SUPPLIER_CONSTANTS.MATCH_SCORE_THRESHOLD}) as the
+                modelled primary; that supplier carries 100 percent of the part&apos;s
+                cost in this table. Alternates appear in the detail cards below.
+                Concentration-risk amber fires when a single supplier holds ≥ {SPEND_BY_SUPPLIER_CONSTANTS.CONCENTRATION_RISK_THRESHOLD_PCT} percent of
+                the deduplicated bill-of-materials.
+            </Text>
+            <View style={styles.table}>
+                <View style={styles.tableHead}>
+                    <Text style={[styles.tableHeadCell, { width: 22 }]}>#</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 2.4 }]}>Supplier</Text>
+                    <Text style={[styles.tableHeadCell, { width: 60 }]}>HQ</Text>
+                    <Text style={[styles.tableHeadCell, { width: 36, textAlign: "right" }]}>
+                        Parts
+                    </Text>
+                    <Text style={[styles.tableHeadCell, { width: 46, textAlign: "right" }]}>
+                        Sole-source
+                    </Text>
+                    <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right", paddingRight: 6 }]}>
+                        Spend
+                    </Text>
+                    <Text style={[styles.tableHeadCell, { width: 42, textAlign: "right", paddingLeft: 6 }]}>
+                        % of BOM
+                    </Text>
+                    <Text style={[styles.tableHeadCell, { width: 36, textAlign: "right" }]}>
+                        Score
+                    </Text>
+                </View>
+                {summary.rows.map((row, i) => {
+                    const supplierLabel = (() => {
+                        const url = row.supplier.websiteUrl
+                        if (typeof url === "string" && /^https?:\/\//i.test(url)) {
+                            try {
+                                return new URL(url).hostname.replace(/^www\./, "")
+                            } catch {
+                                /* fall through */
+                            }
+                        }
+                        return row.supplier.name
+                    })()
+                    const amber = row.concentrationRiskAmber
+                    return (
+                        <View
+                            key={`spend-${i}`}
+                            style={[
+                                styles.tableRow,
+                                amber ? { backgroundColor: "#fef3c7" } : {},
+                            ]}
+                        >
+                            <Text style={[styles.tableCell, { width: 22 }]}>
+                                {i + 1}
+                            </Text>
+                            <Text style={[styles.tableCell, { flex: 2.4 }]}>
+                                {supplierLabel}
+                                {row.soleSourceParts > 0 ? (
+                                    <Text style={{ color: "#b45309", fontWeight: "bold" }}>
+                                        {" "}— sole-source
+                                    </Text>
+                                ) : null}
+                            </Text>
+                            <Text style={[styles.tableCell, { width: 60 }]}>
+                                {row.supplier.hq ?? "—"}
+                            </Text>
+                            <Text style={[styles.tableCell, { width: 36, textAlign: "right" }]}>
+                                {row.partsAsPrimary}
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.tableCell,
+                                    { width: 46, textAlign: "right" },
+                                    row.soleSourceParts > 0 ? { color: "#b45309", fontWeight: "bold" } : {},
+                                ]}
+                            >
+                                {row.soleSourceParts}
+                            </Text>
+                            <Text style={[styles.tableCell, { width: 60, textAlign: "right", paddingRight: 6 }]}>
+                                {fmtMoney(row.modelledSpendGbp)}
+                            </Text>
+                            <Text style={[styles.tableCell, { width: 42, textAlign: "right", paddingLeft: 6 }]}>
+                                {row.spendPct.toFixed(1)}%
+                            </Text>
+                            <Text style={[styles.tableCell, { width: 36, textAlign: "right" }]}>
+                                {row.matchScore != null ? row.matchScore.toFixed(0) : "—"}
+                            </Text>
+                        </View>
+                    )
+                })}
+            </View>
+            <View style={{ marginTop: 6 }}>
+                {summary.unclaimedPartCount > 0 && (
+                    <Text style={[styles.muted, { fontSize: 8.5, color: "#b91c1c" }]}>
+                        {summary.unclaimedPartCount} part
+                        {summary.unclaimedPartCount === 1 ? "" : "s"} ({fmtMoney(summary.unclaimedSpendGbp)} of bill-of-materials value) have no shortlisted supplier above the match-score floor — supply-chain gap.
+                    </Text>
+                )}
+                {summary.capped && (
+                    <Text style={[styles.muted, { fontSize: 8.5 }]}>
+                        Showing top {SPEND_BY_SUPPLIER_CONSTANTS.TOP_N_CAP} by modelled spend. {summary.rowCountBeforeCap - SPEND_BY_SUPPLIER_CONSTANTS.TOP_N_CAP} additional suppliers appear in the detail cards below.
+                    </Text>
+                )}
+                <Text style={[styles.muted, { fontSize: 8.5, marginTop: 4 }]}>
+                    Costs exclude tooling, non-recurring engineering, freight, import duty, and minimum order quantity price breaks. HQ shown is the supplier&apos;s registered office; manufacturing geography may differ. Verify all pricing, availability and lead times directly with suppliers before committing to tooling or placing orders.
+                </Text>
+            </View>
+        </View>
+    )
+}
+
 function SuppliersPage({
     suppliers,
     sources,
     verdict,
+    parts,
 }: {
     suppliers: SupplierPdf[]
     sources: PdfInput["sources"]
     verdict: PdfInput["feasibilityVerdict"]
+    parts: PartRow[]
 }): React.ReactElement {
     const dirCount = fmtInt(sources.supplierDirectoryCount)
     const listingCount = fmtInt(sources.marketplaceListingCount)
@@ -2534,6 +2684,21 @@ function SuppliersPage({
                 // mystery.
                 return null
             })()}
+            {/* L13-S1 (2026-04-27, Tristan-flagged): spend-by-supplier
+               summary table sits at the top of the section. Founder
+               sees concentration of bill-of-materials cost on each
+               supplier, sole-source flags, and the un-claimed parts
+               number — so they know which suppliers to prioritise for
+               due diligence and where the supply-chain bottlenecks are.
+               Allocation: primary-nominee (highest matchScore per part).
+               Council-validated 2026-04-27 (3-of-3 unanimous), see
+               SUPPLIER-SPEND-TABLE-PLAN.md. */}
+            {visibleSuppliers.length > 0 && (
+                <SpendBySupplierTable
+                    parts={parts}
+                    visibleSuppliers={visibleSuppliers}
+                />
+            )}
             {visibleSuppliers.length === 0 && (
                 <Text style={styles.muted}>No suppliers shortlisted yet.</Text>
             )}
@@ -3722,6 +3887,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                     suppliers={data.suppliers}
                     sources={data.sources}
                     verdict={data.feasibilityVerdict}
+                    parts={data.parts}
                 />
             )}
 
