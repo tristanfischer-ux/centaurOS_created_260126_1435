@@ -1353,7 +1353,7 @@ function RedStateBanner({
         sectionKind === "cost"
             ? "This estimate is invalidated until the upstream feasibility blockers are resolved — figures below are illustrative, not procurement-ready."
             : sectionKind === "bom"
-              ? "Tentative bill of materials. Quantities and selections are derived from a configuration the engine could not fit; expect material churn once the blockers below are resolved."
+              ? "Tentative bill of materials. Quantities and selections are derived from a configuration the sizing solver could not fit; expect material churn once the blockers below are resolved."
               : "Procurement deferred. Suppliers below are research candidates — do not begin RFQ work until the upstream feasibility blockers are closed."
     return (
         <View
