@@ -4774,6 +4774,59 @@ async function exportProjectPdfInternal(
             description: typeof p.description === "string" ? p.description : null,
         }))
 
+        // L16-A1 (2026-04-27): snapshot the canonical specs ledger from the
+        // current modules + parts state. This is the minimum-viable wiring
+        // until each specialist (Max, BOM gen, Sizing, Finn, Fang) writes
+        // through canonical-ledger.ts at its own write site. The snapshot
+        // is fire-and-forget — failure is logged but does not block PDF
+        // render. Verifiable via `SELECT canonical_specs_revision FROM
+        // cad_lab_projects WHERE id = ...` post-render (revision should
+        // increment on each render).
+        try {
+            const { snapshotCanonicalSpecs } = await import("@/lib/cad-lab/snapshot-canonical-specs")
+            const finnTotal = Object.values(costEstimates).reduce(
+                (acc: number, est) => acc + (typeof est?.totalPerUnit === "number" ? est.totalPerUnit : 0),
+                0,
+            )
+            const snapshotResult = await snapshotCanonicalSpecs(
+                admin,
+                projectId,
+                modulesRaw.map((m) => ({
+                    id: m.id ?? null,
+                    name: m.name ?? null,
+                    massKg: (m as { massKg?: number | null }).massKg ?? null,
+                    estimatedMassKg: m.estimatedMassKg ?? null,
+                    cost: (m as { cost?: { totalPerUnit?: number | null } }).cost ?? null,
+                })),
+                parts.map((p) => ({
+                    id: p.partNumber,
+                    partNumber: p.partNumber,
+                    name: p.name,
+                    description: p.description,
+                    sourceModuleName: p.sourceModuleName,
+                    quantity: 1,
+                    massKg: p.massKg,
+                    estimatedUnitCostGbp: p.estimatedUnitCostGbp,
+                    isPurchased: p.isPurchased,
+                })),
+                finnTotal > 0 ? finnTotal : null,
+            )
+            if (!snapshotResult.ok) {
+                console.warn(
+                    `[L16-A1 snapshot] non-fatal: project=${projectId} bomTotal=£${snapshotResult.bomTotalGbp.toFixed(0)} reason=${snapshotResult.error}`,
+                )
+            } else {
+                console.log(
+                    `[L16-A1 snapshot] project=${projectId} bom=£${snapshotResult.bomTotalGbp.toFixed(0)} finn=£${snapshotResult.finnTotalGbp.toFixed(0)} modules=${snapshotResult.moduleSpecsCount} parts=${snapshotResult.partRowsCount} digest=${snapshotResult.digest}`,
+                )
+            }
+        } catch (err) {
+            console.warn(
+                "[L16-A1 snapshot] threw:",
+                err instanceof Error ? err.message : err,
+            )
+        }
+
         // Cost aggregates.
         //
         // L9-P1 (2026-04-26): BOM master is the canonical source of truth for
@@ -5316,16 +5369,29 @@ async function exportProjectPdfInternal(
 
                     const extraFindings = [...specExtras, ...mirrorExtras]
 
+                    // L16-I1+I2 (2026-04-27): cover banner counts only
+                    // ALERT-severity findings, not info. The Finn-vs-BOM
+                    // gap (R1) was demoted to info in
+                    // cad-lab-numerical-reconciliation.ts because the BOM
+                    // is canonical and the gap class disappears under
+                    // canonical-spec-ledger logic. Counting it on the
+                    // cover banner would re-surface the very signal we
+                    // just folded into the body.
+                    const baseAlertFindings = baseReconciliation.findings.filter(
+                        (f) => f.severity === "alert",
+                    )
                     const merged = baseReconciliation
                         ? {
                               ...baseReconciliation,
                               findings: [...baseReconciliation.findings, ...extraFindings],
-                              hasAlerts: true,
+                              hasAlerts:
+                                  baseAlertFindings.length + extraFindings.length > 0,
                               coverBanner: (() => {
-                                  const baseCount = baseReconciliation.findings.length
+                                  const baseCount = baseAlertFindings.length
                                   const specCount = specExtras.length
                                   const mirrorCount = mirrorExtras.length
                                   const totalCount = baseCount + specCount + mirrorCount
+                                  if (totalCount === 0) return null
                                   const parts: string[] = []
                                   if (specCount > 0) parts.push(`${specCount} bill-of-materials versus module-description`)
                                   if (mirrorCount > 0) parts.push(`${mirrorCount} mirror-assembly cost / mass parity`)
