@@ -53,6 +53,7 @@ import {
     looksLikeHallucinatedSupplierName,
     checkSupplierUrlShape,
 } from "@/lib/supplier-verification"
+import { dedupAssemblyRollUp } from "@/lib/bom/assembly-dedup"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -1723,14 +1724,14 @@ function ModulePage({
                     ) : null}
                     {/* Sum-vs-BOM cross-check footer — Tristan-flagged 2026-04-27 08:00.
                        Reader sees at a glance whether this module's cost
-                       breakdown actually matches the BOM master. */}
+                       breakdown actually matches the BOM master.
+                       L13-P2 (2026-04-27): partsSum is now computed via
+                       dedupAssemblyRollUp so an assembly-parent row + its
+                       constituents in the same module do not double-count. */}
                     {(() => {
-                        const partsSum = partsForModule.reduce(
-                            (acc, p) =>
-                                acc +
-                                (typeof p.estimatedUnitCostGbp === "number"
-                                    ? p.estimatedUnitCostGbp
-                                    : 0),
+                        const moduleDedup = dedupAssemblyRollUp(partsForModule)
+                        const partsSum = moduleDedup.effectiveCost.reduce(
+                            (acc, c) => acc + c,
                             0,
                         )
                         const finnSum =
@@ -1778,14 +1779,12 @@ function ModulePage({
                                 </Text>
                             </View>
                         )}
-                    {/* Per-unit total: parts roll-up when present, else Finn. */}
+                    {/* Per-unit total: parts roll-up when present, else Finn.
+                       L13-P2 (2026-04-27): de-duplicated to match cover total. */}
                     {(() => {
-                        const partsTotal = partsForModule.reduce(
-                            (acc, p) =>
-                                acc +
-                                (typeof p.estimatedUnitCostGbp === "number"
-                                    ? p.estimatedUnitCostGbp
-                                    : 0),
+                        const totalDedup = dedupAssemblyRollUp(partsForModule)
+                        const partsTotal = totalDedup.effectiveCost.reduce(
+                            (acc, c) => acc + c,
                             0,
                         )
                         const useParts = partsForModule.length > 0
@@ -4029,15 +4028,23 @@ async function exportProjectPdfInternal(
         // parts table. Cover, BOM master, and reconciliation gate all read
         // from the same source. Module pages still show Finn's per-row
         // breakdown for narrative; the per-module *total* uses parts.
+        // L13-P2 (2026-04-27): de-duplicate assembly-parent rows from the
+        // cost roll-up. The bill-of-materials generator emits both an
+        // assembly-parent row (e.g. BESS PC-001-PUR "Skid Assembly" £145k,
+        // Sentinel HAND-ASY "Handle Assembly" £185) AND its constituent
+        // leaf rows. Loop 9 P1 summed both, double-counting cost across
+        // 4 of 6 demos (BESS £142k, Sentinel 8.6×, Vertfarm 53.8% gap,
+        // HAPS 57.8% reconciliation failure). Dedup helper detects the
+        // pattern and zeros the parent's cost when constituents exist.
+        const dedupedRollUp = dedupAssemblyRollUp(parts)
         const partsCostByModule = new Map<string, number>()
-        for (const p of parts) {
-            if (typeof p.estimatedUnitCostGbp !== "number") continue
+        for (let i = 0; i < parts.length; i++) {
+            const ec = dedupedRollUp.effectiveCost[i]
+            if (ec === 0) continue
+            const p = parts[i]
             const modKey =
                 typeof p.sourceModuleName === "string" ? p.sourceModuleName : "_orphan"
-            partsCostByModule.set(
-                modKey,
-                (partsCostByModule.get(modKey) ?? 0) + p.estimatedUnitCostGbp,
-            )
+            partsCostByModule.set(modKey, (partsCostByModule.get(modKey) ?? 0) + ec)
         }
         const perModuleCost = modules.map((m) => {
             const partsTotal = partsCostByModule.get(m.name)
@@ -4053,11 +4060,8 @@ async function exportProjectPdfInternal(
                 totalGbp: typeof partsTotal === "number" ? partsTotal : finnTotal,
             }
         })
-        const unitTotalGbp = parts.reduce(
-            (acc, p) =>
-                acc + (typeof p.estimatedUnitCostGbp === "number" ? p.estimatedUnitCostGbp : 0),
-            0,
-        )
+        let unitTotalGbp = 0
+        for (const v of dedupedRollUp.effectiveCost) unitTotalGbp += v
 
         // Suppliers shortlist — join to global directory for HQ.
         const { data: shortlistRows } = await admin
@@ -4429,17 +4433,17 @@ async function exportProjectPdfInternal(
                     // changes (per Loop 7 critique VertFarm: "Quantities
                     // are NOT on the BOM"), this sum will pick it up
                     // automatically once the field is added.
-                    const bomTotalGbp = parts.reduce((acc, p) => {
-                        const cost =
-                            typeof p.estimatedUnitCostGbp === "number"
-                                ? p.estimatedUnitCostGbp
-                                : 0
-                        return acc + cost
-                    }, 0)
-                    const bomTotalMassKg = parts.reduce((acc, p) => {
-                        const mass = typeof p.massKg === "number" ? p.massKg : 0
-                        return acc + mass
-                    }, 0)
+                    // L13-P2 (2026-04-27): de-duplicated so assembly +
+                    // constituents do not double-count in reconciliation.
+                    const reconcileDedup = dedupAssemblyRollUp(parts)
+                    const bomTotalGbp = reconcileDedup.effectiveCost.reduce(
+                        (acc, c) => acc + c,
+                        0,
+                    )
+                    const bomTotalMassKg = reconcileDedup.effectiveMass.reduce(
+                        (acc, m) => acc + m,
+                        0,
+                    )
                     const declaredTotalMassKg = modules.reduce((acc, m) => {
                         return acc + (typeof m.massKg === "number" ? m.massKg : 0)
                     }, 0)
