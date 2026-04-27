@@ -185,7 +185,7 @@ export function SuppliersView(props: SuppliersViewProps): React.ReactElement {
             {totalShortlisted > 0 && (
                 <div className="sp2-show-work" role="note" aria-label="How these suppliers were matched">
                     <strong>How these suppliers were chosen.</strong>{" "}
-                    Searched 13,700 manufacturers across the United Kingdom and Europe against your bill of materials and your project constraints. Scored every match on capability fingerprint, certification fit, lead time, minimum order quantity, and prior similar-parts builds. Surfaced the top {Math.min(topNInsights, totalShortlisted)} with personalised qualifying questions for each.
+                    Searched 18,000 manufacturers across the United Kingdom and Europe against your bill of materials and your project constraints. Scored every match on capability fingerprint, certification fit, lead time, minimum order quantity, and prior similar-parts builds. Surfaced the top {Math.min(topNInsights, totalShortlisted)} with personalised qualifying questions for each.
                 </div>
             )}
 

@@ -299,7 +299,7 @@ export function InvestorReadinessQuiz() {
             {/* CTA */}
             <div className="rounded-2xl bg-gradient-to-br from-orange-50 to-background p-6 text-center">
               <p className="mb-1 font-semibold text-foreground">ForgeOS helps you close these gaps fast</p>
-              <p className="mb-4 text-sm text-muted-foreground">CAD Lab, AI specialists, and 13,700+ UK manufacturers — everything you need to get investor-ready.</p>
+              <p className="mb-4 text-sm text-muted-foreground">CAD Lab, AI specialists, and 18,000+ UK manufacturers — everything you need to get investor-ready.</p>
               <Button asChild size="lg" className="gap-2 bg-[#ff4500] text-white hover:bg-[#e03d00]">
                 <Link href="/signup">Start free trial <ArrowRight className="size-4" /></Link>
               </Button>

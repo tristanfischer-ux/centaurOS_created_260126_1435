@@ -42,7 +42,7 @@ const FAQ_ITEMS = [
   {
     question: 'Do I need a credit card to start?',
     answer:
-      "No. The Free tier is free forever — five brainstorming sessions a month, five saved investor searches over the life of the account, and unlimited supplier search across 13,700 UK and European manufacturers. No credit card required. Upgrade when you need more.",
+      "No. The Free tier is free forever — five brainstorming sessions a month, five saved investor searches over the life of the account, and unlimited supplier search across 18,000 UK and European manufacturers. No credit card required. Upgrade when you need more.",
   },
   {
     question: 'How does the £10 investor lead add-on work?',
@@ -68,7 +68,7 @@ const FAQ_ITEMS = [
 
 /** Social proof stats — real platform data */
 const SOCIAL_PROOF_STATS = [
-  { value: '13,700+', label: 'UK & European Manufacturers' },
+  { value: '18,000+', label: 'UK & European Manufacturers' },
   { value: '7,800', label: 'Investors Indexed' },
   { value: '49,000', label: 'Partner Contacts' },
   { value: '< 20 min', label: 'First-Pass Engineering Package' },
@@ -85,7 +85,7 @@ const PRICING_TIERS = [
     price: 'Free',
     cadence: '',
     detail:
-      '5 brainstorming sessions a month. 5 saved investor searches over the life of the account. Unlimited supplier search across 13,700 UK and European manufacturers.',
+      '5 brainstorming sessions a month. 5 saved investor searches over the life of the account. Unlimited supplier search across 18,000 UK and European manufacturers.',
     cta: 'Get Started Free',
     ctaSubtext: 'Free forever · No credit card required',
     emphasised: false,
@@ -129,8 +129,15 @@ const PRICING_TIERS = [
  * catalogue is consistent across surfaces. Reuses the homepage's
  * <PricingComparisonTable /> for the row-by-row comparison.
  */
-export function PricingContent() {
+interface PricingContentProps {
+  /** When true, the user is logged in — CTA buttons should route to
+   *  /settings/billing for upgrade rather than /signup. */
+  isAuthed?: boolean
+}
+
+export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
+  const upgradeHref = isAuthed ? '/settings/billing' : '/signup'
 
   /**
    * Toggles a FAQ item open/closed.
@@ -166,7 +173,7 @@ export function PricingContent() {
               Start free. Scale when ready.
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Five free brainstorming sessions a month, five free saved investor searches, and unlimited supplier search across 13,700 UK and European manufacturers. Upgrade when you want more leads or deeper Council sessions.
+              Five free brainstorming sessions a month, five free saved investor searches, and unlimited supplier search across 18,000 UK and European manufacturers. Upgrade when you want more leads or deeper Council sessions.
             </p>
           </div>
 
@@ -235,7 +242,7 @@ export function PricingContent() {
                       variant={tier.emphasised ? 'default' : 'outline'}
                       disabled={tier.name === 'Add-on'}
                     >
-                      <Link href={tier.name === 'Add-on' ? '/pricing' : '/signup'}>
+                      <Link href={tier.name === 'Add-on' ? '/pricing' : upgradeHref}>
                         {tier.cta}
                         {tier.name !== 'Add-on' && (
                           <ArrowRight className="h-4 w-4 ml-2" />
@@ -336,10 +343,10 @@ export function PricingContent() {
           <div className="text-center pb-12 space-y-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
               <Link
-                href="/signup"
+                href={isAuthed ? '/welcome' : '/signup'}
                 className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
               >
-                Get Started Free <ArrowRight className="h-4 w-4" />
+                {isAuthed ? 'Open Welcome' : 'Get Started Free'} <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/contact"

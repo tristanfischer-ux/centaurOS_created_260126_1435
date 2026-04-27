@@ -478,7 +478,7 @@ export default function SamplePackagePage() {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Filtered from ForgeOS&apos;s marketplace of 13,700+ verified
+                  Filtered from ForgeOS&apos;s marketplace of 18,000+ verified
                   suppliers by injection moulding capability, electronics
                   assembly, and ingress-protected (weatherproof) enclosure
                   production. Request quotes from multiple suppliers

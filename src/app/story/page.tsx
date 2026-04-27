@@ -95,7 +95,7 @@ export default function StoryPage() {
             <p>
               Fractional Forge is my attempt at that equivalent. Rather than
               building your own factory from scratch, the platform connects
-              you directly to over 13,700 UK and European manufacturers who
+              you directly to over 18,000 UK and European manufacturers who
               already have the building, the machinery, and the expertise. As
               you work through your product, you can see who can make what
               you are designing, and reach out to them for real advice on how
