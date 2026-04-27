@@ -420,3 +420,388 @@ describe("deriveFangPatches — schema compliance", () => {
         }
     })
 })
+
+// ─── L16-G #11c additions ────────────────────────────────────────────────
+
+describe("deriveFangPatches — L16-G #11c [REPLACE_PART] tag extraction", () => {
+    it("extracts cost patch from a [REPLACE_PART partId=X newCost=N] tag", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                issues: [
+                    {
+                        severity: "critical",
+                        category: "[Cost] Cabinet bespoke pricing",
+                        message: "PC-001 priced at £145k — bespoke fabrication unjustified",
+                        suggestion:
+                            "Specify Rittal AX cabinet for PC-001 at £18,000\n[REPLACE_PART partId=PC-001 newCost=18000]",
+                    },
+                ],
+            }),
+            module: {
+                id: "mod-elec",
+                keyParts: [],
+                bomPartNumbers: ["PC-001", "PC-002"],
+            },
+        })
+        const costPatches = patches.filter((p) => p.scope === "part_cost")
+        expect(costPatches.length).toBeGreaterThan(0)
+        const tagPatch = costPatches.find((p) =>
+            typeof p.reason === "string" && p.reason.includes("[REPLACE_PART]"),
+        )
+        expect(tagPatch).toBeDefined()
+        expect(tagPatch!.partId).toBe("PC-001")
+        expect(tagPatch!.value).toBe(18000)
+    })
+
+    it("extracts mass patch from [REPLACE_PART partId=X newMassKg=N]", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "warn",
+                issues: [
+                    {
+                        severity: "critical",
+                        category: "[Mass] Hub overweight",
+                        message: "Hub-001 is 4.2 kg",
+                        suggestion:
+                            "Aluminium 7075-T6 reduces Hub-001 to 1.6 kg\n[REPLACE_PART partId=Hub-001 newMassKg=1.6]",
+                    },
+                ],
+            }),
+            module: {
+                id: "mod-1",
+                keyParts: [],
+                bomPartNumbers: ["Hub-001", "Hub-002"],
+            },
+        })
+        const tagMassPatches = patches.filter(
+            (p) => p.scope === "part_mass" && typeof p.reason === "string"
+                && p.reason.includes("[REPLACE_PART]"),
+        )
+        expect(tagMassPatches.length).toBeGreaterThan(0)
+        expect(tagMassPatches[0].partId).toBe("Hub-001")
+        expect(tagMassPatches[0].value).toBe(1.6)
+    })
+
+    it("emits both cost and mass patches when tag carries both fields", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                recommendations: [
+                    "[REPLACE_PART partId=PC-001 newCost=18000 newMassKg=2.4]",
+                ],
+            }),
+            module: {
+                id: "mod-elec",
+                keyParts: [],
+                bomPartNumbers: ["PC-001"],
+            },
+        })
+        const cost = patches.find(
+            (p) => p.scope === "part_cost" && p.partId === "PC-001",
+        )
+        const mass = patches.find(
+            (p) => p.scope === "part_mass" && p.partId === "PC-001",
+        )
+        expect(cost?.value).toBe(18000)
+        expect(mass?.value).toBe(2.4)
+    })
+
+    it("rejects [REPLACE_PART] tags whose partId is not in the matching set", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                recommendations: [
+                    "[REPLACE_PART partId=HALLUCINATED-PART newCost=18000]",
+                ],
+            }),
+            module: {
+                id: "mod-elec",
+                keyParts: ["PC-001"],
+                bomPartNumbers: ["PC-001"],
+            },
+        })
+        // No tag patch should land — partId is unknown.
+        const tagPatches = patches.filter(
+            (p) => typeof p.reason === "string" && p.reason.includes("[REPLACE_PART]"),
+        )
+        expect(tagPatches).toEqual([])
+    })
+
+    it("tolerates quoted values: [REPLACE_PART partId=\"PC-001\" newCost=\"18000\"]", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                recommendations: [
+                    `[REPLACE_PART partId="PC-001" newCost="18000"]`,
+                ],
+            }),
+            module: {
+                id: "mod-elec",
+                keyParts: [],
+                bomPartNumbers: ["PC-001"],
+            },
+        })
+        const tagPatch = patches.find(
+            (p) => p.scope === "part_cost"
+                && typeof p.reason === "string"
+                && p.reason.includes("[REPLACE_PART]"),
+        )
+        expect(tagPatch).toBeDefined()
+        expect(tagPatch!.partId).toBe("PC-001")
+        expect(tagPatch!.value).toBe(18000)
+    })
+
+    it("clamps unsafe values from [REPLACE_PART] (cost out-of-bounds)", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                recommendations: [
+                    "[REPLACE_PART partId=PC-001 newCost=99999999]",
+                ],
+            }),
+            module: {
+                id: "mod-elec",
+                keyParts: [],
+                bomPartNumbers: ["PC-001"],
+            },
+        })
+        // 99999999 > £10M ceiling — tag has no usable field, no patch.
+        const tagPatches = patches.filter(
+            (p) => typeof p.reason === "string" && p.reason.includes("[REPLACE_PART]"),
+        )
+        expect(tagPatches).toEqual([])
+    })
+})
+
+describe("deriveFangPatches — L16-G #11c bomPartNumbers matching", () => {
+    it("matches partNumbers against bomPartNumbers when keyParts is prose-only", () => {
+        // Canonical Loop 16 shape: keyParts holds Max's prose hints, the
+        // real BOM identifiers (AV-001 etc.) come from the parts table via
+        // bomPartNumbers. The legacy-only-keyParts path failed; this one
+        // succeeds.
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "warn",
+                issues: [
+                    {
+                        severity: "critical",
+                        category: "[Cost] Avionics tray bespoke",
+                        message: "AV-001 quoted at £45k for bespoke fabrication",
+                        suggestion: "Spec a standard 19-inch rack — AV-001 at £6,500",
+                    },
+                ],
+            }),
+            module: {
+                id: "mod-avionics",
+                // The legacy prose-only keyParts that BLOCK-G handover flagged.
+                keyParts: [
+                    "Triple-redundant autonomous flight control computer based on radiation-tolerant ARM Cortex-R52 lockstep processors, Design Assurance Level B software per DO-178C, with three independent power buses",
+                ],
+                // Real BOM identifiers — what canonical_specs.parts is keyed by.
+                bomPartNumbers: ["AV-001", "AV-002", "AV-003"],
+            },
+        })
+        const costPatch = patches.find((p) => p.scope === "part_cost")
+        expect(costPatch).toBeDefined()
+        expect(costPatch!.partId).toBe("AV-001")
+    })
+
+    it("falls back to keyParts when bomPartNumbers is missing (legacy reviews)", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "warn",
+                issues: [
+                    {
+                        severity: "critical",
+                        category: "Cost",
+                        message: "PC-001 too expensive at £45k",
+                        suggestion: "PC-001 should be £6,500",
+                    },
+                ],
+            }),
+            // Old-style call — only keyParts, no bomPartNumbers.
+            module: { id: "mod-elec", keyParts: ["PC-001"] },
+        })
+        const costPatch = patches.find((p) => p.scope === "part_cost")
+        expect(costPatch).toBeDefined()
+        expect(costPatch!.partId).toBe("PC-001")
+    })
+})
+
+describe("deriveFangPatches — L16-G #11c normalised category tag prefixes", () => {
+    it("recognises [Cost] tag prefix on category", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                issues: [
+                    {
+                        severity: "critical",
+                        category: "[Cost] Sourcing strategy",
+                        message: "PC-001 quoted £45k",
+                        suggestion: "PC-001 catalogue price £6,500",
+                    },
+                ],
+            }),
+            module: {
+                id: "mod-elec",
+                keyParts: [],
+                bomPartNumbers: ["PC-001"],
+            },
+        })
+        // Tag prefix triggers cost extraction even though "Sourcing" isn't
+        // a legacy cost-keyword — issue category is now [Cost]-prefixed.
+        const costPatch = patches.find((p) => p.scope === "part_cost")
+        expect(costPatch).toBeDefined()
+        expect(costPatch!.partId).toBe("PC-001")
+        expect(costPatch!.value).toBe(6500)
+    })
+
+    it("recognises [Mass] tag prefix on category", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "warn",
+                issues: [
+                    {
+                        severity: "critical",
+                        category: "[Mass] Thermal envelope shifted",
+                        message: "Wing-001 is 4.2 kg",
+                        suggestion: "Drop to 1.8 kg via composite Wing-001",
+                    },
+                ],
+            }),
+            module: {
+                id: "mod-wing",
+                keyParts: [],
+                bomPartNumbers: ["Wing-001"],
+                estimatedMassKg: 4.2,
+            },
+        })
+        const partMass = patches.find((p) => p.scope === "part_mass")
+        expect(partMass).toBeDefined()
+        expect(partMass!.value).toBe(1.8)
+        const moduleMass = patches.find((p) => p.scope === "module_spec")
+        expect(moduleMass).toBeDefined()
+    })
+
+    it("legacy free-text category still works (back-compat)", () => {
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "warn",
+                issues: [
+                    {
+                        severity: "critical",
+                        category: "Hub Mass Budget Exceeded",
+                        message: "Hub-001 mass 4.2 kg",
+                        suggestion: "Hub-001 → 1.6 kg via aluminium",
+                    },
+                ],
+            }),
+            module: {
+                id: "mod-1",
+                keyParts: [],
+                bomPartNumbers: ["Hub-001"],
+            },
+        })
+        const partMass = patches.find((p) => p.scope === "part_mass")
+        expect(partMass).toBeDefined()
+        expect(partMass!.partId).toBe("Hub-001")
+    })
+})
+
+describe("deriveFangPatches — L16-G #11c bullet-form CRITICAL extraction", () => {
+    it("extracts mass patch from `- **[CRITICAL]` bullet form (Loop 16 saved-review shape)", () => {
+        const md = [
+            "### VERDICT: WARN",
+            "Hub assembly exceeds mass budget",
+            "",
+            "### Issues Found",
+            "- **[CRITICAL] Hub Mass:** Hub-001 weighs 4.2 kg vs target 1.6 kg",
+            "  - *Suggestion:* Switch to aluminium 7075-T6 — Hub-001 at 1.6 kg",
+            "- **[WARNING] Tolerance:** Fold-line ±0.2 mm",
+        ].join("\n")
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "warn",
+                // Empty issues[] — canonical Loop 16 shape per BLOCK-G handover.
+                issues: [],
+                reviewMarkdown: md,
+            }),
+            module: {
+                id: "mod-1",
+                keyParts: [],
+                bomPartNumbers: ["Hub-001"],
+                estimatedMassKg: 4.2,
+            },
+        })
+        // module_spec massKg should land via bullet extraction.
+        const modulePatch = patches.find(
+            (p) => p.scope === "module_spec" && p.specKey === "massKg",
+        )
+        expect(modulePatch).toBeDefined()
+        const partPatch = patches.find((p) => p.scope === "part_mass")
+        expect(partPatch).toBeDefined()
+        expect(partPatch!.partId).toBe("Hub-001")
+    })
+
+    it("extracts cost patch from bullet-form CRITICAL with £-figure + partNumber", () => {
+        const md = [
+            "### VERDICT: FAIL",
+            "Cabinet sourcing flagged",
+            "",
+            "### Issues Found",
+            "- **[CRITICAL] Cabinet Cost:** PC-001 quoted £145,000 bespoke",
+            "  - *Suggestion:* Specify Rittal AX 1200x800x400 (PC-001) at £18,000",
+        ].join("\n")
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                issues: [],
+                reviewMarkdown: md,
+            }),
+            module: {
+                id: "mod-elec",
+                keyParts: [],
+                bomPartNumbers: ["PC-001"],
+            },
+        })
+        const costPatch = patches.find((p) => p.scope === "part_cost")
+        expect(costPatch).toBeDefined()
+        expect(costPatch!.partId).toBe("PC-001")
+        expect(costPatch!.value).toBe(18000)
+    })
+
+    it("handles MIXED heading + bullet form in one review", () => {
+        const md = [
+            "### VERDICT: FAIL",
+            "Multiple issues",
+            "",
+            "#### 🔴 CRITICAL — Hub Mass:",
+            "Hub-001 at 4.2 kg, target 1.6 kg.",
+            "",
+            "### Issues Found",
+            "- **[CRITICAL] Cabinet Cost:** PC-001 priced at £145k — should be £18,000",
+        ].join("\n")
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                issues: [],
+                reviewMarkdown: md,
+            }),
+            module: {
+                id: "mod-mixed",
+                keyParts: [],
+                bomPartNumbers: ["Hub-001", "PC-001"],
+            },
+        })
+        // Both blocks should fire.
+        const hubPatch = patches.find(
+            (p) => p.scope === "part_mass" && p.partId === "Hub-001",
+        )
+        const cabinetPatch = patches.find(
+            (p) => p.scope === "part_cost" && p.partId === "PC-001",
+        )
+        expect(hubPatch).toBeDefined()
+        expect(cabinetPatch).toBeDefined()
+    })
+})

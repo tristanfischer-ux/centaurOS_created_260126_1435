@@ -1,9 +1,31 @@
 /**
- * @file fang-patch-generator.ts — Loop 16 Block G #11b — derive SpecPatch[]
- * from Fang's prose review output.
+ * @file fang-patch-generator.ts — Loop 16 Block G #11b/#11c — derive
+ * SpecPatch[] from Fang's prose review output.
+ *
+ * L16-G #11c (2026-04-27): Closes the empirical "0 patches across 22
+ * modules" gap surfaced by Loop 16. Three additions:
+ *   1. **`[REPLACE_PART partId=X newCost=N newMassKg=N]` tag extraction.**
+ *      Fang's prompt now asks for these machine-readable tags below part-
+ *      replacement suggestions. When present they're unambiguous and
+ *      become the highest-confidence patches (no min-of-figures heuristic).
+ *   2. **Normalised category tag prefix matching.** Fang's prompt now
+ *      requires every issue category to begin with `[Mass]`, `[Cost]`,
+ *      `[Power]`, etc. The `isMassCategory` / `isCostCategory` helpers and
+ *      the markdown-block scanner both recognise the tag prefix in
+ *      addition to legacy free-text keyword detection.
+ *   3. **Bullet-form CRITICAL extraction.** Saved Loop 16 reviews used
+ *      `- **[CRITICAL] ...` bullets instead of `#### 🔴 CRITICAL —`
+ *      headings. The markdown-block scanner now matches BOTH formats so
+ *      saved reviews emit patches without a re-run.
+ *   4. **BOM `parts.part_number` matching set.** `module.bomPartNumbers`
+ *      (real BOM part numbers, pre-loaded by run-fang-review) is the
+ *      primary set; `module.keyParts` is a fallback for legacy saved
+ *      reviews. The mismatch between Max's prose keyParts and BOM-master's
+ *      `AV-001`-style part numbers was the third Loop 16 gap.
  *
  * @description Block G #11a closed the holes in the canonical-ledger applier;
- * #11b wires it. Fang today emits prose findings ("the bespoke £145k cabinet
+ * #11b wires it; #11c tunes Fang's prompt + extractor so patches actually
+ * fire. Fang today emits prose findings ("the bespoke £145k cabinet
  * is wrong, use a Rittal AX for £18k") that the BOM never sees. This module
  * walks Fang's structured `SpecialistReview` AFTER the review is saved and
  * derives a small, conservative `SpecPatch[]` the applier can land.
@@ -163,16 +185,85 @@ function findReferencedPartNumber(
 /**
  * Decide whether a review issue category indicates a mass / weight concern.
  * Mirrors the helper in run-fang-review.ts.
+ *
+ * L16-G #11c: also matches the normalised tag prefix `[Mass]` / `[Weight]`
+ * Fang's prompt now requires. Free-text categories like "Hub Mass Budget"
+ * still match via the legacy regex so saved Loop 16 reviews keep working.
  */
 function isMassCategory(category: string): boolean {
+    if (/^\s*\[\s*(?:mass|weight)\s*\]/i.test(category)) return true
     return /mass|weight/i.test(category)
 }
 
 /**
  * Decide whether a review issue or recommendation references cost / pricing.
+ *
+ * L16-G #11c: matches the normalised tag prefix `[Cost]` / `[Price]` first.
+ * Falls back to the legacy free-text keyword scan.
  */
 function isCostCategory(category: string): boolean {
+    if (/^\s*\[\s*(?:cost|price)\s*\]/i.test(category)) return true
     return /cost|price|economic|cogs|bom/i.test(category)
+}
+
+/**
+ * Parse `[REPLACE_PART partId=X newCost=N newMassKg=N]` machine-readable
+ * tags out of free text. Returns one extracted tag per match.
+ *
+ * L16-G #11c: this is the high-confidence extraction path. Fang's prompt
+ * now asks for these tags below part-replacement suggestions, and the
+ * extractor reads them as fully-typed patches without regex inference. We
+ * keep the legacy regex-based extraction as a fallback for older saved
+ * reviews.
+ *
+ * Format examples (whitespace-tolerant; partId is required, at least ONE of
+ * newCost / newMassKg is required):
+ *   [REPLACE_PART partId=PC-001 newCost=18000]
+ *   [REPLACE_PART partId=Hub-001 newMassKg=1.6]
+ *   [REPLACE_PART partId=PC-001 newCost=18000 newMassKg=2.4]
+ *   [REPLACE_PART partId="PC-001" newCost="18000"]   (quotes tolerated)
+ */
+interface ReplacePartTag {
+    partId: string
+    newCostGbp?: number
+    newMassKg?: number
+}
+
+function extractReplacePartTags(...sources: Array<string | undefined>): ReplacePartTag[] {
+    const out: ReplacePartTag[] = []
+    for (const src of sources) {
+        if (!src) continue
+        // Match the bracketed tag — capture everything inside.
+        const tagRe = /\[\s*REPLACE_PART\s+([^\]]+?)\s*\]/gi
+        let m: RegExpExecArray | null
+        while ((m = tagRe.exec(src)) !== null) {
+            const inner = m[1]
+            // Pull k=v fragments. Quotes optional. partId can have hyphens
+            // and digits and uppercase letters (BOM part-number convention).
+            const kv: Record<string, string> = {}
+            const kvRe = /(\w+)\s*=\s*"?([A-Za-z0-9_\-.]+)"?/g
+            let kvm: RegExpExecArray | null
+            while ((kvm = kvRe.exec(inner)) !== null) {
+                kv[kvm[1].toLowerCase()] = kvm[2]
+            }
+            const partId = kv.partid
+            if (!partId) continue
+            const tag: ReplacePartTag = { partId }
+            if (kv.newcost) {
+                const v = Number.parseFloat(kv.newcost)
+                if (Number.isFinite(v) && v >= 1 && v <= 10_000_000) tag.newCostGbp = v
+            }
+            if (kv.newmasskg) {
+                const v = Number.parseFloat(kv.newmasskg)
+                if (Number.isFinite(v) && v > 0 && v < 10000) tag.newMassKg = v
+            }
+            // Tag must carry at least one numeric field to be useful.
+            if (tag.newCostGbp !== undefined || tag.newMassKg !== undefined) {
+                out.push(tag)
+            }
+        }
+    }
+    return out
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────
@@ -186,7 +277,42 @@ export interface DerivePatchesArgs {
         keyParts: string[]
         budgetMassKg?: number | null
         estimatedMassKg?: number | null
+        /**
+         * Real BOM part numbers (`parts.part_number`) for this module.
+         *
+         * L16-G #11c (2026-04-27): the prior implementation matched against
+         * `keyParts` only, but `keyParts` is Max's prose hints (e.g.
+         * "Triple-redundant flight control computer ...") not part numbers
+         * (e.g. `AV-001`). Without the real part numbers, the deterministic
+         * extractor could never resolve a Fang reference like
+         * `[REPLACE_PART partId=AV-001 ...]` to a row in canonical_specs.
+         * When supplied, bomPartNumbers is the PRIMARY matching set;
+         * keyParts stays as a fallback for legacy saved reviews.
+         */
+        bomPartNumbers?: string[]
     }
+}
+
+/**
+ * Build the union set of part identifiers used for reference matching.
+ * Prefer real BOM part numbers; fall back to keyParts (Max's prose hints
+ * which sometimes contain partial numbers).
+ */
+function partMatchingSet(
+    bomPartNumbers: string[] | undefined,
+    keyParts: string[],
+): string[] {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const p of [...(bomPartNumbers ?? []), ...keyParts]) {
+        if (typeof p !== "string") continue
+        const trimmed = p.trim()
+        if (trimmed.length === 0) continue
+        if (seen.has(trimmed)) continue
+        seen.add(trimmed)
+        out.push(trimmed)
+    }
+    return out
 }
 
 /**
@@ -208,6 +334,73 @@ export function deriveFangPatches(args: DerivePatchesArgs): SpecPatch[] {
     if (review.verdict !== "warn" && review.verdict !== "fail") return []
 
     const patches: SpecPatch[] = []
+
+    // L16-G #11c: union part-number set. Real BOM part_numbers preferred,
+    // keyParts as fallback for legacy reviews.
+    const matchingParts = partMatchingSet(module.bomPartNumbers, module.keyParts)
+
+    // ── 0. [REPLACE_PART ...] tag extraction (highest confidence) ────
+    //
+    // L16-G #11c (2026-04-27): Fang's prompt now asks for explicit
+    // [REPLACE_PART partId=X newCost=N newMassKg=N] tags below part-
+    // replacement suggestions. When present these are unambiguous: no
+    // unit-of-measure inference, no min-of-two-figures heuristic.
+    //
+    // We scan the entire review payload (issues' message+suggestion,
+    // recommendations, reviewMarkdown) once and emit one structured patch
+    // per tag. Cost patches still require the partId to exist in
+    // matchingParts (the applier will reject otherwise).
+    {
+        const allText: string[] = []
+        for (const i of review.issues) {
+            if (i.message) allText.push(i.message)
+            if (i.suggestion) allText.push(i.suggestion)
+        }
+        for (const r of review.recommendations) {
+            if (typeof r === "string") allText.push(r)
+        }
+        if (typeof review.reviewMarkdown === "string") {
+            allText.push(review.reviewMarkdown)
+        }
+        const tags = extractReplacePartTags(...allText)
+        for (const tag of tags) {
+            // Verify the partId is in the matching set. Without this, a
+            // hallucinated partId would be passed to the applier which
+            // would reject with REJECTED_UNKNOWN_PART — the rejection is
+            // logged but it's wasted work. Enforce here so the patch never
+            // leaves the extractor unless it's resolvable.
+            const resolvedPart = matchingParts.find(
+                (p) => p.toLowerCase() === tag.partId.toLowerCase(),
+            )
+            if (!resolvedPart) continue
+
+            const reasonRaw = `Fang [REPLACE_PART] tag: partId=${resolvedPart}`
+                + (tag.newCostGbp !== undefined ? ` newCost=${tag.newCostGbp}` : "")
+                + (tag.newMassKg !== undefined ? ` newMassKg=${tag.newMassKg}` : "")
+            const reason = reasonRaw.length > 280 ? reasonRaw.slice(0, 277) + "..." : reasonRaw
+
+            if (tag.newCostGbp !== undefined) {
+                patches.push({
+                    scope: "part_cost",
+                    op: "replace",
+                    partId: resolvedPart,
+                    value: tag.newCostGbp,
+                    reason,
+                    source: "applied_review_patch",
+                })
+            }
+            if (tag.newMassKg !== undefined) {
+                patches.push({
+                    scope: "part_mass",
+                    op: "replace",
+                    partId: resolvedPart,
+                    value: tag.newMassKg,
+                    reason,
+                    source: "applied_review_patch",
+                })
+            }
+        }
+    }
 
     for (const issue of review.issues) {
         // Only critical issues drive automatic mutation. Warnings + info are
@@ -244,7 +437,7 @@ export function deriveFangPatches(args: DerivePatchesArgs): SpecPatch[] {
                 // unmatched references silent-skip).
                 const partNumber = findReferencedPartNumber(
                     `${issue.message} ${issue.suggestion ?? ""}`,
-                    module.keyParts,
+                    matchingParts,
                 )
                 if (partNumber) {
                     patches.push({
@@ -265,7 +458,7 @@ export function deriveFangPatches(args: DerivePatchesArgs): SpecPatch[] {
             if (extractedCost !== null) {
                 const partNumber = findReferencedPartNumber(
                     `${issue.message} ${issue.suggestion ?? ""}`,
-                    module.keyParts,
+                    matchingParts,
                 )
                 // Cost patches REQUIRE a referenced partNumber. Without it
                 // the applier rejects with REJECTED_UNKNOWN_PART (Block G
@@ -312,27 +505,54 @@ export function deriveFangPatches(args: DerivePatchesArgs): SpecPatch[] {
         // Split on heading markers. We use a global lookahead split via
         // RegExp.exec rather than .split() so we can keep block content
         // intact (split on newlines would break tables / code).
+        //
+        // L16-G #11c (2026-04-27): widened to cover three observed Fang
+        // formats:
+        //   1. `#### 🔴 CRITICAL —` heading (canonical, what the prompt asks for)
+        //   2. `### CRITICAL —` heading (some Fang outputs drop the emoji/level)
+        //   3. `- **[CRITICAL]` bullet list (legacy Loop 16 format — what the
+        //      empirical Loop 16 verification found in HAPS / BESS / Hedgerow)
+        // Format 3 is line-anchored so the block boundary is "next bullet
+        // OR next heading" (not just next ####).
         const headingRe = /(?:####|###)\s*(?:🔴\s*)?(?:\*\*)?CRITICAL(?:\*\*)?\s*[—–-]/g
-        const indices: number[] = []
+        const bulletRe = /^\s*[-*]\s*\*\*\s*\[\s*CRITICAL\s*\]/gm
+        const indices: Array<{ idx: number; kind: "heading" | "bullet" }> = []
         let mm: RegExpExecArray | null
         while ((mm = headingRe.exec(md)) !== null && indices.length < 16) {
-            indices.push(mm.index)
+            indices.push({ idx: mm.index, kind: "heading" })
         }
-        // Each block spans from indices[i] to indices[i+1] (or EOF).
+        while ((mm = bulletRe.exec(md)) !== null && indices.length < 24) {
+            indices.push({ idx: mm.index, kind: "bullet" })
+        }
+        // Stable sort by index so block ordering matches document ordering.
+        indices.sort((a, b) => a.idx - b.idx)
+
+        // Each block spans from indices[i].idx to indices[i+1].idx (or EOF).
+        // Cap at 8 blocks to keep extraction time bounded.
         const blocks: string[] = []
         for (let i = 0; i < indices.length && i < 8; i++) {
-            const start = indices[i]
-            const end = i + 1 < indices.length ? indices[i + 1] : md.length
+            const start = indices[i].idx
+            const end = i + 1 < indices.length ? indices[i + 1].idx : md.length
             blocks.push(md.slice(start, end))
         }
 
         for (const block of blocks) {
-            // Determine block category from the heading line.
+            // Determine block category from the heading / bullet line.
+            //
+            // L16-G #11c: also recognise the normalised `[Mass]` / `[Cost]` /
+            // `[Power]` etc. tag prefix Fang's prompt now requires. Tag form
+            // is the highest-confidence signal — when present, it overrides
+            // legacy keyword detection. The bullet form keyword detection
+            // stays as a fallback for older saved reviews.
             const headingLine = block.split("\n")[0] ?? ""
-            const isMassBlock = /mass|weight|tyre|hub.*\bkg\b|landing|propulsion.*mass/i.test(headingLine)
-            const isCostBlock = /cost|price|bom|cogs|£|GBP/i.test(headingLine)
+            const tagMass = /\[\s*(?:mass|weight)\s*\]/i.test(headingLine)
+            const tagCost = /\[\s*(?:cost|price)\s*\]/i.test(headingLine)
+            const isMassBlock = tagMass
+                || /mass|weight|tyre|hub.*\bkg\b|landing|propulsion.*mass/i.test(headingLine)
+            const isCostBlock = tagCost
+                || /cost|price|bom|cogs|£|GBP/i.test(headingLine)
 
-            const partNumber = findReferencedPartNumber(block, module.keyParts)
+            const partNumber = findReferencedPartNumber(block, matchingParts)
 
             if (isMassBlock || isCostBlock || /mass|weight|kg\b|grams?\b|£|GBP|cost|price/i.test(block)) {
                 if (isCostBlock || /£|GBP|cost|price/i.test(block)) {
@@ -407,7 +627,7 @@ export function deriveFangPatches(args: DerivePatchesArgs): SpecPatch[] {
         const isMassRec = /mass|weight|kg\b|grams?\b/i.test(rec)
         if (!isCostRec && !isMassRec) continue
 
-        const partNumber = findReferencedPartNumber(rec, module.keyParts)
+        const partNumber = findReferencedPartNumber(rec, matchingParts)
 
         if (isCostRec) {
             const extractedCost = extractUnitCostGbp(rec)
