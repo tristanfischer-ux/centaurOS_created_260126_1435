@@ -54,6 +54,11 @@ import {
     checkSupplierUrlShape,
 } from "@/lib/supplier-verification"
 import { dedupAssemblyRollUp } from "@/lib/bom/assembly-dedup"
+import {
+    anyRiskMatrixIsBoilerplate,
+    inferOwnerByDiscipline,
+    isModuleRiskMatrixBoilerplate,
+} from "@/lib/risk/boilerplate-detect"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -2222,6 +2227,15 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
     // the original failureModes/unknowns string-list shape so older
     // modules still appear without regenerating Max's decomposition.
     const anyMatrix = modules.some((m) => m.riskMatrix.length > 0)
+
+    // L13-P5 (2026-04-27): detect boilerplate risk-matrix modules.
+    // HAPS Loop 12 had all 41 entries across 10 modules listing
+    // "Mechanical lead" as owner regardless of domain (avionics
+    // overheating, software watchdog, hydrogen leak, regulatory
+    // certification — all "Mechanical lead"). Sentinel had 25 entries
+    // with cause "See module-level analysis". Both are detectable.
+    const boilerplateScan = anyRiskMatrixIsBoilerplate(modules)
+
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>6. Risks register</Text>
@@ -2230,6 +2244,26 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                     ? "FMEA-style risk matrix per module. Each row is rated severity (Negligible / Minor / Moderate / Major / Catastrophic) × likelihood (Rare / Unlikely / Possible / Likely / Frequent). Rating bands: low (1–3), medium (4–8), high (9–15), critical (16–25). Residual rating shows the band after the listed mitigation lands."
                     : "Every failure mode and open question declared against each module, in one register."}
             </Text>
+            {boilerplateScan.any && (
+                <View
+                    style={{
+                        marginBottom: 10,
+                        padding: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#fef3c7",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#b45309",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, color: "#7c2d12", fontWeight: "bold" }}>
+                        Risk-register boilerplate detected — owner field auto-corrected, founder review required
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 2 }}>
+                        {boilerplateScan.reasons.length} module
+                        {boilerplateScan.reasons.length === 1 ? "" : "s"} returned a uniform owner or placeholder cause from Fang. The owner column below has been auto-replaced with a discipline-appropriate label inferred from the hazard / cause text. The data in the module decomposition is unchanged; a Fang regen will produce the canonical version.
+                    </Text>
+                </View>
+            )}
             {modules.map((m) => (
                 // L9-P5: removed `wrap={false}` here. With it, the entire
                 // per-module risks block (heading + N risk rows) was forced
@@ -2245,6 +2279,15 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                         m.unknowns.length === 0 && (
                             <Text style={styles.muted}>No risks declared on this module.</Text>
                         )}
+                    {(() => {
+                        // L13-P5: per-module boilerplate evaluation. When the
+                        // module's matrix is boilerplate, replace each row's
+                        // owner with a discipline-inferred label.
+                        const moduleBoilerplate = isModuleRiskMatrixBoilerplate(m.riskMatrix)
+                        ;(m as ModulePdf & { __boilerplateOverride?: boolean }).__boilerplateOverride =
+                            moduleBoilerplate.isBoilerplate
+                        return null
+                    })()}
                     {m.riskMatrix.length > 0 && (
                         <View style={{ marginTop: 4 }}>
                             <Text style={styles.h5}>
@@ -2349,17 +2392,44 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                          * label was long ("Major × Possible — high (12)") it
                                          * overlapped Owner because there was no flex-shrink
                                          * boundary. Stack vertically so they never collide. */}
-                                        {r.owner && (
-                                            <Text
-                                                style={{
-                                                    fontSize: 9,
-                                                    color: MUTED,
-                                                    marginTop: 2,
-                                                }}
-                                            >
-                                                Owner: {r.owner}
-                                            </Text>
-                                        )}
+                                        {(() => {
+                                            // L13-P5: discipline-aware owner.
+                                            // When the module-level matrix is
+                                            // flagged as boilerplate (uniform
+                                            // owner across all rows), override
+                                            // the per-row owner with a label
+                                            // inferred from the hazard text.
+                                            const overrideActive =
+                                                (m as ModulePdf & { __boilerplateOverride?: boolean }).__boilerplateOverride === true
+                                            const renderedOwner = overrideActive
+                                                ? inferOwnerByDiscipline(
+                                                      {
+                                                          hazard: r.hazard ?? null,
+                                                          cause: r.cause ?? null,
+                                                          mitigation: r.mitigation ?? null,
+                                                          owner: r.owner ?? null,
+                                                      },
+                                                      m.name,
+                                                  )
+                                                : r.owner
+                                            if (!renderedOwner) return null
+                                            return (
+                                                <Text
+                                                    style={{
+                                                        fontSize: 9,
+                                                        color: MUTED,
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Owner: {renderedOwner}
+                                                    {overrideActive && r.owner && r.owner !== renderedOwner ? (
+                                                        <Text style={{ fontStyle: "italic" }}>
+                                                            {" "}— auto-corrected from "{r.owner}"
+                                                        </Text>
+                                                    ) : null}
+                                                </Text>
+                                            )
+                                        })()}
                                         {residual && (
                                             <Text
                                                 style={{
@@ -4126,14 +4196,29 @@ async function exportProjectPdfInternal(
         for (const v of dedupedRollUp.effectiveCost) unitTotalGbp += v
 
         // Suppliers shortlist — join to global directory for HQ.
-        const { data: shortlistRows } = await admin
+        // L13-P4 (2026-04-27): drop rows where the LLM matching pass
+        // couldn't link the supplier to a specific BOM part number.
+        // Empty `matched_part_numbers` means the supplier surfaced via
+        // semantic similarity but the model couldn't justify "they
+        // supply X". 100% of HAPS shortlist rows had this shape (115 of
+        // 115 in Loop 12 — all phantom matches), and 17% of Vertfarm.
+        // Without a real part link the row is procurement-grade noise:
+        // Hystar tagged for fuel cell when they make electrolysers,
+        // Water Hydraulics tagged for hydrogen cooling when they make
+        // desalination pumps, New Space Systems for stratospheric
+        // propulsion when they make spacecraft torque rods.
+        const rawShortlistRows = await admin
             .from("forge_supplier_shortlist")
             .select(
                 "supplier_id, supplier_name, module_ids, matched_part_numbers, project_synthesis, best_match_score, best_score_breakdown, all_match_reasons, ramp_role",
             )
             .eq("project_id", projectId)
+        const shortlistRows = (rawShortlistRows.data ?? []).filter((r) => {
+            const matched = r.matched_part_numbers
+            return Array.isArray(matched) && matched.length > 0
+        })
 
-        const supplierIds = (shortlistRows ?? [])
+        const supplierIds = shortlistRows
             .map((r) => r.supplier_id as string | null)
             .filter((x): x is string => typeof x === "string" && x.length > 0)
 
@@ -4216,7 +4301,7 @@ async function exportProjectPdfInternal(
             }
         }
 
-        const suppliers: SupplierPdf[] = (shortlistRows ?? []).map((r) => ({
+        const suppliers: SupplierPdf[] = shortlistRows.map((r) => ({
             name: String(r.supplier_name ?? "Untitled supplier"),
             hq: hqById.get(r.supplier_id as string) ?? null,
             moduleNames: Array.isArray(r.module_ids)
