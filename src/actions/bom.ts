@@ -43,6 +43,14 @@ import {
   completePipelineRun,
   failPipelineRun,
 } from "@/actions/pipeline-runs"
+import {
+  emptyCanonicalSpecs,
+  loadCanonicalSpecs,
+  recomputeCostRollup,
+  saveCanonicalSpecs,
+  upsertCanonicalPart,
+  type CanonicalSpecs,
+} from "@/lib/cad-lab/canonical-ledger"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import type {
   StructuredPart,
@@ -2421,6 +2429,98 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
       )
       return
     }
+  }
+
+  // ── L16-G #11d: Populate canonical_specs.parts so Fang's downstream
+  //    apply path can find the targets its patches reference. Without this,
+  //    every Fang patch gets rejected as "APPLY_THREW: part_X patch
+  //    references unknown partId" — the architecture is half-wired and the
+  //    Fang→patch→extractor→apply chain cannot land any mutation.
+  //
+  //    Keying choice: canonical_specs.parts is keyed by part_number (the
+  //    human-readable string e.g. "WAL-004-PUR"), NOT the parts.id UUID.
+  //    Reason: Fang emits patches with `partId: <part_number>` because
+  //    fang-patch-generator extracts references from prose by matching
+  //    against keyParts strings, and the `[REPLACE_PART partId=X]` tag
+  //    contract uses part_number-style identifiers. The apply path looks
+  //    up `specs.parts[patch.partId]` so the keys must match what Fang
+  //    sends.
+  //
+  //    Source: bom_generator (rank 70). Fang patches (rank 90) and supplier
+  //    matcher (rank 75) can later overwrite cost / mass via the same
+  //    upsert helpers — the rank-gated ledger handles precedence
+  //    automatically.
+  //
+  //    Failure here is NON-FATAL: the merge stage's primary artefact is
+  //    parts + bom_lines (already persisted above). A canonical-specs
+  //    failure is logged + Fang will fall through to a less-effective
+  //    apply path on the next render snapshot, but the run completes.
+  try {
+    // Cast: createAdminClient() returns SupabaseClient<…>; loadCanonicalSpecs
+    // declares a narrow structural shape. The runtime contract is satisfied
+    // (chain shape matches; PostgrestBuilder IS thenable). The structural
+    // mismatch is purely TS-surface — sibling callers (snapshot-canonical-specs)
+    // accept the same client via `supabase: any`.
+    type CanonicalLoadable = Parameters<typeof loadCanonicalSpecs>[0]
+    type CanonicalSavable = Parameters<typeof saveCanonicalSpecs>[0]
+    const loadResult = await loadCanonicalSpecs(admin as unknown as CanonicalLoadable, projectId)
+    let specs: CanonicalSpecs = loadResult.ok ? loadResult.specs : emptyCanonicalSpecs()
+    const priorRevision = loadResult.ok ? loadResult.revision : 0
+
+    // Build a name → moduleId reverse lookup so parts whose
+    // sourceModuleId is null can fall back to a name match. (validatedParts
+    // already has sourceModuleId from the skeleton; this handles the rare
+    // case where it's null but we have a module name match.)
+    const moduleIdSet = new Set<string>()
+    for (const m of loaded.modules) {
+      if (typeof m.id === "string" && m.id) moduleIdSet.add(m.id)
+    }
+
+    for (const p of validatedParts) {
+      if (!p.partNumber) continue
+      const moduleId =
+        typeof p.sourceModuleId === "string" && p.sourceModuleId.length > 0
+          ? (moduleIdSet.has(p.sourceModuleId) ? p.sourceModuleId : p.sourceModuleId)
+          : null
+      specs = upsertCanonicalPart(specs, {
+        partId: p.partNumber,
+        moduleId,
+        partNumber: p.partNumber,
+        description: p.description ?? p.name ?? "",
+        qty: 1, // bom_lines.quantity is the multiplicative factor; parts row is the unit definition
+        isPurchased: Boolean(p.isPurchased),
+        unitCostGbp:
+          typeof p.estimatedUnitCostGbp === "number" && Number.isFinite(p.estimatedUnitCostGbp)
+            ? p.estimatedUnitCostGbp
+            : undefined,
+        massKg:
+          typeof p.massKg === "number" && Number.isFinite(p.massKg)
+            ? p.massKg
+            : undefined,
+        mpn: p.mpn ?? undefined,
+        source: "bom_generator",
+        rationale: `BOM generator merge — initial canonical population for ${p.partNumber}`,
+      })
+    }
+
+    // Recompute cost rollup so Finn-vs-BOM gap closes by construction
+    // (BOM subtotal = SUM(parts × qty), no Finn estimate at this stage).
+    specs = recomputeCostRollup(specs, specs.cost?.finnEstimateGbp ?? null, 0)
+
+    const saveResult = await saveCanonicalSpecs(admin as unknown as CanonicalSavable, projectId, specs, priorRevision)
+    if (!saveResult.ok) {
+      console.warn(
+        `[bom-distributed:merge] L16-G canonical_specs save non-fatal: project=${projectId} reason=${saveResult.error}`,
+      )
+    } else {
+      console.log(
+        `[bom-distributed:merge] L16-G canonical_specs populated: project=${projectId} parts=${Object.keys(specs.parts).length} revision=${saveResult.revision} bomTotal=£${specs.cost?.bomSubtotalGbp ?? 0}`,
+      )
+    }
+  } catch (err) {
+    console.warn(
+      `[bom-distributed:merge] L16-G canonical_specs populate threw (non-fatal): project=${projectId} err=${err instanceof Error ? err.message : err}`,
+    )
   }
 
   // ── Stamp pipeline_run done. ──
