@@ -66,6 +66,14 @@ import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+    emptyCanonicalSpecs,
+    loadCanonicalSpecs,
+    saveCanonicalSpecs,
+    upsertCanonicalSpec,
+    type CanonicalSpecs,
+    type SpecKey,
+} from "@/lib/cad-lab/canonical-ledger"
 import type {
     CadLabModule,
     SkeletonModule,
@@ -520,6 +528,93 @@ async function runMaxDecompositionInternal(
                     error: saveResult.error,
                     errorCode: "SAVE_FAILED",
                 }
+            }
+
+            // 8b. L16-G #11d: Populate canonical_specs.modules so the ledger
+            //     has Max's structural numeric specs available before BOM /
+            //     Sizing / Fang fire. Without this, the ledger is empty until
+            //     BOM merge runs (parts only) — module-level mass / power
+            //     can't be patched by Fang because the moduleId target
+            //     doesn't exist in canonical_specs.modules.
+            //
+            //     Today Max's expansion only emits `estimatedMassKg` as a
+            //     structured numeric (lead-week is time, not a SPEC_KEYS
+            //     numeric). Other module-level specs (powerW, voltageV,
+            //     pressureBar) are NOT yet emitted — Max's prompt would
+            //     need updating to produce a `module.specs` object keyed
+            //     to SPEC_KEYS shape. Flagged in handover for council.
+            //
+            //     Source: max_decomposition (rank 50). Sizing solver
+            //     (rank 80) and Fang patches (rank 90) override later via
+            //     rank-gated upsert.
+            //
+            //     Failure here is NON-FATAL: modules array is the primary
+            //     artefact (already persisted above). Canonical-specs
+            //     failure is logged; downstream stages still run, BOM
+            //     merge will populate canonical_specs.parts on its pass,
+            //     and the PDF render snapshot is the back-stop.
+            try {
+                type CanonicalLoadable = Parameters<typeof loadCanonicalSpecs>[0]
+                type CanonicalSavable = Parameters<typeof saveCanonicalSpecs>[0]
+                const loadResult = await loadCanonicalSpecs(
+                    admin as unknown as CanonicalLoadable,
+                    projectId,
+                )
+                let specs: CanonicalSpecs = loadResult.ok
+                    ? loadResult.specs
+                    : emptyCanonicalSpecs()
+                const priorRevision = loadResult.ok ? loadResult.revision : 0
+
+                let writeCount = 0
+                for (const mod of modules) {
+                    if (!mod.id) continue
+                    if (
+                        typeof mod.estimatedMassKg === "number" &&
+                        Number.isFinite(mod.estimatedMassKg) &&
+                        mod.estimatedMassKg > 0
+                    ) {
+                        specs = upsertCanonicalSpec(specs, {
+                            moduleId: mod.id,
+                            moduleName: mod.name,
+                            key: "massKg" as SpecKey,
+                            value: mod.estimatedMassKg,
+                            source: "max_decomposition",
+                            rationale: `Max decomposition initial spec massKg = ${mod.estimatedMassKg} for module ${mod.name}`,
+                        })
+                        writeCount += 1
+                    }
+                    // Ensure the module entry exists even when no specs
+                    // landed — this seeds the linkedPartIds slot so BOM merge's
+                    // upsertCanonicalPart can wire parts into the right module.
+                    if (!specs.modules[mod.id]) {
+                        specs.modules[mod.id] = {
+                            moduleId: mod.id,
+                            moduleName: mod.name,
+                            specs: {},
+                            linkedPartIds: [],
+                        }
+                    }
+                }
+
+                const canonicalSaveResult = await saveCanonicalSpecs(
+                    admin as unknown as CanonicalSavable,
+                    projectId,
+                    specs,
+                    priorRevision,
+                )
+                if (!canonicalSaveResult.ok) {
+                    console.warn(
+                        `[run-max-decomposition] L16-G canonical_specs save non-fatal: project=${projectId} reason=${canonicalSaveResult.error}`,
+                    )
+                } else {
+                    console.log(
+                        `[run-max-decomposition] L16-G canonical_specs populated: project=${projectId} modules=${Object.keys(specs.modules).length} writes=${writeCount} revision=${canonicalSaveResult.revision}`,
+                    )
+                }
+            } catch (err) {
+                console.warn(
+                    `[run-max-decomposition] L16-G canonical_specs populate threw (non-fatal): project=${projectId} err=${err instanceof Error ? err.message : err}`,
+                )
             }
 
             // 9. Done. Record final token counts + output pointer. cost_gbp_pence
