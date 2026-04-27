@@ -1170,20 +1170,9 @@ async function loadBomPartNumbersForModule(
     moduleId: string,
 ): Promise<string[]> {
     try {
-        // Module-scoped first — preferred when BOM-master populated it.
-        const { data: scoped } = await admin
-            .from("parts")
-            .select("part_number")
-            .eq("cad_lab_project_id", projectId)
-            .eq("module_id", moduleId)
-            .order("part_number", { ascending: true })
-            .limit(50)
-        const scopedPartNumbers = (scoped ?? [])
-            .map((r) => (typeof r.part_number === "string" ? r.part_number : ""))
-            .filter((p) => p.length > 0)
-        if (scopedPartNumbers.length > 0) return scopedPartNumbers
-
-        // Fallback: source_module_id (older BOM writes).
+        // Module-scoped first — `parts.source_module_id` is the canonical
+        // column populated by BOM-master once it knows which decomposition
+        // module the part came from.
         const { data: srcScoped } = await admin
             .from("parts")
             .select("part_number")
@@ -1196,8 +1185,10 @@ async function loadBomPartNumbersForModule(
             .filter((p) => p.length > 0)
         if (srcPartNumbers.length > 0) return srcPartNumbers
 
-        // Final fallback: all project parts (legacy rows with no module ref).
-        // Capped at 50 so a wide-BOM project doesn't bloat the prompt.
+        // Fallback: all project parts (legacy rows where source_module_id
+        // wasn't populated). Capped at 50 so a wide-BOM project doesn't
+        // bloat the prompt; Fang only ever reviews one module at a time so
+        // the fallback gives him at least the project-level part numbers.
         const { data: projectScoped } = await admin
             .from("parts")
             .select("part_number")
