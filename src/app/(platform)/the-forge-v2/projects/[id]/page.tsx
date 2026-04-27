@@ -46,6 +46,8 @@ import { createClient } from "@/lib/supabase/server"
 import { WorkspaceShell } from "../../_components/workspace-shell"
 import { WorkspaceView, type TopMaterialRow, type TopProcessRow, type WorkspaceViewProps } from "./workspace-view"
 import { RunningState } from "./_components/running-state"
+import { NarrativeProgressView } from "./_components/narrative-progress-view"
+import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
 export const dynamic = "force-dynamic"
 
@@ -71,40 +73,82 @@ export default async function ForgeV2ProjectPage({
     }
     const project = loadResult.project
 
-    // ── V1 autopilot routing ─────────────────────────────────────────
-    // If autopilot has finished cleanly, skip the workspace cockpit and
-    // drop founders straight into the inline plan. If it's running, show
-    // the plain-language progress checklist. The legacy cockpit only
-    // renders for pre-autopilot drafts (projects created via the older
-    // 3-step wizard flow) or autopilot-errored states where the founder
-    // wants to inspect the partial artefacts.
+    // ── Founder-facing routing (replaces "drop them into the cockpit") ──
+    // Tristan 2026-04-27: founders should see ONE simple flow — brief in,
+    // narrative timeline of stages building, downloadable PDF at the end.
+    // No module pages, no bill-of-materials tables, no specialist names
+    // exposed inline. The legacy WorkspaceView cockpit is preserved below
+    // as the fallback for pre-autopilot drafts (older 3-step wizard) but
+    // any project that has run through autopilot lands on the narrative
+    // progress view.
     const autopilotState = await loadAutopilotState(id)
-    if (autopilotState?.finished_at && !autopilotState.error) {
-        redirect(`/the-forge-v2/projects/${id}/plan`)
-    }
-
-    if (autopilotState && !autopilotState.finished_at) {
+    if (autopilotState) {
         try {
             await tickAutopilotStage(id)
         } catch (err) {
             console.warn(
-                "[WORKSPACE-PAGE] tickAutopilotStage (running-state) failed (non-fatal):",
+                "[WORKSPACE-PAGE] tickAutopilotStage (narrative-progress) failed (non-fatal):",
                 err instanceof Error ? err.message : err,
             )
         }
+
+        // Look up an existing PDF on the server so the page renders with
+        // the download button visible immediately on completed runs (no
+        // flash-of-empty-content while the first client poll lands).
+        let initialPdfUrl: string | null = null
+        let initialPdfName: string | null = null
+        try {
+            const supabase = await createClient()
+            const { data: dl } = await supabase
+                .from("report_downloads")
+                .select("id, report_name, storage_path, expires_at, created_at")
+                .ilike("report_source", "cad-lab%")
+                .or(`storage_path.ilike.%${id}%,report_name.ilike.%${project.name ?? ""}%`)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            if (dl?.storage_path) {
+                const { data: signed } = await supabase.storage
+                    .from("reports")
+                    .createSignedUrl(dl.storage_path, 60 * 30)
+                if (signed?.signedUrl) {
+                    initialPdfUrl = signed.signedUrl
+                    initialPdfName = (dl.report_name as string | null) ?? "Plan.pdf"
+                }
+            }
+        } catch (err) {
+            console.warn(
+                "[WORKSPACE-PAGE] initial PDF lookup failed (non-fatal):",
+                err instanceof Error ? err.message : err,
+            )
+        }
+
         return (
             <WorkspaceShell
                 crumbs={[
-                    { label: "Workspace", href: "/the-forge-v2" },
+                    { label: "The Forge", href: "/the-forge-v2" },
                     { label: project.name },
                 ]}
-                subtitle="The Forge is building your plan. This page refreshes on its own — you can close the tab and come back."
                 maxWidth="narrow"
             >
-                <RunningState
+                <NarrativeProgressView
                     projectId={id}
-                    projectName={project.name}
-                    state={autopilotState}
+                    initialProjectName={project.name}
+                    initialBriefSummary={project.subject ?? null}
+                    initialStage={
+                        autopilotState.finished_at
+                            ? null
+                            : (autopilotState.stage as AutopilotStage)
+                    }
+                    initialCompletedStages={
+                        Array.isArray(autopilotState.completed_stages)
+                            ? (autopilotState.completed_stages as AutopilotStage[])
+                            : []
+                    }
+                    initialFinishedAt={autopilotState.finished_at ?? null}
+                    initialErrorMessage={autopilotState.error ?? null}
+                    initialPdfUrl={initialPdfUrl}
+                    initialPdfName={initialPdfName}
                 />
             </WorkspaceShell>
         )
