@@ -303,7 +303,7 @@ export function Sidebar({
     return (
         <aside
             aria-label="Primary navigation"
-            className="hidden sm:flex h-screen w-64 shrink-0 flex-col bg-background border-r border-border/40 text-foreground text-[13px]"
+            className="hidden sm:flex h-screen w-64 shrink-0 flex-col bg-background text-foreground text-[13px]"
         >
             {/* ─── Brand row ─────────────────────────────────── */}
             <div className="px-3 pt-4 pb-1 flex items-center gap-2">
@@ -371,7 +371,7 @@ export function Sidebar({
                 </div>
 
                 {/* ME — admin-style collapsible below the primary nav */}
-                <div className="mt-1.5 mb-0.5 border-t border-border/40" />
+                <div className="mt-2 mb-1" />
                 <SectionHeader
                     label="Me"
                     introRoute="/me"
@@ -398,7 +398,7 @@ export function Sidebar({
                 {/* SUPPLIER PORTAL — conditional on profile.is_supplier */}
                 {isSupplier && (
                     <>
-                        <div className="mt-1.5 mb-0.5 border-t border-border/40" />
+                        <div className="mt-2 mb-1" />
                         <SectionHeader
                             label="Supplier Portal"
                             introRoute="/supplier"
@@ -439,7 +439,7 @@ export function Sidebar({
             )}
 
             {/* ─── Footer stack ─── */}
-            <div className="p-3 mt-auto space-y-2 border-t border-border/40">
+            <div className="p-3 mt-auto space-y-2">
                 {/* Util row: Pricing · Settings · Sign Out */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

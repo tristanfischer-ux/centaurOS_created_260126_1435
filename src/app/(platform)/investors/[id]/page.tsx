@@ -404,42 +404,13 @@ export default async function InvestorDetailPage({ params }: PageProps) {
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main content — 2/3 width */}
+          {/* Tristan 2026-04-27: Forge Capital section order is
+              Match Scorecard → Investment Thesis (FIRST big section) →
+              Ideal Company Profile → Investment Pattern → Team Expertise →
+              Connection Brief → Value Add → Fund Details → … → Founded /
+              BVCA chips. The old "About" card duplicated investment_thesis
+              and pushed it below the fold, so it has been removed. */}
           <div className="lg:col-span-2 space-y-6">
-            {/* About */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-base font-semibold text-foreground">About</h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {firm.description && (
-                  <p className="text-sm text-muted-foreground leading-relaxed">{firm.description}</p>
-                )}
-
-                {(attrs.founding_year || attrs.location || attrs.bvca_member) && (
-                  <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                    {attrs.founding_year && (
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5 shrink-0" />
-                        Founded {attrs.founding_year}
-                      </span>
-                    )}
-                    {attrs.location && (
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        {attrs.location}
-                      </span>
-                    )}
-                    {attrs.bvca_member && (
-                      <Badge variant="outline" className="text-xs">
-                        <Shield className="h-3 w-3 mr-1" />
-                        BVCA Member
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             {/* Match Scorecard — Forge Capital 6-pillar breakdown of how
                 this investor matches the foundry's profile. Renders only
                 when match data is available (foundry profile exists). */}
@@ -694,43 +665,11 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Synthesis Dossier (professional+) */}
-            {/*
-             * INTENT: Surface the deep-profile synthesis (signals, contradictions, recent
-             * moves, theses) once the Forge Capital pipeline lands its dossier table on
-             * ForgeOS Supabase. Until then, render a clean forward-looking placeholder so
-             * the slot exists on the page and design can be reasoned about.
-             *
-             * GOTCHA: investor_deep_profiles does NOT exist on the ForgeOS Supabase project
-             * (jyarhvinengfyrwgtskq) yet — confirmed via Supabase MCP execute_sql on
-             * 2026-04-23. When it lands, swap the placeholder body for the actual JOIN
-             * payload (add the JOIN to getInvestorById and pass attrs.deep_profile here).
-             */}
-            {access.intelligenceAccess ? (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-muted-foreground" />
-                    Synthesis Dossier
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    No dossier yet — this firm hasn&apos;t been through the deep-profile
-                    synthesis pipeline. Signals, contradictions, recent moves, and active
-                    theses will appear here once the next research cycle completes.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <LockedSection
-                title="Synthesis Dossier"
-                requiredTier="professional"
-                featureDescription="Cross-source synthesis: stated thesis vs actual investments, recent partner moves, contradictions, and active theses."
-              >
-                <div className="h-16 bg-muted/50 rounded" />
-              </LockedSection>
-            )}
+            {/* Synthesis Dossier card removed 2026-04-27 — the placeholder
+                "No dossier yet" rendered for every investor and looked like
+                a blank section. The real dossier table doesn't exist on the
+                ForgeOS Supabase project yet; when it lands, re-add a card
+                here that ONLY renders when attrs.deep_profile is populated. */}
 
             {/* Recent Activity */}
             {attrs.recent_deals_summary && (

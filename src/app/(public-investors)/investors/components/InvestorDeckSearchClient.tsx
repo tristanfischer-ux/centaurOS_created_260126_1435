@@ -188,7 +188,10 @@ export function InvestorDeckSearchClient({
           query: trimmed,
           sortBy: 'match',
           page: 1,
-          pageSize: 50,
+          // Tristan 2026-04-27: "Why are you only showing the top 50 most
+          // relevant matches and not all of the matches?" — bump to 200 (the
+          // ceiling the underlying pgvector RPC returns).
+          pageSize: 200,
           skipMatchEnrichment: true,
         })
         setFirms(result.firms)
@@ -697,7 +700,13 @@ function MatchCard({
   // Lead with ideal_company_profile (per Forge Capital structure) — falls back
   // to investment_thesis then description. Tristan 2026-04-27: ICP is the
   // single most useful thing for a founder reading a search-result card.
-  const thesis  = attrs.ideal_company_profile ?? attrs.investment_thesis ?? firm.description ?? null
+  // Tristan 2026-04-27 mandate: result cards must show investment_thesis first
+  // (e.g. "Climate VC is a SEIS fund, fully deployed, focusing on pre-seed and
+  // seed stage climate startups…"), NOT the ideal_company_profile shorthand
+  // ("Elite founding teams that are building solutions to decarbonise…").
+  // Fall back to ICP / description only when thesis is null. Mirrors the
+  // Forge-Capital-Search.html result-card snippet (line 795: r.td → 200 chars).
+  const thesis  = attrs.investment_thesis ?? attrs.ideal_company_profile ?? firm.description ?? null
   const sectors = attrs.sectors ?? []
 
   // Why-fit / how-to-pitch — expand state

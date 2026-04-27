@@ -22,6 +22,7 @@ import { getUserSubscription } from '@/lib/billing/subscriptions'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
+import { stageFit as fcStageFit, geoFit as fcGeoFit, chequeFit as fcChequeFit, forgeCapitalComposite } from '@/lib/forge-capital-ranking'
 import type { FoundryProfile, MatchBreakdown } from '@/lib/investor-match'
 import { applySectorBoost } from '@/lib/sector-boost'
 import { embedQuery } from '@/lib/embeddings'
@@ -101,6 +102,17 @@ export type InvestorFirm = {
     // Semantic search scoring (set only when query uses semantic path)
     _hybridScore?: number
     _similarity?: number
+    /** Forge Capital composite (0-100) — sort key when query is semantic. */
+    _fcComposite?: number
+    /** Per-pillar breakdown matching Forge-Capital-Search.html scorecard. */
+    _fcPillars?: {
+      thesis: number
+      stage: number | null
+      geo: number | null
+      cheque: number | null
+      activity: number
+      confidence: number
+    }
   }
   // Contact availability status (aggregated from vc_pe_contacts). Attached
   // post-rowToFirm via attachContactStatuses.
@@ -833,9 +845,13 @@ async function searchInvestorsCore(
 
   // SECURITY: Bound pagination to prevent DoS
   const safePage = Math.max(1, page)
-  // SECURITY: Cap at 100 to prevent bulk data extraction. The "For You" match
-  // view uses a separate internal path via the match API route.
-  const safePageSize = Math.min(Math.max(1, pageSize), 100)
+  // SECURITY: Cap at 200. The deck-search use case ranks candidates against
+  // the user's pasted description; 200 is the same ceiling the underlying
+  // pgvector RPC returns, so this isn't bulk extraction — it's the actual
+  // ranked match set Forge Capital surfaces. Tristan 2026-04-27 mandate:
+  // "Why are you only showing the top 50 most relevant matches and not all
+  // of the matches?"
+  const safePageSize = Math.min(Math.max(1, pageSize), 200)
   const from = (safePage - 1) * safePageSize
 
   const supabase = await createClient()
@@ -1034,32 +1050,47 @@ async function searchInvestorsCore(
         return stripTierGatedFields(firm, access)
       })
 
-      // INTENT: Blend semantic similarity with attribute match for ranking.
-      // Fetch foundry profile for attribute scoring (best-effort — null = skip).
-      const profile = await getFoundryProfileCached()
-      // Tristan 2026-04-27 round-2 red-team fix: sector context. Apply a small
-      // similarity boost when the listing's sectors array contains a keyword
-      // matching the foundry's sector enum value. Without this, P2 medical
-      // CGM founder gets Arise (e-commerce/luxury beauty) at #1.
-      const foundrySector = profile?.sector ?? null
-      if (profile) {
-        firms = firms.map(firm => {
-          const matchedRow = results.find((r) => r.id === firm.id)
-          const rawSim = (matchedRow?.similarity as number) ?? 0
-          const simScore = applySectorBoost(rawSim, foundrySector, firm.attributes.sectors as string[] | undefined)
-          const attrBreakdown = calculateMatchScore(firm, profile)
-          const hybridScore = computeHybridScore(simScore, attrBreakdown.total)
-          return { ...firm, attributes: { ...firm.attributes, _hybridScore: hybridScore, _similarity: simScore } }
-        })
-        firms.sort((a, b) => (b.attributes._hybridScore ?? 0) - (a.attributes._hybridScore ?? 0))
-      } else {
-        firms = firms.map(firm => {
-          const matchedRow = results.find((r) => r.id === firm.id)
-          const simScore = (matchedRow?.similarity as number) ?? 0
-          return { ...firm, attributes: { ...firm.attributes, _similarity: simScore } }
-        })
-        firms.sort((a, b) => (b.attributes._similarity ?? 0) - (a.attributes._similarity ?? 0))
-      }
+      // INTENT: Forge Capital composite ranking — ported VERBATIM from
+      // Forge-Capital-Search.html lines 597-625. Thesis 55%, geo 15%,
+      // stage 10%, cheque 10%, activity 3%, confidence 2%. Stage/geo/cheque
+      // can return null (no signal in query) and are dropped from the
+      // weighted denominator so a thesis-only match isn't taxed for missing
+      // query hints. Tristan 2026-04-27: "Forge Capital all the code exists.
+      // Everything is already there. I just want you to mimic forge capital."
+      const queryText = query.trim()
+      firms = firms.map(firm => {
+        const matchedRow = results.find((r) => r.id === firm.id)
+        const thesisSim = (matchedRow?.similarity as number) ?? 0
+        const attrs = firm.attributes
+        const stageStr = Array.isArray(attrs.stage_focus) ? attrs.stage_focus.join(', ') : (attrs.stage_focus as unknown as string ?? '')
+        const geoStr   = Array.isArray(attrs.geo_focus)   ? attrs.geo_focus.join(', ')   : (attrs.geo_focus   as unknown as string ?? '')
+        const stage  = fcStageFit(stageStr, queryText)
+        const geo    = fcGeoFit(geoStr, queryText)
+        const cmin   = attrs.cheque_range_gbp?.min ?? null
+        const cmax   = attrs.cheque_range_gbp?.max ?? null
+        const cheque = fcChequeFit(cmin, cmax, queryText)
+        const activity = attrs.is_active_deploying ? 80 : 50
+        const dq = typeof attrs.data_quality_score === 'number' ? attrs.data_quality_score : 0
+        const dc = Math.min(100, Math.max(0, dq * 10))
+        const { composite, thesis_sim } = forgeCapitalComposite(thesisSim, stage, geo, cheque, activity, dc)
+        return {
+          ...firm,
+          attributes: {
+            ...firm.attributes,
+            _similarity: thesisSim,
+            _fcComposite: composite,
+            _fcPillars: {
+              thesis:     Math.round(thesis_sim),
+              stage:      stage  ?? null,
+              geo:        geo    ?? null,
+              cheque:     cheque ?? null,
+              activity,
+              confidence: Math.round(dc),
+            },
+          },
+        }
+      })
+      firms.sort((a, b) => (b.attributes._fcComposite ?? 0) - (a.attributes._fcComposite ?? 0))
 
       const total = firms.length
       const paginatedFirms = await attachContactStatuses(firms.slice(from, from + safePageSize))

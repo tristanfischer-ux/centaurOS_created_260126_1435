@@ -1,6 +1,6 @@
 # Fractional Forge — Brand Guide
 
-**Last Updated**: 10 March 2026
+**Last Updated**: 27 April 2026 (added §6 Forge Capital module override)
 
 ---
 
@@ -135,3 +135,30 @@ ForgeOS is the brilliant, experienced colleague you always wished you had. Knowl
 - Preheader text: Complement the subject, never repeat it
 - One CTA per email
 - Unsubscribe always visible
+
+---
+
+## 6. Module-Specific Style Overrides
+
+### Forge Capital parity (Investors + Suppliers)
+
+**Tristan mandate (2026-04-27):** "Fractionalforge.app has a very specific style guide which I'm now asking you to break so that it looks more like FORGE capital. The style guide will need to be updated as a result."
+
+The **Investors** module (`/investors`, `/investors/[id]`, `InvestorDetailDialog`, `InvestorDeckSearchClient`) and the **Suppliers** module (`/suppliers`, supplier detail, supplier search) intentionally diverge from the default Fractional Forge tokens to mirror the Forge Capital dashboard 1:1.
+
+**What changes inside these modules:**
+- **Accent colour**: Forge Capital indigo (`#4F46E5`) replaces `--color-international-orange` for primary accents — numbers, links, scorecard fills, "Search" buttons, tab pills.
+- **Score chip palette**: Tri-band — high `#16a34a`, mid `#f59e0b`, low `#dc2626`. NOT the Fractional Forge orange/grey gradient.
+- **Layout**: Two-column dashboard shell (left filter rail, right results column) and modal-overlay detail view, matching `Forge-Capital-Search.html`.
+- **Result cards**: Compact rank-prefixed (`1. <name>`) with 6-pillar scorecard grid, composite % badge top-right, 200-char thesis snippet, sector tag row.
+- **Detail / modal section order**: Match Scorecard → Why-this-match callout → Pitch Guidance callout → **Investment Thesis (FIRST)** → Ideal Company Profile → Investment Pattern → Team Expertise → Connection Brief → Value Add → Fund Details → Partners → Portfolio → Data Quality.
+- **Search-result thesis snippet**: Always `attrs.investment_thesis` first. Fall back to `ideal_company_profile`/`description` only when thesis is null.
+
+**What stays Fractional Forge:**
+- Sidebar / Mobile nav / Welcome / Brainstorming / The Forge.
+- Marketing site, public pages, signup, pricing.
+- Brand voice, copy rules, "no AI emphasis", British spelling.
+
+**Why the two systems coexist:** Forge Capital is the canonical investor + supplier intelligence dashboard. The Fractional Forge platform embeds those two surfaces verbatim — re-skinning them to match Fractional Forge defaults destroys the dashboard density founders need. Treating them as embedded Forge Capital modules preserves quality while letting the rest of the platform keep its own voice.
+
+**Authoritative reference:** When changing anything in `/investors` or `/suppliers`, the spec is `/Users/tristanfischer/Developer/Forge-Capital/Forge-Capital-Search.html` and `Forge-Capital-Dashboard.html` — NOT the default Fractional Forge components.

@@ -26,7 +26,8 @@ import { CadLabProvider } from "@/app/(platform)/the-forge/cad-lab/cad-lab-conte
 
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { BrowseContextProvider } from "@/contexts/browse-context";
-import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
+// Tristan 2026-04-27: ambient specialist UI deprecated everywhere except
+// Brainstorming on /agents. FloatingSpecialistFAB mount removed below.
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
 import { ActiveTimerBar } from "@/components/time/active-timer-bar";
@@ -162,9 +163,9 @@ export default async function PlatformLayout({
                             </main>
                         </MainContentArea>
                         <MobileNav foundryName={foundryName} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} />
-                        <Suspense fallback={null}>
-                            <FloatingSpecialistFAB />
-                        </Suspense>
+                        {/* FloatingSpecialistFAB removed 2026-04-27 — ambient
+                            specialist UI deprecated; Brainstorming on /agents
+                            keeps its own integrated UI. */}
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />
