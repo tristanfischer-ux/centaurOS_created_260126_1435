@@ -72,10 +72,13 @@ export function CookieConsent() {
       {visible && (
         // INTENT: pointer-events-none on the wrapper so the rest of the page
         // stays clickable. The toast itself opts back in with pointer-events-auto.
-        // Tristan 2026-04-27: lifted from bottom-4 to bottom-24 on mobile so
-        // the banner doesn't sit on top of secondary CTAs during the first
-        // few seconds before the user dismisses it. Desktop stays at bottom-4.
-        <div className="pointer-events-none fixed inset-x-4 bottom-24 z-40 flex justify-end sm:inset-x-auto sm:right-4 sm:left-auto sm:bottom-4">
+        // Tristan 2026-04-27: keep at bottom-4 on mobile (the original
+        // position) but render as a single-row layout that's only ~36px tall
+        // — small enough that it doesn't materially overlap any CTA. The
+        // earlier bottom-24 lift solved the homepage overlap but introduced
+        // an overlap on /login (different page heights stacked the banner
+        // on top of ENTER THE FORGE).
+        <div className="pointer-events-none fixed inset-x-4 bottom-4 z-40 flex justify-end sm:inset-x-auto sm:right-4 sm:left-auto">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -83,32 +86,29 @@ export function CookieConsent() {
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
             role="region"
             aria-label="Cookie preferences"
-            className="pointer-events-auto w-full max-w-[360px] rounded-lg bg-card p-4 shadow-lg"
+            className="pointer-events-auto w-full max-w-[360px] rounded-full bg-card px-3 py-1.5 shadow-lg flex items-center gap-2"
           >
-            <p className="text-xs text-muted-foreground">
-              We use cookies to improve your experience.{" "}
+            <p className="text-[11px] text-muted-foreground flex-1 truncate">
+              Cookies?{" "}
               <Link
                 href="/privacy"
                 className="text-international-orange underline underline-offset-2 hover:opacity-80 transition-opacity"
               >
                 Privacy
               </Link>
-              .
             </p>
-            <div className="mt-3 flex items-center justify-end gap-2">
-              <button
-                onClick={handleReject}
-                className="inline-flex items-center justify-center rounded-md bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                Decline
-              </button>
-              <button
-                onClick={handleAccept}
-                className="inline-flex items-center justify-center rounded-md bg-international-orange px-2.5 py-1 text-xs font-medium text-white hover:opacity-90 transition-opacity"
-              >
-                Accept
-              </button>
-            </div>
+            <button
+              onClick={handleReject}
+              className="inline-flex items-center justify-center rounded-md bg-muted/60 px-2 py-1 text-[11px] font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              Decline
+            </button>
+            <button
+              onClick={handleAccept}
+              className="inline-flex items-center justify-center rounded-md bg-international-orange px-2 py-1 text-[11px] font-medium text-white hover:opacity-90 transition-opacity"
+            >
+              Accept
+            </button>
           </motion.div>
         </div>
       )}
