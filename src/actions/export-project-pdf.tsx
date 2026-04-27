@@ -956,6 +956,34 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                     </View>
                 )}
 
+                {/* L13-P3 (2026-04-27): hard-infeasibility banner on the
+                    cover. When the design fails an envelope / mass /
+                    transport blocker, modules + bill of materials + cost
+                    waterfall + reconciliation + risks register + supplier
+                    shortlist are suppressed; the document is intentionally
+                    short. The reader should NOT scroll past the cover
+                    looking for procurement-grade numbers — there are
+                    none, by design. */}
+                {isHardInfeasible(data.feasibilityVerdict) && (
+                    <View
+                        style={{
+                            marginTop: 14,
+                            padding: 12,
+                            borderRadius: 4,
+                            backgroundColor: "#7f1d1d",
+                            borderLeftWidth: 4,
+                            borderLeftColor: "#450a0a",
+                        }}
+                    >
+                        <Text style={{ fontSize: 12, color: "#ffffff", fontWeight: "bold" }}>
+                            BRIEF INFEASIBLE — DO NOT PROCEED TO PROCUREMENT
+                        </Text>
+                        <Text style={{ fontSize: 9, color: "#fee2e2", marginTop: 4 }}>
+                            The design as currently briefed cannot be built within the declared envelope, mass, or transport constraints. Modules, bill of materials, cost waterfall, reconciliation, risks register and supplier shortlist are intentionally omitted from this document. Resolve the blockers listed on the Feasibility Exception page before any module decomposition or supplier engagement.
+                        </Text>
+                    </View>
+                )}
+
                 {/* wrap=false keeps the full 3-row grid together — before
                     this, the last row (unit cost / ceiling / headroom /
                     reviews) would orphan onto page 2. */}
@@ -1080,6 +1108,32 @@ const VERDICT_COLORS = {
     amber: { bg: "#fef3c7", border: "#b45309", text: "#7c2d12", label: "AMBER" },
     green: { bg: "#dcfce7", border: "#15803d", text: "#14532d", label: "GREEN" },
 } as const
+
+/**
+ * L13-P3 (2026-04-27): a "hard infeasibility" is when the verdict is red
+ * AND at least one blocker fires on a physical-fit axis (envelope, mass,
+ * transport). Loop 3 P1 chose to keep rendering all downstream sections
+ * with a banner; Loop 12 critique found that's not enough — customers
+ * still see numbers that look like procurement targets when the design
+ * does not fit the brief envelope. For hard-infeasible designs, we now
+ * suppress the modules / bill-of-materials / cost waterfall /
+ * reconciliation / risks register / supplier shortlist sections and
+ * leave only the cover, brief, sizing, and feasibility-exception pages.
+ *
+ * Soft red (cost-over-budget, supplier-coverage warning) still renders
+ * everything — those are conversations, not stop-the-line events.
+ */
+function isHardInfeasible(
+    verdict: PdfInput["feasibilityVerdict"],
+): verdict is NonNullable<PdfInput["feasibilityVerdict"]> {
+    if (!verdict) return false
+    if (verdict.status !== "red") return false
+    return verdict.fails.some(
+        (f) =>
+            f.severity === "blocker" &&
+            (f.axis === "envelope" || f.axis === "mass" || f.axis === "transport"),
+    )
+}
 
 function FeasibilityVerdictBanner({
     verdict,
@@ -3518,7 +3572,14 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 </Page>
             )}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_MODULES !== "1" && data.modules.map((m, i) => (
+            {/* L13-P3 (2026-04-27): hard-infeasibility gate. When the
+               sizing solver returns a red verdict with at least one
+               envelope/mass/transport blocker, suppress the module pages
+               and every downstream section so the reader does not see
+               numbers that look like procurement targets for a design
+               that does not fit the brief. Cover / brief / sizing /
+               feasibility-exception remain to communicate WHY. */}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_MODULES !== "1" && !isHardInfeasible(data.feasibilityVerdict) && data.modules.map((m, i) => (
                 <ModulePage
                     key={m.id}
                     mod={m}
@@ -3538,8 +3599,9 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                  2026-04-26 BISECT: env flag PDF_SKIP_BOM=1 hides this
                  section to test the Yoga sentinel hypothesis. Council
                  ranked BomMasterPage as the #1 likely culprit (highest
-                 cell count + most recently mutated by autopilot). */}
-            {process.env.PDF_SKIP_BOM !== "1" && <BomMasterPage
+                 cell count + most recently mutated by autopilot).
+                 L13-P3 (2026-04-27): also suppressed when hard-infeasible. */}
+            {process.env.PDF_SKIP_BOM !== "1" && !isHardInfeasible(data.feasibilityVerdict) && <BomMasterPage
                 parts={data.parts}
                 sources={data.sources}
                 verdict={data.feasibilityVerdict}
@@ -3576,15 +3638,15 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
              *  per the bisect time-signature. PDF_BISECT_MINIMAL forces
              *  everything off; per-section SKIP flags exclude one cleanly
              *  while keeping all other sections in. */}
-            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_COST !== "1" && <CostPage data={data} />}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_COST !== "1" && !isHardInfeasible(data.feasibilityVerdict) && <CostPage data={data} />}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && data.reconciliation && data.reconciliation.findings.length > 0 && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && !isHardInfeasible(data.feasibilityVerdict) && data.reconciliation && data.reconciliation.findings.length > 0 && (
                 <ReconciliationPage reconciliation={data.reconciliation} />
             )}
 
-            {(process.env.PDF_BISECT_MINIMAL !== "1" || process.env.PDF_INCLUDE_RISKS === "1") && <RisksPage modules={data.modules} />}
+            {(process.env.PDF_BISECT_MINIMAL !== "1" || process.env.PDF_INCLUDE_RISKS === "1") && !isHardInfeasible(data.feasibilityVerdict) && <RisksPage modules={data.modules} />}
 
-            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_SUPPLIERS !== "1" && (
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_SUPPLIERS !== "1" && !isHardInfeasible(data.feasibilityVerdict) && (
                 <SuppliersPage
                     suppliers={data.suppliers}
                     sources={data.sources}
