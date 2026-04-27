@@ -1873,9 +1873,9 @@ function BomMasterPage({
                         <Text style={[styles.tableHeadCell, { flex: 1.2 }]}>Module</Text>
                         <Text style={[styles.tableHeadCell, { width: 40 }]}>Type</Text>
                         <Text style={[styles.tableHeadCell, { flex: 1 }]}>Process / material</Text>
-                        <Text style={[styles.tableHeadCell, { width: 38, textAlign: "right" }]}>Mass</Text>
-                        <Text style={[styles.tableHeadCell, { width: 50, textAlign: "right" }]}>Cost</Text>
-                        <Text style={[styles.tableHeadCell, { flex: 1.6 }]}>Suppliers</Text>
+                        <Text style={[styles.tableHeadCell, { width: 38, textAlign: "right", paddingRight: 8 }]}>Mass</Text>
+                        <Text style={[styles.tableHeadCell, { width: 56, textAlign: "right", paddingRight: 12 }]}>Cost</Text>
+                        <Text style={[styles.tableHeadCell, { flex: 1.6, paddingLeft: 8 }]}>Suppliers</Text>
                     </View>
                     {parts.map((p, i) => {
                         const suppliers = suppliersByPart.get(p.partNumber) ?? []
@@ -1903,13 +1903,13 @@ function BomMasterPage({
                                         ? "—"
                                         : `${p.process ?? "—"}${p.material ? " · " + p.material : ""}${p.tolerance ? " · ±" + p.tolerance : ""}`}
                                 </Text>
-                                <Text style={[styles.tableCell, { width: 38, textAlign: "right" }]}>
+                                <Text style={[styles.tableCell, { width: 38, textAlign: "right", paddingRight: 8 }]}>
                                     {p.massKg != null ? `${p.massKg.toFixed(2)}kg` : "—"}
                                 </Text>
-                                <Text style={[styles.tableCell, { width: 50, textAlign: "right" }]}>
+                                <Text style={[styles.tableCell, { width: 56, textAlign: "right", paddingRight: 12 }]}>
                                     {fmtGbp(p.estimatedUnitCostGbp)}
                                 </Text>
-                                <Text style={[styles.tableCell, { flex: 1.6 }]}>
+                                <Text style={[styles.tableCell, { flex: 1.6, paddingLeft: 8 }]}>
                                     {supplierLabel}
                                 </Text>
                             </View>
