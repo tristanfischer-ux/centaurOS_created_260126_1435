@@ -1732,6 +1732,30 @@ function ModulePage({
                 </View>
             )}
 
+            {/* L14 (2026-04-27): when neither Finn cost nor BOM parts
+               exist for a module, the rest of the page is silent on
+               cost. HAPS Loop 13: Landing Gear Assembly had zero
+               parts AND no Finn cost — the customer reads the module
+               page expecting cost data and finds nothing. Surface the
+               gap explicitly. */}
+            {!mod.cost && partsForModule.length === 0 && (
+                <View
+                    style={{
+                        marginTop: 10,
+                        padding: 8,
+                        backgroundColor: "#fee2e2",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#b91c1c",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7f1d1d" }}>
+                        No bill-of-materials decomposition for this module
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7f1d1d", marginTop: 3 }}>
+                        Max did not produce key parts for this module, and Finn did not produce a coarse cost estimate. The cover unit cost and cost waterfall therefore exclude this module entirely. Re-run module decomposition before treating any cost figure as load-bearing.
+                    </Text>
+                </View>
+            )}
             {/* Cost breakdown */}
             {(mod.cost || partsForModule.length > 0) && (
                 <View style={{ marginTop: 10 }}>
