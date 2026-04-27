@@ -30,7 +30,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { PageTour } from '@/components/guidance/page-tour'
 import { ProcessDiscoveryGrid } from '@/components/marketplace/process-discovery-grid'
 import type { ProcessGroup } from '@/actions/marketplace-process-discovery'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
@@ -672,7 +671,6 @@ export function MarketplaceBrowse({
                 }}
             />
 
-            <PageTour page="marketplace" />
         </div>
     )
 }

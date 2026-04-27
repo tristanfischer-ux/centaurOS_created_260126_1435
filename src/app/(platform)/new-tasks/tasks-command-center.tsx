@@ -27,7 +27,6 @@ import dynamic from 'next/dynamic'
 import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
-import { PageTour } from '@/components/guidance/page-tour'
 import { DelegationProgressModal } from '@/components/tasks/delegation-progress-modal'
 
 const TasksGanttView = dynamic(
@@ -560,7 +559,6 @@ export function TasksCommandCenter({
         />
       )}
 
-      <PageTour page="tasks" />
 
       {/* Batch Delegation Modal */}
       <DelegationProgressModal

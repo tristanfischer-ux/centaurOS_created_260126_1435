@@ -72,7 +72,10 @@ export function CookieConsent() {
       {visible && (
         // INTENT: pointer-events-none on the wrapper so the rest of the page
         // stays clickable. The toast itself opts back in with pointer-events-auto.
-        <div className="pointer-events-none fixed inset-x-4 bottom-4 z-40 flex justify-end sm:inset-x-auto sm:right-4 sm:left-auto">
+        // Tristan 2026-04-27: lifted from bottom-4 to bottom-24 on mobile so
+        // the banner doesn't sit on top of secondary CTAs during the first
+        // few seconds before the user dismisses it. Desktop stays at bottom-4.
+        <div className="pointer-events-none fixed inset-x-4 bottom-24 z-40 flex justify-end sm:inset-x-auto sm:right-4 sm:left-auto sm:bottom-4">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

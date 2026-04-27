@@ -81,7 +81,6 @@ const TeamAnalytics = dynamic(
 )
 
 import { useTeamData } from './hooks/use-team-data'
-import { PageTour } from '@/components/guidance/page-tour'
 import { RetainerCard } from '@/components/retainers'
 import type { RetainerWithDetails, RetainerStats } from '@/types/retainers'
 import type { TeamViewMode, BusinessFunction } from './types'
@@ -1834,7 +1833,6 @@ export function TeamPageView({
                 />
             )}
 
-            <PageTour page="team" />
         </div>
     )
 }

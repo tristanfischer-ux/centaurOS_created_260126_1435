@@ -32,7 +32,6 @@ import { cn } from "@/lib/utils"
 import { FORGE_ROUTES, cadLabProjectUrl } from "@/lib/forge-routes"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { getProducts } from "@/actions/products"
-import { PageTour } from "@/components/guidance/page-tour"
 import { RecentProjectsGrid } from "./recent-projects-grid"
 import { ForgeScreenContext } from "./forge-screen-context"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -159,7 +158,6 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
         )}
       </div>
 
-      <PageTour page="the-forge" />
     </div>
   )
 }

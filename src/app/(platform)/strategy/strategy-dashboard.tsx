@@ -46,7 +46,6 @@ import type { SpecialistContext } from '@/components/specialists/types'
 import { updateTaskDates } from '@/actions/tasks'
 import { updateCanvasItem } from '@/actions/canvas'
 import { toast } from 'sonner'
-import { PageTour } from '@/components/guidance/page-tour'
 import { getStrategyColor } from '../new-objectives/strategy-colors'
 import type { GoalBundle, MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
@@ -729,7 +728,6 @@ export function StrategyDashboard({
         />
       )}
 
-      <PageTour page="strategy" />
     </div>
   )
 }

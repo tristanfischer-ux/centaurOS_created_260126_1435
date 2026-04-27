@@ -64,7 +64,6 @@ import type { Database } from '@/types/database.types'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective, PlaybooksData } from './types'
 import type { TaskWithData } from '../new-tasks/types'
 import { PlaybooksSection } from './playbooks-section'
-import { PageTour } from '@/components/guidance/page-tour'
 
 const LARGE_BREAKPOINT = 1280
 const MEDIUM_BREAKPOINT = 768
@@ -632,7 +631,6 @@ export function ObjectivesBoard({
         <PlaybooksSection playbooksData={playbooksData} members={members} />
       )}
 
-      <PageTour page="objectives" />
     </div>
   )
 }

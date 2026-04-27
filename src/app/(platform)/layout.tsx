@@ -8,7 +8,9 @@ import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
-import { UnifiedOnboarding } from "@/components/onboarding/unified-onboarding";
+// Tristan 2026-04-27: removed the unified onboarding tour entirely. The app
+// is now simple enough that founders don't need a guided tour — the Welcome
+// page covers what each section does.
 import { WelcomeBackBanner } from "@/components/WelcomeBackBanner";
 import { ExecutiveProfilePrompt, VerificationSuccessToast, ProfileCompletionWizard } from "@/components/onboarding";
 import { ActivityTracker } from "@/components/ActivityTracker";
@@ -171,7 +173,6 @@ export default async function PlatformLayout({
                         <InvestorMatchPrewarmer />
                         {!needsProfileRepair && (
                             <>
-                                <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} foundryName={foundryName} foundryIsSandbox={foundryIsSandbox} />
                                 <ProfileCompletionWizard
                                     open={!!((profile as unknown as Record<string, unknown>)?.is_fractional_executive && profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed && !(profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)}
                                     userRole={profile?.role ?? undefined}

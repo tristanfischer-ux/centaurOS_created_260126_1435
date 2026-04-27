@@ -144,7 +144,10 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
       <div
         className={cn(
           "fixed z-[200] transition-all duration-200 ease-out",
-          "bottom-24 right-4 sm:bottom-6 sm:right-6",
+          // Mobile: above the bottom-nav (~64px), left side so it doesn't
+          // collide with the centered orange "+" FAB (which is also above
+          // the bottom-nav). Desktop unchanged. Tristan 2026-04-27.
+          "bottom-20 left-4 sm:bottom-6 sm:right-6 sm:left-auto",
           mounted ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
         )}
       >
