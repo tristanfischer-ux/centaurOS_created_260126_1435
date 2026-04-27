@@ -3167,6 +3167,10 @@ export interface InvestorDirectoryStats { // used by pre-search chart panel
   withPortfolio: number
   /** Government grant bodies in the directory */
   grantsCount: number
+  /** Partners / key-people contacts on record (vc_pe_contacts table). Tristan
+   *  2026-04-27: surface the contact count alongside investor count to
+   *  match Forge Capital's "13,076 investors / 61,995 contacts" header. */
+  contactsCount: number
   /** Breakdown by firm_type — donut chart */
   typeBreakdown: { name: string; value: number }[]
   /** Top 10 sectors by investor count — horizontal bar chart */
@@ -3225,17 +3229,22 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
   ])
 
   // ── Summary stats ──────────────────────────────────────────────────────────
-  // DECISION: Use hardcoded real values from the DB query run 2026-04-25
-  // (8,212 total / 8,011 with websites / 4,253 with portfolio / 143 grants)
-  // rather than a live count on every page load. Stats are stable and a live
-  // count on 8K+ rows adds ~200ms. Will be refreshed by the nightly push script.
+  // DECISION: Hardcoded snapshot updated 2026-04-27 (was stale at 2026-04-25
+  // values which capped headline at 8,212 — Tristan flagged the gap vs
+  // Forge Capital's 13,076). Live SQL on jyarhvinengfyrwgtskq returned:
+  //   marketplace_listings WHERE category='Finance'                     → 12,021
+  //   ditto AND attributes->>website_url IS NOT NULL & non-empty        → 10,706
+  //   vc_pe_contacts                                                    → 63,085
+  //   investor_grants                                                   → 3,042
+  // Forge Capital local has 13,076 (1,055 sync gap, ~8% — followed up in
+  // tracker #112). The "with_thesis" subset (8,331) is shown separately
+  // as the "synthesised" stat tile to be honest about pipeline progress.
   const HARDCODED_STATS = {
-    total: 8212,
-    withWebsites: 8011,
+    total: 12021,
+    withWebsites: 10706,
     withPortfolio: 4253,
-    // Live count from investor_grants on 2026-04-25 (3,042 rows). The legacy
-    // 143 referred only to GOVT_GRANT marketplace_listings rows.
     grantsCount: 3042,
+    contactsCount: 63085,
   }
 
   // ── Type breakdown ─────────────────────────────────────────────────────────

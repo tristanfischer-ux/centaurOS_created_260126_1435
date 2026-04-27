@@ -95,11 +95,15 @@ export function InvestorStatsCharts({ stats }: Props) {
         </span>
       </div>
 
-      {/* ── Stat tiles ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── Stat tiles — 5-up to surface partners + grants alongside investors.
+          Tristan 2026-04-27: number must show the full Finance count (12,021),
+          not the prior thesis-only subset (8,212), and the partner count
+          (63,085) must surface to match Forge Capital's headline. ─────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <StatTile label="Total investors"      value={stats.total} />
         <StatTile label="With website"         value={stats.withWebsites} />
         <StatTile label="With portfolio data"  value={stats.withPortfolio} />
+        <StatTile label="Partner contacts"     value={stats.contactsCount} />
         <StatTile label="Grant bodies"         value={stats.grantsCount} />
       </div>
 
