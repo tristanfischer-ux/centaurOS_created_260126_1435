@@ -1647,23 +1647,29 @@ function ModulePage({
                                 ? ` · ${mod.cost.confidence} confidence`
                                 : ""}
                     </Text>
-                    {/* L9-FOLLOWUP: prefer BOM parts table (canonical, matches
-                       cover + BOM master + reconciliation gate). Fall back to
-                       Finn's coarse breakdown only if BOM has no rows for this
-                       module — which itself is a bug worth flagging but better
-                       than rendering nothing. */}
+                    {/* L9-FOLLOWUP + Tristan-flagged 2026-04-27 08:00:
+                       prefer BOM parts table (canonical, matches cover + BOM
+                       master + reconciliation gate). Add explicit Part #
+                       column so a reader can cross-reference each row in the
+                       BOM master. Add a sum-vs-BOM footer line so the reader
+                       can see at a glance whether this module's cost
+                       breakdown actually matches the BOM. */}
                     {partsForModule.length > 0 ? (
                         <View style={styles.table}>
                             <View style={styles.tableHead}>
-                                <Text style={[styles.tableHeadCell, { flex: 3 }]}>Part</Text>
+                                <Text style={[styles.tableHeadCell, { width: 70 }]}>Part #</Text>
+                                <Text style={[styles.tableHeadCell, { flex: 2.5 }]}>Name</Text>
                                 <Text style={[styles.tableHeadCell, { width: 40 }]}>Type</Text>
                                 <Text style={[styles.tableHeadCell, { flex: 1.5 }]}>Process / material</Text>
-                                <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Cost</Text>
+                                <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right", paddingRight: 8 }]}>Cost</Text>
                             </View>
                             {partsForModule.map((p, i) => (
                                 <View key={i} style={styles.tableRow}>
-                                    <Text style={[styles.tableCell, { flex: 3 }]}>
-                                        {p.partNumber ? `${p.partNumber} — ` : ""}{p.name}
+                                    <Text style={[styles.tableCell, { width: 70 }]}>
+                                        {p.partNumber ?? "—"}
+                                    </Text>
+                                    <Text style={[styles.tableCell, { flex: 2.5 }]}>
+                                        {p.name}
                                         {p.description ? (
                                             <Text style={{ color: MUTED }}>{" — " + p.description}</Text>
                                         ) : null}
@@ -1677,7 +1683,7 @@ function ModulePage({
                                             : "—"}
                                     </Text>
                                     <Text
-                                        style={[styles.tableCell, { width: 60, textAlign: "right" }]}
+                                        style={[styles.tableCell, { width: 60, textAlign: "right", paddingRight: 8 }]}
                                     >
                                         {fmtGbp(p.estimatedUnitCostGbp)}
                                     </Text>
@@ -1690,7 +1696,7 @@ function ModulePage({
                                 <Text style={[styles.tableHeadCell, { flex: 3 }]}>Part</Text>
                                 <Text style={[styles.tableHeadCell, { width: 40 }]}>Type</Text>
                                 <Text style={[styles.tableHeadCell, { flex: 1.5 }]}>Process / material</Text>
-                                <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Cost</Text>
+                                <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right", paddingRight: 8 }]}>Cost</Text>
                             </View>
                             {mod.cost.parts.map((p, i) => (
                                 <View key={i} style={styles.tableRow}>
@@ -1707,7 +1713,7 @@ function ModulePage({
                                             : "—"}
                                     </Text>
                                     <Text
-                                        style={[styles.tableCell, { width: 60, textAlign: "right" }]}
+                                        style={[styles.tableCell, { width: 60, textAlign: "right", paddingRight: 8 }]}
                                     >
                                         {fmtGbp(p.cost)}
                                     </Text>
@@ -1715,6 +1721,50 @@ function ModulePage({
                             ))}
                         </View>
                     ) : null}
+                    {/* Sum-vs-BOM cross-check footer — Tristan-flagged 2026-04-27 08:00.
+                       Reader sees at a glance whether this module's cost
+                       breakdown actually matches the BOM master. */}
+                    {(() => {
+                        const partsSum = partsForModule.reduce(
+                            (acc, p) =>
+                                acc +
+                                (typeof p.estimatedUnitCostGbp === "number"
+                                    ? p.estimatedUnitCostGbp
+                                    : 0),
+                            0,
+                        )
+                        const finnSum =
+                            mod.cost?.parts?.reduce(
+                                (acc, p) => acc + (typeof p.cost === "number" ? p.cost : 0),
+                                0,
+                            ) ?? 0
+                        const breakdownSum = partsForModule.length > 0 ? partsSum : finnSum
+                        const bomSum = partsSum
+                        const usingBomDerived = partsForModule.length > 0
+                        if (breakdownSum === 0 && bomSum === 0) return null
+                        const diff = bomSum > 0 ? Math.abs(breakdownSum - bomSum) / bomSum : 0
+                        const matches = usingBomDerived || diff < 0.01
+                        return (
+                            <Text
+                                style={[
+                                    styles.muted,
+                                    {
+                                        fontSize: 9,
+                                        marginTop: 6,
+                                        color: matches ? "#0a7d28" : "#b35900",
+                                    },
+                                ]}
+                            >
+                                {usingBomDerived ? (
+                                    `✓ Cost breakdown is sourced from the bill of materials master · ${partsForModule.length} rows · per-unit total ${fmtGbp(breakdownSum)} matches the BOM master row-sum for this module exactly. Each Part # above can be found verbatim in §4 BOM master.`
+                                ) : matches ? (
+                                    `✓ Cost breakdown sum ${fmtGbp(breakdownSum)} matches the BOM master row-sum for this module within 1%. Lines below are Finn's narrative items; the BOM master in §4 carries the canonical Part # references for procurement.`
+                                ) : (
+                                    `⚠ Cost breakdown sum ${fmtGbp(breakdownSum)} disagrees with the BOM master row-sum for this module (${fmtGbp(bomSum)}) by ${(diff * 100).toFixed(0)}%. The BOM master in §4 is the canonical source — treat the lines above as a narrative breakdown rather than a procurement list. See Reconciliation page.`
+                                )}
+                            </Text>
+                        )
+                    })()}
                     {/* Labour: only when Finn provided it AND we're falling back
                        to Finn's breakdown. Hide when BOM is the source — labour
                        is rolled into per-row "make" costs in the BOM. */}
