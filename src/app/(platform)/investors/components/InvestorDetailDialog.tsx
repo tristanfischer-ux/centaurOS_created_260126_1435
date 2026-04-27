@@ -20,8 +20,9 @@ import { formatFundSize } from '@/lib/format'
 import {
   getInvestorById,
   getInvestorContacts,
+  computeMatchScores,
 } from '@/actions/investors'
-import type { InvestorFirm, InvestorContact } from '@/actions/investors'
+import type { InvestorFirm, InvestorContact, FirmMatchResult } from '@/actions/investors'
 import { getInvestorIntel, generateInvestorIntel } from '@/actions/investor-intel'
 import type { InvestorIntel } from '@/actions/investor-intel'
 import { Button } from '@/components/ui/button'
@@ -43,6 +44,10 @@ interface InvestorDetailDialogProps {
   firmId: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Founder's deck text or search query — used to render Match Explanation
+   *  + Pitch Guidance callouts. Optional: when omitted, those callouts are
+   *  skipped but the Match Scorecard still renders. */
+  query?: string
 }
 
 type DialogView =
@@ -102,6 +107,182 @@ function TextSection({ title, content }: { title: string; content: string | unde
       <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{content}</p>
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Match Scorecard + Match Explanation + Pitch Guidance
+//
+// Ported verbatim (algorithm + copy) from Forge Capital's
+// research/07b-export-python.py lines 2435-2522. The 6 pillars
+// (Thesis / Stage / Geo / Cheque / Activity / Confidence) and prose templates
+// come from there. Tristan 2026-04-27: "follow the forge capital structure
+// for the investor models exactly. Don't include the data quality part."
+// ---------------------------------------------------------------------------
+
+const SCORECARD_DIMS: Array<{ key: keyof FirmMatchResult['pillars']; label: string }> = [
+  { key: 'thesis',     label: 'Thesis' },
+  { key: 'stage',      label: 'Stage' },
+  { key: 'geo',        label: 'Geo' },
+  { key: 'cheque',     label: 'Cheque' },
+  { key: 'activity',   label: 'Activity' },
+  { key: 'confidence', label: 'Confidence' },
+]
+
+function MatchScorecard({ pillars }: { pillars: FirmMatchResult['pillars'] }) {
+  return (
+    <div>
+      <SectionHeading>Match Scorecard</SectionHeading>
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+        {SCORECARD_DIMS.map(({ key, label }) => {
+          const value = pillars[key]
+          const isNA = value == null
+          let fillColor = '#d1d5db'
+          if (!isNA) {
+            if (value >= 70)      fillColor = '#16a34a'
+            else if (value >= 40) fillColor = '#f59e0b'
+            else                  fillColor = '#dc2626'
+          }
+          return (
+            <div key={key} className="text-center">
+              <div className="font-medium uppercase mb-1 truncate"
+                   style={{ fontSize: '9px', color: 'hsl(var(--muted-foreground))', letterSpacing: '0.3px' }}>
+                {label}
+              </div>
+              <div className="w-full overflow-hidden"
+                   style={{ height: '5px', borderRadius: '3px', background: '#e5e7eb' }}>
+                {!isNA && (
+                  <div style={{ height: '100%', borderRadius: '3px',
+                                width: `${Math.min(100, Math.max(0, value))}%`,
+                                background: fillColor }} />
+                )}
+              </div>
+              <div className="font-semibold mt-0.5 tabular-nums"
+                   style={{ fontSize: '10px', color: isNA ? '#9ca3af' : 'hsl(var(--foreground))' }}>
+                {isNA ? 'N/A' : value}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Build the lightbulb match-explanation prose from pillar scores + the founder's
+ *  search query. Ported from Forge Capital generateMatchExplanation. */
+function generateMatchExplanation(
+  pillars: FirmMatchResult['pillars'],
+  composite: number,
+  query: string,
+  attrs: InvestorFirm['attributes'],
+): string {
+  if (!query) return ''
+  const parts: string[] = []
+  const q = query.toLowerCase()
+
+  const sectorTerms = (attrs.sectors ?? []).map(s => s.toLowerCase().trim()).filter(Boolean)
+  const matchingSectors = sectorTerms.filter(s =>
+    s.split(/\s+/).some(t => t.length > 3 && q.includes(t))
+  )
+  if (matchingSectors.length > 0) {
+    parts.push(`Based on available information, they invest in ${matchingSectors.slice(0, 3).join(', ')}, which appears to align with your focus.`)
+  } else if (pillars.thesis > 60) {
+    parts.push(`Their investment thesis appears to have strong semantic overlap with your description.`)
+  } else if (pillars.thesis > 40) {
+    parts.push(`Their thesis appears to have partial overlap with what you described — consider exploring.`)
+  }
+
+  const STAGE_NAMES = ['pre-seed', 'seed', 'early stage', 'series a', 'series b', 'series c', 'growth']
+  let queryStageIdx: number | null = null
+  for (let i = 0; i < STAGE_NAMES.length; i++) {
+    if (q.includes(STAGE_NAMES[i]) || q.includes(STAGE_NAMES[i].replace('-', ' '))) {
+      queryStageIdx = i
+      break
+    }
+  }
+  if (queryStageIdx === null && /\bseed\b/.test(q)) queryStageIdx = 1
+
+  const stageFocus = (attrs.stage_focus ?? []).join(', ')
+  if (queryStageIdx !== null && stageFocus) {
+    const queryStgLabel = STAGE_NAMES[queryStageIdx].replace(/\b\w/g, c => c.toUpperCase())
+    if (pillars.stage >= 90) parts.push(`They appear to invest at ${queryStgLabel} stage — an exact match.`)
+    else if (pillars.stage >= 70) parts.push(`Their stage focus (${stageFocus}) appears close to ${queryStgLabel} — adjacent and potentially reachable.`)
+    else if (pillars.stage >= 50) parts.push(`They typically invest at ${stageFocus} — a different stage, but consider building the relationship for future rounds.`)
+  }
+
+  if (pillars.geo >= 80) parts.push(`Their geographic focus appears to match your location.`)
+  else if (pillars.geo > 0 && pillars.geo < 50) {
+    const geo = (attrs.geo_focus ?? []).join(', ')
+    if (geo) parts.push(`Their geographic focus appears to be ${geo} — you may need to position for that market.`)
+  }
+
+  const cmin = attrs.cheque_range_gbp?.min
+  const cmax = attrs.cheque_range_gbp?.max
+  if (cmin && cmax) {
+    if (pillars.cheque >= 80) parts.push(`Their typical cheque (${formatFundSize(cmin)}–${formatFundSize(cmax)}) appears to fit your raise.`)
+    else if (pillars.cheque > 0 && pillars.cheque < 40) parts.push(`Their cheque range (${formatFundSize(cmin)}–${formatFundSize(cmax)}) may not align with your current raise.`)
+  }
+
+  if (parts.length > 0 && composite < 85) {
+    const dims: Array<{ name: string; val: number }> = [
+      { name: 'thesis alignment', val: pillars.thesis },
+      { name: 'stage fit',        val: pillars.stage },
+      { name: 'geographic match', val: pillars.geo },
+      { name: 'cheque size fit',  val: pillars.cheque },
+    ]
+    dims.sort((a, b) => a.val - b.val)
+    if (dims[0].val < 60) parts.push(`The main gap appears to be ${dims[0].name} (${dims[0].val}%).`)
+  }
+
+  return parts.join(' ')
+}
+
+/** Build pitch-guidance prose. Ported from Forge Capital generatePitchGuidance. */
+function generatePitchGuidance(
+  query: string,
+  attrs: InvestorFirm['attributes'],
+): string {
+  if (!query) return ''
+  const parts: string[] = []
+  const pLower = query.toLowerCase()
+
+  const sectorTerms = (attrs.sectors ?? []).map(s => s.toLowerCase().trim()).filter(Boolean)
+  const overlappingSectors = sectorTerms.filter(s =>
+    s.split(/\s+/).some(t => t.length > 3 && pLower.includes(t))
+  )
+  if (overlappingSectors.length > 0) {
+    parts.push(`Consider emphasising your work in ${overlappingSectors.slice(0, 3).join(', ')}, as this appears to align with their stated investment focus.`)
+  }
+
+  const idealLower = (attrs.ideal_company_profile ?? '').toLowerCase()
+  if (idealLower) {
+    const idealTerms = idealLower.split(/\s+/).filter(t => t.length > 4)
+    const profileTerms = pLower.split(/\s+/).filter(t => t.length > 4)
+    const overlap = idealTerms.filter(t => profileTerms.some(p => p.includes(t) || t.includes(p)))
+    if (overlap.length >= 2) {
+      parts.push(`Based on their described ideal company profile, they may be looking for companies with characteristics similar to yours.`)
+    }
+  }
+
+  const portfolio = attrs.portfolio_companies ?? []
+  if (portfolio.length > 0) {
+    const relatedPortfolio = portfolio.filter(pc => {
+      const pcText = `${pc.company_name ?? ''} ${pc.sector ?? ''} ${pc.description ?? ''}`.toLowerCase()
+      return pLower.split(/\s+/).filter(t => t.length > 4).some(t => pcText.includes(t))
+    })
+    if (relatedPortfolio.length > 0) {
+      const first = relatedPortfolio[0].company_name
+      const more = relatedPortfolio.length > 1 ? ` (and ${relatedPortfolio.length - 1} others)` : ''
+      parts.push(`Consider referencing their portfolio company ${first}${more} as a comparable — this may demonstrate you understand their investment thesis.`)
+    }
+  }
+
+  if (attrs.value_add) {
+    const va = attrs.value_add.length > 150 ? attrs.value_add.slice(0, 150) + '…' : attrs.value_add
+    parts.push(`They describe their value-add as including: "${va}". Consider asking about this during your conversation.`)
+  }
+
+  return parts.join(' ')
 }
 
 function Breadcrumb({ firmName, current, onBack }: { firmName: string; current: string; onBack: () => void }) {
@@ -321,11 +502,15 @@ function PortfolioCompanyDetailView({
 function InvestorMainView({
   firm,
   contacts,
+  matchResult,
+  query,
   onSelectPartner,
   onSelectCompany,
 }: {
   firm: InvestorFirm
   contacts: InvestorContact[]
+  matchResult?: FirmMatchResult
+  query?: string
   onSelectPartner: (c: InvestorContact) => void
   onSelectCompany: (c: NonNullable<InvestorFirm['attributes']['portfolio_companies']>[number]) => void
 }) {
@@ -342,10 +527,44 @@ function InvestorMainView({
   const lastVerified = formatDate(attrs.last_verified)
   const lastSynced = formatDate(attrs.last_synced)
 
+  // Match Explanation + Pitch Guidance — only render when we have both pillar
+  // scores AND a query string (the founder's deck/search input).
+  const explanation = matchResult && query
+    ? generateMatchExplanation(matchResult.pillars, matchResult.score, query, attrs)
+    : ''
+  const pitchGuidance = query
+    ? generatePitchGuidance(query, attrs)
+    : ''
+
   return (
     <div className="space-y-5">
       {/* News Intelligence section — live web-searched data */}
       <InvestorIntelSection firmId={firm.id} />
+
+      {/* Match Scorecard — Forge Capital 6-pillar bar chart. Renders when we
+          have pillar scores; gracefully omitted when the dialog is opened
+          outside a search context. */}
+      {matchResult && <MatchScorecard pillars={matchResult.pillars} />}
+
+      {/* Match Explanation — light-blue lightbulb callout. Generated from
+          pillar scores + the founder's query. Plain text only (no HTML) so
+          interpolated values from query / DB cannot inject markup. */}
+      {explanation && (
+        <div className="rounded-lg p-3 text-sm leading-relaxed"
+             style={{ background: 'hsl(210 80% 96%)', border: '1px solid hsl(210 80% 88%)' }}>
+          <span style={{ marginRight: '6px' }}>💡</span>
+          {explanation}
+        </div>
+      )}
+
+      {/* Pitch Guidance — yellow callout. */}
+      {pitchGuidance && (
+        <div className="rounded-lg p-3 text-sm leading-relaxed"
+             style={{ background: 'hsl(45 90% 94%)', border: '1px solid hsl(45 75% 80%)' }}>
+          <div className="font-semibold mb-1" style={{ color: 'hsl(30 70% 35%)' }}>Pitch Guidance</div>
+          {pitchGuidance}
+        </div>
+      )}
 
       {/* Forge Capital order — Tristan 2026-04-27: Investment Thesis →
           Ideal Company Profile → Investment Pattern → Team Expertise →
@@ -467,9 +686,10 @@ function InvestorMainView({
 // Main Component
 // ---------------------------------------------------------------------------
 
-export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDetailDialogProps) {
+export function InvestorDetailDialog({ firmId, open, onOpenChange, query }: InvestorDetailDialogProps) {
   const [firm, setFirm] = useState<InvestorFirm | null>(null)
   const [contacts, setContacts] = useState<InvestorContact[]>([])
+  const [matchResult, setMatchResult] = useState<FirmMatchResult | undefined>(undefined)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<DialogView>({ type: 'investor' })
@@ -479,12 +699,16 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDet
     setError(null)
     setFirm(null)
     setContacts([])
+    setMatchResult(undefined)
     setView({ type: 'investor' })
 
     try {
-      const [firmResult, contactsResult] = await Promise.all([
+      const [firmResult, contactsResult, matchScoreResult] = await Promise.all([
         getInvestorById(id),
         getInvestorContacts(id),
+        // computeMatchScores returns {} when no foundry profile exists; the
+        // dialog gracefully omits the scorecard in that case.
+        computeMatchScores([id]).catch(() => ({} as Record<string, FirmMatchResult>)),
       ])
 
       if (!firmResult.firm) {
@@ -494,6 +718,7 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDet
 
       setFirm(firmResult.firm)
       setContacts(contactsResult.contacts)
+      setMatchResult(matchScoreResult[id])
     } catch (err) {
       console.error('[InvestorDetailDialog] Failed to fetch:', err)
       setError('Failed to load investor details.')
@@ -564,6 +789,8 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange }: InvestorDet
           <InvestorMainView
             firm={firm}
             contacts={contacts}
+            matchResult={matchResult}
+            query={query}
             onSelectPartner={(c) => setView({ type: 'partner', contact: c })}
             onSelectCompany={(c) => setView({ type: 'portfolio', company: c })}
           />

@@ -725,11 +725,14 @@ export function InvestorBrowser({
         matchScores={matchScores}
       />
 
-      {/* Investor detail modal — opens on row/card click */}
+      {/* Investor detail modal — opens on row/card click. Passes the current
+          search query so the dialog can render Match Explanation + Pitch
+          Guidance callouts (Forge Capital structure). */}
       <InvestorDetailDialog
         firmId={selectedFirmId}
         open={!!selectedFirmId}
         onOpenChange={(open) => { if (!open) setSelectedFirmId(null) }}
+        query={debouncedQuery || undefined}
       />
     </div>
   )
