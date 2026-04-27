@@ -850,16 +850,15 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 }
             `}</style>
 
-            {/* Breadcrumb — Forge Capital pattern (Home › Brainstorming) */}
-            <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "hsl(var(--muted-foreground))", marginBottom: "12px" }}>
-                <Link href="/today" style={{ color: "inherit", textDecoration: "none" }}>Home</Link>
-                <ChevronRight style={{ width: "12px", height: "12px" }} />
-                <span style={{ color: "hsl(var(--foreground))", fontWeight: 500 }}>Brainstorming</span>
-            </nav>
-            {/* ── Page header ── */}
-            <div className="bc-page-head">
-                <h1>Brainstorming Council</h1>
-                <p>You ask one question. Fiona frames it, {activeTier === "quick" ? "two specialists chime in" : activeTier === "full" ? "three specialists chime in" : activeTier === "deep" ? "four specialists chime in from different perspectives" : "five specialists chime in from different perspectives"} in parallel, and Fiona closes with what they agreed on, where they disagreed, and the one thing to do this week.</p>
+            {/* Tristan 2026-04-27: removed Home › Brainstorming breadcrumb +
+                added the red-bar accent to the title so this page matches the
+                canonical My Profile page-header pattern. */}
+            <div className="bc-page-head" style={{ marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
+                    <div style={{ height: "32px", width: "6px", background: "#ff4500", borderRadius: "9999px", boxShadow: "0 0 10px rgba(255,69,0,0.5)" }} />
+                    <h1 style={{ margin: 0 }}>Brainstorming Council</h1>
+                </div>
+                <p style={{ paddingLeft: "18px" }}>You ask one question. Fiona frames it, {activeTier === "quick" ? "two specialists chime in" : activeTier === "full" ? "three specialists chime in" : activeTier === "deep" ? "four specialists chime in from different perspectives" : "five specialists chime in from different perspectives"} in parallel, and Fiona closes with what they agreed on, where they disagreed, and the one thing to do this week.</p>
             </div>
 
             {/* ── Tier picker ── */}

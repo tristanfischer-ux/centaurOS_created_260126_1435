@@ -89,12 +89,8 @@ export default async function MarketplacePage() {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb — mirrors Forge Capital pattern (Home › Suppliers) */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground -mb-2">
-        <Link href="/today" className="hover:text-foreground transition-colors">Home</Link>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground font-medium">Suppliers</span>
-      </nav>
+      {/* Tristan 2026-04-27: removed Home › Suppliers breadcrumb to match
+          the canonical My Profile page-header pattern (red bar + title only). */}
       {/* ── Page header ── */}
       <div className="pb-4 border-b border-border/40">
         <div className={typography.pageHeader}>

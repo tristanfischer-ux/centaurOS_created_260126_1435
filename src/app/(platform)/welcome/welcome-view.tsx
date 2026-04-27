@@ -127,16 +127,16 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
             <section className="relative overflow-hidden rounded-b-2xl bg-gradient-to-br from-background via-background to-orange-50/40">
                 <div className="relative z-10 px-4 sm:px-6 lg:px-12 pt-10 sm:pt-14 lg:pt-20 pb-10 sm:pb-14">
                     <div className="max-w-3xl">
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="h-10 w-2 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.4)]" />
-                            <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                                {firstName ? `Welcome, ${firstName}` : "Welcome"}
-                            </p>
+                        {/* Tristan 2026-04-27: dropped the "WELCOME, TRISTAN"
+                            eyebrow + put the red bar inline with the page title,
+                            matching the canonical My Profile page-header pattern. */}
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="h-12 w-2 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.4)] flex-shrink-0" />
+                            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
+                                Welcome to{" "}
+                                <span className="text-international-orange">Fractional Forge</span>.
+                            </h1>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-4">
-                            Welcome to{" "}
-                            <span className="text-international-orange">Fractional Forge</span>.
-                        </h1>
                         <p className="text-lg sm:text-xl text-muted-foreground font-light">
                             Four tools for hardware founders: sharpen your thinking, design
                             your product, find the right investors, and source the right

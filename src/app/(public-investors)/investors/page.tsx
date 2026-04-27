@@ -129,12 +129,9 @@ export default async function InvestorDirectoryPage() {
 
   return (
     <div className="space-y-0">
-      {/* Breadcrumb — mirrors Forge Capital pattern (Home › Investors) */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
-        <Link href="/today" className="hover:text-foreground transition-colors">Home</Link>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground font-medium">Investors</span>
-      </nav>
+      {/* Tristan 2026-04-27: removed Home › Investors breadcrumb. Sidebar
+          already shows the active page; the breadcrumb pushed the title down.
+          Canonical pattern: red bar + title only (My Profile pattern). */}
       {/* Page header */}
       <div className="pb-6 mb-0">
         <div className="flex items-center gap-3 mb-1">

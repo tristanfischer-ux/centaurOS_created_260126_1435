@@ -128,10 +128,15 @@ export function CompanySwitcher({
                 tabIndex={0}
                 aria-label={`Switch to ${foundry.foundryName}${foundry.isActive ? ' (currently active)' : ''}`}
                 className={cn(
-                  'relative cursor-pointer transition-all duration-200 rounded-xl border shadow-sm',
-                  'hover:shadow-lg hover:-translate-y-0.5',
+                  // Tristan 2026-04-27: dropped the visible border (he flagged
+                  // the dark outline as "stupid black boxes that weren't there
+                  // in the original design"). Soft muted background + shadow
+                  // gives card affordance without the hard frame. Active card
+                  // still gets the orange ring.
+                  'relative cursor-pointer transition-all duration-200 rounded-xl border border-transparent bg-muted/30 shadow-sm',
+                  'hover:shadow-lg hover:-translate-y-0.5 hover:bg-muted/50',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  foundry.isActive && 'ring-1 ring-international-orange/60',
+                  foundry.isActive && 'ring-1 ring-international-orange/60 bg-international-orange/[0.04]',
                   isCurrentlySwitching && 'opacity-70 pointer-events-none'
                 )}
                 onClick={() => onCompanyClick(foundry.foundryId)}

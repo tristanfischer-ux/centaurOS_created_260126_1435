@@ -44,33 +44,10 @@ export function WorkspaceShell({
     const isRoot = !crumbs || crumbs.length <= 1
     return (
         <div className={cn("space-y-6", maxWidth === 'wide' ? "max-w-7xl" : "max-w-5xl")}>
-            {/* Breadcrumb — Forge Capital pattern: always Home › The Forge › <subroute> */}
-            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Link href="/today" className="hover:text-foreground transition-colors">Home</Link>
-                <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-                {isRoot ? (
-                    <span className="text-foreground font-medium">The Forge</span>
-                ) : (
-                    <>
-                        <Link href="/the-forge-v2" className="inline-flex items-center gap-1 hover:text-international-orange transition-colors">
-                            <Hammer className="h-3.5 w-3.5" />
-                            The Forge
-                        </Link>
-                        {crumbs!.slice(0, -1).map((c, i) => (
-                            <span key={i} className="inline-flex items-center gap-1">
-                                <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-                                {c.href ? (
-                                    <Link href={c.href} className="hover:text-international-orange transition-colors">{c.label}</Link>
-                                ) : (
-                                    <span>{c.label}</span>
-                                )}
-                            </span>
-                        ))}
-                        <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-                        <span className="text-foreground font-medium truncate max-w-[280px]">{crumbs![crumbs!.length - 1].label}</span>
-                    </>
-                )}
-            </nav>
+            {/* Tristan 2026-04-27: removed Home › The Forge › <subroute>
+                breadcrumb so the page-header pattern matches My Profile
+                (red bar + title only). Subroute context still surfaces
+                in the title via crumbs[last].label. */}
 
             {/* Header strip */}
             <header className="flex flex-wrap items-end justify-between gap-4 pb-4 border-b border-border">
