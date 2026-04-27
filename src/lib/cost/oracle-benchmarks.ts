@@ -549,15 +549,35 @@ export const ORACLE_BENCHMARKS_BY_PRODUCT_CLASS: Record<string, OracleBenchmark[
 
 /** Heuristic match — given a brief subject string, pick the most likely
  *  product class. Returns null when nothing matches; the caller should
- *  skip Oracle hints rather than show wrong reference data. */
+ *  skip Oracle hints rather than show wrong reference data.
+ *
+ *  L10-B2 (2026-04-27): regex ORDER matters. Hedgerow's brief subject
+ *  contains "lithium iron phosphate battery" (for solar power on a
+ *  £155 bird feeder) — that string used to trip the BESS regex BEFORE
+ *  the consumer-IoT regex got a chance, so Hedgerow's PDF cited the
+ *  £1.3M-£3.6M BESS band against a £155 ceiling and printed
+ *  "0% of industry-low benchmark". Wrong product class.
+ *
+ *  Order specific-product matches FIRST, generic-substrate matches LAST.
+ *  Consumer-IoT > Mobility aid > Vertical farm > Desal > BESS.
+ */
 export function detectProductClass(briefSubject: string): string | null {
     const s = briefSubject.toLowerCase()
+    // Most specific FIRST — these patterns are unambiguous and only
+    // appear in their respective product class.
     if (
-        /\b(bess|battery energy storage|grid.{0,5}forming|lfp|lithium iron phosphate|grid.{0,5}tied|behind.{0,10}meter)\b/.test(
+        /\b(bird feeder|wildlife camera|garden bird|nest box camera|hedgehog camera|pond camera|garden.{0,10}wildlife)\b/.test(
             s,
         )
     ) {
-        return "uk-bess-containerised"
+        return "uk-consumer-iot-outdoor"
+    }
+    if (
+        /\b(walking stick|walking aid|mobility aid|fall.{0,10}detect|gait.{0,10}analy|sentinel|nordic.{0,10}nrf9160|cellular.{0,10}walking|inductive.{0,10}charg.{0,15}stand)\b/.test(
+            s,
+        )
+    ) {
+        return "uk-connected-mobility-aid"
     }
     if (
         /\b(vertical farm|hydroponic|leafy green|grow.{0,5}light|cea|controlled environment agriculture|nutrient.{0,10}recirculat)\b/.test(
@@ -567,25 +587,30 @@ export function detectProductClass(briefSubject: string): string | null {
         return "uk-vertical-farm-container"
     }
     if (
-        /\b(garden|bird feeder|wildlife camera|outdoor.{0,10}iot|consumer.{0,10}outdoor|premium.{0,10}consumer.{0,10}hardware)\b/.test(
-            s,
-        )
-    ) {
-        return "uk-consumer-iot-outdoor"
-    }
-    if (
         /\b(desalination|reverse osmosis|swro|seawater.{0,15}reverse|membrane.{0,10}filt|potable water from seawater)\b/.test(
             s,
         )
     ) {
         return "uk-desal-containerised"
     }
+    // BESS substrate-words (lithium iron phosphate, behind-the-meter,
+    // grid-forming) are the LEAST specific because they appear in
+    // adjacent product classes (solar-powered bird feeder mentions LFP).
+    // Require a primary BESS keyword OR two substrate keywords.
     if (
-        /\b(walking stick|walking aid|mobility aid|fall.{0,10}detect|gait.{0,10}analy|sentinel|nordic.{0,10}nrf9160|cellular.{0,10}walking|inductive.{0,10}charg.{0,15}stand)\b/.test(
+        /\b(bess|battery energy storage|grid.{0,5}forming|grid.{0,5}tied)\b/.test(s) ||
+        (/\blithium iron phosphate\b/.test(s) && /\bbehind.{0,10}meter\b/.test(s))
+    ) {
+        return "uk-bess-containerised"
+    }
+    // Last-resort generic outdoor-IoT — catches edge cases like
+    // "premium consumer outdoor hardware" without specific product noun.
+    if (
+        /\b(outdoor.{0,10}iot|consumer.{0,10}outdoor|premium.{0,10}consumer.{0,10}hardware)\b/.test(
             s,
         )
     ) {
-        return "uk-connected-mobility-aid"
+        return "uk-consumer-iot-outdoor"
     }
     return null
 }
