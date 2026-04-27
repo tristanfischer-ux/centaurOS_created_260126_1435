@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
   "crons": [
     {"path": "/api/cron/telegram-briefings", "schedule": "0 8 * * *"},
     {"path": "/api/cron/agent-sweep", "schedule": "0 */2 * * *"},
