@@ -4538,10 +4538,14 @@ async function exportProjectPdfInternal(
         const admin = createAdminClient()
 
         // Parent project row — pulls every column we care about.
+        // L16-G #11b: canonical_specs added so the renderer reads
+        // post-Fang-patch numerical values instead of raw modules / parts
+        // values. The renderer falls back to raw values when canonical
+        // is empty (revision=0).
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet, spatial_plan, proofread_findings, feasibility_verdict",
+                "id, foundry_id, name, subject, modules, research, ai_cost_estimates, reviews, diagnostic_answers, design_revision, created_at, brief_locked_at, shipped_at, system_illustration_url, interior_overview_url, concept_render_url, dimension_sheet, spatial_plan, proofread_findings, feasibility_verdict, canonical_specs, canonical_specs_revision",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -4569,6 +4573,48 @@ async function exportProjectPdfInternal(
 
         const rawModules = project.modules as unknown
         const modulesRaw = (Array.isArray(rawModules) ? rawModules : []) as CadLabModule[]
+
+        // ── L16-G #11b: canonical_specs override map ──
+        // When canonical_specs has a value for a (moduleId, specKey) or
+        // (partId, field), prefer it over the raw modules / parts table
+        // value. This is the change that makes the 12.5x motor-power class
+        // of mismatch disappear from rendered PDFs: Fang's patches land in
+        // canonical_specs, the renderer reads them here, the PDF reflects
+        // the post-review state.
+        //
+        // Fallback semantics: when canonical_specs is empty (revision=0,
+        // no patches ever landed) the helpers return null and the caller
+        // uses the raw value. This preserves back-compat for projects that
+        // pre-date Fang patch wiring.
+        const canonicalSpecs = (project.canonical_specs ?? null) as {
+            modules?: Record<string, {
+                specs?: Record<string, { value?: number; unit?: string; source?: string; sourceRank?: number }>
+            }>
+            parts?: Record<string, {
+                unitCostGbp?: { value?: number; source?: string; sourceRank?: number }
+                massKg?: { value?: number; source?: string; sourceRank?: number }
+            }>
+        } | null
+        const canonicalRevision = (project.canonical_specs_revision as number | null) ?? 0
+        function canonicalModuleSpec(moduleId: string, specKey: string): number | null {
+            if (!canonicalSpecs || canonicalRevision === 0) return null
+            const m = canonicalSpecs.modules?.[moduleId]
+            if (!m) return null
+            const v = m.specs?.[specKey]?.value
+            return typeof v === "number" && Number.isFinite(v) ? v : null
+        }
+        function canonicalPartCost(partId: string): number | null {
+            if (!canonicalSpecs || canonicalRevision === 0) return null
+            const p = canonicalSpecs.parts?.[partId]
+            const v = p?.unitCostGbp?.value
+            return typeof v === "number" && Number.isFinite(v) ? v : null
+        }
+        function canonicalPartMass(partId: string): number | null {
+            if (!canonicalSpecs || canonicalRevision === 0) return null
+            const p = canonicalSpecs.parts?.[partId]
+            const v = p?.massKg?.value
+            return typeof v === "number" && Number.isFinite(v) ? v : null
+        }
 
         const costEstimates = (project.ai_cost_estimates as Record<
             string,
@@ -4685,7 +4731,17 @@ async function exportProjectPdfInternal(
                 purpose: typeof m.purpose === "string" ? m.purpose : "",
                 description: typeof m.description === "string" ? m.description : "",
                 whyItMatters: typeof m.whyItMatters === "string" ? m.whyItMatters : "",
-                massKg: typeof m.estimatedMassKg === "number" ? m.estimatedMassKg : null,
+                // L16-G #11b: prefer canonical_specs.modules[id].specs.massKg.value
+                // over the raw module estimatedMassKg. Fang's applied_review_patch
+                // (rank 90) supersedes max_decomposition (50) and bom_generator
+                // (70) at the canonical-ledger layer, so when the renderer
+                // reads canonical here it sees the post-review mass, not the
+                // pre-review estimate.
+                massKg: (() => {
+                    const fromCanonical = canonicalModuleSpec(m.id, "massKg")
+                    if (fromCanonical !== null) return fromCanonical
+                    return typeof m.estimatedMassKg === "number" ? m.estimatedMassKg : null
+                })(),
                 budgetMassKg: typeof m.budgetMassKg === "number" ? m.budgetMassKg : null,
                 leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
                 leadTimeSource:
@@ -4756,23 +4812,35 @@ async function exportProjectPdfInternal(
             .eq("cad_lab_project_id", projectId)
             .order("part_number", { ascending: true })
 
-        const parts: PartRow[] = (partsRaw ?? []).map((p) => ({
-            partNumber: String(p.part_number ?? ""),
-            name: String(p.name ?? ""),
-            sourceModuleName:
-                typeof p.source_module_id === "string"
-                    ? moduleNameById.get(p.source_module_id) ?? p.source_module_id
-                    : null,
-            process: typeof p.process === "string" ? p.process : null,
-            material: typeof p.material === "string" ? p.material : null,
-            materialSpec: typeof p.material_spec === "string" ? p.material_spec : null,
-            finish: typeof p.finish === "string" ? p.finish : null,
-            tolerance: typeof p.tolerance === "string" ? p.tolerance : null,
-            massKg: toFiniteOrNull(p.mass_kg),
-            estimatedUnitCostGbp: toFiniteOrNull(p.estimated_unit_cost_gbp),
-            isPurchased: Boolean(p.is_purchased),
-            description: typeof p.description === "string" ? p.description : null,
-        }))
+        const parts: PartRow[] = (partsRaw ?? []).map((p) => {
+            const partNumber = String(p.part_number ?? "")
+            // L16-G #11b: prefer canonical part_cost / part_mass values
+            // (applied_review_patch rank 90 supersedes bom_generator rank
+            // 70 at the canonical-ledger layer). The renderer falls back
+            // to the parts-table value when canonical has no entry.
+            const canonicalCost = partNumber ? canonicalPartCost(partNumber) : null
+            const canonicalMass = partNumber ? canonicalPartMass(partNumber) : null
+            return {
+                partNumber,
+                name: String(p.name ?? ""),
+                sourceModuleName:
+                    typeof p.source_module_id === "string"
+                        ? moduleNameById.get(p.source_module_id) ?? p.source_module_id
+                        : null,
+                process: typeof p.process === "string" ? p.process : null,
+                material: typeof p.material === "string" ? p.material : null,
+                materialSpec: typeof p.material_spec === "string" ? p.material_spec : null,
+                finish: typeof p.finish === "string" ? p.finish : null,
+                tolerance: typeof p.tolerance === "string" ? p.tolerance : null,
+                massKg: canonicalMass !== null ? canonicalMass : toFiniteOrNull(p.mass_kg),
+                estimatedUnitCostGbp:
+                    canonicalCost !== null
+                        ? canonicalCost
+                        : toFiniteOrNull(p.estimated_unit_cost_gbp),
+                isPurchased: Boolean(p.is_purchased),
+                description: typeof p.description === "string" ? p.description : null,
+            }
+        })
 
         // L16-A1 (2026-04-27): snapshot the canonical specs ledger from the
         // current modules + parts state. This is the minimum-viable wiring

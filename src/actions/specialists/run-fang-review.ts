@@ -418,6 +418,86 @@ async function runFangReviewInternal(
                 )
             }
 
+            // ── L16-G #11b: Fang → canonical-specs patch wiring ──
+            //
+            // After the review is saved AND the module-cascade has run,
+            // derive a conservative SpecPatch[] from Fang's structured
+            // findings and apply it to the canonical-specs ledger via
+            // the atomic RPC (apply_canonical_patch_atomic).
+            //
+            // This is the load-bearing wiring step. Block G #11a closed
+            // the holes in the applier; #11b finally calls it. Without
+            // this block, canonical_specs stays at the snapshot taken at
+            // PDF render time and Fang's findings never overwrite the
+            // numerical values the renderer reads.
+            //
+            // The applier handles:
+            //   - rank gating (applied_review_patch=90 supersedes
+            //     bom_generator=70 and max_decomposition=50)
+            //   - oscillation (duplicate patch hash within 24h → reject)
+            //   - cost-impact ceiling (cumulative |delta| > 2x prior BOM
+            //     → reject)
+            //   - schema validation (Zod via SpecPatchSchema)
+            //   - atomic UPDATE specs + INSERT audit row (single txn)
+            //
+            // Failure here is non-fatal — the review IS saved, the chip
+            // can flip green. Patch errors land in audit logs.
+            let patchesEmitted = 0
+            let patchesApplied = 0
+            try {
+                const { deriveFangPatches } = await import(
+                    "@/lib/cad-lab/fang-patch-generator"
+                )
+                const targetForPatches = modules.find((m) => m.id === moduleId)
+                if (targetForPatches) {
+                    const patches = deriveFangPatches({
+                        review: reviewResult.review,
+                        module: {
+                            id: targetForPatches.id,
+                            keyParts: Array.isArray(targetForPatches.keyParts)
+                                ? (targetForPatches.keyParts as string[])
+                                : [],
+                            budgetMassKg: typeof (targetForPatches as { budgetMassKg?: number }).budgetMassKg === "number"
+                                ? (targetForPatches as { budgetMassKg?: number }).budgetMassKg
+                                : null,
+                            estimatedMassKg:
+                                typeof (targetForPatches as { estimatedMassKg?: number })
+                                    .estimatedMassKg === "number"
+                                    ? (targetForPatches as { estimatedMassKg?: number })
+                                          .estimatedMassKg
+                                    : null,
+                        },
+                    })
+                    patchesEmitted = patches.length
+                    if (patches.length > 0) {
+                        const { applyDesignPatches } = await import(
+                            "@/lib/cad-lab/apply-design-patches"
+                        )
+                        const result = await applyDesignPatches(admin, {
+                            projectId,
+                            patches,
+                            iteration: 0,
+                        })
+                        if (result.ok) {
+                            patchesApplied = result.applied
+                            console.info(
+                                `[run-fang-review] L16-G patch wiring: project=${projectId} module=${moduleId} emitted=${patchesEmitted} applied=${patchesApplied} rejected=${result.rejected} halt=${result.halt.reason}`,
+                            )
+                        } else {
+                            // Non-fatal — log + continue. The review is saved.
+                            console.warn(
+                                `[run-fang-review] L16-G patch apply failed (non-fatal): project=${projectId} module=${moduleId} error=${result.error}`,
+                            )
+                        }
+                    }
+                }
+            } catch (patchErr) {
+                console.warn(
+                    "[run-fang-review] L16-G patch wiring threw (non-fatal):",
+                    patchErr instanceof Error ? patchErr.message : patchErr,
+                )
+            }
+
             await completePipelineRun(runId, {
                 output_ref: {
                     table: "cad_lab_projects",
@@ -428,6 +508,8 @@ async function runFangReviewInternal(
                     reviewTimeMs: reviewResult.review.reviewTimeMs,
                     cascadeApplied,
                     cascadePending,
+                    patchesEmitted,
+                    patchesApplied,
                 },
             })
 

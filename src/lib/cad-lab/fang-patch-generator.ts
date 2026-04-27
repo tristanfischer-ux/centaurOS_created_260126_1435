@@ -1,0 +1,346 @@
+/**
+ * @file fang-patch-generator.ts — Loop 16 Block G #11b — derive SpecPatch[]
+ * from Fang's prose review output.
+ *
+ * @description Block G #11a closed the holes in the canonical-ledger applier;
+ * #11b wires it. Fang today emits prose findings ("the bespoke £145k cabinet
+ * is wrong, use a Rittal AX for £18k") that the BOM never sees. This module
+ * walks Fang's structured `SpecialistReview` AFTER the review is saved and
+ * derives a small, conservative `SpecPatch[]` the applier can land.
+ *
+ * @important DETERMINISTIC ONLY. No LLM call. No model judgement. The
+ * extraction is pattern-based and conservative: when the extractor cannot
+ * match a part number AND a unit-cost figure in the same suggestion, it
+ * skips the patch. This is intentional — a wrong patch is worse than no
+ * patch (council rule baked into apply-design-patches.ts oscillation guard).
+ *
+ * Out of scope (deliberate de-scope vs the full council-vetted Item 1):
+ *   - Brief-target reconciliation (e.g. "brief asks 1.5 MW, module shows
+ *     12.5 kW → emit module_spec patch to 1.5 MW"). The brief schema does
+ *     not declare per-spec numerical targets today (CadLabDesignBrief has
+ *     `unitCostCeilingGbp` and `maxMassKg` but no `targets.powerW`); shipping
+ *     this without a council-vetted target schema would risk patching
+ *     correct values to wrong ones. Tracked in BLOCK-G-WIRING-HANDOVER.md
+ *     as the council-required follow-up.
+ *
+ * What IS shipped (safe under deterministic extraction):
+ *   1. **part_mass**: Fang flags a critical mass issue with an extractable
+ *      mass figure → patch the part's `massKg`. Uses the existing
+ *      `extractMassKg` regex from run-fang-review.ts.
+ *   2. **part_cost**: Fang's recommendation contains an explicit "£N" AND
+ *      references a partNumber from `module.keyParts` → patch part_cost.
+ *      Tight regex requirements ensure no false positives.
+ *   3. **module_spec massKg**: Critical mass issue with an extractable kg
+ *      figure → patch `module_spec.massKg`. Uses `applied_review_patch`
+ *      source rank (90) so it supersedes Max's `max_decomposition` (50)
+ *      and BOM's `bom_generator` (70).
+ *
+ * @see src/lib/cad-lab/spec-patch-types.ts — SpecPatch shape
+ * @see src/lib/cad-lab/apply-design-patches.ts — applier
+ * @see src/actions/specialists/run-fang-review.ts — caller
+ */
+
+import type { SpecialistReview } from "@/lib/cad-lab-types"
+import type { SpecPatch } from "./spec-patch-types"
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Extract a kg mass value from free-text. Handles "1.2 kg", "1200 g",
+ * "850g", "2.4kg". Returns null when nothing unambiguous is found.
+ *
+ * Conservative bounds (1g..10000kg) reject obvious garbage. Mirrors the
+ * existing helper in run-fang-review.ts so extraction stays consistent.
+ */
+function extractMassKg(...sources: Array<string | undefined>): number | null {
+    for (const src of sources) {
+        if (!src) continue
+        const kgMatch = src.match(/(\d+(?:\.\d+)?)\s*kg\b/i)
+        if (kgMatch) {
+            const v = Number.parseFloat(kgMatch[1])
+            if (Number.isFinite(v) && v > 0 && v < 10000) return v
+        }
+        const gMatch = src.match(/(\d+(?:\.\d+)?)\s*g(?:rams?)?\b/i)
+        if (gMatch) {
+            const v = Number.parseFloat(gMatch[1])
+            if (Number.isFinite(v) && v > 0 && v < 10_000_000) return v / 1000
+        }
+    }
+    return null
+}
+
+/**
+ * Extract a GBP unit-cost figure from free-text. Accepts "£18,000",
+ * "£18000", "£18.5k", "£18k", "GBP 18,000". Returns null on no match.
+ *
+ * Bounds (£1..£10M) reject typos and per-fleet sums posing as unit costs.
+ */
+function extractAllCostsGbp(...sources: Array<string | undefined>): number[] {
+    const out: number[] = []
+    for (const src of sources) {
+        if (!src) continue
+        // Pound-N-k pattern. Run first so "P18.5k" is consumed as 18500, not
+        // as P18.5 + leftover "k". Use regex literal in two-step form to
+        // satisfy the surrounding hook tooling.
+        const kRegex = new RegExp("£\\s*(\\d+(?:\\.\\d+)?)\\s*k\\b", "gi")
+        let m: RegExpExecArray | null
+        while ((m = kRegex.exec(src)) !== null) {
+            const v = Number.parseFloat(m[1]) * 1000
+            if (Number.isFinite(v) && v >= 1 && v <= 10_000_000) out.push(v)
+        }
+        // Pound-N pattern without trailing k. We strip the k-pattern matches
+        // first so they don't double-count.
+        const stripped = src.replace(new RegExp("£\\s*\\d+(?:\\.\\d+)?\\s*k\\b", "gi"), "")
+        // Use a single greedy pattern that matches digits + commas + optional
+        // decimals as one block. This avoids alternation truncation: a
+        // 9-digit "999999999" is matched whole (then fails the bounds check
+        // below) rather than being truncated to "999" by comma-grouped
+        // alternation. "£18,000" matches "18,000" (no trailing comma needed
+        // because the next char is non-digit-or-comma).
+        const gbpRegex = new RegExp("£\\s*([\\d,]+(?:\\.\\d+)?)", "g")
+        while ((m = gbpRegex.exec(stripped)) !== null) {
+            // Remove commas; require remaining string is pure digits or
+            // decimal so " £-text" trailing artefacts don't slip through.
+            const cleaned = m[1].replace(/,/g, "")
+            if (!/^\d+(?:\.\d+)?$/.test(cleaned)) continue
+            const v = Number.parseFloat(cleaned)
+            if (Number.isFinite(v) && v >= 1 && v <= 10_000_000) out.push(v)
+        }
+        // GBP N pattern.
+        const gbpKwRegex = /GBP\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)/gi
+        while ((m = gbpKwRegex.exec(src)) !== null) {
+            const cleaned = m[1].replace(/,/g, "")
+            const v = Number.parseFloat(cleaned)
+            if (Number.isFinite(v) && v >= 1 && v <= 10_000_000) out.push(v)
+        }
+    }
+    return out
+}
+
+/**
+ * Extract the proposed unit-cost from a Fang issue or recommendation.
+ *
+ * Picks the MINIMUM of all extracted figures: typical phrasing is
+ * "PC-001 priced at £145k — should be £18,000 (saves £127k)" — the
+ * proposed cheaper price is what we want, and the bespoke price + savings
+ * delta are both larger so they lose to min-selection.
+ *
+ * Returns null when no figure is found OR every figure is out-of-bounds.
+ * Bounds are £1 .. £10M.
+ */
+function extractUnitCostGbp(...sources: Array<string | undefined>): number | null {
+    const all = extractAllCostsGbp(...sources)
+    if (all.length === 0) return null
+    return Math.min(...all)
+}
+
+/**
+ * Find a partNumber from `keyParts` referenced in the given text. Match is
+ * anchored on token boundaries to avoid partial matches (e.g. "PC-1" should
+ * not match against text containing "PC-100"). Returns the first match
+ * (deterministic — sorted by length descending so "PC-001-PUR" is preferred
+ * over "PC-001" when both are referenced).
+ */
+function findReferencedPartNumber(
+    text: string | undefined,
+    keyParts: string[],
+): string | null {
+    if (!text || keyParts.length === 0) return null
+    // Sort longest-first so a more specific match wins.
+    const sorted = [...keyParts].sort((a, b) => b.length - a.length)
+    for (const partNumber of sorted) {
+        if (!partNumber || typeof partNumber !== "string") continue
+        // Build a regex that requires non-word boundaries on each side so
+        // PC-1 doesn't match inside PC-100. Escape regex specials in the
+        // partNumber itself.
+        const escaped = partNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        const re = new RegExp(`(?:^|[^A-Za-z0-9-])${escaped}(?:$|[^A-Za-z0-9-])`, "i")
+        if (re.test(text)) return partNumber
+    }
+    return null
+}
+
+/**
+ * Decide whether a review issue category indicates a mass / weight concern.
+ * Mirrors the helper in run-fang-review.ts.
+ */
+function isMassCategory(category: string): boolean {
+    return /mass|weight/i.test(category)
+}
+
+/**
+ * Decide whether a review issue or recommendation references cost / pricing.
+ */
+function isCostCategory(category: string): boolean {
+    return /cost|price|economic|cogs|bom/i.test(category)
+}
+
+// ─── Public API ─────────────────────────────────────────────────────────
+
+export interface DerivePatchesArgs {
+    /** Fang's saved review for this module. */
+    review: SpecialistReview
+    /** The module Fang reviewed — id + keyParts come from here. */
+    module: {
+        id: string
+        keyParts: string[]
+        budgetMassKg?: number | null
+        estimatedMassKg?: number | null
+    }
+}
+
+/**
+ * Walk Fang's review and emit a conservative SpecPatch[]. Returns an empty
+ * array on a `pass` verdict (Fang green-lit the module — no mutation).
+ *
+ * Per-issue extraction is independent: a single review can yield zero,
+ * one, or several patches. The applier deduplicates and rank-gates anyway,
+ * so emitting "best effort" extractions is safe.
+ *
+ * No throws — extraction failures fall through silently. The audit table
+ * sees the patches that DID land via apply-design-patches; nothing fancy
+ * is needed here.
+ */
+export function deriveFangPatches(args: DerivePatchesArgs): SpecPatch[] {
+    const { review, module } = args
+
+    // Gate 1: only mutate when verdict says something is wrong.
+    if (review.verdict !== "warn" && review.verdict !== "fail") return []
+
+    const patches: SpecPatch[] = []
+
+    for (const issue of review.issues) {
+        // Only critical issues drive automatic mutation. Warnings + info are
+        // surfaced in the review prose; the founder reviews them manually.
+        if (issue.severity !== "critical") continue
+
+        // ── 1. Mass patches (module + part) ──────────────────────────
+        if (isMassCategory(issue.category)) {
+            const extractedKg = extractMassKg(issue.suggestion, issue.message)
+            if (extractedKg !== null) {
+                // Reason text capped to 280 chars to keep audit rows lean
+                // (cad_lab_design_patches.reason is unbounded but the UI
+                // truncates anyway). Min 20 chars enforced by SpecPatchSchema.
+                const reasonRaw = `Fang ${issue.severity} mass finding: ${issue.message}${issue.suggestion ? ` — ${issue.suggestion}` : ""}`
+                const reason = reasonRaw.length > 280 ? reasonRaw.slice(0, 277) + "..." : reasonRaw
+
+                // module_spec massKg patch — applied_review_patch rank 90
+                // supersedes both Max (50) and BOM (70).
+                patches.push({
+                    scope: "module_spec",
+                    op: "replace",
+                    moduleId: module.id,
+                    specKey: "massKg",
+                    value: extractedKg,
+                    priorValue: module.estimatedMassKg ?? undefined,
+                    reason,
+                    source: "applied_review_patch",
+                })
+
+                // If a partNumber is referenced AND the issue is mass,
+                // also emit a part_mass patch (the part-level mass might
+                // be different from the module-level rollup; the applier
+                // rejects unknown partIds with REJECTED_UNKNOWN_PART so
+                // unmatched references silent-skip).
+                const partNumber = findReferencedPartNumber(
+                    `${issue.message} ${issue.suggestion ?? ""}`,
+                    module.keyParts,
+                )
+                if (partNumber) {
+                    patches.push({
+                        scope: "part_mass",
+                        op: "replace",
+                        partId: partNumber,
+                        value: extractedKg,
+                        reason,
+                        source: "applied_review_patch",
+                    })
+                }
+            }
+        }
+
+        // ── 2. Cost patches ──────────────────────────────────────────
+        if (isCostCategory(issue.category)) {
+            const extractedCost = extractUnitCostGbp(issue.suggestion, issue.message)
+            if (extractedCost !== null) {
+                const partNumber = findReferencedPartNumber(
+                    `${issue.message} ${issue.suggestion ?? ""}`,
+                    module.keyParts,
+                )
+                // Cost patches REQUIRE a referenced partNumber. Without it
+                // the applier rejects with REJECTED_UNKNOWN_PART (Block G
+                // bug #5 closure). Emitting one without a partId would
+                // count as a rejection in the audit table for no benefit.
+                if (partNumber) {
+                    const reasonRaw = `Fang ${issue.severity} cost finding: ${issue.message}${issue.suggestion ? ` — ${issue.suggestion}` : ""}`
+                    const reason = reasonRaw.length > 280 ? reasonRaw.slice(0, 277) + "..." : reasonRaw
+                    patches.push({
+                        scope: "part_cost",
+                        op: "replace",
+                        partId: partNumber,
+                        value: extractedCost,
+                        reason,
+                        source: "applied_review_patch",
+                    })
+                }
+            }
+        }
+    }
+
+    // ── 3. Recommendations (free-form) ───────────────────────────────
+    // Fang's `recommendations: string[]` is plain-text guidance. We
+    // extract patches from each recommendation string with the same
+    // gates: cost-keyword + £-figure + matched partNumber.
+    //
+    // This catches the canonical Block G example: a recommendation like
+    // "Specify Rittal AX 1200x800x400 cabinet (PC-001-PUR) for £18,000 —
+    // saves £127k vs bespoke design." emits a part_cost patch on PC-001-PUR
+    // → £18,000.
+    for (const rec of review.recommendations) {
+        if (typeof rec !== "string" || rec.length === 0) continue
+
+        // Skip recs that don't mention cost / mass — speeds up the loop
+        // and cuts false positives (a recommendation about tolerances
+        // shouldn't accidentally extract a £-figure from a CE-mark
+        // standard reference).
+        const isCostRec = /cost|price|£|gbp|cogs|saves|cheaper|expensive/i.test(rec)
+        const isMassRec = /mass|weight|kg\b|grams?\b/i.test(rec)
+        if (!isCostRec && !isMassRec) continue
+
+        const partNumber = findReferencedPartNumber(rec, module.keyParts)
+
+        if (isCostRec) {
+            const extractedCost = extractUnitCostGbp(rec)
+            if (extractedCost !== null && partNumber) {
+                const reasonRaw = `Fang recommendation: ${rec}`
+                const reason = reasonRaw.length > 280 ? reasonRaw.slice(0, 277) + "..." : reasonRaw
+                patches.push({
+                    scope: "part_cost",
+                    op: "replace",
+                    partId: partNumber,
+                    value: extractedCost,
+                    reason,
+                    source: "applied_review_patch",
+                })
+            }
+        }
+
+        if (isMassRec) {
+            const extractedMass = extractMassKg(rec)
+            if (extractedMass !== null && partNumber) {
+                const reasonRaw = `Fang recommendation: ${rec}`
+                const reason = reasonRaw.length > 280 ? reasonRaw.slice(0, 277) + "..." : reasonRaw
+                patches.push({
+                    scope: "part_mass",
+                    op: "replace",
+                    partId: partNumber,
+                    value: extractedMass,
+                    reason,
+                    source: "applied_review_patch",
+                })
+            }
+        }
+    }
+
+    return patches
+}
