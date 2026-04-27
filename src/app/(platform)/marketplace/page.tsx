@@ -23,6 +23,10 @@ import { ChevronRight } from 'lucide-react'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { getSupplierDirectoryStats } from '@/actions/suppliers'
+import {
+  getSuppliersDirectoryFacets,
+  getSuppliersDirectoryPage,
+} from '@/actions/suppliers-directory'
 import { SupplierSearchPanel } from './_components/SupplierSearchPanel'
 import { MarketplaceTabs } from './_components/MarketplaceTabs'
 import { typography } from '@/lib/design-system'
@@ -47,16 +51,19 @@ export default async function MarketplacePage() {
   let verifiedCount = 0
   let supplierStats: SupplierDirectoryStats | null = null
 
-  const [searchResult, statsResult, supplierStatsResult] = await Promise.allSettled([
-    searchMarketplaceListings({
-      categories: ['Products', 'Services'],
-      page: 1,
-      pageSize: 24,
-      sort: 'verified',
-    }),
-    getMarketplaceStats(),
-    getSupplierDirectoryStats(),
-  ])
+  const [searchResult, statsResult, supplierStatsResult, facetsResult, suppliersPageResult] =
+    await Promise.allSettled([
+      searchMarketplaceListings({
+        categories: ['Products', 'Services'],
+        page: 1,
+        pageSize: 24,
+        sort: 'verified',
+      }),
+      getMarketplaceStats(),
+      getSupplierDirectoryStats(),
+      getSuppliersDirectoryFacets(),
+      getSuppliersDirectoryPage({ page: 1, pageSize: 20 }),
+    ])
 
   if (searchResult.status === 'fulfilled') {
     listings = searchResult.value.data
@@ -130,6 +137,16 @@ export default async function MarketplacePage() {
           Phase B: Suppliers table with filters. Phase C: contact directory. */}
       <MarketplaceTabs
         totalSuppliers={totalCount}
+        suppliersFacets={
+          facetsResult.status === 'fulfilled'
+            ? facetsResult.value
+            : { countries: [], statuses: [] }
+        }
+        suppliersInitialPage={
+          suppliersPageResult.status === 'fulfilled'
+            ? suppliersPageResult.value
+            : { rows: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }
+        }
         overview={
           <SupplierSearchPanel
             initialListings={listings}

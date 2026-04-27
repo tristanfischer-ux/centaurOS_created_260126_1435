@@ -20,6 +20,11 @@
 import { useState, type ReactNode } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Building2, Users, LayoutGrid } from 'lucide-react'
+import { SuppliersTable } from './SuppliersTable'
+import type {
+  SuppliersDirectoryFacets,
+  SuppliersDirectoryPageResult,
+} from '@/actions/suppliers-directory'
 
 interface MarketplaceTabsProps {
   /** Total supplier count, used for the Suppliers tab badge. */
@@ -28,6 +33,9 @@ interface MarketplaceTabsProps {
   totalContacts?: number
   /** Overview tab content — existing SupplierSearchPanel + headline chips. */
   overview: ReactNode
+  /** Phase B: facets + first page of supplier rows for the Suppliers tab. */
+  suppliersFacets: SuppliersDirectoryFacets
+  suppliersInitialPage: SuppliersDirectoryPageResult
 }
 
 function fmtCount(n: number | undefined): string {
@@ -40,6 +48,8 @@ export function MarketplaceTabs({
   totalSuppliers,
   totalContacts,
   overview,
+  suppliersFacets,
+  suppliersInitialPage,
 }: MarketplaceTabsProps) {
   const [tab, setTab] = useState<'overview' | 'suppliers' | 'contacts'>('overview')
 
@@ -68,24 +78,9 @@ export function MarketplaceTabs({
         {overview}
       </TabsContent>
 
-      {/* ── Suppliers tab — Phase B placeholder ─────────────────────────── */}
+      {/* ── Suppliers tab — Phase B (table + filters + pagination) ──────── */}
       <TabsContent value="suppliers" className="mt-6">
-        <div className="rounded-xl bg-muted/30 p-10 text-center">
-          <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Building2 className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <h3 className="text-base font-semibold text-foreground mb-2">
-            Browse the full supplier directory
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-            A searchable table view of all {fmtCount(totalSuppliers)} suppliers with filters
-            for category, country, status and data-quality tier — same layout as the
-            Forge Capital dashboard. Lands next.
-          </p>
-          <p className="text-xs text-muted-foreground mt-4">
-            For now, use the <button onClick={() => setTab('overview')} className="underline text-international-orange hover:opacity-80">Overview tab</button> to search and surface matches.
-          </p>
-        </div>
+        <SuppliersTable facets={suppliersFacets} initialPage={suppliersInitialPage} />
       </TabsContent>
 
       {/* ── Contacts tab — Phase C placeholder ──────────────────────────── */}
