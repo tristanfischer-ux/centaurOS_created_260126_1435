@@ -2016,6 +2016,16 @@ function BomMasterPage({
     verdict: PdfInput["feasibilityVerdict"]
 }): React.ReactElement {
     const isRed = verdict?.status === "red"
+    // L14 (2026-04-27): count unpriced rows so the founder sees the
+    // BOM gap at a glance. HAPS Loop 13: PWA-001 to PWA-007 (Port wing
+    // primary structure) + PAY-002 (£185k SIGINT receiver, 48% of unit
+    // cost) all had cost = null. Section scored 2/10 because the BOM
+    // claims to be procurement-grade while a third of buy-rows have no
+    // price. Surface the gap explicitly so the customer prioritises
+    // pricing those rows before any RFQ work.
+    const unpricedBuyRows = parts.filter(
+        (p) => p.isPurchased && (p.estimatedUnitCostGbp == null || p.estimatedUnitCostGbp <= 0),
+    )
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>
@@ -2029,6 +2039,29 @@ function BomMasterPage({
                 source_module_id. The Suppliers column shows up to 3
                 candidate suppliers (full details in §7).
             </Text>
+            {unpricedBuyRows.length > 0 && (
+                <View
+                    style={{
+                        marginBottom: 8,
+                        padding: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#fef3c7",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#b45309",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7c2d12" }}>
+                        {unpricedBuyRows.length} purchased row{unpricedBuyRows.length === 1 ? "" : "s"} have no estimated unit cost
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 3 }}>
+                        Pricing was not produced for these rows by the cost specialist. The roll-ups (cover unit cost, cost waterfall) treat them as £0, which understates the bill-of-materials total. Highlighted rows below show "—" in the Cost column. Resolve before sending the document to a contract manufacturer or running unit-economics analysis.
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 4, fontStyle: "italic" }}>
+                        Affected part numbers: {unpricedBuyRows.slice(0, 8).map((p) => p.partNumber).join(", ")}
+                        {unpricedBuyRows.length > 8 ? ` and ${unpricedBuyRows.length - 8} more` : ""}.
+                    </Text>
+                </View>
+            )}
             {parts.length === 0 ? (
                 <Text style={styles.muted}>No parts generated yet.</Text>
             ) : (
