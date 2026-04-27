@@ -108,7 +108,7 @@ export default async function PublicInvestorsLayout({
                 <ZoomProvider>
                     <BrowseContextProvider>
                         <ScreenContextProvider>
-                            <div className="flex h-screen overflow-hidden gap-0">
+                            <div className="flex md:h-screen md:overflow-hidden gap-0">
                                 <CommandPalette />
                                 <KeyboardShortcutsDialog />
                                 <KeyboardShortcuts />
