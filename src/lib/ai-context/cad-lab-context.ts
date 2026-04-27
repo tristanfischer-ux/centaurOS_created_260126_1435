@@ -111,6 +111,19 @@ export interface CadLabReviewContext {
     diagnosticAnswers?: DiagnosticAnswers[string]
     /** Project subject (what they're building) */
     projectSubject: string
+    /**
+     * Real part numbers from the BOM (`parts.part_number`) for the module
+     * under review. Optional — when present (Fang reviews), surfaces machine-
+     * parseable part identifiers in the prompt so the specialist can reference
+     * them in suggestions / recommendations and the deterministic Fang patch
+     * extractor can match references to canonical_specs.parts entries.
+     *
+     * L16-G #11c (2026-04-27): closed the keyParts-vs-parts shape mismatch.
+     * `module.keyParts` is prose hints from Max's decomposition; the BOM
+     * generator owns `parts.part_number`. When Fang sees "PC-001" in this
+     * list, it can reference it verbatim and the patch extractor matches it.
+     */
+    bomPartNumbersForModule?: string[]
 }
 
 /**
@@ -268,7 +281,33 @@ Key reference data available:
         sections.push(focus)
     }
 
-    // 10. Response format
+    // 11. BOM part numbers for this module (Fang only — when available)
+    //
+    // L16-G #11c (2026-04-27): Loop 16 empirical observation showed Fang's
+    // saved reviews referenced "the avionics tray" and "the hub" in prose
+    // but never the real BOM part numbers (AV-001, AV-002, Hub-001 etc.).
+    // The deterministic patch extractor needs literal partNumber strings to
+    // route part_cost / part_mass patches to the correct row in
+    // canonical_specs.parts. Surfacing the BOM part numbers here lets Fang
+    // quote them verbatim in suggestions + recommendations, which the
+    // extractor's findReferencedPartNumber() then resolves.
+    if (ctx.bomPartNumbersForModule && ctx.bomPartNumbersForModule.length > 0) {
+        const partsList = ctx.bomPartNumbersForModule
+            .filter((p) => typeof p === "string" && p.length > 0)
+            .map((p) => `- \`${p}\``)
+            .join("\n")
+        if (partsList.length > 0) {
+            sections.push(`### BOM Part Numbers For This Module
+The following part numbers are the canonical identifiers used by the BOM and
+manufacturing systems. **When you reference a specific part in an issue or
+recommendation, use the exact part number from this list verbatim** so the
+finding can be routed to the right row in the bill of materials.
+
+${partsList}`)
+        }
+    }
+
+    // 12. Response format
     sections.push(`## Required Response Format
 You MUST structure your review as follows. Use these exact headers:
 
@@ -277,11 +316,45 @@ One-sentence summary of your overall assessment.
 
 ### Issues Found
 For each issue:
-- **[CRITICAL/WARNING/INFO] Category:** Description of the issue
+- **[CRITICAL/WARNING/INFO] [TAG] Category:** Description of the issue
   - *Suggestion:* How to fix it
 
+The TAG prefix is REQUIRED and MUST be EXACTLY one of:
+\`[Mass]\` \`[Cost]\` \`[Power]\` \`[Voltage]\` \`[Pressure]\`
+\`[Dimensions]\` \`[Thermal]\` \`[Compliance]\` \`[Sourcing]\` \`[Other]\`
+
+The tag tells downstream automation what KIND of finding this is. The free-text
+"Category" after the tag stays as today (e.g. "Hub Mass Budget", "Cabinet Cost").
+
+When the tag is \`[Mass]\` or \`[Cost]\` AND the suggestion proposes a specific
+part-level replacement, ALSO emit a single machine-readable line BELOW the
+suggestion in this exact form (one per finding, no quotes around values):
+
+\`[REPLACE_PART partId=PC-001 newCost=18000]\`
+or
+\`[REPLACE_PART partId=Hub-001 newMassKg=1.6]\`
+or both fields together:
+\`[REPLACE_PART partId=PC-001 newCost=18000 newMassKg=2.4]\`
+
+The \`partId\` MUST be a literal part number from the BOM Part Numbers list
+above (or, if no BOM list was provided, from \`module.keyParts\`). \`newCost\`
+is GBP per unit. \`newMassKg\` is kilograms per unit. Numerical values only —
+no units, no commas, no \`£\`.
+
+Examples:
+
+- **[CRITICAL] [Cost] Cabinet bespoke cost too high:** PC-001 priced at £145,000 — bespoke fabrication is unjustified for IP54 enclosure
+  - *Suggestion:* Specify Rittal AX 1200x800x400 standard cabinet for PC-001 at £18,000 (saves £127k)
+  - \`[REPLACE_PART partId=PC-001 newCost=18000]\`
+
+- **[WARNING] [Mass] Wing-Skin overweight:** Wing-Skin-001 mass 4.5 kg exceeds 2.0 kg target
+  - *Suggestion:* Switch from steel to aluminium 6061-T6 — Wing-Skin-001 should drop to 1.6 kg
+  - \`[REPLACE_PART partId=Wing-Skin-001 newMassKg=1.6]\`
+
 ### Recommendations
-Numbered list of actionable recommendations.
+Numbered list of actionable recommendations. When a recommendation proposes a
+specific part replacement with a numerical change, append the same
+\`[REPLACE_PART ...]\` tag on its own line.
 
 ### Calculations Performed
 For each tool you called, briefly note:
