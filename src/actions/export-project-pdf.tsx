@@ -2733,9 +2733,46 @@ function SuppliersPage({
                     visibleSuppliers={visibleSuppliers}
                 />
             )}
-            {visibleSuppliers.length === 0 && (
-                <Text style={styles.muted}>No suppliers shortlisted yet.</Text>
-            )}
+            {visibleSuppliers.length === 0 && (() => {
+                // L14 (2026-04-27): when the visible-suppliers list is
+                // empty after the L9-P4 phantom filter and the L13-P4
+                // empty-matched-parts filter, the cause is almost
+                // always supplier-directory coverage rather than an
+                // engine bug. HAPS Loop 13: 115 phantom rows dropped,
+                // leaving 0 verified — because the directory has no
+                // aerospace / high-altitude platform coverage. Render a
+                // diagnostic that explains the gap so the founder
+                // doesn't read "No suppliers shortlisted yet" and
+                // assume the engine failed.
+                const partCount = parts.length
+                const buyPartCount = parts.filter((p) => p.isPurchased).length
+                return (
+                    <View
+                        style={{
+                            marginTop: 8,
+                            marginBottom: 12,
+                            padding: 12,
+                            borderRadius: 4,
+                            backgroundColor: "#fef3c7",
+                            borderLeftWidth: 3,
+                            borderLeftColor: "#b45309",
+                        }}
+                    >
+                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#7c2d12" }}>
+                            Supplier-directory coverage gap
+                        </Text>
+                        <Text style={{ fontSize: 10, color: "#7c2d12", marginTop: 4 }}>
+                            The directory ({dirCount} companies) and marketplace listings ({listingCount} listings) returned no candidates that the matching pass could link to a specific bill-of-materials part for this project. The bill of materials has {partCount} part{partCount === 1 ? "" : "s"} ({buyPartCount} purchased).
+                        </Text>
+                        <Text style={{ fontSize: 9.5, color: "#7c2d12", marginTop: 6 }}>
+                            This is a directory-coverage gap, not an engine failure. Phantom matches (suppliers whose semantic similarity is high but who could not be linked to a specific part) are filtered out so the founder is not handed misleading procurement targets — the previous render of this report showed up to 115 phantoms. Until the directory carries supplier coverage for the product class, the engine cannot produce a credible shortlist.
+                        </Text>
+                        <Text style={{ fontSize: 9.5, color: "#7c2d12", marginTop: 6, fontStyle: "italic" }}>
+                            Action: enrich the directory with vetted suppliers in the project&apos;s primary categories, then re-run the supplier-match pass. The bill-of-materials master in §4 carries part numbers and process / material specifications that a procurement specialist can quote against directly.
+                        </Text>
+                    </View>
+                )
+            })()}
             {visibleSuppliers.map((s, i) => {
                 // L9-P4: visibleSuppliers is pre-filtered above for both
                 // hallucinated names and bad URLs — no per-row null
