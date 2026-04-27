@@ -1512,9 +1512,20 @@ function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactEleme
 function ModulePage({
     mod,
     index,
+    partsForModule,
 }: {
     mod: ModulePdf
     index: number
+    /**
+     * L9-FOLLOWUP (2026-04-27): BOM parts filtered by `sourceModuleName`
+     * for this module. When non-empty, the Cost breakdown table reads
+     * from these (the same source as the cover unit cost + BOM master
+     * after L9-P1) instead of Finn's coarse `mod.cost.parts`. Eliminates
+     * the Reconciliation R1 finding "Module-page cost total disagrees
+     * with BOM master" that fired on every Loop 9 PDF because the page
+     * showed Finn's £195/£195k while the cover showed BOM's £1,328/£647k.
+     */
+    partsForModule: PartRow[]
 }): React.ReactElement {
     return (
         <Page size="A4" style={styles.page} wrap>
@@ -1626,15 +1637,54 @@ function ModulePage({
             )}
 
             {/* Cost breakdown */}
-            {mod.cost && (
+            {(mod.cost || partsForModule.length > 0) && (
                 <View style={{ marginTop: 10 }}>
                     <Text style={styles.h5}>
                         Cost breakdown
-                        {mod.cost.confidence
-                            ? ` · ${mod.cost.confidence} confidence`
-                            : ""}
+                        {partsForModule.length > 0
+                            ? " · BOM-derived"
+                            : mod.cost?.confidence
+                                ? ` · ${mod.cost.confidence} confidence`
+                                : ""}
                     </Text>
-                    {mod.cost.parts && mod.cost.parts.length > 0 && (
+                    {/* L9-FOLLOWUP: prefer BOM parts table (canonical, matches
+                       cover + BOM master + reconciliation gate). Fall back to
+                       Finn's coarse breakdown only if BOM has no rows for this
+                       module — which itself is a bug worth flagging but better
+                       than rendering nothing. */}
+                    {partsForModule.length > 0 ? (
+                        <View style={styles.table}>
+                            <View style={styles.tableHead}>
+                                <Text style={[styles.tableHeadCell, { flex: 3 }]}>Part</Text>
+                                <Text style={[styles.tableHeadCell, { width: 40 }]}>Type</Text>
+                                <Text style={[styles.tableHeadCell, { flex: 1.5 }]}>Process / material</Text>
+                                <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Cost</Text>
+                            </View>
+                            {partsForModule.map((p, i) => (
+                                <View key={i} style={styles.tableRow}>
+                                    <Text style={[styles.tableCell, { flex: 3 }]}>
+                                        {p.partNumber ? `${p.partNumber} — ` : ""}{p.name}
+                                        {p.description ? (
+                                            <Text style={{ color: MUTED }}>{" — " + p.description}</Text>
+                                        ) : null}
+                                    </Text>
+                                    <Text style={[styles.tableCell, { width: 40 }]}>
+                                        {p.isPurchased ? "buy" : "make"}
+                                    </Text>
+                                    <Text style={[styles.tableCell, { flex: 1.5 }]}>
+                                        {!p.isPurchased
+                                            ? `${p.process ?? "—"}${p.material ? " · " + p.material : ""}`
+                                            : "—"}
+                                    </Text>
+                                    <Text
+                                        style={[styles.tableCell, { width: 60, textAlign: "right" }]}
+                                    >
+                                        {fmtGbp(p.estimatedUnitCostGbp)}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    ) : mod.cost?.parts && mod.cost.parts.length > 0 ? (
                         <View style={styles.table}>
                             <View style={styles.tableHead}>
                                 <Text style={[styles.tableHeadCell, { flex: 3 }]}>Part</Text>
@@ -1664,25 +1714,49 @@ function ModulePage({
                                 </View>
                             ))}
                         </View>
-                    )}
-                    {typeof mod.cost.labourCost === "number" && (
-                        <View style={[styles.row, { marginTop: 4 }]}>
-                            <Text style={styles.rowLabel}>Labour</Text>
-                            <Text style={styles.rowValue}>
-                                {fmtGbp(mod.cost.labourCost)}
-                                {mod.cost.labourReasoning ? ` — ${mod.cost.labourReasoning}` : ""}
-                            </Text>
-                        </View>
-                    )}
-                    {typeof mod.cost.totalPerUnit === "number" && (
-                        <View style={styles.row}>
-                            <Text style={styles.rowLabel}>Per-unit total</Text>
-                            <Text style={[styles.rowValue, { fontWeight: "bold" }]}>
-                                {fmtGbp(mod.cost.totalPerUnit)}
-                            </Text>
-                        </View>
-                    )}
-                    {mod.cost.assumptions && mod.cost.assumptions.length > 0 && (
+                    ) : null}
+                    {/* Labour: only when Finn provided it AND we're falling back
+                       to Finn's breakdown. Hide when BOM is the source — labour
+                       is rolled into per-row "make" costs in the BOM. */}
+                    {partsForModule.length === 0 &&
+                        typeof mod.cost?.labourCost === "number" && (
+                            <View style={[styles.row, { marginTop: 4 }]}>
+                                <Text style={styles.rowLabel}>Labour</Text>
+                                <Text style={styles.rowValue}>
+                                    {fmtGbp(mod.cost.labourCost)}
+                                    {mod.cost.labourReasoning ? ` — ${mod.cost.labourReasoning}` : ""}
+                                </Text>
+                            </View>
+                        )}
+                    {/* Per-unit total: parts roll-up when present, else Finn. */}
+                    {(() => {
+                        const partsTotal = partsForModule.reduce(
+                            (acc, p) =>
+                                acc +
+                                (typeof p.estimatedUnitCostGbp === "number"
+                                    ? p.estimatedUnitCostGbp
+                                    : 0),
+                            0,
+                        )
+                        const useParts = partsForModule.length > 0
+                        const total = useParts
+                            ? partsTotal
+                            : typeof mod.cost?.totalPerUnit === "number"
+                                ? mod.cost.totalPerUnit
+                                : null
+                        if (total === null) return null
+                        return (
+                            <View style={styles.row}>
+                                <Text style={styles.rowLabel}>
+                                    Per-unit total{useParts ? " · BOM-derived" : ""}
+                                </Text>
+                                <Text style={[styles.rowValue, { fontWeight: "bold" }]}>
+                                    {fmtGbp(total)}
+                                </Text>
+                            </View>
+                        )
+                    })()}
+                    {mod.cost?.assumptions && mod.cost.assumptions.length > 0 && (
                         <View style={{ marginTop: 4 }}>
                             <Text style={styles.h5}>Assumptions</Text>
                             {mod.cost.assumptions.map((a, i) => (
@@ -1693,7 +1767,7 @@ function ModulePage({
                             ))}
                         </View>
                     )}
-                    {mod.cost.reasoning && (
+                    {mod.cost?.reasoning && (
                         <Text style={[styles.muted, { fontSize: 9, marginTop: 4 }]}>
                             {mod.cost.reasoning}
                         </Text>
@@ -3396,7 +3470,17 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             )}
 
             {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_MODULES !== "1" && data.modules.map((m, i) => (
-                <ModulePage key={m.id} mod={m} index={i} />
+                <ModulePage
+                    key={m.id}
+                    mod={m}
+                    index={i}
+                    /* L9-FOLLOWUP: filter BOM parts to this module so the
+                       Cost breakdown table reads from the same source as
+                       cover unit cost + BOM master + reconciliation gate. */
+                    partsForModule={data.parts.filter(
+                        (p) => p.sourceModuleName === m.name,
+                    )}
+                />
             ))}
 
             {/* 4. BOM master — with per-row supplier candidates inline.
