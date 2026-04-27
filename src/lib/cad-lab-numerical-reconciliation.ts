@@ -141,15 +141,25 @@ export function reconcileNumerics(
     if (moduleCostFilled > 0 && input.bomTotalGbp != null) {
         const diff = pctDiff(moduleCostSum, input.bomTotalGbp)
         if (Math.abs(diff) > COST_TOLERANCE_PCT) {
+            // L14 (2026-04-27): re-label so the founder reads "the
+            // coarse estimate missed parts" rather than "two unreliable
+            // numbers". The gate compares Finn's per-module coarse total
+            // (a few cost lines per module) to the bill-of-materials
+            // generator's detailed parts table. Disagreement means
+            // either Finn missed parts or the BOM has rows Finn didn't
+            // cost — both are signals for the founder, not engine bugs.
             findings.push({
                 id: nextId(),
                 section: "Cost",
                 severity: "alert",
-                summary: `Module-page cost total disagrees with BOM master by ${diff.toFixed(1)}%`,
+                summary:
+                    diff > 0
+                        ? `Coarse cost-estimate (Finn) overshot the bill-of-materials detail by ${Math.abs(diff).toFixed(1)} percent — Finn likely double-counted parts the bill-of-materials generator deduplicated, or Finn's per-module reasoning included items not yet in the bill of materials.`
+                        : `Coarse cost-estimate (Finn) undershot the bill-of-materials detail by ${Math.abs(diff).toFixed(1)} percent — the bill-of-materials generator detailed parts that Finn's per-module estimate missed. The bill-of-materials master (§4) is the load-bearing source for procurement; the per-module coarse total below is illustrative.`,
                 detail: {
-                    sourceA: "Sum of module-page costs",
+                    sourceA: "Coarse per-module estimate (Finn)",
                     valueA: moduleCostSum,
-                    sourceB: "BOM master assembly cost total",
+                    sourceB: "Bill-of-materials master detail (canonical)",
                     valueB: input.bomTotalGbp,
                     pctDiff: diff,
                     unit: "GBP",
