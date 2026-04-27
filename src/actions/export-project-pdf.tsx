@@ -2240,6 +2240,66 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
                     )
                 })}
             </View>
+
+            {/* L14 (2026-04-27): make-vs-buy / purchased-vs-fabricated split.
+               Loop 13 score (Cost waterfall 4/10 Hedgerow, 2/10 HAPS): "the
+               waterfall does not show a breakdown of labour vs materials
+               vs overhead". This panel adds a make-vs-buy view that the
+               founder can use to identify procurement-leverage parts —
+               purchased rows are RFQ-able now, make rows need contract-
+               manufacturer engagement. Sourced from the bill-of-materials
+               parts table after L13-P2 dedup. */}
+            {(() => {
+                const bomDedup = dedupAssemblyRollUp(data.parts)
+                let buyTotal = 0
+                let makeTotal = 0
+                let buyCount = 0
+                let makeCount = 0
+                for (let i = 0; i < data.parts.length; i++) {
+                    const cost = bomDedup.effectiveCost[i]
+                    if (cost === 0) continue
+                    if (data.parts[i].isPurchased) {
+                        buyTotal += cost
+                        buyCount += 1
+                    } else {
+                        makeTotal += cost
+                        makeCount += 1
+                    }
+                }
+                const total = buyTotal + makeTotal
+                if (total === 0) return null
+                const buyPct = (buyTotal / total) * 100
+                const makePct = (makeTotal / total) * 100
+                return (
+                    <View style={{ marginTop: 16 }} wrap={false}>
+                        <Text style={styles.h3}>Make-versus-buy split</Text>
+                        <Text style={[styles.muted, { fontSize: 8.5, marginBottom: 6 }]}>
+                            Purchased rows are catalogue parts that can go to a request-for-quote today. Made rows are fabricated by a contract manufacturer and need design-for-manufacturing engagement before sourcing. Both totals derive from the same de-duplicated bill-of-materials as the per-module roll-up above.
+                        </Text>
+                        <View style={styles.table}>
+                            <View style={styles.tableHead}>
+                                <Text style={[styles.tableHeadCell, { flex: 3 }]}>Category</Text>
+                                <Text style={[styles.tableHeadCell, { width: 60, textAlign: "right" }]}>Rows</Text>
+                                <Text style={[styles.tableHeadCell, { width: 80, textAlign: "right" }]}>Cost</Text>
+                                <Text style={[styles.tableHeadCell, { width: 70, textAlign: "right" }]}>% of unit</Text>
+                            </View>
+                            <View style={styles.tableRow}>
+                                <Text style={[styles.tableCell, { flex: 3 }]}>Purchased (off-the-shelf, request-for-quote ready)</Text>
+                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{buyCount}</Text>
+                                <Text style={[styles.tableCell, { width: 80, textAlign: "right" }]}>{fmtGbp(buyTotal)}</Text>
+                                <Text style={[styles.tableCell, { width: 70, textAlign: "right" }]}>{buyPct.toFixed(1)}%</Text>
+                            </View>
+                            <View style={styles.tableRow}>
+                                <Text style={[styles.tableCell, { flex: 3 }]}>Make (fabricated by contract manufacturer)</Text>
+                                <Text style={[styles.tableCell, { width: 60, textAlign: "right" }]}>{makeCount}</Text>
+                                <Text style={[styles.tableCell, { width: 80, textAlign: "right" }]}>{fmtGbp(makeTotal)}</Text>
+                                <Text style={[styles.tableCell, { width: 70, textAlign: "right" }]}>{makePct.toFixed(1)}%</Text>
+                            </View>
+                        </View>
+                    </View>
+                )
+            })()}
+
             <PdfFooter label="Cost waterfall" />
         </Page>
     )
