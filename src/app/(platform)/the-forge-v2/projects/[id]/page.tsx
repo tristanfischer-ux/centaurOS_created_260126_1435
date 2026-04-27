@@ -39,7 +39,7 @@ import { loadBomRunStatus } from "@/actions/specialists/run-bom-generator"
 import { loadChaseRunStatus } from "@/actions/specialists/run-chase-research"
 import { loadFinnRunStatus } from "@/actions/specialists/run-finn-cost"
 import { loadBriefLockStatus } from "@/actions/brief-lock"
-import { tickAutopilotStage, loadAutopilotState } from "@/actions/forge-v2-autopilot"
+import { tickAutopilotStage } from "@/actions/forge-v2-autopilot"
 import { tickImageRenderChain } from "@/actions/forge-v2-render-all-modules"
 import { createClient } from "@/lib/supabase/server"
 
@@ -81,7 +81,14 @@ export default async function ForgeV2ProjectPage({
     // as the fallback for pre-autopilot drafts (older 3-step wizard) but
     // any project that has run through autopilot lands on the narrative
     // progress view.
-    const autopilotState = await loadAutopilotState(id)
+    //
+    // INTENT (2026-04-27 night, fix #15): read autopilotState from the
+    // already-loaded project (RLS-respecting; works for any foundry the
+    // user is a member of) rather than calling loadAutopilotState() which
+    // filters by active foundry only. The active-foundry filter caused
+    // the page to fall through to the legacy WorkspaceView for users with
+    // multi-foundry memberships even when they could see the project.
+    const autopilotState = project.autopilotState
     if (autopilotState) {
         try {
             await tickAutopilotStage(id)

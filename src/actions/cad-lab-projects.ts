@@ -220,6 +220,11 @@ export interface CadLabProjectData {
   /** UUID of the user who locked the brief (null while draft). */
   briefLockedBy: string | null
 
+  /** Autopilot pipeline state — same shape as listCadLabProjects.autopilotState.
+   *  Loaded via RLS-respecting select so any foundry-membership grants visibility,
+   *  unlike loadAutopilotState() which filters by active foundry only. */
+  autopilotState: CadLabProjectSummary["autopilotState"]
+
   createdAt: string
   updatedAt: string
 }
@@ -348,6 +353,8 @@ export async function loadCadLabProject(
           : null,
         briefLockedAt: (project.brief_locked_at as string | null) ?? null,
         briefLockedBy: (project.brief_locked_by as string | null) ?? null,
+        autopilotState:
+          ((project as { autopilot_state?: unknown }).autopilot_state as CadLabProjectSummary["autopilotState"]) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
