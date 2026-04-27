@@ -134,6 +134,16 @@ export interface ReviewRequest {
     diagnosticAnswers?: DiagnosticAnswers
     /** Project subject line */
     projectSubject: string
+    /**
+     * BOM part numbers for the module being reviewed (Fang only). Pre-loaded
+     * by run-fang-review so this action stays free of `parts` table queries.
+     * When supplied, surfaces in the review prompt and Fang is asked to
+     * reference them verbatim in suggestions + REPLACE_PART tags.
+     *
+     * L16-G #11c (2026-04-27): closes the keyParts-vs-parts shape mismatch
+     * (BLOCK-G-WIRING-HANDOVER.md observation 3).
+     */
+    bomPartNumbersForModule?: string[]
 }
 
 export type ReviewResult =
@@ -182,6 +192,7 @@ export async function requestSpecialistReview(
                 designBrief: req.designBrief,
                 diagnosticAnswers: req.diagnosticAnswers?.[req.moduleId],
                 projectSubject: req.projectSubject,
+                bomPartNumbersForModule: req.bomPartNumbersForModule,
             },
             req.specialistId,
         )
@@ -534,6 +545,7 @@ export async function quickSpecialistVerdict(
                 designBrief: req.designBrief,
                 diagnosticAnswers: req.diagnosticAnswers?.[req.moduleId],
                 projectSubject: req.projectSubject,
+                bomPartNumbersForModule: req.bomPartNumbersForModule,
             },
             req.specialistId,
         )

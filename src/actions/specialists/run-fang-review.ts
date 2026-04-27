@@ -307,6 +307,23 @@ async function runFangReviewInternal(
 
             const allModules: ReviewModuleInput[] = modules.map(toReviewModuleInput)
 
+            // L16-G #11c (2026-04-27): pre-load real BOM part numbers for
+            // this module so Fang sees the literal partNumber strings in
+            // the review prompt and can quote them verbatim in
+            // suggestions / [REPLACE_PART ...] tags. Without this, Fang
+            // writes about "the avionics tray" and the deterministic
+            // patch extractor has nothing to match against.
+            //
+            // Scoped to module — the parts table query is cheap (typical
+            // ~5-15 rows per module) and we already have admin client open.
+            // Fall back to project-scope if module_id column wasn't set on
+            // the parts row (legacy BOM rows).
+            const bomPartNumbersForModule = await loadBomPartNumbersForModule(
+                admin,
+                projectId,
+                moduleId,
+            )
+
             // 6. Invoke the existing specialist-review engine.
             const reviewResult = await requestSpecialistReview({
                 projectId,
@@ -316,6 +333,7 @@ async function runFangReviewInternal(
                 designBrief: designBrief ?? undefined,
                 diagnosticAnswers: diagnosticAnswers ?? undefined,
                 projectSubject,
+                bomPartNumbersForModule,
             }, trusted)
 
             if ("error" in reviewResult) {
@@ -466,6 +484,12 @@ async function runFangReviewInternal(
                                     ? (targetForPatches as { estimatedMassKg?: number })
                                           .estimatedMassKg
                                     : null,
+                            // L16-G #11c: literal BOM part numbers from the
+                            // parts table — the canonical_specs.parts keys
+                            // the applier checks against. keyParts (Max's
+                            // prose hints) is kept as a fallback for legacy
+                            // saved reviews.
+                            bomPartNumbers: bomPartNumbersForModule,
                         },
                     })
                     patchesEmitted = patches.length
@@ -1123,6 +1147,73 @@ function extractVerdictFromOutputRef(raw: unknown): SpecialistReview["verdict"] 
     const v = (raw as { verdict?: unknown }).verdict
     if (v === "pass" || v === "warn" || v === "fail") return v
     return null
+}
+
+/**
+ * Load the literal `parts.part_number` strings for a single module in a
+ * project. Used by L16-G #11c to inject the real BOM part numbers into
+ * Fang's review prompt and into the deterministic patch extractor.
+ *
+ * Scoped first by `module_id` (the canonical column once BOM-master writes
+ * it), falls back to project-scope when no module-scoped rows exist (legacy
+ * BOM rows that pre-date the module_id column being populated). Returns at
+ * most 50 part numbers — Fang has 1 module under review at a time and any
+ * project with more than 50 parts in one module has a different problem.
+ *
+ * Never throws — extraction failures fall through to an empty array. The
+ * review still runs without BOM injection, just without the structured
+ * partNumber boost.
+ */
+async function loadBomPartNumbersForModule(
+    admin: ReturnType<typeof createAdminClient>,
+    projectId: string,
+    moduleId: string,
+): Promise<string[]> {
+    try {
+        // Module-scoped first — preferred when BOM-master populated it.
+        const { data: scoped } = await admin
+            .from("parts")
+            .select("part_number")
+            .eq("cad_lab_project_id", projectId)
+            .eq("module_id", moduleId)
+            .order("part_number", { ascending: true })
+            .limit(50)
+        const scopedPartNumbers = (scoped ?? [])
+            .map((r) => (typeof r.part_number === "string" ? r.part_number : ""))
+            .filter((p) => p.length > 0)
+        if (scopedPartNumbers.length > 0) return scopedPartNumbers
+
+        // Fallback: source_module_id (older BOM writes).
+        const { data: srcScoped } = await admin
+            .from("parts")
+            .select("part_number")
+            .eq("cad_lab_project_id", projectId)
+            .eq("source_module_id", moduleId)
+            .order("part_number", { ascending: true })
+            .limit(50)
+        const srcPartNumbers = (srcScoped ?? [])
+            .map((r) => (typeof r.part_number === "string" ? r.part_number : ""))
+            .filter((p) => p.length > 0)
+        if (srcPartNumbers.length > 0) return srcPartNumbers
+
+        // Final fallback: all project parts (legacy rows with no module ref).
+        // Capped at 50 so a wide-BOM project doesn't bloat the prompt.
+        const { data: projectScoped } = await admin
+            .from("parts")
+            .select("part_number")
+            .eq("cad_lab_project_id", projectId)
+            .order("part_number", { ascending: true })
+            .limit(50)
+        return (projectScoped ?? [])
+            .map((r) => (typeof r.part_number === "string" ? r.part_number : ""))
+            .filter((p) => p.length > 0)
+    } catch (err) {
+        console.warn(
+            "[run-fang-review] loadBomPartNumbersForModule threw (non-fatal):",
+            err instanceof Error ? err.message : err,
+        )
+        return []
+    }
 }
 
 function mapDbStatusToChip(dbStatus: string): FangRunStatusChip {
