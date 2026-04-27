@@ -308,6 +308,81 @@ describe("deriveFangPatches — recommendations path", () => {
     })
 })
 
+describe("deriveFangPatches — reviewMarkdown CRITICAL block extraction", () => {
+    it("extracts mass patch from a CRITICAL block in reviewMarkdown when issues[] is empty", () => {
+        const md = [
+            "### VERDICT: WARN",
+            "",
+            "#### 🔴 CRITICAL — Hub Mass Budget Exceeded",
+            "",
+            "The aluminium hub is currently 4.2 kg per unit but the brief target is 1.6 kg. Hub-001 must be redesigned.",
+            "",
+            "#### 🟡 WARNING — Tolerance call-out missing",
+            "",
+            "Fold-line tolerance is unspecified.",
+        ].join("\n")
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "warn",
+                issues: [], // canonical Fang shape on 2026-04-27 — empty
+                reviewMarkdown: md,
+            }),
+            module: { id: "mod-1", keyParts: ["Hub-001"], estimatedMassKg: 4.2 },
+        })
+        const modulePatch = patches.find(
+            (p) => p.scope === "module_spec" && p.specKey === "massKg",
+        )
+        expect(modulePatch).toBeDefined()
+        // First mass figure encountered is 4.2 kg (the bespoke claim).
+        expect(modulePatch!.value).toBe(4.2)
+        const partPatch = patches.find((p) => p.scope === "part_mass")
+        expect(partPatch).toBeDefined()
+        expect(partPatch!.partId).toBe("Hub-001")
+    })
+
+    it("extracts cost patch from CRITICAL block referencing a partNumber + £", () => {
+        const md = [
+            "### VERDICT: FAIL",
+            "",
+            "#### 🔴 CRITICAL — Cabinet cost £145k vs catalogue £18,000",
+            "",
+            "PC-001-PUR is bespoke at £145,000. Specify Rittal AX 1200x800x400 (PC-001-PUR) for £18,000 — saves £127k.",
+        ].join("\n")
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                issues: [],
+                reviewMarkdown: md,
+            }),
+            module: { id: "mod-elec", keyParts: ["PC-001-PUR"] },
+        })
+        const costPatch = patches.find((p) => p.scope === "part_cost")
+        expect(costPatch).toBeDefined()
+        expect(costPatch!.partId).toBe("PC-001-PUR")
+        // min-selection across the block: 18000 wins over 145000 + 127000.
+        expect(costPatch!.value).toBe(18000)
+    })
+
+    it("processes up to 8 CRITICAL blocks per review (cap)", () => {
+        const blocks = Array.from({ length: 12 }, (_, i) =>
+            `#### 🔴 CRITICAL — Block ${i} mass\n\nPart-00${i} is 2.0 kg vs target 1.0 kg.`,
+        )
+        const md = blocks.join("\n\n")
+        const patches = deriveFangPatches({
+            review: review({
+                verdict: "fail",
+                issues: [],
+                reviewMarkdown: md,
+            }),
+            module: { id: "mod-1", keyParts: blocks.map((_, i) => `Part-00${i}`) },
+        })
+        // Cap is 8 blocks. Each emits up to 2 patches (module_spec + part_mass)
+        // → 16 max from this loop. Past block 8, no patches.
+        const partPatches = patches.filter((p) => p.scope === "part_mass")
+        expect(partPatches.length).toBeLessThanOrEqual(8)
+    })
+})
+
 describe("deriveFangPatches — schema compliance", () => {
     it("every emitted patch passes SpecPatchSchema validation", async () => {
         const { SpecPatchSchema } = await import("../spec-patch-types")

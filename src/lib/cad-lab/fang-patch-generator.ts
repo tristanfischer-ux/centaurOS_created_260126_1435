@@ -287,6 +287,106 @@ export function deriveFangPatches(args: DerivePatchesArgs): SpecPatch[] {
         }
     }
 
+    // ── 2b. reviewMarkdown CRITICAL block extraction ────────────────
+    //
+    // Empirical observation 2026-04-27: Fang's saved reviews have rich
+    // critical findings in `reviewMarkdown` ("#### 🔴 CRITICAL — Tyre
+    // Material: TPU Glass Transition Exceeded ..."), but the structured
+    // `issues[]` array is frequently empty. The model emits prose first
+    // and the structured-issue-extraction step seems to be a separate
+    // (unreliable) pass.
+    //
+    // To make this wiring useful TODAY, scan reviewMarkdown for sections
+    // that look like critical findings and extract mass / cost patches
+    // from them with the same pattern-based extractors used for
+    // issues[]. Conservative gates apply: a partNumber from keyParts
+    // must be referenced for cost patches, mass figures must be
+    // bounded, etc.
+    //
+    // The block delimiter is the heading marker — "#### 🔴 CRITICAL —"
+    // or "**🔴 CRITICAL**" or "#### CRITICAL —" — followed by everything
+    // up to the next "####" heading. We process up to a hard cap of
+    // 8 blocks per review to keep extraction time bounded.
+    if (typeof review.reviewMarkdown === "string" && review.reviewMarkdown.length > 0) {
+        const md = review.reviewMarkdown
+        // Split on heading markers. We use a global lookahead split via
+        // RegExp.exec rather than .split() so we can keep block content
+        // intact (split on newlines would break tables / code).
+        const headingRe = /(?:####|###)\s*(?:🔴\s*)?(?:\*\*)?CRITICAL(?:\*\*)?\s*[—–-]/g
+        const indices: number[] = []
+        let mm: RegExpExecArray | null
+        while ((mm = headingRe.exec(md)) !== null && indices.length < 16) {
+            indices.push(mm.index)
+        }
+        // Each block spans from indices[i] to indices[i+1] (or EOF).
+        const blocks: string[] = []
+        for (let i = 0; i < indices.length && i < 8; i++) {
+            const start = indices[i]
+            const end = i + 1 < indices.length ? indices[i + 1] : md.length
+            blocks.push(md.slice(start, end))
+        }
+
+        for (const block of blocks) {
+            // Determine block category from the heading line.
+            const headingLine = block.split("\n")[0] ?? ""
+            const isMassBlock = /mass|weight|tyre|hub.*\bkg\b|landing|propulsion.*mass/i.test(headingLine)
+            const isCostBlock = /cost|price|bom|cogs|£|GBP/i.test(headingLine)
+
+            const partNumber = findReferencedPartNumber(block, module.keyParts)
+
+            if (isMassBlock || isCostBlock || /mass|weight|kg\b|grams?\b|£|GBP|cost|price/i.test(block)) {
+                if (isCostBlock || /£|GBP|cost|price/i.test(block)) {
+                    const extractedCost = extractUnitCostGbp(block)
+                    if (extractedCost !== null && partNumber) {
+                        const reasonRaw = `Fang reviewMarkdown CRITICAL block: ${headingLine.trim()}`
+                        const reason = reasonRaw.length > 280 ? reasonRaw.slice(0, 277) + "..." : reasonRaw
+                        patches.push({
+                            scope: "part_cost",
+                            op: "replace",
+                            partId: partNumber,
+                            value: extractedCost,
+                            reason,
+                            source: "applied_review_patch",
+                        })
+                    }
+                }
+
+                if (isMassBlock || /mass|weight|kg\b|grams?\b/i.test(block)) {
+                    const extractedMass = extractMassKg(block)
+                    if (extractedMass !== null) {
+                        const reasonRaw = `Fang reviewMarkdown CRITICAL block: ${headingLine.trim()}`
+                        const reason = reasonRaw.length > 280 ? reasonRaw.slice(0, 277) + "..." : reasonRaw
+                        // Module-level mass patch only when the heading
+                        // strongly implies module mass (vs a tolerance
+                        // figure quoted inside a CRITICAL CFRP block, say).
+                        if (isMassBlock) {
+                            patches.push({
+                                scope: "module_spec",
+                                op: "replace",
+                                moduleId: module.id,
+                                specKey: "massKg",
+                                value: extractedMass,
+                                priorValue: module.estimatedMassKg ?? undefined,
+                                reason,
+                                source: "applied_review_patch",
+                            })
+                        }
+                        if (partNumber) {
+                            patches.push({
+                                scope: "part_mass",
+                                op: "replace",
+                                partId: partNumber,
+                                value: extractedMass,
+                                reason,
+                                source: "applied_review_patch",
+                            })
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ── 3. Recommendations (free-form) ───────────────────────────────
     // Fang's `recommendations: string[]` is plain-text guidance. We
     // extract patches from each recommendation string with the same
