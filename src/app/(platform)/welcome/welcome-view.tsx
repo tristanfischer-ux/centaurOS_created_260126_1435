@@ -50,17 +50,26 @@ const STAGE_OPTIONS = [
     "Growth",
 ] as const
 
-const SECTOR_OPTIONS = [
-    "Climate / energy",
-    "Medical device",
-    "AgTech",
-    "Aerospace / drones",
-    "Industrial / manufacturing",
-    "Consumer hardware",
-    "Robotics",
-    "Defence",
-    "Mobility",
-    "Other hardware",
+// {label, value} — value must match foundries.sector CHECK constraint:
+// aerospace | agriculture | automotive | construction | consumer_electronics |
+// defence | energy | food_processing | logistics | manufacturing | marine |
+// medical | mining | robotics | other.
+const SECTOR_OPTIONS: ReadonlyArray<{ label: string; value: string }> = [
+    { label: "Climate / energy",       value: "energy" },
+    { label: "Medical device",         value: "medical" },
+    { label: "AgTech",                 value: "agriculture" },
+    { label: "Food processing",        value: "food_processing" },
+    { label: "Aerospace / drones",     value: "aerospace" },
+    { label: "Defence",                value: "defence" },
+    { label: "Manufacturing",          value: "manufacturing" },
+    { label: "Consumer electronics",   value: "consumer_electronics" },
+    { label: "Robotics",               value: "robotics" },
+    { label: "Automotive / mobility",  value: "automotive" },
+    { label: "Construction",           value: "construction" },
+    { label: "Marine",                 value: "marine" },
+    { label: "Mining",                 value: "mining" },
+    { label: "Logistics",              value: "logistics" },
+    { label: "Other hardware",         value: "other" },
 ] as const
 
 export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewProps): React.ReactElement {
@@ -97,7 +106,8 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
             const result = await setFoundryQuickProfile({
                 stage: stage || null,
                 sector: sector || null,
-                industry: sector || null, // sector doubles as industry for now
+                industry: null, // industry column has its own enum/check; skip
+                                // — stage + sector are enough for matching.
             })
             if (result.success) {
                 setProfileSaved(true)
@@ -176,7 +186,7 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
                                         >
                                             <option value="">Pick sector…</option>
                                             {SECTOR_OPTIONS.map((s) => (
-                                                <option key={s} value={s}>{s}</option>
+                                                <option key={s.value} value={s.value}>{s.label}</option>
                                             ))}
                                         </select>
                                     </label>
