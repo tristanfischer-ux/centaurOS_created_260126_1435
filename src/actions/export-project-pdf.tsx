@@ -58,6 +58,7 @@ import { checkBomModuleConsistency } from "@/lib/bom/module-consistency"
 import { checkMirrorParity } from "@/lib/bom/mirror-parity"
 import { buildSpendSummary, SPEND_BY_SUPPLIER_CONSTANTS } from "@/lib/bom/spend-by-supplier"
 import { applyBomCostFallback } from "@/lib/cad-lab/bom-cost-fallback"
+import { promoteSupplierScore } from "@/lib/cad-lab/supplier-strong-fit-promotion"
 import {
     anyRiskMatrixIsBoilerplate,
     inferOwnerByDiscipline,
@@ -3031,6 +3032,34 @@ function SuppliersPage({
                 )
             })()}
             {visibleSuppliers.map((s, i) => {
+                // L15-P4: render-time STRONG-fit promotion. Council 7-of-8
+                // unanimous: live scorer treats lexical matching too weakly,
+                // and aerospace suppliers with AS9100 + composite capability
+                // were stuck at WEAK FIT (30-43) on HAPS Loop 14. The
+                // promotion adds +20 for regulated-industry cert match,
+                // +5-10 for capability keyword evidence, capped at +25 so
+                // it can lift a 35 to a 50-55 STRONG fit but cannot lift a
+                // 25 phantom into the shortlist.
+                const matchedPartDescs = (s.matchedPartNumbers ?? []).map((pn) => {
+                    const part = parts.find((p) => p.partNumber === pn)
+                    return part ? `${part.name} ${part.description ?? ""}` : pn
+                })
+                const promotion = promoteSupplierScore({
+                    matchScore: s.matchScore,
+                    certifications: s.certifications,
+                    description: s.description,
+                    capabilityText: [
+                        // process_capabilities + subcategory + specialties get
+                        // surfaced in the supplier description in the live data
+                        // path (see cad-lab-supplier-match.ts). We don't have
+                        // direct access to the raw arrays here so the
+                        // description acts as the corpus.
+                        s.description ?? "",
+                    ].join(" "),
+                    matchedPartNumbers: s.matchedPartNumbers ?? [],
+                    matchedPartDescriptions: matchedPartDescs,
+                })
+                const effectiveMatchScore = promotion.promotedScore ?? s.matchScore
                 // L9-P4: visibleSuppliers is pre-filtered above for both
                 // hallucinated names and bad URLs — no per-row null
                 // returns needed here.
@@ -3132,8 +3161,11 @@ function SuppliersPage({
                                 Matched against {s.moduleNames.length} module
                                 {s.moduleNames.length === 1 ? "" : "s"}:{" "}
                                 {s.moduleNames.join(", ")}
-                                {typeof s.matchScore === "number"
-                                    ? ` · match score ${s.matchScore.toFixed(1)}/100`
+                                {typeof effectiveMatchScore === "number"
+                                    ? ` · match score ${effectiveMatchScore.toFixed(1)}/100`
+                                    : ""}
+                                {promotion.boost > 0 && typeof s.matchScore === "number"
+                                    ? ` (live ${s.matchScore.toFixed(1)} + ${promotion.boost} promotion)`
                                     : ""}
                                 {/* Loop 8 score-distribution audit (2026-04-26):
                                  * across 408 shortlisted matches, only 1 (0.2%)
@@ -3145,15 +3177,20 @@ function SuppliersPage({
                                  *   ≥30  Weak fit — directory gap
                                  *   <30  Below noise floor (filtered upstream
                                  *        but legacy rows surface here too) */}
-                                {typeof s.matchScore === "number"
-                                    ? s.matchScore >= 50
+                                {typeof effectiveMatchScore === "number"
+                                    ? effectiveMatchScore >= 50
                                         ? ` · STRONG FIT (top 1% of directory)`
-                                        : s.matchScore >= 40
+                                        : effectiveMatchScore >= 40
                                             ? ` · PLAUSIBLE FIT (top 5% of directory)`
-                                            : s.matchScore >= 30
+                                            : effectiveMatchScore >= 30
                                                 ? ` · WEAK FIT — directory gap, scout other vendors`
                                                 : ` · BELOW NOISE FLOOR — directory has no real coverage for this part class`
                                     : ""}
+                            </Text>
+                        )}
+                        {promotion.boost > 0 && promotion.reasons.length > 0 && (
+                            <Text style={[styles.small, { marginTop: 2, fontStyle: "italic", color: MUTED }]}>
+                                Promotion reasons: {promotion.reasons.join(" · ")}
                             </Text>
                         )}
                         {s.matchReasons.length > 0 && (
