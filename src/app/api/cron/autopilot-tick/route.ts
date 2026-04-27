@@ -273,7 +273,17 @@ async function tickOnce(request: Request): Promise<TickResult> {
 
         if (trackingRow?.status === "running") {
             const age = Date.now() - new Date(trackingRow.started_at).getTime()
-            if (age < STALE_RUNNING_MS) {
+            // L9-FANG-STALE (2026-04-27): per-stage threshold override.
+            // running_fang_reviews fanout takes 12-24min on 8-module
+            // projects; the 9-min default fires STALE_ABANDONED mid-fanout
+            // and refires runFangReviewsForAllModules, burning Sonnet
+            // credits on still-running modules. Stage-specific overrides
+            // give honest fanouts headroom.
+            const stageStaleMs =
+                config.kind === "fire" && typeof config.staleMsOverride === "number"
+                    ? config.staleMsOverride
+                    : STALE_RUNNING_MS
+            if (age < stageStaleMs) {
                 details.push({
                     projectId: project.id,
                     stage,
@@ -290,7 +300,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 .update({
                     status: "failed",
                     error_code: "STALE_ABANDONED",
-                    error_message: `Tracking row stale (${Math.round(age / 1000)}s > ${STALE_RUNNING_MS / 1000}s threshold)`,
+                    error_message: `Tracking row stale (${Math.round(age / 1000)}s > ${Math.round(stageStaleMs / 1000)}s threshold)`,
                     finished_at: new Date().toISOString(),
                 } as never)
                 .eq("id", trackingRow.id)

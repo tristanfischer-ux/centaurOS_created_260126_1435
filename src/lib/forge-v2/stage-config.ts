@@ -60,6 +60,23 @@ export type FireStageConfig = {
     nextStage: AutopilotStage | "done"
     /** How many retries before terminal-failing. */
     maxAttempts: number
+    /**
+     * L9-FANG-STALE (2026-04-27): per-stage override for the cron's
+     * stale-tracking-row threshold. The default `STALE_RUNNING_MS` is
+     * tuned for single-call stages (~3-9 min). Fanout stages —
+     * specifically `running_fang_reviews` with parallelism cap 2 across
+     * 8 modules — take 12-24 min wall-clock when the fanout is honest.
+     *
+     * When omitted, falls back to the global `STALE_RUNNING_MS`.
+     *
+     * Without this override, the cron marks the autopilot tracker
+     * STALE_ABANDONED at 9 min mid-fanout, refires
+     * `runFangReviewsForAllModules`, and burns Sonnet credits on the
+     * still-running modules. Verified on Hedgerow 2026-04-27 — 5
+     * sequential retries × ~£0.10 each = ~£0.50 wasted per project per
+     * regen, on top of the legitimate fanout cost.
+     */
+    staleMsOverride?: number
 }
 
 export type StageConfig = SynchronousStageConfig | FireStageConfig
@@ -138,6 +155,13 @@ export const STAGE_CONFIG: Record<
         // First 2 retries give the partial-success path room to backfill
         // failed modules; further retries cover transient Anthropic 429s.
         maxAttempts: 5,
+        // L9-FANG-STALE: 8 modules @ parallelism 2 × 3 min/module = 12 min
+        // wall-clock minimum. 9-min default triggered STALE_ABANDONED
+        // mid-fanout on every Hedgerow run, refired runFangReviewsForAllModules
+        // 5 times, burned Sonnet credits on still-running modules. Bump to
+        // 25 min to give honest fanouts headroom; the cron still detects
+        // genuinely-dead trackers, just later.
+        staleMsOverride: 25 * 60 * 1000,
     },
     proofreading: {
         kind: "fire",
