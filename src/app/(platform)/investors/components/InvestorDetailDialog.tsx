@@ -347,12 +347,33 @@ function InvestorMainView({
       {/* News Intelligence section — live web-searched data */}
       <InvestorIntelSection firmId={firm.id} />
 
-      <TextSection title="Thesis" content={attrs.investment_thesis} />
+      {/* Forge Capital order — Tristan 2026-04-27: Investment Thesis →
+          Ideal Company Profile → Investment Pattern → Team Expertise →
+          Connection Brief → Value Add. Then Fund Details, Partners,
+          Portfolio (rendered below). Data Quality intentionally omitted —
+          it is an internal field and not appropriate for the external view. */}
+      <TextSection title="Investment Thesis" content={attrs.investment_thesis} />
+      <TextSection title="Ideal Company Profile" content={attrs.ideal_company_profile} />
       <TextSection title="Investment Pattern" content={attrs.investment_pattern} />
       <TextSection title="Team Expertise" content={attrs.team_expertise} />
       <TextSection title="Connection Brief" content={attrs.connection_brief} />
       <TextSection title="Value Add" content={attrs.value_add} />
-      <TextSection title="Ideal Company Profile" content={attrs.ideal_company_profile} />
+
+      {/* Fund Details — moved here per Forge Capital order: between Value Add
+          and Partners. */}
+      {(fundSizeLabel || chequeLabel || stages.length > 0 || sectors.length > 0 || geoFocus.length > 0 || attrs.firm_type) && (
+        <div>
+          <SectionHeading>Fund Details</SectionHeading>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {stages.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Stage Focus:</span> <span className="font-medium">{stages.join(', ')}</span></div>}
+            {sectors.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Sectors:</span> <span className="font-medium">{sectors.join(', ')}</span></div>}
+            {geoFocus.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Geography:</span> <span className="font-medium">{geoFocus.join(', ')}</span></div>}
+            {chequeLabel && <div><span className="text-muted-foreground">Cheque Size:</span> <span className="font-medium">{chequeLabel}</span></div>}
+            {fundSizeLabel && <div><span className="text-muted-foreground">Fund Size:</span> <span className="font-medium">{fundSizeLabel}</span></div>}
+            {attrs.firm_type && <div><span className="text-muted-foreground">Entity Type:</span> <span className="font-medium">{attrs.firm_type}</span></div>}
+          </div>
+        </div>
+      )}
 
       {/* Partners — clickable for drill-down */}
       {contacts.length > 0 && (
@@ -401,21 +422,6 @@ function InvestorMainView({
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {/* Fund Details */}
-      {(fundSizeLabel || chequeLabel || stages.length > 0 || sectors.length > 0 || geoFocus.length > 0 || attrs.firm_type) && (
-        <div>
-          <SectionHeading>Fund Details</SectionHeading>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {fundSizeLabel && <div><span className="text-muted-foreground">Size:</span> <span className="font-medium">{fundSizeLabel}</span></div>}
-            {chequeLabel && <div><span className="text-muted-foreground">Cheque Size:</span> <span className="font-medium">{chequeLabel}</span></div>}
-            {stages.length > 0 && <div><span className="text-muted-foreground">Stage:</span> <span className="font-medium">{stages.join(', ')}</span></div>}
-            {sectors.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Sectors:</span> <span className="font-medium">{sectors.join(', ')}</span></div>}
-            {geoFocus.length > 0 && <div><span className="text-muted-foreground">Geography:</span> <span className="font-medium">{geoFocus.join(', ')}</span></div>}
-            {attrs.firm_type && <div><span className="text-muted-foreground">Entity Type:</span> <span className="font-medium">{attrs.firm_type}</span></div>}
-          </div>
         </div>
       )}
 

@@ -694,7 +694,10 @@ function MatchCard({
   const stageFocusArr = attrs.stage_focus ?? []
   const stageStr = stageFocusArr.slice(0, 2).join(' / ') || null
 
-  const thesis  = attrs.investment_thesis ?? firm.description ?? null
+  // Lead with ideal_company_profile (per Forge Capital structure) — falls back
+  // to investment_thesis then description. Tristan 2026-04-27: ICP is the
+  // single most useful thing for a founder reading a search-result card.
+  const thesis  = attrs.ideal_company_profile ?? attrs.investment_thesis ?? firm.description ?? null
   const sectors = attrs.sectors ?? []
 
   // Why-fit / how-to-pitch — expand state

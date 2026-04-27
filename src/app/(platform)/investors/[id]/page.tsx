@@ -541,22 +541,9 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Value-Add */}
-            {attrs.value_add && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-muted-foreground" />
-                    Value-Add
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Investment Pattern (professional+) */}
+            {/* Investment Pattern (professional+) — moved up per Forge Capital
+                order: Investment Thesis → Ideal Company Profile → Investment
+                Pattern → Team Expertise → Connection Brief → Value Add. */}
             {access.intelligenceAccess && attrs.investment_pattern ? (
               <Card>
                 <CardHeader>
@@ -623,6 +610,22 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               >
                 <div className="h-16 bg-muted/50 rounded" />
               </LockedSection>
+            )}
+
+            {/* Value-Add — moved here after Connection Brief per Forge Capital
+                order. */}
+            {attrs.value_add && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground" />
+                    Value-Add
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
+                </CardContent>
+              </Card>
             )}
 
             {/* Synthesis Dossier (professional+) */}
@@ -839,61 +842,20 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            {/* Data Freshness */}
-            {(attrs.data_quality_score != null || attrs.last_synced || attrs.last_verified || attrs.data_source) && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Database className="h-4 w-4 text-muted-foreground" />
-                    Data Freshness
-                  </h2>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {attrs.data_quality_score != null && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Quality Score</p>
-                        <p className="text-sm font-semibold text-foreground">{Number(attrs.data_quality_score).toFixed(1)}/10</p>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                        {/* Visual bar representing quality score */}
-                        <div
-                          className={`h-full rounded-full ${
-                            attrs.data_quality_score >= 8
-                              ? 'bg-success'
-                              : attrs.data_quality_score >= 6
-                              ? 'bg-warning'
-                              : 'bg-destructive'
-                          }`}
-                          style={{ width: `${(attrs.data_quality_score / 10) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {attrs.last_verified && !isNaN(new Date(attrs.last_verified).getTime()) && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Last Verified</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(attrs.last_verified).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                  )}
-                  {attrs.last_synced && !isNaN(new Date(attrs.last_synced).getTime()) && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Last Synced</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(attrs.last_synced).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                  )}
-                  {attrs.data_source && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Data Source</p>
-                      <p className="text-sm text-foreground capitalize">{attrs.data_source.replace(/_/g, ' ')}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {/* Verification footer — Tristan 2026-04-27: skip Data Quality
+                (quality_score, data_source) — internal-only fields. Keep the
+                website-verified + intel-synthesised dates per Forge Capital
+                external view. */}
+            {(attrs.last_synced || attrs.last_verified) && (
+              <div className="text-xs text-muted-foreground border-t border-border pt-3 mt-2">
+                {attrs.last_verified && !isNaN(new Date(attrs.last_verified).getTime()) && (
+                  <span>Website verified: {new Date(attrs.last_verified).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                )}
+                {attrs.last_verified && attrs.last_synced && <span> · </span>}
+                {attrs.last_synced && !isNaN(new Date(attrs.last_synced).getTime()) && (
+                  <span>Intel synthesised: {new Date(attrs.last_synced).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                )}
+              </div>
             )}
 
             {/* Outreach status */}
