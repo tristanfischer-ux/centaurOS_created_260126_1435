@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   getInvestorById,
+  computeMatchScores,
   getInvestorContacts,
   getSimilarInvestors,
   getCoInvestors,
@@ -221,7 +222,13 @@ function FreeUpgradeOverlay({ firmName, firmType, hqCity }: {
 
 export default async function InvestorDetailPage({ params }: PageProps) {
   const { id } = await params
-  const { firm, access, gated, viewCapHit, viewCap } = await getInvestorById(id)
+  const [{ firm, access, gated, viewCapHit, viewCap }, matchScoresMap] = await Promise.all([
+    getInvestorById(id),
+    // computeMatchScores returns {} when no foundry profile — Scorecard
+    // renders only when pillars come back. Tristan 2026-04-27.
+    computeMatchScores([id]).catch(() => ({} as Awaited<ReturnType<typeof computeMatchScores>>)),
+  ])
+  const matchResult = matchScoresMap[id]
 
   if (!firm) {
     notFound()
@@ -432,6 +439,65 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 )}
               </CardContent>
             </Card>
+
+            {/* Match Scorecard — Forge Capital 6-pillar breakdown of how
+                this investor matches the foundry's profile. Renders only
+                when match data is available (foundry profile exists). */}
+            {matchResult && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                    Match Scorecard
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+                    {(['thesis', 'stage', 'geo', 'cheque', 'activity', 'confidence'] as const).map((key) => {
+                      const value = matchResult.pillars[key]
+                      const isNA = value == null
+                      let fillColor = '#d1d5db'
+                      if (!isNA) {
+                        if (value >= 70) fillColor = '#16a34a'
+                        else if (value >= 40) fillColor = '#f59e0b'
+                        else fillColor = '#dc2626'
+                      }
+                      return (
+                        <div key={key} className="text-center">
+                          <div
+                            className="font-medium uppercase mb-1 truncate"
+                            style={{ fontSize: '9px', color: 'hsl(var(--muted-foreground))', letterSpacing: '0.3px' }}
+                          >
+                            {key}
+                          </div>
+                          <div
+                            className="w-full overflow-hidden"
+                            style={{ height: '5px', borderRadius: '3px', background: '#e5e7eb' }}
+                          >
+                            {!isNA && (
+                              <div
+                                style={{
+                                  height: '100%',
+                                  borderRadius: '3px',
+                                  width: `${Math.min(100, Math.max(0, value))}%`,
+                                  background: fillColor,
+                                }}
+                              />
+                            )}
+                          </div>
+                          <div
+                            className="font-semibold mt-0.5 tabular-nums"
+                            style={{ fontSize: '10px', color: isNA ? '#9ca3af' : 'hsl(var(--foreground))' }}
+                          >
+                            {isNA ? 'N/A' : value}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Investment Thesis — Prominent section */}
             {attrs.investment_thesis && (
