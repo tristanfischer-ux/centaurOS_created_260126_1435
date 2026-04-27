@@ -55,6 +55,7 @@ import {
 } from "@/lib/supplier-verification"
 import { dedupAssemblyRollUp } from "@/lib/bom/assembly-dedup"
 import { checkBomModuleConsistency } from "@/lib/bom/module-consistency"
+import { checkMirrorParity } from "@/lib/bom/mirror-parity"
 import { buildSpendSummary, SPEND_BY_SUPPLIER_CONSTANTS } from "@/lib/bom/spend-by-supplier"
 import {
     anyRiskMatrixIsBoilerplate,
@@ -4868,7 +4869,23 @@ async function exportProjectPdfInternal(
                         })),
                     )
 
-                    if (moduleConsistencyFindings.length === 0) {
+                    // L14-P1 (2026-04-27): mirror-assembly cost / mass
+                    // parity. HAPS Loop 13: Port Wing £895 vs Starboard
+                    // Wing £12,065 (13×) was never flagged because the
+                    // cost waterfall sums each module independently.
+                    const mirrorFindings = checkMirrorParity(
+                        modules.map((m) => ({
+                            name: m.name,
+                            massKg: m.massKg ?? null,
+                        })),
+                        parts.map((p) => ({
+                            sourceModuleName: p.sourceModuleName,
+                            estimatedUnitCostGbp: p.estimatedUnitCostGbp,
+                            massKg: p.massKg,
+                        })),
+                    )
+
+                    if (moduleConsistencyFindings.length === 0 && mirrorFindings.length === 0) {
                         return baseReconciliation
                     }
 
@@ -4876,7 +4893,7 @@ async function exportProjectPdfInternal(
                     // result so the existing Reconciliation page renders
                     // them, the cover banner counts them, and the
                     // hasAlerts flag fires the red treatment.
-                    const extraFindings = moduleConsistencyFindings.map((f, i) => ({
+                    const specExtras = moduleConsistencyFindings.map((f, i) => ({
                         id: `spec-${i}`,
                         section: "Spec" as const,
                         severity: "alert" as const,
@@ -4891,6 +4908,23 @@ async function exportProjectPdfInternal(
                         },
                     }))
 
+                    const mirrorExtras = mirrorFindings.map((f, i) => ({
+                        id: `mirror-${i}`,
+                        section: "Mirror" as const,
+                        severity: "alert" as const,
+                        summary: f.summary,
+                        detail: {
+                            sourceA: f.aName,
+                            valueA: f.aCostGbp,
+                            sourceB: f.bName,
+                            valueB: f.bCostGbp,
+                            pctDiff: f.costDiffPct,
+                            unit: "GBP",
+                        },
+                    }))
+
+                    const extraFindings = [...specExtras, ...mirrorExtras]
+
                     const merged = baseReconciliation
                         ? {
                               ...baseReconciliation,
@@ -4898,14 +4932,28 @@ async function exportProjectPdfInternal(
                               hasAlerts: true,
                               coverBanner: (() => {
                                   const baseCount = baseReconciliation.findings.length
-                                  const totalCount = baseCount + extraFindings.length
-                                  return `Internal numerical inconsistency detected — ${totalCount} value${totalCount === 1 ? "" : "s"} disagree across sections (${extraFindings.length} bill-of-materials versus module-description). See Reconciliation page.`
+                                  const specCount = specExtras.length
+                                  const mirrorCount = mirrorExtras.length
+                                  const totalCount = baseCount + specCount + mirrorCount
+                                  const parts: string[] = []
+                                  if (specCount > 0) parts.push(`${specCount} bill-of-materials versus module-description`)
+                                  if (mirrorCount > 0) parts.push(`${mirrorCount} mirror-assembly cost / mass parity`)
+                                  const detail = parts.length > 0 ? ` (${parts.join(", ")})` : ""
+                                  return `Internal numerical inconsistency detected — ${totalCount} value${totalCount === 1 ? "" : "s"} disagree across sections${detail}. See Reconciliation page.`
                               })(),
                           }
                         : {
                               findings: extraFindings,
                               hasAlerts: true,
-                              coverBanner: `Internal numerical inconsistency detected — ${extraFindings.length} bill-of-materials value${extraFindings.length === 1 ? "" : "s"} disagree with module descriptions. See Reconciliation page.`,
+                              coverBanner: (() => {
+                                  const specCount = specExtras.length
+                                  const mirrorCount = mirrorExtras.length
+                                  const total = specCount + mirrorCount
+                                  const parts: string[] = []
+                                  if (specCount > 0) parts.push(`${specCount} bill-of-materials versus module-description`)
+                                  if (mirrorCount > 0) parts.push(`${mirrorCount} mirror-assembly cost / mass parity`)
+                                  return `Internal numerical inconsistency detected — ${total} value${total === 1 ? "" : "s"} (${parts.join(", ")}). See Reconciliation page.`
+                              })(),
                           }
                     return merged
                 } catch (err) {
