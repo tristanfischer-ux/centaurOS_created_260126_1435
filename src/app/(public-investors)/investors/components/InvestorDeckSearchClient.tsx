@@ -16,7 +16,7 @@
 
 'use client'
 
-import { useState, useCallback, useTransition, useRef } from 'react'
+import { useState, useCallback, useTransition, useRef, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -73,6 +73,28 @@ interface Props {
 const PAID_TIERS = new Set(['seed', 'starter', 'professional', 'enterprise'])
 /** Free tier sees 5 results before the paywall. */
 const FREE_VISIBLE = 5
+
+/**
+ * Forge Capital top-matches pagination — `Forge-Capital-Search.html` uses 8
+ * per page. Tristan 2026-04-27: porting the "← Prev / Page N of M / Next →"
+ * pattern verbatim, plus the 35-50% Near-Misses bucket and the Advisory
+ * Intelligence section below the top matches.
+ */
+const TOP_PER_PAGE = 8
+
+/** Top-matches threshold mirrors `Forge-Capital-Search.html` line 695:
+ *  composite ≥ 50 = "strong match", 35-50 = "near miss". */
+const TOP_MATCH_COMPOSITE_FLOOR = 50
+const NEAR_MISS_COMPOSITE_FLOOR = 35
+
+const NEAR_MISS_GROUP_LABELS = {
+  'Stage Mismatch':       'These investors match your thesis but invest at a different stage.',
+  'Geography Gap':        "Strong thesis match, but their geographic focus doesn't include your region.",
+  'Cheque Size Mismatch': "Good alignment on thesis and stage, but their typical cheque size differs from what you're seeking.",
+  'Thesis Alignment':     'Partial thesis overlap — they invest in adjacent sectors or related technologies.',
+} as const
+
+type NearMissGroupKey = keyof typeof NEAR_MISS_GROUP_LABELS
 
 const EXAMPLE_CHIPS = [
   'Try: "Climate tech hardware, Seed, UK"',
@@ -162,6 +184,10 @@ export function InvestorDeckSearchClient({
   const [searchFailureMessage, setSearchFailureMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Forge Capital top-matches pagination state. Resets to page 0 on every
+  // new search so the founder always sees their best matches first.
+  const [topPage, setTopPage] = useState(0)
 
   const isPaid = PAID_TIERS.has(tier)
   const isFree = tier === 'free'
@@ -276,9 +302,165 @@ export function InvestorDeckSearchClient({
 
   // ── Visible cards logic ───────────────────────────────────────────────────
 
-  const visibleFirms = isPaid ? firms : firms.slice(0, FREE_VISIBLE)
-  const lockedFirms = isPaid ? [] : firms.slice(FREE_VISIBLE, FREE_VISIBLE + 2)
-  const hiddenCount = isPaid ? 0 : Math.max(0, total - FREE_VISIBLE)
+  // Forge Capital partition: composite ≥ 50 = "top match", 35-50 = "near miss",
+  // < 35 dropped. `_fcComposite` is set server-side by searchInvestors when the
+  // semantic path runs. Firms without it (keyword fallback, no query) all
+  // bucket as top-matches so the UX doesn't break.
+  const partitioned = useMemo(() => {
+    const top: InvestorFirm[] = []
+    const nearMiss: InvestorFirm[] = []
+    for (const f of firms) {
+      const c = f.attributes._fcComposite
+      if (c == null) {
+        top.push(f)
+        continue
+      }
+      if (c >= TOP_MATCH_COMPOSITE_FLOOR) top.push(f)
+      else if (c >= NEAR_MISS_COMPOSITE_FLOOR) nearMiss.push(f)
+    }
+    return { top, nearMiss }
+  }, [firms])
+
+  // Free tier still shows the first 5 + paywall on top matches; pagination
+  // and Near Misses + Advisory only render for paid tiers.
+  const visibleFirms = isPaid ? partitioned.top : partitioned.top.slice(0, FREE_VISIBLE)
+  const lockedFirms = isPaid ? [] : partitioned.top.slice(FREE_VISIBLE, FREE_VISIBLE + 2)
+  const hiddenCount = isPaid ? 0 : Math.max(0, partitioned.top.length - FREE_VISIBLE)
+
+  // Paginated slice of top matches (paid only). Reset to page 0 whenever the
+  // firms list changes (new search).
+  const totalTopPages = Math.max(1, Math.ceil(visibleFirms.length / TOP_PER_PAGE))
+  const safeTopPage = Math.min(topPage, totalTopPages - 1)
+  const paginatedTop = useMemo(
+    () => visibleFirms.slice(safeTopPage * TOP_PER_PAGE, (safeTopPage + 1) * TOP_PER_PAGE),
+    [visibleFirms, safeTopPage],
+  )
+
+  // Reset to page 0 on every fresh search.
+  const visibleFirmsKey = visibleFirms.map(f => f.id).join(',')
+  useEffect(() => {
+    if (topPage !== 0) setTopPage(0)
+    // We intentionally only reset when the underlying ID list changes, not on
+    // page click. eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleFirmsKey])
+
+  // Near-miss grouping: bucket each firm into the dimension where it's
+  // weakest. Mirrors `Forge-Capital-Search.html` lines 824-833.
+  const nearMissGroups = useMemo(() => {
+    const groups: Record<NearMissGroupKey, InvestorFirm[]> = {
+      'Stage Mismatch': [],
+      'Geography Gap': [],
+      'Cheque Size Mismatch': [],
+      'Thesis Alignment': [],
+    }
+    for (const f of partitioned.nearMiss) {
+      const p = f.attributes._fcPillars
+      if (!p) {
+        groups['Thesis Alignment'].push(f)
+        continue
+      }
+      let weakest: NearMissGroupKey = 'Thesis Alignment'
+      let weakestVal = p.thesis
+      if (p.stage  != null && p.stage  < weakestVal) { weakest = 'Stage Mismatch';       weakestVal = p.stage  }
+      if (p.geo    != null && p.geo    < weakestVal) { weakest = 'Geography Gap';        weakestVal = p.geo    }
+      if (p.cheque != null && p.cheque < weakestVal) { weakest = 'Cheque Size Mismatch'; weakestVal = p.cheque }
+      groups[weakest].push(f)
+    }
+    return groups
+  }, [partitioned.nearMiss])
+
+  // Advisory Intelligence — derived from near-misses + top-matches.
+  // Three flavours mirror Forge-Capital-Search.html lines 877-961:
+  //   1. Geographic expansion: firms with strong thesis but in regions the
+  //      top-matches don't cover.
+  //   2. Stage adjacency: stage-mismatched firms with strong thesis.
+  //   3. Alternative capital sources: non-VC types with thesis match.
+  const advisoryItems = useMemo(() => {
+    const items: Array<{ title: string; body: string }> = []
+
+    // 1. Geographic expansion
+    const topGeos = new Set<string>()
+    for (const f of partitioned.top.slice(0, 20)) {
+      const arr = f.attributes.geo_focus ?? []
+      for (const g of arr) topGeos.add(g.toLowerCase().trim())
+    }
+    const geoBuckets: Record<string, InvestorFirm[]> = {}
+    for (const f of partitioned.nearMiss) {
+      const p = f.attributes._fcPillars
+      if (!p || p.thesis < 40) continue
+      const arr = f.attributes.geo_focus ?? []
+      for (const g of arr) {
+        const key = g.trim()
+        if (!key) continue
+        if (topGeos.has(key.toLowerCase())) continue
+        if (!geoBuckets[key]) geoBuckets[key] = []
+        geoBuckets[key].push(f)
+      }
+    }
+    const sortedGeos = Object.entries(geoBuckets)
+      .filter(([, list]) => list.length >= 3)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 3)
+    for (const [region, list] of sortedGeos) {
+      const avgThesis = Math.round(
+        list.reduce((s, r) => s + ((r.attributes._fcPillars?.thesis ?? 0)), 0) / list.length,
+      )
+      items.push({
+        title: `Expand to ${region}?`,
+        body: `${list.length} investors in ${region} have thesis alignment with your company (avg ${avgThesis}% thesis match). They're not in your top matches because of geographic focus — if you positioned for ${region}, these become viable targets.`,
+      })
+    }
+
+    // 2. Stage adjacency
+    const stageNearMisses = partitioned.nearMiss.filter(f => {
+      const p = f.attributes._fcPillars
+      return p && p.stage != null && p.stage < 60 && p.thesis > 50
+    })
+    if (stageNearMisses.length >= 3) {
+      const stageCounts: Record<string, number> = {}
+      for (const f of stageNearMisses) {
+        const stages = f.attributes.stage_focus ?? []
+        for (const s of stages) stageCounts[s] = (stageCounts[s] ?? 0) + 1
+      }
+      const top = Object.entries(stageCounts).sort((a, b) => b[1] - a[1])[0]
+      if (top) {
+        items.push({
+          title: 'Stage timing opportunity',
+          body: `${stageNearMisses.length} investors have strong thesis alignment but primarily invest at ${top[0]} stage. These could be valuable relationships to build now for a future round, or for introductions to their portfolio companies.`,
+        })
+      }
+    }
+
+    // 3. Alternative capital sources
+    const altTypes = partitioned.nearMiss.filter(f => {
+      const t = f.attributes.firm_type
+      const p = f.attributes._fcPillars
+      return t && t !== 'VC' && t !== 'PE' && p && p.thesis > 45
+    })
+    if (altTypes.length >= 3) {
+      const typeCounts: Record<string, number> = {}
+      for (const f of altTypes) {
+        const t = f.attributes.firm_type as string
+        typeCounts[t] = (typeCounts[t] ?? 0) + 1
+      }
+      const top = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]
+      if (top) {
+        const [typeName, count] = top
+        const note: Record<string, string> = {
+          Government:      'Government grants and programmes can provide non-dilutive funding alongside (or instead of) equity.',
+          'Corporate VC':  'Corporate VCs can offer strategic partnerships alongside investment — useful for go-to-market acceleration.',
+          Accelerator:     'Accelerators can provide mentorship, network, and follow-on funding connections.',
+          'Family Office': 'Family offices often have longer time horizons and more flexible terms than institutional VCs.',
+        }
+        items.push({
+          title: 'Alternative capital sources',
+          body: `${count} ${typeName} entities match your thesis but have different engagement models. ${note[typeName] ?? 'These could complement traditional VC funding.'}`,
+        })
+      }
+    }
+
+    return items
+  }, [partitioned.top, partitioned.nearMiss])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -325,22 +507,35 @@ export function InvestorDeckSearchClient({
         />
       )}
 
-      {/* ── Match cards (visible) ─────────────────────────────────────────── */}
-      {hasSearched && visibleFirms.map((firm, i) => (
-        <MatchCard
-          key={firm.id}
-          rank={i + 1}
-          firm={firm}
-          matchScore={matchScores[firm.id]?.score}
-          pillars={matchScores[firm.id]?.pillars}
-          matchOutput={matchOutputs[firm.id]}
-          isSaved={!!shortlistIds[firm.id]}
-          onSave={() => handleSave(firm)}
-          onRevealWhyFit={isPaid ? () => handleRevealWhyFit(firm.id) : undefined}
-          isLocked={false}
-          isPaid={isPaid}
+      {/* ── Match cards (paginated for paid; first 5 only for free) ──────── */}
+      {hasSearched && (isPaid ? paginatedTop : visibleFirms).map((firm, i) => {
+        const rank = isPaid ? safeTopPage * TOP_PER_PAGE + i + 1 : i + 1
+        return (
+          <MatchCard
+            key={firm.id}
+            rank={rank}
+            firm={firm}
+            matchScore={matchScores[firm.id]?.score}
+            pillars={matchScores[firm.id]?.pillars}
+            matchOutput={matchOutputs[firm.id]}
+            isSaved={!!shortlistIds[firm.id]}
+            onSave={() => handleSave(firm)}
+            onRevealWhyFit={isPaid ? () => handleRevealWhyFit(firm.id) : undefined}
+            isLocked={false}
+            isPaid={isPaid}
+          />
+        )
+      })}
+
+      {/* ── Top-matches pagination (paid only, > 1 page) ─────────────────── */}
+      {hasSearched && isPaid && totalTopPages > 1 && (
+        <TopMatchesPagination
+          page={safeTopPage}
+          totalPages={totalTopPages}
+          onPrev={() => setTopPage(p => Math.max(0, p - 1))}
+          onNext={() => setTopPage(p => Math.min(totalTopPages - 1, p + 1))}
         />
-      ))}
+      )}
 
       {/* ── Paywall (free + results) ──────────────────────────────────────── */}
       {hasSearched && isFree && firms.length > 0 && (
@@ -363,6 +558,16 @@ export function InvestorDeckSearchClient({
           isPaid={false}
         />
       ))}
+
+      {/* ── Near Misses (paid only) ──────────────────────────────────────── */}
+      {hasSearched && isPaid && partitioned.nearMiss.length > 0 && (
+        <NearMissesSection groups={nearMissGroups} totalCount={partitioned.nearMiss.length} />
+      )}
+
+      {/* ── Advisory Intelligence (paid only) ────────────────────────────── */}
+      {hasSearched && isPaid && advisoryItems.length > 0 && (
+        <AdvisorySection items={advisoryItems} />
+      )}
 
       {/* ── Pre-search charts (visible before search, hidden after results) ── */}
       {!hasSearched && investorStats && (
@@ -1168,4 +1373,163 @@ function normaliseFirmType(raw: string): string {
     'corporate_vc': 'Corporate VC',
   }
   return map[raw] ?? raw
+}
+
+// ─── Top-matches pagination ──────────────────────────────────────────────────
+//
+// Verbatim port of `Forge-Capital-Search.html` lines 717-725. Renders only
+// when there are 2+ pages of top matches. Disabled state on first/last page.
+
+function TopMatchesPagination({
+  page,
+  totalPages,
+  onPrev,
+  onNext,
+}: {
+  page: number
+  totalPages: number
+  onPrev: () => void
+  onNext: () => void
+}) {
+  const atFirst = page === 0
+  const atLast = page >= totalPages - 1
+  return (
+    <div className="flex items-center justify-center gap-3 py-4 mt-2 border-t border-border/30">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={atFirst}
+        className="text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:border-international-orange/50 transition-colors"
+      >
+        ← Prev
+      </button>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        Page {page + 1} of {totalPages}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={atLast}
+        className="text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:border-international-orange/50 transition-colors"
+      >
+        Next →
+      </button>
+    </div>
+  )
+}
+
+// ─── Near Misses section ─────────────────────────────────────────────────────
+//
+// Verbatim port of `Forge-Capital-Search.html` lines 802-862. Lists firms
+// with composite 35-50%, grouped by the dimension where they're weakest.
+// Cap at 8 per group with a "+ N more" tail line.
+
+function NearMissesSection({
+  groups,
+  totalCount,
+}: {
+  groups: Record<NearMissGroupKey, InvestorFirm[]>
+  totalCount: number
+}) {
+  return (
+    <section className="mt-10 pt-6 border-t border-border/40">
+      <div className="flex items-center gap-2 mb-1">
+        <span style={{ fontSize: '18px' }}>⚠️</span>
+        <h2 className="text-base font-semibold text-foreground">
+          Near Misses (35–50%) <span className="text-muted-foreground font-normal">· {totalCount}</span>
+        </h2>
+      </div>
+      <p className="text-xs text-muted-foreground mb-5">
+        Investors who don&apos;t quite hit a 50% match but are worth knowing about — usually one dimension off.
+      </p>
+
+      <div className="space-y-6">
+        {(Object.keys(groups) as NearMissGroupKey[]).map((key) => {
+          const items = groups[key]
+          if (items.length === 0) return null
+          const desc = NEAR_MISS_GROUP_LABELS[key]
+          return (
+            <div key={key}>
+              <div className="text-sm font-semibold text-foreground mb-1">
+                {key} <span className="text-muted-foreground font-normal">({items.length})</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">{desc}</p>
+              <div className="rounded-lg border border-border/50 divide-y divide-border/30 bg-card">
+                {items.slice(0, 8).map((f) => {
+                  const composite = f.attributes._fcComposite ?? 0
+                  const stage = (f.attributes.stage_focus ?? []).slice(0, 2).join(' / ')
+                  const geo   = (f.attributes.geo_focus ?? []).slice(0, 1).join(', ')
+                  const meta  = [geo, stage].filter(Boolean).join(' · ')
+                  return (
+                    <Link
+                      key={f.id}
+                      href={`/investors/${f.id}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-foreground truncate">
+                          {f.title}
+                          {f.attributes.firm_type && (
+                            <span className="text-[10px] text-muted-foreground ml-2 uppercase tracking-wider">
+                              {f.attributes.firm_type}
+                            </span>
+                          )}
+                        </div>
+                        {meta && (
+                          <div className="text-[11px] text-muted-foreground truncate">{meta}</div>
+                        )}
+                      </div>
+                      <div className="text-sm font-semibold text-international-orange tabular-nums shrink-0">
+                        {composite.toFixed(1)}%
+                      </div>
+                    </Link>
+                  )
+                })}
+                {items.length > 8 && (
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground italic">
+                    + {items.length - 8} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// ─── Advisory Intelligence section ───────────────────────────────────────────
+//
+// Verbatim port of `Forge-Capital-Search.html` lines 866-969. Surfaces 3
+// kinds of advice based on the near-misses + top-matches: geographic
+// expansion, stage adjacency, alternative capital sources.
+
+function AdvisorySection({ items }: { items: Array<{ title: string; body: string }> }) {
+  return (
+    <section className="mt-10 pt-6 border-t border-border/40">
+      <div className="flex items-center gap-2 mb-1">
+        <span style={{ fontSize: '18px' }}>💡</span>
+        <h2 className="text-base font-semibold text-foreground">Advisory intelligence</h2>
+      </div>
+      <p className="text-xs text-muted-foreground mb-5">
+        Patterns from your near-misses worth thinking about as you shape your raise.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {items.map((item, i) => (
+          <div
+            key={i}
+            className="rounded-lg p-4"
+            style={{ background: 'hsl(45 90% 96%)', border: '1px solid hsl(45 75% 85%)' }}
+          >
+            <div className="text-sm font-semibold mb-1.5" style={{ color: 'hsl(30 70% 32%)' }}>
+              {item.title}
+            </div>
+            <p className="text-xs text-foreground leading-relaxed">{item.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
