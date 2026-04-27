@@ -24,6 +24,7 @@ import { searchMarketplaceListings } from '@/actions/marketplace'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { getSupplierDirectoryStats } from '@/actions/suppliers'
 import { SupplierSearchPanel } from './_components/SupplierSearchPanel'
+import { MarketplaceTabs } from './_components/MarketplaceTabs'
 import { typography } from '@/lib/design-system'
 import type { MarketplaceListing } from '@/actions/marketplace'
 import type { SupplierDirectoryStats } from '@/actions/suppliers'
@@ -124,11 +125,18 @@ export default async function MarketplacePage() {
         </Link>
       </div>
 
-      {/* ── Search panel + results ── */}
-      <SupplierSearchPanel
-        initialListings={listings}
-        totalCount={totalCount}
-        stats={statsForPanel}
+      {/* ── Tabs (Overview / Suppliers / Contacts) — Forge Capital
+          Nightshift Supplier Dashboard parity. Phase A: shell + Overview.
+          Phase B: Suppliers table with filters. Phase C: contact directory. */}
+      <MarketplaceTabs
+        totalSuppliers={totalCount}
+        overview={
+          <SupplierSearchPanel
+            initialListings={listings}
+            totalCount={totalCount}
+            stats={statsForPanel}
+          />
+        }
       />
     </div>
   )
