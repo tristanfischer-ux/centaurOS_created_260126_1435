@@ -17,6 +17,7 @@ import { embedQuery } from '@/lib/embeddings'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { withAuth } from '@/lib/server-action-utils'
 import { callClaudeCentral } from '@/lib/ai/claude-client'
+import { applySectorBoost } from '@/lib/sector-boost'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -167,11 +168,50 @@ export async function searchSuppliers(
 
       if (fullError) throw fullError
 
-      // Merge similarity scores back into full rows
-      let results = (fullRows || []).map((row: Record<string, unknown>) => ({
-        ...row,
-        similarity: similarityMap.get(row.id as string) ?? 0,
-      }))
+      // Merge similarity scores back into full rows. Apply sector boost when
+      // the searcher's foundry has a sector set — listings whose
+      // attributes.industries (or top-level industries field) contain a
+      // matching sector keyword get +0.10 cosine. Tristan 2026-04-27 red-team
+      // round 2: medical-CGM founder was getting aerospace flight computers
+      // and IoT vending sensors. See src/lib/sector-boost.ts for the full
+      // foundry-sector → keyword map.
+      let foundrySector: string | null = null
+      if (user) {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('foundry_id')
+          .eq('id', user.id)
+          .maybeSingle()
+        if (profileRow?.foundry_id) {
+          const { data: foundryRow } = await supabase
+            .from('foundries')
+            .select('sector')
+            .eq('id', profileRow.foundry_id)
+            .maybeSingle()
+          foundrySector = (foundryRow?.sector as string | null) ?? null
+        }
+      }
+
+      let results = (fullRows || []).map((row: Record<string, unknown>) => {
+        const rawSim = similarityMap.get(row.id as string) ?? 0
+        // Listings keep their sector tags either as attributes.industries
+        // (JSONB array of free text) or sometimes as a top-level industries
+        // column. Collect both so the boost catches either shape.
+        const attrs = (row.attributes as Record<string, unknown> | null) || {}
+        const industriesAttr = attrs.industries as string[] | undefined
+        const topIndustries = (row as Record<string, unknown>).industries as string[] | string | null | undefined
+        const tags: string[] = []
+        if (Array.isArray(industriesAttr)) tags.push(...industriesAttr)
+        if (Array.isArray(topIndustries)) tags.push(...topIndustries)
+        if (typeof topIndustries === 'string') tags.push(topIndustries)
+        return {
+          ...row,
+          similarity: applySectorBoost(rawSim, foundrySector, tags),
+        }
+      })
+
+      // Re-sort by boosted similarity so same-sector matches surface higher.
+      results.sort((a, b) => (Number(b.similarity) || 0) - (Number(a.similarity) || 0))
 
       // Apply additional filters (now with full data from re-fetch)
       if (filters.category) {

@@ -23,6 +23,7 @@ import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
 import { calculateMatchScore, findSimilarInvestors, computeHybridScore } from '@/lib/investor-match'
 import type { FoundryProfile, MatchBreakdown } from '@/lib/investor-match'
+import { applySectorBoost } from '@/lib/sector-boost'
 import { embedQuery } from '@/lib/embeddings'
 import { normaliseFirmTypeLabel } from '@/lib/investors/firm-type-labels'
 import { checkRateLimit } from '@/lib/security/rate-limit'
@@ -1036,10 +1037,16 @@ async function searchInvestorsCore(
       // INTENT: Blend semantic similarity with attribute match for ranking.
       // Fetch foundry profile for attribute scoring (best-effort — null = skip).
       const profile = await getFoundryProfileCached()
+      // Tristan 2026-04-27 round-2 red-team fix: sector context. Apply a small
+      // similarity boost when the listing's sectors array contains a keyword
+      // matching the foundry's sector enum value. Without this, P2 medical
+      // CGM founder gets Arise (e-commerce/luxury beauty) at #1.
+      const foundrySector = profile?.sector ?? null
       if (profile) {
         firms = firms.map(firm => {
           const matchedRow = results.find((r) => r.id === firm.id)
-          const simScore = (matchedRow?.similarity as number) ?? 0
+          const rawSim = (matchedRow?.similarity as number) ?? 0
+          const simScore = applySectorBoost(rawSim, foundrySector, firm.attributes.sectors as string[] | undefined)
           const attrBreakdown = calculateMatchScore(firm, profile)
           const hybridScore = computeHybridScore(simScore, attrBreakdown.total)
           return { ...firm, attributes: { ...firm.attributes, _hybridScore: hybridScore, _similarity: simScore } }
