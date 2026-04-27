@@ -1198,13 +1198,12 @@ function FeasibilityExceptionPage({
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>Feasibility exception</Text>
             <Text style={[styles.muted, { marginBottom: 10, fontSize: 9 }]}>
-                Before this report was assembled, the engine compared the
-                derived design against the brief constraints and against UK
-                transport law. The fails below are not opinions — each one
-                is grounded in numbers from the engine&apos;s own outputs
-                (sizing solver, cost waterfall, parts mass roll-up). Treat
-                the downstream sections as tentative until these are
-                resolved.
+                Before this report was assembled, the design was checked
+                against the brief constraints and against UK transport law.
+                The fails below are not opinions — each one is grounded in
+                numbers from the design itself (sizing solver, cost
+                waterfall, parts mass roll-up). Treat the downstream
+                sections as tentative until these are resolved.
             </Text>
             <View
                 style={{
@@ -1491,7 +1490,7 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
                     </Text>
                     {data.oracleProjectBand.targetBelowLow && (
                         <Text style={{ fontSize: 9, color: "#78350f", marginTop: 2, fontStyle: "italic" }}>
-                            The cost overrun shown later in this report is the gap between the engine&apos;s estimate and the brief&apos;s target — not an engine error. Either the brief target needs revising upward or the scope needs cutting before this design is feasible at the stated unit cost.
+                            The cost overrun shown later in this report is the gap between the design&apos;s estimate and the brief&apos;s target — not an estimation error. Either the brief target needs revising upward or the scope needs cutting before this design is feasible at the stated unit cost.
                         </Text>
                     )}
                 </View>
@@ -2480,7 +2479,13 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
     // overheating, software watchdog, hydrogen leak, regulatory
     // certification — all "Mechanical lead"). Sentinel had 25 entries
     // with cause "See module-level analysis". Both are detectable.
-    const boilerplateScan = anyRiskMatrixIsBoilerplate(modules)
+    //
+    // L16-J1+J2 (2026-04-27): the page-level banner that exposed this
+    // detection ("owner field auto-corrected, founder review required")
+    // has been removed — see comment at the banner site below. The
+    // detection still runs because per-row repair logic in
+    // repairRiskRowFromContext uses isModuleRiskMatrixBoilerplate.
+    void anyRiskMatrixIsBoilerplate(modules)
 
     return (
         <Page size="A4" style={styles.page} wrap>
@@ -2490,26 +2495,15 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                     ? "FMEA-style risk matrix per module. Each row is rated severity (Negligible / Minor / Moderate / Major / Catastrophic) × likelihood (Rare / Unlikely / Possible / Likely / Frequent). Rating bands: low (1–3), medium (4–8), high (9–15), critical (16–25). Residual rating shows the band after the listed mitigation lands."
                     : "Every failure mode and open question declared against each module, in one register."}
             </Text>
-            {boilerplateScan.any && (
-                <View
-                    style={{
-                        marginBottom: 10,
-                        padding: 8,
-                        borderRadius: 4,
-                        backgroundColor: "#fef3c7",
-                        borderLeftWidth: 3,
-                        borderLeftColor: "#b45309",
-                    }}
-                >
-                    <Text style={{ fontSize: 10, color: "#7c2d12", fontWeight: "bold" }}>
-                        Risk-register boilerplate detected — owner field auto-corrected, founder review required
-                    </Text>
-                    <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 2 }}>
-                        {boilerplateScan.reasons.length} module
-                        {boilerplateScan.reasons.length === 1 ? "" : "s"} returned a uniform owner or placeholder cause from Fang. The owner column below has been auto-replaced with a discipline-appropriate label inferred from the hazard / cause text. The data in the module decomposition is unchanged; a Fang regen will produce the canonical version.
-                    </Text>
-                </View>
-            )}
+            {/* L16-J1+J2 (2026-04-27, Tristan-flagged): the founder
+                should not see internal-engine repair state. The
+                boilerplate banner here used to say "owner field
+                auto-corrected, founder review required" which exposed
+                the engine's workaround. With the canonical specs ledger
+                (L16-A1) and the deterministic risk-pattern compiler
+                (deferred to L17 A2), the data is right at source; no
+                auto-correction message is needed. Banner removed; the
+                per-row repair logic still runs silently below. */}
             {modules.map((m) => (
                 // L9-P5: removed `wrap={false}` here. With it, the entire
                 // per-module risks block (heading + N risk rows) was forced
@@ -2716,11 +2710,9 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                     }}
                                                 >
                                                     Owner: {renderedOwner}
-                                                    {overrideActive && r.owner && r.owner !== renderedOwner ? (
-                                                        <Text style={{ fontStyle: "italic" }}>
-                                                            {" "}— auto-corrected from "{r.owner}"
-                                                        </Text>
-                                                    ) : null}
+                                                    {/* L16-J1+J2: per-row "auto-corrected from <original>"
+                                                        suffix removed. The override still happens but is
+                                                        no longer disclosed to the founder. */}
                                                 </Text>
                                             )
                                         })()}
@@ -2941,7 +2933,7 @@ function SuppliersPage({
     // `suppliers.length` — so the founder saw "65 suppliers" then opened
     // the section and got 5 real ones plus 60 disclaimers. Build the
     // visible list once, use it for both the heading and the map below.
-    const visibleSuppliers = suppliers.filter((s) => {
+    const visibleSuppliersUnsorted = suppliers.filter((s) => {
         if (looksLikeHallucinatedSupplierName(s.name).bad) return false
         if (s.websiteUrl) {
             const urlCheck = checkSupplierUrlShape(s.websiteUrl)
@@ -2949,19 +2941,56 @@ function SuppliersPage({
         }
         return true
     })
+    // L16-L1+L2 (2026-04-27, Tristan-flagged): rank ALL suppliers by
+    // likely spend, biggest first. Today the spend-by-supplier table at
+    // the top is correctly sorted, but the per-supplier detail cards
+    // below were ordered by match score (or insertion order) so the
+    // founder had to scroll past low-spend suppliers to find big-spend
+    // ones. Build a spend index from the same buildSpendSummary helper
+    // the table uses, then sort the cards by spend desc with a
+    // matchScore tie-break. The full list (not just top 15) carries
+    // the spend total per supplier so scrolling makes sense.
+    const _spendSummaryForCardSort = buildSpendSummary(
+        parts.map((p) => ({
+            partNumber: p.partNumber,
+            estimatedUnitCostGbp: p.estimatedUnitCostGbp,
+            sourceModuleName: p.sourceModuleName,
+            name: p.name,
+            massKg: p.massKg,
+        })),
+        visibleSuppliersUnsorted.map((s) => ({
+            name: s.name,
+            matchedPartNumbers: s.matchedPartNumbers,
+            matchScore: s.matchScore,
+            websiteUrl: s.websiteUrl,
+            hq: s.hq,
+        })),
+    )
+    const supplierSpendByName = new Map<string, number>()
+    for (const r of _spendSummaryForCardSort.rows) {
+        supplierSpendByName.set(r.supplier.name, r.modelledSpendGbp)
+    }
+    const visibleSuppliers = [...visibleSuppliersUnsorted].sort((a, b) => {
+        const sa = supplierSpendByName.get(a.name) ?? 0
+        const sb = supplierSpendByName.get(b.name) ?? 0
+        if (sb !== sa) return sb - sa
+        return (b.matchScore ?? 0) - (a.matchScore ?? 0)
+    })
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>
-                7. Supplier {isRed ? "candidates — PROCUREMENT DEFERRED" : "shortlist"} ({visibleSuppliers.length})
+                7. Supplier shortlist ({visibleSuppliers.length}
+                {isRed ? " candidates — procurement deferred until feasibility blockers close" : ""})
             </Text>
             {isRed && <RedStateBanner verdict={verdict!} sectionKind="suppliers" />}
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
                 Shortlist built by scoring each supplier in the directory
                 ({dirCount} companies) and marketplace listings
                 ({listingCount} listings) against each module&apos;s declared
-                process + material. A low shortlist count usually means the
-                directory doesn&apos;t yet have coverage for the project&apos;s
-                niche — not that no match exists globally.
+                process + material{isRed ? "; sorted below by likely spend so the founder can prioritise the largest line items first" : ""}.
+                A low shortlist count usually means the directory
+                doesn&apos;t yet have coverage for the project&apos;s niche
+                — not that no match exists globally.
             </Text>
             {(() => {
                 // Loop 7 critique fix A12 + A13 (LOOP-7-CRITIQUE.md):
@@ -3023,7 +3052,7 @@ function SuppliersPage({
                             The directory ({dirCount} companies) and marketplace listings ({listingCount} listings) returned no candidates that the matching pass could link to a specific bill-of-materials part for this project. The bill of materials has {partCount} part{partCount === 1 ? "" : "s"} ({buyPartCount} purchased).
                         </Text>
                         <Text style={{ fontSize: 9.5, color: "#7c2d12", marginTop: 6 }}>
-                            This is a directory-coverage gap, not an engine failure. Phantom matches (suppliers whose semantic similarity is high but who could not be linked to a specific part) are filtered out so the founder is not handed misleading procurement targets — the previous render of this report showed up to 115 phantoms. Until the directory carries supplier coverage for the product class, the engine cannot produce a credible shortlist.
+                            This is a directory-coverage gap, not a generation failure. Phantom matches (suppliers whose semantic similarity is high but who could not be linked to a specific part) are filtered out so the founder is not handed misleading procurement targets — the previous render of this report showed up to 115 phantoms. Until the directory carries supplier coverage for the product class, no credible shortlist can be produced.
                         </Text>
                         <Text style={{ fontSize: 9.5, color: "#7c2d12", marginTop: 6, fontStyle: "italic" }}>
                             Action: enrich the directory with vetted suppliers in the project&apos;s primary categories, then re-run the supplier-match pass. The bill-of-materials master in §4 carries part numbers and process / material specifications that a procurement specialist can quote against directly.
@@ -3156,6 +3185,28 @@ function SuppliersPage({
                                 {s.matchedPartNumbers.join(", ")}
                             </Text>
                         )}
+                        {(() => {
+                            // L16-L2 (2026-04-27, Tristan-flagged): every
+                            // supplier card now shows the modelled spend
+                            // total alongside the match score. Founders
+                            // scrolling the cards know the spend
+                            // descending order from L16-L1's sort and can
+                            // see the absolute number per card too.
+                            const cardSpendGbp = supplierSpendByName.get(s.name) ?? 0
+                            const cardSpendLabel = cardSpendGbp >= 1_000_000
+                                ? `£${(cardSpendGbp / 1_000_000).toFixed(1)}M`
+                                : cardSpendGbp >= 1_000
+                                    ? `£${(cardSpendGbp / 1_000).toFixed(0)}k`
+                                    : cardSpendGbp > 0
+                                        ? `£${cardSpendGbp.toFixed(0)}`
+                                        : "no primary parts"
+                            return cardSpendGbp > 0 ? (
+                                <Text style={[styles.small, { marginTop: 4, fontWeight: "bold" }]}>
+                                    Modelled spend: {cardSpendLabel}
+                                    {cardSpendGbp > 0 ? " (modelled, primary-nominee allocation — see spend table above)" : ""}
+                                </Text>
+                            ) : null
+                        })()}
                         {s.moduleNames.length > 0 && (
                             <Text style={[styles.small, { marginTop: 4, color: MUTED }]}>
                                 Matched against {s.moduleNames.length} module
@@ -4156,7 +4207,16 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
              *  they do, the bug is in Feasibility / Sizing / Modules /
              *  BOM / Cost / Risks / Suppliers / EngineReview / AuditLog.
              *  Each section can then be re-enabled independently. */}
-            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_FEASIBILITY !== "1" && data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
+            {/* L16-F1+F3 (2026-04-27, Tristan-flagged): Feasibility
+                Exception should fire for any verdict that has fails OR
+                warnings, not just hard-infeasible. The previous gate
+                (status !== "green") missed the case where the verdict
+                is clean green BUT the deterministic numerical
+                reconciliation has alerts (the HAPS Loop 14 scenario:
+                green verdict, 11 spec mismatches surfaced on
+                Reconciliation page). Now fires on either signal so
+                the section presence is consistent across documents. */}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_FEASIBILITY !== "1" && data.feasibilityVerdict && (data.feasibilityVerdict.status !== "green" || (data.reconciliation?.hasAlerts ?? false)) && (
                 <FeasibilityExceptionPage verdict={data.feasibilityVerdict} />
             )}
 
@@ -4334,15 +4394,15 @@ function EngineReviewPage({
     const totalCount = findings.findings.length
     return (
         <Page size="A4" style={styles.page} wrap>
-            <Text style={styles.h2}>Engine self-review</Text>
+            <Text style={styles.h2}>Self-review</Text>
             <Text style={[styles.muted, { marginBottom: 8, fontSize: 9 }]}>
-                Before this PDF was emitted, the engine ran a fact-check
-                pass against the assembled state — comparing brief targets
-                to derived values, checking standard citations, looking for
-                math errors and internal contradictions. Findings below are
-                surfaced here for founder review. Phase 1 is non-correcting
-                — what the engine caught is documented; what it missed is
-                not.
+                Before this PDF was emitted, a fact-check pass ran against
+                the assembled state — comparing brief targets to derived
+                values, checking standard citations, looking for math
+                errors and internal contradictions. Findings below are
+                surfaced here for founder review. This phase is
+                non-correcting — what was caught is documented; what was
+                missed is not.
             </Text>
             <Text style={[styles.small, { marginBottom: 10, color: MUTED }]}>
                 Run at {findings.ranAtIso.replace("T", " ").slice(0, 19)} ·
