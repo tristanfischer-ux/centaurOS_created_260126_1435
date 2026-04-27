@@ -54,6 +54,7 @@ import {
     checkSupplierUrlShape,
 } from "@/lib/supplier-verification"
 import { dedupAssemblyRollUp } from "@/lib/bom/assembly-dedup"
+import { checkBomModuleConsistency } from "@/lib/bom/module-consistency"
 import {
     anyRiskMatrixIsBoilerplate,
     inferOwnerByDiscipline,
@@ -4594,7 +4595,7 @@ async function exportProjectPdfInternal(
                     const declaredTotalMassKg = modules.reduce((acc, m) => {
                         return acc + (typeof m.massKg === "number" ? m.massKg : 0)
                     }, 0)
-                    return reconcileNumerics({
+                    const baseReconciliation = reconcileNumerics({
                         moduleCosts: moduleCostsForReconciliation,
                         bomTotalGbp: bomTotalGbp > 0 ? bomTotalGbp : null,
                         // L9-P1: waterfallTotalGbp == bomTotalGbp now (cover
@@ -4607,6 +4608,68 @@ async function exportProjectPdfInternal(
                         declaredTotalMassKg: declaredTotalMassKg > 0 ? declaredTotalMassKg : null,
                         bomTotalMassKg: bomTotalMassKg > 0 ? bomTotalMassKg : null,
                     })
+
+                    // L13-P1 (2026-04-27): bill-of-materials versus module-
+                    // description consistency check. Catches the Loop 12
+                    // pattern where BOM line items disagree with module
+                    // descriptions on power / pressure / mass / voltage.
+                    // Hedgerow solar 100W vs 6W (15-20× area), HAPS 700
+                    // bar vs 350 bar tank pressure, HAPS motor 15 kW vs
+                    // 1.5 kW per drag polar.
+                    const moduleConsistencyFindings = checkBomModuleConsistency(
+                        modules.map((m) => ({
+                            name: m.name,
+                            description: m.description ?? null,
+                            keyParts: m.keyParts,
+                        })),
+                        parts.map((p) => ({
+                            partNumber: p.partNumber,
+                            name: p.name,
+                            description: p.description ?? null,
+                            sourceModuleName: p.sourceModuleName,
+                        })),
+                    )
+
+                    if (moduleConsistencyFindings.length === 0) {
+                        return baseReconciliation
+                    }
+
+                    // Merge consistency findings into the reconciliation
+                    // result so the existing Reconciliation page renders
+                    // them, the cover banner counts them, and the
+                    // hasAlerts flag fires the red treatment.
+                    const extraFindings = moduleConsistencyFindings.map((f, i) => ({
+                        id: `spec-${i}`,
+                        section: "Spec" as const,
+                        severity: "alert" as const,
+                        summary: f.summary,
+                        detail: {
+                            sourceA: `Module description (${f.moduleName})`,
+                            valueA: f.moduleValue,
+                            sourceB: `Bill of materials row ${f.partNumber ?? "(unknown)"}`,
+                            valueB: f.partValue,
+                            pctDiff: ((f.ratio - 1) * 100),
+                            unit: f.unit,
+                        },
+                    }))
+
+                    const merged = baseReconciliation
+                        ? {
+                              ...baseReconciliation,
+                              findings: [...baseReconciliation.findings, ...extraFindings],
+                              hasAlerts: true,
+                              coverBanner: (() => {
+                                  const baseCount = baseReconciliation.findings.length
+                                  const totalCount = baseCount + extraFindings.length
+                                  return `Internal numerical inconsistency detected — ${totalCount} value${totalCount === 1 ? "" : "s"} disagree across sections (${extraFindings.length} bill-of-materials versus module-description). See Reconciliation page.`
+                              })(),
+                          }
+                        : {
+                              findings: extraFindings,
+                              hasAlerts: true,
+                              coverBanner: `Internal numerical inconsistency detected — ${extraFindings.length} bill-of-materials value${extraFindings.length === 1 ? "" : "s"} disagree with module descriptions. See Reconciliation page.`,
+                          }
+                    return merged
                 } catch (err) {
                     console.warn(
                         "[export-pdf] reconciliation pass failed (non-fatal):",

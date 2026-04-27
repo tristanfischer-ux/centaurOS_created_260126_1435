@@ -34,8 +34,10 @@
 export interface ReconciliationFinding {
     /** Stable identifier for tracking across loops. */
     id: string
-    /** Section the divergence sits in (Cost / Mass / Energy / Lighting / Mirror). */
-    section: "Cost" | "Mass" | "Energy" | "Lighting" | "Mirror"
+    /** Section the divergence sits in (Cost / Mass / Energy / Lighting / Mirror / Spec).
+     *  L13-P1 added "Spec" — bill-of-materials line items contradicting
+     *  numerical parameters in the parent module description. */
+    section: "Cost" | "Mass" | "Energy" | "Lighting" | "Mirror" | "Spec"
     /** Severity — "alert" if outside tolerance, "info" otherwise. */
     severity: "alert" | "info"
     /** One-line founder-readable description. */
