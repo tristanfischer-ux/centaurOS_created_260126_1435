@@ -57,6 +57,7 @@ import { dedupAssemblyRollUp } from "@/lib/bom/assembly-dedup"
 import { checkBomModuleConsistency } from "@/lib/bom/module-consistency"
 import { checkMirrorParity } from "@/lib/bom/mirror-parity"
 import { buildSpendSummary, SPEND_BY_SUPPLIER_CONSTANTS } from "@/lib/bom/spend-by-supplier"
+import { applyBomCostFallback } from "@/lib/cad-lab/bom-cost-fallback"
 import {
     anyRiskMatrixIsBoilerplate,
     inferOwnerByDiscipline,
@@ -2051,6 +2052,33 @@ function BomMasterPage({
     const unpricedBuyRows = parts.filter(
         (p) => p.isPurchased && (p.estimatedUnitCostGbp == null || p.estimatedUnitCostGbp <= 0),
     )
+    // L15-P3: parametric fallback for unpriced buy rows. The cost specialist
+    // sometimes returns null on niche aerospace lines (HAPS PWA-001 to
+    // PWA-007 — primary wing structure — were all unpriced in Loop 14). Run
+    // a deterministic pattern match against ~20 part categories (composite
+    // primary structure, hydrogen pressure vessel, fuel cell, avionics,
+    // PCBA, harness, fastener, ...) and surface a "parametric" cost so the
+    // bill-of-materials total is no longer understated. The persistence
+    // layer is unchanged — these are render-time estimates with explicit
+    // rationale shown alongside the row.
+    const parametricByPartNumber = applyBomCostFallback(parts)
+    const parametricRows = parts.filter((p) => {
+        const fb = parametricByPartNumber.get(p.partNumber)
+        return (
+            p.isPurchased &&
+            (p.estimatedUnitCostGbp == null || p.estimatedUnitCostGbp <= 0) &&
+            fb != null &&
+            fb.estimatedUnitCostGbp != null
+        )
+    })
+    const stillUnpricedRows = parts.filter((p) => {
+        const fb = parametricByPartNumber.get(p.partNumber)
+        return (
+            p.isPurchased &&
+            (p.estimatedUnitCostGbp == null || p.estimatedUnitCostGbp <= 0) &&
+            (fb == null || fb.estimatedUnitCostGbp == null)
+        )
+    })
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>
@@ -2064,7 +2092,30 @@ function BomMasterPage({
                 source_module_id. The Suppliers column shows up to 3
                 candidate suppliers (full details in §7).
             </Text>
-            {unpricedBuyRows.length > 0 && (
+            {parametricRows.length > 0 && (
+                <View
+                    style={{
+                        marginBottom: 8,
+                        padding: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#dbeafe",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#1d4ed8",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#1e3a8a" }}>
+                        {parametricRows.length} row{parametricRows.length === 1 ? "" : "s"} priced from a parametric category model
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#1e3a8a", marginTop: 3 }}>
+                        The cost specialist did not produce a unit price for these rows. The bill-of-materials renderer applied a parametric estimate by category match (composite primary structure / hydrogen pressure vessel / avionics / PCBA / etc.). Estimates are shown with a "parametric" tag against the affected rows; the underlying data is unchanged. Treat parametric prices as ±30% until the cost specialist or a contract manufacturer quote replaces them.
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#1e3a8a", marginTop: 4, fontStyle: "italic" }}>
+                        Parametric rows: {parametricRows.slice(0, 8).map((p) => p.partNumber).join(", ")}
+                        {parametricRows.length > 8 ? ` and ${parametricRows.length - 8} more` : ""}.
+                    </Text>
+                </View>
+            )}
+            {stillUnpricedRows.length > 0 && (
                 <View
                     style={{
                         marginBottom: 8,
@@ -2076,14 +2127,14 @@ function BomMasterPage({
                     }}
                 >
                     <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7c2d12" }}>
-                        {unpricedBuyRows.length} purchased row{unpricedBuyRows.length === 1 ? "" : "s"} have no estimated unit cost
+                        {stillUnpricedRows.length} purchased row{stillUnpricedRows.length === 1 ? "" : "s"} have no estimated unit cost — parametric fallback could not categorise them
                     </Text>
                     <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 3 }}>
-                        Pricing was not produced for these rows by the cost specialist. The roll-ups (cover unit cost, cost waterfall) treat them as £0, which understates the bill-of-materials total. Highlighted rows below show "—" in the Cost column. Resolve before sending the document to a contract manufacturer or running unit-economics analysis.
+                        Neither the cost specialist nor the parametric category model produced a price for these rows. The roll-ups (cover unit cost, cost waterfall) treat them as £0, which understates the bill-of-materials total. These are bona-fide unpriceable blockers — resolve before sending the document to a contract manufacturer or running unit-economics analysis.
                     </Text>
                     <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 4, fontStyle: "italic" }}>
-                        Affected part numbers: {unpricedBuyRows.slice(0, 8).map((p) => p.partNumber).join(", ")}
-                        {unpricedBuyRows.length > 8 ? ` and ${unpricedBuyRows.length - 8} more` : ""}.
+                        Affected part numbers: {stillUnpricedRows.slice(0, 8).map((p) => p.partNumber).join(", ")}
+                        {stillUnpricedRows.length > 8 ? ` and ${stillUnpricedRows.length - 8} more` : ""}.
                     </Text>
                 </View>
             )}
@@ -2131,7 +2182,20 @@ function BomMasterPage({
                                     {p.massKg != null ? `${p.massKg.toFixed(2)}kg` : "—"}
                                 </Text>
                                 <Text style={[styles.tableCell, { width: 56, textAlign: "right", paddingRight: 12 }]}>
-                                    {fmtGbp(p.estimatedUnitCostGbp)}
+                                    {(() => {
+                                        // L15-P3: prefer the original cost; if null, show
+                                        // parametric estimate with a "(p)" tag and a slightly
+                                        // muted colour so the founder can see it's an
+                                        // engine-assigned fallback rather than a quote.
+                                        if (p.estimatedUnitCostGbp != null && p.estimatedUnitCostGbp > 0) {
+                                            return fmtGbp(p.estimatedUnitCostGbp)
+                                        }
+                                        const fb = parametricByPartNumber.get(p.partNumber)
+                                        if (fb && fb.estimatedUnitCostGbp != null) {
+                                            return `${fmtGbp(fb.estimatedUnitCostGbp)}*`
+                                        }
+                                        return fmtGbp(null)
+                                    })()}
                                 </Text>
                                 <Text style={[styles.tableCell, { flex: 1.6, paddingLeft: 8 }]}>
                                     {supplierLabel}
@@ -2140,6 +2204,11 @@ function BomMasterPage({
                         )
                     })}
                 </View>
+            )}
+            {parametricRows.length > 0 && (
+                <Text style={{ fontSize: 8, color: MUTED, fontStyle: "italic", marginTop: 4 }}>
+                    * = parametric estimate from category model. {parametricRows.length} row{parametricRows.length === 1 ? "" : "s"} flagged. Replace with supplier quotes before any procurement commitment.
+                </Text>
             )}
             <PdfFooter label="BOM master" />
         </Page>
