@@ -603,12 +603,20 @@ async function runFangReviewsForAllModules(
         .order("started_at", { ascending: false })
     const recentRunningCutoffMs = Date.now() - 15 * 60 * 1000
     const moduleIdsAlreadyTerminalOrRecent = new Set<string>()
+    // L9-FANG-IDEMPOTENCY (2026-04-27): the L8-P9 idempotency guard read
+    // `row.input_ref?.module_id` (snake_case) but the field is persisted
+    // as `moduleId` (camelCase). Field-name mismatch caused this Set to
+    // be empty on every fanout, so every module was re-fired and the
+    // parallelism cap kept picking the same first 2 alphabetically while
+    // 4 modules never got past NONE. Verified on Hedgerow 2026-04-27 —
+    // running_fang_reviews failed 6× over 60min with only 2 of 8 modules
+    // ever completing. Read both spellings for back-compat.
     for (const row of (existingFangRows ?? []) as Array<{
-        input_ref: { module_id?: string } | null
+        input_ref: { moduleId?: string; module_id?: string } | null
         status: string
         started_at: string | null
     }>) {
-        const moduleId = row.input_ref?.module_id
+        const moduleId = row.input_ref?.moduleId ?? row.input_ref?.module_id
         if (!moduleId) continue
         if (row.status === "done" || row.status === "failed") {
             moduleIdsAlreadyTerminalOrRecent.add(moduleId)
