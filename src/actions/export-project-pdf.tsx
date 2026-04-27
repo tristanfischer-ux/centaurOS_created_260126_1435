@@ -61,6 +61,7 @@ import {
     anyRiskMatrixIsBoilerplate,
     inferOwnerByDiscipline,
     isModuleRiskMatrixBoilerplate,
+    repairRiskRowFromContext,
 } from "@/lib/risk/boilerplate-detect"
 
 // ─── Result ────────────────────────────────────────────────────────────
@@ -2474,6 +2475,36 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                     r.residualSeverity != null && r.residualLikelihood != null
                                         ? riskRating(r.residualSeverity, r.residualLikelihood)
                                         : null
+                                // L15-P2: when cause / consequence / mitigation are
+                                // boilerplate ("See module-level analysis", "Detail-design
+                                // phase: derive specific monitoring..."), derive
+                                // substantive replacement text from the engineering review
+                                // issues, the failureModes string list, or hazard-derived
+                                // mechanism + named control. Council-mandated promotion
+                                // of the boilerplate detector from auditor to repair pass.
+                                const issuesForRepair = (m.reviews ?? []).flatMap((rev) => rev.issues ?? [])
+                                const repaired = repairRiskRowFromContext(
+                                    {
+                                        hazard: r.hazard ?? null,
+                                        cause: r.cause ?? null,
+                                        consequence: r.consequence ?? null,
+                                        mitigation: r.mitigation ?? null,
+                                        owner: r.owner ?? null,
+                                    },
+                                    {
+                                        issues: issuesForRepair.map((iss) => ({
+                                            severity: iss.severity,
+                                            category: iss.category,
+                                            message: iss.message,
+                                            suggestion: iss.suggestion ?? null,
+                                        })),
+                                        failureModes: m.failureModes ?? [],
+                                        moduleName: m.name,
+                                    },
+                                )
+                                const renderedCause = repaired.cause
+                                const renderedConsequence = repaired.consequence
+                                const renderedMitigation = repaired.mitigation
                                 return (
                                     <View
                                         key={r.id || i}
@@ -2529,20 +2560,20 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                 {initial.band} ({initial.score})
                                             </Text>
                                         </View>
-                                        {r.cause && (
+                                        {renderedCause && (
                                             <Text style={{ fontSize: 9, marginBottom: 1 }}>
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     Cause:{" "}
                                                 </Text>
-                                                {r.cause}
+                                                {renderedCause}
                                             </Text>
                                         )}
-                                        {r.consequence && (
+                                        {renderedConsequence && (
                                             <Text style={{ fontSize: 9, marginBottom: 1 }}>
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     Consequence:{" "}
                                                 </Text>
-                                                {r.consequence}
+                                                {renderedConsequence}
                                             </Text>
                                         )}
                                         {r.existingControls && (
@@ -2553,12 +2584,30 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                 {r.existingControls}
                                             </Text>
                                         )}
-                                        {r.mitigation && (
+                                        {renderedMitigation && (
                                             <Text style={{ fontSize: 9, marginBottom: 1 }}>
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     Mitigation:{" "}
                                                 </Text>
-                                                {r.mitigation}
+                                                {renderedMitigation}
+                                            </Text>
+                                        )}
+                                        {repaired.repaired && repaired.repairSource && (
+                                            <Text
+                                                style={{
+                                                    fontSize: 8,
+                                                    color: MUTED,
+                                                    fontStyle: "italic",
+                                                    marginTop: 1,
+                                                }}
+                                            >
+                                                Cause / mitigation derived from {
+                                                    repaired.repairSource === "engineering-review"
+                                                        ? "the module engineering-review findings"
+                                                        : repaired.repairSource === "failure-mode"
+                                                            ? "the module's stated failure modes"
+                                                            : "the hazard text by mechanism + named-control template"
+                                                } (Fang risk-matrix returned boilerplate; founder review required).
                                             </Text>
                                         )}
                                         {/* Loop 7 critique fix A8 + Tristan punch list #7/#9 —
