@@ -330,8 +330,8 @@ Output STRICTLY as a JSON object with two keys — "modules" and "connections":
           "existingControls": "what's already in the design that mitigates this (sensors, fuses, redundancy, etc.)",
           "severity": 4,
           "likelihood": 2,
-          "mitigation": "the next concrete action to reduce severity or likelihood",
-          "owner": "Role accountable — Battery safety lead | Electrical lead | Mechanical lead | Controls lead | Founder",
+          "mitigation": "the next concrete action to reduce severity or likelihood — must be specific (e.g. 'Specify EN 62619 cell certification on RFQ; require freeze-thaw test BS EN ISO 10545-12 50-cycle on the housing'). NEVER 'See module-level analysis', 'Detail-design phase: derive specific monitoring', 'TBD', 'Review later'.",
+          "owner": "Role accountable — match the discipline of the hazard. Use 'Mechanical engineering lead' ONLY for structural / fatigue / vibration / sealing / mass-budget hazards. Use 'Electrical engineering lead' for battery / charger / EMC / wiring / power-conversion hazards. Use 'Software engineering lead' for firmware / control-loop / cyber / over-the-air hazards. Use 'Thermal engineering lead' for cooling / overheating / thermal-runaway hazards. Use 'Regulatory affairs lead' for certification / standards / market-entry hazards. Use 'Production engineering lead' for supplier / lead-time / yield / first-article hazards. Use 'Quality engineering lead' for verification / validation / reliability hazards. Use 'Data protection officer' for GDPR / personal-data / privacy hazards. EVERY MODULE SHOULD HAVE OWNER FIELDS THAT VARY BY HAZARD DOMAIN — if every row reads the same owner string, the rubric will demote the entire risk register. Re-check the assignment by hazard text before emitting.",
           "residualSeverity": 3,
           "residualLikelihood": 1
         }
@@ -461,8 +461,8 @@ For the target module, provide detailed engineering information. Output STRICTLY
       "existingControls": "what's already in the design that mitigates this (sensors, fuses, redundancy, etc.)",
       "severity": 4,
       "likelihood": 2,
-      "mitigation": "the next concrete action to reduce severity or likelihood",
-      "owner": "Role accountable — Battery safety lead | Electrical lead | Mechanical lead | Controls lead | Founder",
+      "mitigation": "the next concrete action to reduce severity or likelihood — must be specific (named test or named control), NEVER 'See module-level analysis', 'Detail-design phase: derive specific monitoring', 'TBD', 'Review later'.",
+      "owner": "Role accountable — match the discipline of the hazard. Mechanical engineering lead ONLY for structural / fatigue / vibration / sealing / mass-budget hazards; Electrical engineering lead for battery / charger / EMC / wiring; Software engineering lead for firmware / control-loop / cyber / OTA; Thermal engineering lead for cooling / thermal-runaway; Regulatory affairs lead for certification / standards; Production engineering lead for supplier / lead-time / yield; Quality engineering lead for V&V / reliability; Data protection officer for GDPR / personal-data hazards. Owner field MUST VARY BY HAZARD DOMAIN within and across modules.",
       "residualSeverity": 3,
       "residualLikelihood": 1
     }
