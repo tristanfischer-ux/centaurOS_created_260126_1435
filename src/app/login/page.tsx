@@ -43,9 +43,12 @@ export default async function LoginPage({
             redirect(redirectTo)
         }
 
-        // DECISION 2026-04-16: founder-first architecture. Everyone lands on /today.
-        // Supplier / fractional-executive are opt-in flags, not routing paths.
-        redirect('/investors')
+        // DECISION 2026-04-27: post-login lands on /welcome, which has clear
+        // CTAs to Brainstorming / Forge / Investors / Suppliers. Replaces the
+        // earlier 2026-04-16 founder-first /investors redirect — that took
+        // founders straight to the search panel before they knew what the
+        // four primary destinations were.
+        redirect('/welcome')
     }
 
     return (

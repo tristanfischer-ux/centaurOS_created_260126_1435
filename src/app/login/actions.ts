@@ -142,12 +142,15 @@ export async function login(formData: FormData) {
             redirect('/workspace-picker')
         }
 
-        // Single foundry or active foundry set - go to Today page
+        // Single foundry or active foundry set — land on /welcome.
+        // DECISION 2026-04-27 (Tristan): post-login lands on Welcome, not
+        // /investors. Welcome routes the user to Brainstorming / Forge /
+        // Investors / Suppliers via clear CTAs.
         if (foundryCount >= 1) {
-            redirect('/investors')
+            redirect('/welcome')
         }
     }
 
     // Default: users without foundry memberships
-    redirect('/investors')
+    redirect('/welcome')
 }

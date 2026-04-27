@@ -25,6 +25,7 @@ import {
     MoreHorizontal,
     UsersRound,
     UserSearch,
+    Compass,
     LogOut,
     Waypoints,
     Plus,
@@ -102,15 +103,27 @@ function isRouteActive(pathname: string, href: string): boolean {
     return false
 }
 
-// Primary nav items shown in the bottom bar
+// Primary nav items shown in the bottom bar.
+// Tristan 2026-04-27: Welcome → Brainstorming → The Forge → Investors →
+// Suppliers, in that order, on web and mobile. The five primary destinations.
+// Admin-style items (Today / Comms / Tasks / Me / Plan / Cash Burn) sit
+// inside the More drawer below.
 const mainNavigation = [
-    { name: "Today", shortName: "Today", href: "/today", icon: CalendarDays },
-    { name: "Comms", shortName: "Comms", href: "/updates", icon: MessageCircle },
-    { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
+    { name: "Welcome", shortName: "Welcome", href: "/welcome", icon: Compass },
+    { name: "Brainstorming", shortName: "Brain", href: "/agents", icon: UsersRound },
+    { name: "The Forge", shortName: "Forge", href: "/the-forge-v2", icon: Hammer },
+    { name: "Investors", shortName: "Invest", href: "/investors", icon: Building2 },
+    { name: "Suppliers", shortName: "Supply", href: "/marketplace", icon: Store },
 ]
 
-// Drawer — Me section
+// Drawer — Me section.
+// Today / Comms / Tasks moved here 2026-04-27 when the bottom bar was
+// re-keyed to the primary destinations (Welcome / Brainstorming / Forge /
+// Investors / Suppliers). They remain reachable through the More drawer.
 const meMoreNavigation = [
+    { name: "Today", href: "/today", icon: CalendarDays },
+    { name: "Comms", href: "/updates", icon: MessageCircle },
+    { name: "Tasks", href: "/new-tasks", icon: CheckSquare },
     { name: "My Profile", href: "/my-profile", icon: UserCircle },
     { name: "Time", href: "/time", icon: Clock },
     // { name: "Knowledge", href: "/knowledge", icon: Library },

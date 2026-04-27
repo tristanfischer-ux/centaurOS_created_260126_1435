@@ -1,15 +1,18 @@
 /**
  * WelcomeView — Client component for /welcome.
  *
- * @description First-login landing page. Opens with a hero + short personal
- * letter from Tristan Fischer (Founder), four tiles pointing at the four
- * primary surfaces (Brainstorming / The Forge / Investors / Suppliers), a
- * primary CTA to go straight to Investors, and a closing line. Copy follows
- * Tristan's first-person British voice and the in-product "No AI Emphasis"
- * rule (no "AI-powered", "Smart", "Intelligent", etc.).
+ * @description Post-login landing page (Tristan 2026-04-27: Welcome is now
+ * the first page after login — replaces the earlier auto-redirect to
+ * /investors). Opens with a hero + short personal letter from Tristan Fischer
+ * (Founder), four tiles pointing at the four primary destinations
+ * (Brainstorming / The Forge / Investors / Suppliers), and a closing line.
  *
- * The "Mark complete" button fires `markWelcomeComplete` then routes to
- * /investors — the platform's primary landing surface.
+ * The four tiles ARE the primary call-to-action — the user picks their own
+ * starting point. There is no longer a single "Go to Investors" button at
+ * the bottom because that decision belongs to the founder, not the product.
+ *
+ * Copy follows Tristan's first-person British voice and the in-product
+ * "No AI Emphasis" rule (no "AI-powered", "Smart", "Intelligent", etc.).
  */
 
 "use client"
@@ -37,10 +40,18 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
 
+    /**
+     * Mark the welcome tour as seen. Does NOT redirect — the founder picks
+     * their own destination from the four section tiles. Tristan 2026-04-27:
+     * Welcome is the home; Welcome is not a turnstile.
+     */
     const handleMarkComplete = (): void => {
         startTransition(async () => {
             await markWelcomeComplete()
-            router.push("/investors")
+            // Soft refresh so the sidebar / nav reflects the cleared
+            // first-login state, but stay on /welcome so the user can pick
+            // their own destination from the section tiles above.
+            router.refresh()
         })
     }
 
@@ -122,7 +133,7 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                     <SectionTile
                         icon={Package}
                         label="Suppliers"
-                        description="Describe what you need — a specific material, process capability, or component. Fractional Forge searches 18,459 suppliers and returns a shortlist with a plain-English reason why each one matches your specification."
+                        description="Describe what you need — a specific material, process capability, or component. Fractional Forge searches the directory of UK and European manufacturers and returns a shortlist with a plain-English reason why each one matches your specification."
                         href="/marketplace"
                         ctaLabel="Open Suppliers"
                     />
@@ -155,40 +166,55 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
             </section>
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Primary CTA — mark complete, go to Investors            */}
+            {/* Pick where to start — the four tiles above ARE the CTAs;  */}
+            {/* this card just acknowledges the welcome and offers to     */}
+            {/* dismiss it once the user has had a look around.           */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
                 <div className="max-w-3xl">
                     <Card className="border-2 border-international-orange/20 bg-gradient-to-br from-background to-international-orange/[0.04]">
                         <CardContent className="pt-6 pb-6">
                             <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
-                                Start here
+                                Pick where to start
                             </p>
                             <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight mb-2">
-                                Find the investors who would back you.
+                                Open whichever section is most useful right now.
                             </h2>
                             <p className="text-base text-muted-foreground leading-relaxed mb-5 max-w-2xl">
-                                Investors is the fastest way to see immediate value. Describe
-                                your company in two sentences and get a ranked list of matched
-                                investors with fit scores — in under a minute.
+                                If you have a hard decision to think through, open
+                                Brainstorming. If you have a product to design, open The
+                                Forge. If you&rsquo;re raising, open Investors. If you need a
+                                manufacturer, open Suppliers. You can come back to this page
+                                from the sidebar any time.
                             </p>
                             <div className="flex flex-wrap gap-3">
-                                <Button
-                                    onClick={handleMarkComplete}
-                                    disabled={isPending}
-                                    size="lg"
-                                    className="gap-2"
-                                >
-                                    Go to Investors
-                                    <ArrowRight className="h-4 w-4" />
-                                </Button>
+                                <Link href="/agents">
+                                    <Button size="lg" variant="outline" className="gap-2">
+                                        <MessageSquare className="h-4 w-4" /> Brainstorming
+                                    </Button>
+                                </Link>
+                                <Link href="/the-forge-v2">
+                                    <Button size="lg" variant="outline" className="gap-2">
+                                        <Hammer className="h-4 w-4" /> The Forge
+                                    </Button>
+                                </Link>
+                                <Link href="/investors">
+                                    <Button size="lg" variant="outline" className="gap-2">
+                                        <Users className="h-4 w-4" /> Investors
+                                    </Button>
+                                </Link>
+                                <Link href="/marketplace">
+                                    <Button size="lg" variant="outline" className="gap-2">
+                                        <Package className="h-4 w-4" /> Suppliers
+                                    </Button>
+                                </Link>
                                 <Button
                                     onClick={handleMarkComplete}
                                     disabled={isPending}
                                     variant="ghost"
                                     size="lg"
                                 >
-                                    Mark complete and explore
+                                    Don&rsquo;t show this on next sign-in
                                 </Button>
                             </div>
                         </CardContent>

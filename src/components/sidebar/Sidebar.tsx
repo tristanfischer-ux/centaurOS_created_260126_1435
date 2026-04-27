@@ -352,7 +352,26 @@ export function Sidebar({
                     />
                 </div>
 
-                {/* ME */}
+                {/* Tristan 2026-04-27: primary nav order — Welcome →
+                    Brainstorming → The Forge → Investors → Suppliers. No
+                    section headers or collapsibles; flat top-level for the
+                    five primary destinations. Admin-style sections (Me,
+                    Supplier Portal) sit below a divider. */}
+                <div className="space-y-0.5">
+                    <NavLink item={welcomeNavItem} pathname={pathname} />
+                    {workshopNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                    {moneyLegacyNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                    {marketplaceSuppliesNavigation.map((item) => (
+                        <NavLink key={item.name} item={item} pathname={pathname} />
+                    ))}
+                </div>
+
+                {/* ME — admin-style collapsible below the primary nav */}
+                <div className="mt-1.5 mb-0.5 border-t border-border/40" />
                 <SectionHeader
                     label="Me"
                     introRoute="/me"
@@ -362,7 +381,6 @@ export function Sidebar({
                 />
                 <Collapsible open={openSections.me}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        <NavLink item={welcomeNavItem} pathname={pathname} />
                         {meNavigation.map((item) => (
                             <NavLink
                                 key={item.name}
@@ -397,22 +415,6 @@ export function Sidebar({
                         </Collapsible>
                     </>
                 )}
-
-                {/* Wave 7 sidebar trim (2026-04-25): four primary surfaces only —
-                    Brainstorming, The Forge, Investors, Suppliers. No section
-                    headers / collapsibles for the primary nav. */}
-                <div className="mt-1.5 mb-0.5 border-t border-border/40" />
-                <div className="space-y-0.5">
-                    {workshopNavigation.map((item) => (
-                        <NavLink key={item.name} item={item} pathname={pathname} />
-                    ))}
-                    {moneyLegacyNavigation.map((item) => (
-                        <NavLink key={item.name} item={item} pathname={pathname} />
-                    ))}
-                    {marketplaceSuppliesNavigation.map((item) => (
-                        <NavLink key={item.name} item={item} pathname={pathname} />
-                    ))}
-                </div>
             </nav>
 
             {/* ─── Getting Started — gated on onboarding_data presence ── */}
