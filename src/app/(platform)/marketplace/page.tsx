@@ -26,7 +26,10 @@ import { getSupplierDirectoryStats } from '@/actions/suppliers'
 import {
   getSuppliersDirectoryFacets,
   getSuppliersDirectoryPage,
+  getSupplierContactsFacets,
+  getSupplierContactsPage,
 } from '@/actions/suppliers-directory'
+import { getInvestorTierAccess } from '@/actions/investors'
 import { SupplierSearchPanel } from './_components/SupplierSearchPanel'
 import { MarketplaceTabs } from './_components/MarketplaceTabs'
 import { typography } from '@/lib/design-system'
@@ -51,19 +54,32 @@ export default async function MarketplacePage() {
   let verifiedCount = 0
   let supplierStats: SupplierDirectoryStats | null = null
 
-  const [searchResult, statsResult, supplierStatsResult, facetsResult, suppliersPageResult] =
-    await Promise.allSettled([
-      searchMarketplaceListings({
-        categories: ['Products', 'Services'],
-        page: 1,
-        pageSize: 24,
-        sort: 'verified',
-      }),
-      getMarketplaceStats(),
-      getSupplierDirectoryStats(),
-      getSuppliersDirectoryFacets(),
-      getSuppliersDirectoryPage({ page: 1, pageSize: 20 }),
-    ])
+  const [
+    searchResult,
+    statsResult,
+    supplierStatsResult,
+    facetsResult,
+    suppliersPageResult,
+    contactsFacetsResult,
+    contactsPageResult,
+    tierResult,
+  ] = await Promise.allSettled([
+    searchMarketplaceListings({
+      categories: ['Products', 'Services'],
+      page: 1,
+      pageSize: 24,
+      sort: 'verified',
+    }),
+    getMarketplaceStats(),
+    getSupplierDirectoryStats(),
+    getSuppliersDirectoryFacets(),
+    getSuppliersDirectoryPage({ page: 1, pageSize: 20 }),
+    getSupplierContactsFacets(),
+    getSupplierContactsPage({ page: 1, pageSize: 25 }),
+    // Reuse the investor tier helper — same Stripe subscription drives
+    // contact-name unmasking on the marketplace contacts tab.
+    getInvestorTierAccess(),
+  ])
 
   if (searchResult.status === 'fulfilled') {
     listings = searchResult.value.data
@@ -146,6 +162,26 @@ export default async function MarketplacePage() {
           suppliersPageResult.status === 'fulfilled'
             ? suppliersPageResult.value
             : { rows: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }
+        }
+        contactsFacets={
+          contactsFacetsResult.status === 'fulfilled'
+            ? contactsFacetsResult.value
+            : { totalContacts: 0, suppliersWithContacts: 0, countries: [] }
+        }
+        contactsInitialPage={
+          contactsPageResult.status === 'fulfilled'
+            ? contactsPageResult.value
+            : { rows: [], total: 0, page: 1, pageSize: 25, totalPages: 0 }
+        }
+        totalContacts={
+          contactsFacetsResult.status === 'fulfilled'
+            ? contactsFacetsResult.value.totalContacts
+            : undefined
+        }
+        isPaid={
+          tierResult.status === 'fulfilled'
+            ? tierResult.value.tier !== 'free'
+            : false
         }
         overview={
           <SupplierSearchPanel

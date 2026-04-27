@@ -21,9 +21,12 @@ import { useState, type ReactNode } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Building2, Users, LayoutGrid } from 'lucide-react'
 import { SuppliersTable } from './SuppliersTable'
+import { ContactsTable } from './ContactsTable'
 import type {
   SuppliersDirectoryFacets,
   SuppliersDirectoryPageResult,
+  SupplierContactsFacets,
+  SupplierContactsPageResult,
 } from '@/actions/suppliers-directory'
 
 interface MarketplaceTabsProps {
@@ -36,6 +39,11 @@ interface MarketplaceTabsProps {
   /** Phase B: facets + first page of supplier rows for the Suppliers tab. */
   suppliersFacets: SuppliersDirectoryFacets
   suppliersInitialPage: SuppliersDirectoryPageResult
+  /** Phase C: facets + first page of contact rows for the Contacts tab. */
+  contactsFacets: SupplierContactsFacets
+  contactsInitialPage: SupplierContactsPageResult
+  /** Whether the current viewer's tier reveals full contact names. */
+  isPaid: boolean
 }
 
 function fmtCount(n: number | undefined): string {
@@ -50,11 +58,16 @@ export function MarketplaceTabs({
   overview,
   suppliersFacets,
   suppliersInitialPage,
+  contactsFacets,
+  contactsInitialPage,
+  isPaid,
 }: MarketplaceTabsProps) {
   const [tab, setTab] = useState<'overview' | 'suppliers' | 'contacts'>('overview')
 
   const suppliersBadge = totalSuppliers > 0 ? ` (${fmtCount(totalSuppliers)})` : ''
-  const contactsBadge = totalContacts && totalContacts > 0 ? ` (${fmtCount(totalContacts)})` : ''
+  // Prefer the prop-supplied total when known; fall back to facets.
+  const effectiveContactsCount = totalContacts ?? contactsFacets.totalContacts
+  const contactsBadge = effectiveContactsCount > 0 ? ` (${fmtCount(effectiveContactsCount)})` : ''
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
@@ -83,20 +96,13 @@ export function MarketplaceTabs({
         <SuppliersTable facets={suppliersFacets} initialPage={suppliersInitialPage} />
       </TabsContent>
 
-      {/* ── Contacts tab — Phase C placeholder ──────────────────────────── */}
+      {/* ── Contacts tab — Phase C (supplier key-people directory) ──────── */}
       <TabsContent value="contacts" className="mt-6">
-        <div className="rounded-xl bg-muted/30 p-10 text-center">
-          <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Users className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <h3 className="text-base font-semibold text-foreground mb-2">
-            Supplier contact directory
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-            Searchable directory of named contacts at suppliers in the database — same
-            layout as the Forge Capital Contacts tab. Lands after the Suppliers tab.
-          </p>
-        </div>
+        <ContactsTable
+          facets={contactsFacets}
+          initialPage={contactsInitialPage}
+          isPaid={isPaid}
+        />
       </TabsContent>
     </Tabs>
   )

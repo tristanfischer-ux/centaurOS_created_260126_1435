@@ -145,6 +145,211 @@ export async function getSuppliersDirectoryFacets(): Promise<SuppliersDirectoryF
   return { countries, statuses }
 }
 
+// ---------------------------------------------------------------------------
+// Phase C — Contacts tab (supplier key_people directory)
+// ---------------------------------------------------------------------------
+
+export interface SupplierContactRow {
+  /** Stable UI key derived from supplier id + index. */
+  key: string
+  /** Parent supplier id (links back to /marketplace/<id>). */
+  supplierId: string
+  supplierName: string
+  supplierCountry: string | null
+  /** Best-effort name extracted from heterogeneous key_people shape. */
+  name: string
+  /** Best-effort title / role extracted from the same. */
+  title: string | null
+}
+
+export interface SupplierContactsFacets {
+  /** Total contacts across the directory (deduped per supplier+name). */
+  totalContacts: number
+  /** Number of suppliers with at least one key person on file. */
+  suppliersWithContacts: number
+  /** Top 20 country values by supplier count (for the Country filter). */
+  countries: { value: string; count: number }[]
+}
+
+export interface GetSupplierContactsPageParams {
+  search?: string
+  country?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface SupplierContactsPageResult {
+  rows: SupplierContactRow[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+/**
+ * Normalise one element of a supplier's `key_people` array. The Nightshift
+ * pipeline writes three shapes — sometimes inconsistently within one row:
+ *
+ *   1. `{ "name": "...", "title": "..." }`           — object form
+ *   2. `"Pius Weber, Managing Director"`             — comma-delimited string
+ *   3. `"Faye Tomson|Founder & Sustainable Energy"`  — pipe-delimited string
+ *
+ * Returns `{ name, title }` with name always non-empty (skip the row in
+ * the caller if it is). Handles each shape defensively without assuming
+ * the array is uniform.
+ */
+function normaliseKeyPerson(raw: unknown): { name: string; title: string | null } | null {
+  if (raw == null) return null
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>
+    const name = String(obj.name ?? obj.full_name ?? '').trim()
+    if (!name) return null
+    const title = String(obj.title ?? obj.role ?? '').trim() || null
+    return { name, title }
+  }
+  if (typeof raw === 'string') {
+    const s = raw.trim()
+    if (!s) return null
+    const pipeIdx = s.indexOf('|')
+    if (pipeIdx > 0) {
+      return { name: s.slice(0, pipeIdx).trim(), title: s.slice(pipeIdx + 1).trim() || null }
+    }
+    const commaIdx = s.indexOf(',')
+    if (commaIdx > 0) {
+      return { name: s.slice(0, commaIdx).trim(), title: s.slice(commaIdx + 1).trim() || null }
+    }
+    return { name: s, title: null }
+  }
+  return null
+}
+
+/**
+ * Facet counts for the Contacts tab. Cheap aggregate over array shapes
+ * only — no rows expanded server-side.
+ */
+export async function getSupplierContactsFacets(): Promise<SupplierContactsFacets> {
+  const admin = createAdminClient()
+
+  // Fetch the slim shape we need, scoped to suppliers with a key_people array.
+  const { data, error } = await admin
+    .from('marketplace_listings')
+    .select('id, attributes')
+    .in('category', ['Products', 'Services'])
+    .filter('attributes->key_people', 'not.is', null)
+    .limit(20000)
+
+  if (error || !Array.isArray(data)) {
+    return { totalContacts: 0, suppliersWithContacts: 0, countries: [] }
+  }
+
+  let total = 0
+  let suppliersWithContacts = 0
+  const countryCounts = new Map<string, number>()
+
+  for (const row of data as Array<{ attributes: Record<string, unknown> }>) {
+    const kp = row.attributes?.key_people
+    if (!Array.isArray(kp)) continue
+    const peopleHere = kp.map(normaliseKeyPerson).filter((p): p is { name: string; title: string | null } => p !== null)
+    if (peopleHere.length === 0) continue
+    suppliersWithContacts += 1
+    total += peopleHere.length
+    const c = (row.attributes.country as string | undefined)?.trim()
+    if (c) countryCounts.set(c, (countryCounts.get(c) ?? 0) + 1)
+  }
+
+  const countries = Array.from(countryCounts.entries())
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20)
+
+  return { totalContacts: total, suppliersWithContacts, countries }
+}
+
+/**
+ * Paginated supplier-contacts page. Expands `key_people` server-side.
+ *
+ * GOTCHA: this scans every supplier with a key_people array. ~14K rows,
+ * fast enough for a free-tier query. If it grows past 30K rows we'll need
+ * a flattened materialized view.
+ */
+export async function getSupplierContactsPage(
+  params: GetSupplierContactsPageParams = {},
+): Promise<SupplierContactsPageResult> {
+  const admin = createAdminClient()
+
+  const page = Math.max(1, params.page ?? 1)
+  const pageSize = Math.min(100, Math.max(5, params.pageSize ?? 25))
+  const search = params.search?.trim().toLowerCase() ?? ''
+  const country = params.country?.trim() ?? ''
+
+  let query = admin
+    .from('marketplace_listings')
+    .select('id, title, attributes')
+    .in('category', ['Products', 'Services'])
+    .filter('attributes->key_people', 'not.is', null)
+    .limit(15000)
+
+  if (country) {
+    query = query.filter('attributes->>country', 'eq', country)
+  }
+  // We can't ilike on title at the supplier level when the search is a
+  // contact's name — instead, expand all and filter post-fetch. Acceptable
+  // for the 14K-row scale.
+
+  const { data, error } = await query
+
+  if (error || !Array.isArray(data)) {
+    console.error('[getSupplierContactsPage] query failed:', error?.message)
+    return { rows: [], total: 0, page, pageSize, totalPages: 0 }
+  }
+
+  const expanded: SupplierContactRow[] = []
+  for (const row of data as Array<{
+    id: string
+    title: string
+    attributes: Record<string, unknown>
+  }>) {
+    const kp = row.attributes?.key_people
+    if (!Array.isArray(kp)) continue
+    const supplierName = String(row.title ?? '—')
+    const supplierCountry = (row.attributes?.country as string | undefined) ?? null
+    let i = 0
+    for (const elem of kp) {
+      const person = normaliseKeyPerson(elem)
+      if (!person) continue
+      if (search) {
+        const haystack = `${person.name} ${person.title ?? ''} ${supplierName}`.toLowerCase()
+        if (!haystack.includes(search)) {
+          i += 1
+          continue
+        }
+      }
+      expanded.push({
+        key: `${row.id}::${i}`,
+        supplierId: row.id,
+        supplierName,
+        supplierCountry,
+        name: person.name,
+        title: person.title,
+      })
+      i += 1
+    }
+  }
+
+  // Sort: alphabetical by supplier then person name for stable pagination.
+  expanded.sort((a, b) => {
+    const s = a.supplierName.localeCompare(b.supplierName)
+    return s !== 0 ? s : a.name.localeCompare(b.name)
+  })
+
+  const total = expanded.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const from = (page - 1) * pageSize
+  const rows = expanded.slice(from, from + pageSize)
+
+  return { rows, total, page, pageSize, totalPages }
+}
+
 /**
  * Paginated supplier directory row fetch. Filters server-side so
  * pagination stays accurate.
