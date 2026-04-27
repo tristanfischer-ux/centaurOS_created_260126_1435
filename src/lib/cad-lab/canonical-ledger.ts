@@ -209,16 +209,46 @@ export interface UpsertSpecArgs {
 }
 
 /**
- * Upserts a single module spec. Returns a NEW CanonicalSpecs object (we never
- * mutate input). The caller is responsible for persisting via saveCanonicalSpecs.
+ * Discriminated result of an upsert. Block G bug #6: rank-gated no-ops were
+ * silently counted as "applied" by the caller. Now the caller can branch on
+ * `applied` and skip both `appliedCount += 1` and the audit log.
+ */
+export interface UpsertResult {
+    /** The next ledger state (always returned, even on no-op — equal-by-reference to input on no-op). */
+    specs: CanonicalSpecs
+    /** True iff the value actually changed in the ledger. */
+    applied: boolean
+    /** Reason the upsert was rejected as a no-op. Populated only when applied=false. */
+    reason?: "RANK_DENIED" | "VALUE_UNCHANGED"
+}
+
+/**
+ * Upserts a single module spec. Returns the new ledger state PLUS an `applied`
+ * discriminator so callers don't silently count no-ops as successes.
  *
  * Rank gating: if the existing value's source has higher rank, the new value
- * is ignored (returned unchanged). If lower or equal, overwritten.
+ * is ignored. Equal-or-greater rank: overwrite.
+ *
+ * @deprecated The legacy `upsertCanonicalSpec` returning bare CanonicalSpecs
+ *   exists for backwards compatibility with the existing test suite. New
+ *   callers should use `upsertCanonicalSpecChecked` so they can distinguish
+ *   "applied" from "rank-denied no-op". See Block G bug #6.
  */
 export function upsertCanonicalSpec(
     specs: CanonicalSpecs,
     args: UpsertSpecArgs,
 ): CanonicalSpecs {
+    return upsertCanonicalSpecChecked(specs, args).specs
+}
+
+/**
+ * The discriminated variant. Returns `{ specs, applied, reason? }` so the
+ * caller can branch.
+ */
+export function upsertCanonicalSpecChecked(
+    specs: CanonicalSpecs,
+    args: UpsertSpecArgs,
+): UpsertResult {
     const incomingRank = SOURCE_RANK[args.source]
     const meta = SPEC_KEYS[args.key]
     if (!meta) {
@@ -237,7 +267,20 @@ export function upsertCanonicalSpec(
     const existing = mod.specs[args.key]
     if (existing && !canOverwrite(existing.source, args.source)) {
         // Higher-rank source already owns this value. No-op.
-        return specs
+        return { specs, applied: false, reason: "RANK_DENIED" }
+    }
+
+    // Block G bug #6 follow-on: if the incoming value matches the current
+    // value AND the source is the same, treat as a no-op too — there's
+    // nothing to record. Different source at equal rank still counts as
+    // "applied" because provenance changed.
+    if (
+        existing &&
+        existing.value === args.value &&
+        existing.source === args.source &&
+        existing.unit === meta.unit
+    ) {
+        return { specs, applied: false, reason: "VALUE_UNCHANGED" }
     }
 
     mod.specs[args.key] = {
@@ -250,7 +293,7 @@ export function upsertCanonicalSpec(
         ...(args.rationale ? { rationale: args.rationale } : {}),
     }
     next.modules[args.moduleId] = mod
-    return next
+    return { specs: next, applied: true }
 }
 
 export interface UpsertPartArgs {
@@ -268,23 +311,45 @@ export interface UpsertPartArgs {
     rationale?: string
 }
 
-/** Upserts a part with rank-gated cost and mass values. */
+/**
+ * Upserts a part with rank-gated cost and mass values.
+ *
+ * @deprecated Use `upsertCanonicalPartChecked` for new callers — it returns
+ *   a discriminated result so rank-denied writes are not silently counted
+ *   as applied.
+ */
 export function upsertCanonicalPart(
     specs: CanonicalSpecs,
     args: UpsertPartArgs,
 ): CanonicalSpecs {
+    return upsertCanonicalPartChecked(specs, args).specs
+}
+
+/**
+ * Discriminated variant of `upsertCanonicalPart`. Reports `applied=false`
+ * when every numeric field was rank-denied AND the part already existed
+ * with identical identity fields.
+ */
+export function upsertCanonicalPartChecked(
+    specs: CanonicalSpecs,
+    args: UpsertPartArgs,
+): UpsertResult {
     const incomingRank = SOURCE_RANK[args.source]
     const next = deepClone(specs)
 
     const existing = next.parts[args.partId]
-    const part: CanonicalPart = existing ?? {
-        partId: args.partId,
-        moduleId: args.moduleId,
-        partNumber: args.partNumber,
-        description: args.description,
-        qty: args.qty,
-        isPurchased: args.isPurchased,
-    }
+    const part: CanonicalPart = existing
+        ? { ...existing }
+        : {
+              partId: args.partId,
+              moduleId: args.moduleId,
+              partNumber: args.partNumber,
+              description: args.description,
+              qty: args.qty,
+              isPurchased: args.isPurchased,
+          }
+
+    let mutated = !existing
 
     // Cost: rank-gated.
     if (args.unitCostGbp !== undefined) {
@@ -297,6 +362,7 @@ export function upsertCanonicalPart(
                 updatedAt: new Date().toISOString(),
                 ...(args.rationale ? { rationale: args.rationale } : {}),
             }
+            mutated = true
         }
     }
     // Mass: rank-gated.
@@ -309,19 +375,45 @@ export function upsertCanonicalPart(
                 sourceRank: incomingRank,
                 updatedAt: new Date().toISOString(),
             }
+            mutated = true
         }
     }
     // Identity fields: latest write wins (description / mpn / manufacturer
     // are textual and not subject to numerical-rank precedence; if Fang's
     // patch identifies a Rittal AX cabinet, that description supersedes
     // the bespoke one even though both are "valid" in their own context).
-    if (args.mpn) part.mpn = args.mpn
-    if (args.manufacturer) part.manufacturer = args.manufacturer
-    if (args.description) part.description = args.description
-    if (args.partNumber) part.partNumber = args.partNumber
-    part.qty = args.qty
-    part.isPurchased = args.isPurchased
-    if (args.moduleId !== undefined) part.moduleId = args.moduleId
+    if (args.mpn !== undefined && args.mpn !== part.mpn) {
+        part.mpn = args.mpn
+        mutated = true
+    }
+    if (args.manufacturer !== undefined && args.manufacturer !== part.manufacturer) {
+        part.manufacturer = args.manufacturer
+        mutated = true
+    }
+    if (args.description && args.description !== part.description) {
+        part.description = args.description
+        mutated = true
+    }
+    if (args.partNumber && args.partNumber !== part.partNumber) {
+        part.partNumber = args.partNumber
+        mutated = true
+    }
+    if (part.qty !== args.qty) {
+        part.qty = args.qty
+        mutated = true
+    }
+    if (part.isPurchased !== args.isPurchased) {
+        part.isPurchased = args.isPurchased
+        mutated = true
+    }
+    if (args.moduleId !== undefined && part.moduleId !== args.moduleId) {
+        part.moduleId = args.moduleId
+        mutated = true
+    }
+
+    if (!mutated) {
+        return { specs, applied: false, reason: "RANK_DENIED" }
+    }
 
     next.parts[args.partId] = part
 
@@ -332,7 +424,7 @@ export function upsertCanonicalPart(
             mod.linkedPartIds.push(args.partId)
         }
     }
-    return next
+    return { specs: next, applied: true }
 }
 
 // ─── Cost rollup ──────────────────────────────────────────────────────
@@ -374,10 +466,17 @@ export function recomputeCostRollup(
  * Writes the ledger to cad_lab_projects.canonical_specs with optimistic-lock
  * on canonical_specs_revision. Bumps revision and recomputes digest.
  *
+ * Block G bug #2: the previous implementation used `.select().single()`
+ * after the UPDATE, which throws PGRST116 when zero rows match. The
+ * generic `if (error)` branch swallowed the optimistic-lock conflict as
+ * a generic Postgres error, so the typed `OPTIMISTIC_LOCK_CONFLICT`
+ * branch was unreachable. Now we use plain `.select()` (returns array)
+ * and detect conflict explicitly via `data.length === 0`.
+ *
  * @param supabase a service-role client (createAdminClient()).
  * @param projectId UUID of the cad_lab_projects row.
  * @param specs the new ledger.
- * @returns { ok, revision } on success, { ok: false, error } on conflict.
+ * @returns { ok, revision } on success, { ok: false, error: 'OPTIMISTIC_LOCK_CONFLICT' | string } on conflict / DB error.
  */
 export async function saveCanonicalSpecs(
     supabase: {
@@ -385,12 +484,10 @@ export async function saveCanonicalSpecs(
             update: (values: Record<string, unknown>) => {
                 eq: (col: string, val: string) => {
                     eq: (col: string, val: number) => {
-                        select: () => {
-                            single: () => Promise<{
-                                data: { canonical_specs_revision: number } | null
-                                error: { message: string } | null
-                            }>
-                        }
+                        select: (cols?: string) => Promise<{
+                            data: Array<{ canonical_specs_revision: number }> | null
+                            error: { message: string; code?: string } | null
+                        }>
                     }
                 }
             }
@@ -417,16 +514,23 @@ export async function saveCanonicalSpecs(
         })
         .eq("id", projectId)
         .eq("canonical_specs_revision", expectedRevision)
-        .select()
-        .single()
+        .select("canonical_specs_revision")
 
     if (error) {
         return { ok: false, error: error.message }
     }
-    if (!data) {
+    if (!data || data.length === 0) {
+        // Zero rows matched -> either project missing or revision mismatched.
+        // The atomic RPC distinguishes these; this fallback path treats both
+        // as OPTIMISTIC_LOCK_CONFLICT (caller can probe further if needed).
         return { ok: false, error: "OPTIMISTIC_LOCK_CONFLICT" }
     }
-    return { ok: true, revision: data.canonical_specs_revision }
+    if (data.length > 1) {
+        // This should be impossible (id is PK) but surface it explicitly
+        // rather than silently picking [0].
+        return { ok: false, error: "MULTIPLE_ROWS_MATCHED" }
+    }
+    return { ok: true, revision: data[0].canonical_specs_revision }
 }
 
 /**
