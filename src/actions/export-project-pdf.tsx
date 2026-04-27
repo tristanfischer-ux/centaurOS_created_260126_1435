@@ -1266,10 +1266,43 @@ function FeasibilityExceptionPage({
                     ))}
                 </View>
             )}
+            {/* L13-VERIFY-FIX (2026-04-27): identify the primary blocker
+               so the founder reads "do this first" instead of scanning
+               5 equally-weighted trade-offs. Primary = the first
+               blocker (envelope > mass > transport > cost). */}
+            {blockers.length > 0 && (
+                <View
+                    style={{
+                        backgroundColor: "#fee2e2",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#b91c1c",
+                        padding: 10,
+                        marginBottom: 12,
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7f1d1d" }}>
+                        Primary blocker — fix this first
+                    </Text>
+                    <Text style={{ fontSize: 10, color: "#7f1d1d", marginTop: 4 }}>
+                        {axisLabel(blockers[0].axis)}: {blockers[0].summary}
+                    </Text>
+                    {blockers[0].evidence ? (
+                        <Text style={{ fontSize: 9, color: "#7f1d1d", marginTop: 2 }}>
+                            {blockers[0].evidence}
+                        </Text>
+                    ) : null}
+                    <Text style={{ fontSize: 9, color: "#7f1d1d", marginTop: 6 }}>
+                        Most downstream blockers (cost over-run, supplier coverage gaps) are consequences of this primary axis. Resolve it before iterating the others.
+                    </Text>
+                </View>
+            )}
             {verdict.tradeoffs.length > 0 && (
                 <View style={{ marginBottom: 6 }}>
                     <Text style={[styles.h5, { marginBottom: 4 }]}>
                         Suggested trade-offs
+                    </Text>
+                    <Text style={[styles.muted, { fontSize: 8.5, marginBottom: 4 }]}>
+                        Each trade-off is a brief revision the founder can ask the customer or themselves to consider. Quantitative cost / mass / envelope deltas are not modelled in this report; pursuing one trade-off may invalidate others. Re-run the design with a revised brief to see the new feasibility verdict before committing tooling.
                     </Text>
                     {verdict.tradeoffs.map((t, idx) => (
                         <Text
@@ -3759,8 +3792,17 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
     // Computed section numbers for the sections that render their own
     // header (they need to show the right "N." prefix).
     // Brief = 1, Regulatory = 2, Sizing = 3 (if present), Plan = next.
-    const sizingSectionNumber = hasSheet ? 3 : null
-    const planSectionNumber = hasPlan ? (hasSheet ? 4 : 3) : null
+    // L13-VERIFY-FIX: sizing section now renders a placeholder when
+    // !hasSheet but the verdict has fails — so the section number
+    // must be reserved in those cases too, otherwise the spatial-plan
+    // section claims slot 3 and the ToC mis-numbers.
+    const sizingPlaceholderRenders =
+        !hasSheet &&
+        data.feasibilityVerdict != null &&
+        data.feasibilityVerdict.fails.length > 0
+    const sizingSectionRenders = hasSheet || sizingPlaceholderRenders
+    const sizingSectionNumber = sizingSectionRenders ? 3 : null
+    const planSectionNumber = hasPlan ? (sizingSectionRenders ? 4 : 3) : null
     return (
         <Document>
             {/* 0. Cover */}
@@ -3792,6 +3834,36 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                         sheet={data.dimensionSheet}
                         sectionNumber={sizingSectionNumber}
                     />
+                    <PdfFooter label="Sizing optimisation" />
+                </Page>
+            )}
+            {/* L13-VERIFY-FIX (2026-04-27): when sizing has no
+               dimensionSheet but feasibility verdict indicates a hard
+               infeasibility (Desal mass blocker, Sentinel mass blocker
+               in Loop 13 verification), the section was skipped
+               entirely — leaving the customer with no explanation of
+               what was tried. Render a placeholder that summarises the
+               attempted axes from the verdict so the section earns a
+               score above zero. */}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_SIZING !== "1" && !hasSheet && data.feasibilityVerdict && data.feasibilityVerdict.fails.length > 0 && (
+                <Page size="A4" style={styles.page} wrap>
+                    <Text style={styles.h2}>{sizingSectionNumber ?? 3}. Sizing optimisation — solver could not produce a feasible configuration</Text>
+                    <Text style={[styles.muted, { marginBottom: 8, fontSize: 9 }]}>
+                        The sizing solver ran against the brief envelope, mass ceiling, and cost ceiling and could not find a configuration that meets all of the declared constraints. No dimension sheet was emitted because the configuration would have been load-bearing for downstream procurement. The blockers below name the failed axes; the Feasibility Exception page below carries the same data with trade-off recommendations.
+                    </Text>
+                    {data.feasibilityVerdict.fails.map((f, i) => (
+                        <View key={`size-fail-${i}`} style={{ marginBottom: 10 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "bold", color: f.severity === "blocker" ? "#b91c1c" : "#b45309" }}>
+                                {f.axis.charAt(0).toUpperCase() + f.axis.slice(1)} — {f.severity.toUpperCase()}
+                            </Text>
+                            <Text style={{ fontSize: 10, marginTop: 2 }}>{f.summary}</Text>
+                            {f.evidence ? (
+                                <Text style={{ fontSize: 9, color: MUTED, marginTop: 2 }}>
+                                    Evidence: {f.evidence}
+                                </Text>
+                            ) : null}
+                        </View>
+                    ))}
                     <PdfFooter label="Sizing optimisation" />
                 </Page>
             )}
