@@ -29,16 +29,46 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { markWelcomeComplete } from "@/actions/welcome"
+import { markWelcomeComplete, setFoundryQuickProfile } from "@/actions/welcome"
+import { useState } from "react"
+import { toast } from "sonner"
 
 interface WelcomeViewProps {
     /** First name used in the hero eyebrow greeting. Optional. */
     firstName?: string
+    /** When true, the user's foundry has no stage/sector/industry yet —
+     *  show the Quick set-up card so downstream sections work. */
+    foundryProfileMissing?: boolean
 }
 
-export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement {
+const STAGE_OPTIONS = [
+    "Pre-Seed",
+    "Seed",
+    "Series A",
+    "Series B",
+    "Series C",
+    "Growth",
+] as const
+
+const SECTOR_OPTIONS = [
+    "Climate / energy",
+    "Medical device",
+    "AgTech",
+    "Aerospace / drones",
+    "Industrial / manufacturing",
+    "Consumer hardware",
+    "Robotics",
+    "Defence",
+    "Mobility",
+    "Other hardware",
+] as const
+
+export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewProps): React.ReactElement {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
+    const [profileSaved, setProfileSaved] = useState(false)
+    const [stage, setStage] = useState("")
+    const [sector, setSector] = useState("")
 
     /**
      * Mark the welcome tour as seen. Does NOT redirect — the founder picks
@@ -52,6 +82,30 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
             // first-login state, but stay on /welcome so the user can pick
             // their own destination from the section tiles above.
             router.refresh()
+        })
+    }
+
+    /** Save the founder's Quick set-up (stage + sector). After save, the
+     *  Quick set-up card hides and the four section tiles below work
+     *  with full match-scoring rather than degraded anonymous-tier UX. */
+    const handleQuickProfile = (): void => {
+        if (!stage && !sector) {
+            toast.error("Pick at least a stage or a sector — both is best.")
+            return
+        }
+        startTransition(async () => {
+            const result = await setFoundryQuickProfile({
+                stage: stage || null,
+                sector: sector || null,
+                industry: sector || null, // sector doubles as industry for now
+            })
+            if (result.success) {
+                setProfileSaved(true)
+                toast.success("Saved. Investor and supplier matches will use this.")
+                router.refresh()
+            } else {
+                toast.error("Couldn't save just now. Please try again.")
+            }
         })
     }
 
@@ -81,6 +135,66 @@ export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement
                     </div>
                 </div>
             </section>
+
+            {/* ─────────────────────────────────────────────────────── */}
+            {/* Quick set-up — only when foundry stage/sector are missing */}
+            {/* ─────────────────────────────────────────────────────── */}
+            {foundryProfileMissing && !profileSaved && (
+                <section className="px-4 sm:px-6 lg:px-12 pt-8">
+                    <div className="max-w-3xl">
+                        <Card className="border-2 border-international-orange/30 bg-international-orange/[0.04]">
+                            <CardContent className="pt-5 pb-5">
+                                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">
+                                    Quick set-up · 20 seconds
+                                </p>
+                                <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight mb-1">
+                                    Tell me your stage and sector — I&rsquo;ll match the right investors and suppliers.
+                                </h2>
+                                <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
+                                    Without this, search runs on the deck text alone — useful, but match scoring won&rsquo;t reflect your stage or sector. You can change these any time from your profile.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                    <label className="block">
+                                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Stage</span>
+                                        <select
+                                            value={stage}
+                                            onChange={(e) => setStage(e.target.value)}
+                                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-international-orange"
+                                        >
+                                            <option value="">Pick stage…</option>
+                                            {STAGE_OPTIONS.map((s) => (
+                                                <option key={s} value={s}>{s}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Sector</span>
+                                        <select
+                                            value={sector}
+                                            onChange={(e) => setSector(e.target.value)}
+                                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-international-orange"
+                                        >
+                                            <option value="">Pick sector…</option>
+                                            {SECTOR_OPTIONS.map((s) => (
+                                                <option key={s} value={s}>{s}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+                                <Button
+                                    onClick={handleQuickProfile}
+                                    disabled={isPending}
+                                    size="sm"
+                                    className="gap-1.5"
+                                >
+                                    Save and continue
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </section>
+            )}
 
             {/* ─────────────────────────────────────────────────────── */}
             {/* Short letter from Tristan                               */}

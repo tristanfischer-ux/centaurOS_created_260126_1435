@@ -34,11 +34,28 @@ export default async function WelcomePage(): Promise<React.ReactNode> {
 
     const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name, foundry_id")
         .eq("id", user.id)
         .single()
 
     const firstName = profile?.full_name?.split(" ")[0] || undefined
 
-    return <WelcomeView firstName={firstName} />
+    // Tristan 2026-04-27: detect missing foundry stage/sector so the
+    // Welcome page can prompt for them inline. Without this, new
+    // signups land with an all-null sandbox foundry and downstream
+    // sections (Investors, Brainstorming match-scoring) silently
+    // degrade. See drawer_forgeos_gotchas about the tour-removal cascade.
+    let foundryProfileMissing = false
+    if (profile?.foundry_id) {
+        const { data: foundry } = await supabase
+            .from("foundries")
+            .select("stage, sector, industry, is_sandbox")
+            .eq("id", profile.foundry_id)
+            .single()
+        if (foundry && !foundry.stage && !foundry.sector && !foundry.industry) {
+            foundryProfileMissing = true
+        }
+    }
+
+    return <WelcomeView firstName={firstName} foundryProfileMissing={foundryProfileMissing} />
 }

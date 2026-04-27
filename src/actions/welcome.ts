@@ -47,6 +47,81 @@ export async function markWelcomeComplete(): Promise<{ success: boolean }> {
 }
 
 /**
+ * Sets the foundry's stage / sector / industry from the Welcome page
+ * "Quick set-up" card. Allows non-Founder roles (Executive, Apprentice)
+ * to fill in their own sandbox foundry's profile fields.
+ *
+ * INTENT: New email/password signups land with role="Executive" and a
+ * sandbox foundry whose stage/sector/industry are NULL. The previous
+ * onboarding tour captured these — that tour was retired
+ * 2026-04-27, leaving the fields un-populatable from the UI for a
+ * non-Founder. updateCompanyProfile() in src/actions/foundry.ts
+ * gates on role==='Founder'. This action is the deliberate
+ * sandbox-only escape hatch: any user may set their OWN foundry's
+ * stage/sector/industry, but ONLY if the foundry is flagged
+ * is_sandbox=true (so we never let a non-Founder mutate a real
+ * shared workspace).
+ *
+ * @security RLS-scoped client; user can only update their own
+ * foundry via FK (foundry_id from profiles). Sandbox-only check
+ * prevents shared-foundry tampering.
+ */
+export async function setFoundryQuickProfile(input: {
+    stage: string | null
+    sector: string | null
+    industry: string | null
+}): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "not-authed" }
+
+    // Look up the user's foundry via their profile.
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("foundry_id")
+        .eq("id", user.id)
+        .single()
+
+    if (!profile?.foundry_id) {
+        return { success: false, error: "no-foundry" }
+    }
+
+    // Sandbox-only: refuse to mutate a non-sandbox (shared) foundry
+    // unless the user is the owner. Belt-and-braces.
+    const { data: foundry } = await supabase
+        .from("foundries")
+        .select("is_sandbox, owner_id")
+        .eq("id", profile.foundry_id)
+        .single()
+
+    if (!foundry) return { success: false, error: "foundry-not-found" }
+    if (!foundry.is_sandbox && foundry.owner_id !== user.id) {
+        return { success: false, error: "not-allowed-on-shared-foundry" }
+    }
+
+    const updates: Record<string, string | null> = {}
+    if (input.stage !== null && input.stage !== "") updates.stage = input.stage
+    if (input.sector !== null && input.sector !== "") updates.sector = input.sector
+    if (input.industry !== null && input.industry !== "") updates.industry = input.industry
+
+    if (Object.keys(updates).length === 0) {
+        return { success: false, error: "no-fields" }
+    }
+
+    const { error: updateError } = await supabase
+        .from("foundries")
+        .update(updates)
+        .eq("id", profile.foundry_id)
+
+    if (updateError) {
+        console.error("[welcome] setFoundryQuickProfile failed:", updateError.message)
+        return { success: false, error: "update-failed" }
+    }
+
+    return { success: true }
+}
+
+/**
  * Marks the current user's cockpit tour as seen by merging
  * `has_completed_tour: true` into `profiles.onboarding_data`.
  *
