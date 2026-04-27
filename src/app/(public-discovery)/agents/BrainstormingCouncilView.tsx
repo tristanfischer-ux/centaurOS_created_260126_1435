@@ -487,6 +487,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     height: 1px;
                     background: var(--bc-border);
                 }
+                /* Mobile: drop the rule line + hint so the heading gets the
+                   full row instead of being squeezed into a 4-word column. */
+                @media (max-width: 640px) {
+                    .bc-section-label .bc-rule { display: none; }
+                    .bc-section-label .bc-hint { display: none; }
+                    .bc-section-label h2 { flex: 1; min-width: 0; }
+                }
                 /* ─── Fiona host card ─── */
                 .bc-fiona-card {
                     background: linear-gradient(180deg, #faf5ff 0%, #ffffff 70%);

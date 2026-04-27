@@ -472,9 +472,9 @@ function PastePanel({
         {hasSearched && onReRun && (
           <button
             onClick={onReRun}
-            className="inline-flex items-center gap-2 border border-border text-foreground bg-card font-semibold px-5 py-2.5 rounded-lg text-sm cursor-pointer hover:bg-muted/50 transition-colors"
+            className="inline-flex items-center gap-2 border border-border text-foreground bg-card font-semibold px-5 py-2.5 rounded-lg text-sm cursor-pointer hover:bg-muted/50 transition-colors whitespace-nowrap"
           >
-            ↻ Re-run
+            ↻ Rerun
           </button>
         )}
         {hasSearched && isPaid && !onReRun && (

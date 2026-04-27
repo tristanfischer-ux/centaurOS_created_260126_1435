@@ -48,22 +48,24 @@ export default async function SettingsPage() {
             {/* Profile summary card */}
             <Card>
                 <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                        <UserAvatar
-                            name={displayName}
-                            role={role}
-                            avatarUrl={profile?.avatar_url}
-                            size="xl"
-                        />
-                        <div className="flex-1 min-w-0">
-                            <h2 className="text-lg font-semibold text-foreground truncate">
-                                {displayName}
-                            </h2>
-                            <p className="text-sm text-muted-foreground truncate">{displayEmail}</p>
-                            <Badge variant="secondary" className="mt-1.5">{role}</Badge>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                            <UserAvatar
+                                name={displayName}
+                                role={role}
+                                avatarUrl={profile?.avatar_url}
+                                size="xl"
+                            />
+                            <div className="flex-1 min-w-0">
+                                <h2 className="text-lg font-semibold text-foreground truncate">
+                                    {displayName}
+                                </h2>
+                                <p className="text-sm text-muted-foreground truncate">{displayEmail}</p>
+                                <Badge variant="secondary" className="mt-1.5">{role}</Badge>
+                            </div>
                         </div>
-                        <Link href="/me">
-                            <Button variant="outline" size="sm">
+                        <Link href="/me" className="sm:ml-auto">
+                            <Button variant="outline" size="sm" className="w-full sm:w-auto">
                                 <User className="h-4 w-4 mr-2" />
                                 Edit Profile
                                 <ArrowRight className="h-4 w-4 ml-2" />
