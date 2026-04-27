@@ -1919,7 +1919,29 @@ function ModulePage({
                 </View>
             )}
 
-            {/* Engineering reviews */}
+            {/* Engineering reviews — L14 (2026-04-27): when a module has
+               no engineering review, surface the gap so the customer
+               knows it's missing rather than silently absent. Loop 13
+               scoring (Hedgerow Camera + Battery — 2 of 3 highest-cost
+               modules — had no review). */}
+            {mod.reviews.length === 0 && (
+                <View
+                    style={{
+                        marginTop: 10,
+                        padding: 8,
+                        backgroundColor: "#fef3c7",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#b45309",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7c2d12" }}>
+                        No engineering review on this module
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 3 }}>
+                        Fang did not produce a manufacturing or assembly review for this module. The other module pages carry [CRITICAL] / [WARNING] / [INFO] findings on tolerances, supplier risks, and sequence dependencies; this module is silent. Re-run Fang on this module before treating the cost / mass figures above as procurement-grade.
+                    </Text>
+                </View>
+            )}
             {mod.reviews.length > 0 && (
                 <View style={{ marginTop: 10 }}>
                     <Text style={styles.h5}>Engineering review ({mod.reviews.length})</Text>
