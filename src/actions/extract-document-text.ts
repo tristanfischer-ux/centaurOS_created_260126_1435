@@ -110,18 +110,29 @@ function parseProfile(text: string): ExtractedProfile {
   // Sectors — scan a vocabulary of common hardware/tech sectors. Use word-boundary
   // matching for short tokens so "ai" doesn't match inside "raising"/"Britain"
   // and "iot" doesn't match inside "pilot"/"patriot" (real bug from v1).
+  //
+  // W32 FIX (2026-04-28): Domain-specific sectors come FIRST. Previously
+  // "ai", "machine learning", "deep tech" were near the top and the 6-slot
+  // cap caused medical device and AgTech briefs to be labelled "AI · Deep Tech"
+  // because those generic terms match almost every tech brief. Now we scan
+  // specific industries first so a medical device pitch gets "medtech" before
+  // "ai", and an AgTech pitch gets "agritech" before "hardware".
   const SECTOR_VOCAB = [
+    // Domain-specific — check these first so the 6-slot cap doesn't fill with generics
+    'medtech', 'healthtech', 'diagnostics', 'life sciences', 'biotech',
+    'agritech', 'foodtech',
     'climate tech', 'clean energy', 'renewable energy', 'battery', 'solar', 'wind',
     'robotics', 'drones', 'aerospace', 'space', 'satellite',
-    'ai', 'machine learning', 'computer vision', 'nlp',
-    'biotech', 'medtech', 'healthtech', 'diagnostics', 'life sciences',
     'fintech', 'insurtech', 'payments',
-    'hardware', 'deep tech', 'advanced manufacturing', 'industrial', 'iot', 'sensors',
-    'materials', 'nanotechnology', 'quantum',
     'mobility', 'automotive', 'ev', 'logistics',
-    'agritech', 'foodtech', 'supply chain',
     'cybersecurity', 'saas', 'b2b software',
     'semiconductors', 'photonics',
+    'materials', 'nanotechnology', 'quantum',
+    'advanced manufacturing', 'supply chain',
+    // Generic — only fill remaining slots after specific sectors are found
+    'hardware', 'industrial', 'sensors', 'iot',
+    'ai', 'machine learning', 'computer vision', 'nlp',
+    'deep tech',
   ]
   const foundSectors: string[] = []
   for (const s of SECTOR_VOCAB) {
