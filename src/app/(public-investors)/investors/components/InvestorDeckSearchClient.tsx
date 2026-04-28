@@ -18,6 +18,7 @@
 
 import { useState, useCallback, useTransition, useRef, useMemo, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   searchInvestors,
@@ -928,6 +929,15 @@ function MatchCard({
   const [isEnriching, startEnrichTransition] = useTransition()
   const [enrichFailed, setEnrichFailed] = useState(false)
 
+  // W27: use router.push so the whole card is navigable without a nested <a>
+  const router = useRouter()
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Only navigate on plain card-body clicks; buttons handle their own events
+    // and call e.stopPropagation() before this bubbles.
+    router.push(`/investors/${firm.id}`)
+  }
+
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!isPaid) return
@@ -1020,10 +1030,17 @@ function MatchCard({
     )
   }
 
-  // Unlocked card — render as a Link
+  // Unlocked card — W27: use a div + onClick instead of <Link> wrapping interactive
+  // children (<button> inside <a> is invalid HTML5 and causes unreliable click
+  // behaviour across browsers; nested buttons' stopPropagation can't prevent
+  // the enclosing Link from navigating in some React reconciliation paths).
   return (
-    <Link
-      href={`/investors/${firm.id}`}
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={handleCardClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/investors/${firm.id}`) } }}
       className={`block bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
     >
       {/* ── Header row: rank + name + type chip | composite % ── */}
@@ -1305,7 +1322,7 @@ function MatchCard({
           )}
         </div>
       )}
-    </Link>
+    </div>
     )
   }
 

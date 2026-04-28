@@ -193,7 +193,7 @@ function SupplierScorecard({ pillars }: { pillars: SupplierPillars }) {
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {isNa ? 'N/A' : value}
+              {isNa ? '—' : value}
             </div>
           </div>
         )
