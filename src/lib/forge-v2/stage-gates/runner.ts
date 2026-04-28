@@ -400,6 +400,27 @@ export async function runGate(
     }
 
     // ── Persist verdict BEFORE any remediation (critical invariant) ─────────
+    //
+    // Each gate's check() returns a DeterministicCheckResult that may be
+    // EXTENDED with `remediationContext` + `remediationTargetStage` fields
+    // when verdict is FAIL/WARN. Gates 2, 3, 5 set these; the runner reads
+    // them off the `deterministic_result` and persists them on the verdict
+    // row so the cron handler (or any downstream observer) can see what
+    // remediation the gate WOULD do. The actual specialist re-fire is a
+    // separate piece of plumbing — for now this provides full visibility
+    // into "the gate found X and proposes to re-fire stage Y with context Z".
+    type ExtendedCheckResult = DeterministicCheckResult & {
+        remediationContext?: string
+        remediationTargetStage?: string
+    }
+    const det = (evalResult.deterministic_result ?? null) as ExtendedCheckResult | null
+    const willRemediate =
+        evalResult.verdict === "FAIL" &&
+        thisAttempt < MAX_GATE_ATTEMPTS &&
+        det != null &&
+        typeof det.remediationContext === "string" &&
+        typeof det.remediationTargetStage === "string"
+
     const verdictRow = await persistVerdict({
         project_id: projectId,
         gate_id: gate.gateId,
@@ -410,9 +431,9 @@ export async function runGate(
         failure_details: evalResult.failure_details,
         model_votes: evalResult.model_votes ?? null,
         deterministic_result: evalResult.deterministic_result ?? null,
-        remediation_fired: false,
-        remediation_target_stage: null,
-        remediation_context_injected: null,
+        remediation_fired: willRemediate,
+        remediation_target_stage: willRemediate ? det!.remediationTargetStage! : null,
+        remediation_context_injected: willRemediate ? det!.remediationContext! : null,
         uncertainty_marker_required: false,
         uncertainty_marker_text: null,
     })
