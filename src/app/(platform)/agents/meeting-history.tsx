@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -250,10 +251,14 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                     </div>
                 )}
 
-                {/* Pin / delete affordances — surfaced on hover, always accessible via keyboard */}
+                {/* Pin / delete affordances — surfaced on hover, always accessible via keyboard.
+                    W34/W37: z-10 ensures these buttons are above the absolute-inset-0 cover
+                    image / placeholder divs that share the same stacking context. type="button"
+                    prevents accidental form submission if the component is ever inside a form. */}
                 {canMutate && (
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                         <Button
+                            type="button"
                             variant="secondary"
                             size="icon"
                             className="h-7 w-7 bg-background/95 hover:bg-background shadow-sm"
@@ -273,6 +278,7 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                             )}
                         </Button>
                         <Button
+                            type="button"
                             variant="secondary"
                             size="icon"
                             className="h-7 w-7 bg-background/95 hover:bg-destructive hover:text-destructive-foreground shadow-sm"
@@ -486,10 +492,11 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
             setMutatingId(null)
             if (!result.ok) {
                 console.error("[MeetingHistory] Pin toggle failed:", result.error)
-                // Rollback on failure
+                // W37: Rollback optimistic update and surface error via toast
                 setMeetings((prev) =>
                     prev.map((m) => (m.id === id ? { ...m, isPinned: !pinned } : m)),
                 )
+                toast.error(result.error ?? "Could not update pin — please try again.")
             }
         },
         [],
@@ -513,9 +520,10 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
             setPendingDelete(null)
         } else {
             console.error("[MeetingHistory] Delete failed:", result.error)
-            // Keep the dialog open so the user sees the error state; surface
-            // via console for now (the action returns sanitised errors).
-            alert(result.error ?? "Failed to delete session. Please try again.")
+            // W34: close the dialog and surface the error as a toast so the
+            // user knows the delete failed without a blocking browser alert.
+            setPendingDelete(null)
+            toast.error(result.error ?? "Failed to delete session — please try again.")
         }
     }, [pendingDelete])
 
