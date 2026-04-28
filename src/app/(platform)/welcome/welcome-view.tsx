@@ -127,11 +127,15 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
             <section className="relative overflow-hidden rounded-b-2xl bg-gradient-to-br from-background via-background to-orange-50/40">
                 <div className="relative z-10 px-4 sm:px-6 lg:px-12 pt-10 sm:pt-14 lg:pt-20 pb-10 sm:pb-14">
                     <div className="max-w-3xl">
-                        {/* Tristan 2026-04-27: dropped the "WELCOME, TRISTAN"
-                            eyebrow + put the red bar inline with the page title,
-                            matching the canonical My Profile page-header pattern. */}
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="h-12 w-2 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.4)] flex-shrink-0" />
+                        {/* Tristan 2026-04-28 (post-Gemini final-check):
+                            switched from vertical-bar-beside-title to
+                            horizontal-bar-above-title for the welcome hero.
+                            Gemini's recommended marketing-hero variant —
+                            short horizontal accent bar above the H1, no
+                            eyebrow. The smaller H2 section headers below
+                            keep the vertical-bar-beside variant (compact). */}
+                        <div className="mb-4">
+                            <div className="h-1.5 w-14 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.4)] mb-4" />
                             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
                                 Welcome to{" "}
                                 <span className="text-international-orange">Fractional Forge</span>.
