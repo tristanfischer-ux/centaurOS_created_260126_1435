@@ -269,9 +269,16 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
                 <div className="max-w-3xl">
-                    <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-6">
-                        How founders use it
-                    </p>
+                    {/* Tristan 2026-04-28 (audit cross-cutting fix #3): replaced
+                        grey-uppercase eyebrow with the canonical red-bar +
+                        bold H2 pattern (audit flagged grey-uppercase H2s as
+                        cross-cutting drift). */}
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="h-6 w-1 bg-international-orange rounded-full" />
+                        <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+                            How founders use it
+                        </h2>
+                    </div>
                     <div className="space-y-5">
                         <ScenarioRow
                             number="01"
@@ -298,12 +305,18 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
                 <div className="max-w-3xl">
                     <Card className="border-2 border-international-orange/20 bg-gradient-to-br from-background to-international-orange/[0.04]">
                         <CardContent className="pt-6 pb-6">
-                            <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
-                                Pick where to start
-                            </p>
-                            <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight mb-2">
+                            {/* Tristan 2026-04-28 (audit fix): same red-bar
+                                pattern instead of the grey-uppercase eyebrow.
+                                "Pick where to start" merged into the H2. */}
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="h-6 w-1 bg-international-orange rounded-full" />
+                                <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                                    Pick where to start
+                                </h2>
+                            </div>
+                            <h3 className="text-lg sm:text-xl text-foreground tracking-tight mb-2">
                                 Open whichever section is most useful right now.
-                            </h2>
+                            </h3>
                             <p className="text-base text-muted-foreground leading-relaxed mb-5 max-w-2xl">
                                 If you have a hard decision to think through, open
                                 Brainstorming. If you have a product to design, open The
