@@ -17,6 +17,9 @@ import * as React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import {
   updateProduct,
   deleteProduct,
@@ -82,6 +85,25 @@ import {
 import type { Product, ProductLifecycle, MarketAssessment, FundabilityScore, DesignBrief, ProductIteration, ProductSynthesis, IterationPareto } from '@/types/product'
 import { LIFECYCLE_LABELS, LIFECYCLE_ORDER } from '@/types/product'
 
+// ─── Synthesis validity guard ──────────────────────────────────────
+// Reality check: the DB column `product_synthesis` is JSONB, so a row can
+// carry a partial/legacy shape that satisfies TypeScript at the type-cast
+// boundary but misses required fields at render time. If pareto is missing
+// we'd crash in the Fundability tab on `synthesis.pareto.market`. Guard
+// here — treat any invalid shape as "no synthesis" and show the empty-
+// state CTA. Verified 2026-04-20 against legacy-shaped rows.
+function hasFullSynthesis(s: ProductSynthesis | null | undefined): s is ProductSynthesis {
+  if (!s) return false
+  const p = (s as Partial<ProductSynthesis>).pareto
+  if (!p || typeof p !== 'object') return false
+  return (
+    typeof p.market === 'number' &&
+    typeof p.financial === 'number' &&
+    typeof p.fundability === 'number' &&
+    typeof p.manufacturing === 'number'
+  )
+}
+
 // ─── Lifecycle styling ──────────────────────────────────────────────
 
 const LIFECYCLE_VARIANT: Record<ProductLifecycle, 'default' | 'secondary' | 'success' | 'warning' | 'info' | 'brand' | 'outline'> = {
@@ -132,11 +154,16 @@ function formatPence(pence: number): string {
 
 interface ProductDetailViewProps {
   product: Product
+  // READ-ONLY: When true, all edit, delete, and mutation controls are hidden
+  // or disabled. Used by /products/legacy/[id] during the Pre-Phase Coming
+  // Soon period so founders can still inspect data without being able to
+  // mutate it.
+  readOnly?: boolean
 }
 
 // ─── Component ──────────────────────────────────────────────────────
 
-export function ProductDetailView({ product: initialProduct }: ProductDetailViewProps) {
+export function ProductDetailView({ product: initialProduct, readOnly = false }: ProductDetailViewProps) {
   const router = useRouter()
   const [product, setProduct] = React.useState(initialProduct)
   const [activeTab, setActiveTab] = React.useState('overview')
@@ -201,6 +228,9 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   // FLOW: Check if linked Forge project has completed and auto-sync COGS
   React.useEffect(() => {
     if (!product.cad_lab_project_id) return
+    // READ-ONLY: checkForgeCompletionAndSync writes COGS back to the product;
+    // skip entirely in legacy view so data stays frozen.
+    if (readOnly) return
     let cancelled = false
     async function checkForge() {
       const result = await checkForgeCompletionAndSync(product.id)
@@ -228,7 +258,51 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
     checkForge()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product.id, product.cad_lab_project_id])
+  }, [product.id, product.cad_lab_project_id, readOnly])
+
+  // ── AI Briefing ──────────────────────────────────────────────────
+  const briefingContext = React.useMemo(() => {
+    const parts: string[] = [`Product: ${product.name}`, `Stage: ${product.lifecycle}`]
+    if (product.unit_economics?.cogs_per_unit_pence) {
+      parts.push(`COGS: ${formatPence(product.unit_economics.cogs_per_unit_pence)}`)
+    }
+    if (product.unit_economics?.gross_margin_pct != null) {
+      parts.push(`Margin: ${product.unit_economics.gross_margin_pct.toFixed(1)}%`)
+    }
+    if (product.cad_lab_project_id) parts.push('Linked to CAD Lab')
+    // FLOW: Include iteration progress for Priya to reference
+    if (iterations.length > 0) {
+      const latest = iterations[iterations.length - 1]
+      parts.push(`Iteration ${latest.iteration_number} (${latest.convergence_status})`)
+      if (iterations.length >= 2) {
+        const first = iterations[0]
+        const fp = first.pareto_scores as IterationPareto
+        const lp = latest.pareto_scores as IterationPareto
+        const totalImprovement = (lp.market + lp.financial + lp.fundability + lp.manufacturing)
+          - (fp.market + fp.financial + fp.fundability + fp.manufacturing)
+        if (totalImprovement !== 0) {
+          parts.push(`Total improvement since v1: ${totalImprovement > 0 ? '+' : ''}${totalImprovement} points`)
+        }
+      }
+    }
+    if (hasFullSynthesis(synthesis)) {
+      const p = synthesis.pareto
+      parts.push(`Pareto: market=${p.market}, financial=${p.financial}, fundability=${p.fundability}, manufacturing=${p.manufacturing}`)
+    }
+    return parts.join(', ')
+  }, [product, iterations, synthesis])
+
+  const briefingSeverity = React.useMemo(() => {
+    if (product.lifecycle === 'deprecated') return 'warning' as const
+    return 'success' as const
+  }, [product.lifecycle])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('product-lead', briefingContext, briefingSeverity),
+    briefingSeverity,
+    true,
+    `briefing-product-${product.id}`,
+  )
 
   // INTENT: Fetch iterations when History tab is first opened
   React.useEffect(() => {
@@ -664,12 +738,26 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
 
   const lifecycleIndex = LIFECYCLE_ORDER.indexOf(product.lifecycle)
 
+  // ROUTING: In read-only mode, the back link returns to the legacy list; in
+  // live mode it points at the main Products surface.
+  const backHref = readOnly ? '/products/legacy' : '/products'
+
   return (
     <div className="space-y-6">
+      {/* READ-ONLY banner */}
+      {readOnly && (
+        <div className="rounded-md border border-international-orange/30 bg-international-orange/5 px-4 py-3">
+          <p className="text-sm text-foreground">
+            <span className="font-medium">Read-only mode</span> — editing resumes in
+            the new Products experience (coming soon).
+          </p>
+        </div>
+      )}
+
       {/* Back link + header */}
       <div>
         <Link
-          href="/products"
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -686,28 +774,44 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
               </Badge>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              <Pencil className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete
-            </Button>
-          </div>
+          {/* Header actions — hidden in read-only mode. */}
+          {!readOnly && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Priya briefing */}
+      <SpecialistBriefingHero
+        specialistId="product-lead"
+        specialistName="Priya"
+        specialistTitle="Product Development"
+        narrative={briefing.narrative}
+        fallbackMessage={`Reviewing ${product.name} — currently in ${LIFECYCLE_LABELS[product.lifecycle]} stage.`}
+        isLoading={briefing.isLoading}
+        loadingMessage={`Analysing ${product.name}...`}
+        severity={briefing.severity}
+        context={{ type: 'general', title: product.name, description: briefingContext }}
+      />
 
       {/* Tab bar — WAI-ARIA tablist with arrow-key navigation */}
       <div className="border-b border-border" role="tablist" aria-label="Product sections">
@@ -765,6 +869,13 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
           })}
         </div>
       </div>
+
+      {/* READ-ONLY: everything below the tab bar lives inside a fieldset that
+          is disabled when readOnly is true. Browsers natively disable all
+          descendant <button>, <input>, <textarea>, and <select> elements,
+          which covers every edit / save / mutate control in the tab panels,
+          forms, and nested dialogs without us having to tag each one. */}
+      <fieldset disabled={readOnly} className="contents">
 
       {/* Tab content: Overview */}
       {activeTab === 'overview' && (
@@ -2125,7 +2236,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
               </div>
             </CardHeader>
             <CardContent>
-              {synthesis ? (
+              {hasFullSynthesis(synthesis) ? (
                 <div className="space-y-6">
                   {/* Pareto Score Bars */}
                   <div>
@@ -2621,6 +2732,8 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      </fieldset>
     </div>
   )
 }

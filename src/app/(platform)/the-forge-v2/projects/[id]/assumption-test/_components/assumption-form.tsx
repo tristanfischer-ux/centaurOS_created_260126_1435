@@ -1,24 +1,21 @@
 "use client"
 
 /**
- * @file assumption-form.tsx — Stub form that captures a Products-style
- * assumption test (hypothesis, expected outcome, actual outcome, decision).
- *
- * @description No Products-side integration is wired yet — submit holds the
- * captured record in local component state so the founder can see the shape
- * of what the record will look like. A follow-up PR will persist the record
- * via a dedicated assumption_tests table and propagate to the Products surface.
+ * @file assumption-form.tsx — Real form that captures + persists a
+ * Products-style assumption test via the createAssumptionTest server action.
+ * Backed by the assumption_tests table shipped 2026-04-22.
  */
 
-import { useState } from "react"
-import { Beaker, CheckCircle2, Target } from "lucide-react"
+import { useState, useTransition } from "react"
+import { Beaker, CheckCircle2, Target, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { createAssumptionTest } from "@/actions/cad-lab-projects"
 
 type Decision = "keep" | "kill" | "pivot" | ""
 
@@ -36,26 +33,43 @@ const DECISION_META: Record<Exclude<Decision, "">, { label: string; description:
     pivot: { label: "Pivot", description: "Hypothesis mixed — reshape the assumption before retesting.", tone: "bg-international-orange/10 text-international-orange border-international-orange/30" },
 }
 
-export function AssumptionForm(): React.ReactElement {
+export function AssumptionForm({ projectId }: { projectId: string }): React.ReactElement {
     const [hypothesis, setHypothesis] = useState("")
     const [expected, setExpected] = useState("")
     const [actual, setActual] = useState("")
     const [decision, setDecision] = useState<Decision>("")
     const [rationale, setRationale] = useState("")
     const [submitted, setSubmitted] = useState<SubmittedRecord | null>(null)
+    const [isPending, startTransition] = useTransition()
 
-    const canSubmit = hypothesis.trim().length > 0 && expected.trim().length > 0 && decision !== ""
+    const canSubmit = hypothesis.trim().length > 0 && expected.trim().length > 0 && decision !== "" && !isPending
 
     function handleSubmit(e: React.FormEvent): void {
         e.preventDefault()
         if (decision === "") return
         if (!canSubmit) return
-        setSubmitted({
-            hypothesis: hypothesis.trim(),
-            expected: expected.trim(),
-            actual: actual.trim(),
-            decision,
-            rationale: rationale.trim(),
+        startTransition(async () => {
+            const result = await createAssumptionTest({
+                projectId,
+                hypothesis: hypothesis.trim(),
+                expectedOutcome: expected.trim(),
+                actualOutcome: actual.trim() || null,
+                decision,
+                rationale: rationale.trim() || null,
+                testedAt: actual.trim().length > 0 ? new Date().toISOString() : null,
+            })
+            if ("error" in result) {
+                toast.error(result.error)
+                return
+            }
+            toast.success("Assumption test logged")
+            setSubmitted({
+                hypothesis: hypothesis.trim(),
+                expected: expected.trim(),
+                actual: actual.trim(),
+                decision,
+                rationale: rationale.trim(),
+            })
         })
     }
 
@@ -77,10 +91,10 @@ export function AssumptionForm(): React.ReactElement {
                         <CheckCircle2 className="h-5 w-5 text-status-success mt-0.5 shrink-0" />
                         <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-foreground">
-                                Captured in this session (stub — no persistence yet)
+                                Assumption test logged
                             </p>
                             <p className="text-[12.5px] text-muted-foreground leading-relaxed mt-0.5">
-                                This is the record the upcoming assumption_tests table will hold. No Products-side propagation is wired yet.
+                                Persisted to the assumption_tests register for this foundry. Products-side propagation ships in Phase 4.
                             </p>
                         </div>
                     </div>
@@ -122,6 +136,7 @@ export function AssumptionForm(): React.ReactElement {
                             value={hypothesis}
                             onChange={e => setHypothesis(e.target.value)}
                             required
+                            maxLength={5000}
                         />
                     </div>
 
@@ -134,6 +149,7 @@ export function AssumptionForm(): React.ReactElement {
                             value={expected}
                             onChange={e => setExpected(e.target.value)}
                             required
+                            maxLength={5000}
                         />
                     </div>
 
@@ -198,16 +214,13 @@ export function AssumptionForm(): React.ReactElement {
             <Card className="rounded-xl border bg-muted/30">
                 <CardContent className="py-5 px-5 flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <Badge variant="outline" className="text-[10px] font-semibold bg-international-orange/10 text-international-orange border-international-orange/30">
-                            Stub
-                        </Badge>
-                        <p className="text-sm font-semibold text-foreground mt-1">Submit writes to local state only</p>
+                        <p className="text-sm font-semibold text-foreground">Persists to assumption_tests register</p>
                         <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed max-w-xl">
-                            A dedicated `assumption_tests` table with Products propagation lands in a later PR. This form shapes the record so the data contract is visible now.
+                            Scoped to your foundry via RLS. Records feed the lessons-learned registry and will propagate to Products assumption roster in Phase 4.
                         </p>
                     </div>
                     <Button type="submit" size="sm" disabled={!canSubmit} className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                        <Beaker className="h-3.5 w-3.5" />
+                        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Beaker className="h-3.5 w-3.5" />}
                         Log assumption test
                     </Button>
                 </CardContent>

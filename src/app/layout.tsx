@@ -42,10 +42,10 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Fractional Forge — Ship the smart version of every hardware product",
-    template: "%s | Fractional Forge",
+    default: "ForgeOS — Ship the smart version of every hardware product",
+    template: "%s | ForgeOS",
   },
-  description: "Cheap intelligence is making every commodity hardware product re-imaginable. Fractional Forge helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
+  description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
   metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Fractional Forge",
+    title: "ForgeOS",
   },
   formatDetection: {
     telephone: false,
@@ -64,15 +64,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_GB",
-    siteName: "Fractional Forge",
-    title: "Fractional Forge — Ship the smart version of every hardware product",
-    description: "Cheap intelligence is making every commodity hardware product re-imaginable. Fractional Forge helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
+    siteName: "ForgeOS by Fractional Forge",
+    title: "ForgeOS — Ship the smart version of every hardware product",
+    description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
     url: "https://fractionalforge.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fractional Forge — Ship the smart version of every hardware product",
-    description: "Cheap intelligence is making every commodity hardware product re-imaginable. Fractional Forge helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
+    title: "ForgeOS — Ship the smart version of every hardware product",
+    description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
   },
   robots: {
     index: true,

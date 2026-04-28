@@ -1,42 +1,30 @@
 /**
- * @file page.tsx — Server component for the /products page.
+ * @file page.tsx — /products root page (Pre-Phase stub).
  *
- * @description Authenticates the user, fetches products for the foundry,
- * and delegates rendering to the ProductListView client component.
+ * @description During the Pre-Phase Coming Soon period, this page's output is
+ * replaced by the ProductsLayout's route gate — it swaps to the Coming Soon
+ * bridge whenever the pathname is under /products but not /products/legacy.
+ * This stub therefore returns null; the layout renders everything visible.
+ *
+ * When Phase 4 ships, the Coming Soon sidecar is removed and this file is
+ * restored to the real list view implementation. The pre-sidecar version
+ * lives at the legacy route (/products/legacy) so no work is lost.
  *
  * @related
- * - src/app/(platform)/products/product-list-view.tsx — Client component
- * - src/actions/products.ts — Server actions
- * - src/types/product.ts — Types
+ * - src/app/(platform)/products/layout.tsx — route gate (renders Coming Soon)
+ * - src/app/(platform)/products/legacy/page.tsx — read-only archive
  */
 
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { getProducts } from '@/actions/products'
-import { ProductListView } from './product-list-view'
 
 export const metadata: Metadata = {
   title: 'Products',
-  description: 'Your hardware products — from concept to market',
-  openGraph: {
-    title: 'Products | ForgeOS',
-    description: 'Your hardware products — from concept to market',
-    type: 'website',
-  },
+  description: 'Products is being redesigned — coming soon',
 }
 
-export default async function ProductsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const foundryId = await getFoundryIdCached()
-  if (!foundryId) redirect('/investors')
-
-  const result = await getProducts()
-  const products = result.data ?? []
-
-  return <ProductListView products={products} />
+export default function ProductsPage() {
+  // INTENT: The layout gate renders the Coming Soon bridge in place of this
+  // stub for live /products/* paths. Returning null keeps the page segment
+  // rendered (Next requires something) without duplicating the bridge.
+  return null
 }

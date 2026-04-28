@@ -3,6 +3,7 @@
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { classifyAIError } from '@/lib/agents/error-classification'
+import { recordSpecialistCall } from '@/lib/audit/specialist-call'
 import { z } from 'zod'
 import {
   businessPlanAnalysisSchema,
@@ -178,15 +179,36 @@ async function extractSection(
   sectionPrompt: string,
   modelOverride?: string,
   maxTokensOverride?: number,
+  /** Optional ledger context — when set, the call is logged to ai_credits_ledger via SHARED audit_log. */
+  ledgerCtx?: { foundryId: string | null; userId: string; sectionName: string },
 ): Promise<string> {
+  const callStartedAt = Date.now()
+  const modelId = modelOverride ?? SECTION_MODEL
   const response = await client.messages.create({
-    model: modelOverride ?? SECTION_MODEL,
+    model: modelId,
     max_tokens: maxTokensOverride ?? SECTION_MAX_TOKENS,
     system: sectionPrompt,
     messages: [
       { role: 'user', content: `Analyze the following business plan:\n\n${businessPlanText}` },
     ],
   })
+
+  // Money: log the LLM call to ai_credits_ledger (via SHARED audit_log trigger).
+  // Sage owns business-plan analysis. Map full model ids to the cost-rules key.
+  if (ledgerCtx) {
+    const costModelKey = modelId.includes('opus') ? 'opus' : modelId.includes('haiku') ? 'haiku' : 'sonnet'
+    void recordSpecialistCall({
+      foundryId: ledgerCtx.foundryId,
+      specialistId: 'sage',
+      section: 'plan',
+      model: costModelKey,
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+      durationMs: Date.now() - callStartedAt,
+      invokedByUserId: ledgerCtx.userId,
+      entityId: ledgerCtx.sectionName,
+    })
+  }
 
   const textBlock = response.content.find(block => block.type === 'text')
   if (!textBlock || textBlock.type !== 'text') {
@@ -210,7 +232,7 @@ async function extractSection(
 export async function analyzeBusinessPlan(
   formData: FormData
 ): Promise<{ analysis?: BusinessPlanAnalysis; error?: string }> {
-  return withAIGate('analyze', async ({ user }) => {
+  return withAIGate('analyze', async ({ user, foundryId }) => {
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) return { error: 'AI analysis service is not configured' }
 
@@ -255,6 +277,9 @@ export async function analyzeBusinessPlan(
       const Anthropic = (await import('@anthropic-ai/sdk')).default
       const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
 
+      // Money: ledger context for ai_credits_ledger via SHARED audit_log.
+      const ledgerBase = { foundryId, userId: user.id }
+
       // DECISION: Run all 6 Sonnet calls in parallel within the server action.
       // Objectives extraction also runs via /api/analyze-objectives (Opus, 300s)
       // from the client component — if Opus returns objectives and Sonnet doesn't,
@@ -267,12 +292,12 @@ export async function analyzeBusinessPlan(
         productsRaw,
         summaryRaw,
       ] = await Promise.all([
-        extractSection(client, truncatedText, OBJECTIVES_PROMPT),
-        extractSection(client, truncatedText, HIRING_PROMPT),
-        extractSection(client, truncatedText, CAPACITY_PROMPT),
-        extractSection(client, truncatedText, FUNDING_PROMPT),
-        extractSection(client, truncatedText, PRODUCTS_PROMPT),
-        extractSection(client, truncatedText, SUMMARY_PROMPT),
+        extractSection(client, truncatedText, OBJECTIVES_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'objectives' }),
+        extractSection(client, truncatedText, HIRING_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'hiring' }),
+        extractSection(client, truncatedText, CAPACITY_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'capacity' }),
+        extractSection(client, truncatedText, FUNDING_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'funding' }),
+        extractSection(client, truncatedText, PRODUCTS_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'products' }),
+        extractSection(client, truncatedText, SUMMARY_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'summary' }),
       ])
 
       // ── Parse and validate each section independently ──

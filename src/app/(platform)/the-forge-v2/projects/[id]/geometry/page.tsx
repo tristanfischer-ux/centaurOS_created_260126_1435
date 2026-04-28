@@ -94,12 +94,7 @@ export default async function ForgeV2GeometryPage({
                 { label: project.name, href: `/the-forge-v2/projects/${project.id}` },
                 { label: "Geometry" },
             ]}
-            subtitle="Integrated assembly · module STEP/STL · CAD deep links"
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}`,
-                icon: <Wrench className="h-3.5 w-3.5" />,
-            }}
+            subtitle="Integrated assembly · module STEP/STL"
         >
             {/* Founder-uploaded CAD (Round A) */}
             <CadUploadPanel projectId={project.id} existingFiles={uploadedFiles} />
@@ -186,12 +181,6 @@ export default async function ForgeV2GeometryPage({
                                     </a>
                                 </Button>
                             )}
-                            <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                <Link href={`/the-forge/cad-lab?project=${project.id}`}>
-                                    <Wrench className="h-3.5 w-3.5" />
-                                    Open in CAD Lab
-                                </Link>
-                            </Button>
                         </div>
                     </div>
                 </CardContent>
@@ -233,15 +222,15 @@ export default async function ForgeV2GeometryPage({
                                 Geometry arrives once the concept is decomposed
                             </h2>
                             <p className="text-sm text-muted-foreground leading-relaxed">
-                                Decompose your product into modules in the CAD Lab. Each module can then run
-                                the research → interface → generate pipeline and produces a STEP/STL plus an
-                                engineering illustration you&apos;ll see here.
+                                Each module runs the research → interface → generate pipeline and
+                                produces a STEP/STL plus an engineering illustration you&apos;ll see
+                                here.
                             </p>
                         </div>
-                        <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                            <Link href={`/the-forge/cad-lab?project=${project.id}`}>
-                                <Wrench className="h-3.5 w-3.5" />
-                                Open CAD Lab
+                        <Button asChild size="sm" variant="outline" className="gap-1.5">
+                            <Link href={`/the-forge-v2/projects/${project.id}/modules`}>
+                                View modules
+                                <ArrowRight className="h-3.5 w-3.5" />
                             </Link>
                         </Button>
                     </CardContent>
@@ -440,15 +429,9 @@ function ModuleGeometryCard({
                 <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/50">
                     <Link
                         href={`/the-forge-v2/projects/${projectId}/modules/${module.id}`}
-                        className="text-[11.5px] font-semibold text-muted-foreground hover:text-international-orange transition-colors"
-                    >
-                        Module detail
-                    </Link>
-                    <Link
-                        href={`/the-forge/cad-lab?project=${projectId}&module=${module.id}`}
                         className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-international-orange hover:underline"
                     >
-                        Open CAD Lab <ArrowRight className="h-3 w-3" />
+                        Module detail <ArrowRight className="h-3 w-3" />
                     </Link>
                 </div>
             </CardContent>

@@ -117,7 +117,7 @@ ${previousContext}
 Please provide a helpful, practical answer for a startup founder.`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-5.4",
+                model: "gpt-4.1-mini",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userPrompt }
@@ -221,7 +221,7 @@ Return ONLY a raw JSON object with this structure:
 }`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-5.4",
+                model: "gpt-4.1-mini",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: `Question: ${input.question_title}\n\nDetails: ${input.question_body}` }
@@ -283,13 +283,13 @@ export async function suggestQuestionCategory(
 
         try {
             const completion = await openai.chat.completions.create({
-                model: "gpt-5.4",
+                model: "gpt-4.1-mini",
                 messages: [
-                    { 
-                        role: "system", 
+                    {
+                        role: "system",
                         content: `Categorize this question into one of: Legal, Finance, HR, Operations, Strategy, Fundraising, Product, Marketing, Sales, Technical, General.
 Also extract 2-4 relevant tags.
-Return JSON only: { "category": "...", "tags": ["...", "..."] }` 
+Return JSON only: { "category": "...", "tags": ["...", "..."] }`
                     },
                     { role: "user", content: `Title: ${title}\n\nBody: ${body}` }
                 ],

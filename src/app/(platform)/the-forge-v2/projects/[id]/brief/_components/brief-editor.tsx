@@ -30,11 +30,11 @@
  */
 
 import Link from "next/link"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { ArrowRight, FileText, Lock, Sparkles, Unlock } from "lucide-react"
 import { toast } from "sonner"
 
-import { saveCadLabProductOverview } from "@/actions/cad-lab-projects"
+import { saveCadLabProductOverview, lockCadLabBrief, unlockCadLabBrief } from "@/actions/cad-lab-projects"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -103,11 +103,25 @@ export function BriefEditor({
     const [draft, setDraft] = useState<string>(initialOverview ?? "")
     const [lockedAt, setLockedAt] = useState<string | null>(initialLockedAt)
     const [isSaving, startSave] = useTransition()
+    const [isLocking, startLock] = useTransition()
 
     const isLocked = lockedAt !== null
     const isDirty = draft !== savedOverview
     const overLength = draft.length > OVERVIEW_MAX
     const hasBriefData = (initialOverview && initialOverview.trim().length > 0) || designBrief !== null
+
+    // RT.4 — warn on navigation-away with unsaved changes. The browser's native
+    // "Leave site?" dialog is the standard UX and prevents accidental loss of
+    // multi-paragraph edits. No-op when clean or locked.
+    useEffect(() => {
+        if (!isDirty || isLocked) return
+        const handler = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            e.returnValue = ""
+        }
+        window.addEventListener("beforeunload", handler)
+        return () => window.removeEventListener("beforeunload", handler)
+    }, [isDirty, isLocked])
 
     const designBriefRows = useMemo(() => {
         if (!designBrief) return []
@@ -145,21 +159,33 @@ export function BriefEditor({
         toast.success("Unsaved changes discarded.")
     }
 
-    // DECISION: lock/unlock is optimistic-only until the migration lands. The
-    // server action doesn't exist yet, so there's nothing to await — we simply
-    // flip local state and mirror the UX the real action will produce.
+    // Real persistence via lockCadLabBrief / unlockCadLabBrief (PR #71).
     function handleLock(): void {
         if (isDirty) {
             toast.error("Save or discard your changes before locking the brief.")
             return
         }
-        setLockedAt(new Date().toISOString())
-        toast.success("Brief locked. Downstream artefacts now anchor to this revision.")
+        startLock(async () => {
+            const result = await lockCadLabBrief(projectId)
+            if ("error" in result) {
+                toast.error(result.error)
+                return
+            }
+            setLockedAt(result.lockedAt)
+            toast.success("Brief locked. Downstream artefacts now anchor to this revision.")
+        })
     }
 
     function handleUnlock(): void {
-        setLockedAt(null)
-        toast.success("Brief unlocked — edits are live again.")
+        startLock(async () => {
+            const result = await unlockCadLabBrief(projectId)
+            if ("error" in result) {
+                toast.error(result.error)
+                return
+            }
+            setLockedAt(null)
+            toast.success("Brief unlocked — edits are live again.")
+        })
     }
 
     // ─── Empty state ─────────────────────────────────────────────────────
@@ -173,15 +199,10 @@ export function BriefEditor({
                     <div className="max-w-sm space-y-2">
                         <p className="text-sm font-semibold text-foreground">No brief captured yet</p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            The brief seeds automatically from research and decomposition. Run the pipeline in CAD Lab to populate it, then edit the narrative here.
+                            The brief seeds automatically from research and decomposition.
+                            Once the pipeline runs, the narrative appears here ready to edit.
                         </p>
                     </div>
-                    <Link
-                        href={`/the-forge/cad-lab?project=${projectId}`}
-                        className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                    >
-                        <Sparkles className="h-3.5 w-3.5" /> Open CAD Lab <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
                 </CardContent>
             </Card>
         )
@@ -209,10 +230,11 @@ export function BriefEditor({
                             variant="secondary"
                             size="sm"
                             onClick={handleUnlock}
+                            disabled={isLocking}
                             className="shrink-0"
                         >
                             <Unlock className="h-3.5 w-3.5" />
-                            Unlock
+                            {isLocking ? "Unlocking…" : "Unlock"}
                         </Button>
                     </CardContent>
                 </Card>
@@ -299,7 +321,7 @@ export function BriefEditor({
                             <Button
                                 size="sm"
                                 onClick={handleLock}
-                                disabled={isSaving || isDirty}
+                                disabled={isSaving || isDirty || isLocking}
                                 title={
                                     isDirty
                                         ? "Save or discard changes before locking"
@@ -307,7 +329,7 @@ export function BriefEditor({
                                 }
                             >
                                 <Lock className="h-3.5 w-3.5" />
-                                Lock brief
+                                {isLocking ? "Locking…" : "Lock brief"}
                             </Button>
                         </div>
                     </div>

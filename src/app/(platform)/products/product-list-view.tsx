@@ -18,7 +18,9 @@ import * as React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import {
   createProduct,
   createIteration,
@@ -119,11 +121,16 @@ function countByLifecycle(products: ProductSummary[]): Record<string, number> {
 
 interface ProductListViewProps {
   products: ProductSummary[]
+  // READ-ONLY: When true, all creation, edit, and delete controls are hidden.
+  // Used by the /products/legacy route during the Pre-Phase Coming Soon period
+  // so founders can still see their existing product records without being
+  // able to mutate them.
+  readOnly?: boolean
 }
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export function ProductListView({ products }: ProductListViewProps) {
+export function ProductListView({ products, readOnly = false }: ProductListViewProps) {
   const router = useRouter()
 
   // ── State for creation flows ────────────────────────────────────
@@ -131,77 +138,138 @@ export function ProductListView({ products }: ProductListViewProps) {
   const [forgePickerOpen, setForgePickerOpen] = React.useState(false)
   const [showPlanUpload, setShowPlanUpload] = React.useState(false)
 
+  // ── AI Briefing ─────────────────────────────────────────────────
+  const briefingContext = React.useMemo(() => {
+    const counts = countByLifecycle(products)
+    const parts = Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')
+    return `Products: ${products.length}${parts ? ` (${parts})` : ''}`
+  }, [products])
+
+  // INTENT: Empty is a starting point, not a problem. Only escalate severity
+  // when there's an actual regression to flag (e.g. a regressing iteration).
+  // "warning" triggers failure-framing language in the AI briefing.
+  const briefingSeverity = React.useMemo(() => {
+    const hasRegressing = products.some((p) => p.latest_convergence_status === 'regressing')
+    return hasRegressing ? 'warning' as const : 'success' as const
+  }, [products])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('product-lead', briefingContext, briefingSeverity),
+    briefingSeverity,
+    true,
+    'briefing-products',
+  )
+
   return (
     <div className="space-y-6">
+      {/* READ-ONLY banner */}
+      {readOnly && (
+        <div className="rounded-md border border-international-orange/30 bg-international-orange/5 px-4 py-3">
+          <p className="text-sm text-foreground">
+            <span className="font-medium">Read-only mode</span> — editing resumes in
+            the new Products experience (coming soon). Your records are preserved.
+          </p>
+        </div>
+      )}
+
       {/* Page header */}
       <div>
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>Products</h1>
           <Badge variant="brand" size="sm" className="ml-1 uppercase tracking-wide">
-            Beta
+            {readOnly ? 'Legacy' : 'Beta'}
           </Badge>
         </div>
         <p className={typography.pageSubtitle}>
-          Where your designs, market research, and unit economics come together.
+          {readOnly
+            ? 'Your existing product records — read-only while the new workbench is built.'
+            : 'Where your designs, market research, and unit economics come together.'}
         </p>
       </div>
 
+      {/* Priya briefing — only in live mode. The legacy view is a plain archive. */}
+      {!readOnly && (
+        <SpecialistBriefingHero
+          specialistId="product-lead"
+          specialistName="Priya"
+          specialistTitle="Product Development"
+          narrative={briefing.narrative}
+          fallbackMessage="I'm Priya. Each product on this page moves through five steps: concept, validate, build, launch, grow. Market assessment and competitor tracking run alongside, so the story stays honest at every stage. Start with a name and the problem you want to solve — that's enough for me to take it from there."
+          isLoading={briefing.isLoading}
+          loadingMessage="Reviewing your product portfolio..."
+          severity={briefing.severity}
+          context={{ type: 'general', title: 'Products', description: briefingContext }}
+        />
+      )}
+
       {/* Empty state or product grid */}
       {products.length === 0 ? (
-        <EmptyProductState
-          onMarketIdea={() => setMarketDialogOpen(true)}
-          onForgePromote={() => setForgePickerOpen(true)}
-          onPlanUpload={() => setShowPlanUpload(true)}
-          showPlanUpload={showPlanUpload}
-          router={router}
-        />
+        readOnly ? (
+          <div className="rounded-lg border border-border bg-card py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              No product records to show.
+            </p>
+          </div>
+        ) : (
+          <EmptyProductState
+            onMarketIdea={() => setMarketDialogOpen(true)}
+            onForgePromote={() => setForgePickerOpen(true)}
+            onPlanUpload={() => setShowPlanUpload(true)}
+            showPlanUpload={showPlanUpload}
+            router={router}
+          />
+        )
       ) : (
         <div className="space-y-4">
-          {/* Creation actions */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button onClick={() => setMarketDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              New Product
-            </Button>
-            <Button variant="outline" onClick={() => setForgePickerOpen(true)}>
-              <Hammer className="h-4 w-4 mr-1.5" />
-              Promote from Forge
-            </Button>
-            <Button variant="outline" onClick={() => setShowPlanUpload(!showPlanUpload)}>
-              <FileText className="h-4 w-4 mr-1.5" />
-              Extract from Plan
-            </Button>
-          </div>
+          {/* Creation actions — hidden in read-only mode */}
+          {!readOnly && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button onClick={() => setMarketDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Product
+              </Button>
+              <Button variant="outline" onClick={() => setForgePickerOpen(true)}>
+                <Hammer className="h-4 w-4 mr-1.5" />
+                Promote from Forge
+              </Button>
+              <Button variant="outline" onClick={() => setShowPlanUpload(!showPlanUpload)}>
+                <FileText className="h-4 w-4 mr-1.5" />
+                Extract from Plan
+              </Button>
+            </div>
+          )}
 
           {/* Inline plan upload (toggled) */}
-          {showPlanUpload && (
+          {!readOnly && showPlanUpload && (
             <InlinePlanUpload router={router} />
           )}
 
           {/* Product grid */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} readOnly={readOnly} />
             ))}
           </div>
         </div>
       )}
 
-      {/* Market Idea Dialog */}
-      <MarketIdeaDialog
-        open={marketDialogOpen}
-        onOpenChange={setMarketDialogOpen}
-        router={router}
-      />
-
-      {/* Forge Picker Dialog */}
-      <ForgePickerDialog
-        open={forgePickerOpen}
-        onOpenChange={setForgePickerOpen}
-        existingProjectIds={products.map((p) => p.cad_lab_project_id).filter(Boolean) as string[]}
-        router={router}
-      />
+      {/* Creation dialogs — never mounted in read-only mode */}
+      {!readOnly && (
+        <>
+          <MarketIdeaDialog
+            open={marketDialogOpen}
+            onOpenChange={setMarketDialogOpen}
+            router={router}
+          />
+          <ForgePickerDialog
+            open={forgePickerOpen}
+            onOpenChange={setForgePickerOpen}
+            existingProjectIds={products.map((p) => p.cad_lab_project_id).filter(Boolean) as string[]}
+            router={router}
+          />
+        </>
+      )}
     </div>
   )
 }
@@ -796,7 +864,7 @@ function MarketIdeaDialog({
 
 // ─── Product Card ────────────────────────────────────────────────────
 
-function ProductCard({ product }: { product: ProductSummary }) {
+function ProductCard({ product, readOnly = false }: { product: ProductSummary; readOnly?: boolean }) {
   const monthlyRevenue =
     product.unit_price_pence != null && product.target_monthly_units != null
       ? product.unit_price_pence * product.target_monthly_units
@@ -805,8 +873,12 @@ function ProductCard({ product }: { product: ProductSummary }) {
   const lifecycleProgress = LIFECYCLE_ORDER.indexOf(product.lifecycle)
   const lifecycleMax = LIFECYCLE_ORDER.length - 1
 
+  // ROUTING: In read-only mode, link to the legacy detail route so the
+  // full legacy branch is preserved for data viewing.
+  const href = readOnly ? `/products/legacy/${product.id}` : `/products/${product.id}`
+
   return (
-    <Link href={`/products/${product.id}`}>
+    <Link href={href}>
       <Card className="hover:-translate-y-0.5 active:scale-[0.99] duration-200 cursor-pointer h-full">
         {/* Hero image */}
         {product.hero_image_url ? (

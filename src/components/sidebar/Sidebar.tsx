@@ -40,9 +40,14 @@ import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 
 import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
-import { moneyLegacyNavigation } from "@/components/sidebar/data/money"
+import { getPlanNavigation } from "@/components/sidebar/data/plan"
+import {
+    getMoneyIntroRoute,
+    getMoneyNavigation,
+    getMoneySectionLabel,
+} from "@/components/sidebar/data/money"
 import { getWorkshopNavigation } from "@/components/sidebar/data/workshop"
-import { marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
+import { marketplacePeopleNavigation, marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
 import type { SidebarNavItem } from "@/components/sidebar/data/types"
 
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -55,6 +60,7 @@ import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { AICreditsBarLoader } from "@/components/ui/ai-credits-bar"
 import { TimeWeekBarLoader } from "@/components/ui/time-week-bar"
+import { MoneyCreditsPill } from "@/components/sidebar/MoneyCreditsPill"
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist"
 
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
@@ -65,12 +71,12 @@ import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import { getMyReferralInfo } from "@/actions/referrals"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
-import { getUnreadAlertCount } from "@/actions/match-alerts"
-import { toast } from "sonner"
 import {
     ForgeAmbassadorBadge,
     ForgeAmbassadorMilestoneToast,
 } from "@/components/referrals/ForgeAmbassadorBadge"
+import { getUnreadAlertCount } from "@/actions/match-alerts"
+import { toast } from "sonner"
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -103,15 +109,28 @@ interface SidebarProps {
      */
     newForgeExperienceEnabled?: boolean
     /**
-     * Whether the user currently has Forge Ambassador status (10+ active paid
-     * referrals). When true, a "Forge Ambassador" badge appears in the footer
-     * and they have unlimited investor searches.
+     * Phase 2 feature flag. When true, the "Cash Burn" section header is
+     * rendered as "MONEY [V2]" and the 6-item legacy nav is replaced with
+     * the 3-item Cockpit · Plan · Raise group. Default false preserves the
+     * current legacy experience.
+     */
+    newMoneyExperienceEnabled?: boolean
+    /**
+     * Phase 3 feature flag. When true, the PLAN section collapses from
+     * 7 legacy items (Strategy · Objectives · Tasks · Review · Reports ·
+     * Red Team · Knowledge) to 3 new items (Plan · Report · History).
+     * Default false preserves current behaviour.
+     */
+    newPlanExperienceEnabled?: boolean
+    /**
+     * Forge Ambassador — set when the user has 10+ active paid referrals.
+     * Renders the ForgeAmbassadorBadge in the sidebar footer.
      */
     isForgeAmbassador?: boolean
     /**
-     * ISO timestamp when the user first crossed the 10-referral threshold.
+     * ISO timestamp of when the ambassador status was first earned.
      * Passed to ForgeAmbassadorMilestoneToast so it fires only on the
-     * first sign-in after the milestone.
+     * session when the threshold was first crossed.
      */
     ambassadorSince?: string | null
 }
@@ -223,6 +242,8 @@ export function Sidebar({
     onboardingData,
     isSupplier,
     newForgeExperienceEnabled = false,
+    newMoneyExperienceEnabled = false,
+    newPlanExperienceEnabled = false,
     isForgeAmbassador = false,
     ambassadorSince = null,
 }: SidebarProps) {
@@ -240,6 +261,7 @@ export function Sidebar({
     // RSC payload is in the client cache before the click fires.
     React.useEffect(() => {
         const topRoutes = [
+            "/today",
             "/new-tasks",
             "/new-objectives",
             "/team",
@@ -288,7 +310,7 @@ export function Sidebar({
                 toast.error("Could not load your referral link.")
                 return
             }
-            const url = `${window.location.origin}/signup?ref=${info.referralCode}`
+            const url = `${window.location.origin}/join?ref=${info.referralCode}`
             await navigator.clipboard.writeText(url)
             toast.success("Referral link copied to clipboard!")
             await updateOnboardingData({ checklist_friend_invited: true })
@@ -299,23 +321,31 @@ export function Sidebar({
 
     // Workshop nav is flag-aware — Forge href flips to /the-forge-v2 when on.
     const workshopNavigation = getWorkshopNavigation(newForgeExperienceEnabled)
+    // Money nav is flag-aware — legacy 6-item Cash Burn group under flag-off,
+    // 3-item MONEY [V2] group (Cockpit · Plan · Raise) under flag-on.
+    const moneyNavigation = getMoneyNavigation(newMoneyExperienceEnabled)
+    const moneySectionLabel = getMoneySectionLabel(newMoneyExperienceEnabled)
+    const moneyIntroRoute = getMoneyIntroRoute(newMoneyExperienceEnabled)
+    // Plan nav is flag-aware — legacy 7-item group under flag-off,
+    // 3-item Plan · Report · History group under flag-on.
+    const planNavigation = getPlanNavigation(newPlanExperienceEnabled)
 
     return (
         <aside
             aria-label="Primary navigation"
-            className="hidden sm:flex h-screen w-64 shrink-0 flex-col bg-background text-foreground text-[13px]"
+            className="hidden sm:flex h-screen w-64 shrink-0 flex-col bg-background border-r border-border text-foreground text-[13px]"
         >
             {/* ─── Brand row ─────────────────────────────────── */}
             <div className="px-3 pt-4 pb-1 flex items-center gap-2">
                 <Link
-                    href="/investors"
+                    href="/today"
                     className="group flex items-center gap-2 font-display text-[15px] font-bold tracking-tight text-foreground hover:text-international-orange transition-colors"
                 >
                     <span
                         className="h-[7px] w-[7px] rounded-full bg-international-orange shadow-[0_0_8px_rgba(255,69,0,0.6)] animate-pulse"
                         aria-hidden="true"
                     />
-                    Fractional Forge
+                    ForgeOS
                 </Link>
                 <div className="ml-auto flex items-center gap-0.5">
                     <Tooltip delayDuration={200}>
@@ -352,26 +382,7 @@ export function Sidebar({
                     />
                 </div>
 
-                {/* Tristan 2026-04-27: primary nav order — Welcome →
-                    Brainstorming → The Forge → Investors → Suppliers. No
-                    section headers or collapsibles; flat top-level for the
-                    five primary destinations. Admin-style sections (Me,
-                    Supplier Portal) sit below a divider. */}
-                <div className="space-y-0.5">
-                    <NavLink item={welcomeNavItem} pathname={pathname} />
-                    {workshopNavigation.map((item) => (
-                        <NavLink key={item.name} item={item} pathname={pathname} />
-                    ))}
-                    {moneyLegacyNavigation.map((item) => (
-                        <NavLink key={item.name} item={item} pathname={pathname} />
-                    ))}
-                    {marketplaceSuppliesNavigation.map((item) => (
-                        <NavLink key={item.name} item={item} pathname={pathname} />
-                    ))}
-                </div>
-
-                {/* ME — admin-style collapsible below the primary nav */}
-                <div className="mt-2 mb-1" />
+                {/* ME */}
                 <SectionHeader
                     label="Me"
                     introRoute="/me"
@@ -381,6 +392,7 @@ export function Sidebar({
                 />
                 <Collapsible open={openSections.me}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        <NavLink item={welcomeNavItem} pathname={pathname} />
                         {meNavigation.map((item) => (
                             <NavLink
                                 key={item.name}
@@ -398,7 +410,7 @@ export function Sidebar({
                 {/* SUPPLIER PORTAL — conditional on profile.is_supplier */}
                 {isSupplier && (
                     <>
-                        <div className="mt-2 mb-1" />
+                        <div className="mt-1.5 mb-0.5 border-t border-border" />
                         <SectionHeader
                             label="Supplier Portal"
                             introRoute="/supplier"
@@ -415,6 +427,73 @@ export function Sidebar({
                         </Collapsible>
                     </>
                 )}
+
+                {/* PLAN (renamed "Brainstorming" 2026-04-24 during pivot) */}
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
+                <SectionHeader
+                    label="Brainstorming"
+                    introRoute="/plan"
+                    hasNew={badges.plan}
+                    isOpen={openSections.plan}
+                    onToggle={() => toggleSection("plan")}
+                />
+                <Collapsible open={openSections.plan}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {planNavigation.map((item) => (
+                            <NavLink key={item.name} item={item} pathname={pathname} />
+                        ))}
+                    </CollapsibleContent>
+                </Collapsible>
+
+                {/* MONEY (flag-aware — legacy "Cash Burn" 6-item group OR V2 3-item group) */}
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
+                <SectionHeader
+                    label={moneySectionLabel}
+                    introRoute={moneyIntroRoute}
+                    isOpen={openSections.cashBurn}
+                    onToggle={() => toggleSection("cashBurn")}
+                />
+                <Collapsible open={openSections.cashBurn}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {moneyNavigation.map((item) => (
+                            <NavLink key={item.name} item={item} pathname={pathname} />
+                        ))}
+                    </CollapsibleContent>
+                </Collapsible>
+
+                {/* WORKSHOP */}
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
+                <SectionHeader
+                    label="Workshop"
+                    introRoute="/workshop"
+                    hasNew={badges.workshop}
+                    isOpen={openSections.workshop}
+                    onToggle={() => toggleSection("workshop")}
+                />
+                <Collapsible open={openSections.workshop}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {workshopNavigation.map((item) => (
+                            <NavLink key={item.name} item={item} pathname={pathname} />
+                        ))}
+                    </CollapsibleContent>
+                </Collapsible>
+
+                {/* MARKETPLACE — People + Supplies sub-groups */}
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
+                <SectionHeader
+                    label="Marketplace"
+                    introRoute="/marketplace-hub"
+                    hasNew={badges.marketplace}
+                    isOpen={openSections.marketplace}
+                    onToggle={() => toggleSection("marketplace")}
+                />
+                <Collapsible open={openSections.marketplace}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {[...marketplacePeopleNavigation, ...marketplaceSuppliesNavigation].map((item) => (
+                            <NavLink key={item.name} item={item} pathname={pathname} />
+                        ))}
+                    </CollapsibleContent>
+                </Collapsible>
             </nav>
 
             {/* ─── Getting Started — gated on onboarding_data presence ── */}
@@ -438,93 +517,66 @@ export function Sidebar({
                 </div>
             )}
 
-            {/* ─── Footer stack ─── */}
-            {/* Tristan 2026-04-28 (design audit #110 cross-cutting fix #1): the
-                old footer crammed Pricing / Settings / Sign Out + THIS WEEK +
-                Enterprise into a single row + bare bars stack with inconsistent
-                alignment. Audit P0/P1 across welcome / agents / the-forge /
-                my-profile / marketplace-suppliers. Refactored layout:
-                  1. Status block (TimeWeek + AICredits) consolidated, sits on
-                     a soft muted background so it reads as ONE group.
-                  2. Subtle divider.
-                  3. Action links (Pricing · Settings · Sign Out) stacked
-                     vertically and icon-aligned with the primary nav above
-                     (h-4 w-4 icons + same gap-3 + same text-sm). */}
-            <div className="mt-auto">
-                {/* Forge Ambassador badge — visible when user has 10+ active paid referrals */}
-                {isForgeAmbassador && (
-                    <div className="px-3 pt-2 pb-1">
-                        <ForgeAmbassadorBadge className="text-[9px]" />
-                    </div>
-                )}
-
-                {/* Status block — single grouped surface for the two meters,
-                    visually contained so it reads as one unit, not two
-                    floating bars. */}
-                <div className="mx-3 mb-2 rounded-lg bg-muted/40 px-3 py-2 space-y-1.5">
-                    <TimeWeekBarLoader />
-                    <AICreditsBarLoader />
+            {/* Forge Ambassador badge — visible when user has 10+ active paid referrals */}
+            {isForgeAmbassador && (
+                <div className="px-3 pt-2 pb-1">
+                    <ForgeAmbassadorBadge className="text-[9px]" />
                 </div>
+            )}
 
-                {/* Soft divider keeps the action links visually distinct from
-                    the status block above. */}
-                <div className="mx-3 border-t border-border/30" />
-
-                {/* Action links — vertically stacked, icon + label, aligned
-                    with the primary nav above (sized to match SidebarItem). */}
-                <nav className="px-3 py-2 flex flex-col gap-0.5" aria-label="Account">
-                    <Link
-                        href="/pricing"
-                        aria-current={isRouteActive(pathname, "/pricing") ? "page" : undefined}
-                        className={cn(
-                            "flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors",
-                            isRouteActive(pathname, "/pricing")
-                                ? "text-international-orange font-semibold bg-international-orange/[0.06]"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                        )}
-                    >
-                        <PoundSterling className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        Pricing
-                    </Link>
-                    <Link
-                        href="/settings"
-                        aria-current={isRouteActive(pathname, "/settings") ? "page" : undefined}
-                        className={cn(
-                            "flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors",
-                            isRouteActive(pathname, "/settings")
-                                ? "text-international-orange font-semibold bg-international-orange/[0.06]"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                        )}
-                    >
-                        <Settings className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        Settings
-                    </Link>
+            {/* ─── Footer stack ─── */}
+            <div className="p-3 mt-auto space-y-2 border-t border-border">
+                {/* Util row: Pricing · Settings · Sign Out */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/pricing"
+                            aria-current={isRouteActive(pathname, "/pricing") ? "page" : undefined}
+                            className={cn(
+                                "flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors",
+                                isRouteActive(pathname, "/pricing")
+                                    ? "text-international-orange font-semibold"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <PoundSterling className="h-3.5 w-3.5" aria-hidden="true" />
+                            Pricing
+                        </Link>
+                        <Link
+                            href="/settings"
+                            aria-current={isRouteActive(pathname, "/settings") ? "page" : undefined}
+                            className={cn(
+                                "flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors",
+                                isRouteActive(pathname, "/settings")
+                                    ? "text-international-orange font-semibold"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <Settings className="h-3.5 w-3.5" aria-hidden="true" />
+                            Settings
+                        </Link>
+                    </div>
                     <form action={signOut}>
                         <button
                             type="submit"
-                            className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors text-left"
+                            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md"
                         >
-                            <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
                             Sign Out
                         </button>
                     </form>
-                </nav>
+                </div>
 
-                {/* Milestone toast — fires once per session when ambassador threshold is crossed */}
-                <ForgeAmbassadorMilestoneToast since={ambassadorSince} />
-
-                {/* TODO Tier 5 step 22 (RED-TEAM-PIVOT-PLAN): usage counter +
-                 * invite-friend CTA in sidebar footer. Render a running
-                 * counter "X/Y searches this month, invite a friend, +100
-                 * free" against the user's current month's usage from
-                 * llm_usage / user_subscriptions. CTA URL pattern is
-                 * `${APP_DOMAIN}/signup?ref=<user.id>` (centralised in
-                 * src/lib/domains.ts). Conversion-engine wiring lands in
-                 * the same step — credits the inviter +100 leads when the
-                 * referee subscribes to Starter. Free-tier accounts cap at
-                 * +500 inviter searches per month. The investors empty-out
-                 * upsell (LimitReachedUpsell) and the post-meeting upsell
-                 * (PostMeetingUpsell) already produce the same URL shape. */}
+                {/* Status bars: Time (this week) + Credits. Per CLAUDE.md no-AI-emphasis
+                    rule, the in-product label stays "Credits", not "AI Credits".
+                    The Money Credits pill (live ai_credits_ledger sum) lands here under
+                    the flag — it sits below the legacy AI usage pill so the founder sees
+                    both during the migration window. */}
+                <div className="space-y-1">
+                    <TimeWeekBarLoader />
+                    <AICreditsBarLoader />
+                    {newMoneyExperienceEnabled && <MoneyCreditsPill />}
+                </div>
             </div>
 
             <FeedbackDialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />
@@ -534,6 +586,9 @@ export function Sidebar({
                 onCreateObjective={handleCaptureObjective}
                 onCreateTask={handleCaptureTask}
             />
+
+            {/* Milestone toast — fires once per session when ambassador threshold is crossed */}
+            <ForgeAmbassadorMilestoneToast since={ambassadorSince} />
         </aside>
     )
 }

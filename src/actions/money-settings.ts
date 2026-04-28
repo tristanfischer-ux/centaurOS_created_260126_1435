@@ -1,259 +1,358 @@
-/**
- * @file money-settings.ts — Server actions for /money/settings.
- *
- * @description Read + write for the foundry-scoped `money_settings` row.
- * One row per foundry — the row is upserted on first save so new foundries
- * can land on the page before anybody's touched settings. All numeric
- * thresholds are stored as plain integers (weeks, percent, cents).
- *
- * @security Uses `withAuth` for tenant-scoped writes. The RLS policy on
- * `money_settings` should permit founder/co_founder only, but we also
- * derive the foundry_id from the authenticated session and never trust
- * a client-supplied foundry_id.
- *
- * @related
- *   - Table:  public.money_settings (see database.types.ts line 13068)
- *   - View:   src/app/(platform)/money/settings/settings-view.tsx
- *   - Page:   src/app/(platform)/money/settings/page.tsx
- *   - Schema: MONEY-SCHEMA.md §2 `money_settings`
- */
-
-"use server"
-
-import { revalidatePath } from "next/cache"
-
-import { withAuth } from "@/lib/server-action-utils"
-import type {
-    DigestSchedule,
-    FiscalYearStartMonth,
-    MoneySettingsPatch,
-    MoneySettingsRow,
-    NumberFormatLocale,
-    ReportingCurrency,
-    SpecialistModelTier,
-    SpecialistsEnabled,
-} from "./money-settings-types"
-import { DEFAULT_MONEY_SETTINGS } from "./money-settings-types"
-
-// ─── Validation helpers ────────────────────────────────────────────────
-
-const VALID_CURRENCIES: ReadonlySet<string> = new Set([
-    "GBP",
-    "USD",
-    "EUR",
-])
-const VALID_FY_MONTHS: ReadonlySet<number> = new Set([1, 4, 7, 10])
-const VALID_NUMBER_FORMATS: ReadonlySet<string> = new Set([
-    "en-GB",
-    "de-DE",
-    "fr-FR",
-])
-const VALID_DIGEST: ReadonlySet<string> = new Set([
-    "weekly_mon_09",
-    "daily",
-    "off",
-])
-const VALID_MODEL_TIERS: ReadonlySet<string> = new Set([
-    "haiku",
-    "sonnet",
-    "opus",
-])
-const VALID_RETENTION_YEARS: ReadonlySet<number> = new Set([1, 3, 7, 100])
-
-function isPositiveInt(value: number, max = 520): boolean {
-    return Number.isInteger(value) && value >= 0 && value <= max
-}
-
-function isPercent(value: number): boolean {
-    return Number.isInteger(value) && value >= 0 && value <= 100
-}
-
-// ─── Actions ───────────────────────────────────────────────────────────
+'use server'
 
 /**
- * Load the current foundry's `money_settings` row, or the defaults if no
- * row exists yet. Returns a fully-populated object so the view never
- * needs to null-check individual fields.
+ * Money Settings server actions.
+ *
+ * Powers the four /money/settings/* surfaces:
+ *   - /money/settings              (this file: getMoneySettings, updateMoneySettings, markOnboardingStep)
+ *   - /money/settings/permissions  (see money-permissions.ts)
+ *   - /money/settings/audit-log    (see money-audit.ts)
+ *   - /money/settings/credits      (see money-credits.ts)
+ *
+ * All reads/writes scope to the caller's foundry via withAuth. RLS + the
+ * money_settings_foundry_write_founder policy already restrict writes to the
+ * Founder/Executive roles; we keep the action thin and let the policy do the
+ * work. Onboarding-step writes go through the same path so the founder-only
+ * guard still applies.
  */
-export async function loadMoneySettings(): Promise<
-    { settings: MoneySettingsRow } | { error: string }
-> {
-    return withAuth(async ({ supabase, foundryId }) => {
-        const { data, error } = await supabase
-            .from("money_settings")
-            .select(
-                "foundry_id, currency, fiscal_year_start_month, number_format, runway_danger_weeks, runway_healthy_weeks, large_expense_threshold_cents, variance_alert_pct, digest_schedule, specialists_enabled, specialist_model_tier, retention_years",
-            )
-            .eq("foundry_id", foundryId)
-            .maybeSingle()
 
-        if (error) {
-            console.error("[money-settings] load failed", {
-                foundryId,
-                error: error.message,
-            })
-            return { error: "Could not load Money settings." }
-        }
+import { revalidatePath } from 'next/cache'
+import { withAuth } from '@/lib/server-action-utils'
+import type { Database } from '@/types/database.types'
 
-        if (!data) {
-            return {
-                settings: {
-                    foundry_id: foundryId,
-                    ...DEFAULT_MONEY_SETTINGS,
-                } satisfies MoneySettingsRow,
-            }
-        }
+type MoneySettingsRow = Database['public']['Tables']['money_settings']['Row']
 
-        // `specialists_enabled` is stored as `Json` on the row but we
-        // rely on the DB default + the save path to keep the shape
-        // honest. Narrow defensively so the view never crashes.
-        const specialists = normaliseSpecialists(data.specialists_enabled)
+export type SpecialistModelTier = 'haiku' | 'sonnet' | 'opus'
 
-        return {
-            settings: {
-                foundry_id: data.foundry_id,
-                currency: data.currency,
-                fiscal_year_start_month: data.fiscal_year_start_month,
-                number_format: data.number_format,
-                runway_danger_weeks: data.runway_danger_weeks,
-                runway_healthy_weeks: data.runway_healthy_weeks,
-                large_expense_threshold_cents:
-                    data.large_expense_threshold_cents,
-                variance_alert_pct: data.variance_alert_pct,
-                digest_schedule: data.digest_schedule,
-                specialists_enabled: specialists,
-                specialist_model_tier: data.specialist_model_tier,
-                retention_years: data.retention_years,
-            } satisfies MoneySettingsRow,
-        }
-    })
+export type OnboardingProgress = {
+  connect_accounting: boolean
+  first_plan_line: boolean
+  define_thesis: boolean
+  create_round: boolean
+  log_first_touch: boolean
+  send_first_update: boolean
+}
+
+export type OnboardingStep = keyof OnboardingProgress
+
+const ONBOARDING_STEP_KEYS: readonly OnboardingStep[] = [
+  'connect_accounting',
+  'first_plan_line',
+  'define_thesis',
+  'create_round',
+  'log_first_touch',
+  'send_first_update',
+] as const
+
+const DEFAULT_ONBOARDING: OnboardingProgress = {
+  connect_accounting: false,
+  first_plan_line: false,
+  define_thesis: false,
+  create_round: false,
+  log_first_touch: false,
+  send_first_update: false,
+}
+
+const SPECIALIST_TIERS: readonly SpecialistModelTier[] = ['haiku', 'sonnet', 'opus'] as const
+
+export type MoneySettings = {
+  foundry_id: string
+  currency: string
+  fiscal_year_start_month: number
+  number_format: string
+  runway_danger_weeks: number
+  runway_healthy_weeks: number
+  large_expense_threshold_cents: number
+  variance_alert_pct: number
+  retention_years: number
+  specialist_model_tier: SpecialistModelTier
+  digest_schedule: string
+  onboarding_progress: OnboardingProgress
+}
+
+export type MoneySettingsResult =
+  | { error: string }
+  | { settings: MoneySettings }
+
+/**
+ * Coerce the JSONB onboarding_progress shape into the typed OnboardingProgress.
+ * Any keys missing from the row default to false; unknown keys are dropped.
+ */
+function coerceOnboarding(raw: unknown): OnboardingProgress {
+  const out: OnboardingProgress = { ...DEFAULT_ONBOARDING }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>
+    for (const key of ONBOARDING_STEP_KEYS) {
+      const v = obj[key]
+      if (typeof v === 'boolean') out[key] = v
+    }
+  }
+  return out
+}
+
+function coerceTier(raw: string): SpecialistModelTier {
+  return (SPECIALIST_TIERS as readonly string[]).includes(raw)
+    ? (raw as SpecialistModelTier)
+    : 'sonnet'
+}
+
+function rowToSettings(row: MoneySettingsRow): MoneySettings {
+  return {
+    foundry_id: row.foundry_id,
+    currency: row.currency,
+    fiscal_year_start_month: row.fiscal_year_start_month,
+    number_format: row.number_format,
+    runway_danger_weeks: row.runway_danger_weeks,
+    runway_healthy_weeks: row.runway_healthy_weeks,
+    large_expense_threshold_cents: row.large_expense_threshold_cents,
+    variance_alert_pct: row.variance_alert_pct,
+    retention_years: row.retention_years,
+    specialist_model_tier: coerceTier(row.specialist_model_tier),
+    digest_schedule: row.digest_schedule,
+    onboarding_progress: coerceOnboarding(row.onboarding_progress),
+  }
 }
 
 /**
- * Save a patch against the current foundry's `money_settings` row.
- * Upserts so a brand-new foundry lands a row on first save; subsequent
- * saves merge partial patches into the existing row.
- *
- * @throws Returns `{ error }` — callers handle the string. Never throws.
+ * Read the foundry's money_settings row. Lazily creates the row with defaults
+ * if it doesn't exist yet (first Money interaction in this foundry).
  */
-export async function saveMoneySettings(
-    patch: MoneySettingsPatch,
-): Promise<{ success: true } | { error: string }> {
-    // VALIDATION: reject bad enum values up front so the row cannot
-    // land in a state the view does not know how to render.
-    if (patch.currency && !VALID_CURRENCIES.has(patch.currency)) {
-        return { error: `Unknown currency: ${patch.currency}` }
-    }
-    if (
-        patch.fiscal_year_start_month !== undefined &&
-        !VALID_FY_MONTHS.has(patch.fiscal_year_start_month)
-    ) {
-        return {
-            error: `Unknown fiscal year start month: ${patch.fiscal_year_start_month}`,
-        }
-    }
-    if (
-        patch.number_format &&
-        !VALID_NUMBER_FORMATS.has(patch.number_format)
-    ) {
-        return { error: `Unknown number format: ${patch.number_format}` }
-    }
-    if (patch.digest_schedule && !VALID_DIGEST.has(patch.digest_schedule)) {
-        return { error: `Unknown digest schedule: ${patch.digest_schedule}` }
-    }
-    if (
-        patch.specialist_model_tier &&
-        !VALID_MODEL_TIERS.has(patch.specialist_model_tier)
-    ) {
-        return {
-            error: `Unknown model tier: ${patch.specialist_model_tier}`,
-        }
-    }
-    if (
-        patch.runway_danger_weeks !== undefined &&
-        !isPositiveInt(patch.runway_danger_weeks)
-    ) {
-        return { error: "Runway danger threshold must be 0–520 weeks." }
-    }
-    if (
-        patch.runway_healthy_weeks !== undefined &&
-        !isPositiveInt(patch.runway_healthy_weeks)
-    ) {
-        return { error: "Runway healthy threshold must be 0–520 weeks." }
-    }
-    if (
-        patch.large_expense_threshold_cents !== undefined &&
-        !isPositiveInt(
-            patch.large_expense_threshold_cents,
-            1_000_000_000,
-        )
-    ) {
-        return { error: "Large expense threshold must be a positive amount." }
-    }
-    if (
-        patch.variance_alert_pct !== undefined &&
-        !isPercent(patch.variance_alert_pct)
-    ) {
-        return { error: "Variance alert must be 0–100%." }
-    }
-    if (
-        patch.retention_years !== undefined &&
-        !VALID_RETENTION_YEARS.has(patch.retention_years)
-    ) {
-        return {
-            error: `Unknown retention period: ${patch.retention_years}`,
-        }
+export async function getMoneySettings(): Promise<MoneySettingsResult> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const { data: row, error } = await supabase
+      .from('money_settings')
+      .select(
+        'foundry_id, currency, fiscal_year_start_month, number_format, runway_danger_weeks, runway_healthy_weeks, large_expense_threshold_cents, variance_alert_pct, retention_years, specialist_model_tier, digest_schedule, onboarding_progress, runway_months_cached, runway_cached_at, credits_cap_cents, specialists_enabled, created_at, updated_at',
+      )
+      .eq('foundry_id', foundryId)
+      .maybeSingle()
+
+    if (error) return { error: error.message }
+
+    if (row) {
+      return { settings: rowToSettings(row as MoneySettingsRow) }
     }
 
-    return withAuth(async ({ supabase, foundryId }) => {
-        // NOTE: `specialists_enabled` on the generated Supabase `Json`
-        // type requires an index signature we do not want to put on
-        // the public `SpecialistsEnabled` interface (callers rely on
-        // named keys, not string-keyed lookups). The Json cast is
-        // narrow and only applied to that one field.
-        const rowWithJson: Record<string, unknown> = {
-            foundry_id: foundryId,
-            ...patch,
-        }
-        if (patch.specialists_enabled) {
-            rowWithJson.specialists_enabled = {
-                ...patch.specialists_enabled,
-            }
-        }
+    // Lazy create with defaults. Founder/Executive RLS will enforce role on
+    // first insert; if the caller lacks permission they get an error here
+    // (which is the right behaviour — non-founders shouldn't materialise
+    // foundry-level settings).
+    const { data: inserted, error: insertError } = await supabase
+      .from('money_settings')
+      .insert({ foundry_id: foundryId })
+      .select(
+        'foundry_id, currency, fiscal_year_start_month, number_format, runway_danger_weeks, runway_healthy_weeks, large_expense_threshold_cents, variance_alert_pct, retention_years, specialist_model_tier, digest_schedule, onboarding_progress, runway_months_cached, runway_cached_at, credits_cap_cents, specialists_enabled, created_at, updated_at',
+      )
+      .single()
 
-        const { error } = await supabase
-            .from("money_settings")
-            .upsert(rowWithJson as never, { onConflict: "foundry_id" })
+    if (insertError || !inserted) {
+      return { error: insertError?.message ?? 'Failed to initialise settings' }
+    }
 
-        if (error) {
-            console.error("[money-settings] save failed", {
-                foundryId,
-                error: error.message,
-            })
-            return { error: "Could not save Money settings. Please try again." }
-        }
-
-        revalidatePath("/money/settings")
-        return { success: true }
-    })
+    return { settings: rowToSettings(inserted as MoneySettingsRow) }
+  })
 }
 
-// ─── Internal ──────────────────────────────────────────────────────────
+export type MoneySettingsPatch = Partial<{
+  currency: string
+  fiscal_year_start_month: number
+  number_format: string
+  runway_danger_weeks: number
+  runway_healthy_weeks: number
+  large_expense_threshold_cents: number
+  variance_alert_pct: number
+  retention_years: number
+  specialist_model_tier: SpecialistModelTier
+  digest_schedule: string
+}>
 
 /**
- * Coerce a `Json` value back into `SpecialistsEnabled`. The DB default
- * is the canonical shape; any drift is treated as "all on" so we never
- * silently disable a specialist because of a broken row.
+ * Apply a patch to money_settings. Validation guards keep RLS-rejected
+ * mutations from reaching Postgres with junk values; RLS still enforces the
+ * Founder/Executive write policy.
  */
-function normaliseSpecialists(value: unknown): SpecialistsEnabled {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return DEFAULT_MONEY_SETTINGS.specialists_enabled
+export async function updateMoneySettings(
+  patch: MoneySettingsPatch,
+): Promise<{ success: true; settings: MoneySettings } | { error: string }> {
+  // Whitelist + validate each field. We never trust client-supplied keys
+  // beyond the typed patch shape.
+  const update: Record<string, string | number> = {}
+
+  if (patch.currency !== undefined) {
+    const code = patch.currency.trim().toUpperCase()
+    if (!/^[A-Z]{3}$/.test(code)) return { error: 'Currency must be an ISO 4217 3-letter code' }
+    update.currency = code
+  }
+
+  if (patch.fiscal_year_start_month !== undefined) {
+    const m = Number(patch.fiscal_year_start_month)
+    if (!Number.isInteger(m) || m < 1 || m > 12) {
+      return { error: 'Fiscal year start month must be 1–12' }
     }
-    const v = value as Record<string, unknown>
+    update.fiscal_year_start_month = m
+  }
+
+  if (patch.number_format !== undefined) {
+    const fmt = patch.number_format.trim()
+    if (!fmt || fmt.length > 20) return { error: 'Invalid number format locale' }
+    update.number_format = fmt
+  }
+
+  if (patch.runway_danger_weeks !== undefined) {
+    const w = Number(patch.runway_danger_weeks)
+    if (!Number.isInteger(w) || w < 1 || w > 520) {
+      return { error: 'Runway danger weeks must be a positive integer' }
+    }
+    update.runway_danger_weeks = w
+  }
+
+  if (patch.runway_healthy_weeks !== undefined) {
+    const w = Number(patch.runway_healthy_weeks)
+    if (!Number.isInteger(w) || w < 1 || w > 520) {
+      return { error: 'Runway healthy weeks must be a positive integer' }
+    }
+    update.runway_healthy_weeks = w
+  }
+
+  // Cross-field check after both are normalised in the patch (or against the
+  // current row would be ideal — but a UI-side hint is enough; we re-check
+  // after fetch).
+  if (
+    update.runway_danger_weeks !== undefined &&
+    update.runway_healthy_weeks !== undefined &&
+    Number(update.runway_healthy_weeks) <= Number(update.runway_danger_weeks)
+  ) {
+    return { error: 'Healthy threshold must be greater than danger threshold' }
+  }
+
+  if (patch.large_expense_threshold_cents !== undefined) {
+    const c = Number(patch.large_expense_threshold_cents)
+    if (!Number.isInteger(c) || c < 0) {
+      return { error: 'Large expense threshold must be zero or positive (cents)' }
+    }
+    update.large_expense_threshold_cents = c
+  }
+
+  if (patch.variance_alert_pct !== undefined) {
+    const p = Number(patch.variance_alert_pct)
+    if (!Number.isInteger(p) || p < 0 || p > 100) {
+      return { error: 'Variance alert percent must be 0–100' }
+    }
+    update.variance_alert_pct = p
+  }
+
+  if (patch.retention_years !== undefined) {
+    const y = Number(patch.retention_years)
+    if (!Number.isInteger(y) || y < 1 || y > 50) {
+      return { error: 'Retention years must be 1–50' }
+    }
+    update.retention_years = y
+  }
+
+  if (patch.specialist_model_tier !== undefined) {
+    if (!(SPECIALIST_TIERS as readonly string[]).includes(patch.specialist_model_tier)) {
+      return { error: 'Specialist model tier must be haiku, sonnet, or opus' }
+    }
+    update.specialist_model_tier = patch.specialist_model_tier
+  }
+
+  if (patch.digest_schedule !== undefined) {
+    const s = patch.digest_schedule.trim()
+    if (!s || s.length > 64) return { error: 'Invalid digest schedule' }
+    update.digest_schedule = s
+  }
+
+  if (Object.keys(update).length === 0) {
+    // No-op patch — read current state and return.
+    const current = await getMoneySettings()
+    if ('error' in current) return current
+    return { success: true as const, settings: current.settings }
+  }
+
+  return withAuth(async ({ supabase, foundryId }) => {
+    // Ensure the row exists so update() doesn't no-op silently.
+    const ensured = await ensureSettingsRow(supabase, foundryId)
+    if ('error' in ensured) return ensured
+
+    const { data: updated, error } = await supabase
+      .from('money_settings')
+      .update(update)
+      .eq('foundry_id', foundryId)
+      .select(
+        'foundry_id, currency, fiscal_year_start_month, number_format, runway_danger_weeks, runway_healthy_weeks, large_expense_threshold_cents, variance_alert_pct, retention_years, specialist_model_tier, digest_schedule, onboarding_progress, runway_months_cached, runway_cached_at, credits_cap_cents, specialists_enabled, created_at, updated_at',
+      )
+      .single()
+
+    if (error || !updated) return { error: error?.message ?? 'Update failed' }
+
+    revalidatePath('/money/settings')
+    revalidatePath('/money/cockpit')
+
     return {
-        finn: v.finn === false ? false : true,
-        fiona: v.fiona === false ? false : true,
-        harper: v.harper === false ? false : true,
-        leo: v.leo === false ? false : true,
+      success: true as const,
+      settings: rowToSettings(updated as MoneySettingsRow),
     }
+  })
+}
+
+/**
+ * Mark a single onboarding step done (or undone). Step name is checked
+ * against the canonical key set; unknown keys are rejected.
+ */
+export async function markOnboardingStep(
+  step: string,
+  done: boolean,
+): Promise<{ success: true; progress: OnboardingProgress } | { error: string }> {
+  if (!(ONBOARDING_STEP_KEYS as readonly string[]).includes(step)) {
+    return { error: `Unknown onboarding step: ${step}` }
+  }
+
+  return withAuth(async ({ supabase, foundryId }) => {
+    const ensured = await ensureSettingsRow(supabase, foundryId)
+    if ('error' in ensured) return ensured
+
+    const next: OnboardingProgress = {
+      ...ensured.progress,
+      [step as OnboardingStep]: !!done,
+    }
+
+    const { error } = await supabase
+      .from('money_settings')
+      .update({ onboarding_progress: next })
+      .eq('foundry_id', foundryId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/money/settings')
+
+    return { success: true as const, progress: next }
+  })
+}
+
+// ── Internals ────────────────────────────────────────────────────────────────
+
+type EnsureResult = { progress: OnboardingProgress } | { error: string }
+
+async function ensureSettingsRow(
+  supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>,
+  foundryId: string,
+): Promise<EnsureResult> {
+  const { data: existing } = await supabase
+    .from('money_settings')
+    .select('onboarding_progress')
+    .eq('foundry_id', foundryId)
+    .maybeSingle()
+
+  if (existing) {
+    return { progress: coerceOnboarding(existing.onboarding_progress) }
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('money_settings')
+    .insert({ foundry_id: foundryId })
+    .select('onboarding_progress')
+    .single()
+
+  if (error || !inserted) return { error: error?.message ?? 'Failed to initialise settings' }
+  return { progress: coerceOnboarding(inserted.onboarding_progress) }
 }

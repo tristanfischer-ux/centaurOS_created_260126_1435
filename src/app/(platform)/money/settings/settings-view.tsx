@@ -1,957 +1,372 @@
-/**
- * SettingsView — /money/settings, mockup-faithful port of
- * MONEY-MOCKUP-SETTINGS.html. Scoped to `.mst2`.
- *
- * DOM ported top-to-bottom: page head, save-changes button, title with
- * brand title-dot, sticky side-nav, and six form sections — General,
- * Alerts & thresholds, Specialists, Data & privacy, Billing & plan,
- * Advanced (danger). Each row carries its label + helper copy + the
- * real control wired to `money_settings`.
- *
- * Data contract (what persists today, via saveMoneySettings):
- *   - Reporting currency      → money_settings.currency
- *   - Fiscal year start       → money_settings.fiscal_year_start_month
- *   - Number format           → money_settings.number_format
- *   - Runway danger threshold → money_settings.runway_danger_weeks
- *   - Runway healthy threshold→ money_settings.runway_healthy_weeks
- *   - Large-expense alert     → money_settings.large_expense_threshold_cents
- *   - Variance alert          → money_settings.variance_alert_pct
- *   - Email digest            → money_settings.digest_schedule
- *   - Specialist toggles      → money_settings.specialists_enabled jsonb
- *   - Model tier              → money_settings.specialist_model_tier
- *   - Data retention          → money_settings.retention_years
- *
- * Fields on the mockup we do NOT persist yet — each renders with honest
- * chrome so the founder can see which rows are live:
- *   - Display style (compact vs full) — no column today.
- *   - Specialist Tone          — no column today.
- *   - Anonymised benchmarks    — no column today.
- *   - Export / reset / delete  — surfaces exist but actions land with
- *                                the settings audit PR. Buttons disabled.
- *   - Billing & plan block     — read-only, no Stripe wiring yet.
- */
+'use client'
 
-"use client"
+import { useState, useTransition } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Check, Circle, Save } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  updateMoneySettings,
+  markOnboardingStep,
+  type MoneySettings,
+  type SpecialistModelTier,
+  type OnboardingProgress,
+  type OnboardingStep,
+} from '@/actions/money-settings'
 
-import Link from "next/link"
-import { useMemo, useState, useTransition } from "react"
-
-import { saveMoneySettings } from "@/actions/money-settings"
-import type {
-    DigestSchedule,
-    FiscalYearStartMonth,
-    MoneySettingsPatch,
-    MoneySettingsRow,
-    NumberFormatLocale,
-    ReportingCurrency,
-    SpecialistModelTier,
-    SpecialistsEnabled,
-} from "@/actions/money-settings-types"
-
-import "./mst2.css"
-
-// ─── Section anchors (side-nav) ────────────────────────────────────────
-
-interface SectionLink {
-    id: string
-    label: string
-}
-
-const SECTION_LINKS: ReadonlyArray<SectionLink> = [
-    { id: "general", label: "General" },
-    { id: "alerts", label: "Alerts & thresholds" },
-    { id: "specialists", label: "Specialists" },
-    { id: "data", label: "Data & privacy" },
-    { id: "billing", label: "Billing & plan" },
-    { id: "danger", label: "Advanced" },
+const FISCAL_MONTHS: Array<{ value: number; label: string }> = [
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April (UK default)' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
 ]
 
-// ─── Copy (from mockup) ────────────────────────────────────────────────
-
-interface CurrencyOption {
-    value: ReportingCurrency
-    label: string
+const ONBOARDING_LABELS: Record<OnboardingStep, { title: string; helper: string }> = {
+  connect_accounting: {
+    title: 'Connect accounting (Xero)',
+    helper: 'Pull live actuals so runway tracks reality, not just the plan.',
+  },
+  first_plan_line: {
+    title: 'Add your first plan line',
+    helper: 'A single salary or rent line is enough to start projecting runway.',
+  },
+  define_thesis: {
+    title: 'Define your investor thesis',
+    helper: 'Lets the directory rank investors against your stage, sector, and cheque size.',
+  },
+  create_round: {
+    title: 'Create your fundraise round',
+    helper: 'Sets the target, instrument, and close date the pipeline tracks against.',
+  },
+  log_first_touch: {
+    title: 'Log your first investor touch',
+    helper: 'Anything counts — a meeting, a cold reply, a portfolio intro.',
+  },
+  send_first_update: {
+    title: 'Send your first investor update',
+    helper: 'Existing investors get monthly updates; warm prospects get a low-frequency cadence.',
+  },
 }
-const CURRENCY_OPTIONS: ReadonlyArray<CurrencyOption> = [
-    { value: "GBP", label: "GBP · £" },
-    { value: "USD", label: "USD · $" },
-    { value: "EUR", label: "EUR · €" },
+
+const ONBOARDING_ORDER: OnboardingStep[] = [
+  'connect_accounting',
+  'first_plan_line',
+  'define_thesis',
+  'create_round',
+  'log_first_touch',
+  'send_first_update',
 ]
 
-interface FiscalYearOption {
-    value: FiscalYearStartMonth
-    label: string
-}
-const FISCAL_YEAR_OPTIONS: ReadonlyArray<FiscalYearOption> = [
-    { value: 4, label: "6 April (UK default)" },
-    { value: 1, label: "1 January" },
-    { value: 7, label: "1 July" },
-    { value: 10, label: "1 October" },
-]
-
-interface NumberFormatOption {
-    value: NumberFormatLocale
-    label: string
-}
-const NUMBER_FORMAT_OPTIONS: ReadonlyArray<NumberFormatOption> = [
-    { value: "en-GB", label: "1,234.56 (UK/US)" },
-    { value: "de-DE", label: "1.234,56 (EU)" },
-    { value: "fr-FR", label: "1 234,56 (FR)" },
-]
-
-interface DigestOption {
-    value: DigestSchedule
-    label: string
-}
-const DIGEST_OPTIONS: ReadonlyArray<DigestOption> = [
-    { value: "weekly_mon_09", label: "Monday 09:00 BST" },
-    { value: "daily", label: "Daily" },
-    { value: "off", label: "Off" },
-]
-
-interface ModelTierOption {
-    value: SpecialistModelTier
-    label: string
-}
-const MODEL_TIER_OPTIONS: ReadonlyArray<ModelTierOption> = [
-    { value: "haiku", label: "Standard (Haiku · fast)" },
-    { value: "sonnet", label: "Quality (Sonnet · balanced)" },
-    { value: "opus", label: "Deep (Opus · slowest)" },
-]
-
-interface RetentionOption {
-    value: number
-    label: string
-}
-const RETENTION_OPTIONS: ReadonlyArray<RetentionOption> = [
-    { value: 1, label: "1 year" },
-    { value: 3, label: "3 years" },
-    { value: 7, label: "7 years (UK statutory)" },
-    { value: 100, label: "Forever" },
-]
-
-// ─── Props ─────────────────────────────────────────────────────────────
-
-export interface SettingsViewProps {
-    /** Row loaded server-side. Never null — defaults populate missing rows. */
-    initialSettings: MoneySettingsRow
+export function MoneySettingsView({ settings }: { settings: MoneySettings }) {
+  return (
+    <div className="space-y-6">
+      <SettingsForm initial={settings} />
+      <OnboardingChecklist initial={settings.onboarding_progress} />
+    </div>
+  )
 }
 
-// ─── Component ─────────────────────────────────────────────────────────
+function SettingsForm({ initial }: { initial: MoneySettings }) {
+  const [draft, setDraft] = useState<MoneySettings>(initial)
+  const [isPending, startTransition] = useTransition()
 
-export function SettingsView({
-    initialSettings,
-}: SettingsViewProps): React.ReactElement {
-    const [isPending, startTransition] = useTransition()
-    const [error, setError] = useState<string | null>(null)
-    const [success, setSuccess] = useState<string | null>(null)
+  const dirty =
+    draft.currency !== initial.currency ||
+    draft.fiscal_year_start_month !== initial.fiscal_year_start_month ||
+    draft.runway_danger_weeks !== initial.runway_danger_weeks ||
+    draft.runway_healthy_weeks !== initial.runway_healthy_weeks ||
+    draft.variance_alert_pct !== initial.variance_alert_pct ||
+    draft.large_expense_threshold_cents !== initial.large_expense_threshold_cents ||
+    draft.retention_years !== initial.retention_years ||
+    draft.specialist_model_tier !== initial.specialist_model_tier
 
-    // Form state — mirrors the row columns 1:1 so `.save()` just
-    // snapshots the current state into a patch.
-    const [currency, setCurrency] = useState<ReportingCurrency>(
-        (initialSettings.currency as ReportingCurrency) ?? "GBP",
-    )
-    const [fiscalMonth, setFiscalMonth] = useState<FiscalYearStartMonth>(
-        (initialSettings.fiscal_year_start_month as FiscalYearStartMonth) ?? 4,
-    )
-    const [numberFormat, setNumberFormat] = useState<NumberFormatLocale>(
-        (initialSettings.number_format as NumberFormatLocale) ?? "en-GB",
-    )
-    const [runwayDanger, setRunwayDanger] = useState<string>(
-        String(initialSettings.runway_danger_weeks),
-    )
-    const [runwayHealthy, setRunwayHealthy] = useState<string>(
-        String(initialSettings.runway_healthy_weeks),
-    )
-    // Stored as pence on the row; shown as whole pounds in the input.
-    const [largeExpensePounds, setLargeExpensePounds] = useState<string>(
-        String(
-            Math.max(
-                0,
-                Math.round(initialSettings.large_expense_threshold_cents / 100),
-            ),
-        ),
-    )
-    const [variancePct, setVariancePct] = useState<string>(
-        String(initialSettings.variance_alert_pct),
-    )
-    const [digest, setDigest] = useState<DigestSchedule>(
-        (initialSettings.digest_schedule as DigestSchedule) ?? "weekly_mon_09",
-    )
-    const [specialists, setSpecialists] = useState<SpecialistsEnabled>({
-        finn: initialSettings.specialists_enabled.finn,
-        fiona: initialSettings.specialists_enabled.fiona,
-        harper: initialSettings.specialists_enabled.harper,
-        leo: initialSettings.specialists_enabled.leo,
+  const validationError = (() => {
+    if (draft.runway_healthy_weeks <= draft.runway_danger_weeks) {
+      return 'Healthy threshold must be greater than danger threshold.'
+    }
+    return null
+  })()
+
+  function handleSave() {
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+    startTransition(async () => {
+      const result = await updateMoneySettings({
+        currency: draft.currency,
+        fiscal_year_start_month: draft.fiscal_year_start_month,
+        runway_danger_weeks: draft.runway_danger_weeks,
+        runway_healthy_weeks: draft.runway_healthy_weeks,
+        variance_alert_pct: draft.variance_alert_pct,
+        large_expense_threshold_cents: draft.large_expense_threshold_cents,
+        retention_years: draft.retention_years,
+        specialist_model_tier: draft.specialist_model_tier,
+      })
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      setDraft({ ...draft, ...result.settings })
+      toast.success('Settings saved.')
     })
-    const [modelTier, setModelTier] = useState<SpecialistModelTier>(
-        (initialSettings.specialist_model_tier as SpecialistModelTier) ??
-            "sonnet",
-    )
-    const [retention, setRetention] = useState<string>(
-        String(initialSettings.retention_years),
-    )
+  }
 
-    const isDirty = useMemo<boolean>(() => {
-        return (
-            currency !== initialSettings.currency ||
-            fiscalMonth !== initialSettings.fiscal_year_start_month ||
-            numberFormat !== initialSettings.number_format ||
-            parseInt(runwayDanger, 10) !==
-                initialSettings.runway_danger_weeks ||
-            parseInt(runwayHealthy, 10) !==
-                initialSettings.runway_healthy_weeks ||
-            parseInt(largeExpensePounds, 10) * 100 !==
-                initialSettings.large_expense_threshold_cents ||
-            parseInt(variancePct, 10) !==
-                initialSettings.variance_alert_pct ||
-            digest !== initialSettings.digest_schedule ||
-            specialists.finn !==
-                initialSettings.specialists_enabled.finn ||
-            specialists.fiona !==
-                initialSettings.specialists_enabled.fiona ||
-            specialists.harper !==
-                initialSettings.specialists_enabled.harper ||
-            specialists.leo !==
-                initialSettings.specialists_enabled.leo ||
-            modelTier !== initialSettings.specialist_model_tier ||
-            parseInt(retention, 10) !== initialSettings.retention_years
-        )
-    }, [
-        currency,
-        fiscalMonth,
-        numberFormat,
-        runwayDanger,
-        runwayHealthy,
-        largeExpensePounds,
-        variancePct,
-        digest,
-        specialists,
-        modelTier,
-        retention,
-        initialSettings,
-    ])
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Defaults</CardTitle>
+        <CardDescription>Used by the cockpit, plan, and variance views.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="currency">Reporting currency</Label>
+            <Input
+              id="currency"
+              maxLength={3}
+              value={draft.currency}
+              onChange={(e) => setDraft({ ...draft, currency: e.target.value.toUpperCase() })}
+              placeholder="GBP"
+            />
+            <p className="text-xs text-muted-foreground">ISO 4217 three-letter code.</p>
+          </div>
 
-    const handleToggle = (key: keyof SpecialistsEnabled): void => {
-        setSpecialists((prev) => ({ ...prev, [key]: !prev[key] }))
-    }
+          <div className="space-y-2">
+            <Label htmlFor="fiscal-month">Fiscal year start month</Label>
+            <Select
+              value={String(draft.fiscal_year_start_month)}
+              onValueChange={(v) => setDraft({ ...draft, fiscal_year_start_month: Number(v) })}
+            >
+              <SelectTrigger id="fiscal-month">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FISCAL_MONTHS.map((m) => (
+                  <SelectItem key={m.value} value={String(m.value)}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-    const handleSave = (): void => {
-        setError(null)
-        setSuccess(null)
+          <div className="space-y-2">
+            <Label htmlFor="danger">Runway danger threshold (weeks)</Label>
+            <Input
+              id="danger"
+              type="number"
+              min={1}
+              max={520}
+              value={draft.runway_danger_weeks}
+              onChange={(e) =>
+                setDraft({ ...draft, runway_danger_weeks: Number(e.target.value) || 0 })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Cockpit shows a critical badge below this value.
+            </p>
+          </div>
 
-        const runwayDangerN = parseInt(runwayDanger, 10)
-        const runwayHealthyN = parseInt(runwayHealthy, 10)
-        const largeExpenseN = parseInt(largeExpensePounds, 10)
-        const varianceN = parseInt(variancePct, 10)
-        const retentionN = parseInt(retention, 10)
+          <div className="space-y-2">
+            <Label htmlFor="healthy">Runway healthy threshold (weeks)</Label>
+            <Input
+              id="healthy"
+              type="number"
+              min={1}
+              max={520}
+              value={draft.runway_healthy_weeks}
+              onChange={(e) =>
+                setDraft({ ...draft, runway_healthy_weeks: Number(e.target.value) || 0 })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              At or above this value the cockpit is green.
+            </p>
+          </div>
 
-        if (
-            Number.isNaN(runwayDangerN) ||
-            Number.isNaN(runwayHealthyN) ||
-            Number.isNaN(largeExpenseN) ||
-            Number.isNaN(varianceN) ||
-            Number.isNaN(retentionN)
-        ) {
-            setError("Numeric thresholds must be whole numbers.")
-            return
-        }
-        if (runwayHealthyN < runwayDangerN) {
-            setError(
-                "Healthy runway threshold must be at least the danger threshold.",
-            )
-            return
-        }
+          <div className="space-y-2">
+            <Label htmlFor="variance">Variance alert percent</Label>
+            <Input
+              id="variance"
+              type="number"
+              min={0}
+              max={100}
+              value={draft.variance_alert_pct}
+              onChange={(e) =>
+                setDraft({ ...draft, variance_alert_pct: Number(e.target.value) || 0 })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Per-category variance over this percent triggers a Today signal.
+            </p>
+          </div>
 
-        const patch: MoneySettingsPatch = {
-            currency,
-            fiscal_year_start_month: fiscalMonth,
-            number_format: numberFormat,
-            runway_danger_weeks: runwayDangerN,
-            runway_healthy_weeks: runwayHealthyN,
-            large_expense_threshold_cents: largeExpenseN * 100,
-            variance_alert_pct: varianceN,
-            digest_schedule: digest,
-            specialists_enabled: specialists,
-            specialist_model_tier: modelTier,
-            retention_years: retentionN,
-        }
+          <div className="space-y-2">
+            <Label htmlFor="large-expense">Large-expense threshold ({draft.currency})</Label>
+            <Input
+              id="large-expense"
+              type="number"
+              min={0}
+              step={1}
+              value={draft.large_expense_threshold_cents / 100}
+              onChange={(e) => {
+                const major = Number(e.target.value) || 0
+                setDraft({
+                  ...draft,
+                  large_expense_threshold_cents: Math.round(major * 100),
+                })
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Single transactions above this amount get flagged for review.
+            </p>
+          </div>
 
-        startTransition(async () => {
-            const result = await saveMoneySettings(patch)
-            if ("error" in result) {
-                setError(result.error)
-                return
-            }
-            setSuccess("Saved. Changes apply across Cockpit, Plan, and Raise.")
-        })
-    }
+          <div className="space-y-2">
+            <Label htmlFor="retention">Audit retention (years)</Label>
+            <Input
+              id="retention"
+              type="number"
+              min={1}
+              max={50}
+              value={draft.retention_years}
+              onChange={(e) => setDraft({ ...draft, retention_years: Number(e.target.value) || 1 })}
+            />
+            <p className="text-xs text-muted-foreground">
+              How long Money-section audit rows are kept before archive.
+            </p>
+          </div>
 
-    return (
-        <div className="mst2">
-            {/* ── Breadcrumbs + primary action ─────────────────────── */}
-            <div className="mst2-page-head">
-                <div className="mst2-crumbs">
-                    <Link href="/money/cockpit">Money</Link>
-                    <span className="sep">›</span>
-                    <span className="current">Settings</span>
-                </div>
-                <div className="mst2-ctx-chips">
-                    <button
-                        type="button"
-                        className="mst2-btn mst2-btn-primary"
-                        onClick={handleSave}
-                        disabled={!isDirty || isPending}
-                    >
-                        {isPending ? "Saving…" : "Save changes"}
-                    </button>
-                </div>
-            </div>
-
-            {/* ── Title tile ───────────────────────────────────────── */}
-            <div className="mst2-head">
-                <h1>
-                    <span
-                        className="mst2-title-dot"
-                        aria-hidden="true"
-                    />
-                    Money settings
-                </h1>
-                <div className="mst2-sub">
-                    Foundry-wide defaults. Changes affect every user and
-                    every view in Cockpit, Plan, and Raise.
-                </div>
-            </div>
-
-            {isDirty && !isPending ? (
-                <div className="mst2-save-banner" role="status">
-                    <strong>Unsaved changes</strong>
-                    <span>
-                        Save to apply new thresholds, specialist toggles, and
-                        defaults.
-                    </span>
-                    <div className="mst2-save-banner-actions">
-                        <button
-                            type="button"
-                            className="mst2-btn mst2-btn-primary"
-                            onClick={handleSave}
-                            disabled={isPending}
-                        >
-                            Save now
-                        </button>
-                    </div>
-                </div>
-            ) : null}
-
-            {error ? (
-                <div className="mst2-alert mst2-alert-error" role="alert">
-                    {error}
-                </div>
-            ) : null}
-            {success ? (
-                <div
-                    className="mst2-alert mst2-alert-success"
-                    role="status"
-                >
-                    {success}
-                </div>
-            ) : null}
-
-            {/* ── Grid: side-nav + form column ─────────────────────── */}
-            <div className="mst2-grid">
-                <nav className="mst2-side" aria-label="Settings sections">
-                    {SECTION_LINKS.map((link, index) => (
-                        <a
-                            key={link.id}
-                            href={`#${link.id}`}
-                            className={index === 0 ? "active" : undefined}
-                        >
-                            {link.label}
-                        </a>
-                    ))}
-                </nav>
-
-                <div>
-                    {/* ── GENERAL ─────────────────────────────────── */}
-                    <section className="mst2-section" id="general">
-                        <h3>General</h3>
-                        <div className="mst2-section-sub">
-                            Currency, fiscal year, and how dates and numbers
-                            display.
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Reporting currency
-                                <small>
-                                    Used everywhere — Cockpit, Plan, P&amp;L,
-                                    investor updates. Transactions in other
-                                    currencies convert at the day&apos;s rate.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    value={currency}
-                                    onChange={(e) =>
-                                        setCurrency(
-                                            e.target.value as ReportingCurrency,
-                                        )
-                                    }
-                                    aria-label="Reporting currency"
-                                >
-                                    {CURRENCY_OPTIONS.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Fiscal year start
-                                <small>
-                                    Affects annual P&amp;L and VAT quarter
-                                    alignment.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    value={fiscalMonth}
-                                    onChange={(e) =>
-                                        setFiscalMonth(
-                                            Number(
-                                                e.target.value,
-                                            ) as FiscalYearStartMonth,
-                                        )
-                                    }
-                                    aria-label="Fiscal year start"
-                                >
-                                    {FISCAL_YEAR_OPTIONS.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Number format
-                                <small>
-                                    Thousands and decimal separators.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    value={numberFormat}
-                                    onChange={(e) =>
-                                        setNumberFormat(
-                                            e.target
-                                                .value as NumberFormatLocale,
-                                        )
-                                    }
-                                    aria-label="Number format"
-                                >
-                                    {NUMBER_FORMAT_OPTIONS.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Display style
-                                <small>
-                                    How amounts render in lists and charts.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    defaultValue="compact"
-                                    disabled
-                                    aria-label="Display style"
-                                >
-                                    <option value="compact">
-                                        Compact (£34k, £2.4M)
-                                    </option>
-                                    <option value="full">
-                                        Full (£34,220 · £2,400,000)
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ── ALERTS ──────────────────────────────────── */}
-                    <section className="mst2-section" id="alerts">
-                        <h3>Alerts &amp; thresholds</h3>
-                        <div className="mst2-section-sub">
-                            When ForgeOS flags something on Cockpit or sends
-                            notifications.
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Runway danger threshold
-                                <small>
-                                    Cockpit shows a red tag if runway drops
-                                    below this. Founders often set 13 weeks
-                                    (1 quarter).
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl mst2-threshold">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={runwayDanger}
-                                    onChange={(e) =>
-                                        setRunwayDanger(e.target.value)
-                                    }
-                                    aria-label="Runway danger threshold in weeks"
-                                />
-                                <span className="mst2-unit">weeks</span>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Runway healthy threshold
-                                <small>
-                                    Cockpit shows a green tag above this.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl mst2-threshold">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={runwayHealthy}
-                                    onChange={(e) =>
-                                        setRunwayHealthy(e.target.value)
-                                    }
-                                    aria-label="Runway healthy threshold in weeks"
-                                />
-                                <span className="mst2-unit">weeks</span>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Large expense alert
-                                <small>
-                                    Prompts co-founder awareness for one-off
-                                    expenses over this amount.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl mst2-threshold">
-                                <span className="mst2-prefix">£</span>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={largeExpensePounds}
-                                    onChange={(e) =>
-                                        setLargeExpensePounds(e.target.value)
-                                    }
-                                    aria-label="Large expense alert in pounds"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Variance alert threshold
-                                <small>
-                                    Finn flags a month if actuals overrun
-                                    plan by more than this.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl mst2-threshold">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={variancePct}
-                                    onChange={(e) =>
-                                        setVariancePct(e.target.value)
-                                    }
-                                    aria-label="Variance alert percent"
-                                />
-                                <span className="mst2-unit">% over</span>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Email digest
-                                <small>
-                                    Weekly summary of runway, new variance,
-                                    pipeline changes.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    value={digest}
-                                    onChange={(e) =>
-                                        setDigest(
-                                            e.target.value as DigestSchedule,
-                                        )
-                                    }
-                                    aria-label="Email digest schedule"
-                                >
-                                    {DIGEST_OPTIONS.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ── SPECIALISTS ─────────────────────────────── */}
-                    <section className="mst2-section" id="specialists">
-                        <h3>Specialists</h3>
-                        <div className="mst2-section-sub">
-                            Control how Finn (finance), Fiona (fundraise),
-                            Harper (HR), and Leo (legal) appear in Money.
-                            Turning one off keeps their surface plainer and
-                            reduces specialist credits used.
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Finn callouts on Cockpit &amp; Plan
-                                <small>
-                                    Monthly diagnoses, variance explanations,
-                                    runway commentary.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <SpecialistToggle
-                                    label="Finn callouts"
-                                    value={specialists.finn}
-                                    onChange={() => handleToggle("finn")}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Fiona pre-briefs on Raise
-                                <small>
-                                    Before-meeting context and suggested
-                                    next actions for each investor.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <SpecialistToggle
-                                    label="Fiona pre-briefs"
-                                    value={specialists.fiona}
-                                    onChange={() => handleToggle("fiona")}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Harper HR suggestions
-                                <small>
-                                    On cost lines affecting people (payroll,
-                                    hire timing).
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <SpecialistToggle
-                                    label="Harper HR suggestions"
-                                    value={specialists.harper}
-                                    onChange={() => handleToggle("harper")}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Leo legal flags
-                                <small>
-                                    Tax dates, compliance deadlines, SAFE
-                                    terms.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <SpecialistToggle
-                                    label="Leo legal flags"
-                                    value={specialists.leo}
-                                    onChange={() => handleToggle("leo")}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Tone
-                                <small>
-                                    How specialists phrase their suggestions.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    defaultValue="direct_british"
-                                    disabled
-                                    aria-label="Specialist tone"
-                                >
-                                    <option value="direct_british">
-                                        Direct · British
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Model tier
-                                <small>
-                                    Higher tier gives better analysis and
-                                    uses more credits. Your plan includes
-                                    500 credits each month.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    value={modelTier}
-                                    onChange={(e) =>
-                                        setModelTier(
-                                            e.target
-                                                .value as SpecialistModelTier,
-                                        )
-                                    }
-                                    aria-label="Specialist model tier"
-                                >
-                                    {MODEL_TIER_OPTIONS.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ── DATA & PRIVACY ──────────────────────────── */}
-                    <section className="mst2-section" id="data">
-                        <h3>Data &amp; privacy</h3>
-                        <div className="mst2-section-sub">
-                            How your financial data is handled, stored, and
-                            (optionally) contributed to aggregate benchmarks.
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Contribute anonymised benchmarks
-                                <small>
-                                    Anonymised burn and revenue figures help
-                                    other UK pre-seed hardware founders
-                                    benchmark. No identifying data leaves
-                                    your foundry. (Preview — not yet wired.)
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <button
-                                    type="button"
-                                    className="mst2-toggle"
-                                    aria-pressed="false"
-                                    aria-label="Contribute anonymised benchmarks"
-                                    disabled
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Data retention
-                                <small>
-                                    How long ForgeOS retains audit logs and
-                                    archived touches.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <select
-                                    value={retention}
-                                    onChange={(e) =>
-                                        setRetention(e.target.value)
-                                    }
-                                    aria-label="Data retention"
-                                >
-                                    {RETENTION_OPTIONS.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Export &amp; delete
-                                <small>
-                                    Download all your Money data as JSON +
-                                    CSV, or request full deletion. (Lands
-                                    with the audit log surface.)
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <button
-                                    type="button"
-                                    className="mst2-btn"
-                                    disabled
-                                >
-                                    Request export
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ── BILLING ─────────────────────────────────── */}
-                    <section className="mst2-section" id="billing">
-                        <h3>Billing &amp; plan</h3>
-                        <div className="mst2-section-sub">
-                            ForgeOS subscription for this foundry. Controlled
-                            at the account level, not per user.
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Plan
-                                <small>
-                                    Managed under Settings &rsaquo; Billing.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <Link
-                                    href="/settings/billing"
-                                    className="mst2-btn"
-                                >
-                                    Open billing
-                                </Link>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Usage this month
-                                <small>
-                                    Specialist credit usage is surfaced on
-                                    the Money Cockpit once metering lands.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl mst2-meta">
-                                Coming with Cockpit ledger
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Next invoice
-                                <small>
-                                    Stripe manages renewals — the invoice
-                                    date is shown on the Billing page.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl mst2-meta">
-                                See Settings &rsaquo; Billing
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ── DANGER ──────────────────────────────────── */}
-                    <section className="mst2-danger" id="danger">
-                        <h3>Advanced · irreversible</h3>
-                        <div className="mst2-section-sub">
-                            Actions that cannot be undone easily. Each
-                            action prompts for password confirmation when
-                            wired.
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Reset Money data
-                                <small>
-                                    Wipe all Plan, Scenarios, Investors, and
-                                    Pitch data. Keep the foundry, Workshop,
-                                    and Team. Requires password.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <button
-                                    type="button"
-                                    className="mst2-btn mst2-btn-danger-outline"
-                                    disabled
-                                >
-                                    Reset Money…
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="mst2-row">
-                            <div className="mst2-lab">
-                                Delete foundry
-                                <small>
-                                    Permanent. All users lose access. A
-                                    14-day grace period allows undo.
-                                </small>
-                            </div>
-                            <div className="mst2-ctrl">
-                                <button
-                                    type="button"
-                                    className="mst2-btn mst2-btn-danger-outline"
-                                    disabled
-                                >
-                                    Delete foundry…
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <div className="mst2-note">
-                        <strong>How these settings behave</strong>
-                        Thresholds drive conditional rendering on the Money
-                        Cockpit (tag colours) and the variance alert that
-                        Finn raises on Plan. Specialist toggles gate
-                        server-side briefings per call — turning one off
-                        hides that surface across Money without touching
-                        the rest of the Forge.
-                    </div>
-                </div>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="tier">Specialist model tier</Label>
+            <Select
+              value={draft.specialist_model_tier}
+              onValueChange={(v) =>
+                setDraft({ ...draft, specialist_model_tier: v as SpecialistModelTier })
+              }
+            >
+              <SelectTrigger id="tier">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="haiku">Haiku — fastest, cheapest</SelectItem>
+                <SelectItem value="sonnet">Sonnet — balanced (recommended)</SelectItem>
+                <SelectItem value="opus">Opus — most capable, highest cost</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Default tier for specialist invocations. Per-task overrides may apply.
+            </p>
+          </div>
         </div>
-    )
+
+        {validationError && (
+          <p className="text-xs text-destructive">{validationError}</p>
+        )}
+
+        <div className="flex items-center justify-end gap-3">
+          {dirty && (
+            <Badge variant="warning">Unsaved changes</Badge>
+          )}
+          <Button onClick={handleSave} disabled={!dirty || isPending || !!validationError}>
+            <Save className="h-4 w-4 mr-1" />
+            {isPending ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
-// ─── Small internal toggle component ───────────────────────────────────
+function OnboardingChecklist({ initial }: { initial: OnboardingProgress }) {
+  const [progress, setProgress] = useState<OnboardingProgress>(initial)
+  const [pendingStep, setPendingStep] = useState<OnboardingStep | null>(null)
 
-interface SpecialistToggleProps {
-    label: string
-    value: boolean
-    onChange: () => void
-}
+  const completed = ONBOARDING_ORDER.filter((s) => progress[s]).length
 
-function SpecialistToggle({
-    label,
-    value,
-    onChange,
-}: SpecialistToggleProps): React.ReactElement {
-    return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={value}
-            aria-label={label}
-            onClick={onChange}
-            className={`mst2-toggle ${value ? "mst2-on" : ""}`}
-        />
-    )
+  function toggle(step: OnboardingStep) {
+    const next = !progress[step]
+    setPendingStep(step)
+    // Optimistic update.
+    setProgress((p) => ({ ...p, [step]: next }))
+    void markOnboardingStep(step, next).then((result) => {
+      if ('error' in result) {
+        // Roll back.
+        setProgress((p) => ({ ...p, [step]: !next }))
+        toast.error(result.error)
+      } else {
+        setProgress(result.progress)
+      }
+      setPendingStep(null)
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Onboarding checklist</CardTitle>
+            <CardDescription>Six steps to make Money do the heavy lifting.</CardDescription>
+          </div>
+          <Badge variant="secondary">{completed} / {ONBOARDING_ORDER.length}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {ONBOARDING_ORDER.map((step) => {
+            const done = progress[step]
+            const meta = ONBOARDING_LABELS[step]
+            const busy = pendingStep === step
+            return (
+              <li key={step}>
+                <button
+                  type="button"
+                  onClick={() => toggle(step)}
+                  disabled={busy}
+                  aria-pressed={done}
+                  className={`w-full text-left flex items-start gap-3 rounded-md border border-border px-3 py-3 transition-colors ${done ? 'bg-success/5' : 'bg-background hover:bg-muted/50'} ${busy ? 'opacity-60' : ''}`}
+                >
+                  <span className="mt-0.5 shrink-0">
+                    {done ? (
+                      <Check className="h-5 w-5 text-success" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-sm font-medium ${done ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                      {meta.title}
+                    </span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      {meta.helper}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      </CardContent>
+    </Card>
+  )
 }

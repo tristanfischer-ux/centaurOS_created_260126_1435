@@ -85,10 +85,10 @@
   </div>
 
   <div class="stats">
-    <div class="tile"><div class="lab">Mockups built</div><div class="val">10</div><div class="sub">1 main · 1 empty · 8 drill-ins + transitions</div></div>
-    <div class="tile"><div class="lab">5-tab coverage</div><div class="val brand">5 / 5</div><div class="sub">All tabs have a populated + empty state</div></div>
-    <div class="tile"><div class="lab">Gaps found</div><div class="val bad">18</div><div class="sub">See PRODUCTS-MOCKUP-GAP-AUDIT.html for the list</div></div>
-    <div class="tile"><div class="lab">Must-mock before code</div><div class="val bad">6</div><div class="sub">Blocks Phase 4 if skipped</div></div>
+    <div class="tile"><div class="lab">Mockups built</div><div class="val good">16</div><div class="sub">1 main · 1 empty · 14 drill-ins + flows + inline variants</div></div>
+    <div class="tile"><div class="lab">5-tab coverage</div><div class="val brand">5 / 5</div><div class="sub">All tabs have populated + empty + read-only + role states</div></div>
+    <div class="tile"><div class="lab">MUSTs closed</div><div class="val good">13 / 13</div><div class="sub">5 new standalone + 4 inline tweaks + 4 banner variants</div></div>
+    <div class="tile"><div class="lab">Build gate</div><div class="val good">✓ Ready</div><div class="sub">All MUSTs addressed · waits on Plan merge per phase order</div></div>
   </div>
 
   <!-- Reading order -->
@@ -172,13 +172,13 @@
         <p>Zero hypotheses. Invites the founder into the three creation paths (net-new, promote-from-Forge, paste-from-plan). Priya briefing in positive framing.</p>
         <div class="tag">Main surface · empty state</div>
       </a>
-      <div class="mock" style="opacity: 0.55; cursor: default;">
-        <span class="status todo">todo</span>
+      <a class="mock" href="FORGE-MOCKUP-PRODUCTS-LIST.html">
+        <span class="status built">built</span>
         <h3>Products · list view (≥ 1 hypothesis)</h3>
-        <div class="path">PRODUCTS-LIST (MISSING)</div>
-        <p>Multi-hypothesis list. Needed for founders tracking 2–5 parallel hypotheses. Filter by lifecycle_stage, sort by readiness, archive. Gap #1.1 in audit.</p>
-        <div class="tag">V1 must-have · blocks code</div>
-      </div>
+        <div class="path">FORGE-MOCKUP-PRODUCTS-LIST.html</div>
+        <p>Multi-hypothesis list · filter pills (All/Concept/Researching/Validated/Promoted/Archived) + sort dropdown · 4 sample cards across lifecycle stages with lifecycle-specific primary CTAs · collapsed Archived disclosure. Gap 1.1 MUST closed.</p>
+        <div class="tag">Main surface · populated list</div>
+      </a>
     </div>
   </div>
 
@@ -209,7 +209,14 @@
         <h3>Customer interview · detail</h3>
         <div class="path">FORGE-MOCKUP-INTERVIEW-DETAIL.html</div>
         <p>Quote as atomic unit. Tags (<code>#must-have</code> / <code>#blocker</code> / <code>#willing-to-pay</code>). Linked segment from market sizing. Blocker tag fires event_log.</p>
-        <div class="tag">Evidence tab · drill-in</div>
+        <div class="tag">Evidence tab · drill-in (read)</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-INTERVIEW-CREATE.html">
+        <span class="status built">built</span>
+        <h3>Customer interview · log (create)</h3>
+        <div class="path">FORGE-MOCKUP-INTERVIEW-CREATE.html</div>
+        <p>Two-column create form: name/role/company · segment dropdown · date · verbatim quote (min 20 chars) · tags with 8-default chip picker + free-text · `#blocker` fires Today signal. Right sticky context panel with 5 existing interviews + help card. Gap 3.1 MUST closed.</p>
+        <div class="tag">Evidence tab · drill-in (write)</div>
       </a>
       <a class="mock" href="FORGE-MOCKUP-LOI-DETAIL.html">
         <span class="status built">built</span>
@@ -225,13 +232,13 @@
         <p>Assumption register row. Risk level 1–5. Status untested → testing → valid/invalid. Invalidating high-risk assumptions fires critical Today entry.</p>
         <div class="tag">Evidence tab · drill-in</div>
       </a>
-      <div class="mock" style="opacity: 0.55; cursor: default;">
-        <span class="status gap">missing</span>
+      <a class="mock" href="FORGE-MOCKUP-EXPERIMENT-DETAIL.html">
+        <span class="status built">built</span>
         <h3>Experiment · detail / log</h3>
-        <div class="path">EXPERIMENT-DETAIL (MISSING)</div>
-        <p>Experiment entity has no drill-in. Needed for result logging + keep/iterate/kill decision. Gap #3.4 in audit.</p>
-        <div class="tag">Evidence tab · drill-in · MUST</div>
-      </div>
+        <div class="path">FORGE-MOCKUP-EXPERIMENT-DETAIL.html</div>
+        <p>Pre-declared success criterion (locked at creation) · method · result with chart · keep/iterate/kill decision cards · linked-assumption transitions · RT2 constraint satisfaction check before Save enables. Gap 3.4 MUST closed.</p>
+        <div class="tag">Evidence tab · drill-in</div>
+      </a>
       <a class="mock" href="FORGE-MOCKUP-READINESS-ACTION.html">
         <span class="status built">built</span>
         <h3>Readiness · close an action</h3>
@@ -264,13 +271,13 @@
         <p>Reason picker (killed-by-assumption / pivoted / market-too-small / paused). Pivoted → link to replacement hypothesis. Low-urgency Today entry.</p>
         <div class="tag">Soft-delete</div>
       </a>
-      <div class="mock" style="opacity: 0.55; cursor: default;">
-        <span class="status gap">missing</span>
+      <a class="mock" href="FORGE-MOCKUP-UNARCHIVE.html">
+        <span class="status built">built</span>
         <h3>Unarchive · restore</h3>
-        <div class="path">UNARCHIVE (MISSING)</div>
-        <p>Inverse of archive. Banner if hypothesis was promoted ("re-promote to re-link"). Gap #C.3 in audit.</p>
-        <div class="tag">State transition · MUST</div>
-      </div>
+        <div class="path">FORGE-MOCKUP-UNARCHIVE.html</div>
+        <p>Two variants stacked: simple unarchive (never-promoted) + unarchive-with-Forge-provenance (previously promoted → "Re-promote to re-link" banner + optional audit-log note field). Gap 6.1 MUST closed.</p>
+        <div class="tag">State transition</div>
+      </a>
     </div>
   </div>
 
@@ -282,31 +289,31 @@
       <span class="desc">Onboarding, legacy read-only, permissions banners, mobile-specific, error states. These span tabs and are flagged in the gap audit.</span>
     </div>
     <div class="grid">
-      <div class="mock" style="opacity: 0.55; cursor: default;">
-        <span class="status gap">missing</span>
+      <a class="mock" href="FORGE-MOCKUP-PRODUCTS-LEGACY.html">
+        <span class="status built">built</span>
         <h3>Legacy read-only (Coming Soon bridge)</h3>
-        <div class="path">LEGACY-READ-ONLY (MISSING)</div>
-        <p>Users with existing <code>products</code> rows during Pre-Phase Coming Soon. Reads from old table, no writes. Phase 4 replaces this surface. Gap #C.1.</p>
-        <div class="tag">Pre-Phase bridge · MUST</div>
-      </div>
-      <div class="mock" style="opacity: 0.55; cursor: default;">
-        <span class="status gap">missing</span>
+        <div class="path">FORGE-MOCKUP-PRODUCTS-LEGACY.html</div>
+        <p>Two stacked sections: legacy list view + legacy detail view. Info banner at top. 🔒 glyphs on old tabs. "from legacy products table" badges. Migration-guarantee card explains `id` preservation. Gap C.1 MUST closed.</p>
+        <div class="tag">Pre-Phase bridge</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-PRODUCTS-V2.html#banner-variants">
+        <span class="status built">built</span>
         <h3>Read-only banner (wrong role)</h3>
-        <div class="path">PERMISSION-BANNER (MISSING)</div>
-        <p>Advisor / contractor / read_only_observer view. 9-role matrix enforced. Gap #C.5 in audit.</p>
-        <div class="tag">Cross-tab · MUST</div>
-      </div>
-      <div class="mock" style="opacity: 0.55; cursor: default;">
-        <span class="status gap">missing</span>
+        <div class="path">inline in FORGE-MOCKUP-PRODUCTS-V2.html</div>
+        <p>Advisor / contractor / read_only_observer view — grey eye icon + "read-only view for your role" + role code shown + "See full matrix →" link. Appears above tab-strip, gates every editor. Gap C.5 MUST closed (inline variant in PRODUCTS-V2).</p>
+        <div class="tag">Cross-tab · inline variant</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-PRODUCTS-V2.html#banner-variants">
+        <span class="status built">built</span>
         <h3>Promote-blocked banner</h3>
-        <div class="path">PROMOTE-BLOCKED (MISSING)</div>
-        <p>Hypothesis already promoted → tabs show read-only banner "The Brief is canonical now. Edits live at The Forge." Gap #C.4.</p>
-        <div class="tag">Post-promote state · MUST</div>
-      </div>
-      <div class="mock" style="opacity: 0.55; cursor: default;">
-        <span class="status gap">missing</span>
+        <div class="path">inline in FORGE-MOCKUP-PRODUCTS-V2.html</div>
+        <p>Blue info-soft banner "Promoted to The Forge — this surface is read-only. Canonical ownership is now the Brief." + Open Brief link + Un-promote button. Gates all editors. Gap C.4 MUST closed (inline variant in PRODUCTS-V2).</p>
+        <div class="tag">Post-promote · inline variant</div>
+      </a>
+      <a class="mock" href="FORGE-MOCKUP-HYPOTHESIS-CREATE.html">
+        <span class="status built">built</span>
         <h3>Hypothesis-create (net new)</h3>
-        <div class="path">HYPOTHESIS-CREATE (MISSING)</div>
+        <div class="path">FORGE-MOCKUP-HYPOTHESIS-CREATE.html</div>
         <p>Three-field entry form (<code>If / Then / Because</code> grammar per Maze pattern). Tag D/F/V risk. Empty-state has three CTAs but no single mock of the net-new form alone. Gap #1.2.</p>
         <div class="tag">Hypothesis tab · MUST</div>
       </div>

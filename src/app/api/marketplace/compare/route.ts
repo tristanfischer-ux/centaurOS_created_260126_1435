@@ -180,7 +180,7 @@ Analyze these options and provide your recommendation.`;
 
         // Call OpenAI
         const completion = await openai.chat.completions.create({
-            model: "gpt-5.4",
+            model: "gpt-4.1-mini",
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt }
@@ -189,7 +189,7 @@ Analyze these options and provide your recommendation.`;
         });
 
         guard.trackUsage({
-            model: 'gpt-5.4',
+            model: 'gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
         }).catch(() => {})

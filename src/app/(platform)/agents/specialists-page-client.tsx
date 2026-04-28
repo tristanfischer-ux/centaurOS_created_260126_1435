@@ -11,7 +11,6 @@ import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { ArrowLeft, Monitor } from "lucide-react"
 import { SpecialistsLanding } from "./specialists-landing"
 import type { AgentWorkflowRow, AgentCustomPromptRow } from "@/actions/agent-workflows"
-import type { SubscriptionTier } from "@/lib/billing/plans"
 
 /**
  * Dynamically load the heavy workflow builder (ReactFlow + Dagre) only when needed.
@@ -39,13 +38,6 @@ type PageView = "specialists" | "project-builder"
 interface SpecialistsPageClientProps {
     initialWorkflows: AgentWorkflowRow[]
     initialCustomPrompts: AgentCustomPromptRow[]
-    /** Authenticated user id, threaded into TeamMeetingDialog for the
-     * referral URL on the post-meeting upsell. */
-    userId?: string
-    /** Subscription tier of the current user, drives the upsell variant. */
-    userTier?: SubscriptionTier
-    /** Brainstorm sessions consumed this calendar month. */
-    brainstormsUsedThisMonth?: number
 }
 
 /**
@@ -55,9 +47,6 @@ interface SpecialistsPageClientProps {
 export function SpecialistsPageClient({
     initialWorkflows,
     initialCustomPrompts,
-    userId,
-    userTier,
-    brainstormsUsedThisMonth,
 }: SpecialistsPageClientProps) {
     const [view, setView] = useState<PageView>("specialists")
     const [isMobile, setIsMobile] = useState<boolean | null>(null)
@@ -101,7 +90,7 @@ export function SpecialistsPageClient({
                         )}
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight inline-flex items-center gap-1.5">
-                            {view === "specialists" ? "Your Specialists" : "Team Project"}
+                            {view === "specialists" ? "Brainstorming" : "Team Project"}
                             {view === "project-builder" && (
                                 <HelpTooltip content="Chain multiple specialists together. Each step's output feeds into the next." />
                             )}
@@ -124,7 +113,7 @@ export function SpecialistsPageClient({
                     fallbackMessage="Thirteen specialists, each with a different lens on your business. Sage will challenge your strategy, Finn will stress-test your numbers, Harper will tell you who to hire next. You don't need to know which one to pick — describe your problem and the right one will surface. Start with whoever's closest to the thing keeping you up at night."
                     isLoading={briefing.isLoading}
                     severity={briefing.severity}
-                    context={{ type: 'general', title: 'Your Specialists', description: 'Cal on specialists.', metadata: {} }}
+                    context={{ type: 'general', title: 'Brainstorming', description: 'Cal on specialists.', metadata: {} }}
                     storageKey="specialists"
                 />
             </div>
@@ -136,9 +125,6 @@ export function SpecialistsPageClient({
                         <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
                             <SpecialistsLanding
                                 onOpenProjectBuilder={() => setView("project-builder")}
-                                userId={userId}
-                                userTier={userTier}
-                                brainstormsUsedThisMonth={brainstormsUsedThisMonth}
                             />
                         </Suspense>
                     </div>

@@ -391,6 +391,77 @@ For every page-level red-team pass, the code audit + fix is only half the work. 
 2. If "still doesn't work": STOP. Switch to Plan Mode. Re-analyze assumptions. Create debugging plan. Write reproducing test. Prove fix works.
 - Only ONE attempt before escalating to plan mode
 
+### Logs Are Your Debugger — USE THEM, DON'T POKE BLINDLY
+
+**You have full Vercel access via the `vercel` CLI AND full Supabase log access via the MCP server. Production runtime logs are one command away on both layers. Use them BEFORE guessing at fixes.** Codified 2026-04-25 after a session spent diagnosing a silent signup-failure bug by visual inspection alone, when `vercel logs` + `mcp__claude_ai_Supabase__get_logs` together would have surfaced the actual root cause in 60 seconds.
+
+The mistake to avoid: a user reports "X doesn't work in production" → you start reading code, forming hypotheses, reproducing in agent-browser → you hit a silent failure (no client-side error, no toast, no console) → you guess at root causes (rate limiter? CSRF? validation?) and propose three speculative fixes. None of that is necessary. The server-side log line tells you the answer. Two log queries can rule out 80% of the hypothesis space.
+
+#### Vercel logs (frontend / API routes / edge / middleware / runtime errors)
+
+**Commands you should reach for FIRST when debugging anything that touches the Next.js layer:**
+
+```bash
+# Recent production logs, expanded so message bodies are visible
+npx vercel logs --no-follow --environment production --since 30m -x -n 200
+
+# Filter to errors only
+npx vercel logs --no-follow --environment production --since 2h --level error -x
+
+# Search by query string (function logs, message text, etc)
+npx vercel logs --no-follow --environment production --since 1h -q "signup" -x
+
+# Inspect a specific deployment with logs
+npx vercel inspect <deployment-url> --logs
+
+# List recent deployments to find the one a user was hitting
+npx vercel ls
+```
+
+Source markers in output: `λ` = serverless function, `ε` = edge/middleware, `◇` = static. Errors of interest cluster under `λ` (server actions) and `ε` (middleware).
+
+#### Supabase logs (auth / Postgres / RLS / Storage / Edge Functions / Realtime)
+
+**Use the MCP tool for the linked Supabase project — equally important when debugging auth, RLS, or DB errors:**
+
+```
+mcp__claude_ai_Supabase__get_logs(project_id, service)
+```
+
+Service values to know:
+- `auth` — sign-up, sign-in, token refresh, password resets. The first place to look for any "user can't log in" / "signup didn't work" report.
+- `postgres` — slow queries, RLS policy denials, connection-pool issues, statement timeouts.
+- `api` — PostgREST request log; surfaces 4xx/5xx from anywhere using the auto-generated REST API.
+- `edge-function` — Deno edge function invocations + their stdout.
+- `storage` — file upload/download errors, signed-URL issues.
+- `realtime` — channel subscription / broadcast issues.
+- `branch-action` — Supabase branch operations.
+
+ForgeOS production project ID: `jyarhvinengfyrwgtskq`. (See `forgeos_supabase_project_ids.md` in memory for the full list — there's also `kgkajatjyqfetdtbzmwg` for the apex-outreach CRM. Do not confuse them.)
+
+#### Workflow for any "X is broken in production" report
+
+1. **Reproduce once** (agent-browser or curl) — note the timestamp.
+2. **Pull Vercel logs** for that window (`vercel logs --since` + `--level error`). Note any matching error.
+3. **If signup / auth / RLS related**: also pull Supabase auth logs via the MCP tool. Cross-reference timing.
+4. **Read the log line carefully.** Most production bugs surface as a single distinctive error message in one of the two log streams.
+5. **If both logs show nothing** for the request: the request didn't reach the server. Block is client-side (JS error, validation, BotID, network). That alone narrows the hypothesis space by 80%.
+6. ONLY THEN form a hypothesis and edit code. Logs over guesses every time.
+
+#### Cross-layer signal patterns
+
+- **Vercel `λ POST /investors` error + Supabase postgres slow-query log** → likely the function timed out on a query you can identify in postgres logs.
+- **Vercel function log absent + Supabase auth log absent for a user-attempted signup** → fully client-side block (BotID, JS error, controlled-component issue).
+- **Vercel function log shows `signup` was called + Supabase auth log shows `auth.signUp` errored** → the cause is in the Supabase auth log message.
+- **Both logs show success but user reports failure** → race / hydration / client-state issue. Different debugging route.
+
+#### Do not skip this step because:
+- "I think I know what's wrong" — you don't, until logs say so.
+- "It's faster to just edit the code" — it's not. Wrong fixes cost an hour each. Reading a log line costs 30 seconds.
+- "Logs are noisy" — `--since`, `--level`, `-q`, and service filters narrow fast.
+
+This rule applies equally to BOTH platforms — Vercel for the Next.js runtime, Supabase for the data layer. Together they cover the full request lifecycle. Reach for both before reaching for code.
+
 ### Supabase Is Your Job — ZERO EXCEPTIONS
 
 **You have FULL ACCESS to Supabase. You can and MUST do ALL database operations yourself. NEVER ask the user to run Supabase commands. NEVER say "you'll need to apply this migration" or "run npx supabase db push when you're back." YOU run it. NOW.**
@@ -639,28 +710,34 @@ Every specialist workflow output MUST follow the Voice Sandwich pattern:
 ### Config Interface Integrity Rule
 Any time a field is added to a config interface (not just personality — any interface), grep for where it's consumed, not just where it's defined. An interface field without a consumer is a bug, not a feature.
 
-### Baseline Scores (April 5, 2026 — Post-Optimization, All 13 Specialists)
-Live API benchmarks (claude-sonnet-4-20250514, LLM-as-judge). 5 AutoAgent mutation cycles per specialist. Any personality change must not drop composite below these baselines minus 0.2.
+### Live Specialist→Model Mapping (refreshed 2026-04-25)
 
-| Specialist | ID | Composite | Action. | Spec. | Depth | Voice | Scenarios |
-|---|---|---|---|---|---|---|---|
-| Sage (Strategy) | strategist | **4.40** | 4.30 | 4.20 | 4.40 | 4.67 | 20 |
-| Max (CTO) | cto | **4.46** | 4.30 | 4.20 | 4.50 | 4.85 | 10 |
-| Jian (VP Eng) | vp-engineering | **4.38** | 4.20 | 4.20 | 4.25 | 4.85 | 10 |
-| Fang (VP Mfg) | vp-manufacturing | **4.33** | 4.40 | 4.15 | 4.25 | 4.50 | 10 |
-| Chase (VP Supply) | vp-supply-chain | **4.39** | 4.40 | 4.35 | 4.20 | 4.60 | 10 |
-| Priya (Product) | product-lead | **4.37** | 4.55 | 4.15 | 4.35 | 4.40 | 10 |
-| Mia (Marketing) | growth-marketer | **4.35** | 4.50 | 4.05 | 4.40 | 4.45 | 10 |
-| Sal (Sales) | sales-lead | **4.42** | 4.55 | 4.30 | 4.25 | 4.65 | 10 |
-| Cal (Chief of Staff) | chief-of-staff | **4.35** | 4.50 | 4.05 | 4.25 | 4.55 | 10 |
-| Finn (Finance) | finance-lead | **4.39** | 4.45 | 4.40 | 4.20 | 4.50 | 10 |
-| Fiona (Fundraising) | fundraising-advisor | **4.39** | 4.25 | 4.25 | 4.35 | 4.70 | 10 |
-| Harper (HR) | hiring-team | **4.29** | 4.40 | 4.15 | 4.25 | 4.35 | 10 |
-| Leo (Legal) | legal-counsel | **4.38** | 4.55 | 4.10 | 4.25 | 4.65 | 10 |
+**Source of truth:** `src/lib/agents/specialists-config.ts` + `src/lib/agents/failover.ts`. The historical "April 5" baseline table previously here was stale on at least eight rows after the 2026-04-25 swap sweep — refreshed below to match what's actually deployed.
 
-**Fleet average: 4.38 composite (+0.04 from pre-optimization).** Top: Max (4.46), Sal (4.42), Sage (4.40). Most improved: Priya (+0.12), Chase (+0.10), Sal (+0.08), Leo (+0.08).
+| Specialist | ID | `modelTier` | Resolves to | Last benchmark (composite / voice) | Notes |
+|---|---|---|---|---|---|
+| Sage (Strategy) | strategist | `claude` | claude-opus-4-7 | 4.40 / 4.67 (Apr 5) | Mistral Large 2 swap proposed but blocked on key |
+| Max (CTO) | cto | `deepseek` | deepseek-v4 | 4.54 / 4.90 (Apr 7) | V4-Pro rejected 2026-04-25: -0.35 composite |
+| Jian (VP Eng) | vp-engineering | `deepseek` | deepseek-v4 | 4.45 / 4.85 (Apr 7) | At ceiling — don't swap without strong evidence |
+| Fang (VP Mfg) | vp-manufacturing | `qwen-235b` | qwen3-235b | **4.64 / 5.00** (2026-04-25) | Best Fang ever measured; swapped from V4 |
+| Chase (VP Supply) | vp-supply-chain | `google` | gemini-3.1-pro | 4.39 / 4.60 (Apr 5) | Llama 70B catastrophic (-1.19/-2.00) |
+| Priya (Product) | product-lead | `deepseek` | deepseek-v4 | 4.51 / 4.40 (Apr 7) | Already optimal |
+| Mia (Marketing) | growth-marketer | `haiku` | claude-haiku-4-5-20251001 | +0.06 / +0.10 vs Sonnet (2026-04-25) | ~5× cheaper |
+| Sal (Sales) | sales-lead | `gpt-mini` | gpt-4.1-mini | +0.07 / -0.05 vs Sonnet (2026-04-25) | ~10× cheaper |
+| Cal (Chief of Staff) | chief-of-staff | `claude` | claude-opus-4-7 | 4.35 / 4.55 (Apr 5) | Synthesis-heavy — Opus stays |
+| Finn (Finance) | finance-lead | `deepseek-v4-pro` | deepseek-v4-pro | +0.19 / +0.05 vs Opus (2026-04-25) | ~8× cheaper than Opus |
+| Fiona (Fundraising) | fundraising-advisor | `claude` | claude-opus-4-7 | **+0.21 / +0.35** vs Sonnet (2026-04-25) | Cleanest win in suite. Hosts Brainstorming Council. |
+| Harper (HR) | hiring-team | `deepseek` | deepseek-v4 | 4.29 / 4.35 (Apr 5) | Empathy needs Claude lineage — re-benchmark candidate |
+| Leo (Legal) | legal-counsel | `claude` | claude-opus-4-7 | 4.62 / 4.70 (live, 2026-04-25) | Already Opus — Tristan's risk-call retroactively confirmed |
 
-**DeepSeek V4 re-benchmark (April 7, 2026):** 4 specialists switched from Sonnet to DeepSeek V4 after cross-model benchmarking showed consistent improvement. Max (CTO): 4.46 -> 4.54 (+0.08), Jian (VP Eng): 4.38 -> 4.45 (+0.07), Fang (VP Mfg): 4.33 -> 4.47 (+0.14), Priya (Product): 4.37 -> 4.51 (+0.14). Fallback chain: deepseek -> sonnet -> gemini-flash -> minimax -> gpt-5.4.
+**Keep/discard rule for any future swap:** composite ≥ live - 0.2 AND voice ≥ 4.0. Run via `experiments/autoagent-strategy-specialist/benchmark/runner_multi.py` (multi-provider sidecar — Anthropic, OpenAI, DeepSeek, Together AI, OpenRouter routable).
+
+**Don't repeat these losing experiments** (per `~/.claude/projects/.../memory/forgeos_specialist_model_swap_findings_20260425.md`):
+- Llama 3.3/4 70B on any persona-heavy specialist (depth ceiling too low)
+- gpt-oss-120b on any persona-heavy specialist (voice floor breach)
+- DeepSeek V4-Pro on any specialist already at composite ≥4.50 (no headroom; reasoning_content blowup makes it expensive)
+
+**Read this section AND `specialists-config.ts` before proposing any new swap.** The mapping above is the live truth as of 2026-04-25 — newer commits supersede.
 
 ---
 

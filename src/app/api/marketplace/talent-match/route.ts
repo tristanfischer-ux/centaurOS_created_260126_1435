@@ -126,7 +126,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         // Call OpenAI for matching and scoring
         const completion = await openai.chat.completions.create({
-            model: "gpt-5.4",
+            model: "gpt-4.1-mini",
             messages: [
                 {
                     role: "system",
@@ -177,7 +177,7 @@ ${JSON.stringify(listingSummaries, null, 1)}`
 
         // AUDIT: Track AI usage
         await guard.trackUsage({
-            model: 'gpt-5.4',
+            model: 'gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens || 1200,
             completionTokens: completion.usage?.completion_tokens || 500,
         })

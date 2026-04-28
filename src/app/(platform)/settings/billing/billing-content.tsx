@@ -37,10 +37,6 @@ import { cn } from '@/lib/utils'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/plans'
 import type { MonthlyUsage } from '@/lib/ai/usage-tracking'
-import {
-  ForgeAmbassadorBadge,
-  ForgeAmbassadorMilestoneToast,
-} from '@/components/referrals/ForgeAmbassadorBadge'
 
 interface BillingContentProps {
   userId: string
@@ -55,10 +51,6 @@ interface BillingContentProps {
   hasStripeCustomer: boolean
   /** When true, upgrade buttons use test-activate instead of Stripe checkout */
   isTestMode?: boolean
-  /** Whether the user currently has Forge Ambassador status (10+ active paid referrals) */
-  isForgeAmbassador?: boolean
-  /** ISO timestamp when they first crossed the 10-referral threshold; triggers milestone toast */
-  ambassadorSince?: string | null
 }
 
 /**
@@ -75,8 +67,6 @@ export function BillingContent({
   aiUsage,
   hasStripeCustomer,
   isTestMode = false,
-  isForgeAmbassador = false,
-  ambassadorSince = null,
 }: BillingContentProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -162,16 +152,18 @@ export function BillingContent({
     }
   }
 
-  // Hide enterprise (contact-sales tier) and legacy plans (existing subscribers
-  // continue to resolve against legacy entries but new upgrades route through
-  // the public catalogue only — see plans.ts `legacy` flag).
-  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => p.tier !== 'enterprise' && !p.legacy)
+  // Hide enterprise (sales-led) AND legacy plans (Seed £19 / Startup Team £49,
+  // retired 2026-04-25) from the upgrade catalogue. Existing legacy subscribers
+  // still see their CURRENT plan card via the `isCurrent` branch below — only
+  // the upgrade options are filtered.
+  const tiers = Object.values(SUBSCRIPTION_PLANS).filter(p => {
+    if (p.tier === 'enterprise') return false
+    if (p.legacy && p.tier !== currentTier) return false
+    return true
+  })
 
   return (
     <div className="space-y-8 max-w-5xl">
-      {/* Forge Ambassador milestone toast — fires once per session on first crossing */}
-      <ForgeAmbassadorMilestoneToast since={ambassadorSince ?? null} />
-
       {/* Success / Canceled alerts */}
       {isSuccess && (
         <Alert>
@@ -222,7 +214,7 @@ export function BillingContent({
                   {subscription?.cancel_at_period_end
                     ? 'Cancels at end of period'
                     : currentTier === 'free'
-                      ? 'Free tier — upgrade for more specialist tasks and features'
+                      ? 'Free tier — upgrade for more smart assists and features'
                       : `Renews ${subscription?.current_period_end
                           ? new Date(subscription.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
                           : 'monthly'
@@ -231,19 +223,14 @@ export function BillingContent({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge
-                variant={currentTier === 'free' ? 'secondary' : 'default'}
-                className={cn(
-                  currentTier !== 'free' && 'bg-international-orange text-white'
-                )}
-              >
-                {currentPlan.name}
-              </Badge>
-              {isForgeAmbassador && (
-                <ForgeAmbassadorBadge />
+            <Badge
+              variant={currentTier === 'free' ? 'secondary' : 'default'}
+              className={cn(
+                currentTier !== 'free' && 'bg-international-orange text-white'
               )}
-            </div>
+            >
+              {currentPlan.name}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -282,18 +269,18 @@ export function BillingContent({
             </div>
             <div>
               <CardTitle className="text-base sm:text-lg flex items-center gap-1.5">
-                Specialist Tasks This Month
+                Smart Assists This Month
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help shrink-0" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[280px]">
-                    <p className="text-sm">Each specialist chat message, CAD Lab generation, voice-to-task, comparison, or investor match counts as one specialist task.</p>
+                    <p className="text-sm">Each specialist chat message, CAD Lab generation, voice-to-task, comparison, or investor match counts as one smart assist.</p>
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                {aiUsage.totalAiTasks} of {aiLimit} specialist tasks used
+                {aiUsage.totalAiTasks} of {aiLimit} smart assists used
               </p>
             </div>
           </div>
@@ -322,7 +309,7 @@ export function BillingContent({
               <p className="text-sm text-status-warning flex items-center gap-1.5">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {aiUsagePercent >= 100
-                  ? 'Limit reached — upgrade for more specialist tasks'
+                  ? 'Limit reached — upgrade for more smart assists'
                   : 'Approaching limit — consider upgrading'
                 }
               </p>
@@ -335,7 +322,7 @@ export function BillingContent({
               <p className="text-2xl font-semibold text-foreground">
                 {aiUsage.totalAiTasks}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Specialist Tasks</p>
+              <p className="text-xs text-muted-foreground mt-1">AI Tasks</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <p className="text-2xl font-semibold text-foreground">
@@ -461,7 +448,7 @@ export function BillingContent({
                 <div>
                   <p className="font-semibold text-foreground">Enterprise</p>
                   <p className="text-sm text-muted-foreground">
-                    Unlimited specialist tasks, SSO, dedicated support, custom integrations
+                    Unlimited smart assists, SSO, dedicated support, custom integrations
                   </p>
                 </div>
               </div>
@@ -478,16 +465,18 @@ export function BillingContent({
 
 /**
  * Get numeric order of a tier for comparison.
+ *
+ * 2026-04-25: `seed` (legacy £19) and `starter` (legacy Startup Team £49)
+ * sit BELOW `starter_v2` (the new £20 entry) so anyone on a legacy plan
+ * sees `starter_v2` as a sideways move rather than an upgrade. Pro and
+ * Enterprise still sit above everything.
  */
 function getPlanOrder(tier: SubscriptionTier): number {
-  // Legacy tiers (`seed`, `starter`) are slotted in below `starter_v2` so
-  // a £49/mo Startup Team subscriber is correctly recognised as "above"
-  // the new £20 Starter when the upgrade UI compares orders.
   const order: Record<SubscriptionTier, number> = {
     free: 0,
-    seed: 1,
-    starter_v2: 2,
-    starter: 3,
+    starter_v2: 1,
+    seed: 2, // legacy — slightly above starter_v2 by historical price
+    starter: 3, // legacy Startup Team — above seed by historical price
     professional: 4,
     enterprise: 5,
   }

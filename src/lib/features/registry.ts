@@ -334,6 +334,18 @@ export const FEATURE_REGISTRY: Feature[] = [
     
     // === Coming Soon ===
     {
+        id: 'products',
+        name: 'Products (redesigning)',
+        description: 'Market-validation workbench — hypothesis testing, TAM/SAM/SOM, evidence logs, unit economics, investor-readiness. Coming in Phase 4.',
+        route: '/products',
+        releasedAt: new Date('2026-04-19'),
+        category: 'core',
+        section: 'workshop',
+        status: 'coming_soon',
+        isVisibleInNav: true,
+        changelog: 'Products section hidden behind Coming Soon while the market-validation workbench is built. Existing product records preserved and viewable in read-only mode at /products/legacy.',
+    },
+    {
         id: 'fundraise',
         name: 'Fundraise',
         description: 'Track your fundraise pipeline — shortlisted investors, outreach, and coverage',

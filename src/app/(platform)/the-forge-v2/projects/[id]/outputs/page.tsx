@@ -34,6 +34,7 @@ import type { CadLabModule } from "@/lib/cad-lab-types"
 import { cn } from "@/lib/utils"
 
 import { WorkspaceShell } from "../../../_components/workspace-shell"
+import { InvestorDeckButton } from "./_components/investor-deck-button"
 
 export const dynamic = "force-dynamic"
 
@@ -129,15 +130,16 @@ function buildArtefactList(
         })
     }
 
-    // Investor deck placeholder
+    // Investor-facing handoff document (Markdown export of brief + modules + risks).
+    // Wired to exportProjectHandoffMarkdown action.
     items.push({
         key: "investor-deck",
         kind: "investor-deck",
-        title: "Investor deck draft",
-        subtitle: "Auto-assembled from the artefact spine · Sage + Finn narrative",
-        ready: false,
+        title: "Investor handoff (Markdown)",
+        subtitle: "Auto-assembled from brief + modules + risks · ready for any deck tool",
+        ready: true,
         icon: Presentation,
-        extraBadge: "Soon",
+        extraBadge: "MD",
     })
 
     return items
@@ -166,11 +168,6 @@ export default async function ForgeV2OutputsPage({
                 { label: "Outputs" },
             ]}
             subtitle="Hero render · integrated STEP/STL · module blueprints · investor deck"
-            primaryCta={{
-                label: "Open CAD Lab",
-                href: `/the-forge/cad-lab?project=${project.id}`,
-                icon: <FileOutput className="h-3.5 w-3.5" />,
-            }}
         >
             {/* Summary tile */}
             <Card className="rounded-xl border border-l-[3px] border-l-international-orange bg-gradient-to-br from-background to-international-orange/[0.03]">
@@ -196,7 +193,7 @@ export default async function ForgeV2OutputsPage({
             {/* Gallery grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {artefacts.map(a => (
-                    <ArtefactTile key={a.key} artefact={a} />
+                    <ArtefactTile key={a.key} artefact={a} projectId={project.id} />
                 ))}
             </div>
         </WorkspaceShell>
@@ -205,7 +202,7 @@ export default async function ForgeV2OutputsPage({
 
 // ─── Tile component ────────────────────────────────────────────────
 
-function ArtefactTile({ artefact }: { artefact: ArtefactItem }): React.ReactElement {
+function ArtefactTile({ artefact, projectId }: { artefact: ArtefactItem; projectId: string }): React.ReactElement {
     const Icon = artefact.icon
     const pillTone = artefact.ready
         ? "bg-status-success-light text-status-success border-status-success/30"
@@ -263,7 +260,9 @@ function ArtefactTile({ artefact }: { artefact: ArtefactItem }): React.ReactElem
                             Detail <ArrowRight className="h-3 w-3" />
                         </Link>
                     )}
-                    {artefact.ready && artefact.downloadHref ? (
+                    {artefact.kind === "investor-deck" ? (
+                        <InvestorDeckButton projectId={projectId} />
+                    ) : artefact.ready && artefact.downloadHref ? (
                         <Button asChild size="sm" variant="outline" className="gap-1.5 ml-auto">
                             <a href={artefact.downloadHref} download>
                                 <FileDown className="h-3.5 w-3.5" />
@@ -277,10 +276,10 @@ function ArtefactTile({ artefact }: { artefact: ArtefactItem }): React.ReactElem
                             className="gap-1.5 ml-auto"
                             disabled
                             aria-disabled="true"
-                            title={artefact.kind === "investor-deck" ? "Investor deck export ships in a later PR" : "This artefact has not been generated yet"}
+                            title="This artefact has not been generated yet"
                         >
                             <FileDown className="h-3.5 w-3.5" />
-                            {artefact.kind === "investor-deck" ? "Coming soon" : "Pending"}
+                            Pending
                         </Button>
                     )}
                 </div>

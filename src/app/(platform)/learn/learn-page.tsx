@@ -27,13 +27,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { typography } from '@/lib/design-system'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { TechniquesExplorer } from '@/components/techniques'
 import { InsightsExplorer } from '@/components/techniques/insights-explorer'
 import { ALL_TECHNIQUES } from '@/lib/manufacturing-techniques'
-import { LearningTracksSection } from '@/components/techniques/learning-tracks-section'
-import { LEARNING_TRACKS } from '@/lib/manufacturing/learning-tracks'
 import type { TechniqueEnrichment } from '@/types/manufacturing-techniques'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -57,7 +56,7 @@ import {
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type LearnTabId = 'techniques' | 'tracks' | 'insights' | 'tutorials' | 'qa'
+type LearnTabId = 'techniques' | 'insights' | 'tutorials' | 'qa'
 
 interface Tab {
   id: LearnTabId
@@ -168,14 +167,6 @@ export function LearnPage({
       activeClasses: 'bg-international-orange/10 text-international-orange border-international-orange',
     },
     {
-      id: 'tracks',
-      label: 'Learning Tracks',
-      icon: ListChecks,
-      count: LEARNING_TRACKS.length,
-      iconColor: 'text-electric-blue',
-      activeClasses: 'bg-electric-blue/10 text-electric-blue border-electric-blue',
-    },
-    {
       id: 'insights',
       label: 'Real-World Insights',
       icon: Factory,
@@ -211,21 +202,33 @@ export function LearnPage({
       <div className="pb-4 border-b border-muted">
         {/* Cascade breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-          <a href="/workshop" className="hover:text-foreground transition-colors">Workshop</a>
+          <Link href="/marketplace" className="hover:text-foreground transition-colors">Marketplace</Link>
           <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground font-medium">Inspiration</span>
+          <span className="text-foreground font-medium">Manufacturing Techniques</span>
         </nav>
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>
             <BookOpen className="h-7 w-7 mr-3 inline-block text-electric-blue" />
-            Inspiration
+            Manufacturing Techniques
           </h1>
         </div>
         <p className={cn(typography.pageSubtitle, 'mt-1')}>
           Techniques, tutorials, and expert guidance to level up your craft.
         </p>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="strategist"
+        specialistName="Sage"
+        specialistTitle="Strategy"
+        narrative={null}
+        fallbackMessage="Most founders over-specify tolerances by 2x, which doubles their unit cost — and they don't know it until the first invoice hits. I've mapped the decisions that actually matter: when to injection mould vs CNC, when tolerances are overkill, when a cheaper material performs better. Find the topic closest to your current build and I'll save you the expensive lesson."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Manufacturing Techniques', description: 'Sage on manufacturing know-how.', metadata: {} }}
+        storageKey="learn"
+      />
 
       {/* Tab bar */}
       <div className="flex flex-wrap gap-2" role="tablist">
@@ -268,11 +271,6 @@ export function LearnPage({
       {/* TECHNIQUES tab                                                     */}
       {/* ================================================================== */}
       {activeTab === 'techniques' && <TechniquesExplorer />}
-
-      {/* ================================================================== */}
-      {/* LEARNING TRACKS tab                                                */}
-      {/* ================================================================== */}
-      {activeTab === 'tracks' && <LearningTracksSection />}
 
       {/* ================================================================== */}
       {/* INSIGHTS tab                                                       */}

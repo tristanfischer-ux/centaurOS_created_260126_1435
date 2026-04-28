@@ -83,7 +83,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.4",
-      max_tokens: 256,
+      max_completion_tokens: 256,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

@@ -8,9 +8,7 @@ import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
-// Tristan 2026-04-27: removed the unified onboarding tour entirely. The app
-// is now simple enough that founders don't need a guided tour — the Welcome
-// page covers what each section does.
+import { UnifiedOnboarding } from "@/components/onboarding/unified-onboarding";
 import { WelcomeBackBanner } from "@/components/WelcomeBackBanner";
 import { ExecutiveProfilePrompt, VerificationSuccessToast, ProfileCompletionWizard } from "@/components/onboarding";
 import { ActivityTracker } from "@/components/ActivityTracker";
@@ -26,17 +24,16 @@ import { CadLabProvider } from "@/app/(platform)/the-forge/cad-lab/cad-lab-conte
 
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { BrowseContextProvider } from "@/contexts/browse-context";
-// Tristan 2026-04-27: ambient specialist UI deprecated everywhere except
-// Brainstorming on /agents. FloatingSpecialistFAB mount removed below.
+import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
+import { MobileDesktopBanner } from "@/components/mobile-desktop-banner";
 import { ActiveTimerBar } from "@/components/time/active-timer-bar";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
 import { getFeatureFlag } from "@/lib/features/flags";
-import { FLAG_NEW_FORGE_EXPERIENCE } from "@/lib/features/keys";
-import { getForgeAmbassadorStatus } from "@/actions/referrals";
+import { FLAG_NEW_FORGE_EXPERIENCE, FLAG_NEW_MONEY_EXPERIENCE, FLAG_NEW_PLAN_EXPERIENCE } from "@/lib/features/keys";
 
 // DECISION: Vercel Pro caps at 300s. Server actions (research, decomposition,
 // image generation) called from platform pages need up to 240s per invocation.
@@ -120,17 +117,17 @@ export default async function PlatformLayout({
     // Flag on: target /the-forge-v2 (redesign routes, flag-gated, land in PR #2+).
     // Reuses the Supabase client already fetched above — no extra round-trip.
     const newForgeExperienceEnabled = await getFeatureFlag(supabase, user.id, FLAG_NEW_FORGE_EXPERIENCE)
+    // Phase 2 — new Money experience flag. Gates sidebar Cash Burn → MONEY [V2]
+    // swap (6-item legacy group → 3-item Cockpit · Plan · Raise) + routes under
+    // /money/*. Flag off (default): legacy Cash Burn visible. Flag on: V2 group.
+    // Reuses the same Supabase client — no extra round-trip.
+    const newMoneyExperienceEnabled = await getFeatureFlag(supabase, user.id, FLAG_NEW_MONEY_EXPERIENCE)
 
-    // FORGE AMBASSADOR: fetch in parallel with the flag above, non-blocking.
-    // Passes the result to Sidebar so the badge can appear in the footer
-    // without a client-side fetch. Fails open (false) if the RPC errors.
-    const ambassadorResult = await getForgeAmbassadorStatus().catch(() => null)
-    const isForgeAmbassador = ambassadorResult && 'isAmbassador' in ambassadorResult
-      ? ambassadorResult.isAmbassador
-      : false
-    const ambassadorSince = ambassadorResult && 'since' in ambassadorResult
-      ? ambassadorResult.since
-      : null
+    // Phase 3 — new Plan experience flag. Gates the 7→3 sidebar collapse
+    // (Strategy/Objectives/Tasks/Review/Reports/Red Team/Knowledge → Plan/Report/History)
+    // and the /plan, /plan/report, /plan/history routes (flag-off redirects
+    // /plan/report → /reports and /plan/history → /knowledge).
+    const newPlanExperienceEnabled = await getFeatureFlag(supabase, user.id, FLAG_NEW_PLAN_EXPERIENCE)
 
     return (
         <PostHogProvider>
@@ -141,19 +138,27 @@ export default async function PlatformLayout({
                   <CadLabProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
-                    <div className="flex md:h-screen md:overflow-hidden gap-0">
+                    <div className="flex h-screen overflow-hidden gap-0">
+                        {/* a11y skip-link — keyboard users can bypass the ~40 sidebar links on every page */}
+                        <a
+                            href="#main-content"
+                            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[400] focus:px-3 focus:py-2 focus:bg-international-orange focus:text-white focus:rounded-md focus:shadow-lg"
+                        >
+                            Skip to main content
+                        </a>
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <KeyboardShortcuts />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} isForgeAmbassador={isForgeAmbassador} ambassadorSince={ambassadorSince} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} newMoneyExperienceEnabled={newMoneyExperienceEnabled} newPlanExperienceEnabled={newPlanExperienceEnabled} />
                         <MainContentArea>
                             <ActiveTimerBar />
-                            <main className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-28 sm:pb-8">
+                            <main id="main-content" className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-24 sm:pb-8">
                                 {needsProfileRepair ? (
                                     <ProfileSetupRequired userRole={profile?.role} />
                                 ) : (
                                     <>
+                                        <MobileDesktopBanner />
                                         <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
                                         <ErrorBoundary>
                                             {children}
@@ -163,9 +168,9 @@ export default async function PlatformLayout({
                             </main>
                         </MainContentArea>
                         <MobileNav foundryName={foundryName} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} />
-                        {/* FloatingSpecialistFAB removed 2026-04-27 — ambient
-                            specialist UI deprecated; Brainstorming on /agents
-                            keeps its own integrated UI. */}
+                        <Suspense fallback={null}>
+                            <FloatingSpecialistFAB />
+                        </Suspense>
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />
@@ -174,6 +179,7 @@ export default async function PlatformLayout({
                         <InvestorMatchPrewarmer />
                         {!needsProfileRepair && (
                             <>
+                                <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} foundryName={foundryName} foundryIsSandbox={foundryIsSandbox} />
                                 <ProfileCompletionWizard
                                     open={!!((profile as unknown as Record<string, unknown>)?.is_fractional_executive && profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed && !(profile.onboarding_data as Record<string, unknown>).profile_wizard_completed)}
                                     userRole={profile?.role ?? undefined}

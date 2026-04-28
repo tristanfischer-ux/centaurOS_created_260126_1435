@@ -208,7 +208,7 @@ Guidelines:
         { role: 'user', content: sanitizedIdea },
       ],
       temperature: 0.7,
-      max_tokens: 800,
+      max_completion_tokens: 800,
     })
 
     const content = response.choices[0]?.message?.content?.trim()
@@ -299,7 +299,7 @@ Be fair but encouraging. A simple clear action gets at least 3 on specific.`,
         { role: 'user', content: sanitizedText },
       ],
       temperature: 0.3,
-      max_tokens: 200,
+      max_completion_tokens: 200,
     })
 
     const content = response.choices[0]?.message?.content?.trim()

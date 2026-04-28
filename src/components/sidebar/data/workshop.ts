@@ -1,23 +1,28 @@
 import {
   Hammer,
-  UsersRound,
 } from 'lucide-react'
 import type { SidebarNavItem } from './types'
 
 /**
- * WORKSHOP section — Wave 7 sidebar trim (2026-04-25, Tristan).
+ * WORKSHOP section — Forge routing.
  *
- * Sidebar pared back to the four primary surfaces: Brainstorming, The Forge,
- * Investors, Suppliers. Team / Deliverables / Inspiration removed from the
- * primary nav. Investors lives in Money section, Suppliers in Marketplace
- * section.
+ * The Forge entry is flag-aware: when `new_forge_experience` is true the
+ * link routes to /the-forge-v2 (Phase 1 rebuild); otherwise to legacy
+ * /the-forge. DEFAULT IS OFF to preserve the original experience — users
+ * opt in per-profile when ready. CAD Lab remains at /the-forge/cad-lab
+ * regardless.
+ *
+ * Rollback 2026-04-20: unconditional cutover to /the-forge-v2 reverted
+ * because the V2 experience had unaddressed issues in production. Per-user
+ * opt-in via new_forge_experience flag is the safer path.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function getWorkshopNavigation(newForgeExperience: boolean = true): SidebarNavItem[] {
-  const forgeHref = '/the-forge-v2'
+// Hidden during pivot focus (2026-04-24): Products, Browse, Team.
+// Moved to Brainstorming 2026-04-24: Specialists (renamed "Brainstorm"), Outputs.
+// Moved to Marketplace + renamed "Manufacturing Techniques" 2026-04-24: Inspiration.
+export function getWorkshopNavigation(newForgeExperience: boolean = false): SidebarNavItem[] {
+  const forgeHref = newForgeExperience ? '/the-forge-v2' : '/the-forge'
   return [
-    { name: 'Brainstorming', href: '/agents', icon: UsersRound, tooltip: 'Brainstorm with the Council — Sage, Priya, Fang, Fiona and the rest. Talk through any decision: product, fundraise, hiring, sequencing.' },
-    { name: 'The Forge', href: forgeHref, icon: Hammer, tooltip: 'Describe what you are building — twenty minutes for the first pass, hours of detail after' },
+    { name: 'The Forge', href: forgeHref, icon: Hammer, tooltip: 'Explore materials, manufacturing approaches, and find suppliers' },
   ]
 }

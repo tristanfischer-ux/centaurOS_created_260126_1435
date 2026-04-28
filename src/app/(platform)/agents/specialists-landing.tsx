@@ -22,9 +22,8 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import Image from "next/image"
 import { motion } from "framer-motion"
-import { ArrowRight, Layers, Users, ChevronDown, ChevronRight, Sparkles, X, Shield } from "lucide-react"
+import { ArrowRight, Layers, ChevronDown, ChevronRight, Sparkles, X, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -34,34 +33,22 @@ import { TeamMeetingDialog } from "./team-meeting-dialog"
 import { MeetingHistory } from "./meeting-history"
 import { HuddleCard } from "./huddle-card"
 import { HUDDLES } from "./huddle-config"
-import { getSpecialistActivities } from "@/actions/agent-memory"
-import type { SpecialistActivity } from "@/actions/agent-memory"
+import { IDEA_PROMPTS, type IdeaPrompt } from "./idea-prompts"
 import { getInsightFeed } from "@/actions/agent-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
 import type { HandoffTrailEntry } from "@/lib/agents/specialist-handoff-types"
 import type { SpecialistId } from "@/lib/agents/specialists-config"
 
-function formatTimeAgo(dateStr: string): string {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    if (diffMins < 1) return "just now"
-    if (diffMins < 60) return `${diffMins}m ago`
-    const diffHours = Math.floor(diffMins / 60)
-    if (diffHours < 24) return `${diffHours}h ago`
-    const diffDays = Math.floor(diffHours / 24)
-    if (diffDays < 7) return `${diffDays}d ago`
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
-
-// INTENT: Key leaders are the four specialists a founder speaks to most.
-// They appear as prominent clickable avatars at the top of the page.
+// INTENT: Key leaders — four specialists used as the default participant set
+// for the Brainstorming box launch. Post-pivot (2026-04-24) lineup reflects the
+// two product poles Tristan is focused on: Fang (manufacturing) + Chase (supply
+// chain) cover The Forge side, Fiona (fundraising) covers the Investors side,
+// and Sage (strategy) is the glue specialist who frames every brainstorm.
 const KEY_LEADER_IDS: SpecialistId[] = [
+    "vp-manufacturing",
+    "vp-supply-chain",
+    "fundraising-advisor",
     "strategist",
-    "cto",
-    "chief-of-staff",
-    "legal-counsel",
 ]
 
 /**
@@ -111,21 +98,18 @@ export function SpecialistsLanding({
         participantIds: string[]
         topic: string
     } | null>(null)
+    const [brainstormTopic, setBrainstormTopic] = useState("")
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
     const [handoffTrail, setHandoffTrail] = useState<HandoffTrailEntry[]>([])
     const [handoffSourceThreadId, setHandoffSourceThreadId] = useState<string | null>(null)
     const [handoffSourceSpecialistId, setHandoffSourceSpecialistId] = useState<string | null>(null)
     const [showOrgChart, setShowOrgChart] = useState(false)
-    const [specialistActivities, setSpecialistActivities] = useState<Record<string, SpecialistActivity>>({})
     const [unreadInsights, setUnreadInsights] = useState<AgentInsight[]>([])
     const [allInsights, setAllInsights] = useState<AgentInsight[]>([])
     const [showCatchUp, setShowCatchUp] = useState(true)
 
     useEffect(() => {
-        getSpecialistActivities().then((result) => {
-            if (result.data) setSpecialistActivities(result.data)
-        })
         getInsightFeed(20).then((result) => {
             const all = [
                 ...result.critical,
@@ -153,10 +137,6 @@ export function SpecialistsLanding({
     }, [searchParams])
 
     const orgHierarchy = useMemo(() => getOrgChartHierarchy(), [])
-
-    const keyLeaders = useMemo(() => {
-        return KEY_LEADER_IDS.map((id) => getSpecialistById(id)).filter(Boolean)
-    }, [])
 
     // INTENT: Group insights by huddle based on which specialist generated them.
     // Each huddle card shows its most relevant discussion topics.
@@ -192,117 +172,116 @@ export function SpecialistsLanding({
         setIsMeetingOpen(true)
     }, [])
 
+    // INTENT: Brainstorming box launches a team meeting with the four key leaders
+    // on whatever topic the founder types. No persona selection, no pre-configured
+    // huddle — a single blank whiteboard entry point. Mirrors the Red Team topic
+    // input box in shape but routes to TeamMeetingDialog rather than debate stream.
+    const handleLaunchBrainstorm = useCallback(() => {
+        const trimmed = brainstormTopic.trim()
+        if (trimmed.length < 10) return
+        setMeetingPreset({ participantIds: [...KEY_LEADER_IDS], topic: trimmed })
+        setIsMeetingOpen(true)
+    }, [brainstormTopic])
+
+    // INTENT: Idea prompts are curated brainstorming starters. Click → open a
+    // team meeting with the prompt's question as the topic and its suggested
+    // specialists pre-selected. Zero typing required.
+    const handleLaunchIdea = useCallback((prompt: IdeaPrompt) => {
+        setMeetingPreset({
+            participantIds: prompt.specialistIds,
+            topic: prompt.question,
+        })
+        setIsMeetingOpen(true)
+    }, [])
+
     return (
         <div className="space-y-10 pb-12">
-            {/* ── Hero Section ──────────────────────────────────────────── */}
+            {/* ── Ideas to brainstorm — curated prompts to start a session ── */}
             <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="space-y-5"
+                className="space-y-4"
             >
-                <div className="max-w-3xl space-y-3">
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-bold text-foreground tracking-tight leading-tight">
-                        Your leadership team, ready to huddle.
+                <div className="space-y-1">
+                    <h2 className="text-xl sm:text-2xl font-display font-semibold text-foreground tracking-tight">
+                        Ideas to brainstorm
                     </h2>
-                    <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-                        Talk to your key leaders one-on-one, or jump into a team huddle where
-                        they&apos;ve already identified what needs discussing.
+                    <p className="text-sm text-muted-foreground">
+                        Pick a question to start a conversation with the specialists best placed to help.
                     </p>
                 </div>
-            </motion.div>
-
-            {/* ── Human-First Philosophy Banner ─────────────────────────── */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="flex items-start gap-3 rounded-lg bg-status-info-light/50 border border-status-info/20 px-4 py-3"
-            >
-                <Shield className="h-4 w-4 text-status-info mt-0.5 shrink-0" />
-                <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-foreground">
-                        You&apos;re in charge
-                    </p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                        Your Specialists are fast, knowledgeable, and tireless&nbsp;&mdash;&nbsp;but
-                        like any team member, they can make mistakes or miss nuances. You&apos;re the
-                        decision-maker. Always verify critical information, especially legal and
-                        financial guidance.
-                    </p>
-                </div>
-            </motion.div>
-
-            {/* ── Key Leaders Row ───────────────────────────────────────── */}
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.15 }}
-            >
-                <div className="flex items-center gap-2 mb-3">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                        Your Key Leaders
-                    </h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    {keyLeaders.map((leader) => {
-                        if (!leader) return null
-                        const activity = specialistActivities[leader.id]
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {IDEA_PROMPTS.map((prompt) => {
+                        const participants = prompt.specialistIds
+                            .map((id) => getSpecialistById(id))
+                            .filter((s): s is NonNullable<ReturnType<typeof getSpecialistById>> => Boolean(s))
                         return (
                             <button
-                                key={leader.id}
-                                onClick={() => handleBrief(leader.id)}
-                                className="flex items-center gap-3 p-3 rounded-xl border bg-card hover:bg-muted hover:shadow-md transition-all text-left group"
+                                key={prompt.id}
+                                type="button"
+                                onClick={() => handleLaunchIdea(prompt)}
+                                className="group flex flex-col gap-3 rounded-xl border bg-card hover:border-international-orange/40 hover:shadow-md transition-all text-left p-4"
                             >
-                                <div className="relative h-11 w-11 rounded-full overflow-hidden bg-muted flex-shrink-0">
-                                    {leader.avatarImage ? (
-                                        <Image
-                                            src={leader.avatarImage}
-                                            alt={leader.name}
-                                            fill
-                                            unoptimized
-                                            className="object-cover"
-                                            sizes="44px"
-                                        />
-                                    ) : (
-                                        <span className="flex items-center justify-center h-full w-full text-base font-semibold text-foreground">
-                                            {leader.name.charAt(0)}
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                                        {prompt.category}
+                                    </span>
+                                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-international-orange transition-all" />
+                                </div>
+                                <p className="text-sm font-semibold text-foreground leading-snug group-hover:text-international-orange transition-colors">
+                                    {prompt.question}
+                                </p>
+                                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                                    {prompt.subtitle}
+                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap mt-auto pt-1">
+                                    {participants.map((specialist) => (
+                                        <span
+                                            key={specialist.id}
+                                            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                        >
+                                            {specialist.name}
                                         </span>
-                                    )}
+                                    ))}
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold text-foreground group-hover:text-international-orange transition-colors truncate">
-                                        {leader.name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground truncate">
-                                        {leader.title}
-                                    </p>
-                                    {activity?.lastMessageAt && (
-                                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                                            Last talked {formatTimeAgo(activity.lastMessageAt)}
-                                        </p>
-                                    )}
-                                    {activity?.mood && (
-                                        <div className="flex items-center gap-1 mt-0.5">
-                                            <div className={cn(
-                                                "h-1.5 w-1.5 rounded-full flex-shrink-0",
-                                                activity.mood === 'energized' || activity.mood === 'proud' ? 'bg-success' :
-                                                activity.mood === 'concerned' ? 'bg-warning' :
-                                                activity.mood === 'thoughtful' ? 'bg-status-info' :
-                                                'bg-muted-foreground',
-                                            )} />
-                                            <span className="text-[10px] text-muted-foreground capitalize truncate">
-                                                {activity.mood}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                             </button>
                         )
                     })}
                 </div>
+            </motion.div>
+
+            {/* ── Or write your own — ad-hoc brainstorm ───────────────── */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+            >
+                <Card>
+                    <CardContent className="pt-6 space-y-3">
+                        <label
+                            htmlFor="brainstorm-topic"
+                            className="text-sm font-medium text-foreground"
+                        >
+                            Or brainstorm something else
+                        </label>
+                        <textarea
+                            id="brainstorm-topic"
+                            value={brainstormTopic}
+                            onChange={(e) => setBrainstormTopic(e.target.value)}
+                            placeholder="Type any topic — we'll open it up with the four key specialists."
+                            rows={3}
+                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 resize-none"
+                        />
+                        <Button
+                            onClick={handleLaunchBrainstorm}
+                            disabled={brainstormTopic.trim().length < 10}
+                            className="w-full bg-international-orange hover:bg-international-orange/90 text-white h-11 text-sm font-semibold"
+                        >
+                            <Sparkles className="h-4 w-4 mr-2" /> Start Brainstorming
+                        </Button>
+                    </CardContent>
+                </Card>
             </motion.div>
 
             {/* ── Catch-Up Card — shows when specialists have unread insights ── */}

@@ -199,7 +199,7 @@ Keep response under 200 chars.`,
                 content: text,
             },
         ],
-        max_tokens: 150,
+        max_completion_tokens: 150,
     })
 
     return completion.choices[0].message.content || "I can help you create objectives! Just describe what you'd like to accomplish."

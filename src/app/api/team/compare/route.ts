@@ -236,7 +236,7 @@ Analyze their availability and recommend the best person for task delegation.`;
 
         // Call OpenAI
         const completion = await openai.chat.completions.create({
-            model: "gpt-5.4",
+            model: "gpt-4.1-mini",
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt }
@@ -246,7 +246,7 @@ Analyze their availability and recommend the best person for task delegation.`;
 
         // AUDIT: Track AI usage
         await guard.trackUsage({
-            model: 'gpt-5.4',
+            model: 'gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens || 1000,
             completionTokens: completion.usage?.completion_tokens || 500,
         });

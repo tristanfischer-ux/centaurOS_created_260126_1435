@@ -1,18 +1,24 @@
 /**
  * WelcomeView — Client component for /welcome.
  *
- * @description Post-login landing page (Tristan 2026-04-27: Welcome is now
- * the first page after login — replaces the earlier auto-redirect to
- * /investors). Opens with a hero + short personal letter from Tristan Fischer
- * (Founder), four tiles pointing at the four primary destinations
- * (Brainstorming / The Forge / Investors / Suppliers), and a closing line.
+ * @description First-login tour page rebuilt 2026-04-25 for the post-pivot
+ * product: Brainstorming-led, Fundraising-focused, with a trimmed sidebar
+ * (Brainstorming · Fundraising · Workshop · Marketplace).
  *
- * The four tiles ARE the primary call-to-action — the user picks their own
- * starting point. There is no longer a single "Go to Investors" button at
- * the bottom because that decision belongs to the founder, not the product.
+ * Structure: hero + personal letter from Tristan → "Try these three in
+ * your first hour" card pointing at brainstorm/investors/forge → guided
+ * tour of the four current sidebar sections with their canonical
+ * drop-in/output → trimmed roster of the four key leaders (Fang, Chase,
+ * Fiona, Sage) with a link to all 13 → closing CTA.
  *
  * Copy follows Tristan's first-person British voice and the in-product
- * "No AI Emphasis" rule (no "AI-powered", "Smart", "Intelligent", etc.).
+ * "No AI Emphasis" rule — no "AI-powered", "Smart", "Intelligent",
+ * AI-agent counts, robot/brain icons. Specialists are referred to as
+ * "specialists", never "AI agents".
+ *
+ * The primary CTA marks the welcome as seen via the `markWelcomeComplete`
+ * server action, then routes to `/agents` (the Brainstorming page —
+ * post-pivot default landing).
  */
 
 "use client"
@@ -22,100 +28,39 @@ import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
     ArrowRight,
-    MessageSquare,
+    Sparkles,
+    Building2,
     Hammer,
-    Users,
-    Package,
+    Store,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { markWelcomeComplete, setFoundryQuickProfile } from "@/actions/welcome"
-import { useState } from "react"
-import { toast } from "sonner"
+import { markWelcomeComplete } from "@/actions/welcome"
+
+// INTENT: Trimmed roster — the four key leaders the founder will speak to most
+// in the post-pivot product. Forge pole (Fang + Chase) + Investors pole (Fiona)
+// + Strategy glue (Sage). All 13 still live at /agents.
+const KEY_LEADERS: ReadonlyArray<{ name: string; role: string; reason: string }> = [
+    { name: "Sage", role: "Strategy", reason: "Frames every brainstorm and stress-tests big calls." },
+    { name: "Fang", role: "VP Manufacturing", reason: "Picks the manufacturing route and the cost ceiling." },
+    { name: "Chase", role: "VP Supply Chain", reason: "Finds the suppliers and ranks them on price + lead time." },
+    { name: "Fiona", role: "Fundraising", reason: "Matches you to investors and writes the outreach." },
+]
 
 interface WelcomeViewProps {
     /** First name used in the hero eyebrow greeting. Optional. */
     firstName?: string
-    /** When true, the user's foundry has no stage/sector/industry yet —
-     *  show the Quick set-up card so downstream sections work. */
-    foundryProfileMissing?: boolean
 }
 
-const STAGE_OPTIONS = [
-    "Pre-Seed",
-    "Seed",
-    "Series A",
-    "Series B",
-    "Series C",
-    "Growth",
-] as const
-
-// {label, value} — value must match foundries.sector CHECK constraint:
-// aerospace | agriculture | automotive | construction | consumer_electronics |
-// defence | energy | food_processing | logistics | manufacturing | marine |
-// medical | mining | robotics | other.
-const SECTOR_OPTIONS: ReadonlyArray<{ label: string; value: string }> = [
-    { label: "Climate / energy",       value: "energy" },
-    { label: "Medical device",         value: "medical" },
-    { label: "AgTech",                 value: "agriculture" },
-    { label: "Food processing",        value: "food_processing" },
-    { label: "Aerospace / drones",     value: "aerospace" },
-    { label: "Defence",                value: "defence" },
-    { label: "Manufacturing",          value: "manufacturing" },
-    { label: "Consumer electronics",   value: "consumer_electronics" },
-    { label: "Robotics",               value: "robotics" },
-    { label: "Automotive / mobility",  value: "automotive" },
-    { label: "Construction",           value: "construction" },
-    { label: "Marine",                 value: "marine" },
-    { label: "Mining",                 value: "mining" },
-    { label: "Logistics",              value: "logistics" },
-    { label: "Other hardware",         value: "other" },
-] as const
-
-export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewProps): React.ReactElement {
+export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
-    const [profileSaved, setProfileSaved] = useState(false)
-    const [stage, setStage] = useState("")
-    const [sector, setSector] = useState("")
 
-    /**
-     * Mark the welcome tour as seen. Does NOT redirect — the founder picks
-     * their own destination from the four section tiles. Tristan 2026-04-27:
-     * Welcome is the home; Welcome is not a turnstile.
-     */
-    const handleMarkComplete = (): void => {
+    const handleContinue = (): void => {
         startTransition(async () => {
             await markWelcomeComplete()
-            // Soft refresh so the sidebar / nav reflects the cleared
-            // first-login state, but stay on /welcome so the user can pick
-            // their own destination from the section tiles above.
-            router.refresh()
-        })
-    }
-
-    /** Save the founder's Quick set-up (stage + sector). After save, the
-     *  Quick set-up card hides and the four section tiles below work
-     *  with full match-scoring rather than degraded anonymous-tier UX. */
-    const handleQuickProfile = (): void => {
-        if (!stage && !sector) {
-            toast.error("Pick at least a stage or a sector — both is best.")
-            return
-        }
-        startTransition(async () => {
-            const result = await setFoundryQuickProfile({
-                stage: stage || null,
-                sector: sector || null,
-                industry: null, // industry column has its own enum/check; skip
-                                // — stage + sector are enough for matching.
-            })
-            if (result.success) {
-                setProfileSaved(true)
-                toast.success("Saved. Investor and supplier matches will use this.")
-                router.refresh()
-            } else {
-                toast.error("Couldn't save just now. Please try again.")
-            }
+            // 2026-04-24: post-pivot landing is /agents (Brainstorming).
+            router.push("/agents")
         })
     }
 
@@ -127,251 +72,241 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
             <section className="relative overflow-hidden rounded-b-2xl bg-gradient-to-br from-background via-background to-orange-50/40">
                 <div className="relative z-10 px-4 sm:px-6 lg:px-12 pt-10 sm:pt-14 lg:pt-20 pb-10 sm:pb-14">
                     <div className="max-w-3xl">
-                        {/* Tristan 2026-04-28 (post-Gemini final-check):
-                            switched from vertical-bar-beside-title to
-                            horizontal-bar-above-title for the welcome hero.
-                            Gemini's recommended marketing-hero variant —
-                            short horizontal accent bar above the H1, no
-                            eyebrow. The smaller H2 section headers below
-                            keep the vertical-bar-beside variant (compact). */}
-                        <div className="mb-4">
-                            <div className="h-1.5 w-14 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.4)] mb-4" />
-                            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
-                                Welcome to{" "}
-                                <span className="text-international-orange">Fractional Forge</span>.
-                            </h1>
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="h-10 w-2 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.4)]" />
+                            <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                                {firstName ? `Welcome, ${firstName}` : "Welcome"}
+                            </p>
                         </div>
+                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-4">
+                            Welcome to <span className="text-international-orange">ForgeOS</span>.
+                        </h1>
                         <p className="text-lg sm:text-xl text-muted-foreground font-light">
-                            Four tools for hardware founders: sharpen your thinking, design
-                            your product, find the right investors, and source the right
-                            suppliers.
+                            The operating system for hardware startups.
                         </p>
                     </div>
                 </div>
             </section>
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Quick set-up — only when foundry stage/sector are missing */}
-            {/* ─────────────────────────────────────────────────────── */}
-            {foundryProfileMissing && !profileSaved && (
-                <section className="px-4 sm:px-6 lg:px-12 pt-8">
-                    <div className="max-w-3xl">
-                        <Card className="border-2 border-international-orange/30 bg-international-orange/[0.04]">
-                            <CardContent className="pt-5 pb-5">
-                                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">
-                                    Quick set-up · 20 seconds
-                                </p>
-                                <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight mb-1">
-                                    Tell me your stage and sector — I&rsquo;ll match the right investors and suppliers.
-                                </h2>
-                                <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
-                                    Without this, search runs on the deck text alone — useful, but match scoring won&rsquo;t reflect your stage or sector. You can change these any time from your profile.
-                                </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                                    <label className="block">
-                                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Stage</span>
-                                        <select
-                                            value={stage}
-                                            onChange={(e) => setStage(e.target.value)}
-                                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-international-orange"
-                                        >
-                                            <option value="">Pick stage…</option>
-                                            {STAGE_OPTIONS.map((s) => (
-                                                <option key={s} value={s}>{s}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                    <label className="block">
-                                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Sector</span>
-                                        <select
-                                            value={sector}
-                                            onChange={(e) => setSector(e.target.value)}
-                                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-international-orange"
-                                        >
-                                            <option value="">Pick sector…</option>
-                                            {SECTOR_OPTIONS.map((s) => (
-                                                <option key={s.value} value={s.value}>{s.label}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                </div>
-                                <Button
-                                    onClick={handleQuickProfile}
-                                    disabled={isPending}
-                                    size="sm"
-                                    className="gap-1.5"
-                                >
-                                    Save and continue
-                                    <ArrowRight className="h-3.5 w-3.5" />
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </section>
-            )}
-
-            {/* ─────────────────────────────────────────────────────── */}
-            {/* Short letter from Tristan                               */}
+            {/* Letter from Tristan                                     */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
                 <div className="max-w-2xl space-y-5 text-base sm:text-[17px] leading-relaxed text-foreground">
-                    <p className="font-medium">I&apos;m Tristan Fischer.</p>
+                    <p className="font-medium">{"Welcome. I’m Tristan Fischer."}</p>
                     <p>
-                        I&apos;ve spent 26 years running startups — software and hardware —
-                        most recently Fischer Farms, one of the United Kingdom&apos;s larger
-                        vertical farms. Fractional Forge is the set of tools I wish I&apos;d
-                        had: a way to think through hard decisions with context-aware
-                        specialists, design a product to manufacturable spec, find the
-                        investors most likely to back you, and shortlist the suppliers
-                        who&apos;ll actually build it.
+                        {"I’ve spent 26 years running startups — software and hardware — most recently Fischer Farms, one of the UK’s larger vertical farms. ForgeOS is the wish list of everything I could have had along the way."}
                     </p>
                     <p>
-                        There are four surfaces. Here&apos;s what each one does and where to
-                        start.
+                        {"A software founder builds one thing: the product. A hardware founder builds two — the product, and all the infrastructure to make it. Finding a factory. Negotiating leases. Procuring equipment. Hiring the people to run it. Eighteen months can disappear before you’ve shipped anything."}
                     </p>
-                </div>
-            </section>
-
-            {/* ─────────────────────────────────────────────────────── */}
-            {/* Four primary surface tiles                              */}
-            {/* ─────────────────────────────────────────────────────── */}
-            <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-12">
-                <div className="max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                    <SectionTile
-                        icon={MessageSquare}
-                        label="Brainstorming"
-                        description="Ask a hard question — pricing, positioning, build vs. buy, a specific supplier risk. Four specialists answer in parallel from different angles: strategy, engineering, manufacturing, finance. Fiona closes with a consensus and the one action to take."
-                        href="/agents"
-                        ctaLabel="Open Brainstorming"
-                    />
-                    <SectionTile
-                        icon={Hammer}
-                        label="The Forge"
-                        description="Describe what you&rsquo;re building in a paragraph. A twenty-minute autopilot returns a system architecture, module decomposition, bill of materials, cost estimate, supplier shortlist, and risk register — ready to share with a contract manufacturer."
-                        href="/the-forge-v2"
-                        ctaLabel="Open The Forge"
-                    />
-                    <SectionTile
-                        icon={Users}
-                        label="Investors"
-                        description="Paste your deck or describe your company. Fractional Forge ranks the investors most likely to back you — with a fit score, a plain-English explanation of why each firm would be interested, and a drafted intro email for each match."
-                        href="/investors"
-                        ctaLabel="Open Investors"
-                    />
-                    <SectionTile
-                        icon={Package}
-                        label="Suppliers"
-                        description="Describe what you need — a specific material, process capability, or component. Fractional Forge searches the directory of UK and European manufacturers and returns a shortlist with a plain-English reason why each one matches your specification."
-                        href="/marketplace"
-                        ctaLabel="Open Suppliers"
-                    />
-                </div>
-            </section>
-
-            {/* ─────────────────────────────────────────────────────── */}
-            {/* How founders use it — 3 short scenarios                */}
-            {/* ─────────────────────────────────────────────────────── */}
-            <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
-                <div className="max-w-3xl">
-                    {/* Tristan 2026-04-28 (audit cross-cutting fix #3): replaced
-                        grey-uppercase eyebrow with the canonical red-bar +
-                        bold H2 pattern (audit flagged grey-uppercase H2s as
-                        cross-cutting drift). */}
-                    <div className="flex items-center gap-3 mb-5">
-                        <div className="h-6 w-1 bg-international-orange rounded-full" />
-                        <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
-                            How founders use it
-                        </h2>
-                    </div>
-                    <div className="space-y-5">
-                        <ScenarioRow
-                            number="01"
-                            text="A founder at the idea stage uses Brainstorming to pressure-test whether their product is manufacturable at the price point investors expect, then runs The Forge to get a real bill of materials before their first investor meeting."
-                        />
-                        <ScenarioRow
-                            number="02"
-                            text="A founder raising a seed round pastes their deck into Investors, gets a ranked list of 50 firms with fit scores and drafted intro emails, and works through them in order — starting with the highest-fit deep-tech funds."
-                        />
-                        <ScenarioRow
-                            number="03"
-                            text="A founder who has a design locked but no supply chain uses Suppliers to find contract manufacturers in their target region, then asks Brainstorming to help them evaluate which one to approach first."
-                        />
+                    <p>
+                        {"ForgeOS gives you a team of 13 specialists, an investor database of 600 UK funds, and a workspace that turns a paragraph about your product into a system architecture. Use it to think out loud, find capital, and actually build the thing."}
+                    </p>
+                    <div className="pt-2">
+                        <p className="font-semibold text-foreground">{"— Tristan"}</p>
+                        <p className="text-sm text-muted-foreground">Founder, Fractional Forge</p>
                     </div>
                 </div>
             </section>
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Pick where to start — the four tiles above ARE the CTAs;  */}
-            {/* this card just acknowledges the welcome and offers to     */}
-            {/* dismiss it once the user has had a look around.           */}
+            {/* First hour card + primary CTA                           */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
                 <div className="max-w-3xl">
+                    <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-5">
+                        Try these three in your first hour
+                    </p>
                     <Card className="border-2 border-international-orange/20 bg-gradient-to-br from-background to-international-orange/[0.04]">
-                        <CardContent className="pt-6 pb-6">
-                            {/* Tristan 2026-04-28 (audit fix): same red-bar
-                                pattern instead of the grey-uppercase eyebrow.
-                                "Pick where to start" merged into the H2. */}
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="h-6 w-1 bg-international-orange rounded-full" />
-                                <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-                                    Pick where to start
-                                </h2>
-                            </div>
-                            <h3 className="text-lg sm:text-xl text-foreground tracking-tight mb-2">
-                                Open whichever section is most useful right now.
-                            </h3>
-                            <p className="text-base text-muted-foreground leading-relaxed mb-5 max-w-2xl">
-                                If you have a hard decision to think through, open
-                                Brainstorming. If you have a product to design, open The
-                                Forge. If you&rsquo;re raising, open Investors. If you need a
-                                manufacturer, open Suppliers. You can come back to this page
-                                from the sidebar any time.
-                            </p>
-                            <div className="flex flex-wrap gap-3">
-                                <Link href="/agents">
-                                    <Button size="lg" variant="outline" className="gap-2">
-                                        <MessageSquare className="h-4 w-4" /> Brainstorming
-                                    </Button>
-                                </Link>
-                                <Link href="/the-forge-v2">
-                                    <Button size="lg" variant="outline" className="gap-2">
-                                        <Hammer className="h-4 w-4" /> The Forge
-                                    </Button>
-                                </Link>
-                                <Link href="/investors">
-                                    <Button size="lg" variant="outline" className="gap-2">
-                                        <Users className="h-4 w-4" /> Investors
-                                    </Button>
-                                </Link>
-                                <Link href="/marketplace">
-                                    <Button size="lg" variant="outline" className="gap-2">
-                                        <Package className="h-4 w-4" /> Suppliers
-                                    </Button>
-                                </Link>
-                                <Button
-                                    onClick={handleMarkComplete}
-                                    disabled={isPending}
-                                    variant="ghost"
-                                    size="lg"
-                                >
-                                    Don&rsquo;t show this on next sign-in
-                                </Button>
-                            </div>
+                        <CardContent className="pt-6 pb-6 space-y-5">
+                            <FirstHourStep
+                                number={1}
+                                title={"Brainstorm something you’re stuck on."}
+                                body={"Pick one of the eight idea prompts on the Brainstorming page, or type your own. Sage and three other specialists run the conversation, ask good questions, and leave you with the next step instead of more reading."}
+                            />
+                            <FirstHourStep
+                                number={2}
+                                title="Search the investor database."
+                                body="Six hundred UK VC and PE firms, matched against your stage, sector, and cheque size. Fiona surfaces the dozen you should actually approach this week and writes the opening line."
+                            />
+                            <FirstHourStep
+                                number={3}
+                                title="Drop your product idea into The Forge."
+                                body={"One paragraph in. A system architecture, a module decomposition, a skeleton Bill of Materials, and a shortlist of UK manufacturers — out — before lunch."}
+                            />
                         </CardContent>
                     </Card>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                        <Button
+                            onClick={handleContinue}
+                            disabled={isPending}
+                            size="lg"
+                            className="gap-2"
+                        >
+                            Take me to Brainstorming
+                            <ArrowRight className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="lg" asChild>
+                            <a href="#tour">Keep reading the tour</a>
+                        </Button>
+                    </div>
                 </div>
             </section>
 
+            <div id="tour" className="scroll-mt-8" />
+
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Closing                                                 */}
+            {/* Section deep-dives — match the four current sidebar
+                sections (Brainstorming · Fundraising · Workshop ·
+                Marketplace) in the order they appear in the sidebar. */}
+            {/* ─────────────────────────────────────────────────────── */}
+            <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 space-y-6 lg:space-y-8 max-w-4xl">
+                <SectionBlock
+                    icon={Sparkles}
+                    label="Brainstorming"
+                    subtitle="Ideas in, decisions out"
+                    startHref="/agents"
+                    startLabel="Open Brainstorming"
+                    intro={"The Brainstorming page is the front door. Eight curated questions are waiting — pricing, hiring, fundraising, build-vs-partner — each one already paired with the specialists best placed to answer it. Or type your own topic and four key leaders pick it up. The output isn’t a chat log; it’s a decision and the next step."}
+                    rows={[
+                        [
+                            "Strategy",
+                            "Sage frames the bigger picture. Drop a business plan or paste your one-liner — back comes a strategic tree of pillars, objectives, and atomic tasks, each linked to a measurable outcome.",
+                        ],
+                        [
+                            "Objectives",
+                            "Each objective auto-decomposes into 1–3-day tasks scheduled against your team’s velocity. The system tells you “this objective needs one more engineer to ship on time” before you spend six weeks finding out.",
+                        ],
+                        [
+                            "Tasks",
+                            "Day-to-day work tied to the objectives that justify the burn. Drag, assign, mark done, see it ladder up to the strategic pillar.",
+                        ],
+                        [
+                            "Outputs",
+                            "Every deliverable your specialists have produced — pitch decks, financial models, strategy briefs, CAD exports — searchable by specialist or document type.",
+                        ],
+                    ]}
+                />
+                <SectionBlock
+                    icon={Building2}
+                    label="Fundraising"
+                    subtitle={"Find the investors who’d back you"}
+                    startHref="/investors"
+                    startLabel="Open the investor database"
+                    intro={"Six hundred UK VC and PE firms profiled and matched to your sector, stage, and cheque size. Filter in plain English — “early-stage food tech”, “hardware climate fund”, “family office angels writing £250K”. Fiona pulls each investor’s portfolio and recent activity into every outreach brief, so the email lands in their inbox already personalised."}
+                    rows={[]}
+                />
+                <SectionBlock
+                    icon={Hammer}
+                    label="Workshop"
+                    subtitle="From idea to manufactured product"
+                    startHref="/the-forge-v2"
+                    startLabel="Open The Forge"
+                    intro="Type your product idea in one paragraph. Max, your CTO specialist, returns a system architecture diagram, a module decomposition, a skeleton Bill of Materials, reference images of each module, and a design report with research, risks, and next steps. Jian (engineering), Fang (manufacturing), and Chase (supply chain) take it from there."
+                    rows={[
+                        [
+                            "Build",
+                            "Jian generates detailed CAD specs, tolerance stack-ups, manufacturing process recommendations, and cost-per-unit estimates from live supplier quotes.",
+                        ],
+                        [
+                            "Assemble",
+                            "Fang returns assembly method sheets, tooling lists, and labour-hour estimates.",
+                        ],
+                        [
+                            "Procurement",
+                            "Chase searches hundreds of thousands of parts, auto-fills supplier quotes, flags long lead times, and ranks suppliers on reliability and price.",
+                        ],
+                    ]}
+                    footnote="IP-sensitive? Mark the project, and designs never touch shared storage."
+                />
+                <SectionBlock
+                    icon={Store}
+                    label="Marketplace"
+                    subtitle="Fractional Executives · Suppliers · Manufacturing Techniques"
+                    startHref="/marketplace"
+                    startLabel="Open the Marketplace"
+                    intro="Three doors into the same physical world: experienced fractional executives ready to fill a gap on your team, UK suppliers and contract manufacturers ranked on capability and lead time, and a library of manufacturing techniques (injection moulding, PCB assembly, 3D printing, CNC) so you stop over-specifying tolerances by 2x."
+                    rows={[
+                        [
+                            "Fractional Executives",
+                            "Describe the hole in your team. Harper returns matched candidates with portfolios, interview questions, and a culture-fit checklist. Fractional, contract, or full-time — your choice.",
+                        ],
+                        [
+                            "Suppliers",
+                            "Your Bill of Materials goes in. Ranked supplier shortlists come out — PCB assembly, injection moulding, 3D printing, testing labs, fulfilment.",
+                        ],
+                        [
+                            "Manufacturing Techniques",
+                            "Curated tutorials and Q&A on the decisions that quietly cost the most: when to mould vs CNC, when tolerances are overkill, when a cheaper material outperforms.",
+                        ],
+                    ]}
+                />
+            </section>
+
+            {/* ─────────────────────────────────────────────────────── */}
+            {/* Trimmed key-leaders roster                              */}
+            {/* ─────────────────────────────────────────────────────── */}
+            <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 max-w-4xl">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="h-8 w-1.5 bg-international-orange rounded-full" />
+                    <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                        Your four key leaders
+                    </h2>
+                </div>
+                <p className="text-base text-muted-foreground mb-6 max-w-2xl leading-relaxed">
+                    Most brainstorming sessions land with one of these four. The other nine
+                    specialists are a click away whenever a conversation needs them — Max,
+                    Jian, Priya, Mia, Sal, Cal, Finn, Harper, Leo.
+                </p>
+                <Card className="border-border">
+                    <CardContent className="pt-6 pb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                            {KEY_LEADERS.map((leader) => (
+                                <div key={leader.name} className="flex flex-col">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-base font-semibold text-foreground">
+                                            {leader.name}
+                                        </span>
+                                        <span className="text-sm text-muted-foreground">
+                                            — {leader.role}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed mt-1">
+                                        {leader.reason}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                        <Link
+                            href="/agents"
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-international-orange hover:underline mt-5"
+                        >
+                            See all 13 specialists
+                            <ArrowRight className="h-4 w-4" />
+                        </Link>
+                    </CardContent>
+                </Card>
+            </section>
+
+            {/* ─────────────────────────────────────────────────────── */}
+            {/* Closing + final CTA                                     */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 max-w-2xl">
                 <p className="text-base sm:text-lg text-foreground mb-2">
                     Have a look around, and let me know how you get on.
                 </p>
                 <p className="font-semibold text-foreground">— Tristan</p>
-                <p className="text-sm text-muted-foreground">Founder, Fractional Forge</p>
+                <p className="text-sm text-muted-foreground mb-8">Founder, Fractional Forge</p>
+                <Button
+                    onClick={handleContinue}
+                    disabled={isPending}
+                    size="lg"
+                    className="gap-2"
+                >
+                    Take me to Brainstorming
+                    <ArrowRight className="h-4 w-4" />
+                </Button>
             </section>
         </div>
     )
@@ -381,59 +316,85 @@ export function WelcomeView({ firstName, foundryProfileMissing }: WelcomeViewPro
 // Internals
 // ─────────────────────────────────────────────────────────────────────
 
-interface SectionTileProps {
-    icon: React.ComponentType<{ className?: string }>
-    label: string
-    description: string
-    href: string
-    ctaLabel: string
+function FirstHourStep({
+    number,
+    title,
+    body,
+}: {
+    number: number
+    title: string
+    body: string
+}): React.ReactElement {
+    return (
+        <div className="flex gap-4">
+            <div className="flex items-center justify-center w-9 h-9 rounded-full bg-orange-50 text-international-orange font-semibold text-sm shrink-0">
+                {number}
+            </div>
+            <div>
+                <p className="text-base font-semibold text-foreground mb-1">{title}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+            </div>
+        </div>
+    )
 }
 
-function SectionTile({
+interface SectionBlockProps {
+    icon: React.ComponentType<{ className?: string }>
+    label: string
+    subtitle: string
+    intro: string
+    rows: ReadonlyArray<readonly [string, string]>
+    startHref: string
+    startLabel: string
+    footnote?: string
+}
+
+function SectionBlock({
     icon: Icon,
     label,
-    description,
-    href,
-    ctaLabel,
-}: SectionTileProps): React.ReactElement {
+    subtitle,
+    intro,
+    rows,
+    startHref,
+    startLabel,
+    footnote,
+}: SectionBlockProps): React.ReactElement {
     return (
-        <Card className="border-border hover:border-international-orange/30 hover:-translate-y-0.5 transition-all duration-200">
-            <CardContent className="pt-6 pb-6 h-full flex flex-col">
+        <Card className="border-border hover:border-international-orange/30 transition-colors duration-200">
+            <CardContent className="pt-6 pb-6">
                 <div className="flex items-start gap-4 mb-4">
                     <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-orange-50 shrink-0">
                         <Icon className="h-5 w-5 text-international-orange" />
                     </div>
-                    <h3 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight pt-1">
-                        {label}
-                    </h3>
+                    <div>
+                        <h3 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+                            {label}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
+                    </div>
                 </div>
-                <p className="text-base text-foreground leading-relaxed mb-5 flex-1">
-                    {description}
-                </p>
+                <p className="text-base text-foreground leading-relaxed mb-5">{intro}</p>
+                {rows.length > 0 && (
+                    <div className="space-y-3 mb-5">
+                        {rows.map(([name, body]) => (
+                            <div key={name} className="text-sm text-foreground">
+                                <span className="font-semibold">{name}.</span>{" "}
+                                <span className="text-muted-foreground leading-relaxed">{body}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                {footnote && (
+                    <p className="text-sm text-muted-foreground italic mb-5">{footnote}</p>
+                )}
                 <Link
-                    href={href}
+                    href={startHref}
                     className="inline-flex items-center gap-2 text-sm font-semibold text-international-orange hover:text-international-orange-hover transition-colors"
                 >
-                    {ctaLabel}
+                    {startLabel}
                     <ArrowRight className="h-4 w-4" />
                 </Link>
             </CardContent>
         </Card>
-    )
-}
-
-interface ScenarioRowProps {
-    number: string
-    text: string
-}
-
-function ScenarioRow({ number, text }: ScenarioRowProps): React.ReactElement {
-    return (
-        <div className="flex gap-4">
-            <span className="text-xs font-mono text-muted-foreground pt-1 shrink-0 w-6">
-                {number}
-            </span>
-            <p className="text-base text-foreground leading-relaxed">{text}</p>
-        </div>
     )
 }

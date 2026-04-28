@@ -142,15 +142,14 @@ export async function login(formData: FormData) {
             redirect('/workspace-picker')
         }
 
-        // Single foundry or active foundry set — land on /welcome.
-        // DECISION 2026-04-27 (Tristan): post-login lands on Welcome, not
-        // /investors. Welcome routes the user to Brainstorming / Forge /
-        // Investors / Suppliers via clear CTAs.
+        // Single foundry or active foundry set — go to Brainstorming (/agents)
+        // as the post-pivot default landing (2026-04-24). Today route stays
+        // mounted for deep links but is no longer the primary entry point.
         if (foundryCount >= 1) {
-            redirect('/welcome')
+            redirect('/agents')
         }
     }
 
     // Default: users without foundry memberships
-    redirect('/welcome')
+    redirect('/agents')
 }

@@ -1,22 +1,29 @@
 import {
+  BookOpen,
   Store,
+  UserSearch,
 } from 'lucide-react'
 import type { SidebarNavItem } from './types'
 
 /**
- * MARKETPLACE section — PEOPLE + SUPPLIES sub-groups.
+ * MARKETPLACE section — flat 3-item list post-pivot.
  *
- * Playbooks content moved into the Objectives page as "Other ideas for you
- * to be getting on with". Learn/educational content moved to Workshop as
- * "Inspiration". This mirrors the Team page pattern (your stuff +
- * marketplace).
+ * 2026-04-24: People/Supplies sub-headers collapsed. Inspiration moved here
+ * from Workshop and renamed "Manufacturing Techniques". Items:
+ *   - Hire People  (was "Recruits")
+ *   - Suppliers    (was "Marketplace")
+ *   - Manufacturing Techniques  (was "Inspiration" under Workshop)
  *
  * Hidden during pivot focus (2026-04-24): Guild, Apprenticeship, Quotes, Orders.
- * Recruits removed 2026-04-25 — page pulled from V1 scope.
+ * Arrays remain split (People / Supplies) for Sidebar.tsx render order; the
+ * sub-header labels have been removed from the rendering.
  */
 
-export const marketplacePeopleNavigation: SidebarNavItem[] = []
+export const marketplacePeopleNavigation: SidebarNavItem[] = [
+  { name: 'Fractional Executives', href: '/recruits', icon: UserSearch, tooltip: 'Find expert talent — fractional executives, specialists, and consultants' },
+]
 
 export const marketplaceSuppliesNavigation: SidebarNavItem[] = [
-  { name: 'Suppliers', href: '/marketplace', icon: Store, tooltip: 'Find suppliers and manufacturers' },
+  { name: 'Suppliers', href: '/marketplace', icon: Store, tooltip: 'Find experts, suppliers, products, and services' },
+  { name: 'Manufacturing Techniques', href: '/learn', icon: BookOpen, tooltip: 'Techniques, tutorials, and expert guidance to level up your skills' },
 ]
