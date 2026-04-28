@@ -229,7 +229,21 @@ export function calculateMatchScore(
     }
   }
 
-  const total = Math.min(100, stageScore + sectorScore + hardwareScore + chequeScore + geoScore + activeScore + productReadinessScore + thesisBonus)
+  // INTENT: Apply the same cosine-fallback to the COMPOSITE total that
+  // we apply to the displayed thesis pillar (see thesisPillar below).
+  // Without this, free-text queries left `sectorScore + thesisBonus = 0`
+  // (max 35 points) so the headline "X% match" capped at ~50% even when
+  // pgvector returned cosine 70%+. Replace the structured thesis points
+  // with MAX(structured, cosine * 35) so the headline composite tracks
+  // semantic search the same way the pillar bar does. Structured matches
+  // don't get worse (max). Fixed 2026-04-28 alongside the pillar fix
+  // shipped 2026-04-27 on engine-fixes-wip.
+  const structuredThesisPoints = sectorScore + thesisBonus  // 0-35 inclusive
+  const cosineThesisPoints = (typeof similarity === 'number' && similarity > 0)
+    ? Math.min(35, similarity * 35)
+    : 0
+  const thesisPoints = Math.max(structuredThesisPoints, cosineThesisPoints)
+  const total = Math.min(100, stageScore + hardwareScore + chequeScore + geoScore + activeScore + productReadinessScore + thesisPoints)
 
   // ── 6-pillar breakdown (dashboard parity, Forge-Capital-Dashboard.html:1172-1237)
   //    Each pillar is 0-100. Map internal 8-factor points to the pillar scale.
