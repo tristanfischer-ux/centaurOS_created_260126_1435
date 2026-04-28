@@ -225,6 +225,12 @@ export interface CadLabProjectData {
    *  unlike loadAutopilotState() which filters by active foundry only. */
   autopilotState: CadLabProjectSummary["autopilotState"]
 
+  /** ISO timestamp when the project was archived (null if not archived). */
+  archivedAt: string | null
+
+  /** UUID of the project this was forked from (null if original). */
+  forkedFromId: string | null
+
   createdAt: string
   updatedAt: string
 }
@@ -353,6 +359,8 @@ export async function loadCadLabProject(
           : null,
         briefLockedAt: (project.brief_locked_at as string | null) ?? null,
         briefLockedBy: (project.brief_locked_by as string | null) ?? null,
+        archivedAt: (project.archived_at as string | null) ?? null,
+        forkedFromId: (project.forked_from_id as string | null) ?? null,
         autopilotState:
           ((project as { autopilot_state?: unknown }).autopilot_state as CadLabProjectSummary["autopilotState"]) ?? null,
         createdAt: project.created_at,
@@ -1579,5 +1587,399 @@ export async function saveCadLabReviewSkipped(
     }
 
     return { success: true as const }
+  })
+}
+
+// ─── Forge v2 backends (F.8 follow-up) ─────────────────────────────
+
+/**
+ * Lock the brief. Sets brief_locked_at = now() and prevents further edits
+ * to productOverview until unlocked.
+ */
+export async function lockCadLabBrief(
+  projectId: string,
+): Promise<{ success: true; lockedAt: string } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+    const lockedAt = new Date().toISOString()
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ brief_locked_at: lockedAt })
+      .eq("id", projectId)
+      .eq("foundry_id", foundryId)
+    if (error) return { error: `Failed to lock brief: ${sanitizeErrorMessage(error)}` }
+    return { success: true as const, lockedAt }
+  })
+}
+
+/**
+ * Unlock the brief. Clears brief_locked_at.
+ */
+export async function unlockCadLabBrief(
+  projectId: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ brief_locked_at: null })
+      .eq("id", projectId)
+      .eq("foundry_id", foundryId)
+    if (error) return { error: `Failed to unlock brief: ${sanitizeErrorMessage(error)}` }
+    return { success: true as const }
+  })
+}
+
+/**
+ * Soft-archive a project. Sets archived_at. Archived projects still load
+ * but are filtered from the default workspace list.
+ */
+export async function archiveCadLabProject(
+  projectId: string,
+  archived = true,
+): Promise<{ success: true; archivedAt: string | null } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+    const archivedAt = archived ? new Date().toISOString() : null
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ archived_at: archivedAt })
+      .eq("id", projectId)
+      .eq("foundry_id", foundryId)
+    if (error) return { error: `Failed to archive project: ${sanitizeErrorMessage(error)}` }
+    return { success: true as const, archivedAt }
+  })
+}
+
+/**
+ * Fork a project — shallow copy with forked_from_id set. Copies name
+ * (with "· fork" suffix if not already), subject, research, modules,
+ * interface contracts, and productOverview. Regeneratable fields
+ * (result / generated_code / thumbnails) are NOT copied — the fork runs
+ * its own pipeline from scratch.
+ */
+export async function forkCadLabProject(
+  sourceProjectId: string,
+  nameOverride?: string,
+): Promise<{ projectId: string } | { error: string }> {
+  return withAuth(async ({ supabase, user }) => {
+    if (!sourceProjectId || !UUID_RE.test(sourceProjectId)) return { error: "Invalid source project ID" }
+
+    // Load the source
+    const { data: src, error: loadErr } = await supabase
+      .from("cad_lab_projects")
+      .select("*")
+      .eq("id", sourceProjectId)
+      .single()
+    if (loadErr || !src) return { error: "Source project not found" }
+
+    const newName = nameOverride && nameOverride.trim().length > 0
+      ? nameOverride.trim().slice(0, 200)
+      : `${String(src.name)} · fork`
+
+    // Strip fields that must be fresh on the fork
+    // Explicitly pick copied fields — avoids carrying batch/generation state.
+    const { data: forked, error: insertErr } = await supabase
+      .from("cad_lab_projects")
+      .insert({
+        name: newName,
+        subject: src.subject,
+        model_id: src.model_id,
+        status: 'draft' as string,
+        stage: src.stage ?? 'design',
+        foundry_id: src.foundry_id,
+        created_by: user.id,
+        research: src.research,
+        interface_definition: src.interface_definition,
+        modules: src.modules,
+        interface_contracts: src.interface_contracts,
+        decomposition_connections: src.decomposition_connections,
+        diagnostic_answers: src.diagnostic_answers,
+        diagnostic_enrichment: src.diagnostic_enrichment,
+        product_overview: src.product_overview,
+        seeded_brief_content: src.seeded_brief_content,
+        illustration_style: src.illustration_style,
+        visual_style: src.visual_style,
+        reference_images: src.reference_images,
+        reference_documents: src.reference_documents,
+        forked_from_id: sourceProjectId,
+        design_revision: 1,
+        images_generated_at_revision: 0,
+        review_skipped: false,
+        batch_status: 'idle' as string,
+      })
+      .select("id")
+      .single()
+
+    if (insertErr || !forked) {
+      return { error: `Failed to fork: ${sanitizeErrorMessage(insertErr ?? new Error('insert returned no row'))}` }
+    }
+
+    return { projectId: forked.id as string }
+  })
+}
+
+// ─── Per-part spec store (cad_lab_parts) ──────────────────────────
+
+export interface CadLabPartInput {
+  projectId: string
+  moduleId: string
+  name: string
+  displayName?: string | null
+  description?: string | null
+  quantity?: number | null
+  material?: string | null
+  process?: string | null
+  tolerance?: string | null
+  finish?: string | null
+  dimensions?: string | null
+  massGrams?: number | null
+  preferredSupplierId?: string | null
+  typicalLeadWeeks?: number | null
+  estimatedCostGbp?: number | null
+  sourceKeyPart?: string | null
+}
+
+export interface CadLabPartRow {
+  id: string
+  projectId: string
+  moduleId: string
+  name: string
+  displayName: string | null
+  description: string | null
+  quantity: number | null
+  material: string | null
+  process: string | null
+  tolerance: string | null
+  finish: string | null
+  dimensions: string | null
+  massGrams: number | null
+  preferredSupplierId: string | null
+  typicalLeadWeeks: number | null
+  estimatedCostGbp: number | null
+  sourceKeyPart: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Lists all parts for a project, grouped by module when the caller iterates.
+ */
+export async function listCadLabParts(
+  projectId: string,
+): Promise<{ parts: CadLabPartRow[] } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+    const { data, error } = await supabase
+      .from("cad_lab_parts")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("module_id", { ascending: true })
+      .order("name", { ascending: true })
+    if (error) return { error: `Failed to list parts: ${sanitizeErrorMessage(error)}` }
+    const parts: CadLabPartRow[] = (data ?? []).map(r => ({
+      id: r.id as string,
+      projectId: r.project_id as string,
+      moduleId: r.module_id as string,
+      name: r.name as string,
+      displayName: (r.display_name as string | null) ?? null,
+      description: (r.description as string | null) ?? null,
+      quantity: (r.quantity as number | null) ?? null,
+      material: (r.material as string | null) ?? null,
+      process: (r.process as string | null) ?? null,
+      tolerance: (r.tolerance as string | null) ?? null,
+      finish: (r.finish as string | null) ?? null,
+      dimensions: (r.dimensions as string | null) ?? null,
+      massGrams: (r.mass_grams as number | null) ?? null,
+      preferredSupplierId: (r.preferred_supplier_id as string | null) ?? null,
+      typicalLeadWeeks: (r.typical_lead_weeks as number | null) ?? null,
+      estimatedCostGbp: (r.estimated_cost_gbp as number | null) ?? null,
+      sourceKeyPart: (r.source_key_part as string | null) ?? null,
+      createdAt: r.created_at as string,
+      updatedAt: r.updated_at as string,
+    }))
+    return { parts }
+  })
+}
+
+/**
+ * Creates a new part. Used by /bom + part-detail flows when the user
+ * adds a spec row.
+ */
+export async function createCadLabPart(
+  input: CadLabPartInput,
+): Promise<{ partId: string } | { error: string }> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    if (!input.projectId || !UUID_RE.test(input.projectId)) return { error: "Invalid project ID" }
+    if (!input.moduleId || input.moduleId.trim().length === 0) return { error: "Module ID required" }
+    if (!input.name || input.name.trim().length === 0) return { error: "Part name required" }
+    if (input.name.length > 500) return { error: "Part name too long (max 500 characters)" }
+
+    // SECURITY: verify the project belongs to the caller's foundry AND the
+    // moduleId exists on the project. Prevents orphaned parts + cross-foundry writes.
+    const { data: project, error: projectErr } = await supabase
+      .from("cad_lab_projects")
+      .select("id, modules")
+      .eq("id", input.projectId)
+      .eq("foundry_id", foundryId)
+      .single()
+    if (projectErr || !project) return { error: "Project not found" }
+    const modules = (project.modules as unknown as Array<{ id?: string }> | null) ?? []
+    const moduleExists = modules.some(m => m?.id === input.moduleId)
+    if (!moduleExists) return { error: `Module '${input.moduleId}' not found on project` }
+
+    const { data, error } = await supabase
+      .from("cad_lab_parts")
+      .insert({
+        project_id: input.projectId,
+        module_id: input.moduleId,
+        foundry_id: foundryId,
+        name: input.name.trim().slice(0, 500),
+        display_name: input.displayName ?? null,
+        description: input.description ?? null,
+        quantity: input.quantity ?? null,
+        material: input.material ?? null,
+        process: input.process ?? null,
+        tolerance: input.tolerance ?? null,
+        finish: input.finish ?? null,
+        dimensions: input.dimensions ?? null,
+        mass_grams: input.massGrams ?? null,
+        preferred_supplier_id: input.preferredSupplierId ?? null,
+        typical_lead_weeks: input.typicalLeadWeeks ?? null,
+        estimated_cost_gbp: input.estimatedCostGbp ?? null,
+        source_key_part: input.sourceKeyPart ?? null,
+        created_by: user.id,
+      })
+      .select("id")
+      .single()
+    if (error || !data) return { error: `Failed to create part: ${sanitizeErrorMessage(error ?? new Error('insert returned no row'))}` }
+    return { partId: data.id as string }
+  })
+}
+
+// ─── Assumption tests ──────────────────────────────────────────────
+
+export interface AssumptionTestInput {
+  projectId: string
+  hypothesis: string
+  expectedOutcome: string
+  actualOutcome?: string | null
+  decision?: 'keep' | 'kill' | 'pivot' | null
+  rationale?: string | null
+  testedAt?: string | null
+}
+
+/**
+ * Log an assumption test — hypothesis / expected / actual / decision.
+ * Used by the /assumption-test page.
+ */
+export async function createAssumptionTest(
+  input: AssumptionTestInput,
+): Promise<{ assumptionId: string } | { error: string }> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    if (!input.projectId || !UUID_RE.test(input.projectId)) return { error: "Invalid project ID" }
+    if (!input.hypothesis || input.hypothesis.trim().length === 0) return { error: "Hypothesis required" }
+    if (!input.expectedOutcome || input.expectedOutcome.trim().length === 0) return { error: "Expected outcome required" }
+    const { data, error } = await supabase
+      .from("assumption_tests")
+      .insert({
+        project_id: input.projectId,
+        foundry_id: foundryId,
+        hypothesis: input.hypothesis.trim().slice(0, 5000),
+        expected_outcome: input.expectedOutcome.trim().slice(0, 5000),
+        actual_outcome: input.actualOutcome ?? null,
+        decision: input.decision ?? null,
+        rationale: input.rationale ?? null,
+        tested_at: input.testedAt ?? null,
+        logged_by: user.id,
+      })
+      .select("id")
+      .single()
+    if (error || !data) return { error: `Failed to log assumption: ${sanitizeErrorMessage(error ?? new Error('insert returned no row'))}` }
+    return { assumptionId: data.id as string }
+  })
+}
+
+// ─── Investor-deck export (Markdown handoff) ────────────────────────
+
+/**
+ * Builds a Markdown handoff document summarising the project: brief +
+ * modules + BOM rollup + risks. Returned as a base64-encoded string so
+ * the UI can trigger a download via a data: URL. No server state mutated.
+ */
+export async function exportProjectHandoffMarkdown(
+  projectId: string,
+): Promise<{ filename: string; contentBase64: string; bytes: number } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+
+    const { data: project, error } = await supabase
+      .from("cad_lab_projects")
+      .select("id, name, subject, stage, status, product_overview, research, modules, created_at, updated_at, design_revision, foundry_id")
+      .eq("id", projectId)
+      .eq("foundry_id", foundryId)
+      .single()
+    if (error || !project) return { error: "Project not found" }
+
+    type Mod = {
+      id?: string; name?: string; purpose?: string; description?: string; whyItMatters?: string
+      inputs?: string[]; outputs?: string[]; keyParts?: string[]; failureModes?: string[]; unknowns?: string[]
+      leadWeeks?: number; estimatedMassKg?: number; status?: string
+    }
+    const modules = (project.modules as unknown as Mod[] | null) ?? []
+    const esc = (s: string) => s.replace(/([*_`[\]])/g, '\\$1')
+    const bullet = (items: string[] | undefined) => (items && items.length ? items.map(i => `- ${esc(i)}`).join('\n') : '_(none listed)_')
+
+    const lines: string[] = []
+    lines.push(`# ${project.name}`, '')
+    lines.push(`_${project.subject ?? ''}_`, '')
+    lines.push(`**Stage:** ${project.stage}  `)
+    lines.push(`**Design revision:** v${project.design_revision}  `)
+    lines.push(`**Last updated:** ${new Date(String(project.updated_at)).toISOString()}`, '')
+    lines.push(`---`, '')
+
+    if (project.product_overview) {
+      lines.push(`## Product overview`, '')
+      lines.push(String(project.product_overview), '')
+    }
+
+    lines.push(`## Modules (${modules.length})`, '')
+    for (const m of modules) {
+      lines.push(`### ${m.name ?? m.id}`, '')
+      if (m.purpose) lines.push(`_${esc(m.purpose)}_`, '')
+      if (m.description) lines.push(m.description, '')
+      if (m.whyItMatters) { lines.push(`**Why it matters.** ${esc(m.whyItMatters)}`, '') }
+      if (m.keyParts?.length) { lines.push(`**Key components**`, bullet(m.keyParts), '') }
+      if (m.failureModes?.length) { lines.push(`**Failure modes**`, bullet(m.failureModes), '') }
+      if (m.unknowns?.length) { lines.push(`**Open questions**`, bullet(m.unknowns), '') }
+      if (m.leadWeeks || m.estimatedMassKg) {
+        lines.push(`**Lead time:** ${m.leadWeeks ?? '—'} wk · **Est. mass:** ${m.estimatedMassKg ? m.estimatedMassKg.toFixed(2) + ' kg' : '—'}`, '')
+      }
+    }
+
+    // Risks rollup
+    const failureModes = modules.flatMap(m => (m.failureModes ?? []).map(fm => ({ module: m.name ?? m.id, text: fm })))
+    const unknowns = modules.flatMap(m => (m.unknowns ?? []).map(u => ({ module: m.name ?? m.id, text: u })))
+    if (failureModes.length || unknowns.length) {
+      lines.push(`## Risk register`, '')
+      if (failureModes.length) {
+        lines.push(`### Failure modes (${failureModes.length})`, '')
+        for (const f of failureModes) lines.push(`- **${esc(String(f.module))}:** ${esc(f.text)}`)
+        lines.push('')
+      }
+      if (unknowns.length) {
+        lines.push(`### Open questions (${unknowns.length})`, '')
+        for (const u of unknowns) lines.push(`- **${esc(String(u.module))}:** ${esc(u.text)}`)
+        lines.push('')
+      }
+    }
+
+    lines.push(`---`, `Generated by ForgeOS · ${new Date().toISOString()}`)
+
+    const contents = lines.join('\n')
+    const contentBase64 = Buffer.from(contents, 'utf8').toString('base64')
+    const safeName = String(project.name).replace(/[^a-z0-9-]+/gi, '-').toLowerCase()
+    const filename = `forge-handoff-${safeName}-v${project.design_revision}.md`
+    return { filename, contentBase64, bytes: contents.length }
   })
 }

@@ -115,7 +115,12 @@ const SOCIAL_PROOF_STATS = [
  * - Social proof section for trust building
  * - FAQ section to address common objections
  */
-export function PricingContent() {
+interface PricingContentProps {
+  /** When true, user is authenticated — can show personalised CTAs. */
+  isAuthed?: boolean
+}
+
+export function PricingContent({ isAuthed = false }: PricingContentProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
 

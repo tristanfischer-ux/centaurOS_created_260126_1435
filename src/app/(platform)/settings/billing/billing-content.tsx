@@ -51,6 +51,10 @@ interface BillingContentProps {
   hasStripeCustomer: boolean
   /** When true, upgrade buttons use test-activate instead of Stripe checkout */
   isTestMode?: boolean
+  /** When true, renders the Forge Ambassador badge + status in the billing page. */
+  isForgeAmbassador?: boolean
+  /** ISO timestamp of when ambassador status was first earned. */
+  ambassadorSince?: string | null
 }
 
 /**
@@ -67,6 +71,8 @@ export function BillingContent({
   aiUsage,
   hasStripeCustomer,
   isTestMode = false,
+  isForgeAmbassador = false,
+  ambassadorSince = null,
 }: BillingContentProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)

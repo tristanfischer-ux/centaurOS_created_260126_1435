@@ -134,6 +134,12 @@ interface TeamMeetingDialogProps {
     onOpenChange: (open: boolean) => void
     /** When provided, auto-selects participants and pre-fills topic */
     preset?: MeetingPreset
+    /** Authenticated user id — forwarded from specialists-landing for billing checks. */
+    userId?: string
+    /** Subscription tier — forwarded from specialists-landing. */
+    userTier?: import("@/lib/billing/plans").SubscriptionTier
+    /** Brainstorms used this month — forwarded from specialists-landing. */
+    brainstormsUsedThisMonth?: number
 }
 
 // ─── Meeting Topic Suggestions ────────────────────────────────────────────────
@@ -750,6 +756,9 @@ export function TeamMeetingDialog({
     open,
     onOpenChange,
     preset,
+    userId: _userId,
+    userTier: _userTier,
+    brainstormsUsedThisMonth: _brainstormsUsedThisMonth,
 }: TeamMeetingDialogProps) {
     const router = useRouter()
     // ─── State ────────────────────────────────────────────────────────────

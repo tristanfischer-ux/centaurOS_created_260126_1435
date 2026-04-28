@@ -50,9 +50,11 @@ const KEY_LEADERS: ReadonlyArray<{ name: string; role: string; reason: string }>
 interface WelcomeViewProps {
     /** First name used in the hero eyebrow greeting. Optional. */
     firstName?: string
+    /** When true, the foundry profile is missing — show the profile setup prompt. */
+    foundryProfileMissing?: boolean
 }
 
-export function WelcomeView({ firstName }: WelcomeViewProps): React.ReactElement {
+export function WelcomeView({ firstName, foundryProfileMissing = false }: WelcomeViewProps): React.ReactElement {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
 

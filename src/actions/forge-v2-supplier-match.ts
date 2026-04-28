@@ -295,7 +295,7 @@ async function matchSuppliersForProjectInternal(
         // ISO codes or short market names ("United Kingdom", "GB", "Europe").
         // Joined comma-separated so substring matching in scoreRegionMatch
         // can match the listing's country / country_iso against any of them.
-        const research = project.research as { designBrief?: { constraints?: { markets?: unknown; batchSize?: number } } } | null
+        const research = project.research as { designBrief?: { constraints?: { markets?: unknown; batchSize?: number }; report?: string } } | null
         const briefMarkets = research?.designBrief?.constraints?.markets
         const targetMarket = Array.isArray(briefMarkets) && briefMarkets.length > 0
             ? briefMarkets.filter((m): m is string => typeof m === "string").join(", ")
@@ -690,9 +690,9 @@ async function matchSuppliersForProjectInternal(
                 uncoveredModules.map((m) => m.id),
             )
             for (const part of purchasedParts) {
-                const coverage = matchesPerPart.get(part.partNumber) ?? 0
-                if (coverage < TARGET_PER_ROW && part.sourceModuleId) {
-                    undercoveredModuleIds.add(part.sourceModuleId)
+                const coverage = matchesPerPart.get(part.part_number) ?? 0
+                if (coverage < TARGET_PER_ROW && part.source_module_id) {
+                    undercoveredModuleIds.add(part.source_module_id)
                 }
             }
             // Bound the discovery fan-out to keep within budget. 5
