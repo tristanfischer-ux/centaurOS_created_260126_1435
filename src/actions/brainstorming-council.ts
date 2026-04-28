@@ -190,6 +190,8 @@ export async function conveneCouncil(
         maxTokens: 400,
         temperature: 0.7,
         timeoutMs: 60_000,
+        // W23: prose call — never fall back to reasoning_content if content is empty.
+        suppressReasoningFallback: true,
     })
 
     // ── Step 2: All specialists in parallel ───────────────────────────────
@@ -210,6 +212,8 @@ export async function conveneCouncil(
             maxTokens: 800,
             temperature: 0.75,
             timeoutMs: 75_000,
+            // W23: prose call — never fall back to reasoning_content if content is empty.
+            suppressReasoningFallback: true,
         })
 
         if (!result.ok) {
@@ -258,6 +262,8 @@ export async function conveneCouncil(
         maxTokens: 500,
         temperature: 0.65,
         timeoutMs: 60_000,
+        // W23: prose call — never fall back to reasoning_content if content is empty.
+        suppressReasoningFallback: true,
     })
 
     const fionaClosing = fionaClosingResult.ok

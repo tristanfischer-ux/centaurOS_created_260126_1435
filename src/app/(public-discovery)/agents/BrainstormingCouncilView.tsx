@@ -1221,27 +1221,28 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         </div>
                     </div>
                     <div style={{
-                        background: "var(--bc-fg)",
-                        color: "#fff",
+                        background: "var(--bc-brand-soft)",
+                        color: "var(--bc-fg)",
                         borderRadius: "12px",
                         padding: "18px 22px",
                         marginTop: "4px",
                         position: "relative",
                         overflow: "hidden",
+                        border: "1px solid var(--bc-brand-dim)",
                     }}>
                         <div style={{
                             position: "absolute", top: 0, right: 0,
                             width: "200px", height: "200px",
-                            background: "radial-gradient(circle, rgba(255,69,0,0.15) 0%, transparent 70%)",
+                            background: "radial-gradient(circle, rgba(255,69,0,0.08) 0%, transparent 70%)",
                             pointerEvents: "none",
                         }} />
-                        <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--bc-brand-dim)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px", position: "relative" }}>
+                        <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--bc-brand)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px", position: "relative" }}>
                             &rarr; Next concrete action this week
                         </div>
-                        <h3 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 700, letterSpacing: "-0.01em", position: "relative" }}>
+                        <h3 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 700, letterSpacing: "-0.01em", color: "var(--bc-fg)", position: "relative" }}>
                             One action. One deadline. No ambiguity.
                         </h3>
-                        <p style={{ margin: 0, fontSize: "13.5px", lineHeight: "1.6", color: "#d6d3d1", position: "relative" }}>
+                        <p style={{ margin: 0, fontSize: "13.5px", lineHeight: "1.6", color: "var(--bc-fg)", position: "relative" }}>
                             Fiona closes with the single most important thing to do this week &mdash; not a list, not options. One action with a deadline.
                         </p>
                     </div>

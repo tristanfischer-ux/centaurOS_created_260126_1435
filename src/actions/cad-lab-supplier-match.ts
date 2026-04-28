@@ -831,12 +831,114 @@ export async function matchCadLabModuleSuppliers(
   // applying it here means hallucinated rows never enter the shortlist
   // (vs the render-layer filter shipped in 290454be which only stops
   // them appearing in the PDF).
+  // ── Fix 2 (audit Fix 2, 2026-04-27): hard-filter via supplier_capabilities ──
+  //
+  // The 11,647-row supplier_capabilities table has structured per-process
+  // records (process_category, materials_worked, tolerance_min_mm, batch ranges)
+  // linked to marketplace_listings via listing_id FK. The old scorer read only
+  // the sparse process_capabilities JSONB on the listing row (13.7% populated),
+  // giving the capability dimension almost no signal.
+  //
+  // This step fetches supplier_capabilities for the candidate set and:
+  //   1. Builds a boosted-ID set: any listing that has a capability record
+  //      matching the module's normalised process gets a hard boost in Factor 6
+  //      (capability score multiplied by 3× — from 5 max points to 15).
+  //   2. Builds a hard-reject set: when the module declares both a specific
+  //      process AND a tolerance, any listing whose BEST matching capability row
+  //      has tolerance_min_mm > requiredTolerance is hard-rejected before
+  //      scoring (can never achieve the declared precision).
+  //
+  // Soft-scored listings with NO capability rows are unaffected (same as
+  // before). The 13.7%-populated JSONB cap column is still used as Factor 6
+  // fallback for those rows.
+  //
+  // Query is batched against the already-filtered candidateIds (≤100 rows),
+  // not the full 11,647-row table — no table-scan risk.
+  //
+  // On any error the sets stay empty and scoring falls through to existing logic.
+
+  // Normalised process keys already available: inputProcessKeys
+  // Map supplier_capabilities.process_category → our internal key names
+  const CAP_PROCESS_MAP: Record<string, string[]> = {
+    cnc_machining: ["cnc_milling", "cnc_turning"],
+    sheet_metal: ["sheet_metal_bending"],
+    additive_manufacturing: ["fdm", "sla", "sls", "dmls"],
+    injection_moulding: ["injection_molding"],
+    welding: ["mig_welding", "tig_welding"],
+    laser_cutting: ["laser_cutting"],
+    waterjet: ["waterjet_cutting"],
+    casting: ["die_casting", "investment_casting", "sand_casting"],
+  }
+
+  const capabilityBoostedIds = new Set<string>()   // listing_id has matching cap row
+  const capabilityHardRejectIds = new Set<string>() // listing_id cannot meet tolerance
+
+  if (candidateIds.size > 0 && inputProcessKeys.size > 0) {
+    try {
+      const adminForCaps = createAdminClient()
+      const { data: capRows } = await adminForCaps
+        .from("supplier_capabilities")
+        .select("listing_id, process_category, materials_worked, tolerance_min_mm")
+        .in("listing_id", [...candidateIds])
+        .limit(500)
+
+      if (capRows && capRows.length > 0) {
+        // Build a map: listing_id → best matching capability rows
+        const capByListing = new Map<string, typeof capRows>()
+        for (const row of capRows) {
+          const lid = row.listing_id as string
+          if (!capByListing.has(lid)) capByListing.set(lid, [])
+          capByListing.get(lid)!.push(row)
+        }
+
+        for (const [listingId, caps] of capByListing) {
+          // Check if any cap row matches one of our input process keys
+          const matchingCaps = caps.filter((cap) => {
+            const capProcessKey = cap.process_category as string | null
+            if (!capProcessKey) return false
+            // Direct match against internal key
+            if (inputProcessKeys.has(capProcessKey)) return true
+            // Mapped match (e.g. "cnc_machining" → ["cnc_milling","cnc_turning"])
+            const mappedKeys = CAP_PROCESS_MAP[capProcessKey] ?? []
+            return mappedKeys.some((k) => inputProcessKeys.has(k))
+          })
+
+          if (matchingCaps.length > 0) {
+            capabilityBoostedIds.add(listingId)
+
+            // Hard reject: when the module declares a tolerance AND all matching
+            // caps have tolerance_min_mm > requiredTolerance, reject outright.
+            // Only reject when we have a SPECIFIC tolerance requirement (not null).
+            if (input.toleranceMm != null && input.toleranceMm > 0) {
+              const bestTolerance = Math.min(
+                ...matchingCaps
+                  .map((c) => c.tolerance_min_mm)
+                  .filter((v): v is number => typeof v === "number" && v > 0),
+              )
+              if (Number.isFinite(bestTolerance) && bestTolerance > input.toleranceMm) {
+                capabilityHardRejectIds.add(listingId)
+              }
+            }
+          }
+        }
+        console.info(
+          `[CadLabMatch:fix2] supplier_capabilities: boosted=${capabilityBoostedIds.size} hard-rejected=${capabilityHardRejectIds.size} (of ${candidateIds.size} candidates)`,
+        )
+      }
+    } catch (capErr) {
+      // Non-fatal — soft scoring continues without capability hard-filter
+      console.warn("[CadLabMatch:fix2] supplier_capabilities fetch failed (non-fatal):", capErr instanceof Error ? capErr.message : capErr)
+    }
+  }
+
   const { looksLikeHallucinatedSupplierName: nameCheck } = await import(
     "@/lib/supplier-verification"
   )
   const listings = (rawListings ?? []).filter((l) => {
     if (isNonSupplierUrl(l.website_url)) return false
     if (typeof l.title === "string" && nameCheck(l.title).bad) return false
+    // Fix 2: drop listings that provably cannot meet the declared tolerance
+    if (capabilityHardRejectIds.has(l.id)) return false
     return true
   })
   const droppedNonSupplierCount = (rawListings?.length ?? 0) - listings.length
@@ -935,14 +1037,25 @@ export async function matchCadLabModuleSuppliers(
       let { score: keywordRaw } = scoreKeywords(searchTerms, listingText, input.keyParts)
 
       // Factor 6: Capability (from process_capabilities JSONB — 13.7% populated)
+      // Fix 2 (audit Fix 2, 2026-04-27): when supplier_capabilities table has a
+      // matching structured record for this listing, the raw score is multiplied
+      // by 3 (from max 5pt → max 15pt effective weight). This converts the
+      // previously near-useless capability dimension into a meaningful signal for
+      // suppliers that have been fully profiled in the structured capabilities table.
       const caps = (listing.process_capabilities ?? []) as ProcessCapability[]
-      const capabilityRaw = scoreCapabilityMatch(
+      const capabilityRawBase = scoreCapabilityMatch(
         caps,
         inputProcessKeys,
         input.material,
         input.toleranceMm,
         input.batchSize,
       )
+      // Structured capability boost: 3× multiplier for listings with a verified
+      // supplier_capabilities record matching the process. Floor at 0.33 (1/3) so
+      // that even a marginal base score registers a meaningful boost.
+      const capabilityRaw = capabilityBoostedIds.has(listing.id)
+        ? Math.max(capabilityRawBase, 0.33) * 3
+        : capabilityRawBase
 
       // Factor 7: Industry match (listing industries vs inferred project industries)
       const industryRaw = scoreIndustryMatch(industriesList, projectIndustries)

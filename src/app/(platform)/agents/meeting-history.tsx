@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +49,7 @@ import {
     AudioLines,
     ImageIcon,
     Sparkles,
+    RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -56,6 +58,8 @@ import {
     deleteMeetingThread,
     togglePinMeetingThread,
 } from "@/actions/meeting-threads"
+import { generateSessionInfographic } from "@/actions/brainstorm-cover"
+import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import { getMeetingHistory } from "@/actions/agent-artifacts"
 import type { MeetingThreadSummary } from "@/actions/meeting-threads"
 import type { MeetingHistoryItem } from "@/actions/agent-artifacts"
@@ -166,6 +170,34 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
     const hasPermalink = !meeting.id.startsWith("legacy-")
     const tierLabel = TIER_LABELS[meeting.councilTier] ?? meeting.councilTier
     const canMutate = hasPermalink
+    const [isRetryingCover, setIsRetryingCover] = useState(false)
+    const [isRetryingAudio, setIsRetryingAudio] = useState(false)
+
+    // W36: retry cover image generation when stuck in generating/pending (Sarah)
+    async function handleRetryCover(e: React.MouseEvent) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (isRetryingCover) return
+        setIsRetryingCover(true)
+        try {
+            await generateSessionInfographic(meeting.id)
+        } finally {
+            setIsRetryingCover(false)
+        }
+    }
+
+    // W35: retry audio generation when stuck in generating/pending (Sarah)
+    async function handleRetryAudio(e: React.MouseEvent) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (isRetryingAudio) return
+        setIsRetryingAudio(true)
+        try {
+            await generateSessionAudio(meeting.id)
+        } finally {
+            setIsRetryingAudio(false)
+        }
+    }
 
     return (
         <Card
@@ -196,6 +228,19 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                                 ? "Generating cover image…"
                                 : "Cover image queued"}
                         </span>
+                        {/* W36: retry button for stuck cover generation (Sarah) */}
+                        {canMutate && (
+                            <button
+                                type="button"
+                                onClick={handleRetryCover}
+                                disabled={isRetryingCover}
+                                className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                                title="Retry cover generation"
+                            >
+                                <RotateCcw className={cn("h-3 w-3", isRetryingCover && "animate-spin")} />
+                                Retry
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
@@ -206,10 +251,14 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                     </div>
                 )}
 
-                {/* Pin / delete affordances — surfaced on hover, always accessible via keyboard */}
+                {/* Pin / delete affordances — surfaced on hover, always accessible via keyboard.
+                    W34/W37: z-10 ensures these buttons are above the absolute-inset-0 cover
+                    image / placeholder divs that share the same stacking context. type="button"
+                    prevents accidental form submission if the component is ever inside a form. */}
                 {canMutate && (
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                         <Button
+                            type="button"
                             variant="secondary"
                             size="icon"
                             className="h-7 w-7 bg-background/95 hover:bg-background shadow-sm"
@@ -229,6 +278,7 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                             )}
                         </Button>
                         <Button
+                            type="button"
                             variant="secondary"
                             size="icon"
                             className="h-7 w-7 bg-background/95 hover:bg-destructive hover:text-destructive-foreground shadow-sm"
@@ -299,6 +349,19 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                         <span className="flex items-center gap-1 text-muted-foreground">
                             <AudioLines className="h-3 w-3 animate-pulse" />
                             Generating audio…
+                            {/* W35: retry button for stuck audio generation (Sarah) */}
+                            {canMutate && (
+                                <button
+                                    type="button"
+                                    onClick={handleRetryAudio}
+                                    disabled={isRetryingAudio}
+                                    className="ml-1 flex items-center gap-0.5 text-[10px] hover:text-foreground transition-colors disabled:opacity-50"
+                                    title="Retry audio generation"
+                                >
+                                    <RotateCcw className={cn("h-2.5 w-2.5", isRetryingAudio && "animate-spin")} />
+                                    Retry
+                                </button>
+                            )}
                         </span>
                     )}
                     <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
@@ -429,10 +492,11 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
             setMutatingId(null)
             if (!result.ok) {
                 console.error("[MeetingHistory] Pin toggle failed:", result.error)
-                // Rollback on failure
+                // W37: Rollback optimistic update and surface error via toast
                 setMeetings((prev) =>
                     prev.map((m) => (m.id === id ? { ...m, isPinned: !pinned } : m)),
                 )
+                toast.error(result.error ?? "Could not update pin — please try again.")
             }
         },
         [],
@@ -456,9 +520,10 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
             setPendingDelete(null)
         } else {
             console.error("[MeetingHistory] Delete failed:", result.error)
-            // Keep the dialog open so the user sees the error state; surface
-            // via console for now (the action returns sanitised errors).
-            alert(result.error ?? "Failed to delete session. Please try again.")
+            // W34: close the dialog and surface the error as a toast so the
+            // user knows the delete failed without a blocking browser alert.
+            setPendingDelete(null)
+            toast.error(result.error ?? "Failed to delete session — please try again.")
         }
     }, [pendingDelete])
 

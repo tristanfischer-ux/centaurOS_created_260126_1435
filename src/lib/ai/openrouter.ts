@@ -28,6 +28,17 @@ export interface OpenRouterCallInput {
     maxTokens?: number
     temperature?: number
     timeoutMs?: number
+    /**
+     * W23 guard — when true, never fall back to `reasoning_content` if
+     * `content` is empty. Use for all prose-output calls (brainstorming
+     * council, cover copy, audio scripts) where a reasoning trace must
+     * never reach the rendered UI. Returns an error instead so the caller
+     * can degrade gracefully.
+     *
+     * Default: false (backward-compatible — existing structured-extraction
+     * callers that rely on the reasoning fallback are unaffected).
+     */
+    suppressReasoningFallback?: boolean
 }
 
 export interface OpenRouterCallResult {
@@ -74,8 +85,10 @@ interface RawResponse {
  *   - Default `maxTokens` = 16384 (sized for V4 reasoning + V4-Flash JSON).
  *   - Default `temperature` = 0 (structured-output workloads dominate).
  *   - Default `timeoutMs` = 90_000 (BOM batches sometimes run ~60s).
- *   - Extracts text from `message.content` AND `message.reasoning_content`
- *     (concatenated when both present) so DeepSeek V4 outputs land cleanly.
+ *   - Extracts text from `message.content` (final answer). Falls back to
+ *     `message.reasoning_content` ONLY when `suppressReasoningFallback` is false
+ *     (the default). Pass `suppressReasoningFallback: true` for all prose calls
+ *     to prevent DeepSeek V4 reasoning traces reaching user-visible UI (W23).
  */
 export async function callOpenRouter(
     input: OpenRouterCallInput,
@@ -170,20 +183,28 @@ export async function callOpenRouter(
         }
     }
 
-    // Extract text — concatenate `reasoning_content` and `content` if both
-    // present. DeepSeek V4 reasoning models often emit `reasoning_content`
-    // for chain-of-thought (visible to caller) and `content` for the final
-    // structured answer. For JSON-extraction workloads we want the LATTER
-    // primarily; reasoning_content is supplementary.
+    // Extract text from `content` (final answer field).
+    // DeepSeek V4 reasoning models also emit `reasoning_content` (chain-of-thought).
+    // For JSON-extraction workloads we prefer `content`; fall back to
+    // `reasoning_content` ONLY when the caller allows it (suppressReasoningFallback=false).
+    // W23: prose callers (brainstorming council) pass suppressReasoningFallback=true so a
+    // reasoning trace can never reach the rendered UI even if `content` comes back empty.
     const content = stringFromMaybeArray(choice.message?.content)
     const reasoning = stringFromMaybeArray(
         choice.message?.reasoning_content ?? choice.message?.reasoning,
     )
-    // Prefer `content` when non-empty (final answer); fall back to
-    // reasoning when the model dumped everything into reasoning_content.
-    const text = (content && content.trim().length > 0)
-        ? content
-        : reasoning ?? ""
+    const contentPresent = content && content.trim().length > 0
+    let text: string
+    if (contentPresent) {
+        text = content
+    } else if (!input.suppressReasoningFallback && reasoning) {
+        // Structured-extraction caller: fall back to reasoning_content (legacy behaviour).
+        text = reasoning
+    } else {
+        // Prose caller (suppressReasoningFallback=true) OR both fields empty:
+        // return empty string so the error path fires cleanly.
+        text = ""
+    }
 
     if (!text) {
         return {

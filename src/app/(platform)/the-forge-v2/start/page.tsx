@@ -24,6 +24,15 @@ import type { Metadata } from "next"
 import { StartView } from "./start-view"
 
 export const dynamic = "force-dynamic"
+// GOTCHA (W18 — 2026-04-28): Edge functions do NOT support next/server `after()`.
+// Without this, createCadLabProject's Chase after()-callback runs synchronously
+// in-response, hitting the 300s wall and silently dropping the POST back to the
+// client (no projectId → no redirect → founder sees nothing). Node.js runtime is
+// required for after() to work as intended.
+export const runtime = "nodejs"
+// The action itself returns in <5s (DB write + autopilot seed). Chase runs
+// post-response via after(). 30s budget is plenty for the synchronous path.
+export const maxDuration = 30
 
 export const metadata: Metadata = {
     title: "Start a new project · The Forge",

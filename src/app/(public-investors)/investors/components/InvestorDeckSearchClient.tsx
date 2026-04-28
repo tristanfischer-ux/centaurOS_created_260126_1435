@@ -17,6 +17,7 @@
 'use client'
 
 import { useState, useCallback, useTransition, useRef, useMemo, useEffect } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -77,15 +78,20 @@ const FREE_VISIBLE = 5
 /**
  * Forge Capital top-matches pagination — `Forge-Capital-Search.html` uses 8
  * per page. Tristan 2026-04-27: porting the "← Prev / Page N of M / Next →"
- * pattern verbatim, plus the 35-50% Near-Misses bucket and the Advisory
+ * pattern verbatim, plus the 10-34% Near-Misses bucket and the Advisory
  * Intelligence section below the top matches.
  */
 const TOP_PER_PAGE = 8
 
-/** Top-matches threshold mirrors `Forge-Capital-Search.html` line 695:
- *  composite ≥ 50 = "strong match", 35-50 = "near miss". */
-const TOP_MATCH_COMPOSITE_FLOOR = 50
-const NEAR_MISS_COMPOSITE_FLOOR = 35
+/** Top-matches threshold.
+ * W46 fix 2026-04-28: lowered from 50 → 35 so all firms the engine returns
+ * with a meaningful score appear in the ranked main list. At 50 only ~65 of
+ * 200 candidates made the top bucket; founders saw a misleadingly short list.
+ * Firms scoring < 35 are still dropped as noise. Near-miss grouping is now
+ * only applied to < 35 firms (edge case — those groups will usually be empty
+ * for a well-formed query returning 200 candidates). */
+const TOP_MATCH_COMPOSITE_FLOOR = 35
+const NEAR_MISS_COMPOSITE_FLOOR = 10
 
 const NEAR_MISS_GROUP_LABELS = {
   'Stage Mismatch':       'These investors match your thesis but invest at a different stage.',
@@ -184,6 +190,11 @@ export function InvestorDeckSearchClient({
   const [searchFailureMessage, setSearchFailureMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // W45b: URL persistence for back-nav restore
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const restoredFromUrl = useRef(false)
 
   // Forge Capital top-matches pagination state. Resets to page 0 on every
   // new search so the founder always sees their best matches first.
@@ -199,6 +210,13 @@ export function InvestorDeckSearchClient({
 
   // ── Search ────────────────────────────────────────────────────────────────
 
+  // W45b: restore search from URL on back-nav. Placed before runSearch def
+  // so the effect can reference the stable callback after mount.
+  // NOTE: effect is defined here but useEffect runs after all hooks —
+  // runSearch is assigned before effects fire, so this is safe. We use
+  // a separate useEffect below after runSearch is defined.
+  const runSearchRef = useRef<((q: string) => void) | null>(null)
+
   const runSearch = useCallback((q: string) => {
     const trimmed = q.trim()
     if (trimmed.length < 10) {
@@ -208,6 +226,10 @@ export function InvestorDeckSearchClient({
     setLastQuery(trimmed)
     setHasSearched(true)
     setSearchFailureMessage(null)
+    // W45b: mirror query to URL so back-nav restores it
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('q', trimmed)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     startTransition(async () => {
       try {
         const result = await searchInvestors({
@@ -245,7 +267,17 @@ export function InvestorDeckSearchClient({
             if (typeof s === 'number') sims[f.id] = s
           }
           computeMatchScores(ids, sims)
-            .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+            .then(scores => {
+              setMatchScores(prev => ({ ...prev, ...scores }))
+              // W47: re-sort firms so display order matches displayed % (the
+              // score from computeMatchScores). Server sort used _fcComposite;
+              // the card displays scores[id].score — they can disagree.
+              // After scores land, re-order to be strictly descending by the
+              // value the founder actually sees on each card.
+              setFirms(prev =>
+                [...prev].sort((a, b) => (scores[b.id]?.score ?? 0) - (scores[a.id]?.score ?? 0))
+              )
+            })
             .catch(() => { /* non-critical — cards show without bars */ })
         }
       } catch (err) {
@@ -253,7 +285,25 @@ export function InvestorDeckSearchClient({
         toast.error('Search failed — please try again.')
       }
     })
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, router, searchParams])
+
+  // W45b: sync runSearch ref so the restoration effect below can call it
+  runSearchRef.current = runSearch
+
+  // W45b: on mount, restore search state if ?q= is present in the URL
+  // (happens when user presses Back from /investors/[id]).
+  useEffect(() => {
+    if (restoredFromUrl.current) return
+    const q = searchParams.get('q')
+    if (q && q.trim().length >= 10) {
+      restoredFromUrl.current = true
+      setQuery(q.trim())
+      if (textareaRef.current) textareaRef.current.value = q.trim()
+      runSearchRef.current?.(q.trim())
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — run once on mount only
 
   const handleChipClick = (chipText: string) => {
     // Extract the quoted example from the chip label
@@ -311,8 +361,9 @@ export function InvestorDeckSearchClient({
 
   // ── Visible cards logic ───────────────────────────────────────────────────
 
-  // Forge Capital partition: composite ≥ 50 = "top match", 35-50 = "near miss",
-  // < 35 dropped. `_fcComposite` is set server-side by searchInvestors when the
+  // Forge Capital partition: composite ≥ 35 = "top match" (W46 fix 2026-04-28,
+  // was ≥ 50), 10-34 = "near miss", < 10 dropped. `_fcComposite` is set
+  // server-side by searchInvestors when the
   // semantic path runs. Firms without it (keyword fallback, no query) all
   // bucket as top-matches so the UX doesn't break.
   const partitioned = useMemo(() => {
@@ -956,7 +1007,7 @@ function MatchCard({
       // STRUCTURE: Forge Capital search-result-card (locked variant)
       // 1px border · white bg · 12px radius · 14px padding (p-3.5)
       <div
-        className={`bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all opacity-80`}
+        className={`bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all opacity-80`}
       >
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -1020,12 +1071,29 @@ function MatchCard({
     )
   }
 
-  // Unlocked card — render as a Link
+  // Unlocked card — W27 "cover-link" pattern:
+  //   - Outer div is position:relative and holds all content.
+  //   - An absolutely-positioned <Link> (the "cover") fills the entire card.
+  //     It is the only <a> tag so HTML5 interactive-inside-interactive is
+  //     avoided. It uses aria-hidden + tabIndex=-1 so screen-readers use the
+  //     card's own landmark, not a duplicate link.
+  //   - Interactive children (Save button, accordion) sit above the cover via
+  //     position:relative + z-index:10. They call e.stopPropagation() so their
+  //     own onClick fires without the cover's href navigation also triggering.
+  //   - This approach (a) works in real browsers, (b) is traversable by
+  //     agent-browser / Playwright via the native <a> href, (c) keeps the
+  //     card content semantically outside the anchor so it's valid HTML5.
   return (
-    <Link
-      href={`/investors/${firm.id}`}
-      className={`block bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
+    <div
+      className={`relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
     >
+      {/* Cover link — makes the whole card navigable via native <a> href */}
+      <Link
+        href={`/investors/${firm.id}`}
+        className="absolute inset-0 rounded-xl"
+        aria-hidden
+        tabIndex={-1}
+      />
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <div className="min-w-0 flex-1">
@@ -1075,11 +1143,12 @@ function MatchCard({
             return null
           })()}
 
-          {/* Save button — below score, paid only */}
+          {/* Save button — below score, paid only. relative z-10 lifts above cover link. */}
           {onSave && (
             <button
+              type="button"
               onClick={handleSaveClick}
-              className={`mt-1.5 text-[10px] px-2 py-0.5 rounded border transition-all ${
+              className={`relative z-10 mt-1.5 text-[10px] px-2 py-0.5 rounded border transition-all ${
                 isSaved
                   ? 'border-international-orange text-international-orange bg-international-orange/10'
                   : 'border-border text-muted-foreground hover:border-international-orange hover:text-international-orange'
@@ -1265,9 +1334,11 @@ function MatchCard({
       )}
 
       {/* ── Why-fit / how-to-pitch expand panel (paid only) ── */}
+      {/* relative z-10 lifts the accordion above the cover-link overlay so clicks reach the button. */}
       {isPaid && (
-        <div className="mt-1">
+        <div className="relative z-10 mt-1">
           <button
+            type="button"
             onClick={handleExpand}
             className="text-xs text-international-orange font-semibold hover:underline cursor-pointer"
           >
@@ -1305,7 +1376,7 @@ function MatchCard({
           )}
         </div>
       )}
-    </Link>
+    </div>
     )
   }
 
@@ -1430,7 +1501,7 @@ function TopMatchesPagination({
 // ─── Near Misses section ─────────────────────────────────────────────────────
 //
 // Verbatim port of `Forge-Capital-Search.html` lines 802-862. Lists firms
-// with composite 35-50%, grouped by the dimension where they're weakest.
+// with composite 10-34%, grouped by the dimension where they're weakest.
 // Cap at 8 per group with a "+ N more" tail line.
 
 function NearMissesSection({
@@ -1445,11 +1516,11 @@ function NearMissesSection({
       <div className="flex items-center gap-2 mb-1">
         <span style={{ fontSize: '18px' }}>⚠️</span>
         <h2 className="text-base font-semibold text-foreground">
-          Near Misses (35–50%) <span className="text-muted-foreground font-normal">· {totalCount}</span>
+          Near Misses (10–34%) <span className="text-muted-foreground font-normal">· {totalCount}</span>
         </h2>
       </div>
       <p className="text-xs text-muted-foreground mb-5">
-        Investors who don&apos;t quite hit a 50% match but are worth knowing about — usually one dimension off.
+        Investors who don&apos;t quite hit a 35% match but are worth knowing about — usually one dimension off.
       </p>
 
       <div className="space-y-6">

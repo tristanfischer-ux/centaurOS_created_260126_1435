@@ -76,6 +76,21 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
   const initialTab = searchParams.get('tab') ?? 'overview'
   const [isPending, startTransition] = useTransition()
   const [switchingTo, setSwitchingTo] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState(initialTab)
+
+  // Lazy-mount guards: KnowledgeVaultView fires startTransition(async) on
+  // mount via useEffect, which keeps React in a pending-transition state and
+  // blocks click events on neighbouring TabsTriggers (same root cause as W16
+  // in MarketplaceTabs). Only mount each heavyweight tab on first activation
+  // so the on-mount fetches don't run until the user explicitly visits the tab.
+  const [knowledgeVisited, setKnowledgeVisited] = useState(initialTab === 'knowledge')
+  const [marketplaceVisited, setMarketplaceVisited] = useState(initialTab === 'marketplace')
+
+  const handleTabChange = (v: string): void => {
+    setActiveTab(v)
+    if (v === 'knowledge') setKnowledgeVisited(true)
+    if (v === 'marketplace') setMarketplaceVisited(true)
+  }
 
   /**
    * Handles clicking a company tile — switches foundry (if needed) and navigates to dashboard.
@@ -156,7 +171,7 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
           the 4-5 tabs don't wrap to a 3+1 layout that strands "Preferences"
           on its own row. On sm+ the row is wide enough to fit all tabs
           inline so we drop the scroll affordance. */}
-      <Tabs defaultValue={initialTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="w-full justify-start overflow-x-auto whitespace-nowrap sm:flex-wrap sm:justify-center">
           <TabsTrigger value="overview" className="sm:flex-1">Overview</TabsTrigger>
           {showMarketplaceTab && (
@@ -184,10 +199,10 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
           />
         </TabsContent>
 
-        {/* Marketplace Tab (providers + Apprentices) */}
+        {/* Marketplace Tab (providers + Apprentices) — lazy-mounted on first visit */}
         {showMarketplaceTab && (
           <TabsContent value="marketplace" className="mt-6">
-            {isProvider && providerProfile ? (
+            {marketplaceVisited && (isProvider && providerProfile ? (
               <MarketplaceTab
                 providerProfile={providerProfile}
                 listing={listing}
@@ -198,13 +213,16 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
               <MarketplaceOnboardingCTA
                 onSetupClick={() => setIsWizardOpen(true)}
               />
-            )}
+            ))}
           </TabsContent>
         )}
 
-        {/* Knowledge Vault Tab */}
+        {/* Knowledge Vault Tab — lazy-mounted on first visit.
+            KnowledgeVaultView fires startTransition(async) on mount via
+            useEffect; keeping it always-mounted blocked TabsTrigger clicks
+            on neighbouring tabs (W24). */}
         <TabsContent value="knowledge" className="mt-6">
-          {profile?.foundry_id ? (
+          {knowledgeVisited && (profile?.foundry_id ? (
             <KnowledgeVaultView
               foundryId={profile.foundry_id}
               userId={profile.id}
@@ -214,7 +232,7 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
             <div className="py-12 text-center text-sm text-muted-foreground">
               Join a company to start building your knowledge vault.
             </div>
-          )}
+          ))}
         </TabsContent>
 
         {/* Links & Social Tab */}

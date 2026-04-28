@@ -30,6 +30,12 @@ import type { Metadata } from "next"
 import { ProjectCreateView } from "./project-create-view"
 
 export const dynamic = "force-dynamic"
+// GOTCHA (W19 — 2026-04-28): Same edge-function/after() issue as the simple
+// start page. createCadLabProject uses after() for Chase auto-trigger, which
+// only works on the Node.js runtime. Without this, the wizard submit blocks
+// until Chase completes (92s+), overruns the 300s cap, and returns nothing.
+export const runtime = "nodejs"
+export const maxDuration = 30
 
 export const metadata: Metadata = {
     title: "Start a new project · The Forge",

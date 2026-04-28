@@ -36,7 +36,7 @@ const ORACLE_COUNCIL_MODELS: ReadonlyArray<string> = [
     "openai/gpt-5.5",
     "google/gemini-3.1-pro-preview",
     "deepseek/deepseek-v4-pro",
-    "qwen/qwen3.6-plus",
+    "qwen/qwen3-235b-a22b-2507",
 ] as const
 
 export interface OracleFinding {

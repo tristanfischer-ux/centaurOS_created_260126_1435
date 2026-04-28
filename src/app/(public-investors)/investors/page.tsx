@@ -11,6 +11,7 @@
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { searchInvestors, computeMatchScores, getShortlistIds, getInvestorTierAccess, getInvestorViewCapStatus, getAnonymousInvestorsTeaser, getInvestorDirectoryStats, type FirmMatchResult } from '@/actions/investors'
 import type { InvestorDirectoryStats } from '@/actions/investors'
@@ -143,19 +144,23 @@ export default async function InvestorDirectoryPage() {
         </p>
       </div>
 
-      {/* Paste-deck → results surface (all 3 states) */}
-      <InvestorDeckSearchClient
-        initialFirms={initialFirms}
-        initialTotal={initialTotal}
-        initialMatchScores={matchScores}
-        initialShortlistIds={shortlistIds}
-        initialMatchOutputs={initialMatchOutputs}
-        resolvedTier={resolvedTier as 'free' | 'seed' | 'starter' | 'professional' | 'enterprise' | 'anonymous'}
-        access={access}
-        companyContext={companyContext}
-        viewCapStatus={viewCapStatus}
-        investorStats={investorStats}
-      />
+      {/* Paste-deck → results surface (all 3 states)
+          Wrapped in Suspense because InvestorDeckSearchClient uses
+          useSearchParams for W45b back-nav query restore. */}
+      <Suspense fallback={null}>
+        <InvestorDeckSearchClient
+          initialFirms={initialFirms}
+          initialTotal={initialTotal}
+          initialMatchScores={matchScores}
+          initialShortlistIds={shortlistIds}
+          initialMatchOutputs={initialMatchOutputs}
+          resolvedTier={resolvedTier as 'free' | 'seed' | 'starter' | 'professional' | 'enterprise' | 'anonymous'}
+          access={access}
+          companyContext={companyContext}
+          viewCapStatus={viewCapStatus}
+          investorStats={investorStats}
+        />
+      </Suspense>
     </div>
   )
 }

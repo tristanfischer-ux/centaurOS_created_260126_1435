@@ -47,6 +47,7 @@ import {
 } from "@/lib/agent-memory"
 import type { ConversationMessage } from "@/lib/agent-memory"
 import { withLlmPermit } from "@/lib/ai/llm-permit"
+import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -206,6 +207,57 @@ export async function requestSpecialistReview(
             req.specialistId,
         )
 
+        // Fix 5 (audit Fix 5, 2026-04-27): inject material_properties + process_capabilities
+        // into Fang's (vp-manufacturing) review context so it can make database-grounded
+        // assertions about tolerances, material properties, and process constraints.
+        //
+        // Prior behaviour: Fang had zero access to material_properties (47 rows) or
+        // process_capabilities (20 rows). All DFM judgments ("FDM cannot achieve ±0.05mm")
+        // came from model training priors — factually right, but unverifiable and
+        // unattributable to a source. The loop critiques flagged this as "generic risk flags
+        // not grounded in real engineering data."
+        //
+        // New behaviour: detect materials and processes from the module being reviewed,
+        // fetch verified engineering data, and prepend it to the system prompt. Fang can
+        // now cite specific values ("per our process_capabilities DB, FDM tolerance is
+        // typically ±0.3mm, best achievable ±0.1mm") rather than guessing.
+        //
+        // Only fires for vp-manufacturing (Fang). Other review specialists (vp-engineering,
+        // cto, vp-supply-chain) already use different context-building paths.
+        let materialPropertiesBlock = ""
+        if (req.specialistId === "vp-manufacturing") {
+            try {
+                const moduleDescription = [
+                    targetModule.description ?? "",
+                    targetModule.purpose ?? "",
+                    (targetModule.keyParts ?? []).join(" "),
+                ].join(" ")
+                // Extract materials and processes from the brief when available
+                const briefMaterials: string[] = []
+                const briefProcesses: string[] = []
+                if (req.designBrief?.targetMaterial) briefMaterials.push(req.designBrief.targetMaterial)
+                if (req.designBrief?.targetProcess) briefProcesses.push(req.designBrief.targetProcess)
+
+                const engData = await retrieveEngineeringDataForPrompt(
+                    moduleDescription,
+                    briefMaterials,
+                    briefProcesses,
+                )
+                if (engData.content) {
+                    materialPropertiesBlock = `\n\n## Engineering Reference Data (from database — cite these values in your review)\n${engData.content}`
+                    console.info(
+                        `[cad-reviews:fix5] engineering data injected: materials=${engData.materialsCount} processes=${engData.processesCount} hardware=${engData.hardwareCount}`,
+                    )
+                }
+            } catch (engErr) {
+                // Non-fatal — Fang review still runs without database grounding
+                console.warn(
+                    "[cad-reviews:fix5] retrieveEngineeringDataForPrompt failed (non-fatal):",
+                    engErr instanceof Error ? engErr.message : engErr,
+                )
+            }
+        }
+
         // DECISION: Fang (VP Manufacturing) owns the Specify stage. Her reviews
         // include Assembly Notes that carry forward to the Assemble stage as
         // constraints for Chase (VP Supply Chain).
@@ -227,6 +279,7 @@ Include these in your recommendations section with the prefix "ASSEMBLY:" so the
 
 ## Current Task: Design Review
 You are performing a structured design review of a CAD Lab module. Use your tools to verify claims with real data — never guess material properties or process constraints.
+${materialPropertiesBlock}
 
 ${reviewContext}${assemblyNotesInstructions}`
 

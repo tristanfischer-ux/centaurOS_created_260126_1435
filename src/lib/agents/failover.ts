@@ -105,7 +105,7 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         // No fallbacks — local-only for privacy
     ],
     deepseek: [
-        { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "deepseek", modelId: "deepseek-v4-flash" },
         // Fallback: 4 specialists switched to deepseek 2026-04-07
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "google", modelId: "gemini-2.5-flash" },

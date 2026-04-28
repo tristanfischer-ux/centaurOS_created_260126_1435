@@ -18,6 +18,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, ExternalLink, Loader2, ShieldCheck } from 'lucide-react'
 import {
   getSuppliersDirectoryPage,
@@ -199,10 +200,15 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
       {/* ── Pagination ───────────────────────────────────────────────────── */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 py-2">
+          {/* W26: disabled no longer includes isPending — removing isPending
+              from the guard allows the user to click Next/Prev while a fetch
+              is in-flight. The useEffect dependency on `page` triggers a new
+              startTransition fetch immediately, superseding the old one.
+              Keeping the opacity hint on isPending for the counter only. */}
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={safePage === 1 || isPending}
+            disabled={safePage === 1}
             className="text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:border-international-orange/50 transition-colors"
           >
             ← Prev
@@ -213,7 +219,7 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
           <button
             type="button"
             onClick={() => setPage((p) => p + 1)}
-            disabled={safePage >= totalPages || isPending}
+            disabled={safePage >= totalPages}
             className="text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:border-international-orange/50 transition-colors"
           >
             Next →
@@ -227,6 +233,7 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
 // ─── Row component ──────────────────────────────────────────────────────────
 
 function SupplierRow({ row }: { row: SuppliersDirectoryRow }) {
+  const router = useRouter()
   const verified = row.isVerified
   const scoreClass = row.score == null
     ? 'text-muted-foreground'
@@ -234,12 +241,25 @@ function SupplierRow({ row }: { row: SuppliersDirectoryRow }) {
     : row.score >= 40 ? 'text-warning'
     : 'text-destructive'
 
+  // W42: whole row is navigable. External-link icon stops propagation so it
+  // opens the website without also triggering row navigation.
+  const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+    // Don't navigate when the user clicked the external-link icon
+    if ((e.target as HTMLElement).closest('a[target="_blank"]')) return
+    router.push(`/marketplace/${row.id}`)
+  }
+
   return (
-    <tr className="hover:bg-muted/20 transition-colors">
+    <tr
+      className="hover:bg-muted/20 transition-colors cursor-pointer"
+      onClick={handleRowClick}
+    >
       <td className="px-3 py-2">
         <div className="flex items-center gap-2 min-w-0">
+          {/* Name is still a Link for right-click / open-in-new-tab UX */}
           <Link
             href={`/marketplace/${row.id}`}
+            onClick={(e) => e.stopPropagation()}
             className="font-medium text-foreground hover:text-international-orange truncate"
           >
             {row.title}

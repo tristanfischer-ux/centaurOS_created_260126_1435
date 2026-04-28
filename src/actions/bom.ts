@@ -65,20 +65,25 @@ import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { fetchCatalogueForPrompt, extractSearchKeywords } from "./component-library"
 import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 import { renderOracleHint } from "@/lib/cost/oracle-benchmarks"
-import { withLlmPermit } from "@/lib/ai/llm-permit"
+import { callOpenRouter, CHEAP_STRUCTURED_MODEL } from "@/lib/ai/openrouter"
+import { embedText } from "@/lib/search/semantic-search"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-// COST TRIAL (2026-04-25): swap from claude-opus-4-7 to claude-haiku-4-5.
-// BOM generation is structured JSON extraction — pulls part rows out of
-// a module spec into a known schema. Voice / reasoning depth is not the
-// signal here; shape correctness is. Haiku is ~20× cheaper than Opus
-// ($0.80/M-in vs $15/M-in). Per-run drop ≈ £6. Watch for: Haiku may
-// produce thinner descriptions or miss some edge-case parts; if quality
-// regresses on the next demo run we step back up to Sonnet (~5× cheaper
-// than Opus, still 4× cheaper than Sonnet's predecessor).
-const BOM_MODEL = "claude-haiku-4-5-20251001"
-const BOM_MAX_TOKENS = 8192
+// W21/W22 FIX (2026-04-28): Anthropic credits exhausted — pipeline_runs showed
+// every bom.generate stage failing with "Your credit balance is too low to access
+// the Anthropic API". Swapped from claude-haiku-4-5-20251001 to DeepSeek V4-Flash
+// via OpenRouter. BOM generation is structured JSON extraction — shape correctness
+// is the signal, not reasoning depth. V4-Flash handles this reliably at ~18× lower
+// cost than Haiku (~$0.14/$0.28 per M vs Haiku's $0.80/M-in). Max tokens bumped
+// from 8192 to 16384 because V4-Flash uses reasoning_content as part of the
+// max_tokens budget — need headroom to avoid truncated JSON.
+// DECISION: CHEAP_STRUCTURED_MODEL = "deepseek/deepseek-v4-flash". If quality
+// regresses on expansion detail, step up to MID_STRUCTURED_MODEL (V4-Pro), but
+// V4-Pro has the reasoning_content contamination issue so only use for structured-
+// output workloads, not prose. V4-Flash is clean.
+const BOM_MODEL = CHEAP_STRUCTURED_MODEL
+const BOM_MAX_TOKENS = 16384
 /** Max depth for BOM tree recursion to prevent infinite loops from cyclic data */
 const MAX_BOM_DEPTH = 20
 /** Max length for user-provided strings interpolated into prompts */
@@ -370,11 +375,8 @@ export async function skeletonBom(
   diagnosticAnswers?: DiagnosticAnswers,
 ): Promise<BomSkeletonResult> {
   return withAIGate('bom', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      return { success: false, error: "Anthropic API key not configured", parts: [], bomLines: [] }
-    }
-    return skeletonBomInternal(projectId, modules, apiKey, designBrief, diagnosticAnswers)
+    // W21 fix (2026-04-28): no longer needs ANTHROPIC_API_KEY — uses OpenRouter
+    return skeletonBomInternal(projectId, modules, designBrief, diagnosticAnswers)
   })
 }
 
@@ -393,10 +395,70 @@ export async function skeletonBom(
  * TODO: track usage via admin-variant of trackAIUsage once the stage pattern
  * is proven.
  */
+/**
+ * Pre-fetches the top matching marketplace_listings suppliers for a given BOM
+ * domain query and formats them as a prompt context block.
+ *
+ * FIX 1 (audit Fix 1, 2026-04-27): Ground the BOM skeleton generator on the
+ * 19,928-row marketplace_listings manufacturer database BEFORE part invention,
+ * not only AFTER in the supplier-match stage. This constrains Max to specify
+ * parts that have realistic procurement paths, rather than generating from
+ * training-data priors with no reference to what is actually sourceable.
+ *
+ * Cap: top 20 semantic matches (Products/Services only) to keep prompt lean.
+ * On error: returns empty string — BOM still generates without grounding.
+ */
+async function fetchMarketplaceSupplierContextForBom(
+  queryText: string,
+): Promise<string> {
+  try {
+    const admin = createAdminClient()
+    const embedding = await embedText(queryText)
+    if (!embedding) return ""
+
+    const { data: semantic } = await admin.rpc("match_marketplace_listings", {
+      query_embedding: JSON.stringify(embedding),
+      match_threshold: 0.25,
+      match_count: 20,
+    })
+
+    if (!semantic || semantic.length === 0) return ""
+
+    const ids = semantic.map((r: { id: string }) => r.id)
+    const { data: listings } = await admin
+      .from("marketplace_listings")
+      .select("id, title, subcategory, specialties, materials, description")
+      .in("id", ids)
+      .in("category", ["Products", "Services"])
+
+    if (!listings || listings.length === 0) return ""
+
+    const lines = listings.slice(0, 20).map((l) => {
+      const parts: string[] = []
+      if (l.title) parts.push(l.title)
+      if (l.subcategory) parts.push(`(${l.subcategory})`)
+      const mats = Array.isArray(l.materials)
+        ? (l.materials as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 3).join(", ")
+        : null
+      if (mats) parts.push(`materials: ${mats}`)
+      const specs = Array.isArray(l.specialties)
+        ? (l.specialties as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 3).join(", ")
+        : null
+      if (specs) parts.push(`specialties: ${specs}`)
+      return `- ${parts.join(" | ")}`
+    }).join("\n")
+
+    return `\nKNOWN SUPPLIERS IN OUR DIRECTORY FOR THIS DOMAIN (sourced from 19,928-supplier database):\n${lines}\n\nGenerate a BOM that is practically sourceable from suppliers like these. Do NOT specify materials, processes, or components that have no realistic supplier match in this list. Where a part category is well-represented in the list above, prefer those categories.`
+  } catch (err) {
+    // Non-fatal — BOM still generates without marketplace grounding
+    console.warn("[bom:fix1] fetchMarketplaceSupplierContextForBom failed (non-fatal):", err instanceof Error ? err.message : err)
+    return ""
+  }
+}
+
 async function skeletonBomInternal(
   projectId: string,
   modules: CadLabModule[],
-  apiKey: string,
   designBrief?: CadLabDesignBrief,
   diagnosticAnswers?: DiagnosticAnswers,
 ): Promise<BomSkeletonResult> {
@@ -414,6 +476,22 @@ async function skeletonBomInternal(
   if (projErr || !project) {
     return { success: false, error: "Project not found", parts: [], bomLines: [] }
   }
+
+  // FIX 1 (audit Fix 1, 2026-04-27): pre-fetch matching marketplace suppliers
+  // BEFORE generating the BOM skeleton. Run in parallel with module description
+  // assembly so there's no wall-clock penalty.
+  const allKeyParts = modules.flatMap((m) => m.keyParts)
+  const bomQueryText = [
+    typeof project.subject === "string" ? project.subject : "",
+    modules.map((m) => `${m.name} ${m.purpose}`).join(" "),
+    allKeyParts.slice(0, 20).join(" "),
+    designBrief?.targetProcess ?? "",
+    designBrief?.targetMaterial ?? "",
+  ].filter(Boolean).join(" ").slice(0, 2000)
+
+  const [supplierContextForSkeleton] = await Promise.all([
+    fetchMarketplaceSupplierContextForBom(bomQueryText),
+  ])
 
   const moduleDescriptions = modules.map((m) => {
     const diagInfo = diagnosticAnswers?.[m.id]
@@ -433,6 +511,7 @@ Description: ${truncate(m.description, MAX_PROMPT_FIELD_LENGTH)}${diagInfo}`
     : ""
 
   const systemPrompt = `You are a manufacturing engineer creating a Bill of Materials skeleton from product module decomposition data.
+${supplierContextForSkeleton}
 
 Your task (SKELETON ONLY — no detailed specs):
 1. Expand each module's keyParts into named parts with a manufacturing process type
@@ -474,32 +553,24 @@ Respond with ONLY valid JSON:
 
   const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
 
-  const Anthropic = (await import("@anthropic-ai/sdk")).default
-  const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
+  const orResult = await callOpenRouter({
+    model: BOM_MODEL,
+    system: systemPrompt,
+    prompt: userPrompt,
+    maxTokens: BOM_MAX_TOKENS,
+    timeoutMs: 120_000,
+  })
 
-  let response
-  try {
-    response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
-      model: BOM_MODEL,
-      max_tokens: BOM_MAX_TOKENS,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }))
-  } catch (err) {
+  if (!orResult.ok) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Anthropic request failed",
+      error: orResult.error,
       parts: [],
       bomLines: [],
     }
   }
 
-  const textBlock = response.content.find((b) => b.type === "text")
-  if (!textBlock || textBlock.type !== "text") {
-    return { success: false, error: "No text response from Claude", parts: [], bomLines: [] }
-  }
-
-  const jsonStr = extractJson(textBlock.text)
+  const jsonStr = extractJson(orResult.text)
   const parsed = tryParseJsonWithRepair<{
     parts: Array<Record<string, unknown>>
     bomLines: Array<Record<string, unknown>>
@@ -753,27 +824,19 @@ ${moduleContext}${briefContext}
 
 Add material, specs, dimensions, mass, cost, and confidence for every part.`
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      return { success: false, error: "Anthropic API key not configured", expansions: {} }
-    }
-
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
-
-    const response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
+    const orExpandResult = await callOpenRouter({
       model: BOM_MODEL,
-      max_tokens: BOM_MAX_TOKENS,
       system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }))
+      prompt: userPrompt,
+      maxTokens: BOM_MAX_TOKENS,
+      timeoutMs: 240_000,
+    })
 
-    const textBlock = response.content.find((b) => b.type === "text")
-    if (!textBlock || textBlock.type !== "text") {
-      return { success: false, error: "No text response from Claude", expansions: {} }
+    if (!orExpandResult.ok) {
+      return { success: false, error: orExpandResult.error, expansions: {} }
     }
 
-    const jsonStr = extractJson(textBlock.text)
+    const jsonStr = extractJson(orExpandResult.text)
     const parsed = tryParseJsonWithRepair<{
       expansions: Record<string, Record<string, unknown>>
     }>(jsonStr)
@@ -829,7 +892,6 @@ Add material, specs, dimensions, mass, cost, and confidence for every part.`
  * batches (fetching the catalogue 3× would be wasteful and non-deterministic).
  */
 async function expandBomPartsBatchInternal(params: {
-  apiKey: string
   batchParts: SkeletonPart[]
   moduleContext: string
   briefContext: string
@@ -839,7 +901,7 @@ async function expandBomPartsBatchInternal(params: {
   error?: string
   expansions: BomExpansionResult["expansions"]
 }> {
-  const { apiKey, batchParts, moduleContext, briefContext, catalogueRef } = params
+  const { batchParts, moduleContext, briefContext, catalogueRef } = params
 
   const skeletonSummary = batchParts.map((p) =>
     `- ${p.partNumber}: "${p.name}" (${p.process}, ${p.isPurchased ? "purchased" : "manufactured"}, module: ${p.sourceModuleId})`
@@ -887,31 +949,23 @@ ${moduleContext}${briefContext}
 
 Add material, specs, dimensions, mass, cost, and confidence for every part.`
 
-  const Anthropic = (await import("@anthropic-ai/sdk")).default
-  const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
+  const orBatchResult = await callOpenRouter({
+    model: BOM_MODEL,
+    system: systemPrompt,
+    prompt: userPrompt,
+    maxTokens: BOM_MAX_TOKENS,
+    timeoutMs: 120_000,
+  })
 
-  let response
-  try {
-    response = await withLlmPermit("anthropic", BOM_MODEL, () => client.messages.create({
-      model: BOM_MODEL,
-      max_tokens: BOM_MAX_TOKENS,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }))
-  } catch (err) {
+  if (!orBatchResult.ok) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Anthropic request failed",
+      error: orBatchResult.error,
       expansions: {},
     }
   }
 
-  const textBlock = response.content.find((b) => b.type === "text")
-  if (!textBlock || textBlock.type !== "text") {
-    return { success: false, error: "No text response from Claude", expansions: {} }
-  }
-
-  const jsonStr = extractJson(textBlock.text)
+  const jsonStr = extractJson(orBatchResult.text)
   const parsed = tryParseJsonWithRepair<{
     expansions: Record<string, Record<string, unknown>>
   }>(jsonStr)
@@ -1018,10 +1072,7 @@ export async function generateBomFromModules(
       return { success: false, error: "Project not found" }
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      return { success: false, error: "Anthropic API key not configured" }
-    }
+    // W21 fix: no longer needs ANTHROPIC_API_KEY — uses OpenRouter
 
     // ── Phase 1: Skeleton ──
     // Fast call (~10s) returning part names, hierarchy, process, isPurchased.
@@ -1102,7 +1153,6 @@ export async function generateBomFromModules(
           batches,
           EXPAND_CONCURRENCY,
           (batch) => expandBomPartsBatchInternal({
-            apiKey,
             batchParts: batch,
             moduleContext,
             briefContext,
@@ -1939,23 +1989,13 @@ export async function runBomSkeletonStage(projectId: string): Promise<void> {
   //
   // TODO: track usage via admin-variant of trackAIUsage once the stage
   // pattern is proven.
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) {
-    await recordBomStageFailure(
-      projectId,
-      state,
-      "NO_API_KEY",
-      "Anthropic API key not configured.",
-    )
-    return
-  }
+  // W21 fix (2026-04-28): no longer needs ANTHROPIC_API_KEY — uses OpenRouter
 
   let skeleton
   try {
     skeleton = await skeletonBomInternal(
       projectId,
       modules,
-      apiKey,
       designBrief,
       diagnosticAnswers,
     )
@@ -2103,16 +2143,7 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
   //
   // TODO: track usage via admin-variant of trackAIUsage once the stage pattern
   // is proven.
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) {
-    await recordBomStageFailure(
-      projectId,
-      state,
-      "NO_API_KEY",
-      "Anthropic API key not configured.",
-    )
-    return
-  }
+  // W21 fix (2026-04-28): no longer needs ANTHROPIC_API_KEY — uses OpenRouter
 
   const briefContext = designBrief
     ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
@@ -2153,7 +2184,6 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
     batchPartsList,
     EXPAND_CONCURRENCY,
     (batchParts) => expandBomPartsBatchInternal({
-      apiKey,
       batchParts,
       moduleContext,
       briefContext,
