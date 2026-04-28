@@ -201,7 +201,7 @@ export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
           </div>
 
           {/* Pricing tier cards — mirror homepage */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {PRICING_TIERS.map((tier) => (
               <Card
                 key={tier.name}
@@ -265,12 +265,12 @@ export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
           </div>
 
           {/* Comparison table — shared with homepage */}
-          <div className="mb-16">
+          <div className="mb-8">
             <PricingComparisonTable />
           </div>
 
           {/* Enterprise section */}
-          <Card className="mb-16 bg-muted/30">
+          <Card className="mb-8 bg-muted/30">
             <CardContent className="py-8">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
@@ -292,7 +292,7 @@ export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
           </Card>
 
           {/* Social proof — real platform data */}
-          <div className="mb-16">
+          <div className="mb-8">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
               {SOCIAL_PROOF_STATS.map((stat) => (
                 <div key={stat.label} className="text-center">
@@ -308,7 +308,7 @@ export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
           </div>
 
           {/* FAQ section */}
-          <div className="mb-16 max-w-3xl mx-auto">
+          <div className="mb-8 max-w-3xl mx-auto">
             <h2 className="text-2xl font-display font-semibold text-foreground text-center mb-8">
               Frequently Asked Questions
             </h2>
