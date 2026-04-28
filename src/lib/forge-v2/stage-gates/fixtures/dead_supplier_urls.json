@@ -1,0 +1,46 @@
+{
+  "_fixture": "dead_supplier_urls",
+  "_description": "Gate 5 regression fixture — URL liveness and blocklist check. Four representative URLs: one valid manufacturer, one news-domain, one marketplace product listing, one likely-dead URL. Check flags: 1=blocklisted, 2=dead (4xx/5xx liveness), 3=<3 suppliers per BOM row.",
+  "_triggers": "Gate 5 (supplier validity deterministic check)",
+  "_version": "v2.0 — Phase 2 Gate 5 sub-agent",
+  "entries": [
+    {
+      "url": "https://www.digikey.com/en/products/category/resistors",
+      "expected_blocklisted": false,
+      "expected_live": true,
+      "check_flags": [],
+      "notes": "Valid — DigiKey is a well-known electronic component distributor. URL is a category page, not a specific product listing. Should pass blocklist and liveness."
+    },
+    {
+      "url": "https://news.catl.com/en/news/catl-launches-new-cell",
+      "expected_blocklisted": true,
+      "expected_live": null,
+      "check_flags": [1],
+      "notes": "Blocklisted — URL is on a news subdomain (news.*). Gate 5 should flag this before even attempting the HEAD request. Check flag 1 = blocklisted."
+    },
+    {
+      "url": "https://www.alibaba.com/product-detail/100ah-prismatic-lfp-cell_1600123456789.html",
+      "expected_blocklisted": true,
+      "expected_live": null,
+      "check_flags": [1],
+      "notes": "Blocklisted — Alibaba product-detail listing. This is the BESS demo failure pattern (memory: forgeos_pdf_and_supplier_gotchas). Check flag 1 = blocklisted."
+    },
+    {
+      "url": "https://phantom-battery-management-nonexistent-supplier-404.com/bms-16s",
+      "expected_blocklisted": false,
+      "expected_live": false,
+      "check_flags": [2],
+      "notes": "Dead URL — domain does not exist, HEAD and GET both return network error or DNS failure. Check flag 2 = dead (liveness failure)."
+    }
+  ],
+  "bom_row_check": {
+    "_description": "A BOM row with only 2 valid suppliers triggers check flag 3 (< 3 suppliers per row). No is_proprietary exception available on the parts table as of Phase 2.",
+    "part_name": "Thermal management unit",
+    "valid_supplier_urls": [
+      "https://www.laird.com/thermal-management",
+      "https://www.parker.com/us/en/divisions/chomerics-division.html"
+    ],
+    "expected_check_flag": 3,
+    "notes": "Check flag 3 = fewer than 3 valid suppliers for this BOM row. Gate 5 should FAIL with severity P1."
+  }
+}
