@@ -204,6 +204,19 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
   'qwen3-235b-a22b': { input: 0.26, output: 0.90 },
   // Together-hosted Qwen 3.5 397B MoE — kept here so failover cost-tracking works
   'Qwen/Qwen3.5-397B-A17B': { input: 0.88, output: 0.88 },
+  // Image generation models — billed per image, not per token.
+  // We map these to a token-equivalent cost so the price table covers them:
+  // cost = (input_tokens / 1_000_000) * input_rate. Callers should pass
+  // tokensIn=1 and use costUsdOverride with the per-image price instead
+  // where exact billing matters. Rates: gpt-image-2 ~$0.04-0.08/image,
+  // imagen-4 ~$0.04/image, flux-pro-1.1-ultra ~$0.06/image (Apr 2026).
+  'gpt-image-2': { input: 60_000, output: 0 },         // ~$0.06 per image (token equiv)
+  'imagen-4': { input: 40_000, output: 0 },             // ~$0.04 per image (token equiv)
+  'flux-pro-1.1-ultra': { input: 60_000, output: 0 },   // ~$0.06 per image (token equiv)
+  'flux-pro': { input: 55_000, output: 0 },             // ~$0.055 per image (token equiv)
+  'flux-dev': { input: 3_000, output: 0 },              // ~$0.003 per image (token equiv, self-hosted)
+  'gemini-nano-banana': { input: 40_000, output: 0 },   // ~$0.04 per image (token equiv)
+  'stable-diffusion-3.5-large': { input: 5_000, output: 0 }, // ~$0.005 per image (token equiv, self-hosted)
   // MiniMax models — dramatically cheaper than OpenAI/Anthropic
   // M2.7: same pricing tier as M2.5 (OpenAI-compatible endpoint)
   'MiniMax-M2.7': { input: 0.15, output: 1.20 },
@@ -312,17 +325,27 @@ export function estimateAICost(
 export async function trackAIUsage(
   params: TrackAIUsageParams
 ): Promise<TrackAIUsageResult | null> {
-  // Always forward to the canonical logger — fire-and-forget, never throws.
-  // This is the single source of truth for the /admin/cost dashboard.
-  void logLlmUsage({
-    foundryId: params.foundryId,
-    userId: params.userId,
-    action: params.feature,
-    modelUsed: params.model || 'unknown',
-    tokensIn: params.promptTokens || 0,
-    tokensOut: params.completionTokens || 0,
-    costUsdOverride: params.estimatedCostUsd,
-  })
+  // Forward to the canonical logger only when there is meaningful data to record.
+  // GOTCHA: The withAIGate auto-tracker fires with no model/tokens when the
+  // action callback never called trackUsage() manually (e.g. page_insights
+  // wrappers that log directly via logLlmUsage). Skipping the forward here
+  // prevents a duplicate 'unknown' row in llm_usage on every such call.
+  // The direct logLlmUsage() calls in those action bodies already cover it.
+  const hasModel = params.model && params.model !== 'unknown'
+  const hasTokens = (params.promptTokens ?? 0) > 0 || (params.completionTokens ?? 0) > 0
+  if (hasModel || hasTokens) {
+    // AWAIT so the INSERT lands before the Vercel function tears down.
+    // logLlmUsage never throws — the await only adds ~10ms per call.
+    await logLlmUsage({
+      foundryId: params.foundryId,
+      userId: params.userId,
+      action: params.feature,
+      modelUsed: params.model || 'unknown',
+      tokensIn: params.promptTokens || 0,
+      tokensOut: params.completionTokens || 0,
+      costUsdOverride: params.estimatedCostUsd,
+    })
+  }
 
   try {
     const supabase = createAdminClient()

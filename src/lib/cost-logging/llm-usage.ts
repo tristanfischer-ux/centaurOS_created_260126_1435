@@ -78,6 +78,19 @@ export const MODEL_COSTS_PER_1M_TOKENS: Record<
   'MiniMax-M2.1': { input: 0.3, output: 1.2 },
   'MiniMax-M2.1-lightning': { input: 0.3, output: 2.4 },
 
+  // Image generation models — billed per image, not per token.
+  // Mapped to a token-equivalent cost so the price table is self-consistent:
+  // cost = (tokens_in / 1_000_000) * input_rate. Callers should pass
+  // tokensIn=1 and use costUsdOverride with the per-image price where exact
+  // billing matters. Rates from provider pages, Apr 2026.
+  'gpt-image-2': { input: 60_000, output: 0 },         // ~$0.06 per image average (standard quality)
+  'imagen-4': { input: 40_000, output: 0 },             // ~$0.04 per image (Google Vertex AI)
+  'flux-pro-1.1-ultra': { input: 60_000, output: 0 },   // ~$0.06 per image (Black Forest Labs via fal.ai)
+  'flux-pro': { input: 55_000, output: 0 },             // ~$0.055 per image
+  'flux-dev': { input: 3_000, output: 0 },              // ~$0.003 per image (open-weight, self-hosted)
+  'gemini-nano-banana': { input: 40_000, output: 0 },   // ~$0.04 per image (banana MCP endpoint)
+  'stable-diffusion-3.5-large': { input: 5_000, output: 0 }, // ~$0.005 per image (self-hosted on Modal)
+
   // Local / self-hosted embeddings (Ollama nomic-embed-text) — effectively free
   // but logged to keep accounting honest.
   'nomic-embed-text': { input: 0.0625, output: 0 },
