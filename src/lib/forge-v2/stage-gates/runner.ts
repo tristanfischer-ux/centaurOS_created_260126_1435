@@ -171,7 +171,13 @@ async function runDeterministicGate(
     deterministic_result: DeterministicCheckResult
 }> {
     const input = await gate.loadInput(ctx)
-    const result = gate.check(input)
+    // `check` may be sync (Gates 2/3/6) or async (Gate 5 — HEAD/GET liveness).
+    // `await` handles both: a sync return is awaited as a resolved value;
+    // an async Promise is awaited normally. Without this, async gates returned
+    // a Promise object whose `.passed`/`.check_name`/`.actual`/`.expected` were
+    // all `undefined`, producing the "undefined: expected undefined, got undefined"
+    // failure_details we saw on Loop 20 (commit 4c957755 era).
+    const result = await gate.check(input)
 
     return {
         verdict: result.passed ? "PASS" : "FAIL",
