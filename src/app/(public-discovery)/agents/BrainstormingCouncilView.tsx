@@ -775,6 +775,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 .bc-picker-item .bc-pi-label {
                     flex: 1;
                     min-width: 0;
+                    display: inline-flex;
+                    align-items: baseline;
+                    gap: 6px;
                 }
                 .bc-picker-item .bc-pi-name {
                     font-size: 12.5px;
