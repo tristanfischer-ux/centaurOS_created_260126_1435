@@ -263,16 +263,16 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
       // upstream call can burn the whole function budget. 90s + batching
       // keeps wall-clock predictable.
       const response = await fetchWithTimeout(
-        "https://api.deepseek.com/chat/completions",
+        "https://openrouter.ai/api/v1/chat/completions",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "deepseek-chat",
-            max_tokens: 8192,
+            model: "deepseek/deepseek-v4-pro",
+            max_tokens: 16000,
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
