@@ -222,11 +222,23 @@ function FreeUpgradeOverlay({ firmName, firmType, hqCity }: {
 
 export default async function InvestorDetailPage({ params }: PageProps) {
   const { id } = await params
-  const [{ firm, access, gated, viewCapHit, viewCap }, matchScoresMap] = await Promise.all([
-    getInvestorById(id),
-    // computeMatchScores returns {} when no foundry profile — Scorecard
-    // renders only when pillars come back. Tristan 2026-04-27.
-    computeMatchScores([id]).catch(() => ({} as Awaited<ReturnType<typeof computeMatchScores>>)),
+  // W45a perf fix: fire getShortlistIds in parallel with the two blocking
+  // calls — it has no dependency on firm or access. getSimilarInvestors is the
+  // slowest secondary (full-table Jaccard scan) so it now races the first group
+  // instead of waiting behind it.
+  const [
+    [{ firm, access, gated, viewCapHit, viewCap }, matchScoresMap],
+    shortlistIdsPrefetch,
+    similarPrefetch,
+  ] = await Promise.all([
+    Promise.all([
+      getInvestorById(id),
+      // computeMatchScores returns {} when no foundry profile — Scorecard
+      // renders only when pillars come back. Tristan 2026-04-27.
+      computeMatchScores([id]).catch(() => ({} as Awaited<ReturnType<typeof computeMatchScores>>)),
+    ]),
+    getShortlistIds().catch(() => ({} as Record<string, ShortlistStage>)),
+    getSimilarInvestors(id, 5).catch(() => ({ firms: [], similarityScores: {} as Record<string, number> })),
   ])
   const matchResult = matchScoresMap[id]
 
@@ -259,13 +271,14 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   }
 
   const attrs = firm.attributes
-  const [contactResult, similarResult, userSectorResult, coInvestorResult, shortlistResult] = await Promise.allSettled([
+  const [contactResult, userSectorResult, coInvestorResult] = await Promise.allSettled([
     getInvestorContacts(id, access),
-    getSimilarInvestors(id, 5, access),
     access.intelligenceAccess ? getUserSector() : Promise.resolve(null),
     access.contactsVisible ? getCoInvestors(id, access) : Promise.resolve({ coInvestors: [] }),
-    getShortlistIds(),
   ])
+  // shortlist and similar were already prefetched above in parallel
+  const shortlistResult = { status: 'fulfilled' as const, value: shortlistIdsPrefetch }
+  const similarResult = { status: 'fulfilled' as const, value: similarPrefetch }
 
   const { contacts, access: contactAccess } = contactResult.status === 'fulfilled'
     ? contactResult.value

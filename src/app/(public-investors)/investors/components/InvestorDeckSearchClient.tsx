@@ -77,15 +77,20 @@ const FREE_VISIBLE = 5
 /**
  * Forge Capital top-matches pagination — `Forge-Capital-Search.html` uses 8
  * per page. Tristan 2026-04-27: porting the "← Prev / Page N of M / Next →"
- * pattern verbatim, plus the 35-50% Near-Misses bucket and the Advisory
+ * pattern verbatim, plus the 10-34% Near-Misses bucket and the Advisory
  * Intelligence section below the top matches.
  */
 const TOP_PER_PAGE = 8
 
-/** Top-matches threshold mirrors `Forge-Capital-Search.html` line 695:
- *  composite ≥ 50 = "strong match", 35-50 = "near miss". */
-const TOP_MATCH_COMPOSITE_FLOOR = 50
-const NEAR_MISS_COMPOSITE_FLOOR = 35
+/** Top-matches threshold.
+ * W46 fix 2026-04-28: lowered from 50 → 35 so all firms the engine returns
+ * with a meaningful score appear in the ranked main list. At 50 only ~65 of
+ * 200 candidates made the top bucket; founders saw a misleadingly short list.
+ * Firms scoring < 35 are still dropped as noise. Near-miss grouping is now
+ * only applied to < 35 firms (edge case — those groups will usually be empty
+ * for a well-formed query returning 200 candidates). */
+const TOP_MATCH_COMPOSITE_FLOOR = 35
+const NEAR_MISS_COMPOSITE_FLOOR = 10
 
 const NEAR_MISS_GROUP_LABELS = {
   'Stage Mismatch':       'These investors match your thesis but invest at a different stage.',
@@ -245,7 +250,17 @@ export function InvestorDeckSearchClient({
             if (typeof s === 'number') sims[f.id] = s
           }
           computeMatchScores(ids, sims)
-            .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+            .then(scores => {
+              setMatchScores(prev => ({ ...prev, ...scores }))
+              // W47: re-sort firms so display order matches displayed % (the
+              // score from computeMatchScores). Server sort used _fcComposite;
+              // the card displays scores[id].score — they can disagree.
+              // After scores land, re-order to be strictly descending by the
+              // value the founder actually sees on each card.
+              setFirms(prev =>
+                [...prev].sort((a, b) => (scores[b.id]?.score ?? 0) - (scores[a.id]?.score ?? 0))
+              )
+            })
             .catch(() => { /* non-critical — cards show without bars */ })
         }
       } catch (err) {
@@ -311,8 +326,9 @@ export function InvestorDeckSearchClient({
 
   // ── Visible cards logic ───────────────────────────────────────────────────
 
-  // Forge Capital partition: composite ≥ 50 = "top match", 35-50 = "near miss",
-  // < 35 dropped. `_fcComposite` is set server-side by searchInvestors when the
+  // Forge Capital partition: composite ≥ 35 = "top match" (W46 fix 2026-04-28,
+  // was ≥ 50), 10-34 = "near miss", < 10 dropped. `_fcComposite` is set
+  // server-side by searchInvestors when the
   // semantic path runs. Firms without it (keyword fallback, no query) all
   // bucket as top-matches so the UX doesn't break.
   const partitioned = useMemo(() => {
@@ -1450,7 +1466,7 @@ function TopMatchesPagination({
 // ─── Near Misses section ─────────────────────────────────────────────────────
 //
 // Verbatim port of `Forge-Capital-Search.html` lines 802-862. Lists firms
-// with composite 35-50%, grouped by the dimension where they're weakest.
+// with composite 10-34%, grouped by the dimension where they're weakest.
 // Cap at 8 per group with a "+ N more" tail line.
 
 function NearMissesSection({
@@ -1465,11 +1481,11 @@ function NearMissesSection({
       <div className="flex items-center gap-2 mb-1">
         <span style={{ fontSize: '18px' }}>⚠️</span>
         <h2 className="text-base font-semibold text-foreground">
-          Near Misses (35–50%) <span className="text-muted-foreground font-normal">· {totalCount}</span>
+          Near Misses (10–34%) <span className="text-muted-foreground font-normal">· {totalCount}</span>
         </h2>
       </div>
       <p className="text-xs text-muted-foreground mb-5">
-        Investors who don&apos;t quite hit a 50% match but are worth knowing about — usually one dimension off.
+        Investors who don&apos;t quite hit a 35% match but are worth knowing about — usually one dimension off.
       </p>
 
       <div className="space-y-6">
