@@ -41,11 +41,7 @@ import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
 import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
 import { getPlanNavigation } from "@/components/sidebar/data/plan"
-import {
-    getMoneyIntroRoute,
-    getMoneyNavigation,
-    getMoneySectionLabel,
-} from "@/components/sidebar/data/money"
+import { getMoneyNavigation } from "@/components/sidebar/data/money"
 import { getWorkshopNavigation } from "@/components/sidebar/data/workshop"
 import { marketplacePeopleNavigation, marketplaceSuppliesNavigation } from "@/components/sidebar/data/marketplace"
 import type { SidebarNavItem } from "@/components/sidebar/data/types"
@@ -56,15 +52,11 @@ import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
-import { SectionHeader } from "@/components/sidebar/SectionHeader"
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { AICreditsBarLoader } from "@/components/ui/ai-credits-bar"
 import { TimeWeekBarLoader } from "@/components/ui/time-week-bar"
 import { MoneyCreditsPill } from "@/components/sidebar/MoneyCreditsPill"
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist"
 
-import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
-import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { isRouteAlpha, isRouteBeta, isRouteComingSoon, isRouteDemo } from "@/lib/features/registry"
 
 import { signOut } from "@/actions/auth"
@@ -249,8 +241,6 @@ export function Sidebar({
 }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
-    const { badges } = useSectionNewBadges()
-    const { openSections, toggleSection } = useSidebarCollapse(pathname)
 
     const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false)
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
@@ -324,8 +314,6 @@ export function Sidebar({
     // Money nav is flag-aware — legacy 6-item Cash Burn group under flag-off,
     // 3-item MONEY [V2] group (Cockpit · Plan · Raise) under flag-on.
     const moneyNavigation = getMoneyNavigation(newMoneyExperienceEnabled)
-    const moneySectionLabel = getMoneySectionLabel(newMoneyExperienceEnabled)
-    const moneyIntroRoute = getMoneyIntroRoute(newMoneyExperienceEnabled)
     // Plan nav is flag-aware — legacy 7-item group under flag-off,
     // 3-item Plan · Report · History group under flag-on.
     const planNavigation = getPlanNavigation(newPlanExperienceEnabled)
@@ -382,118 +370,41 @@ export function Sidebar({
                     />
                 </div>
 
-                {/* ME */}
-                <SectionHeader
-                    label="Me"
-                    introRoute="/me"
-                    hasNew={badges.me}
-                    isOpen={openSections.me}
-                    onToggle={() => toggleSection("me")}
-                />
-                <Collapsible open={openSections.me}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        <NavLink item={welcomeNavItem} pathname={pathname} />
-                        {meNavigation.map((item) => (
-                            <NavLink
-                                key={item.name}
-                                item={item}
-                                pathname={pathname}
-                                overrideBadge={item.href === "/updates" ? unreadAlertCount : undefined}
-                            />
-                        ))}
-                        <div className="px-1 pb-1">
-                            <UnreadIndicator />
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
+                {/*
+                 * Flat nav — Tristan 2026-04-28: no macro section headings,
+                 * no divider lines. One flat list: Welcome · My Profile ·
+                 * Brainstorm · The Forge · Suppliers · Investors. Supplier
+                 * Portal stays conditional on profile.is_supplier.
+                 */}
+                <NavLink item={welcomeNavItem} pathname={pathname} />
+                {meNavigation.map((item) => (
+                    <NavLink
+                        key={item.name}
+                        item={item}
+                        pathname={pathname}
+                        overrideBadge={item.href === "/updates" ? unreadAlertCount : undefined}
+                    />
+                ))}
+                {planNavigation.map((item) => (
+                    <NavLink key={item.name} item={item} pathname={pathname} />
+                ))}
+                {workshopNavigation.map((item) => (
+                    <NavLink key={item.name} item={item} pathname={pathname} />
+                ))}
+                {[...marketplacePeopleNavigation, ...marketplaceSuppliesNavigation].map((item) => (
+                    <NavLink key={item.name} item={item} pathname={pathname} />
+                ))}
+                {moneyNavigation.map((item) => (
+                    <NavLink key={item.name} item={item} pathname={pathname} />
+                ))}
 
-                {/* SUPPLIER PORTAL — conditional on profile.is_supplier */}
-                {isSupplier && (
-                    <>
-                        <div className="mt-1.5 mb-0.5 border-t border-border" />
-                        <SectionHeader
-                            label="Supplier Portal"
-                            introRoute="/supplier"
-                            hasNew={false}
-                            isOpen={openSections.supplier}
-                            onToggle={() => toggleSection("supplier")}
-                        />
-                        <Collapsible open={openSections.supplier}>
-                            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                                {supplierNavigation.map((item) => (
-                                    <NavLink key={item.name} item={item} pathname={pathname} />
-                                ))}
-                            </CollapsibleContent>
-                        </Collapsible>
-                    </>
-                )}
+                {isSupplier && supplierNavigation.map((item) => (
+                    <NavLink key={item.name} item={item} pathname={pathname} />
+                ))}
 
-                {/* PLAN (renamed "Brainstorming" 2026-04-24 during pivot) */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Brainstorming"
-                    introRoute="/plan"
-                    hasNew={badges.plan}
-                    isOpen={openSections.plan}
-                    onToggle={() => toggleSection("plan")}
-                />
-                <Collapsible open={openSections.plan}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {planNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* MONEY (flag-aware — legacy "Cash Burn" 6-item group OR V2 3-item group) */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label={moneySectionLabel}
-                    introRoute={moneyIntroRoute}
-                    isOpen={openSections.cashBurn}
-                    onToggle={() => toggleSection("cashBurn")}
-                />
-                <Collapsible open={openSections.cashBurn}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {moneyNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* WORKSHOP */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Workshop"
-                    introRoute="/workshop"
-                    hasNew={badges.workshop}
-                    isOpen={openSections.workshop}
-                    onToggle={() => toggleSection("workshop")}
-                />
-                <Collapsible open={openSections.workshop}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {workshopNavigation.map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* MARKETPLACE — People + Supplies sub-groups */}
-                <div className="mt-1.5 mb-0.5 border-t border-border" />
-                <SectionHeader
-                    label="Marketplace"
-                    introRoute="/marketplace-hub"
-                    hasNew={badges.marketplace}
-                    isOpen={openSections.marketplace}
-                    onToggle={() => toggleSection("marketplace")}
-                />
-                <Collapsible open={openSections.marketplace}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {[...marketplacePeopleNavigation, ...marketplaceSuppliesNavigation].map((item) => (
-                            <NavLink key={item.name} item={item} pathname={pathname} />
-                        ))}
-                    </CollapsibleContent>
-                </Collapsible>
+                <div className="px-1 pt-1">
+                    <UnreadIndicator />
+                </div>
             </nav>
 
             {/* ─── Getting Started — gated on onboarding_data presence ── */}
