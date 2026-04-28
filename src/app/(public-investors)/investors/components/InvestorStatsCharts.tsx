@@ -38,23 +38,27 @@ import {
 } from 'recharts'
 import type { InvestorDirectoryStats } from '@/actions/investors'
 
-// ── Colour palette — Forge Capital line 1298 ─────────────────────────────────
+// ── Colour palette — brand-orange monochromatic ramp ─────────────────────────
+// Tristan 2026-04-28 (design audit cross-cutting fix #2): replaced the rainbow
+// indigo/cyan/pink/amber/emerald/red ramp with an orange-derived monochromatic
+// scale + neutral breaks. Audit P0: "charts on /investors and /marketplace —
+// purple/teal/cyan all fight the established #ff4500 accent."
 
 const COLORS = [
-  '#4f46e5',
-  '#0891b2',
-  '#db2777',
-  '#d97706',
-  '#059669',
-  '#dc2626',
-  '#7c3aed',
-  '#0284c7',
-  '#c026d3',
-  '#65a30d',
+  '#ff4500', // international-orange (primary)
+  '#fb923c', // orange-400
+  '#fdba74', // orange-300
+  '#fed7aa', // orange-200
+  '#94a3b8', // slate-400 (neutral break for >4 segments)
+  '#64748b', // slate-500
+  '#475569', // slate-600
+  '#334155', // slate-700
+  '#1e293b', // slate-800 (last resort, only when 9+ segments)
+  '#fde68a', // amber-200 (warm neutral, only used at index 9)
 ]
 
-const BAR_COLOR_SECTORS  = '#4f46e5' // indigo-600 (Forge Capital Top Sectors)
-const BAR_COLOR_STAGE    = '#0891b2' // cyan-600   (Forge Capital Stage Focus)
+const BAR_COLOR_SECTORS  = '#ff4500' // international-orange — primary chart accent
+const BAR_COLOR_STAGE    = '#fb923c' // orange-400 — secondary monochromatic step
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

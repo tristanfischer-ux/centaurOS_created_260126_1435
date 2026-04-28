@@ -37,10 +37,15 @@ const PILLAR_ORDER: Array<{ key: keyof MatchBreakdown['pillars']; label: string 
 // (/investors) sometimes end up in different CSS bundles — Tailwind classes like
 // `bg-success` can silently fail to render on one when both use this component.
 // Hex fallbacks guarantee colour parity across every entry point.
+//
+// Tristan 2026-04-28 (design audit cross-cutting fix #2): swapped from
+// green/amber/grey to a brand-orange ramp. Keeps the 3-step legibility cue
+// without fighting the #ff4500 accent. Audit P0: "replace non-brand green
+// and yellow with the orange ramp on Match Scorecard."
 function fillHex(value: number): string {
-  if (value >= 70) return '#22c55e' // success — tailwind green-500
-  if (value >= 40) return '#f59e0b' // warning — tailwind amber-500
-  return '#94a3b8'                   // slate-400
+  if (value >= 70) return '#ff4500' // international-orange — strong match
+  if (value >= 40) return '#fdba74' // orange-300 — moderate
+  return '#cbd5e1'                   // slate-300 — weak (neutral, not alarming)
 }
 
 export function MatchPillarBars({ pillars, compositeScore, compact = false, hideZeroValues = false, className }: MatchPillarBarsProps) {

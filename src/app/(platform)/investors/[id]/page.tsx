@@ -427,11 +427,14 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     {(['thesis', 'stage', 'geo', 'cheque', 'activity', 'confidence'] as const).map((key) => {
                       const value = matchResult.pillars[key]
                       const isNA = value == null
-                      let fillColor = '#d1d5db'
+                      // Tristan 2026-04-28 (design audit cross-cutting fix #2):
+                      // brand-orange ramp instead of green/amber/red. Keeps a
+                      // 3-step legibility cue without fighting the #ff4500 accent.
+                      let fillColor = '#e5e7eb' // N/A: neutral
                       if (!isNA) {
-                        if (value >= 70) fillColor = '#16a34a'
-                        else if (value >= 40) fillColor = '#f59e0b'
-                        else fillColor = '#dc2626'
+                        if (value >= 70) fillColor = '#ff4500'      // international-orange — strong
+                        else if (value >= 40) fillColor = '#fdba74' // orange-300 — moderate
+                        else fillColor = '#cbd5e1'                  // slate-300 — weak (semantic, not alarming)
                       }
                       return (
                         <div key={key} className="text-center">

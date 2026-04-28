@@ -46,24 +46,28 @@ import type { SupplierDirectoryStats } from '@/actions/suppliers'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 // ---------------------------------------------------------------------------
-// Forge Capital chart palette (07b-export-python.py line 1298)
+// Brand-orange monochromatic chart palette
 // ---------------------------------------------------------------------------
+// Tristan 2026-04-28 (design audit cross-cutting fix #2): replaced the
+// indigo/cyan/pink/amber/emerald/red rainbow with a brand-orange-derived
+// ramp + neutral breaks. Audit P0: "charts on /marketplace fight the
+// established #ff4500 accent."
 
 const COLORS = [
-  '#4f46e5',
-  '#0891b2',
-  '#db2777',
-  '#d97706',
-  '#059669',
-  '#dc2626',
-  '#7c3aed',
-  '#0284c7',
-  '#c026d3',
-  '#65a30d',
+  '#ff4500', // international-orange (primary)
+  '#fb923c', // orange-400
+  '#fdba74', // orange-300
+  '#fed7aa', // orange-200
+  '#94a3b8', // slate-400 (neutral break for >4 segments)
+  '#64748b', // slate-500
+  '#475569', // slate-600
+  '#334155', // slate-700
+  '#1e293b', // slate-800
+  '#fde68a', // amber-200 (warm last-resort)
 ]
 
-const BAR_COLOR_CAPABILITIES = '#4f46e5' // horizontal bar — Forge Capital sectors colour
-const BAR_COLOR_MATERIALS    = '#0891b2' // vertical bar   — Forge Capital stage colour
+const BAR_COLOR_CAPABILITIES = '#ff4500' // international-orange — primary
+const BAR_COLOR_MATERIALS    = '#fb923c' // orange-400 — secondary
 
 // ---------------------------------------------------------------------------
 // Helpers
