@@ -48,6 +48,7 @@ import {
     AudioLines,
     ImageIcon,
     Sparkles,
+    RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -56,6 +57,8 @@ import {
     deleteMeetingThread,
     togglePinMeetingThread,
 } from "@/actions/meeting-threads"
+import { generateSessionInfographic } from "@/actions/brainstorm-cover"
+import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import { getMeetingHistory } from "@/actions/agent-artifacts"
 import type { MeetingThreadSummary } from "@/actions/meeting-threads"
 import type { MeetingHistoryItem } from "@/actions/agent-artifacts"
@@ -166,6 +169,34 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
     const hasPermalink = !meeting.id.startsWith("legacy-")
     const tierLabel = TIER_LABELS[meeting.councilTier] ?? meeting.councilTier
     const canMutate = hasPermalink
+    const [isRetryingCover, setIsRetryingCover] = useState(false)
+    const [isRetryingAudio, setIsRetryingAudio] = useState(false)
+
+    // W36: retry cover image generation when stuck in generating/pending (Sarah)
+    async function handleRetryCover(e: React.MouseEvent) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (isRetryingCover) return
+        setIsRetryingCover(true)
+        try {
+            await generateSessionInfographic(meeting.id)
+        } finally {
+            setIsRetryingCover(false)
+        }
+    }
+
+    // W35: retry audio generation when stuck in generating/pending (Sarah)
+    async function handleRetryAudio(e: React.MouseEvent) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (isRetryingAudio) return
+        setIsRetryingAudio(true)
+        try {
+            await generateSessionAudio(meeting.id)
+        } finally {
+            setIsRetryingAudio(false)
+        }
+    }
 
     return (
         <Card
@@ -196,6 +227,19 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                                 ? "Generating cover image…"
                                 : "Cover image queued"}
                         </span>
+                        {/* W36: retry button for stuck cover generation (Sarah) */}
+                        {canMutate && (
+                            <button
+                                type="button"
+                                onClick={handleRetryCover}
+                                disabled={isRetryingCover}
+                                className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                                title="Retry cover generation"
+                            >
+                                <RotateCcw className={cn("h-3 w-3", isRetryingCover && "animate-spin")} />
+                                Retry
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
@@ -299,6 +343,19 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                         <span className="flex items-center gap-1 text-muted-foreground">
                             <AudioLines className="h-3 w-3 animate-pulse" />
                             Generating audio…
+                            {/* W35: retry button for stuck audio generation (Sarah) */}
+                            {canMutate && (
+                                <button
+                                    type="button"
+                                    onClick={handleRetryAudio}
+                                    disabled={isRetryingAudio}
+                                    className="ml-1 flex items-center gap-0.5 text-[10px] hover:text-foreground transition-colors disabled:opacity-50"
+                                    title="Retry audio generation"
+                                >
+                                    <RotateCcw className={cn("h-2.5 w-2.5", isRetryingAudio && "animate-spin")} />
+                                    Retry
+                                </button>
+                            )}
                         </span>
                     )}
                     <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
