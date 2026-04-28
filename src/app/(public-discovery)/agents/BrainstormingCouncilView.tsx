@@ -34,7 +34,7 @@ import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
 import { conveneCouncil } from "@/actions/brainstorming-council"
 import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council-types"
-import { createMeetingThread } from "@/actions/meeting-threads"
+import { createMeetingThread, refreshSessionAssetUrls } from "@/actions/meeting-threads"
 import { generateSessionInfographic } from "@/actions/brainstorm-cover"
 import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
@@ -247,6 +247,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
     // W52: inline status for the graphic / audio re-generation buttons
     const [graphicStatus, setGraphicStatus] = useState<"idle" | "running" | "done" | "error">("idle")
     const [audioStatus, setAudioStatus] = useState<"idle" | "running" | "done" | "error">("idle")
+    // W54: generated asset URLs — populated after generation completes so the
+    // image and audio render inline on the page (not just in the saved-sessions panel).
+    const [generatedCoverUrl, setGeneratedCoverUrl] = useState<string | null>(null)
+    const [generatedAudioClips, setGeneratedAudioClips] = useState<Array<{ specialistId: string; voice: string; url: string; durationMs: number | null }> | null>(null)
 
     const submitted = session.phase !== "idle"
     // W8: always derive council members from activeTier for the pre-session
@@ -331,9 +335,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 hadRound2: result.hadRound2 ?? false,
                 savedThreadId: null, // filled in after createMeetingThread returns
             })
-            // Reset asset generation buttons for the new session
+            // Reset asset generation buttons + cached URLs for the new session
             setGraphicStatus("idle")
             setAudioStatus("idle")
+            setGeneratedCoverUrl(null)
+            setGeneratedAudioClips(null)
 
             // W1 + W6 + W7: persist the completed session so:
             //   - createMeetingThread triggers after() which fires
@@ -407,6 +413,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
     function handleReset() {
         setSession(EMPTY_SESSION)
+        setGraphicStatus("idle")
+        setAudioStatus("idle")
+        setGeneratedCoverUrl(null)
+        setGeneratedAudioClips(null)
         // Return focus to the question input so the next question
         // is immediately ready to type without an extra click.
         setTimeout(() => inputRef.current?.focus(), 50)
@@ -865,8 +875,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     text-align: left;
                     transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
                     display: flex;
-                    align-items: baseline;
-                    gap: 10px;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 6px;
                     font-family: inherit;
                 }
                 .bc-suggestion-chip:hover {
@@ -883,10 +894,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     color: var(--bc-brand);
                     text-transform: uppercase;
                     letter-spacing: 0.06em;
-                    flex-shrink: 0;
                     padding: 2px 7px;
                     border-radius: 100px;
                     background: var(--bc-brand-soft);
+                    align-self: flex-start;
                 }
                 .bc-suggestion-text {
                     font-size: 13px;
@@ -1425,7 +1436,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             setGraphicStatus("running")
                             try {
                                 const result = await generateSessionInfographic(session.savedThreadId)
-                                setGraphicStatus(result.ok ? "done" : "error")
+                                if (result.ok) {
+                                    // W54: fetch the signed URL so the image renders inline.
+                                    // generateSessionInfographic only saves to storage; the
+                                    // component previously had no render block for the result.
+                                    const urls = await refreshSessionAssetUrls(session.savedThreadId)
+                                    if (urls.coverUrl) {
+                                        setGeneratedCoverUrl(urls.coverUrl)
+                                    }
+                                    setGraphicStatus("done")
+                                } else {
+                                    setGraphicStatus("error")
+                                }
                             } catch {
                                 setGraphicStatus("error")
                             }
@@ -1461,7 +1483,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             setAudioStatus("running")
                             try {
                                 const result = await generateSessionAudio(session.savedThreadId)
-                                setAudioStatus(result.ok ? "done" : "error")
+                                if (result.ok) {
+                                    // W54: fetch signed URLs for all audio clips so the
+                                    // audio player renders inline. Previously the component
+                                    // had no render block for the generated clips.
+                                    const urls = await refreshSessionAssetUrls(session.savedThreadId)
+                                    if (urls.audioClips.length > 0) {
+                                        setGeneratedAudioClips(urls.audioClips)
+                                    }
+                                    setAudioStatus("done")
+                                } else {
+                                    setAudioStatus("error")
+                                }
                             } catch {
                                 setAudioStatus("error")
                             }
@@ -1488,6 +1521,65 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                          audioStatus === "error" ? "Error — retry" :
                          "Create audio transcript"}
                     </button>
+                </div>
+            )}
+
+            {/* W54 — Inline render of generated session assets.
+                Shown below the generation buttons once the user triggers
+                generation; disappears on reset/new session.
+                Cover image: 16:9 rounded block, full-width.
+                Audio: one <audio> player per clip, labelled with specialist name. */}
+            {(generatedCoverUrl || (generatedAudioClips && generatedAudioClips.length > 0)) && (
+                <div style={{
+                    marginTop: "20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                }}>
+                    {generatedCoverUrl && (
+                        <div style={{
+                            borderRadius: "12px",
+                            overflow: "hidden",
+                            border: "1px solid var(--bc-border)",
+                            background: "#f9f8f6",
+                        }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={generatedCoverUrl}
+                                alt={`Graphic summary for: ${session.submittedQuestion}`}
+                                style={{ width: "100%", display: "block", borderRadius: "12px" }}
+                            />
+                        </div>
+                    )}
+                    {generatedAudioClips && generatedAudioClips.length > 0 && (
+                        <div style={{
+                            padding: "16px 20px",
+                            background: "var(--bc-blue-soft)",
+                            border: "1px solid var(--bc-blue-dim)",
+                            borderRadius: "12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                        }}>
+                            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--bc-fg-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                                Audio transcript — {generatedAudioClips.length} clips
+                            </div>
+                            {generatedAudioClips.map((clip, idx) => (
+                                <div key={clip.url} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--bc-fg-muted)" }}>
+                                        {clip.specialistId}
+                                    </span>
+                                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                                    <audio
+                                        controls
+                                        src={clip.url}
+                                        aria-label={`Audio clip ${idx + 1} — ${clip.specialistId}`}
+                                        style={{ width: "100%", height: "36px" }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
