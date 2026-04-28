@@ -151,19 +151,23 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
         onCompanyClick={handleCompanyClick}
       />
 
-      {/* Tabbed Content */}
+      {/* Tabbed Content.
+          2026-04-28: replaced flex-wrap with horizontal-scroll on mobile so
+          the 4-5 tabs don't wrap to a 3+1 layout that strands "Preferences"
+          on its own row. On sm+ the row is wide enough to fit all tabs
+          inline so we drop the scroll affordance. */}
       <Tabs defaultValue={initialTab}>
-        <TabsList className="w-full flex-wrap">
-          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto whitespace-nowrap sm:flex-wrap sm:justify-center">
+          <TabsTrigger value="overview" className="sm:flex-1">Overview</TabsTrigger>
           {showMarketplaceTab && (
-            <TabsTrigger value="marketplace" className="flex-1">Marketplace</TabsTrigger>
+            <TabsTrigger value="marketplace" className="sm:flex-1">Marketplace</TabsTrigger>
           )}
-          <TabsTrigger value="knowledge" className="flex-1">Knowledge</TabsTrigger>
-          <TabsTrigger value="links" className="flex-1">
+          <TabsTrigger value="knowledge" className="sm:flex-1">Knowledge</TabsTrigger>
+          <TabsTrigger value="links" className="sm:flex-1">
             <span className="sm:hidden">Links</span>
             <span className="hidden sm:inline">Links &amp; Social</span>
           </TabsTrigger>
-          <TabsTrigger value="preferences" className="flex-1">Preferences</TabsTrigger>
+          <TabsTrigger value="preferences" className="sm:flex-1">Preferences</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
