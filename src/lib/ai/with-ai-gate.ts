@@ -123,8 +123,10 @@ export async function withAIGate<T>(
     } catch (err) {
       // SECURITY: Track usage even when the action throws — the AI call may
       // have already been made. Without this, thrown errors bypass the monthly counter.
+      // AWAIT so the DB writes complete before the Vercel function tears down.
+      // trackAIUsage never throws — the await only adds ~20ms per call.
       if (!manuallyTracked) {
-        trackAIUsage({
+        await trackAIUsage({
           foundryId: authCtx.foundryId,
           userId: authCtx.user.id,
           feature,
@@ -138,6 +140,8 @@ export async function withAIGate<T>(
     // AUTO-TRACK: If the action succeeded and didn't manually call trackUsage,
     // record a baseline usage entry so limits are enforced even when actions
     // forget to track. Skip if manually tracked to prevent double-counting.
+    // AWAIT so the DB writes complete before the Vercel function tears down —
+    // fire-and-forget here was causing TypeError: fetch failed in production.
     if (!manuallyTracked) {
       const resultObj = result as Record<string, unknown> | null | undefined
       const hasError =
@@ -146,7 +150,7 @@ export async function withAIGate<T>(
         'error' in resultObj &&
         !!resultObj['error']
       if (!hasError) {
-        trackAIUsage({
+        await trackAIUsage({
           foundryId: authCtx.foundryId,
           userId: authCtx.user.id,
           feature,
