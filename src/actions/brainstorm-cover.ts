@@ -35,22 +35,22 @@ const OPENAI_IMAGE_URL = 'https://api.openai.com/v1/images/generations'
 const GOOGLE_AI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 const COVER_BUCKET = 'brainstorm-assets'
 
-// Primary: gpt-image-2 — best text-in-image rendering, low hallucination on
-// short text strings. medium @ 1024×1024 = ~$0.04–0.08.
-// DECISION 2026-04-28: swapped from gpt-image-1 which hallucinated dense
-// panel text ("I yewr entering", "#Btore @tleagn"). gpt-image-2 is
-// OpenAI's current production image model with improved legibility.
+// Primary: gpt-image-2 — best text-in-image rendering, low hallucination.
+// FIX E 2026-04-28: quality bumped from 'medium' to 'high' (~$0.12 per image)
+// for sharper editorial illustration output. Size stays 1024×1024 — gpt-image-2
+// does not accept 1792×1024 in the current API. The quality improvement is
+// worth the 2× cost given one image per saved session.
 const IMAGE_MODEL = 'gpt-image-2'
 const IMAGE_SIZE = '1024x1024'
-const IMAGE_QUALITY = 'medium'
+const IMAGE_QUALITY = 'high'
 
 // Fallback: Nano Banana stable (gemini-2.5-flash-preview-05-20 native image gen).
 // Fires only if gpt-image-2 throws (rate limit, content policy, 5xx).
 // Cost: ~$0.001/image. Same API pattern as image-generator.ts.
 const NANO_BANANA_FALLBACK_MODEL = 'gemini-2.5-flash-preview-05-20'
 
-// Per-image cost in USD for telemetry (medium @ 1024x1024, gpt-image-2)
-const COST_USD = 0.06
+// Per-image cost in USD for telemetry (high @ 1024x1024, gpt-image-2, FIX E)
+const COST_USD = 0.12
 
 type CoverStatus = 'pending' | 'generating' | 'ready' | 'failed'
 
@@ -61,21 +61,6 @@ interface SpecialistEntry {
 }
 
 /**
- * Build the image prompt from the meeting topic + specialist entries.
- *
- * Design philosophy — less text = less hallucination room:
- *  - Cap each specialist take to ≤8 words (was 80 chars / ~15 words).
- *    Short headline takes allow gpt-image-2 and Nano Banana to typeset
- *    cleanly without glyph-hallucination pressure.
- *  - Brand palette explicit: International Orange (#ff4500) + cream
- *    (#fff7ed) + stone text. No black backgrounds ever.
- *  - Font character named: DM Serif Display for headers, Inter for body.
- *    Models mimic the visual weight/proportion even if they can't typeset.
- *  - Light theme, generous whitespace — ForgeOS design philosophy.
- *
- * Sent to both gpt-image-2 (primary) and Nano Banana fallback unchanged.
- */
-/**
  * Strip prompt-injection vectors before interpolating user text into the
  * image prompt. Removes quote characters that could close our delimiters
  * and any line-break sequences that could be used to inject a new
@@ -85,73 +70,75 @@ interface SpecialistEntry {
 function sanitiseForPrompt(input: string, maxLen: number): string {
     return input
         .replace(/[\r\n]+/g, ' ')
-        .replace(/["“”'`]/g, '')
+        .replace(/[“””'`]/g, '')
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, maxLen)
 }
 
 /**
- * Build an editorial hero illustration prompt from the session's themes.
+ * Build an editorial hero illustration prompt from the session content.
  *
- * Design philosophy — illustrate THEMES, not text:
- *   - Single hero illustration in flat editorial style (Stripe / Linear blog
- *     header aesthetic), NOT a layout of text panels or mini speaker cards.
- *   - The model picks the visual metaphor from the theme cues we extract from
- *     specialist content (tension, tradeoffs, paths, levers, gauges, scales).
- *   - Strict "no text overlay" rule: zero embedded text (or at most a 3-5 word
- *     headline if the model absolutely must anchor — but we actively discourage
- *     it). The previous prompt embedded the full question + per-specialist
- *     panels, producing a layout widget instead of an illustration.
- *   - 16:9 landscape, off-white background, International Orange accent.
- *   - No speaker boxes, no duplicated question banner, no widget cards.
+ * FIX E 2026-04-28 — Design philosophy shift:
+ *   BEFORE: Gave the model a menu of 6 fixed metaphors (diverging paths,
+ *     balance scale, gauge cluster…) — model always picked one of the stock
+ *     options, producing generic stock-illustration results.
+ *   AFTER: Pass the actual question + verbatim specialist excerpts (first
+ *     200 chars each, up to 3 specialists) and ask the model to illustrate
+ *     the REAL-WORLD BUSINESS SITUATION described. Explicitly forbid the
+ *     stock metaphor list and generic abstractions. Brief in the style of
+ *     an instruction to a human editorial illustrator.
  *
- * @param topic — the founder's question (used only for theme extraction, not
- *   rendered verbatim in the image)
- * @param entries — specialist entries; we extract top 3–4 theme cues
+ * Style reference: New York Times opinion-page art / The Economist long-form
+ * headers — flat editorial vector, coherent single scene depicting the actual
+ * subject matter (not abstract geometry).
+ *
+ * @param topic — the founder's question
+ * @param entries — specialist entries; we use first 200 chars of up to 3
  */
 function buildPrompt(topic: string, entries: SpecialistEntry[]): string {
-    const safeTopic = sanitiseForPrompt(topic, 200)
+    const safeTopic = sanitiseForPrompt(topic, 250)
 
-    // Extract theme cues from up to 4 specialist responses (first sentence each).
-    // These cues guide the visual metaphor without being typeset in the image.
+    // Extract up to 3 verbatim specialist excerpts (first 200 chars each).
+    // Passing real content lets the model build a concrete scene rather than
+    // falling back to an abstract metaphor.
     const reactors = entries.filter(
         (e) =>
             !e.councilPosition?.toLowerCase().includes('open') &&
             !e.councilPosition?.toLowerCase().includes('close'),
     )
-    const themeCues = reactors
-        .slice(0, 4)
+    const excerpts = reactors
+        .slice(0, 3)
         .map((e) => {
-            const firstSentence = (e.content ?? '').split(/[.!?]/)[0] ?? e.content ?? ''
-            return sanitiseForPrompt(firstSentence, 80)
+            const text = sanitiseForPrompt(e.content ?? '', 200)
+            const name = e.specialistName ? sanitiseForPrompt(e.specialistName, 30) : null
+            return name ? `${name}: ${text}` : text
         })
         .filter(Boolean)
-        .join('; ')
 
-    // DESIGN RATIONALE:
-    // We pass theme cues to help the model pick a concrete visual metaphor
-    // (diverging paths for strategic tradeoffs, a balance scale for risk vs.
-    // reward, a gauge cluster for operational metrics, etc.) rather than
-    // falling back to a generic abstract pattern. No text is typeset in the
-    // image — the cues are instructions to the model, not copy to render.
+    // Build a brief that reads like an instruction to a human editorial illustrator.
+    // The key difference from the previous prompt: NO metaphor menu, NO “choose from”
+    // list. The model must derive the scene from the actual content.
+    const excerptBlock = excerpts.length > 0
+        ? `What the advisors are weighing: ${excerpts.join(' | ')}`
+        : ''
+
     return [
-        'Flat editorial hero illustration, 16:9 landscape format.',
-        'Style: clean vector art in the spirit of Stripe or Linear blog post headers.',
-        'Light off-white background (#fff7ef), International Orange (#ff4500) as the primary accent,',
-        'one or two muted secondary tones (slate blue or warm stone). No dark backgrounds.',
-        'Depict the THEMES of this business discussion as a single coherent metaphor —',
-        'choose from: diverging paths, a balance scale, a lever and fulcrum, a gauge cluster,',
-        'interconnected gears, a horizon with a single bright focal point — whichever best',
-        'captures the tension in the discussion described below.',
-        'Discussion topic (for theme guidance only — do NOT typeset this): ' + safeTopic + '.',
-        themeCues
-            ? ('Key themes from the discussion (for visual metaphor selection only — do NOT typeset): ' + themeCues + '.')
-            : '',
-        'Absolutely NO text in the image — no labels, no question text, no speaker names,',
-        'no speech bubbles, no callout cards, no panels, no infographic widgets.',
-        'No human faces, no robots, no brain icons, no neural-network imagery.',
-        'No watermarks, no logos, no signatures.',
+        'Create a single editorial illustration for this hardware-startup business discussion.',
+        `The founder is asking: ${safeTopic}.`,
+        excerptBlock,
+        '',
+        'Style: flat editorial vector illustration in the spirit of New York Times opinion-page art',
+        'or The Economist long-form header. Depict the ACTUAL REAL-WORLD SUBJECT of this discussion',
+        '— show the concrete subjects involved (e.g. for a US expansion question: a UK port and',
+        'a US port with a container ship; for a fundraising question: an investor office, a pitch',
+        'deck, a founder at a table; for a supply-chain question: factories, containers, a map).',
+        'Do NOT illustrate abstract metaphors — NO balance scales, NO diverging arrows, NO gauge',
+        'clusters, NO gears, NO neural networks, NO light bulbs, NO magnifying glasses.',
+        'Single coherent scene. Flat vector. Bright optimistic palette: International Orange',
+        '#ff4500 as the primary accent colour, off-white background (#fff7ef), slate blue and',
+        'warm stone as secondary tones. No dark backgrounds. No text in the image. No human',
+        'faces (use silhouettes if people are needed). No robots, no brain icons. No watermarks.',
         'Generous whitespace. Optimistic, forward-looking mood.',
     ]
         .filter(Boolean)

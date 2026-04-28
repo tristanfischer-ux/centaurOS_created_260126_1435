@@ -34,7 +34,7 @@ import {
     Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Markdown } from "@/components/ui/markdown"
@@ -95,9 +95,14 @@ function formatArrivalMs(ms: number | null): string | null {
     return `${(ms / 1000).toFixed(1)}s`
 }
 
-// ─── Entry Card ───────────────────────────────────────────────────────────────
+// ─── Entry Block ──────────────────────────────────────────────────────────────
+// FIX C / FIX D: Replaced the Card-based layout with a clean paragraph stream.
+// The Card component's visible borders ("the stupid black lines") dissolve.
+// Every entry — all rounds, all specialists — is shown in reading order with
+// the specialist name + role as a styled label above the body text.
+// This mirrors the editorial reading experience Tristan asked for.
 
-interface EntryCardProps {
+interface EntryBlockProps {
     entry: MeetingEntryRow
     onBranch: (entryId: string) => void
     isBranching: boolean
@@ -105,7 +110,7 @@ interface EntryCardProps {
     isBranchTarget: boolean
 }
 
-function EntryCard({ entry, onBranch, isBranching, isBranchTarget }: EntryCardProps) {
+function EntryBlock({ entry, onBranch, isBranching, isBranchTarget }: EntryBlockProps) {
     const specialist = entry.specialistId ? getSpecialistById(entry.specialistId) : null
     const positionLabel = entry.councilPosition
         ? (COUNCIL_POSITION_LABELS[entry.councilPosition as keyof typeof COUNCIL_POSITION_LABELS] ?? entry.councilPosition)
@@ -115,87 +120,84 @@ function EntryCard({ entry, onBranch, isBranching, isBranchTarget }: EntryCardPr
 
     if (entry.role === "founder") {
         return (
-            <div className="flex justify-end mb-4">
-                <div className="max-w-[70%] rounded-2xl rounded-tr-sm bg-international-orange/10 border border-international-orange/20 px-4 py-3">
-                    <p className="text-xs font-semibold text-international-orange mb-1">You</p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{entry.content}</p>
-                </div>
+            <div className={cn(
+                "mb-6 pl-4 border-l-2 border-international-orange/30",
+                isBranchTarget && "border-international-orange",
+            )}>
+                <p className="text-xs font-semibold text-international-orange mb-1.5">You</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{entry.content}</p>
             </div>
         )
     }
 
     return (
-        <div className="mb-4 group">
-            {/* Position + arrival pills */}
-            <div className="flex items-center gap-2 mb-1.5 pl-1">
-                {positionLabel && positionClass && (
-                    <span className={cn(
-                        "inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border",
-                        positionClass,
-                    )}>
-                        {positionLabel}
-                    </span>
-                )}
-                {arrivalLabel && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                        <Clock className="h-2.5 w-2.5" />
-                        {arrivalLabel}
-                    </span>
-                )}
-                <span className="text-[10px] text-muted-foreground ml-auto">
-                    Round {entry.roundNumber}
-                </span>
-            </div>
-
-            <Card className={cn(
-                "border",
-                isBranchTarget && "ring-2 ring-international-orange/30",
-            )}>
-                <CardHeader className="pb-2 pt-4 px-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            {specialist?.avatarImage && (
-                                <img
-                                    src={specialist.avatarImage}
-                                    alt={entry.specialistName ?? ""}
-                                    className="h-7 w-7 rounded-full object-cover flex-shrink-0"
-                                />
-                            )}
-                            <div>
-                                <p className="text-sm font-semibold text-foreground leading-none">
-                                    {entry.specialistName ?? "Specialist"}
-                                </p>
-                                {specialist?.title && (
-                                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                                        {specialist.title}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                        {/* Branch CTA — only visible on hover */}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                                "h-7 text-xs gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity",
-                                isBranchTarget && "opacity-100",
-                            )}
-                            onClick={() => onBranch(entry.id)}
-                            disabled={isBranching}
-                        >
-                            {isBranching && isBranchTarget ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                                <GitBranch className="h-3 w-3" />
-                            )}
-                            Branch from here
-                        </Button>
+        <div className={cn(
+            "mb-8 group",
+            isBranchTarget && "ring-1 ring-international-orange/30 rounded-lg px-3 py-2 -mx-3",
+        )}>
+            {/* Specialist byline */}
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                    {specialist?.avatarImage && (
+                        <img
+                            src={specialist.avatarImage}
+                            alt={entry.specialistName ?? ""}
+                            className="h-6 w-6 rounded-full object-cover flex-shrink-0"
+                        />
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-foreground">
+                            {entry.specialistName ?? "Specialist"}
+                        </span>
+                        {specialist?.title && (
+                            <span className="text-[10px] text-muted-foreground">
+                                {specialist.title}
+                            </span>
+                        )}
+                        {positionLabel && positionClass && (
+                            <span className={cn(
+                                "inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                                positionClass,
+                            )}>
+                                {positionLabel}
+                            </span>
+                        )}
+                        {arrivalLabel && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Clock className="h-2.5 w-2.5" />
+                                {arrivalLabel}
+                            </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">
+                            Round {entry.roundNumber}
+                        </span>
                     </div>
-                </CardHeader>
-                <CardContent className="px-4 pb-4">
-                    <Markdown content={entry.content} className="text-sm" />
-                </CardContent>
-            </Card>
+                </div>
+                {/* Branch CTA — surfaces on hover */}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                        "h-7 text-xs gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0",
+                        isBranchTarget && "opacity-100",
+                    )}
+                    onClick={() => onBranch(entry.id)}
+                    disabled={isBranching}
+                >
+                    {isBranching && isBranchTarget ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                        <GitBranch className="h-3 w-3" />
+                    )}
+                    Branch from here
+                </Button>
+            </div>
+            {/* Body — plain prose, no card, no border */}
+            <div className="text-sm leading-relaxed text-foreground pl-8">
+                <Markdown content={entry.content} className="text-sm" />
+            </div>
+            {/* Light divider between entries — replaces the card border */}
+            <div className="mt-6 border-t border-border/40" />
         </div>
     )
 }
@@ -771,7 +773,7 @@ export function MeetingThreadView({
                     ) : (
                         <div>
                             {entries.map((entry) => (
-                                <EntryCard
+                                <EntryBlock
                                     key={entry.id}
                                     entry={entry}
                                     onBranch={handleBranch}
