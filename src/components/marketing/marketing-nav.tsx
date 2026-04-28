@@ -26,7 +26,15 @@ const NAV_LINKS = [
     { href: '/contact', label: 'Contact' },
 ] as const
 
-export function MarketingNav() {
+interface MarketingNavProps {
+    /** When true, the viewer is logged in — swap "Sign In" / "Get Started"
+     *  CTAs for a single "Open app" link so authed users aren't sent back
+     *  to /signup or /login. W30 fix: Sarah + Marcus saw "Sign In" after
+     *  landing on /pricing while already logged in. */
+    isAuthed?: boolean
+}
+
+export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
     const pathname = usePathname()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -80,19 +88,30 @@ export function MarketingNav() {
                     ))}
                 </nav>
 
-                {/* Desktop CTA */}
+                {/* Desktop CTA — authed users see "Open app", anonymous see Sign In + Get Started */}
                 <div className="hidden items-center gap-3 md:flex">
-                    <Link href="/login">
-                        <Button variant="ghost" size="sm">
-                            Sign In
-                        </Button>
-                    </Link>
-                    <Link href="/signup">
-                        <Button size="sm" className="gap-1.5">
-                            Get Started
-                            <ArrowRight className="h-3.5 w-3.5" />
-                        </Button>
-                    </Link>
+                    {isAuthed ? (
+                        <Link href="/investors">
+                            <Button size="sm" className="gap-1.5">
+                                Open app
+                                <ArrowRight className="h-3.5 w-3.5" />
+                            </Button>
+                        </Link>
+                    ) : (
+                        <>
+                            <Link href="/login">
+                                <Button variant="ghost" size="sm">
+                                    Sign In
+                                </Button>
+                            </Link>
+                            <Link href="/signup">
+                                <Button size="sm" className="gap-1.5">
+                                    Get Started
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                </Button>
+                            </Link>
+                        </>
+                    )}
                 </div>
 
                 {/* Mobile menu button */}
@@ -122,11 +141,11 @@ export function MarketingNav() {
                     <div className="border-t bg-background shadow-lg md:hidden">
                         <div className="flex flex-col gap-1 px-4 py-4 sm:px-6">
                             <Link
-                                href="/signup"
+                                href={isAuthed ? '/investors' : '/signup'}
                                 className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-xs font-mono font-bold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-international-orange-hover"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                Get Started
+                                {isAuthed ? 'Open app' : 'Get Started'}
                             </Link>
                             {NAV_LINKS.map((link) => (
                                 <Link
@@ -143,13 +162,15 @@ export function MarketingNav() {
                                     {link.label}
                                 </Link>
                             ))}
-                            <Link
-                                href="/login"
-                                className="flex min-h-[48px] items-center py-3.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                                onClick={() => setMobileMenuOpen(false)}
-                            >
-                                Sign In
-                            </Link>
+                            {!isAuthed && (
+                                <Link
+                                    href="/login"
+                                    className="flex min-h-[48px] items-center py-3.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    Sign In
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </>

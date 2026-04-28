@@ -149,7 +149,7 @@ export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <MarketingNav />
+      <MarketingNav isAuthed={isAuthed} />
 
       <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
