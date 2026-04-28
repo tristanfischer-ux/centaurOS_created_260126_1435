@@ -357,7 +357,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       hardwareItemCount: number; processesApplied: string[];
       supplierTechniques: number; totalDataPoints: number;
     } | undefined
-    let synthesisModel = "claude-opus-4-7"
+    let synthesisModel = "claude-sonnet-4-6"
     try {
       const domain = await detectDomainFromProductDescription(description)
 
