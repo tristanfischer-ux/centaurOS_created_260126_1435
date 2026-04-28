@@ -409,6 +409,13 @@ export async function createCadLabProject(
         created_by: user.id,
         name,
         subject: subject.trim(),
+        // GOTCHA: founder_raw_brief is NOT NULL with no column default — must
+        // be supplied here. This column was added after createCadLabProject was
+        // originally written, so it wasn't included at the time. Both `subject`
+        // and `founder_raw_brief` store the user's raw input; `subject` is the
+        // legacy name used elsewhere (BOM brief, modules header, etc.),
+        // `founder_raw_brief` is used by Gate 1 for numeric verification.
+        founder_raw_brief: subject.trim(),
         model_id: modelId,
         status: "draft",
         stage: "design",
